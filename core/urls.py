@@ -10,4 +10,7 @@ urlpatterns = [
     path("confidentialite/", views.privacy_policy, name="privacy_policy"),
     path("conditions-utilisation/", views.terms_of_service, name="terms_of_service"),
     path("plan-du-site/", views.sitemap, name="sitemap"),
+    path("legal/<str:page_type>/pdf/", views.legal_page_pdf, name="legal_pdf"),
+    # ✅ AJOUTE ÇA
+    path("legal/<str:page_type>/pdf/", views.legal_page_pdf, name="legal_pdf"),
 ]

@@ -1,46 +1,168 @@
 {% extends "base.html" %}
-{% block title %}Mentions légales | ESFE{% endblock %}
+{% block title %}{{ page.title }} | {{ institution_name }}{% endblock %}
 
 {% block content %}
-<section class="max-w-5xl mx-auto px-6 py-20">
-  <h1 class="text-3xl font-bold mb-10">Mentions légales</h1>
 
-  <div class="space-y-8 text-sm leading-relaxed">
+<!-- ================= HERO ================= -->
+<section class="bg-gray-100 border-b">
+  <div class="max-w-7xl mx-auto px-6 py-16">
 
-    <div>
-      <h2 class="text-xl font-semibold mb-2">Éditeur du site</h2>
-      <p>
-        ESFE – Établissement Supérieur de Formation et d’Excellence<br>
-        Bamako, Mali<br>
-        Email : contact@esfe.ml<br>
-        Téléphone : +223 XX XX XX XX
-      </p>
-    </div>
+    <h1 class="text-4xl font-bold text-gray-900">
+      {{ page.title }}
+    </h1>
 
-    <div>
-      <h2 class="text-xl font-semibold mb-2">Responsable de publication</h2>
-      <p>
-        La direction générale de l’ESFE.
-      </p>
-    </div>
+    {% if page.introduction %}
+      <div class="mt-6 text-gray-600 max-w-3xl leading-relaxed prose max-w-none">
+        {{ page.introduction|safe }}
+      </div>
+    {% endif %}
 
-    <div>
-      <h2 class="text-xl font-semibold mb-2">Hébergement</h2>
-      <p>
-        Site hébergé sur un serveur sécurisé.<br>
-        Les données sont protégées conformément aux standards de sécurité en vigueur.
-      </p>
-    </div>
-
-    <div>
-      <h2 class="text-xl font-semibold mb-2">Propriété intellectuelle</h2>
-      <p>
-        L’ensemble du contenu du site (textes, logos, visuels, documents, structure)
-        est la propriété exclusive de l’ESFE.
-        Toute reproduction sans autorisation est interdite.
-      </p>
+    <div class="mt-6 text-sm text-gray-500">
+      Version {{ page.version }} —
+      Mise à jour le {{ page.updated_at|date:"d F Y" }}
     </div>
 
   </div>
 </section>
+
+
+<!-- ================= CONTENU ================= -->
+<section class="max-w-7xl mx-auto px-6 py-20">
+
+  <div class="grid lg:grid-cols-4 gap-12">
+
+    <!-- ================= LEFT SIDEBAR ================= -->
+    <aside class="hidden lg:block lg:col-span-1">
+      <div class="sticky top-28 space-y-6">
+
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-4 text-sm uppercase tracking-wide">
+            Sommaire
+          </h3>
+
+          <ul class="space-y-2 text-sm">
+            {% for section in sections %}
+              <li>
+                <a href="#section-{{ forloop.counter }}"
+                   class="text-gray-600 hover:text-black transition">
+                  {{ section.title }}
+                </a>
+              </li>
+            {% empty %}
+              <li class="text-gray-400">
+                Aucun contenu disponible
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <!-- PDF -->
+        <div class="pt-6 border-t">
+          <a href="{% url 'core:legal_pdf' page.page_type %}"
+             class="inline-flex items-center text-sm font-medium text-blue-600 hover:underline">
+            Télécharger en PDF
+          </a>
+        </div>
+
+      </div>
+    </aside>
+
+
+    <!-- ================= MAIN CONTENT ================= -->
+    <main class="lg:col-span-2 space-y-16">
+
+      {% for section in sections %}
+        <article id="section-{{ forloop.counter }}">
+          <h2 class="text-2xl font-semibold mb-6 text-gray-900">
+            {{ section.title }}
+          </h2>
+
+          <div class="prose prose-gray max-w-none text-sm leading-relaxed">
+            {{ section.content|safe }}
+          </div>
+        </article>
+      {% empty %}
+        <p class="text-gray-500">
+          Aucun contenu disponible pour cette page.
+        </p>
+      {% endfor %}
+
+    </main>
+
+
+    <!-- ================= RIGHT SIDEBAR ================= -->
+    <aside class="lg:col-span-1">
+      <div class="sticky top-28 space-y-8">
+
+        {% if institution %}
+
+        <!-- Institution -->
+        <div class="bg-gray-50 p-6 rounded-xl shadow-sm">
+          <h3 class="font-semibold mb-4 text-sm uppercase tracking-wide">
+            Établissement
+          </h3>
+
+          <div class="text-sm text-gray-600 space-y-2">
+            <p><strong>{{ institution.name }}</strong></p>
+            <p>{{ institution.address }}</p>
+            <p>{{ institution.city }}, {{ institution.country }}</p>
+          </div>
+        </div>
+
+        <!-- Contact -->
+        <div class="bg-gray-50 p-6 rounded-xl shadow-sm">
+          <h3 class="font-semibold mb-4 text-sm uppercase tracking-wide">
+            Contact institutionnel
+          </h3>
+
+          <div class="text-sm text-gray-600 space-y-2">
+            <p>Téléphone : {{ institution.phone }}</p>
+            <p>Email : {{ institution.email }}</p>
+          </div>
+        </div>
+
+        <!-- Référence administrative -->
+        {% if institution.approval_number %}
+        <div class="bg-gray-50 p-6 rounded-xl shadow-sm">
+          <h3 class="font-semibold mb-4 text-sm uppercase tracking-wide">
+            Référence administrative
+          </h3>
+
+          <p class="text-sm text-gray-600">
+            Numéro d’agrément : {{ institution.approval_number }}
+          </p>
+        </div>
+        {% endif %}
+
+        {% endif %}
+
+        <!-- Statut -->
+        <div class="bg-gray-50 p-6 rounded-xl shadow-sm">
+          <h3 class="font-semibold mb-4 text-sm uppercase tracking-wide">
+            Statut du document
+          </h3>
+
+          <div class="text-sm text-gray-600 space-y-2">
+            <p>Version : {{ page.version }}</p>
+
+            <p>
+              État :
+              {% if page.status == "published" %}
+                <span class="text-green-600 font-medium">Publié</span>
+              {% elif page.status == "review" %}
+                <span class="text-yellow-600 font-medium">En révision</span>
+              {% else %}
+                <span class="text-gray-500 font-medium">Brouillon</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+
+</section>
+
 {% endblock %}

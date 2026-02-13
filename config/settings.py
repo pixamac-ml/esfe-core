@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     # UI / Core
     "ui.apps.UiConfig",
     "core",
-
+    "ckeditor",
     # Métier
     "admissions.apps.AdmissionsConfig",
     "inscriptions.apps.InscriptionsConfig",

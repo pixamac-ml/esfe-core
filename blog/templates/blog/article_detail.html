@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} – ESFE{% endblock %}
+
+{% block meta %}
+<meta property="og:title" content="{{ article.title }}">
+<meta property="og:description" content="{{ article.excerpt }}">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+<meta property="og:type" content="article">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ article.title }}">
+<meta name="twitter:description" content="{{ article.excerpt }}">
+{% endblock %}
+
+{% block content %}
+<section class="max-w-3xl mx-auto px-4 py-16">
+
+  <!-- ARTICLE -->
+  <article>
+    <h1 class="text-3xl font-poppins font-bold text-gray-900 leading-tight">
+      {{ article.title }}
+    </h1>
+
+    <div class="mt-6 text-gray-800 leading-relaxed space-y-4">
+      {{ article.content|linebreaks }}
+    </div>
+  </article>
+
+  <!-- COMMENTAIRES -->
+  <div class="mt-16">
+    <h2 class="text-xl font-poppins font-semibold text-gray-900 mb-6">
+      Commentaires
+    </h2>
+
+    <div class="space-y-6">
+      {% for comment in comments %}
+        <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <p class="font-medium text-gray-900">
+            {{ comment.author_name }}
+          </p>
+          <p class="mt-2 text-gray-700">
+            {{ comment.content }}
+          </p>
+        </div>
+      {% empty %}
+        <p class="text-gray-500">
+          Aucun commentaire pour le moment.
+        </p>
+      {% endfor %}
+    </div>
+
+    {% if article.allow_comments %}
+      <div class="mt-10">
+        <h3 class="text-lg font-poppins font-semibold text-gray-900 mb-4">
+          Laisser un commentaire
+        </h3>
+
+        <form method="post" class="space-y-4">
+          {% csrf_token %}
+          <input
+            type="text"
+            name="author_name"
+            placeholder="Votre nom"
+            required
+            class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+          >
+
+          <textarea
+            name="content"
+            rows="4"
+            placeholder="Votre commentaire"
+            required
+            class="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+          ></textarea>
+
+          <button
+            type="submit"
+            class="inline-flex items-center px-6 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
+          >
+            Envoyer
+          </button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}

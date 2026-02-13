@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load component_tags %}
+
+{% block title %}Formations – ESFE{% endblock %}
+
+{% block content %}
+
+{% component "section_header"
+  title="Nos formations"
+  subtitle="Des parcours adaptés aux métiers de la santé"
+%}{% endcomponent %}
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
+
+  {% for programme in programmes %}
+    {% component "formation_card"
+      title=programme.title
+      description=programme.short_description
+      duration=programme.duration_years|stringformat:"d"|add:" ans"
+      href=programme.get_absolute_url
+    %}{% endcomponent %}
+  {% empty %}
+    <p class="text-gray-500 col-span-full text-center">
+      Aucune formation disponible pour le moment.
+    </p>
+  {% endfor %}
+
+</div>
+
+{% endblock %}

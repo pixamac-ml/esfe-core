@@ -1,0 +1,98 @@
+{% load static component_tags %}
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ESFE{% endblock %}</title>
+
+  <!-- ================= GOOGLE FONTS ================= -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- ================= TAILWIND ================= -->
+  <link rel="stylesheet" href="{% static 'public/css/main.css' %}">
+
+  <!-- ================= LIBRAIRIES JS ================= -->
+
+  <!-- Lucide -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Alpine (plugin avant core) -->
+  <script defer src="https://unpkg.com/@alpinejs/intersect@3.13.5/dist/cdn.min.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
+</head>
+
+<body class="min-h-screen flex flex-col bg-gray-50 text-gray-800 font-roboto antialiased overflow-x-hidden">
+
+  {# ===================================================== #}
+  {# NAVBAR FIXE                                           #}
+  {# ===================================================== #}
+
+  <div
+    x-data="{ visible: false }"
+    x-init="
+      window.addEventListener('scroll', () => {
+        visible = window.scrollY > window.innerHeight * 0.6
+      })
+    "
+    class="fixed top-0 left-0 w-full z-50"
+  >
+    <div
+      x-show="visible"
+      x-transition.opacity.duration.400ms
+      class="w-full"
+    >
+      {% component "navbar" %}{% endcomponent %}
+    </div>
+  </div>
+
+  {# ===================================================== #}
+  {# CONTENU PRINCIPAL                                     #}
+  {# ===================================================== #}
+
+  <main class="flex-grow">
+    {% block content %}{% endblock %}
+  </main>
+
+  {# ===================================================== #}
+  {# FOOTER                                                #}
+  {# ===================================================== #}
+
+    {% component "footer"
+       site_name="ESFE"
+       site_description="Établissement supérieur de formation professionnelle orienté vers l’excellence académique, l’innovation pédagogique et l’employabilité."
+       footer_navigation=[
+           {'label': 'À propos', 'url': '/a-propos/'},
+           {'label': 'Formations', 'url': '/formations/'},
+           {'label': 'Blog', 'url': '/actualites/'},
+           {'label': 'Contact', 'url': '/contact/'}
+       ]
+       footer_contact={
+           'address': 'Bamako, Mali',
+           'phone': '+223 XX XX XX XX',
+           'email': 'contact@esfe.ml'
+       }
+       footer_legal_links=[
+           {'label': 'Mentions légales', 'url': '/mentions-legales/'},
+           {'label': 'Politique de confidentialité', 'url': '/confidentialite/'}
+       ]
+    %}
+    {% endcomponent %}
+
+  {# ===================================================== #}
+  {# INIT ICONS                                            #}
+  {# ===================================================== #}
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    });
+  </script>
+
+</body>
+</html>

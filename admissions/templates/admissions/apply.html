@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+Inscription – {{ programme.title }} | ESFE
+{% endblock %}
+
+{% block content %}
+
+<section class="max-w-3xl mx-auto px-6 py-16">
+
+  <!-- ============================= -->
+  <!-- EN-TÊTE -->
+  <!-- ============================= -->
+  <header class="mb-10 text-center">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">
+      Inscription à la formation
+    </h1>
+
+    <p class="text-gray-600 text-lg">
+      {{ programme.title }}
+    </p>
+  </header>
+
+  <!-- ============================= -->
+  <!-- INFORMATION CONTEXTUELLE -->
+  <!-- ============================= -->
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-10">
+    <p class="text-sm text-blue-800">
+      Veuillez remplir soigneusement le formulaire ci-dessous.
+      Votre dossier sera analysé par l’administration avant validation définitive.
+      Les documents manquants pourront être complétés ultérieurement si nécessaire.
+    </p>
+  </div>
+
+  <!-- ============================= -->
+  <!-- FORMULAIRE -->
+  <!-- ============================= -->
+  <form
+    method="post"
+    enctype="multipart/form-data"
+    class="space-y-8"
+  >
+
+    {% csrf_token %}
+
+    <!-- ============================= -->
+    <!-- INFORMATIONS PERSONNELLES -->
+    <!-- ============================= -->
+    <fieldset class="border border-gray-200 rounded-lg p-6">
+      <legend class="text-sm font-semibold text-gray-700 px-2">
+        Informations personnelles
+      </legend>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          {{ form.first_name.label_tag }}
+          {{ form.first_name }}
+        </div>
+
+        <div>
+          {{ form.last_name.label_tag }}
+          {{ form.last_name }}
+        </div>
+
+        <div>
+          {{ form.gender.label_tag }}
+          {{ form.gender }}
+        </div>
+
+        <div>
+          {{ form.birth_date.label_tag }}
+          {{ form.birth_date }}
+        </div>
+
+        <div class="md:col-span-2">
+          {{ form.birth_place.label_tag }}
+          {{ form.birth_place }}
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ============================= -->
+    <!-- COORDONNÉES -->
+    <!-- ============================= -->
+    <fieldset class="border border-gray-200 rounded-lg p-6">
+      <legend class="text-sm font-semibold text-gray-700 px-2">
+        Coordonnées
+      </legend>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          {{ form.phone.label_tag }}
+          {{ form.phone }}
+        </div>
+
+        <div>
+          {{ form.email.label_tag }}
+          {{ form.email }}
+        </div>
+
+        <div>
+          {{ form.city.label_tag }}
+          {{ form.city }}
+        </div>
+
+        <div>
+          {{ form.address.label_tag }}
+          {{ form.address }}
+        </div>
+
+        <div class="md:col-span-2">
+          {{ form.country.label_tag }}
+          {{ form.country }}
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ============================= -->
+    <!-- DOCUMENTS À FOURNIR -->
+    <!-- ============================= -->
+    {% if required_documents %}
+      <fieldset class="border border-gray-200 rounded-lg p-6">
+        <legend class="text-sm font-semibold text-gray-700 px-2">
+          Dossier de candidature
+        </legend>
+
+        <div class="space-y-5 mt-4">
+          {% for prd in required_documents %}
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                {{ prd.document.name }}
+                {% if prd.document.is_mandatory %}
+                  <span class="text-red-600">*</span>
+                {% endif %}
+              </label>
+
+              <input
+                type="file"
+                name="document_{{ prd.document.id }}"
+                class="block w-full text-sm text-gray-700
+                       file:mr-4 file:py-2 file:px-4
+                       file:rounded-lg file:border-0
+                       file:text-sm file:font-semibold
+                       file:bg-gray-100 file:text-gray-700
+                       hover:file:bg-gray-200"
+              />
+            </div>
+          {% endfor %}
+        </div>
+
+        <p class="mt-4 text-sm text-gray-500">
+          Les documents marqués d’un astérisque (*) sont obligatoires.
+          Les dossiers incomplets peuvent être acceptés sous réserve.
+        </p>
+      </fieldset>
+    {% endif %}
+
+    <!-- ============================= -->
+    <!-- ACTION -->
+    <!-- ============================= -->
+    <div class="pt-6 text-center">
+      <button
+        type="submit"
+        class="bg-blue-600 text-white px-10 py-3 rounded-lg
+               font-semibold text-lg hover:bg-blue-700 transition"
+      >
+        Soumettre ma candidature
+      </button>
+
+      <p class="mt-4 text-sm text-gray-500">
+        Après soumission, vous serez contacté par l’administration.
+      </p>
+    </div>
+
+  </form>
+
+</section>
+
+{% endblock %}

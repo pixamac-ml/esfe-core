@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load static %}
+{% load component_tags %}
+
+{% block title %}Accueil – ESFE{% endblock %}
+
+{% block content %}
+
+  {# ===================================================== #}
+  {# HERO                                                  #}
+  {# ===================================================== #}
+
+  {% component "hero"
+     title="ESFE"
+     subtitle="Former les cadres de la santé"
+     cities="['Abidjan','Kati','Koulikoro','San','Gao','Bobo']"
+  %}{% endcomponent %}
+
+
+
+  {# ===================================================== #}
+  {# SECTION : INSTITUTION                                #}
+  {# ===================================================== #}
+
+  <section
+    id="explorer"
+    class="relative bg-gradient-to-b from-white to-gray-50 py-32"
+    x-data="{ show: false }"
+    x-intersect.once="show = true"
+  >
+
+    <div class="max-w-7xl mx-auto px-6">
+
+      {# ====== GRID PRINCIPAL ====== #}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+
+        <!-- ================= TEXTE ================= -->
+        <div
+          :class="show
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 translate-y-10'"
+          class="transition-all duration-1000 ease-out"
+        >
+
+          <span class="inline-block text-sm font-semibold text-primary-600 uppercase tracking-wider mb-4">
+            Qui sommes-nous
+          </span>
+
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-tight">
+            Une institution dédiée aux sciences de la santé
+          </h2>
+
+          <p class="text-lg text-gray-700 mb-4">
+            <strong>L’École de Santé Félix Houphouët-Boigny</strong>
+            est un établissement d’enseignement supérieur spécialisé dans les sciences de la santé.
+          </p>
+
+          <p class="text-gray-600 mb-4">
+            Elle forme des professionnels compétents, responsables et engagés,
+            selon des standards académiques rigoureux adaptés aux réalités nationales.
+          </p>
+
+          <p class="text-gray-600">
+            L’institution accueille des étudiants issus de différents horizons
+            et met l’accent sur l’excellence pédagogique, l’éthique professionnelle
+            et l’employabilité.
+          </p>
+
+        </div>
+
+        <!-- ================= IMAGE ================= -->
+        <div
+          :class="show
+            ? 'opacity-100 translate-x-0 scale-100'
+            : 'opacity-0 translate-x-10 scale-95'"
+          class="flex justify-center lg:justify-end transition-all duration-1000 ease-out delay-200"
+        >
+
+          <img
+            src="{% static 'images/institution/students-academic.jpg' %}"
+            class="w-full max-w-lg rounded-3xl shadow-2xl object-cover transition duration-700 hover:scale-[1.02]"
+            alt="Étudiants ESFE"
+            loading="lazy"
+          >
+
+        </div>
+
+      </div>
+
+
+
+      {# ===================================================== #}
+      {# SECTION : PILIERS                                    #}
+      {# ===================================================== #}
+
+      {% if pillars %}
+      <div class="mt-28">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+
+          {% for pillar in pillars %}
+            {% component "base_card"
+               content="
+                 <h3 class='font-semibold text-lg mb-2'>{{ pillar.title }}</h3>
+                 <p class='text-sm text-gray-600'>{{ pillar.description }}</p>
+               "
+            %}{% endcomponent %}
+          {% endfor %}
+
+        </div>
+
+      </div>
+      {% endif %}
+
+    </div>
+
+  </section>
+
+{% endblock %}

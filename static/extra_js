@@ -1,0 +1,37 @@
+<script>
+function typingHero() {
+  return {
+    cities: "{{ cities }}".split(" "),
+    index: 0,
+    charIndex: 0,
+    displayText: "",
+    typingSpeed: 80,
+    pause: 1500,
+
+    init() {
+      this.type();
+    },
+
+    type() {
+      if (this.charIndex < this.cities[this.index].length) {
+        this.displayText += this.cities[this.index][this.charIndex];
+        this.charIndex++;
+        setTimeout(() => this.type(), this.typingSpeed);
+      } else {
+        setTimeout(() => this.erase(), this.pause);
+      }
+    },
+
+    erase() {
+      if (this.charIndex > 0) {
+        this.displayText = this.displayText.slice(0, -1);
+        this.charIndex--;
+        setTimeout(() => this.erase(), this.typingSpeed / 2);
+      } else {
+        this.index = (this.index + 1) % this.cities.length;
+        setTimeout(() => this.type(), this.typingSpeed);
+      }
+    }
+  }
+}
+</script>

@@ -1,0 +1,205 @@
+{% load static %}
+
+<section class="relative h-screen w-full overflow-hidden">
+
+  <!-- ZOOM WRAPPER (image + overlay synchronisés) -->
+  <div class="absolute inset-0 hero-zoom">
+    <img src="{% static 'images/hero-bg.jpg' %}"
+         class="w-full h-full object-cover"
+         alt="Campus ESFE">
+    <div class="absolute inset-0 bg-black/65"></div>
+  </div>
+
+  <!-- Logo -->
+  <div class="absolute top-6 left-6 z-20">
+    <img src="{% static 'images/logo-esfe.png' %}"
+         class="h-14 md:h-20 opacity-95"
+         alt="Logo ESFE">
+  </div>
+
+  <!-- CONTENU CENTRAL -->
+  <div class="relative z-10 h-full flex flex-col items-center justify-center text-white px-6 text-center">
+
+    <div class="hero-line">
+
+      <span class="brand">{{ title }}</span>
+
+      <span class="city-mask">
+        <span id="cityText" class="city-text"></span>
+        <span id="cursor" class="cursor"></span>
+      </span>
+
+    </div>
+
+    <p class="hero-tagline">
+      <strong>Former les cadres de la santé</strong>
+    </p>
+
+  </div>
+
+  <!-- BOUTON SIMPLE (ANCRE HTML) -->
+  <a href="#explorer" class="scroll-button" aria-label="Aller à la section suivante">
+    ↓
+  </a>
+
+</section>
+
+<style>
+
+/* ============================= */
+/* ZOOM PROPRE SYNCHRONISÉ       */
+/* ============================= */
+
+.hero-zoom {
+  transform: scale(1);
+  transition: transform 18s ease-in-out;
+}
+
+/* ============================= */
+/* TITRE                         */
+/* ============================= */
+
+.hero-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: clamp(0.5rem, 2vw, 1.5rem);
+  flex-wrap: wrap;
+}
+
+.brand,
+.city-text {
+  font-family: 'Poppins', sans-serif;
+  font-size: clamp(3rem, 9vw, 7rem);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ============================= */
+/* WRITING EFFECT                */
+/* ============================= */
+
+.city-mask {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.cursor {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 2px;
+  height: 100%;
+  background: white;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+/* ============================= */
+/* TAGLINE                       */
+/* ============================= */
+
+.hero-tagline {
+  margin-top: 1.6rem;
+  font-size: clamp(1.2rem, 2vw, 1.7rem);
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+/* ============================= */
+/* BOUTON SCROLL                 */
+/* ============================= */
+
+.scroll-button {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  color: white;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+.scroll-button:hover {
+  background: white;
+  color: black;
+  transform: translateX(-50%) scale(1.1);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .hero-line {
+    flex-direction: column;
+  }
+}
+
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+  /* ZOOM DÉCLENCHÉ AU CHARGEMENT */
+  const zoom = document.querySelector(".hero-zoom");
+  if (zoom) {
+    setTimeout(() => {
+      zoom.style.transform = "scale(1.05)";
+    }, 100);
+  }
+
+  /* WRITING ANIMATION */
+  const cities = {{ cities|safe }};
+  const text = document.getElementById("cityText");
+  const cursor = document.getElementById("cursor");
+
+  if (cities && cities.length) {
+
+    let index = 0;
+
+    function animateWord(word) {
+
+      text.textContent = word;
+
+      const duration = word.length * 0.22;
+
+      text.style.transition = "none";
+      text.style.clipPath = "inset(0 100% 0 0)";
+
+      requestAnimationFrame(() => {
+
+        text.style.transition =
+          `clip-path ${duration}s cubic-bezier(0.4,0,0.2,1)`;
+
+        text.style.clipPath = "inset(0 0 0 0)";
+        cursor.style.opacity = 1;
+
+        setTimeout(() => {
+          cursor.style.opacity = 0;
+          text.style.clipPath = "inset(0 100% 0 0)";
+        }, duration * 1000 + 2500);
+
+      });
+    }
+
+    function cycle() {
+      animateWord(cities[index]);
+      index = (index + 1) % cities.length;
+    }
+
+    cycle();
+    setInterval(cycle, 9000);
+  }
+
+});
+</script>

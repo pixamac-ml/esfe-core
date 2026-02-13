@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Blog – ESFE{% endblock %}
+
+{% block content %}
+<section class="max-w-5xl mx-auto px-4 py-16">
+
+  <header class="mb-12">
+    <h1 class="text-3xl font-poppins font-bold text-gray-900">
+      Actualités & Articles
+    </h1>
+    <p class="mt-2 text-gray-600 max-w-2xl">
+      Informations officielles, communiqués et articles institutionnels de l’ESFE.
+    </p>
+  </header>
+
+  <div class="space-y-10">
+    {% for article in articles %}
+      <article class="border-b border-gray-200 pb-8">
+        <h2 class="text-xl font-poppins font-semibold text-gray-900">
+          <a href="{% url 'blog:article_detail' article.slug %}"
+             class="hover:text-blue-600 transition">
+            {{ article.title }}
+          </a>
+        </h2>
+
+        <p class="mt-3 text-gray-700 leading-relaxed">
+          {{ article.excerpt }}
+        </p>
+
+        <div class="mt-4">
+          <a href="{% url 'blog:article_detail' article.slug %}"
+             class="inline-flex items-center text-sm font-medium text-blue-600 hover:underline">
+            Lire l’article →
+          </a>
+        </div>
+      </article>
+    {% empty %}
+      <p class="text-gray-500">
+        Aucun article publié pour le moment.
+      </p>
+    {% endfor %}
+  </div>
+
+</section>
+{% endblock %}

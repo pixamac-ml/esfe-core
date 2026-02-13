@@ -5,26 +5,71 @@
 
 {% block content %}
 
+<!-- ===================================================== -->
+<!-- HEADER SECTION                                        -->
+<!-- ===================================================== -->
+
 {% component "section_header"
   title="Nos formations"
   subtitle="Des parcours adaptés aux métiers de la santé"
 %}{% endcomponent %}
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
 
-  {% for programme in programmes %}
-    {% component "formation_card"
-      title=programme.title
-      description=programme.short_description
-      duration=programme.duration_years|stringformat:"d"|add:" ans"
-      href=programme.get_absolute_url
-    %}{% endcomponent %}
-  {% empty %}
-    <p class="text-gray-500 col-span-full text-center">
-      Aucune formation disponible pour le moment.
-    </p>
-  {% endfor %}
+<!-- ===================================================== -->
+<!-- SECTION FORMATIONS                                    -->
+<!-- ===================================================== -->
 
-</div>
+<section class="py-16">
+
+  <div class="max-w-7xl mx-auto px-6">
+
+    <!-- ================= FILTRES ================= -->
+
+    <div class="flex flex-wrap justify-center gap-4 mb-12">
+
+      <!-- Toutes -->
+      <button
+        hx-get="{% url 'formations:list_fragment' %}"
+        hx-target="#programme-container"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="px-4 py-2 rounded-md text-sm font-medium transition
+               bg-gray-200 hover:bg-gray-300"
+      >
+        Toutes
+      </button>
+
+      <!-- Cycles -->
+      {% for cycle in cycles %}
+        <button
+          hx-get="{% url 'formations:list_fragment' %}?cycle={{ cycle.slug }}"
+          hx-target="#programme-container"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          class="px-4 py-2 rounded-md text-sm font-medium transition
+                 bg-gray-200 hover:bg-gray-300"
+        >
+          {{ cycle.name }}
+        </button>
+      {% endfor %}
+
+    </div>
+
+
+    <!-- ================= CONTAINER DYNAMIQUE ================= -->
+
+    <div
+      id="programme-container"
+      hx-get="{% url 'formations:list_fragment' %}"
+      hx-trigger="load"
+      hx-swap="innerHTML"
+      hx-indicator="#global-loader"
+      class="min-h-[300px]"
+    >
+    </div>
+
+  </div>
+
+</section>
 
 {% endblock %}

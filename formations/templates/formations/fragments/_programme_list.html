@@ -1,0 +1,51 @@
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+  {% for programme in programmes %}
+    {% component "formation_card"
+      title=programme.title
+      description=programme.short_description
+      duration=programme.years_count|stringformat:"d"|add:" ans"
+      href=programme.get_absolute_url
+    %}{% endcomponent %}
+  {% empty %}
+    <p class="text-gray-500 col-span-full text-center py-20">
+      Aucune formation disponible pour le moment.
+    </p>
+  {% endfor %}
+
+</div>
+
+
+<!-- ================= PAGINATION ================= -->
+
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center mt-12 gap-4">
+
+  {% if page_obj.has_previous %}
+    <button
+      hx-get="?page={{ page_obj.previous_page_number }}{% if current_cycle %}&cycle={{ current_cycle }}{% endif %}"
+      hx-target="#programme-container"
+      hx-swap="innerHTML"
+      class="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition"
+    >
+      ← Précédent
+    </button>
+  {% endif %}
+
+  <span class="text-sm text-gray-600 flex items-center">
+    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+  </span>
+
+  {% if page_obj.has_next %}
+    <button
+      hx-get="?page={{ page_obj.next_page_number }}{% if current_cycle %}&cycle={{ current_cycle }}{% endif %}"
+      hx-target="#programme-container"
+      hx-swap="innerHTML"
+      class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition"
+    >
+      Suivant →
+    </button>
+  {% endif %}
+
+</div>
+{% endif %}

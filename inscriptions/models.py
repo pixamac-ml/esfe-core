@@ -15,9 +15,9 @@ class Inscription(models.Model):
     Inscription officielle après acceptation d’une candidature.
 
     RÈGLES :
-    - Le montant à payer est COPIÉ et FIGÉ ici
+    - amount_due est FIGÉ lors de la création
+    - amount_paid est CALCULÉ uniquement via Payment
     - Cette table est la SOURCE DE VÉRITÉ FINANCIÈRE
-    - Accès sécurisé par code privé
     """
 
     # ==================================================
@@ -39,15 +39,16 @@ class Inscription(models.Model):
     )
 
     public_token = models.CharField(
-        max_length=50,
+        max_length=60,
         unique=True,
         editable=False,
         db_index=True
     )
 
     access_code = models.CharField(
-        max_length=20,
+        max_length=32,
         blank=True,
+        editable=False,
         help_text="Code d’accès privé au dossier"
     )
 
@@ -63,19 +64,21 @@ class Inscription(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default="created"
+        default="created",
+        db_index=True
     )
 
     # ==================================================
     # FINANCES (FIGÉES)
     # ==================================================
-    amount_due = models.PositiveIntegerField(
-        help_text="Montant total à payer pour cette inscription (FCFA)"
+    amount_due = models.PositiveBigIntegerField(
+        help_text="Montant total à payer (FCFA)"
     )
 
-    amount_paid = models.PositiveIntegerField(
+    amount_paid = models.PositiveBigIntegerField(
         default=0,
-        help_text="Montant déjà payé (FCFA)"
+        editable=False,
+        help_text="Montant payé (calcul automatique)"
     )
 
     # ==================================================
@@ -87,16 +90,18 @@ class Inscription(models.Model):
         ordering = ["-created_at"]
 
     # ==================================================
-    # SYSTÈME
+    # REPRÉSENTATION
     # ==================================================
     def __str__(self):
         return f"Inscription {self.public_token}"
 
+    # ==================================================
+    # SAVE SÉCURISÉ
+    # ==================================================
     def save(self, *args, **kwargs):
         """
-        - Génère public_token UNE SEULE FOIS
-        - Génère access_code UNE SEULE FOIS
-        - Aucune logique financière ici
+        Génération sécurisée des identifiants.
+        Aucune logique financière ici.
         """
 
         if not self.public_token:
@@ -108,7 +113,7 @@ class Inscription(models.Model):
         super().save(*args, **kwargs)
 
     # ==================================================
-    # GÉNÉRATEURS SÉCURISÉS
+    # GÉNÉRATEURS
     # ==================================================
     @staticmethod
     def generate_public_token():
@@ -116,8 +121,8 @@ class Inscription(models.Model):
 
     @staticmethod
     def generate_access_code():
-        # Code court mais sécurisé
-        return secrets.token_urlsafe(6)
+        # Plus robuste que token_urlsafe(6)
+        return secrets.token_hex(8)
 
     # ==================================================
     # URL PUBLIQUE
@@ -129,12 +134,11 @@ class Inscription(models.Model):
         )
 
     # ==================================================
-    # LOGIQUE FINANCIÈRE
+    # LOGIQUE FINANCIÈRE DÉTERMINISTE
     # ==================================================
     def update_financial_state(self):
         """
-        ⚠️ Appelée UNIQUEMENT par Payment après validation.
-        Méthode DÉTERMINISTE.
+        ⚠️ Doit être appelée UNIQUEMENT après validation d’un paiement.
         """
 
         total_paid = (
@@ -143,6 +147,10 @@ class Inscription(models.Model):
             .aggregate(total=Sum("amount"))["total"]
             or 0
         )
+
+        # Sécurité anti incohérence
+        if total_paid < 0:
+            total_paid = 0
 
         self.amount_paid = total_paid
 

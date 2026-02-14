@@ -1,0 +1,227 @@
+{% extends "admin/base_site.html" %}
+{% load humanize %}
+
+{% block content %}
+
+<div class="container-fluid mt-4">
+
+    <!-- ========================= -->
+    <!-- HEADER -->
+    <!-- ========================= -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="mb-1">
+                <i class="fas fa-chart-line me-2 text-primary"></i>
+                Dashboard SuperAdmin
+            </h3>
+            <small class="text-muted">
+                Vue stratégique globale de l’institution
+            </small>
+        </div>
+
+        <div>
+            <a href="/admin/" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-cog me-1"></i> Admin classique
+            </a>
+        </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- KPI PRINCIPAUX -->
+    <!-- ========================= -->
+    <div class="row">
+
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <small class="text-muted">Total Candidatures</small>
+                    <h3 class="fw-bold mt-2">
+                        <i class="fas fa-user-plus text-info me-2"></i>
+                        {{ total_candidatures }}
+                    </h3>
+                    <small class="text-success">
+                        Taux d’acceptation : {{ acceptance_rate }}%
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <small class="text-muted">Total Inscriptions</small>
+                    <h3 class="fw-bold mt-2">
+                        <i class="fas fa-id-card text-primary me-2"></i>
+                        {{ total_inscriptions }}
+                    </h3>
+                    <small class="text-muted">
+                        Actives : {{ active_inscriptions }}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <small class="text-muted">Paiements validés</small>
+                    <h3 class="fw-bold mt-2">
+                        <i class="fas fa-credit-card text-success me-2"></i>
+                        {{ total_payments }}
+                    </h3>
+                    <small class="text-muted">
+                        Ce mois : {{ monthly_revenue|intcomma }} FCFA
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <small class="text-muted">Revenus totaux</small>
+                    <h3 class="fw-bold mt-2 text-success">
+                        <i class="fas fa-money-bill-wave me-2"></i>
+                        {{ total_revenue|intcomma }} FCFA
+                    </h3>
+                    <small class="text-danger">
+                        Reste à encaisser : {{ remaining_balance|intcomma }} FCFA
+                    </small>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================= -->
+    <!-- STATUTS CANDIDATURES -->
+    <!-- ========================= -->
+    <div class="row mb-4">
+
+        <div class="col-md-3">
+            <div class="card bg-light border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-hourglass-half text-warning fa-lg mb-2"></i>
+                    <h6>En analyse</h6>
+                    <h4>{{ under_review }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-light border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-check-circle text-success fa-lg mb-2"></i>
+                    <h6>Acceptées</h6>
+                    <h4>{{ accepted }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-light border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-times-circle text-danger fa-lg mb-2"></i>
+                    <h6>Refusées</h6>
+                    <h4>{{ rejected }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-light border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-exclamation-circle text-secondary fa-lg mb-2"></i>
+                    <h6>À compléter</h6>
+                    <h4>{{ to_complete }}</h4>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================= -->
+    <!-- ACTIVITÉ RÉCENTE -->
+    <!-- ========================= -->
+    <div class="row">
+
+        <!-- Candidatures -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="fas fa-user-plus me-2"></i>
+                    Dernières candidatures
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for c in recent_candidatures %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            {{ c.last_name }} {{ c.first_name }}
+                            <small class="text-muted">{{ c.submitted_at|date:"d/m/Y" }}</small>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted">Aucune donnée</li>
+                    {% endfor %}
+                </ul>
+                <div class="card-footer text-end">
+                    <a href="/admin/admissions/candidature/" class="btn btn-sm btn-outline-primary">
+                        Voir tout
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inscriptions -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="fas fa-id-card me-2"></i>
+                    Dernières inscriptions
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for i in recent_inscriptions %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            {{ i.candidature.last_name }}
+                            <small class="text-muted">{{ i.created_at|date:"d/m/Y" }}</small>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted">Aucune donnée</li>
+                    {% endfor %}
+                </ul>
+                <div class="card-footer text-end">
+                    <a href="/admin/inscriptions/inscription/" class="btn btn-sm btn-outline-primary">
+                        Voir tout
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paiements -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="fas fa-credit-card me-2"></i>
+                    Derniers paiements
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for p in recent_payments %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            {{ p.amount|intcomma }} FCFA
+                            <small class="text-muted">{{ p.paid_at|date:"d/m/Y" }}</small>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted">Aucune donnée</li>
+                    {% endfor %}
+                </ul>
+                <div class="card-footer text-end">
+                    <a href="/admin/payments/payment/" class="btn btn-sm btn-outline-primary">
+                        Voir tout
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

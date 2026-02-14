@@ -3,6 +3,7 @@
 from django.db import models, transaction
 from django.utils import timezone
 from django.core.files.base import ContentFile
+from django.db.models import Sum
 
 from inscriptions.models import Inscription
 from payments.services.receipt import generate_receipt_number
@@ -12,17 +13,24 @@ from payments.utils.pdf import render_pdf
 from students.services.create_student import (
     create_student_after_first_payment
 )
-from students.services.email import send_student_credentials_email
-
-
+from students.services.email import (
+    send_student_credentials_email,
+    send_payment_confirmation_email
+)
 
 from django.contrib.auth import get_user_model
 import secrets
+from datetime import timedelta
+import random
 
 User = get_user_model()
 
 
+# ==================================================
+# PAYMENT AGENT
+# ==================================================
 class PaymentAgent(models.Model):
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -37,7 +45,6 @@ class PaymentAgent(models.Model):
     )
 
     is_active = models.BooleanField(default=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -49,12 +56,9 @@ class PaymentAgent(models.Model):
         return f"{self.user.get_full_name()} ({self.agent_code})"
 
 
-
-from django.utils import timezone
-from datetime import timedelta
-import random
-
-
+# ==================================================
+# CASH PAYMENT SESSION
+# ==================================================
 class CashPaymentSession(models.Model):
 
     inscription = models.ForeignKey(
@@ -70,17 +74,14 @@ class CashPaymentSession(models.Model):
     )
 
     verification_code = models.CharField(max_length=6)
-
     expires_at = models.DateTimeField()
-
     is_used = models.BooleanField(default=False)
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     def generate_code(self):
         self.verification_code = str(random.randint(100000, 999999))
         self.expires_at = timezone.now() + timedelta(minutes=5)
-        self.save()
+        self.save(update_fields=["verification_code", "expires_at"])
 
     def is_valid(self, code):
         return (
@@ -93,23 +94,11 @@ class CashPaymentSession(models.Model):
         return f"Session cash {self.inscription.reference}"
 
 
-
+# ==================================================
+# PAYMENT
+# ==================================================
 class Payment(models.Model):
-    """
-    Paiement lié à une inscription.
 
-    RÈGLES MÉTIER (STRICTES) :
-    - Un paiement VALIDÉ :
-        • met à jour l’inscription (montant payé / statut)
-        • génère UN SEUL reçu PDF
-        • crée le compte étudiant au PREMIER paiement validé
-    - AUCUN signal métier
-    - TOUT est centralisé ici
-    """
-
-    # ==================================================
-    # CHOIX
-    # ==================================================
     METHOD_CHOICES = (
         ("cash", "Espèces"),
         ("orange_money", "Orange Money"),
@@ -122,12 +111,6 @@ class Payment(models.Model):
         ("cancelled", "Annulé"),
     )
 
-    # ==================================================
-    # LIENS
-    # ==================================================
-    # ==================================================
-    # LIENS
-    # ==================================================
     inscription = models.ForeignKey(
         Inscription,
         on_delete=models.CASCADE,
@@ -142,33 +125,28 @@ class Payment(models.Model):
         related_name="payments"
     )
 
-    # ==================================================
-    # DONNÉES DE PAIEMENT
-    # ==================================================
-    amount = models.PositiveIntegerField(
+    amount = models.PositiveBigIntegerField(
         help_text="Montant payé en FCFA"
     )
 
     method = models.CharField(
         max_length=30,
-        choices=METHOD_CHOICES
+        choices=METHOD_CHOICES,
+        db_index=True
     )
 
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default="pending"
+        default="pending",
+        db_index=True
     )
 
     reference = models.CharField(
         max_length=100,
-        blank=True,
-        help_text="Référence externe (OM, virement, reçu manuel)"
+        blank=True
     )
 
-    # ==================================================
-    # REÇU
-    # ==================================================
     receipt_number = models.CharField(
         max_length=50,
         unique=True,
@@ -182,17 +160,12 @@ class Payment(models.Model):
         blank=True
     )
 
-    # ==================================================
-    # MÉTADONNÉES
-    # ==================================================
     paid_at = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-paid_at"]
         indexes = [
-            models.Index(fields=["status"]),
-            models.Index(fields=["method"]),
             models.Index(fields=["paid_at"]),
         ]
 
@@ -200,30 +173,41 @@ class Payment(models.Model):
         return f"{self.amount} FCFA – {self.inscription.reference}"
 
     # ==================================================
-    # PIPELINE MÉTIER CENTRAL
+    # PIPELINE MÉTIER SÉCURISÉ
     # ==================================================
     def save(self, *args, **kwargs):
 
         previous_status = None
+
         if self.pk:
-            previous_status = Payment.objects.get(pk=self.pk).status
+            previous_status = (
+                Payment.objects.only("status")
+                .get(pk=self.pk)
+                .status
+            )
+
+            # 🔒 Empêcher rétrogradation d’un paiement validé
+            if previous_status == "validated" and self.status != "validated":
+                raise ValueError("Un paiement validé ne peut pas être modifié.")
 
         with transaction.atomic():
+
             super().save(*args, **kwargs)
 
             just_validated = (
-                    self.status == "validated"
-                    and previous_status != "validated"
+                self.status == "validated"
+                and previous_status != "validated"
             )
 
             if not just_validated:
                 return
 
-            # 1️⃣ Synchronisation financière
+            # 1️⃣ Mise à jour financière inscription
             self.inscription.update_financial_state()
 
-            # 2️⃣ Génération du reçu (UNE SEULE FOIS)
+            # 2️⃣ Génération reçu UNIQUE
             if not self.receipt_number:
+
                 self.receipt_number = generate_receipt_number(self)
 
                 qr_image = generate_qr_image(
@@ -247,10 +231,17 @@ class Payment(models.Model):
                 )
 
         # ==========================================
-        # 3️⃣ APRÈS COMMIT
+        # ACTIONS POST-COMMIT SÉCURISÉES
         # ==========================================
+        transaction.on_commit(
+            lambda: self._post_commit_actions()
+        )
 
-        # Création étudiant (1er paiement uniquement)
+    # ==================================================
+    # POST-COMMIT
+    # ==================================================
+    def _post_commit_actions(self):
+
         result = create_student_after_first_payment(self.inscription)
 
         if result:
@@ -259,6 +250,4 @@ class Payment(models.Model):
                 raw_password=result["password"]
             )
         else:
-            # Paiement suivant → simple confirmation
-            from students.services.email import send_payment_confirmation_email
             send_payment_confirmation_email(payment=self)

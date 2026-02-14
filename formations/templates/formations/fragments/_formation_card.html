@@ -1,49 +1,71 @@
 <div
-    class="bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition duration-300 p-6 flex flex-col justify-between"
+  class="group bg-white rounded-xl border border-gray-100
+         shadow-sm hover:shadow-2xl
+         transition-all duration-300
+         overflow-hidden flex flex-col justify-between"
 >
 
-    <!-- ===== Header ===== -->
-    <div class="space-y-3">
+  <!-- ================= HEADER ================= -->
 
-        <div class="flex items-center justify-between">
+  <div class="p-6 space-y-4">
 
-            <span class="text-xs font-semibold px-3 py-1 rounded-full bg-secondary/10 text-secondary">
-                {{ programme.cycle.name }}
-            </span>
+    <!-- Badge + durée -->
+    <div class="flex items-center justify-between">
 
-            <span class="text-xs text-gray-400">
-                {{ programme.years_count }} an{{ programme.years_count|pluralize }}
-            </span>
+      <span class="inline-flex items-center
+                   text-xs font-semibold px-3 py-1
+                   rounded-full
+                   bg-primary/10 text-primary
+                   transition group-hover:bg-primary group-hover:text-white">
+        {{ programme.cycle.name }}
+      </span>
 
-        </div>
-
-        <h3 class="text-lg font-semibold text-primary leading-tight">
-            {{ programme.title }}
-        </h3>
-
-        <p class="text-sm text-gray-600 line-clamp-3">
-            {{ programme.description|truncatewords:20 }}
-        </p>
+      <span class="text-xs text-gray-400">
+        {{ programme.duration_years }} an{{ programme.duration_years|pluralize }}
+      </span>
 
     </div>
 
-    <!-- ===== Footer ===== -->
-    <div class="pt-6 flex items-center justify-between">
+    <!-- Titre -->
+    <h3 class="text-lg font-semibold text-gray-800
+               leading-snug
+               group-hover:text-primary
+               transition-colors duration-300">
+      {{ programme.title }}
+    </h3>
 
-        <div class="text-sm text-gray-500">
-            Diplôme :
-            <span class="font-medium text-gray-700">
-                {{ programme.diploma_awarded.name }}
-            </span>
-        </div>
+    <!-- Description -->
+    <p class="text-sm text-gray-600 leading-relaxed line-clamp-3">
+      {{ programme.short_description|default:programme.description|truncatewords:18 }}
+    </p>
 
-        <a
-            href="{% url 'formations:detail' programme.slug %}"
-            class="text-sm font-semibold text-primary hover:underline"
-        >
-            Voir →
-        </a>
+  </div>
 
+
+  <!-- ================= FOOTER ================= -->
+
+  <div class="px-6 pb-6 pt-2 flex items-center justify-between">
+
+    <div class="text-xs text-gray-500">
+      Diplôme :
+      <span class="font-medium text-gray-700">
+        {{ programme.diploma_awarded.name }}
+      </span>
     </div>
+
+    <a
+      href="{% url 'formations:detail' programme.slug %}"
+      class="inline-flex items-center gap-1
+             text-sm font-semibold text-primary
+             transition-all duration-300
+             group-hover:gap-2"
+    >
+      Voir
+      <span class="transition-transform duration-300 group-hover:translate-x-1">
+        →
+      </span>
+    </a>
+
+  </div>
 
 </div>

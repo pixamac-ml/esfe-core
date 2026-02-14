@@ -185,3 +185,122 @@ def sitemap(request):
     }
 
     return render(request, "sitemap.html", context)
+
+
+
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import render
+from django.utils import timezone
+from django.db.models import Sum, Count, F
+from admissions.models import Candidature
+from inscriptions.models import Inscription
+from payments.models import Payment
+
+
+@staff_member_required
+def superadmin_dashboard(request):
+
+    now = timezone.now()
+    current_month = now.month
+    current_year = now.year
+
+    # ======================================================
+    # CANDIDATURES
+    # ======================================================
+    total_candidatures = Candidature.objects.count()
+    under_review = Candidature.objects.filter(status="under_review").count()
+    accepted = Candidature.objects.filter(
+        status__in=["accepted", "accepted_with_reserve"]
+    ).count()
+    rejected = Candidature.objects.filter(status="rejected").count()
+    to_complete = Candidature.objects.filter(status="to_complete").count()
+
+    acceptance_rate = 0
+    if total_candidatures > 0:
+        acceptance_rate = round((accepted / total_candidatures) * 100, 2)
+
+    # ======================================================
+    # INSCRIPTIONS
+    # ======================================================
+    total_inscriptions = Inscription.objects.count()
+    active_inscriptions = Inscription.objects.filter(status="active").count()
+    suspended_inscriptions = Inscription.objects.filter(status="suspended").count()
+
+    unpaid_inscriptions = Inscription.objects.filter(
+        amount_paid__lt=F("amount_due")
+    ).count()
+
+    # ======================================================
+    # PAYMENTS
+    # ======================================================
+    validated_payments = Payment.objects.filter(status="validated")
+
+    total_payments = validated_payments.count()
+
+    total_revenue = (
+        validated_payments.aggregate(total=Sum("amount"))["total"] or 0
+    )
+
+    monthly_revenue = (
+        validated_payments.filter(
+            paid_at__month=current_month,
+            paid_at__year=current_year
+        ).aggregate(total=Sum("amount"))["total"] or 0
+    )
+
+    # ======================================================
+    # FINANCES GLOBALES
+    # ======================================================
+    total_due = (
+        Inscription.objects.aggregate(total=Sum("amount_due"))["total"] or 0
+    )
+
+    total_paid = (
+        Inscription.objects.aggregate(total=Sum("amount_paid"))["total"] or 0
+    )
+
+    remaining_balance = total_due - total_paid
+
+    # ======================================================
+    # ACTIVITÉ RÉCENTE
+    # ======================================================
+    recent_candidatures = Candidature.objects.order_by("-submitted_at")[:5]
+    recent_inscriptions = Inscription.objects.order_by("-created_at")[:5]
+    recent_payments = Payment.objects.order_by("-paid_at")[:5]
+
+    # ======================================================
+    # CONTEXT FINAL
+    # ======================================================
+    context = {
+
+        # Candidatures
+        "total_candidatures": total_candidatures,
+        "under_review": under_review,
+        "accepted": accepted,
+        "rejected": rejected,
+        "to_complete": to_complete,
+        "acceptance_rate": acceptance_rate,
+
+        # Inscriptions
+        "total_inscriptions": total_inscriptions,
+        "active_inscriptions": active_inscriptions,
+        "suspended_inscriptions": suspended_inscriptions,
+        "unpaid_inscriptions": unpaid_inscriptions,
+
+        # Paiements
+        "total_payments": total_payments,
+        "total_revenue": total_revenue,
+        "monthly_revenue": monthly_revenue,
+
+        # Finances
+        "remaining_balance": remaining_balance,
+        "total_due": total_due,
+        "total_paid": total_paid,
+
+        # Activité
+        "recent_candidatures": recent_candidatures,
+        "recent_inscriptions": recent_inscriptions,
+        "recent_payments": recent_payments,
+    }
+
+    return render(request, "dashboard/superadmin_dashboard.html", context)

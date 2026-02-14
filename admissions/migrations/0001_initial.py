@@ -13,56 +13,138 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+
+        # ==================================================
+        # CANDIDATURE
+        # ==================================================
         migrations.CreateModel(
             name='Candidature',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+
+                # Académique
+                ('academic_year', models.CharField(max_length=9)),
+                ('entry_year', models.PositiveSmallIntegerField(default=1)),
+
+                # Identité
                 ('first_name', models.CharField(max_length=150)),
                 ('last_name', models.CharField(max_length=150)),
                 ('birth_date', models.DateField()),
                 ('birth_place', models.CharField(max_length=150)),
-                ('gender', models.CharField(choices=[('male', 'Masculin'), ('female', 'Féminin')], max_length=10)),
+                ('gender', models.CharField(
+                    choices=[('male', 'Masculin'), ('female', 'Féminin')],
+                    max_length=10
+                )),
+
+                # Contact
                 ('phone', models.CharField(max_length=30)),
                 ('email', models.EmailField(max_length=254)),
                 ('address', models.CharField(blank=True, max_length=255)),
                 ('city', models.CharField(blank=True, max_length=100)),
                 ('country', models.CharField(default='Mali', max_length=100)),
-                ('status', models.CharField(choices=[('submitted', 'Soumise'), ('under_review', 'En cours d’analyse'), ('to_complete', 'À compléter'), ('accepted', 'Acceptée'), ('accepted_with_reserve', 'Acceptée sous réserve'), ('rejected', 'Refusée')], default='submitted', max_length=30)),
-                ('admin_comment', models.TextField(blank=True, help_text='Commentaire interne (non visible par le candidat)')),
+
+                # Statut
+                ('status', models.CharField(
+                    choices=[
+                        ('submitted', 'Soumise'),
+                        ('under_review', 'En cours d’analyse'),
+                        ('to_complete', 'À compléter'),
+                        ('accepted', 'Acceptée'),
+                        ('accepted_with_reserve', 'Acceptée sous réserve'),
+                        ('rejected', 'Refusée'),
+                    ],
+                    default='submitted',
+                    max_length=30
+                )),
+                ('admin_comment', models.TextField(blank=True)),
+
+                # Métadonnées
                 ('submitted_at', models.DateTimeField(auto_now_add=True)),
                 ('reviewed_at', models.DateTimeField(blank=True, null=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('programme', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='candidatures', to='formations.programme')),
+
+                # FK
+                ('programme', models.ForeignKey(
+                    on_delete=django.db.models.deletion.PROTECT,
+                    related_name='candidatures',
+                    to='formations.programme'
+                )),
             ],
             options={
                 'ordering': ['-submitted_at'],
             },
         ),
+
+        # ==================================================
+        # CANDIDATURE DOCUMENT
+        # ==================================================
         migrations.CreateModel(
             name='CandidatureDocument',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('file', models.FileField(upload_to='candidatures/documents/')),
-                ('is_valid', models.BooleanField(default=False, help_text='Validé par l’administration')),
+                ('is_valid', models.BooleanField(default=False)),
                 ('admin_note', models.CharField(blank=True, max_length=255)),
                 ('uploaded_at', models.DateTimeField(auto_now_add=True)),
-                ('candidature', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='documents', to='admissions.candidature')),
-                ('document_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='formations.requireddocument')),
+                ('candidature', models.ForeignKey(
+                    on_delete=django.db.models.deletion.CASCADE,
+                    related_name='documents',
+                    to='admissions.candidature'
+                )),
+                ('document_type', models.ForeignKey(
+                    on_delete=django.db.models.deletion.PROTECT,
+                    to='formations.requireddocument'
+                )),
             ],
             options={
                 'ordering': ['uploaded_at'],
             },
         ),
+
+        # ==================================================
+        # INDEXES
+        # ==================================================
         migrations.AddIndex(
             model_name='candidature',
-            index=models.Index(fields=['status'], name='admissions__status_c3c8ed_idx'),
+            index=models.Index(fields=['status'], name='admissions_status_idx'),
         ),
         migrations.AddIndex(
             model_name='candidature',
-            index=models.Index(fields=['programme'], name='admissions__program_87ac59_idx'),
+            index=models.Index(fields=['programme'], name='admissions_programme_idx'),
         ),
-        migrations.AlterUniqueTogether(
-            name='candidaturedocument',
-            unique_together={('candidature', 'document_type')},
+        migrations.AddIndex(
+            model_name='candidature',
+            index=models.Index(fields=['programme', 'entry_year', 'status'], name='admissions_prog_year_status_idx'),
+        ),
+        migrations.AddIndex(
+            model_name='candidature',
+            index=models.Index(fields=['academic_year'], name='admissions_academic_year_idx'),
+        ),
+        migrations.AddIndex(
+            model_name='candidaturedocument',
+            index=models.Index(fields=['is_valid'], name='admissions_doc_valid_idx'),
+        ),
+        migrations.AddIndex(
+            model_name='candidaturedocument',
+            index=models.Index(fields=['document_type'], name='admissions_doc_type_idx'),
+        ),
+
+        # ==================================================
+        # CONTRAINTES
+        # ==================================================
+        migrations.AddConstraint(
+            model_name='candidature',
+            constraint=models.UniqueConstraint(
+                fields=['email', 'programme', 'academic_year'],
+                name='unique_candidature_per_year'
+            ),
+        ),
+
+        migrations.AddConstraint(
+            model_name='candidaturedocument',
+            constraint=models.UniqueConstraint(
+                fields=['candidature', 'document_type'],
+                name='unique_document_per_type'
+            ),
         ),
     ]

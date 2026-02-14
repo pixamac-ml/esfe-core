@@ -7,26 +7,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}ESFE{% endblock %}</title>
 
-  <!-- ================= GOOGLE FONTS ================= -->
+  <!-- GOOGLE FONTS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- ================= TAILWIND ================= -->
+  <!-- TAILWIND -->
   <link rel="stylesheet" href="{% static 'public/css/main.css' %}">
-
-  <!-- ================= HTMX ================= -->
+<link rel="stylesheet" href="{% static 'core/css/esfe_theme.css' %}">
+  <!-- HTMX -->
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
-  <!-- ================= LIBRAIRIES JS ================= -->
-
-  <!-- Lucide -->
+  <!-- LUCIDE -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
-  <!-- Alpine (plugin avant core) -->
+  <!-- ALPINE -->
   <script defer src="https://unpkg.com/@alpinejs/intersect@3.13.5/dist/cdn.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
 
+  {% block extra_head %}{% endblock %}
 </head>
 
 <body
@@ -34,49 +33,41 @@
   hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
 >
 
-  <!-- ===================================================== -->
-  <!-- LOADER GLOBAL HTMX                                   -->
-  <!-- ===================================================== -->
-
+  <!-- ================= GLOBAL LOADER ================= -->
   <div id="global-loader"
-       class="fixed inset-0 bg-white/70 backdrop-blur-sm hidden items-center justify-center z-[9999]">
-    <div class="h-10 w-10 border-4 border-gray-300 border-t-primary rounded-full animate-spin"></div>
+       class="hidden fixed bottom-6 right-6 z-50">
+    <div class="h-6 w-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin"></div>
   </div>
 
-  <!-- ===================================================== -->
-  <!-- NAVBAR FIXE                                           -->
-  <!-- ===================================================== -->
 
+  <!-- ================= NAVBAR INTELLIGENTE ================= -->
   <div
-    x-data="{ visible: false }"
-    x-init="
-      window.addEventListener('scroll', () => {
-        visible = window.scrollY > window.innerHeight * 0.6
-      })
-    "
+    x-data="navbarObserver()"
+    x-init="init()"
     class="fixed top-0 left-0 w-full z-50"
   >
     <div
       x-show="visible"
-      x-transition.opacity.duration.400ms
-      class="w-full"
+      x-transition:enter="transition ease-out duration-300"
+      x-transition:enter-start="opacity-0 -translate-y-4"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-200"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 -translate-y-4"
+      class="w-full backdrop-blur-md bg-white/80 shadow-md"
     >
       {% component "navbar" %}{% endcomponent %}
     </div>
   </div>
 
-  <!-- ===================================================== -->
-  <!-- CONTENU PRINCIPAL                                     -->
-  <!-- ===================================================== -->
 
+  <!-- ================= CONTENU ================= -->
   <main class="flex-grow">
     {% block content %}{% endblock %}
   </main>
 
-  <!-- ===================================================== -->
-  <!-- FOOTER                                                -->
-  <!-- ===================================================== -->
 
+  <!-- ================= FOOTER ================= -->
   {% component "footer"
      site_name="ESFE"
      site_description="Établissement supérieur de formation professionnelle orienté vers l’excellence académique, l’innovation pédagogique et l’employabilité."
@@ -98,10 +89,8 @@
   %}
   {% endcomponent %}
 
-  <!-- ===================================================== -->
-  <!-- INIT ICONS                                            -->
-  <!-- ===================================================== -->
 
+  <!-- ================= INIT ICONS ================= -->
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       if (window.lucide) {
@@ -110,24 +99,62 @@
     });
   </script>
 
-  <!-- ===================================================== -->
-  <!-- HTMX GLOBAL EVENTS                                    -->
-  <!-- ===================================================== -->
 
+  <!-- ================= NAVBAR OBSERVER ================= -->
   <script>
-    document.body.addEventListener('htmx:beforeRequest', function () {
-      document.getElementById('global-loader').classList.remove('hidden');
+    function navbarObserver() {
+      return {
+        visible: true,
+
+        init() {
+          const hero = document.getElementById("hero-section");
+
+          // Si pas de hero → navbar visible immédiatement
+          if (!hero) {
+            this.visible = true;
+            return;
+          }
+
+          this.visible = false;
+
+          const observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach(entry => {
+                // Navbar visible uniquement quand le hero est totalement sorti
+                this.visible = entry.intersectionRatio === 0;
+              });
+            },
+            {
+              threshold: 0
+            }
+          );
+
+          observer.observe(hero);
+        }
+      }
+    }
+  </script>
+
+
+  <!-- ================= HTMX LOADER ================= -->
+  <script>
+    const loader = document.getElementById("global-loader");
+
+    document.body.addEventListener("htmx:beforeRequest", function () {
+      loader.classList.remove("hidden");
     });
 
-    document.body.addEventListener('htmx:afterRequest', function () {
-      document.getElementById('global-loader').classList.add('hidden');
+    document.body.addEventListener("htmx:afterRequest", function () {
+      loader.classList.add("hidden");
     });
 
-    document.body.addEventListener('htmx:responseError', function () {
-      document.getElementById('global-loader').classList.add('hidden');
+    document.body.addEventListener("htmx:responseError", function () {
+      loader.classList.add("hidden");
       console.error("Erreur HTMX détectée.");
     });
   </script>
+
+  {% block extra_scripts %}{% endblock %}
 
 </body>
 </html>

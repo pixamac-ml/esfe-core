@@ -13,4 +13,5 @@ urlpatterns = [
     path("legal/<str:page_type>/pdf/", views.legal_page_pdf, name="legal_pdf"),
     # ✅ AJOUTE ÇA
     path("legal/<str:page_type>/pdf/", views.legal_page_pdf, name="legal_pdf"),
+    path("dashboard/", views.superadmin_dashboard, name="superadmin_dashboard"),
 ]

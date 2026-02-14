@@ -13,7 +13,6 @@ from inscriptions.services import create_inscription_from_candidature
 class CandidatureDocumentInline(admin.TabularInline):
     model = CandidatureDocument
     extra = 0
-
     fields = (
         "document_type",
         "file",
@@ -21,7 +20,6 @@ class CandidatureDocumentInline(admin.TabularInline):
         "admin_note",
         "uploaded_at",
     )
-
     readonly_fields = ("uploaded_at",)
     autocomplete_fields = ("document_type",)
 
@@ -33,21 +31,28 @@ class CandidatureDocumentInline(admin.TabularInline):
 class CandidatureAdmin(admin.ModelAdmin):
 
     # ----------------------------------------------
+    # PERFORMANCE
+    # ----------------------------------------------
+    list_select_related = ("programme",)
+    date_hierarchy = "submitted_at"
+
+    # ----------------------------------------------
     # LISTE
     # ----------------------------------------------
     list_display = (
         "full_name",
         "programme",
+        "academic_year",
         "entry_year",
+        "documents_progress",
         "status_badge",
-        "phone",
-        "email",
         "submitted_at",
         "reviewed_at",
     )
 
     list_filter = (
         "status",
+        "academic_year",
         "programme__cycle",
         "programme__filiere",
         "programme",
@@ -57,13 +62,14 @@ class CandidatureAdmin(admin.ModelAdmin):
     search_fields = (
         "first_name",
         "last_name",
-        "phone",
         "email",
+        "phone",
         "programme__title",
     )
 
     ordering = ("-submitted_at",)
     list_per_page = 25
+    autocomplete_fields = ("programme",)
 
     # ----------------------------------------------
     # LECTURE SEULE
@@ -78,8 +84,12 @@ class CandidatureAdmin(admin.ModelAdmin):
     # STRUCTURE FORMULAIRE
     # ----------------------------------------------
     fieldsets = (
-        ("Programme", {
-            "fields": ("programme", "entry_year", "status")
+        ("Programme académique", {
+            "fields": (
+                "programme",
+                "academic_year",
+                "entry_year",
+            )
         }),
         ("Informations personnelles", {
             "fields": (
@@ -101,11 +111,13 @@ class CandidatureAdmin(admin.ModelAdmin):
         }),
         ("Décision administrative", {
             "fields": (
+                "status",
                 "admin_comment",
                 "reviewed_at",
             )
         }),
         ("Système", {
+            "classes": ("collapse",),
             "fields": (
                 "submitted_at",
                 "updated_at",
@@ -129,70 +141,108 @@ class CandidatureAdmin(admin.ModelAdmin):
     # ==================================================
     # AFFICHAGES
     # ==================================================
+
     @admin.display(description="Candidat")
     def full_name(self, obj):
-        return f"{obj.last_name} {obj.first_name}"
+        return obj.full_name
+
+    @admin.display(description="Documents")
+    def documents_progress(self, obj):
+        total = obj.documents_count
+        valid = obj.validated_documents_count
+
+        color = "danger"
+        if total and valid == total:
+            color = "success"
+        elif valid > 0:
+            color = "warning"
+
+        return format_html(
+            '<span class="badge badge-{}">{}/{} validés</span>',
+            color,
+            valid,
+            total
+        )
 
     @admin.display(description="Statut", ordering="status")
     def status_badge(self, obj):
-        colors = {
-            "submitted": "#6c757d",
-            "under_review": "#0d6efd",
-            "to_complete": "#ffc107",
-            "accepted": "#198754",
-            "accepted_with_reserve": "#20c997",
-            "rejected": "#dc3545",
+        classes = {
+            "submitted": "secondary",
+            "under_review": "primary",
+            "to_complete": "warning",
+            "accepted": "success",
+            "accepted_with_reserve": "info",
+            "rejected": "danger",
         }
 
         return format_html(
-            '<span style="padding:4px 8px; border-radius:4px; '
-            'background:{}; color:white; font-weight:600;">{}</span>',
-            colors.get(obj.status, "#6c757d"),
+            '<span class="badge badge-{}">{}</span>',
+            classes.get(obj.status, "secondary"),
             obj.get_status_display()
         )
 
     # ==================================================
+    # SÉCURISATION DES ACTIONS
+    # ==================================================
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+
+        # Exemple futur : restreindre certaines actions
+        if not request.user.is_superuser:
+            actions.pop("mark_rejected", None)
+
+        return actions
+
+    # ==================================================
     # ACTIONS MÉTIER
     # ==================================================
-    @admin.action(description="📂 En cours d’analyse")
-    def mark_under_review(self, request, queryset):
-        for candidature in queryset:
-            candidature.status = "under_review"
-            candidature.reviewed_at = timezone.now()
-            candidature.save(update_fields=["status", "reviewed_at"])
 
-    @admin.action(description="✅ Accepter")
+    @admin.action(description="📂 Passer en cours d’analyse")
+    def mark_under_review(self, request, queryset):
+        updated = queryset.exclude(status="accepted").update(
+            status="under_review",
+            reviewed_at=timezone.now()
+        )
+        messages.success(request, f"{updated} dossier(s) mis en analyse.")
+
+    @admin.action(description="✅ Accepter et créer inscription")
     def mark_accepted(self, request, queryset):
+
         accepted = 0
         skipped = 0
 
-        for candidature in queryset:
+        for candidature in queryset.select_related("programme"):
 
-            if candidature.status in ("accepted", "accepted_with_reserve"):
+            if candidature.status not in (
+                "submitted",
+                "under_review",
+                "to_complete",
+            ):
                 skipped += 1
                 continue
 
-            if hasattr(candidature, "inscription"):
+            if getattr(candidature, "inscription_id", None):
                 skipped += 1
                 continue
 
             programme = candidature.programme
-            entry_year = candidature.entry_year
 
-            # 🔐 Sécurité : méthode obligatoire
             if not hasattr(programme, "get_inscription_amount_for_year"):
                 messages.error(
                     request,
-                    f"{programme} : méthode de calcul des frais absente."
+                    f"{programme} : méthode de calcul absente."
                 )
                 continue
 
-            amount_due = programme.get_inscription_amount_for_year(entry_year)
+            amount_due = programme.get_inscription_amount_for_year(
+                candidature.entry_year
+            )
 
             if not amount_due or amount_due <= 0:
                 messages.error(
                     request,
-                    f"Aucun frais configuré pour {programme} (année {entry_year})."
+                    f"Aucun frais configuré pour {programme}."
                 )
                 continue
 
@@ -211,66 +261,43 @@ class CandidatureAdmin(admin.ModelAdmin):
         if accepted:
             messages.success(
                 request,
-                f"{accepted} candidature(s) acceptée(s) avec inscription créée."
+                f"{accepted} inscription(s) créée(s)."
             )
 
         if skipped:
             messages.warning(
                 request,
-                f"{skipped} candidature(s) ignorée(s)."
+                f"{skipped} dossier(s) ignoré(s)."
             )
 
     @admin.action(description="⚠️ Accepter sous réserve")
     def mark_accepted_with_reserve(self, request, queryset):
-        accepted = 0
 
-        for candidature in queryset:
+        updated = queryset.update(
+            status="accepted_with_reserve",
+            reviewed_at=timezone.now()
+        )
 
-            if hasattr(candidature, "inscription"):
-                continue
-
-            programme = candidature.programme
-            entry_year = candidature.entry_year
-
-            if not hasattr(programme, "get_inscription_amount_for_year"):
-                continue
-
-            amount_due = programme.get_inscription_amount_for_year(entry_year)
-
-            if not amount_due or amount_due <= 0:
-                continue
-
-            with transaction.atomic():
-                create_inscription_from_candidature(
-                    candidature=candidature,
-                    amount_due=amount_due
-                )
-
-                candidature.status = "accepted_with_reserve"
-                candidature.reviewed_at = timezone.now()
-                candidature.save(update_fields=["status", "reviewed_at"])
-
-            accepted += 1
-
-        if accepted:
-            messages.success(
-                request,
-                f"{accepted} candidature(s) acceptée(s) sous réserve."
-            )
+        messages.success(
+            request,
+            f"{updated} dossier(s) acceptée(s) sous réserve."
+        )
 
     @admin.action(description="📝 Dossier à compléter")
     def mark_to_complete(self, request, queryset):
-        for candidature in queryset:
-            candidature.status = "to_complete"
-            candidature.reviewed_at = timezone.now()
-            candidature.save(update_fields=["status", "reviewed_at"])
+        updated = queryset.update(
+            status="to_complete",
+            reviewed_at=timezone.now()
+        )
+        messages.success(request, f"{updated} dossier(s) marqués à compléter.")
 
     @admin.action(description="❌ Refuser")
     def mark_rejected(self, request, queryset):
-        for candidature in queryset:
-            candidature.status = "rejected"
-            candidature.reviewed_at = timezone.now()
-            candidature.save(update_fields=["status", "reviewed_at"])
+        updated = queryset.update(
+            status="rejected",
+            reviewed_at=timezone.now()
+        )
+        messages.success(request, f"{updated} dossier(s) refusé(s).")
 
 
 # ==================================================
@@ -278,6 +305,9 @@ class CandidatureAdmin(admin.ModelAdmin):
 # ==================================================
 @admin.register(CandidatureDocument)
 class CandidatureDocumentAdmin(admin.ModelAdmin):
+
+    list_select_related = ("candidature", "document_type")
+    date_hierarchy = "uploaded_at"
 
     list_display = (
         "candidature",
@@ -299,5 +329,4 @@ class CandidatureDocumentAdmin(admin.ModelAdmin):
 
     ordering = ("-uploaded_at",)
     list_per_page = 25
-
     readonly_fields = ("uploaded_at",)

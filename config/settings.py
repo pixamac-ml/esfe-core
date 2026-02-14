@@ -19,9 +19,7 @@ load_dotenv(BASE_DIR / ".env")
 # ==================================================
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
-
 DEBUG = os.getenv("DEBUG", "True") == "True"
-
 ALLOWED_HOSTS = []
 
 # ==================================================
@@ -29,6 +27,12 @@ ALLOWED_HOSTS = []
 # ==================================================
 
 INSTALLED_APPS = [
+
+    # ============================
+    # ADMIN THEME (DOIT être avant admin)
+    # ============================
+    "jazzmin",
+
     # Django core
     "django_components",
     "django.contrib.admin",
@@ -46,6 +50,7 @@ INSTALLED_APPS = [
     "ui.apps.UiConfig",
     "core",
     "ckeditor",
+
     # Métier
     "admissions.apps.AdmissionsConfig",
     "inscriptions.apps.InscriptionsConfig",
@@ -105,7 +110,6 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-
             ],
             "builtins": [
                 "django_components.templatetags.component_tags",
@@ -189,3 +193,107 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # ==================================================
 
 STUDENT_LOGIN_URL = "http://127.0.0.1:8000/student/login/"
+
+# ==================================================
+# JAZZMIN CONFIG
+# ==================================================
+
+JAZZMIN_SETTINGS = {
+
+    # ------------------------------
+    # BRANDING
+    # ------------------------------
+    "site_title": "ESFE Administration",
+    "site_header": "ESFE | Gestion Académique",
+    "site_brand": "ESFE",
+    "welcome_sign": "Panneau de gestion institutionnelle",
+    "copyright": "École Supérieure de Formation et d'Excellence",
+
+    # ------------------------------
+    # UI
+    # ------------------------------
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "show_ui_builder": False,
+    "sidebar_disable_expand": False,
+
+    # ------------------------------
+    # MENU ORDER
+    # ------------------------------
+    "order_with_respect_to": [
+        "admissions",
+        "inscriptions",
+        "payments",
+        "students",
+        "formations",
+        "auth",
+        "blog",
+        "news",
+    ],
+
+    # ------------------------------
+    # ICONS
+    # ------------------------------
+    "icons": {
+        "auth": "fas fa-users-cog",
+
+        "admissions": "fas fa-file-signature",
+        "admissions.Candidature": "fas fa-user-plus",
+
+        "inscriptions": "fas fa-id-card",
+        "inscriptions.Inscription": "fas fa-user-check",
+
+        "payments": "fas fa-money-bill-wave",
+        "payments.Payment": "fas fa-credit-card",
+        "payments.PaymentAgent": "fas fa-user-tie",
+        "payments.CashPaymentSession": "fas fa-key",
+
+        "students": "fas fa-user-graduate",
+        "formations": "fas fa-graduation-cap",
+
+        "blog": "fas fa-blog",
+        "news": "fas fa-newspaper",
+    },
+
+    # ------------------------------
+    # TOP MENU
+    # ------------------------------
+    "topmenu_links": [
+        {
+            "name": "Dashboard stratégique",
+            "url": "superadmin_dashboard",
+        },
+    ],
+
+
+    # ------------------------------
+    # GLOBAL SEARCH
+    # ------------------------------
+    "search_model": [
+        "admissions.Candidature",
+        "inscriptions.Inscription",
+        "payments.Payment",
+        "students.Student",
+    ],
+
+
+    "custom_css": "core/css/esfe_theme.css",
+    "custom_js": "core/js/esfe_admin.js",
+
+}
+
+# ==================================================
+# JAZZMIN UI TWEAKS
+# ==================================================
+
+JAZZMIN_UI_TWEAKS = {
+    "theme": "flatly",
+    "dark_mode_theme": "darkly",
+    "navbar": "navbar-dark navbar-primary",
+    "sidebar": "sidebar-dark-primary",
+    "accent": "accent-indigo",
+    "sidebar_nav_small_text": False,
+    "footer_small_text": False,
+
+}
+

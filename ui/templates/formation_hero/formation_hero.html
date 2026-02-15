@@ -1,0 +1,100 @@
+{% load static %}
+
+<section class="relative overflow-hidden bg-primary text-white">
+
+  <!-- Image de fond dynamique si disponible -->
+  {% if programme.image %}
+    <div class="absolute inset-0">
+      <img src="{{ programme.image.url }}"
+           alt="{{ programme.title }}"
+           class="w-full h-full object-cover opacity-20">
+    </div>
+  {% else %}
+    <div class="absolute inset-0">
+      <img src="{% static 'public/images/hero-formation.png' %}"
+           alt="Formation ESFE"
+           class="w-full h-full object-cover opacity-15">
+    </div>
+  {% endif %}
+
+  <!-- Overlay institutionnel -->
+<div class="absolute inset-0 bg-gradient-to-b from-white/80 via-black/70 to-blue-200/50"></div>
+
+  <div class="relative max-w-7xl mx-auto px-6 py-28">
+
+    <div class="max-w-3xl space-y-8">
+
+      <!-- Badge académique -->
+      <div class="inline-flex items-center gap-3
+                  bg-white/10 backdrop-blur-md
+                  px-6 py-3 rounded-full text-sm tracking-wide font-medium">
+
+        <svg class="w-5 h-5 text-secondary" fill="currentColor"
+             viewBox="0 0 20 20">
+          <path d="M10 2L2 6l8 4 8-4-8-4z"/>
+          <path d="M2 10l8 4 8-4"/>
+        </svg>
+
+        {{ programme.cycle.name }} – {{ programme.diploma_awarded.name }}
+      </div>
+
+      <!-- Titre -->
+      <h1 class="text-5xl md:text-6xl font-bold leading-tight">
+        {{ programme.title }}
+      </h1>
+
+      <!-- Description courte -->
+      <p class="text-lg md:text-xl text-white/85 leading-relaxed">
+        {{ programme.short_description }}
+      </p>
+
+      <!-- Infos clés -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 pt-10 border-t border-white/20 text-sm">
+
+        <div>
+          <div class="text-white/60 uppercase tracking-wide text-xs">
+            Durée
+          </div>
+          <div class="font-semibold text-lg">
+            {{ programme.duration_years }} ans
+          </div>
+        </div>
+
+        <div>
+          <div class="text-white/60 uppercase tracking-wide text-xs">
+            Filière
+          </div>
+          <div class="font-semibold text-lg">
+            {{ programme.filiere.name }}
+          </div>
+        </div>
+
+        <div>
+          <div class="text-white/60 uppercase tracking-wide text-xs">
+            Diplôme
+          </div>
+          <div class="font-semibold text-lg">
+            {{ programme.diploma_awarded.name }}
+          </div>
+        </div>
+
+        <div>
+          <div class="text-white/60 uppercase tracking-wide text-xs">
+            Statut
+          </div>
+          <div class="font-semibold text-lg">
+            {% if programme.is_active %}
+              Ouvert
+            {% else %}
+              Fermé
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</section>

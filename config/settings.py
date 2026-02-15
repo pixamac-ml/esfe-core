@@ -28,13 +28,15 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
 
+    "django_components",
+
     # ============================
     # ADMIN THEME (DOIT être avant admin)
     # ============================
     "jazzmin",
 
     # Django core
-    "django_components",
+
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -198,16 +200,19 @@ STUDENT_LOGIN_URL = "http://127.0.0.1:8000/student/login/"
 # JAZZMIN CONFIG
 # ==================================================
 
+# ==================================================
+# JAZZMIN CONFIG
+# ==================================================
+
 JAZZMIN_SETTINGS = {
 
     # ------------------------------
     # BRANDING
     # ------------------------------
-    "site_title": "ESFE Administration",
-    "site_header": "ESFE | Gestion Académique",
-    "site_brand": "ESFE",
-    "welcome_sign": "Panneau de gestion institutionnelle",
-    "copyright": "École Supérieure de Formation et d'Excellence",
+    "site_title": "ESFé | Administration",
+    "site_header": "École de Santé Félix Houphouët Boigny",
+    "site_brand": "ESFé",
+    "welcome_sign": "Système de Gestion Institutionnel",
 
     # ------------------------------
     # UI
@@ -232,12 +237,12 @@ JAZZMIN_SETTINGS = {
     ],
 
     # ------------------------------
-    # ICONS
+    # ICONS (Font Awesome 6)
     # ------------------------------
     "icons": {
-        "auth": "fas fa-users-cog",
+        "auth": "fas fa-user-shield",
 
-        "admissions": "fas fa-file-signature",
+        "admissions": "fas fa-file-medical",
         "admissions.Candidature": "fas fa-user-plus",
 
         "inscriptions": "fas fa-id-card",
@@ -260,27 +265,34 @@ JAZZMIN_SETTINGS = {
     # ------------------------------
     "topmenu_links": [
         {
-            "name": "Dashboard stratégique",
-            "url": "superadmin_dashboard",
+            "name": "Dashboard",
+            "url": "/dashboard/",
+            "icon": "fas fa-chart-line",
+        },
+        {
+            "name": "Site public",
+            "url": "/",
+            "new_window": True,
+            "icon": "fas fa-globe",
+        },
+        {
+            "name": "Déconnexion",
+            "url": "/admin/logout/",
+            "icon": "fas fa-sign-out-alt",
         },
     ],
 
-
-    # ------------------------------
-    # GLOBAL SEARCH
-    # ------------------------------
     "search_model": [
         "admissions.Candidature",
         "inscriptions.Inscription",
         "payments.Payment",
         "students.Student",
     ],
-
-
+    "show_logout": True,
     "custom_css": "core/css/esfe_theme.css",
     "custom_js": "core/js/esfe_admin.js",
-
 }
+
 
 # ==================================================
 # JAZZMIN UI TWEAKS
@@ -289,11 +301,8 @@ JAZZMIN_SETTINGS = {
 JAZZMIN_UI_TWEAKS = {
     "theme": "flatly",
     "dark_mode_theme": "darkly",
-    "navbar": "navbar-dark navbar-primary",
+    "navbar": "navbar-dark",
     "sidebar": "sidebar-dark-primary",
-    "accent": "accent-indigo",
+    "accent": "accent-primary",
     "sidebar_nav_small_text": False,
-    "footer_small_text": False,
-
 }
-

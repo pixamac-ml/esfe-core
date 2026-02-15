@@ -1,0 +1,141 @@
+{% load humanize %}
+
+<div id="finance-block"
+     class="bg-white rounded-2xl shadow-md border p-8 space-y-10">
+
+    <!-- TITRE -->
+    <div>
+        <h2 class="text-xl font-semibold">
+            Situation financière
+        </h2>
+        <p class="text-sm text-gray-500 mt-1">
+            Consultez votre solde et effectuez votre paiement.
+        </p>
+    </div>
+
+    <!-- RÉSUMÉ -->
+    <div class="grid md:grid-cols-3 gap-6 text-sm">
+
+        <div class="bg-gray-50 rounded-xl p-4">
+            <p class="text-gray-500">Total à payer</p>
+            <p class="font-bold text-lg">
+                {{ inscription.amount_due|intcomma }} FCFA
+            </p>
+        </div>
+
+        <div class="bg-gray-50 rounded-xl p-4">
+            <p class="text-gray-500">Montant payé</p>
+            <p class="font-bold text-lg text-green-700">
+                {{ inscription.amount_paid|intcomma }} FCFA
+            </p>
+        </div>
+
+        <div class="bg-gray-50 rounded-xl p-4">
+            <p class="text-gray-500">Solde restant</p>
+            <p class="font-bold text-lg text-red-600">
+                {{ inscription.balance|intcomma }} FCFA
+            </p>
+        </div>
+
+    </div>
+
+    <!-- HISTORIQUE -->
+    <div class="space-y-4 text-sm">
+        <h3 class="font-semibold">Historique des paiements</h3>
+
+        {% if payments %}
+            {% for payment in payments %}
+                <div class="flex justify-between border-b pb-3">
+                    <div>
+                        {{ payment.amount|intcomma }} FCFA —
+                        {{ payment.get_method_display }}
+                    </div>
+                    <div class="font-medium">
+                        {{ payment.get_status_display }}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-500">Aucun paiement enregistré.</p>
+        {% endif %}
+    </div>
+
+    <!-- FORMULAIRE -->
+    {% if can_pay and payment_form %}
+
+        <div class="border-t pt-6">
+
+            <h3 class="font-semibold mb-4">
+                Initier un paiement
+            </h3>
+
+            <form
+                hx-post="{% url 'payments:student_initiate' inscription.public_token %}"
+                hx-target="#finance-block"
+                hx-swap="outerHTML"
+                class="space-y-6"
+            >
+                {% csrf_token %}
+
+                <!-- Méthode -->
+                <div>
+                    {{ payment_form.method.label_tag }}
+                    {{ payment_form.method }}
+                </div>
+
+                <!-- Agent -->
+                <div id="agent-session-block" class="space-y-2">
+
+                    {{ payment_form.agent_name.label_tag }}
+
+                    <input
+                        type="text"
+                        name="agent_name"
+                        hx-post="{% url 'payments:initiate_cash_session' inscription.public_token %}"
+                        hx-trigger="blur"
+                        hx-target="#agent-session-block"
+                        hx-swap="outerHTML"
+                        class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                        placeholder="Ex : Fatoumata Dia"
+                    >
+
+                    <p class="text-xs text-gray-500">
+                        Dès que vous entrez le nom de l’agent,
+                        un code temporaire est généré automatiquement.
+                    </p>
+
+                </div>
+
+                <!-- Code -->
+                <div>
+                    {{ payment_form.verification_code.label_tag }}
+                    {{ payment_form.verification_code }}
+                </div>
+
+                <!-- Montant -->
+                <div>
+                    {{ payment_form.amount.label_tag }}
+                    {{ payment_form.amount }}
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition">
+                    Envoyer la demande de paiement
+                </button>
+
+            </form>
+
+        </div>
+
+    {% elif has_pending_payment %}
+        <p class="text-orange-600 font-medium">
+            Une demande est déjà en attente de validation.
+        </p>
+    {% else %}
+        <p class="text-green-700 font-semibold">
+            Tous les frais sont réglés.
+        </p>
+    {% endif %}
+
+</div>

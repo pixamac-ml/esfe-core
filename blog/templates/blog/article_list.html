@@ -1,46 +1,189 @@
 {% extends "base.html" %}
 
-{% block title %}Blog – ESFE{% endblock %}
+{% block title %}Actualités & Articles – ESFE{% endblock %}
 
 {% block content %}
-<section class="max-w-5xl mx-auto px-4 py-16">
 
-  <header class="mb-12">
-    <h1 class="text-3xl font-poppins font-bold text-gray-900">
-      Actualités & Articles
-    </h1>
-    <p class="mt-2 text-gray-600 max-w-2xl">
-      Informations officielles, communiqués et articles institutionnels de l’ESFE.
-    </p>
-  </header>
+<!-- ================= HERO ================= -->
+<section class="bg-white border-b border-gray-200">
+  <div class="max-w-7xl mx-auto px-6 py-16">
 
-  <div class="space-y-10">
-    {% for article in articles %}
-      <article class="border-b border-gray-200 pb-8">
-        <h2 class="text-xl font-poppins font-semibold text-gray-900">
-          <a href="{% url 'blog:article_detail' article.slug %}"
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+
+      <div>
+        <h1 class="text-4xl font-poppins font-bold text-gray-900">
+          Actualités & Communications Officielles
+        </h1>
+        <p class="mt-4 text-gray-600 max-w-2xl">
+          Informations académiques, communiqués institutionnels et annonces officielles de l’ESFE.
+        </p>
+      </div>
+
+      <!-- Recherche -->
+      <div class="w-full lg:w-80">
+        <form method="get">
+          <input
+            type="text"
+            name="q"
+            placeholder="Rechercher un article..."
+            class="w-full rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+          >
+        </form>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ================= FEATURED ARTICLE ================= -->
+{% if articles %}
+<section class="max-w-7xl mx-auto px-6 py-12">
+
+  {% with featured=articles.0 %}
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition hover:shadow-lg">
+
+    <div class="grid lg:grid-cols-2">
+
+      <!-- Image -->
+      <div class="h-64 lg:h-full bg-gray-100">
+        {% if featured.featured_image %}
+          <img src="{{ featured.featured_image.url }}"
+               class="w-full h-full object-cover"
+               alt="{{ featured.title }}">
+        {% endif %}
+      </div>
+
+      <!-- Content -->
+      <div class="p-10 flex flex-col justify-center">
+
+        {% if featured.category %}
+          <span class="text-xs font-medium text-blue-600 uppercase tracking-wide">
+            {{ featured.category.name }}
+          </span>
+        {% endif %}
+
+        <h2 class="mt-4 text-3xl font-poppins font-semibold text-gray-900 leading-snug">
+          <a href="{% url 'blog:article_detail' featured.slug %}"
              class="hover:text-blue-600 transition">
-            {{ article.title }}
+            {{ featured.title }}
           </a>
         </h2>
 
-        <p class="mt-3 text-gray-700 leading-relaxed">
-          {{ article.excerpt }}
+        <p class="mt-4 text-gray-600 leading-relaxed">
+          {{ featured.excerpt|truncatechars:220 }}
         </p>
 
-        <div class="mt-4">
-          <a href="{% url 'blog:article_detail' article.slug %}"
-             class="inline-flex items-center text-sm font-medium text-blue-600 hover:underline">
+        <div class="mt-6">
+          <a href="{% url 'blog:article_detail' featured.slug %}"
+             class="inline-flex items-center text-blue-600 font-medium hover:underline">
             Lire l’article →
           </a>
         </div>
-      </article>
-    {% empty %}
-      <p class="text-gray-500">
-        Aucun article publié pour le moment.
-      </p>
-    {% endfor %}
+
+      </div>
+
+    </div>
   </div>
+  {% endwith %}
 
 </section>
+{% endif %}
+
+
+<!-- ================= MAIN + SIDEBAR ================= -->
+<section class="max-w-7xl mx-auto px-6 pb-20">
+  <div class="grid lg:grid-cols-12 gap-12">
+
+    <!-- ================= MAIN (8 cols) ================= -->
+    <div class="lg:col-span-8">
+
+      <h3 class="text-xl font-poppins font-semibold text-gray-900 mb-8">
+        Articles récents
+      </h3>
+
+      <div class="grid sm:grid-cols-2 gap-8">
+
+        {% for article in articles|slice:"1:" %}
+          {% component "blog_article_card" article=article %}{% endcomponent %}
+        {% empty %}
+          <p class="text-gray-500">Aucun article disponible.</p>
+        {% endfor %}
+
+      </div>
+
+      <!-- Pagination -->
+      {% if articles.has_other_pages %}
+      <div class="mt-12 flex justify-center">
+        <div class="flex items-center gap-4 text-sm">
+
+          {% if articles.has_previous %}
+            <a href="?page={{ articles.previous_page_number }}"
+               class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+              ← Précédent
+            </a>
+          {% endif %}
+
+          <span class="text-gray-600">
+            Page {{ articles.number }} / {{ articles.paginator.num_pages }}
+          </span>
+
+          {% if articles.has_next %}
+            <a href="?page={{ articles.next_page_number }}"
+               class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+              Suivant →
+            </a>
+          {% endif %}
+
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+
+    <!-- ================= SIDEBAR (4 cols) ================= -->
+    <aside class="lg:col-span-4 space-y-10">
+
+      <!-- Catégories -->
+      <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <h4 class="font-semibold text-gray-900 mb-4">
+          Catégories
+        </h4>
+
+        <ul class="space-y-3 text-sm">
+          {% for category in categories %}
+            <li>
+              <a href="{% url 'blog:category_detail' category.slug %}"
+                 class="flex justify-between hover:text-blue-600 transition">
+                <span>{{ category.name }}</span>
+                <span class="text-gray-400">
+                  ({{ category.articles.count }})
+                </span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Bloc institutionnel -->
+      <div class="bg-blue-600 text-white rounded-2xl p-6">
+        <h4 class="font-semibold mb-3">
+          Besoin d’informations ?
+        </h4>
+        <p class="text-sm text-blue-100">
+          Contactez l’administration pour toute question académique ou administrative.
+        </p>
+        <a href="/contact/"
+           class="inline-block mt-4 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium">
+          Nous contacter
+        </a>
+      </div>
+
+    </aside>
+
+  </div>
+</section>
+
 {% endblock %}

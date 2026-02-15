@@ -1,274 +1,53 @@
 {% extends "base.html" %}
+{% load component_tags %}
 {% load humanize %}
-
-{% block title %}
-Dossier d’inscription – {{ programme.title }} | ESFE
-{% endblock %}
 
 {% block content %}
 
-<section class="max-w-3xl mx-auto px-6 py-20 space-y-10">
+<section class="max-w-5xl mx-auto px-6 py-20 space-y-10">
 
-  <!-- EN-TÊTE -->
-  <header>
-    <h1 class="text-2xl font-bold">Dossier d’inscription</h1>
-    <p class="text-gray-600 text-sm mt-1">
-      Lien personnel permettant de suivre votre inscription et vos paiements.
-    </p>
-  </header>
+    <!-- HERO -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl p-10 shadow-lg">
 
+        <div class="flex justify-between items-center">
 
-  <!-- ========================= -->
-  <!-- MESSAGES DJANGO (PROPRES) -->
-  <!-- ========================= -->
-  {% if messages %}
-    <div class="space-y-3">
-      {% for message in messages %}
-        <div class="p-4 rounded-lg text-sm font-medium
-          {% if message.tags == 'success' %}
-            bg-green-100 text-green-800
-          {% elif message.tags == 'error' %}
-            bg-red-100 text-red-800
-          {% elif message.tags == 'warning' %}
-            bg-orange-100 text-orange-800
-          {% else %}
-            bg-blue-100 text-blue-800
-          {% endif %}
-        ">
-          {{ message }}
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
+            <div>
+                <p class="text-sm opacity-80">Dossier d’inscription</p>
+                <h1 class="text-2xl font-bold mt-1">
+                    {{ candidature.last_name }} {{ candidature.first_name }}
+                </h1>
+                <p class="text-sm opacity-80 mt-2">
+                    {{ programme.title }}
+                </p>
+            </div>
 
-
-  <!-- ========================= -->
-  <!-- CANDIDAT -->
-  <!-- ========================= -->
-  <section class="border rounded-lg p-6">
-    <h2 class="font-semibold mb-2">👤 Candidat</h2>
-    <p class="font-medium">
-      {{ candidature.last_name }} {{ candidature.first_name }}
-    </p>
-    <p class="text-sm text-gray-600">{{ candidature.email }}</p>
-    <p class="text-sm text-gray-600">{{ candidature.phone }}</p>
-  </section>
-
-
-  <!-- ========================= -->
-  <!-- FORMATION -->
-  <!-- ========================= -->
-  <section class="border rounded-lg p-6">
-    <h2 class="font-semibold mb-2">🎓 Formation</h2>
-    <p class="font-medium">{{ programme.title }}</p>
-    <p class="text-sm text-gray-600">
-      {{ programme.cycle.name }} — {{ programme.filiere.name }}
-    </p>
-  </section>
-
-
-  <!-- ========================= -->
-  <!-- STATUT -->
-  <!-- ========================= -->
-  <section class="border rounded-lg p-6">
-    <h2 class="font-semibold mb-2">📂 État du dossier</h2>
-
-    {% if inscription.status == "active" %}
-      <p class="text-green-700 font-medium">✔ Inscription active</p>
-    {% elif inscription.status == "created" %}
-      <p class="text-blue-700 font-medium">⏳ En attente de paiement</p>
-    {% else %}
-      <p class="text-red-700 font-medium">⚠ Inscription suspendue</p>
-    {% endif %}
-  </section>
-
-
-  <!-- ========================= -->
-  <!-- HISTORIQUE DES PAIEMENTS -->
-  <!-- ========================= -->
-  <section class="border rounded-lg p-6">
-    <h2 class="font-semibold mb-4">🧾 Historique des paiements</h2>
-
-    {% if payments %}
-      {% for payment in payments %}
-        <div class="flex justify-between border-b py-3">
-
-          <div>
-            <p class="font-medium">
-              {{ payment.amount|intcomma }} FCFA —
-              {{ payment.get_method_display }}
-            </p>
-
-            <p class="text-xs text-gray-500">
-              {{ payment.created_at|date:"d/m/Y H:i" }}
-            </p>
-
-            {% if payment.method == "cash" and payment.agent %}
-              <p class="text-xs text-gray-500">
-                Agent : {{ payment.agent.user.get_full_name }}
-              </p>
-            {% endif %}
-          </div>
-
-          <div class="text-right">
-            {% if payment.status == "validated" %}
-              <span class="text-green-700 font-semibold">✔ Validé</span>
-
-              {% if payment.receipt_number %}
-                <div>
-                  <a
-                    href="{% url 'payments:receipt_pdf' payment.receipt_number %}"
-                    class="text-blue-600 text-sm underline">
-                    Télécharger le reçu
-                  </a>
+            <div class="text-right">
+                <div class="text-xs opacity-70">Référence</div>
+                <div class="font-mono text-sm">
+                    {{ inscription.reference }}
                 </div>
-              {% endif %}
-
-            {% elif payment.status == "pending" %}
-              <span class="text-orange-600">⏳ En attente</span>
-
-            {% else %}
-              <span class="text-red-600">✖ Annulé</span>
-            {% endif %}
-          </div>
+            </div>
 
         </div>
-      {% endfor %}
-    {% else %}
-      <p class="text-sm text-gray-500">Aucun paiement enregistré.</p>
-    {% endif %}
-  </section>
-
-
-  <!-- ========================= -->
-  <!-- SITUATION FINANCIÈRE -->
-  <!-- ========================= -->
-  <section class="border rounded-lg p-6 space-y-6">
-    <h2 class="font-semibold">💰 Situation financière</h2>
-
-    <div class="grid grid-cols-3 gap-4 text-sm">
-      <div>
-        <p class="text-gray-500">Total</p>
-        <p class="font-semibold">
-          {{ inscription.amount_due|intcomma }} FCFA
-        </p>
-      </div>
-      <div>
-        <p class="text-gray-500">Payé</p>
-        <p class="font-semibold">
-          {{ inscription.amount_paid|intcomma }} FCFA
-        </p>
-      </div>
-      <div>
-        <p class="text-gray-500">Solde</p>
-        <p class="font-semibold">
-          {{ inscription.balance|intcomma }} FCFA
-        </p>
-      </div>
     </div>
 
+    {% component "inscription_identity"
+        candidature=candidature
+        programme=programme
+    %}{% endcomponent %}
 
-    <!-- ========================= -->
-    <!-- FORMULAIRE DE PAIEMENT -->
-    <!-- ========================= -->
-    {% if can_pay and payment_form %}
+    {% component "inscription_status"
+        inscription=inscription
+    %}{% endcomponent %}
 
-      <form method="post"
-            action="{% url 'payments:student_initiate' inscription.public_token %}"
-            class="space-y-6">
-
-        {% csrf_token %}
-
-        {% if payment_form.non_field_errors %}
-          <div class="bg-red-100 text-red-700 p-4 rounded-lg text-sm">
-            {{ payment_form.non_field_errors }}
-          </div>
-        {% endif %}
-
-        <div class="space-y-4">
-
-          <div>
-            {{ payment_form.method.label_tag }}
-            {{ payment_form.method }}
-            {{ payment_form.method.errors }}
-          </div>
-
-          <div>
-            {{ payment_form.agent_name.label_tag }}
-            {{ payment_form.agent_name }}
-            {{ payment_form.agent_name.errors }}
-          </div>
-
-          <div>
-            {{ payment_form.verification_code.label_tag }}
-            {{ payment_form.verification_code }}
-            {{ payment_form.verification_code.errors }}
-          </div>
-
-          <div>
-            {{ payment_form.amount.label_tag }}
-            {{ payment_form.amount }}
-            {{ payment_form.amount.errors }}
-          </div>
-
-        </div>
-
-        <button
-          type="submit"
-          class="w-full bg-blue-600 hover:bg-blue-700 transition text-white py-3 rounded-lg font-semibold">
-          Envoyer la demande de paiement
-        </button>
-
-      </form>
-
-    {% elif has_pending_payment %}
-      <p class="text-orange-600 font-medium">
-        ⏳ Une demande de paiement est déjà en attente de validation.
-      </p>
-
-    {% else %}
-      <p class="text-green-700 font-semibold">
-        ✔ Tous les frais sont réglés.
-      </p>
-    {% endif %}
-
-  </section>
+    {% component "inscription_finance"
+        inscription=inscription
+        payments=payments
+        can_pay=can_pay
+        has_pending_payment=has_pending_payment
+        payment_form=payment_form
+    %}{% endcomponent %}
 
 </section>
-
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    const agentInput = document.querySelector("input[name='agent_name']");
-    if (!agentInput) return;
-
-    const url = "{% url 'payments:verify_agent_ajax' %}";
-
-    agentInput.addEventListener("blur", function () {
-
-        const value = agentInput.value.trim();
-        if (!value) return;
-
-        fetch(url + "?name=" + encodeURIComponent(value))
-            .then(response => response.json())
-            .then(data => {
-
-                agentInput.classList.remove("border-green-500", "border-red-500");
-
-                if (data.valid) {
-                    agentInput.classList.add("border-green-500");
-                    agentInput.readOnly = true;
-
-                    console.log("Agent valide :", data.full_name);
-                } else {
-                    agentInput.classList.add("border-red-500");
-                }
-
-            });
-    });
-});
-</script>
-
 
 {% endblock %}

@@ -20,4 +20,11 @@ urlpatterns = [
         views.verify_agent_ajax,
         name="verify_agent_ajax"
     ),
+
+    path(
+        "cash-session/<str:token>/",
+        views.initiate_cash_session,
+        name="initiate_cash_session",
+    ),
+
 ]

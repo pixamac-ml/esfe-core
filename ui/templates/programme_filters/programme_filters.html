@@ -1,0 +1,85 @@
+<div class="bg-white rounded-3xl border border-primary/10 shadow-sm
+            p-8 space-y-10 sticky top-28">
+
+  <!-- Recherche -->
+  <form
+      hx-get="{% url 'formations:list' %}"
+      hx-target="#programme-container"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      class="space-y-4"
+  >
+      <h3 class="text-sm font-semibold text-primary uppercase tracking-wide">
+          Recherche
+      </h3>
+
+      <input type="hidden" name="cycle" value="{{ current_cycle|default:'' }}">
+
+      <div class="relative">
+          <input
+              type="text"
+              name="q"
+              value="{{ search_query|default:'' }}"
+              placeholder="Rechercher une formation..."
+              hx-trigger="keyup changed delay:300ms"
+              class="w-full pl-12 py-4 rounded-xl
+                     border border-primary/20
+                     focus:ring-2 focus:ring-secondary/40
+                     focus:border-secondary transition"
+          />
+
+          <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary"
+               fill="none" stroke="currentColor" stroke-width="2"
+               viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+      </div>
+  </form>
+
+
+  <!-- Cycle -->
+  <div class="space-y-6">
+
+      <h3 class="text-sm font-semibold text-primary uppercase tracking-wide">
+          Cycle
+      </h3>
+
+      <div class="space-y-3">
+
+          <button
+              hx-get="{% url 'formations:list' %}"
+              hx-target="#programme-container"
+              hx-swap="innerHTML"
+              hx-push-url="true"
+              class="w-full px-5 py-4 rounded-xl text-sm font-medium
+                     {% if not current_cycle %}
+                     bg-primary text-white
+                     {% else %}
+                     bg-white border border-primary/20 text-primary hover:bg-primary hover:text-white
+                     {% endif %}"
+          >
+              Toutes les formations
+          </button>
+
+          {% for cycle in cycles %}
+          <button
+              hx-get="{% url 'formations:list' %}?cycle={{ cycle.slug }}"
+              hx-target="#programme-container"
+              hx-swap="innerHTML"
+              hx-push-url="true"
+              class="w-full px-5 py-4 rounded-xl text-sm font-medium
+                     {% if current_cycle == cycle.slug %}
+                     bg-secondary text-white
+                     {% else %}
+                     bg-white border border-primary/20 text-primary hover:bg-secondary hover:text-white
+                     {% endif %}"
+          >
+              {{ cycle.name }}
+          </button>
+          {% endfor %}
+
+      </div>
+  </div>
+
+</div>

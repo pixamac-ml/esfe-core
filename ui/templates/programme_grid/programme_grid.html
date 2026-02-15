@@ -1,0 +1,26 @@
+{% load component_tags %}
+
+<div class="mb-8 text-sm text-primary font-medium">
+    {{ total_programmes }} formation{{ total_programmes|pluralize }}
+</div>
+
+<div class="grid md:grid-cols-2 xl:grid-cols-3 gap-10">
+
+    {% for programme in programmes %}
+        {% component "programme_card"
+            title=programme.title
+            short_description=programme.short_description
+            cycle=programme.cycle.name
+            duration=programme.duration_years
+            diploma=programme.diploma_awarded.name
+            url=programme.get_absolute_url
+            is_featured=programme.is_featured
+        %}
+        {% endcomponent %}
+    {% empty %}
+        <div class="col-span-full text-center py-20 text-primary">
+            Aucune formation trouvée.
+        </div>
+    {% endfor %}
+
+</div>

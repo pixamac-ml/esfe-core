@@ -1,5 +1,6 @@
 # payments/admin.py
-
+from django.utils.safestring import mark_safe
+from django.utils import timezone
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
@@ -201,18 +202,74 @@ class PaymentAgentAdmin(admin.ModelAdmin):
 
 @admin.register(CashPaymentSession)
 class CashPaymentSessionAdmin(admin.ModelAdmin):
+
     list_display = (
-        "inscription",
+        "inscription_reference",
+        "candidate_name",
         "agent",
-        "verification_code",
-        "is_used",
+        "verification_code_display",
+        "status_display",
         "expires_at",
         "created_at",
     )
+
+    list_filter = (
+        "agent",
+        "is_used",
+        "expires_at",
+    )
+
     search_fields = (
         "inscription__reference",
+        "inscription__candidature__first_name",
+        "inscription__candidature__last_name",
         "agent__user__first_name",
         "agent__user__last_name",
     )
-    list_filter = ("is_used",)
 
+    ordering = ("-created_at",)
+
+    readonly_fields = (
+        "verification_code",
+        "expires_at",
+        "created_at",
+    )
+
+    # ==========================================
+    # AFFICHAGES CUSTOM
+    # ==========================================
+
+    @admin.display(description="Référence inscription")
+    def inscription_reference(self, obj):
+        return obj.inscription.reference
+
+    @admin.display(description="Candidat")
+    def candidate_name(self, obj):
+        c = obj.inscription.candidature
+        return f"{c.last_name} {c.first_name}"
+
+    @admin.display(description="Code")
+    def verification_code_display(self, obj):
+        return format_html(
+            "<strong style='font-size:14px;'>{}</strong>",
+            obj.verification_code
+        )
+
+
+
+    @admin.display(description="Statut")
+    def status_display(self, obj):
+
+        if obj.is_used:
+            return mark_safe(
+                '<span style="color:#198754; font-weight:600;">Utilisé</span>'
+            )
+
+        if timezone.now() > obj.expires_at:
+            return mark_safe(
+                '<span style="color:#dc3545; font-weight:600;">Expiré</span>'
+            )
+
+        return mark_safe(
+            '<span style="color:#ffc107; font-weight:600;">Actif</span>'
+        )

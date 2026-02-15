@@ -1,75 +1,99 @@
 {% extends "base.html" %}
 {% load component_tags %}
+{% load static %}
+{% load humanize %}
 
 {% block title %}Formations – ESFE{% endblock %}
 
 {% block content %}
 
-<!-- ===================================================== -->
-<!-- HEADER SECTION                                        -->
-<!-- ===================================================== -->
+<!-- ================= HERO INSTITUTIONNEL ================= -->
+<section class="relative overflow-hidden bg-primary text-white">
 
-{% component "section_header"
-  title="Nos formations"
-  subtitle="Des parcours adaptés aux métiers de la santé"
-%}{% endcomponent %}
+  <div class="absolute inset-0">
+    <img src="{% static 'public/images/hero-formation.png' %}"
+         class="w-full h-full object-cover opacity-15"
+         alt="ESFE formations">
+  </div>
 
+  <div class="absolute inset-0 bg-gradient-to-r from-primary/95 to-primary/80"></div>
 
-<!-- ===================================================== -->
-<!-- SECTION FORMATIONS                                    -->
-<!-- ===================================================== -->
+  <div class="relative max-w-7xl mx-auto px-6 py-28">
 
-<section class="py-16">
+    <div class="max-w-3xl space-y-8">
 
-  <div class="max-w-7xl mx-auto px-6">
+      <div class="inline-flex items-center gap-3
+                  bg-white/10 backdrop-blur-md
+                  px-6 py-3 rounded-full text-sm tracking-wide">
 
-    <!-- ================= FILTRES ================= -->
+        <svg class="w-5 h-5 text-secondary" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 2L2 6l8 4 8-4-8-4z"/>
+        </svg>
 
-    <div class="flex flex-wrap justify-center gap-4 mb-12">
+        Catalogue académique officiel
+      </div>
 
-      <!-- Toutes -->
-      <button
-        hx-get="{% url 'formations:list_fragment' %}"
-        hx-target="#programme-container"
-        hx-swap="innerHTML"
-        hx-push-url="true"
-        class="px-4 py-2 rounded-md text-sm font-medium transition
-               bg-gray-200 hover:bg-gray-300"
-      >
-        Toutes
-      </button>
+      <h1 class="text-5xl md:text-6xl font-bold leading-tight">
+        Nos Formations
+        <span class="block text-secondary">
+          Professionnelles
+        </span>
+      </h1>
 
-      <!-- Cycles -->
-      {% for cycle in cycles %}
-        <button
-          hx-get="{% url 'formations:list_fragment' %}?cycle={{ cycle.slug }}"
-          hx-target="#programme-container"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-          class="px-4 py-2 rounded-md text-sm font-medium transition
-                 bg-gray-200 hover:bg-gray-300"
-        >
-          {{ cycle.name }}
-        </button>
-      {% endfor %}
+      <p class="text-lg text-white/80 leading-relaxed">
+        Des parcours structurés pour former les professionnels de santé
+        avec rigueur, éthique et excellence.
+      </p>
 
-    </div>
-
-
-    <!-- ================= CONTAINER DYNAMIQUE ================= -->
-
-    <div
-      id="programme-container"
-      hx-get="{% url 'formations:list_fragment' %}"
-      hx-trigger="load"
-      hx-swap="innerHTML"
-      hx-indicator="#global-loader"
-      class="min-h-[300px]"
-    >
     </div>
 
   </div>
+</section>
 
+
+<!-- ================= CONTENU ================= -->
+<section class="py-24 bg-soft">
+  <div class="max-w-7xl mx-auto px-6">
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-16">
+
+      <!-- Sidebar -->
+      <aside class="lg:col-span-1">
+
+        {% component "programme_filters"
+            cycles=cycles
+            current_cycle=current_cycle
+            search_query=search_query
+        %}
+        {% endcomponent %}
+
+      </aside>
+
+      <!-- Grid -->
+      <div class="lg:col-span-3">
+
+        <div
+          id="programme-container"
+          hx-get="{% url 'formations:list' %}"
+          hx-trigger="load"
+          hx-target="#programme-container"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-history-elt
+          hx-indicator="#loader"
+          class="min-h-[400px]"
+        ></div>
+
+        <div id="loader"
+             class="hidden flex items-center justify-center py-16">
+          <div class="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
 </section>
 
 {% endblock %}

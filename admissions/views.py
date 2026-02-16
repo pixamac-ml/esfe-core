@@ -4,6 +4,7 @@ from django.contrib import messages
 from formations.models import Programme
 from .forms import CandidatureForm
 from .models import CandidatureDocument, Candidature
+from django.templatetags.static import static
 
 
 def apply_to_programme(request, slug):
@@ -72,6 +73,7 @@ def apply_to_programme(request, slug):
         "programme": programme,
         "form": form,
         "required_documents": required_documents,
+        "lab_image": static("images/lab_students.png"),
     }
 
     return render(

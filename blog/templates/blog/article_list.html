@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load component_tags %}
 
 {% block title %}Actualités & Articles – ESFE{% endblock %}
 
@@ -25,8 +26,9 @@
           <input
             type="text"
             name="q"
+            value="{{ request.GET.q }}"
             placeholder="Rechercher un article..."
-            class="w-full rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-[#0f2c59] focus:border-[#0f2c59]"
           >
         </form>
       </div>
@@ -38,11 +40,12 @@
 
 
 <!-- ================= FEATURED ARTICLE ================= -->
-{% if articles %}
+{% if articles and articles|length > 0 %}
 <section class="max-w-7xl mx-auto px-6 py-12">
 
   {% with featured=articles.0 %}
-  <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition hover:shadow-lg">
+  <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden
+              shadow-sm hover:shadow-xl transition duration-300">
 
     <div class="grid lg:grid-cols-2">
 
@@ -52,6 +55,10 @@
           <img src="{{ featured.featured_image.url }}"
                class="w-full h-full object-cover"
                alt="{{ featured.title }}">
+        {% else %}
+          <div class="w-full h-full flex items-center justify-center text-gray-400">
+            Image non disponible
+          </div>
         {% endif %}
       </div>
 
@@ -59,14 +66,12 @@
       <div class="p-10 flex flex-col justify-center">
 
         {% if featured.category %}
-          <span class="text-xs font-medium text-blue-600 uppercase tracking-wide">
-            {{ featured.category.name }}
-          </span>
+          {% component "category_badge" category=featured.category %}{% endcomponent %}
         {% endif %}
 
         <h2 class="mt-4 text-3xl font-poppins font-semibold text-gray-900 leading-snug">
-          <a href="{% url 'blog:article_detail' featured.slug %}"
-             class="hover:text-blue-600 transition">
+          <a href="{{ featured.get_absolute_url }}"
+             class="hover:text-[#0f2c59] transition">
             {{ featured.title }}
           </a>
         </h2>
@@ -76,8 +81,8 @@
         </p>
 
         <div class="mt-6">
-          <a href="{% url 'blog:article_detail' featured.slug %}"
-             class="inline-flex items-center text-blue-600 font-medium hover:underline">
+          <a href="{{ featured.get_absolute_url }}"
+             class="inline-flex items-center text-[#0f2c59] font-medium hover:underline">
             Lire l’article →
           </a>
         </div>
@@ -96,7 +101,7 @@
 <section class="max-w-7xl mx-auto px-6 pb-20">
   <div class="grid lg:grid-cols-12 gap-12">
 
-    <!-- ================= MAIN (8 cols) ================= -->
+    <!-- ================= MAIN ================= -->
     <div class="lg:col-span-8">
 
       <h3 class="text-xl font-poppins font-semibold text-gray-900 mb-8">
@@ -119,8 +124,8 @@
         <div class="flex items-center gap-4 text-sm">
 
           {% if articles.has_previous %}
-            <a href="?page={{ articles.previous_page_number }}"
-               class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+            <a href="?page={{ articles.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+               class="px-4 py-2 border rounded-lg hover:bg-gray-100 shadow-sm">
               ← Précédent
             </a>
           {% endif %}
@@ -130,8 +135,8 @@
           </span>
 
           {% if articles.has_next %}
-            <a href="?page={{ articles.next_page_number }}"
-               class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+            <a href="?page={{ articles.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}"
+               class="px-4 py-2 border rounded-lg hover:bg-gray-100 shadow-sm">
               Suivant →
             </a>
           {% endif %}
@@ -143,32 +148,13 @@
     </div>
 
 
-    <!-- ================= SIDEBAR (4 cols) ================= -->
+    <!-- ================= SIDEBAR ================= -->
     <aside class="lg:col-span-4 space-y-10">
 
-      <!-- Catégories -->
-      <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-        <h4 class="font-semibold text-gray-900 mb-4">
-          Catégories
-        </h4>
-
-        <ul class="space-y-3 text-sm">
-          {% for category in categories %}
-            <li>
-              <a href="{% url 'blog:category_detail' category.slug %}"
-                 class="flex justify-between hover:text-blue-600 transition">
-                <span>{{ category.name }}</span>
-                <span class="text-gray-400">
-                  ({{ category.articles.count }})
-                </span>
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-      </div>
+      {% component "blog_sidebar" %}{% endcomponent %}
 
       <!-- Bloc institutionnel -->
-      <div class="bg-blue-600 text-white rounded-2xl p-6">
+      <div class="bg-[#0f2c59] text-white rounded-2xl p-6 shadow-lg">
         <h4 class="font-semibold mb-3">
           Besoin d’informations ?
         </h4>
@@ -176,7 +162,7 @@
           Contactez l’administration pour toute question académique ou administrative.
         </p>
         <a href="/contact/"
-           class="inline-block mt-4 bg-white text-blue-600 px-4 py-2 rounded-lg text-sm font-medium">
+           class="inline-block mt-4 bg-white text-[#0f2c59] px-4 py-2 rounded-lg text-sm font-medium shadow-md hover:bg-gray-100 transition">
           Nous contacter
         </a>
       </div>

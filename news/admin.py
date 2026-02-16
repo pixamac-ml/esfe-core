@@ -1,5 +1,6 @@
-# admin.py
 from django.contrib import admin
+from django.utils import timezone
+
 from .models import News, Category, NewsImage
 
 
@@ -31,6 +32,7 @@ class NewsImageInline(admin.TabularInline):
 # --------------------------------------------------
 @admin.register(News)
 class NewsAdmin(admin.ModelAdmin):
+
     list_display = (
         "titre",
         "categorie",
@@ -96,3 +98,18 @@ class NewsAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+    # --------------------------------------------------
+    # SÉCURISATION PUBLICATION
+    # --------------------------------------------------
+    def save_model(self, request, obj, form, change):
+
+        # Si on publie sans date → on force la date
+        if obj.status == obj.STATUS_PUBLISHED and not obj.published_at:
+            obj.published_at = timezone.now()
+
+        # Si pas d’auteur → on attribue l’admin connecté
+        if not obj.auteur:
+            obj.auteur = request.user
+
+        super().save_model(request, obj, form, change)

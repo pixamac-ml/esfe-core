@@ -1,54 +1,161 @@
 from django.utils import timezone
-from .models import Comment
+from django.db.models import Q
+from django.core.exceptions import ValidationError
 
+from .models import Comment, CommentLike
+
+
+# ==========================================================
+# CONFIGURATION MODERATION
+# ==========================================================
 
 SENSITIVE_KEYWORDS = [
-    'fraude', 'argent', 'paiement', 'corruption',
-    'faux', 'escroquerie', 'arnaque'
+    "fraude", "argent", "paiement", "corruption",
+    "faux", "escroquerie", "arnaque"
 ]
 
+MAX_COMMENT_LENGTH = 2000
+MIN_COMMENT_LENGTH = 3
+FLOOD_DELAY_SECONDS = 60
 
-def must_be_moderated(content: str) -> bool:
+
+# ==========================================================
+# UTILITAIRE : Détection mots sensibles
+# ==========================================================
+
+def must_be_flagged(content: str) -> bool:
+    if not content:
+        return True
+
     content = content.lower()
     return any(word in content for word in SENSITIVE_KEYWORDS)
 
 
+# ==========================================================
+# VALIDATION INTERNE COMMENTAIRE
+# ==========================================================
+
+def validate_comment_content(content: str):
+    if not content:
+        raise ValidationError("Le commentaire ne peut pas être vide.")
+
+    if len(content) < MIN_COMMENT_LENGTH:
+        raise ValidationError("Commentaire trop court.")
+
+    if len(content) > MAX_COMMENT_LENGTH:
+        raise ValidationError("Commentaire trop long.")
+
+
+# ==========================================================
+# ANTI-FLOOD SIMPLE
+# ==========================================================
+
+def is_flooding(article, content, user):
+    threshold = timezone.now() - timezone.timedelta(seconds=FLOOD_DELAY_SECONDS)
+
+    filters = {
+        "article": article,
+        "content": content,
+        "created_at__gte": threshold,
+    }
+
+    if user and user.is_authenticated:
+        filters["author_user"] = user
+
+    return Comment.objects.filter(**filters).exists()
+
+
+# ==========================================================
+# CREATION COMMENTAIRE
+# ==========================================================
+
 def create_comment(article, data, user=None):
-    status = 'approved'
 
-    if must_be_moderated(data['content']):
-        status = 'pending'
+    content = (data.get("content") or "").strip()
+    author_name = (data.get("author_name") or "").strip()
+    author_email = (data.get("author_email") or "").strip()
 
-    if not user:
-        status = 'pending'
+    validate_comment_content(content)
+
+    if not author_name:
+        author_name = "Utilisateur"
+
+    if is_flooding(article, content, user):
+        raise ValidationError("Vous venez déjà de publier ce commentaire.")
+
+    flagged = must_be_flagged(content)
 
     comment = Comment.objects.create(
         article=article,
-        author_name=data['author_name'],
-        author_email=data.get('author_email'),
-        content=data['content'],
-        author_user=user,
-        status=status
+        author_name=author_name,
+        author_email=author_email or None,
+        content=content,
+        author_user=user if user and user.is_authenticated else None,
+        status=Comment.STATUS_APPROVED,
+        flagged=flagged
     )
 
     return comment
 
 
+# ==========================================================
+# APPROBATION COMMENTAIRE
+# ==========================================================
+
 def approve_comment(comment, moderator):
-    comment.status = 'approved'
-    comment.approved_by = moderator
-    comment.approved_at = timezone.now()
-    comment.save()
+    if comment.status == Comment.STATUS_APPROVED:
+        return comment
+
+    comment.mark_approved(moderator)
+    return comment
 
 
-from .models import CommentLike
+# ==========================================================
+# REJET COMMENTAIRE
+# ==========================================================
+
+def reject_comment(comment, moderator):
+    comment.mark_rejected(moderator)
+    return comment
 
 
-def like_comment(comment, request):
-    ip = request.META.get('REMOTE_ADDR')
+# ==========================================================
+# REACTION COMMENTAIRE (LIKE / DISLIKE)
+# ==========================================================
 
-    CommentLike.objects.get_or_create(
+def react_to_comment(comment, request, reaction_type):
+
+    if comment.status != Comment.STATUS_APPROVED:
+        return None
+
+    if reaction_type not in [
+        CommentLike.REACTION_LIKE,
+        CommentLike.REACTION_DISLIKE
+    ]:
+        raise ValidationError("Type de réaction invalide.")
+
+    ip = request.META.get("REMOTE_ADDR")
+    user = request.user if request.user.is_authenticated else None
+
+    if not ip:
+        return None
+
+    existing = CommentLike.objects.filter(
+        comment=comment
+    ).filter(
+        Q(user=user) | Q(ip_address=ip)
+    ).first()
+
+    if existing:
+        # Change la réaction si différente
+        if existing.reaction_type != reaction_type:
+            existing.reaction_type = reaction_type
+            existing.save(update_fields=["reaction_type"])
+        return existing
+
+    return CommentLike.objects.create(
         comment=comment,
-        user=request.user if request.user.is_authenticated else None,
-        ip_address=ip
+        user=user,
+        ip_address=ip,
+        reaction_type=reaction_type
     )

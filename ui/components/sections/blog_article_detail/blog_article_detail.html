@@ -1,0 +1,71 @@
+<section class="py-16 bg-gray-50">
+  <div class="max-w-7xl mx-auto px-6">
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+
+      <!-- 75% -->
+      <div class="lg:col-span-9 space-y-16">
+
+        <!-- ARTICLE CARD -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 transition hover:shadow-md">
+
+          {% component "article_meta" article=article %}{% endcomponent %}
+
+          <div class="mt-10 prose prose-lg max-w-none text-gray-800">
+            {{ article.content|linebreaks }}
+          </div>
+
+          {% component "reaction_bar" article=article %}{% endcomponent %}
+
+        </div>
+
+        <!-- COMMENTS -->
+        <div class="space-y-8">
+
+          <h2 class="text-2xl font-semibold text-gray-900">
+            Commentaires ({{ comments|length }})
+          </h2>
+
+          {% for comment in comments %}
+            {% component "comment_card" comment=comment %}{% endcomponent %}
+          {% empty %}
+            <p class="text-gray-500">Aucun commentaire.</p>
+          {% endfor %}
+
+          {% component "comment_form" article=article %}{% endcomponent %}
+
+        </div>
+
+      </div>
+
+      <!-- 25% SIDEBAR -->
+      <div class="lg:col-span-3">
+
+        <div class="sticky top-24 space-y-8">
+
+          {% component "share_card" article=article %}{% endcomponent %}
+
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <h4 class="font-semibold text-gray-900 mb-6">
+              Articles similaires
+            </h4>
+
+            <div class="space-y-4">
+              {% for item in related_articles %}
+                {% component "related_article_card" article=item %}{% endcomponent %}
+              {% empty %}
+                <p class="text-sm text-gray-400">
+                  Aucun article similaire.
+                </p>
+              {% endfor %}
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</section>

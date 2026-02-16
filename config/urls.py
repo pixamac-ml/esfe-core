@@ -31,6 +31,7 @@ urlpatterns = [
     path("admissions/", include("admissions.urls")),
     path("inscriptions/", include("inscriptions.urls")),
     path("payments/", include("payments.urls")),
+    path("actualites/", include("news.urls", namespace="news")),
 
 ]
 

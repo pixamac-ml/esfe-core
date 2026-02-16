@@ -24,10 +24,11 @@ urlpatterns = [
     # COMMENTAIRES
     # ======================================================
 
-    path('comment/<int:comment_id>/like/',
-         views.like_comment_view,
-         name='like_comment'),
-
+    path(
+        "comment/<int:comment_id>/react/",
+        views.react_comment_view,
+        name="react_comment"
+    ),
 
     # ======================================================
     # MODERATION

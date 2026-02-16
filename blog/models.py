@@ -163,58 +163,153 @@ class ArticleImage(models.Model):
 # COMMENT
 # ==========================================================
 
+# ==========================================================
+# COMMENT
+# ==========================================================
 class Comment(models.Model):
 
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+
     STATUS_CHOICES = (
-        ('pending', 'En attente'),
-        ('approved', 'Approuvé'),
-        ('rejected', 'Rejeté'),
+        (STATUS_PENDING, "En attente"),
+        (STATUS_APPROVED, "Approuvé"),
+        (STATUS_REJECTED, "Rejeté"),
     )
 
     article = models.ForeignKey(
         Article,
         on_delete=models.CASCADE,
-        related_name='comments'
+        related_name="comments",
+        db_index=True
     )
 
+    # Auteur texte (toujours conservé pour historique)
     author_name = models.CharField(max_length=150)
     author_email = models.EmailField(blank=True, null=True)
+
+    # Utilisateur connecté (optionnel)
+    author_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="user_comments"
+    )
+
     content = models.TextField()
 
     status = models.CharField(
         max_length=10,
         choices=STATUS_CHOICES,
-        default='pending'
+        default=STATUS_APPROVED,   # 🔥 publication immédiate
+        db_index=True
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    # 🔎 Indicateur interne (détection automatique)
+    flagged = models.BooleanField(
+        default=False,
+        help_text="Commentaire signalé automatiquement par le système"
+    )
+
+    # 🛡️ Traçabilité modération
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_comments"
+    )
+
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
-        ordering = ['created_at']
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["flagged"]),
+            models.Index(fields=["created_at"]),
+        ]
         verbose_name = "Commentaire"
         verbose_name_plural = "Commentaires"
 
     def __str__(self):
         return f"{self.author_name} - {self.article.title}"
 
+    # ------------------------------------------------------
+    # Méthodes utilitaires
+    # ------------------------------------------------------
+
+    def is_approved(self):
+        return self.status == self.STATUS_APPROVED
+
+    def mark_approved(self, moderator):
+        self.status = self.STATUS_APPROVED
+        self.approved_by = moderator
+        self.approved_at = timezone.now()
+        self.save(update_fields=["status", "approved_by", "approved_at"])
+
+    def mark_rejected(self, moderator):
+        self.status = self.STATUS_REJECTED
+        self.approved_by = moderator
+        self.approved_at = timezone.now()
+        self.save(update_fields=["status", "approved_by", "approved_at"])
+
+
+
+
 
 # ==========================================================
 # COMMENT LIKE
 # ==========================================================
-
 class CommentLike(models.Model):
+
+    REACTION_LIKE = "like"
+    REACTION_DISLIKE = "dislike"
+
+    REACTION_CHOICES = (
+        (REACTION_LIKE, "Like"),
+        (REACTION_DISLIKE, "Dislike"),
+    )
+
     comment = models.ForeignKey(
         Comment,
         on_delete=models.CASCADE,
-        related_name='likes'
+        related_name="reactions",
+        db_index=True
     )
-    ip_address = models.GenericIPAddressField()
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="comment_reactions"
+    )
+
+    ip_address = models.GenericIPAddressField(db_index=True)
+
+    reaction_type = models.CharField(
+        max_length=10,
+        choices=REACTION_CHOICES,
+        default=REACTION_LIKE,
+        db_index=True
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('comment', 'ip_address')
-        verbose_name = "Like"
-        verbose_name_plural = "Likes"
+        unique_together = (
+            ("comment", "ip_address"),
+        )
+        indexes = [
+            models.Index(fields=["comment", "reaction_type"]),
+        ]
+        verbose_name = "Réaction"
+        verbose_name_plural = "Réactions"
 
     def __str__(self):
-        return f"Like - {self.comment.id}"
+        return f"{self.reaction_type} - Comment {self.comment.id}"

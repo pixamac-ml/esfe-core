@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ news.titre }}{% endblock %}
+
+{% block content %}
+
+<section class="py-12 bg-white">
+    <div class="max-w-4xl mx-auto px-4">
+
+        <article>
+
+            {% if news.image %}
+            <div class="mb-8">
+                <img 
+                    src="{{ news.image.url }}" 
+                    alt="{{ news.titre }}"
+                    class="w-full rounded-xl shadow"
+                >
+            </div>
+            {% endif %}
+
+            <h1 class="text-3xl font-bold text-gray-800 mb-4">
+                {{ news.titre }}
+            </h1>
+
+            <div class="text-sm text-gray-500 mb-8">
+                Publié le {{ news.published_at|date:"d M Y" }}
+                {% if news.auteur %}
+                    — par {{ news.auteur.get_full_name|default:news.auteur.username }}
+                {% endif %}
+                — {{ news.categorie.nom }}
+            </div>
+
+            <div class="prose max-w-none">
+                {{ news.contenu|safe }}
+            </div>
+
+        </article>
+
+        <!-- Galerie -->
+        {% if news.gallery.all %}
+        <div class="mt-12 grid md:grid-cols-2 gap-6">
+            {% for img in news.gallery.all %}
+            <img 
+                src="{{ img.image.url }}"
+                alt="{{ img.alt_text|default:news.titre }}"
+                class="rounded-lg shadow"
+            >
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Retour -->
+        <div class="mt-12">
+            <a href="{% url 'news:list' %}" 
+               class="text-blue-600 hover:underline">
+                ← Retour aux actualités
+            </a>
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

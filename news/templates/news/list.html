@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Actualités{% endblock %}
+
+{% block content %}
+
+<section class="py-12 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4">
+
+        <div class="mb-10 text-center">
+            <h1 class="text-3xl font-bold text-gray-800">Actualités</h1>
+            <p class="text-gray-600 mt-2">
+                Découvrez les dernières informations de l’établissement.
+            </p>
+        </div>
+
+        <!-- Recherche -->
+        <form method="get" class="mb-8 flex flex-col md:flex-row gap-4">
+            <input
+                type="text"
+                name="q"
+                value="{{ search_query|default:'' }}"
+                placeholder="Rechercher une actualité..."
+                class="w-full md:w-1/2 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+
+            <button
+                type="submit"
+                class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+                Rechercher
+            </button>
+        </form>
+
+        <!-- Liste -->
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+            {% for item in news %}
+            <article class="bg-white rounded-xl shadow-sm hover:shadow-lg transition overflow-hidden">
+
+                {% if item.image %}
+                <img
+                    src="{{ item.image.url }}"
+                    alt="{{ item.titre }}"
+                    class="w-full h-52 object-cover"
+                >
+                {% endif %}
+
+                <div class="p-6">
+                    <div class="text-sm text-gray-500 mb-2">
+                        {{ item.published_at|date:"d M Y" }} — {{ item.categorie.nom }}
+                    </div>
+
+                    <h2 class="text-xl font-semibold text-gray-800 mb-3">
+                        <a href="{{ item.get_absolute_url }}" class="hover:text-blue-600">
+                            {{ item.titre }}
+                        </a>
+                    </h2>
+
+                    <p class="text-gray-600 mb-4">
+                        {{ item.resume|truncatewords:20 }}
+                    </p>
+
+                    <a
+                        href="{{ item.get_absolute_url }}"
+                        class="text-blue-600 font-medium hover:underline"
+                    >
+                        Lire la suite →
+                    </a>
+                </div>
+
+            </article>
+            {% empty %}
+            <div class="col-span-full text-center text-gray-600">
+                Aucune actualité disponible.
+            </div>
+            {% endfor %}
+
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="mt-12 flex justify-center items-center gap-4">
+
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}"
+               class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+                ← Précédent
+            </a>
+            {% endif %}
+
+            <span class="text-gray-700">
+                Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+            </span>
+
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}"
+               class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+                Suivant →
+            </a>
+            {% endif %}
+
+        </div>
+        {% endif %}
+
+    </div>
+</section>
+
+{% endblock %}

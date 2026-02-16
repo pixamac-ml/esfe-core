@@ -69,6 +69,7 @@ INSTALLED_APPS = [
 # DJANGO-COMPONENTS CONFIG
 # ==================================================
 
+
 COMPONENTS = {
     "template_cache_size": 128,
 }

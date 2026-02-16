@@ -2,8 +2,10 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.text import slugify
+from django.urls import reverse
 
-from core.images.optimizer import optimize_image  # utilitaire Pillow centralisé
+from core.images.optimizer import optimize_image
+from .managers import PublishedNewsManager
 
 User = get_user_model()
 
@@ -43,6 +45,10 @@ class News(models.Model):
         (STATUS_ARCHIVED, "Archivé"),
     )
 
+    objects = models.Manager()
+    published = PublishedNewsManager()
+
+    # Contenu
     titre = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
 
@@ -61,6 +67,7 @@ class News(models.Model):
         related_name="news"
     )
 
+    # Publication
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -77,6 +84,7 @@ class News(models.Model):
 
     published_at = models.DateTimeField(null=True, blank=True)
 
+    # Métadonnées
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -93,22 +101,15 @@ class News(models.Model):
     def __str__(self):
         return self.titre
 
-    # ------------------------------
-    # LOGIQUE MÉTIER
-    # ------------------------------
-    def publish(self, user=None):
-        if self.status != self.STATUS_DRAFT:
-            return False
+    # --------------------------------------------------
+    # URL PROPRE
+    # --------------------------------------------------
+    def get_absolute_url(self):
+        return reverse("news:detail", kwargs={"slug": self.slug})
 
-        self.status = self.STATUS_PUBLISHED
-        self.published_at = timezone.now()
-
-        if user:
-            self.auteur = user
-
-        self.save(update_fields=["status", "published_at", "auteur"])
-        return True
-
+    # --------------------------------------------------
+    # ÉTAT PUBLICATION
+    # --------------------------------------------------
     @property
     def is_published(self):
         return (
@@ -117,13 +118,21 @@ class News(models.Model):
             and self.published_at <= timezone.now()
         )
 
-    # ------------------------------
-    # SAVE OVERRIDE (Pillow)
-    # ------------------------------
+    # --------------------------------------------------
+    # SAVE OVERRIDE
+    # --------------------------------------------------
     def save(self, *args, **kwargs):
 
         if not self.slug:
-            self.slug = slugify(self.titre)
+            base_slug = slugify(self.titre)
+            slug = base_slug
+            counter = 1
+
+            while News.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+
+            self.slug = slug
 
         if self.image:
             self.image = optimize_image(
@@ -136,7 +145,7 @@ class News(models.Model):
 
 
 # --------------------------------------------------
-# NEWS GALLERY (IMAGES DÉFILANTES)
+# NEWS GALLERY
 # --------------------------------------------------
 class NewsImage(models.Model):
     news = models.ForeignKey(

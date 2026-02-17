@@ -36,4 +36,5 @@ from .layout.split_admission_layout.split_admission_layout import SplitAdmission
 # Forms
 from .forms.upload_zone.upload_zone import UploadZone
 
+from .layout.section import section
 

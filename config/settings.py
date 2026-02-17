@@ -33,7 +33,6 @@ INSTALLED_APPS = [
     # ============================
     # ADMIN THEME (DOIT être avant admin)
     # ============================
-    "jazzmin",
 
     # Django core
 
@@ -50,7 +49,7 @@ INSTALLED_APPS = [
 
     # UI / Core
     "ui.apps.UiConfig",
-    "core",
+    "core.apps.CoreConfig",
     "ckeditor",
 
     # Métier
@@ -111,6 +110,7 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
+
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],

@@ -30,6 +30,24 @@ class Category(models.Model):
         return self.nom
 
 
+class Program(models.Model):
+    nom = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True)
+    description = models.TextField()
+    image = models.ImageField(upload_to="programs/", blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nom"]
+
+    def __str__(self):
+        return self.nom
+
+# --------------------------------------------------
+# NEWS
+# --------------------------------------------------
 # --------------------------------------------------
 # NEWS
 # --------------------------------------------------
@@ -51,15 +69,18 @@ class News(models.Model):
     # Contenu
     titre = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
-
     resume = models.TextField(blank=True)
     contenu = models.TextField()
 
-    image = models.ImageField(
-        upload_to="news/main/",
+    program = models.ForeignKey(
+        Program,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
-        null=True
+        related_name="news"
     )
+
+    image = models.ImageField(upload_to="news/main/", blank=True, null=True)
 
     categorie = models.ForeignKey(
         Category,
@@ -68,80 +89,20 @@ class News(models.Model):
     )
 
     # Publication
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default=STATUS_DRAFT
-    )
-
-    auteur = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="news_posts"
-    )
-
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    auteur = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="news_posts")
     published_at = models.DateTimeField(null=True, blank=True)
+
+    # Indicateurs éditoriaux
+    is_important = models.BooleanField(default=False)
+    is_urgent = models.BooleanField(default=False)
+
+    # Statistiques
+    views_count = models.PositiveIntegerField(default=0)
 
     # Métadonnées
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["-published_at", "-created_at"]
-        verbose_name = "Actualité"
-        verbose_name_plural = "Actualités"
-        indexes = [
-            models.Index(fields=["status"]),
-            models.Index(fields=["published_at"]),
-            models.Index(fields=["slug"]),
-        ]
-
-    def __str__(self):
-        return self.titre
-
-    # --------------------------------------------------
-    # URL PROPRE
-    # --------------------------------------------------
-    def get_absolute_url(self):
-        return reverse("news:detail", kwargs={"slug": self.slug})
-
-    # --------------------------------------------------
-    # ÉTAT PUBLICATION
-    # --------------------------------------------------
-    @property
-    def is_published(self):
-        return (
-            self.status == self.STATUS_PUBLISHED
-            and self.published_at
-            and self.published_at <= timezone.now()
-        )
-
-    # --------------------------------------------------
-    # SAVE OVERRIDE
-    # --------------------------------------------------
-    def save(self, *args, **kwargs):
-
-        if not self.slug:
-            base_slug = slugify(self.titre)
-            slug = base_slug
-            counter = 1
-
-            while News.objects.filter(slug=slug).exclude(pk=self.pk).exists():
-                slug = f"{base_slug}-{counter}"
-                counter += 1
-
-            self.slug = slug
-
-        if self.image:
-            self.image = optimize_image(
-                self.image,
-                max_width=1600,
-                quality=75
-            )
-
-        super().save(*args, **kwargs)
 
 
 # --------------------------------------------------
@@ -176,3 +137,5 @@ class NewsImage(models.Model):
                 quality=75
             )
         super().save(*args, **kwargs)
+
+

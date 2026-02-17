@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ program.nom }}{% endblock %}
+
+{% block content %}
+
+<section class="py-16 bg-white">
+    <div class="max-w-6xl mx-auto px-6">
+
+        <h1 class="text-4xl font-bold mb-6">
+            {{ program.nom }}
+        </h1>
+
+        {% if program.image %}
+        <img src="{{ program.image.url }}"
+             class="rounded-xl shadow mb-8">
+        {% endif %}
+
+        <div class="prose max-w-none mb-12">
+            {{ program.description|safe }}
+        </div>
+
+        <h2 class="text-2xl font-semibold mb-6">
+            Actualités liées au programme
+        </h2>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            {% for item in program_news %}
+                <a href="{{ item.get_absolute_url }}"
+                   class="bg-white p-6 rounded-xl shadow hover:shadow-lg transition">
+
+                    <h3 class="font-semibold mb-2">
+                        {{ item.titre }}
+                    </h3>
+
+                    <div class="text-sm text-gray-500">
+                        {{ item.published_at|date:"d M Y" }}
+                    </div>
+
+                </a>
+            {% empty %}
+                <p>Aucune actualité pour ce programme.</p>
+            {% endfor %}
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

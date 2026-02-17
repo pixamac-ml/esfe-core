@@ -56,9 +56,7 @@ def get_institution_context():
     }
 
 
-# ==========================================================
-# PAGE D’ACCUEIL
-# ==========================================================
+from formations.models import Programme
 
 def home(request):
 
@@ -81,8 +79,14 @@ def home(request):
         },
     ]
 
+    # 🔥 2 licences + 1 master
+    formations_home = Programme.objects.filter(
+        is_active=True
+    ).select_related("cycle", "diploma_awarded").order_by("cycle__min_duration_years")[:3]
+
     context = {
         "pillars": pillars,
+        "formations_home": formations_home,
         **get_institution_context(),
     }
 

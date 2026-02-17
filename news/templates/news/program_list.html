@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Programmes & Initiatives{% endblock %}
+
+{% block content %}
+
+<section class="py-16 bg-white">
+    <div class="max-w-6xl mx-auto px-6">
+
+        <h1 class="text-4xl font-bold mb-12">
+            Programmes & Initiatives
+        </h1>
+
+        <div class="grid md:grid-cols-3 gap-10">
+
+            {% for program in programs %}
+            <a href="{% url 'news:program_detail' program.slug %}"
+               class="bg-white rounded-xl shadow hover:shadow-xl transition overflow-hidden">
+
+                {% if program.image %}
+                <img src="{{ program.image.url }}"
+                     class="h-48 w-full object-cover">
+                {% endif %}
+
+                <div class="p-6">
+                    <h2 class="text-xl font-semibold mb-3">
+                        {{ program.nom }}
+                    </h2>
+
+                    <p class="text-sm text-gray-600">
+                        {{ program.description|truncatewords:20 }}
+                    </p>
+                </div>
+
+            </a>
+            {% empty %}
+                <p>Aucun programme actif.</p>
+            {% endfor %}
+
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

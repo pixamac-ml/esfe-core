@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import News, Category, NewsImage
+from .models import News, Category, NewsImage, Program
 
 
 # --------------------------------------------------
@@ -75,6 +75,7 @@ class NewsAdmin(admin.ModelAdmin):
                     "resume",
                     "contenu",
                     "image",
+                    "program",
                 )
             },
         ),
@@ -113,3 +114,9 @@ class NewsAdmin(admin.ModelAdmin):
             obj.auteur = request.user
 
         super().save_model(request, obj, form, change)
+
+
+@admin.register(Program)
+class ProgramAdmin(admin.ModelAdmin):
+    list_display = ("nom", "is_active", "created_at")
+    prepopulated_fields = {"slug": ("nom",)}

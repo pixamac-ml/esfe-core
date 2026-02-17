@@ -15,33 +15,33 @@
   %}{% endcomponent %}
 
   <!-- SECTION INSTITUTION -->
-    <section
-      id="explorer"
-      class="relative bg-gradient-to-b from-white to-gray-50 py-32"
-      x-data="{ show: false }"
-      x-intersect:enter.threshold.30.once="show = true"
-    >
+  <section
+    id="explorer"
+    class="bg-soft py-24"
+    x-data="{ show: false }"
+    x-intersect:enter.threshold.30.once="show = true"
+  >
 
     <div class="max-w-7xl mx-auto px-6">
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
         <!-- TEXTE -->
         <div
           :class="show
             ? 'opacity-100 translate-y-0'
-            : 'opacity-0 translate-y-10'"
+            : 'opacity-0 translate-y-8'"
           class="transition-all duration-1000 ease-out"
         >
-          <span class="inline-block text-sm font-semibold text-primary-600 uppercase tracking-wider mb-4">
+          <span class="inline-block text-sm font-semibold text-primary-500 uppercase tracking-wider mb-4">
             Qui sommes-nous
           </span>
 
-          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-tight">
+          <h2 class="text-3xl md:text-4xl font-bold mb-6 leading-tight text-primary-700">
             Une institution dédiée aux sciences de la santé
           </h2>
 
-          <p class="text-lg text-gray-700 mb-4">
+          <p class="text-lg mb-4">
             <strong>L’École de Santé Félix Houphouët-Boigny</strong>
             est un établissement d’enseignement supérieur spécialisé dans les sciences de la santé.
           </p>
@@ -62,12 +62,12 @@
         <div
           :class="show
             ? 'opacity-100 translate-x-0 scale-100'
-            : 'opacity-0 translate-x-10 scale-95'"
+            : 'opacity-0 translate-x-8 scale-95'"
           class="flex justify-center lg:justify-end transition-all duration-1000 ease-out delay-200"
         >
           <img
             src="{% static 'images/institution/students-academic.jpg' %}"
-            class="w-full max-w-lg rounded-3xl shadow-2xl object-cover transition duration-700 hover:scale-[1.02]"
+            class="w-full max-w-lg rounded-3xl shadow-xl object-cover"
             alt="Étudiants ESFE"
             loading="lazy"
           >
@@ -76,21 +76,146 @@
       </div>
 
       {% if pillars %}
-      <div class="mt-28">
+      <div class="mt-20">
+
+        <!-- 🔥 GRILLE RESTAURÉE -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+
           {% for pillar in pillars %}
             {% component "base_card"
                content="
-                 <h3 class='font-semibold text-lg mb-2'>{{ pillar.title }}</h3>
-                 <p class='text-sm text-gray-600'>{{ pillar.description }}</p>
+                 <h3 class='font-semibold text-lg mb-2 text-primary-600'>
+                   {{ pillar.title }}
+                 </h3>
+                 <p class='text-sm text-gray-600'>
+                   {{ pillar.description }}
+                 </p>
                "
-            %}{% endcomponent %}
+            %}
+            {% endcomponent %}
           {% endfor %}
+
         </div>
+
       </div>
       {% endif %}
 
     </div>
+
   </section>
+
+<section id="formations-home"
+         class="relative py-32 bg-gradient-to-b from-soft/70 to-white overflow-hidden"
+         x-data="{ show: false }"
+         x-intersect:enter.threshold.20.once="show = true">
+
+  <div class="max-w-7xl mx-auto px-6">
+
+    <!-- ================= HEADER ================= -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-end mb-24">
+
+      <!-- LEFT -->
+      <div>
+        <span class="text-sm uppercase tracking-wider font-semibold text-primary-500">
+          Catalogue académique
+        </span>
+
+        <h2 class="mt-4 text-3xl md:text-4xl font-bold leading-tight
+                   bg-gradient-to-r from-primary-700 to-secondary
+                   bg-clip-text text-transparent">
+          Nos Formations Professionnelles
+        </h2>
+
+        <p class="mt-6 text-gray-600 max-w-xl leading-relaxed">
+          Des parcours structurés, reconnus par l’État,
+          conçus pour former les professionnels de santé de demain.
+        </p>
+      </div>
+
+      <!-- RIGHT CTA -->
+      <div class="lg:text-right">
+        <a href="{% url 'formations:list' %}"
+           class="inline-block bg-secondary hover:bg-secondary/90
+                  text-white px-8 py-3 rounded-xl
+                  font-semibold transition-all duration-300
+                  shadow-md hover:shadow-xl hover:-translate-y-1">
+          Explorer toutes les formations →
+        </a>
+      </div>
+
+    </div>
+
+    <!-- ================= GRID ================= -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+
+      {% for formation in formations_home %}
+
+        <div
+          :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'"
+          style="transition-delay: {{ forloop.counter0 }}00ms"
+          class="relative bg-white rounded-2xl p-8
+                 shadow-md hover:shadow-2xl
+                 transition-all duration-700 ease-out
+                 hover:-translate-y-3
+                 border-l-4
+                 {% if formation.is_featured %}
+                   border-secondary
+                 {% else %}
+                   border-primary
+                 {% endif %}">
+
+          <!-- META -->
+          <div class="flex justify-between items-center mb-6">
+
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              {{ formation.cycle.name }}
+            </span>
+
+            {% if formation.is_featured %}
+              <span class="text-xs bg-secondary/20 text-secondary px-3 py-1 rounded-full">
+                Recommandé
+              </span>
+            {% endif %}
+
+          </div>
+
+          <!-- TITLE -->
+          <h3 class="text-xl font-semibold mb-4 text-primary-700 leading-snug">
+            {{ formation.title }}
+          </h3>
+
+          <!-- DESCRIPTION -->
+          <p class="text-sm text-gray-600 mb-8 leading-relaxed">
+            {{ formation.short_description|truncatewords:18 }}
+          </p>
+
+          <!-- INFOS -->
+          <div class="flex justify-between text-xs text-gray-400 mb-8">
+            <span>
+              {{ formation.duration_years }} an{% if formation.duration_years > 1 %}s{% endif %}
+            </span>
+
+            <span>
+              {{ formation.diploma_awarded.name }}
+            </span>
+          </div>
+
+          <!-- LINK -->
+          <a href="{{ formation.get_absolute_url }}"
+             class="inline-flex items-center text-primary-600 font-medium
+                    hover:text-secondary transition-colors duration-300">
+            Voir le programme
+            <span class="ml-2 transition-transform duration-300 group-hover:translate-x-1">→</span>
+          </a>
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+  </div>
+
+</section>
 
 {% endblock %}

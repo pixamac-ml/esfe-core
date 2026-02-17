@@ -1,0 +1,56 @@
+<section class="bg-red-50 py-10 border-b border-red-200">
+    <div class="max-w-7xl mx-auto px-4">
+
+        <div class="flex items-center justify-between mb-8">
+            <h2 class="text-2xl font-bold text-red-700">
+                Communiqués Importants
+            </h2>
+
+            <span class="text-xs uppercase tracking-wider text-red-600 font-semibold">
+                Communication Officielle
+            </span>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-8">
+
+            {% for item in important_news %}
+            <a href="{{ item.get_absolute_url }}"
+               class="group bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-600 hover:shadow-xl transition">
+
+                <!-- Meta -->
+                <div class="flex items-center justify-between text-xs text-gray-500 mb-3">
+                    <span>
+                        {{ item.published_at|date:"d M Y" }}
+                    </span>
+                    <span class="uppercase tracking-wide">
+                        {{ item.categorie.nom }}
+                    </span>
+                </div>
+
+                <!-- Titre -->
+                <h3 class="font-bold text-lg mb-3 text-gray-800 group-hover:text-red-700 transition">
+                    {{ item.titre }}
+                </h3>
+
+                <!-- Résumé -->
+                {% if item.resume %}
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    {{ item.resume|truncatewords:25 }}
+                </p>
+                {% endif %}
+
+                <!-- Indicateur -->
+                <div class="mt-4 text-sm text-red-600 font-medium">
+                    Lire le communiqué →
+                </div>
+
+            </a>
+            {% empty %}
+                <div class="text-gray-500">
+                    Aucun communiqué important actuellement.
+                </div>
+            {% endfor %}
+
+        </div>
+    </div>
+</section>

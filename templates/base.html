@@ -198,6 +198,36 @@ function advancedCounter(target, suffix = '') {
 }
 </script>
 
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const container = document.querySelector("#editorial .overflow-y-auto");
+  if (!container) return;
+
+  let scrollAmount = 0;
+  let autoScroll;
+
+  function startScroll() {
+    autoScroll = setInterval(() => {
+      scrollAmount += 1;
+      container.scrollTop = scrollAmount;
+
+      if (scrollAmount >= container.scrollHeight - container.clientHeight) {
+        scrollAmount = 0;
+      }
+    }, 35);
+  }
+
+  function stopScroll() {
+    clearInterval(autoScroll);
+  }
+
+  container.addEventListener("mouseenter", stopScroll);
+  container.addEventListener("mouseleave", startScroll);
+
+  startScroll();
+});
+</script>
+
 
 </body>
 </html>

@@ -82,6 +82,8 @@ def article_detail(request, slug):
         )
     )
 
+    absolute_url = request.build_absolute_uri()
+
     # Création commentaire
     if request.method == "POST" and article.allow_comments:
 
@@ -102,7 +104,8 @@ def article_detail(request, slug):
 
     return render(request, "blog/article_detail.html", {
         "article": article,
-        "comments": comments
+        "comments": comments,
+        "absolute_url": absolute_url
     })
 
 

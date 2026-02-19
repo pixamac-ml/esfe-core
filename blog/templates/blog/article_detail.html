@@ -4,34 +4,42 @@
 {% block title %}{{ article.title }} – ESFE{% endblock %}
 
 {% block meta %}
+<meta name="description" content="{{ article.excerpt|default:article.title }}">
 <meta property="og:title" content="{{ article.title }}">
-<meta property="og:description" content="{{ article.excerpt }}">
-<meta property="og:url" content="{{ request.build_absolute_uri }}">
+<meta property="og:description" content="{{ article.excerpt|default:article.title }}">
+<meta property="og:url" content="{{ absolute_url }}">
 <meta property="og:type" content="article">
+<meta property="og:site_name" content="ESFE">
+{% if article.featured_image %}
+<meta property="og:image" content="{{ article.featured_image.url }}">
+{% endif %}
+<link rel="canonical" href="{{ absolute_url }}">
 {% endblock %}
 
 {% block content %}
 
-<section class="max-w-7xl mx-auto px-6 py-16">
+<section class="max-w-7xl mx-auto px-6 py-16"
+         itemscope itemtype="https://schema.org/Article">
 
-  <!-- ===== GRID STRUCTURE 75 / 25 ===== -->
+  <meta itemprop="mainEntityOfPage" content="{{ absolute_url }}">
+  <meta itemprop="headline" content="{{ article.title }}">
+  {% if article.excerpt %}
+    <meta itemprop="description" content="{{ article.excerpt }}">
+  {% endif %}
+
   <div class="grid lg:grid-cols-12 gap-12">
 
-    <!-- ===================================================== -->
-    <!-- ===================== MAIN 75% ====================== -->
-    <!-- ===================================================== -->
+    <!-- ================= MAIN ================= -->
     <div class="lg:col-span-9 space-y-16">
 
-      <!-- ================= ARTICLE CARD ================= -->
       <article class="bg-white rounded-2xl border border-gray-200 shadow-lg p-10">
 
-        <!-- CATEGORY BADGE -->
         {% if article.category %}
           {% component "category_badge" category=article.category %}{% endcomponent %}
         {% endif %}
 
-        <!-- TITLE -->
-        <h1 class="mt-4 text-4xl font-poppins font-bold text-gray-900 leading-tight">
+        <h1 class="mt-4 text-4xl font-poppins font-bold text-gray-900 leading-tight"
+            itemprop="headline">
           {{ article.title }}
         </h1>
 
@@ -39,7 +47,16 @@
         <div class="mt-6 flex flex-wrap items-center gap-6 text-sm text-gray-500 border-b border-gray-100 pb-6">
 
           {% if article.published_at %}
-            <span>📅 {{ article.published_at|date:"d M Y" }}</span>
+            <span itemprop="datePublished"
+                  content="{{ article.published_at|date:'c' }}">
+              📅 {{ article.published_at|date:"d M Y" }}
+            </span>
+          {% endif %}
+
+          {% if article.author %}
+            <span itemprop="author" itemscope itemtype="https://schema.org/Person">
+              ✍ <span itemprop="name">{{ article.author }}</span>
+            </span>
           {% endif %}
 
           <span>👁 {{ article.views_count }} vues</span>
@@ -52,36 +69,42 @@
           <div class="mt-8 rounded-xl overflow-hidden shadow-md">
             <img src="{{ article.featured_image.url }}"
                  alt="{{ article.title }}"
-                 class="w-full object-cover">
+                 class="w-full object-cover"
+                 loading="lazy"
+                 itemprop="image">
           </div>
         {% endif %}
 
         <!-- CONTENT -->
-        <div class="mt-10 prose prose-lg max-w-none text-gray-800">
+        <div class="mt-10 prose prose-lg max-w-none text-gray-800"
+             itemprop="articleBody">
           {{ article.content|linebreaks }}
         </div>
 
         <!-- SHARE BAR -->
         <div class="mt-12 border-t pt-6">
-          {% component "article_share_bar" article=article %}{% endcomponent %}
+          {% component "article_share_bar" article=article absolute_url=absolute_url %}
+          {% endcomponent %}
         </div>
 
       </article>
 
-      <!-- ================= RELATED ARTICLES ================= -->
-      {% component "related_articles" article=article %}{% endcomponent %}
+      <!-- RELATED -->
+      {% component "related_articles" article=article %}
+      {% endcomponent %}
 
-      <!-- ================= COMMENTS SECTION ================= -->
-      <section>
+      <!-- COMMENTS -->
+      <section aria-labelledby="comments-title">
 
-        <h2 class="text-2xl font-poppins font-semibold text-gray-900 mb-8">
+        <h2 id="comments-title"
+            class="text-2xl font-poppins font-semibold text-gray-900 mb-8">
           Commentaires
         </h2>
 
-        <!-- COMMENT LIST -->
         <div id="comment-list" class="space-y-6">
           {% for comment in comments %}
-            {% component "comment_card" comment=comment %}{% endcomponent %}
+            {% component "comment_card" comment=comment %}
+            {% endcomponent %}
           {% empty %}
             <p class="text-gray-500">
               Aucun commentaire pour le moment.
@@ -89,10 +112,10 @@
           {% endfor %}
         </div>
 
-        <!-- COMMENT FORM -->
         {% if article.allow_comments %}
           <div class="mt-14 bg-white border border-gray-200 rounded-2xl shadow-md p-8">
-            {% component "comment_form" article=article %}{% endcomponent %}
+            {% component "comment_form" article=article %}
+            {% endcomponent %}
           </div>
         {% endif %}
 
@@ -100,18 +123,13 @@
 
     </div>
 
-
-    <!-- ===================================================== -->
-    <!-- ===================== SIDEBAR 25% =================== -->
-    <!-- ===================================================== -->
-    <aside class="lg:col-span-3 space-y-8">
-
-      <!-- Sticky container -->
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="lg:col-span-3 space-y-8" aria-label="Barre latérale">
       <div class="sticky top-24 space-y-8">
 
-        {% component "blog_sidebar" %}{% endcomponent %}
+        {% component "blog_sidebar" %}
+        {% endcomponent %}
 
-        <!-- Bloc CTA institutionnel -->
         <div class="bg-[#0f2c59] text-white rounded-2xl p-6 shadow-lg">
           <h4 class="font-semibold mb-3">
             Besoin d’informations ?
@@ -126,11 +144,9 @@
         </div>
 
       </div>
-
     </aside>
 
   </div>
-
 </section>
 
 {% endblock %}

@@ -1,11 +1,13 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
+
 from .models import (
     Institution,
     LegalPage,
     LegalSection,
     LegalSidebarBlock,
     LegalPageHistory,
+    InstitutionStat,
 )
 
 
@@ -59,6 +61,14 @@ class InstitutionAdmin(admin.ModelAdmin):
             )
         }),
     )
+
+    def has_add_permission(self, request):
+        """
+        Empêche la création de plusieurs institutions.
+        """
+        if Institution.objects.exists():
+            return False
+        return True
 
 
 # ==========================================================
@@ -140,3 +150,27 @@ class LegalPageHistoryAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ==========================================================
+# INSTITUTION STATS
+# ==========================================================
+
+@admin.register(InstitutionStat)
+class InstitutionStatAdmin(admin.ModelAdmin):
+
+    list_display = ("label", "value", "suffix", "order")
+    list_editable = ("value", "suffix", "order")
+    search_fields = ("label",)
+    ordering = ("order",)
+
+    fieldsets = (
+        ("Statistique", {
+            "fields": (
+                "label",
+                "value",
+                "suffix",
+                "order",
+            )
+        }),
+    )

@@ -3,6 +3,8 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import Http404, HttpResponse
 from django.utils.html import strip_tags
+from news.models import News
+from blog.models import Article
 
 from .models import Institution, LegalPage
 
@@ -55,8 +57,8 @@ def get_institution_context():
         ],
     }
 
-
 from formations.models import Programme
+from .models import InstitutionStat
 
 def home(request):
 
@@ -79,16 +81,65 @@ def home(request):
         },
     ]
 
-    # 🔥 2 licences + 1 master
-    formations_home = Programme.objects.filter(
-        is_active=True
-    ).select_related("cycle", "diploma_awarded").order_by("cycle__min_duration_years")[:3]
+    formations_home = (
+        Programme.objects
+        .filter(is_active=True)
+        .select_related("cycle", "diploma_awarded")
+        .order_by("cycle__min_duration_years")[:3]
+    )
+
+    why_blocks = [
+        {
+            "img": "labo.png",
+            "title": "Laboratoires modernes",
+            "desc": "Équipements professionnels dernière génération.",
+        },
+        {
+            "img": "enseignant.png",
+            "title": "Encadrement expert",
+            "desc": "Professionnels de santé et pédagogues qualifiés.",
+        },
+        {
+            "img": "uniforme.png",
+            "title": "Formation immersive",
+            "desc": "Immersion progressive en milieu réel.",
+        },
+        {
+            "img": "social.png",
+            "title": "Impact social",
+            "desc": "Professionnels engagés au service des communautés.",
+        },
+    ]
+
+    stats = InstitutionStat.objects.all()
+
+
+    latest_news = (
+        News.objects
+        .filter(is_published=True)
+        .order_by("-published_at")[:3]
+    )
+
+    latest_articles = (
+        Article.objects
+        .filter(is_published=True)
+        .order_by("-published_at")[:3]
+    )
+
+    context.update({
+        "latest_news": latest_news,
+        "latest_articles": latest_articles,
+    })
 
     context = {
         "pillars": pillars,
         "formations_home": formations_home,
+        "why_blocks": why_blocks,
+        "stats": stats,
         **get_institution_context(),
     }
+
+
 
     return render(request, "home.html", context)
 

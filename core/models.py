@@ -185,3 +185,14 @@ class LegalSidebarBlock(models.Model):
 
     def __str__(self):
         return f"{self.page.title} - Bloc : {self.title}"
+
+
+
+class InstitutionStat(models.Model):
+    label = models.CharField(max_length=100)
+    value = models.PositiveIntegerField()
+    suffix = models.CharField(max_length=5, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']

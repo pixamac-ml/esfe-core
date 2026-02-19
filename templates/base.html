@@ -164,5 +164,40 @@
 
   {% block extra_scripts %}{% endblock %}
 
+
+<script>
+function advancedCounter(target, suffix = '') {
+    return {
+        display: 0,
+        circumference: 2 * Math.PI * 65,
+        offset: 2 * Math.PI * 65,
+
+        start() {
+            let duration = 1800;
+            let startTime = null;
+
+            const animate = (timestamp) => {
+                if (!startTime) startTime = timestamp;
+                let progress = timestamp - startTime;
+                let percent = Math.min(progress / duration, 1);
+
+                // Smooth cubic easing
+                percent = 1 - Math.pow(1 - percent, 3);
+
+                this.display = Math.floor(percent * target);
+                this.offset = this.circumference - (this.circumference * percent);
+
+                if (percent < 1) {
+                    requestAnimationFrame(animate);
+                }
+            };
+
+            requestAnimationFrame(animate);
+        }
+    }
+}
+</script>
+
+
 </body>
 </html>

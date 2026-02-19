@@ -58,7 +58,10 @@ def get_institution_context():
     }
 
 from formations.models import Programme
+from news.models import News
+from blog.models import Article
 from .models import InstitutionStat
+
 
 def home(request):
 
@@ -113,36 +116,29 @@ def home(request):
 
     stats = InstitutionStat.objects.all()
 
-
     latest_news = (
         News.objects
-        .filter(is_published=True)
+        .filter(status="published")
         .order_by("-published_at")[:3]
     )
 
     latest_articles = (
         Article.objects
-        .filter(is_published=True)
+        .filter(status="published")
         .order_by("-published_at")[:3]
     )
-
-    context.update({
-        "latest_news": latest_news,
-        "latest_articles": latest_articles,
-    })
 
     context = {
         "pillars": pillars,
         "formations_home": formations_home,
         "why_blocks": why_blocks,
         "stats": stats,
+        "latest_news": latest_news,
+        "latest_articles": latest_articles,
         **get_institution_context(),
     }
 
-
-
     return render(request, "home.html", context)
-
 
 # ==========================================================
 # MÉTHODE GÉNÉRIQUE POUR PAGES LÉGALES

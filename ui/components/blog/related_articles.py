@@ -8,14 +8,16 @@ class RelatedArticles(component.Component):
 
     def get_context_data(self, article):
 
-        if not article.category:
+        # Sécurité défensive : si pas d’article valide
+        if not article or not article.category:
             return {"related_articles": []}
 
         related = (
             Article.published
             .filter(category=article.category)
-            .exclude(id=article.id)
+            .exclude(pk=article.pk)
             .select_related("author", "category")
+            .prefetch_related("images", "comments")
             .order_by("-published_at")[:3]
         )
 

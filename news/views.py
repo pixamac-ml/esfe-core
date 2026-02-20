@@ -74,18 +74,12 @@ class NewsDetailView(DetailView):
 
         context.update({
             "page_title": self.object.titre,
-
-            # Actualités liées même catégorie
             "related_news": (
                 published_qs
                 .filter(categorie=self.object.categorie)
                 .exclude(id=self.object.id)[:4]
             ),
-
-            # À la une
             "featured_news": published_qs[:3],
-
-            # Si l'article est lié à un programme
             "program_related_news": (
                 published_qs
                 .filter(program=self.object.program)
@@ -94,14 +88,7 @@ class NewsDetailView(DetailView):
             ),
         })
 
-    def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        obj.views_count += 1
-        obj.save(update_fields=["views_count"])
-        return obj
-
-        return context
-
+        return context  # ← MANQUAIT ICI
 
 # =====================================================
 # PROGRAMMES — LISTE

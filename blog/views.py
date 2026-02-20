@@ -237,7 +237,10 @@ def approve_comment_view(request, comment_id):
 # REACTION COMMENTAIRE (LIKE / DISLIKE)
 # ==========================================================
 
-from django.http import JsonResponse
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+from django.views.decorators.http import require_POST
+
 
 @require_POST
 def react_comment_view(request, comment_id):
@@ -246,12 +249,16 @@ def react_comment_view(request, comment_id):
 
     reaction_type = request.POST.get("reaction_type")
 
-    try:
-        react_to_comment(comment, request, reaction_type)
-    except Exception:
-        return JsonResponse({"error": "Invalid"}, status=400)
+    if reaction_type not in [
+        CommentLike.REACTION_LIKE,
+        CommentLike.REACTION_DISLIKE,
+    ]:
+        return HttpResponse(status=400)
 
-    # Recalcule compteurs
+    # Enregistre la réaction
+    react_to_comment(comment, request, reaction_type)
+
+    # Recalcul propre
     like_count = comment.reactions.filter(
         reaction_type=CommentLike.REACTION_LIKE
     ).count()
@@ -260,11 +267,17 @@ def react_comment_view(request, comment_id):
         reaction_type=CommentLike.REACTION_DISLIKE
     ).count()
 
-    return JsonResponse({
-        "like_count": like_count,
-        "dislike_count": dislike_count
-    })
+    html = render_to_string(
+        "cards/comment_card/comment_card.html",
+        {
+            "comment": comment,
+            "likes_count": like_count,
+            "dislikes_count": dislike_count,
+        },
+        request=request
+    )
 
+    return HttpResponse(html)
 
 # ==========================================================
 # CUSTOM 404

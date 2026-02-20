@@ -38,3 +38,7 @@ from .forms.upload_zone.upload_zone import UploadZone
 
 from .layout.section import section
 
+from .formation_learning_outcomes.formation_learning_outcomes import FormationLearningOutcomes
+from .formation_career_opportunities.formation_career_opportunities import FormationCareerOpportunities
+
+from .formation_overview.formation_overview import FormationOverview

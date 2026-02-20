@@ -1,0 +1,45 @@
+<div id="comment-{{ comment.id }}"
+     class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 transition hover:shadow-md">
+
+  <div class="flex justify-between items-start">
+    <div>
+      <p class="font-medium text-gray-900">
+        {{ comment.author_name }}
+      </p>
+      <p class="text-xs text-gray-400">
+        {{ comment.created_at|date:"d M Y H:i" }}
+      </p>
+    </div>
+  </div>
+
+  <p class="mt-4 text-gray-700 leading-relaxed">
+    {{ comment.content }}
+  </p>
+
+  <div class="mt-4 flex items-center gap-6 text-sm">
+
+    <!-- LIKE -->
+    <button
+      hx-post="{% url 'blog:react_comment' comment.id %}"
+      hx-vals='{"reaction_type": "like"}'
+      hx-target="#comment-{{ comment.id }}"
+      hx-swap="outerHTML"
+      class="flex items-center gap-1 text-gray-500 hover:text-[#0f2c59] transition"
+    >
+      👍 {{ likes_count }}
+    </button>
+
+    <!-- DISLIKE -->
+    <button
+      hx-post="{% url 'blog:react_comment' comment.id %}"
+      hx-vals='{"reaction_type": "dislike"}'
+      hx-target="#comment-{{ comment.id }}"
+      hx-swap="outerHTML"
+      class="flex items-center gap-1 text-gray-500 hover:text-red-500 transition"
+    >
+      👎 {{ dislikes_count }}
+    </button>
+
+  </div>
+
+</div>

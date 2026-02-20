@@ -146,3 +146,46 @@ def formation_detail(request, slug):
         "formations/detail.html",
         context
     )
+
+
+def formation_list_fragment(request):
+    cycle_slug = request.GET.get("cycle")
+    search_query = request.GET.get("q")
+    page_number = request.GET.get("page", 1)
+
+    programmes = (
+        Programme.objects
+        .filter(is_active=True)
+        .select_related("cycle", "filiere", "diploma_awarded")
+        .annotate(years_count=Count("years"))
+    )
+
+    if search_query:
+        programmes = programmes.filter(
+            Q(title__icontains=search_query) |
+            Q(short_description__icontains=search_query)
+        )
+
+    if cycle_slug:
+        programmes = programmes.filter(cycle__slug=cycle_slug)
+
+    programmes = programmes.order_by(
+        "-is_featured",
+        "cycle__min_duration_years",
+        "title"
+    )
+
+    paginator = Paginator(programmes, 6)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "programmes": page_obj.object_list,
+        "page_obj": page_obj,
+        "total_programmes": paginator.count,
+    }
+
+    return render(
+        request,
+        "formations/fragments/_programme_list.html",
+        context
+    )

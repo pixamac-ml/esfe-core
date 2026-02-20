@@ -355,3 +355,72 @@ def superadmin_dashboard(request):
     }
 
     return render(request, "dashboard/superadmin_dashboard.html", context)
+
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+from formations.models import Programme
+
+def custom_404(request, exception):
+
+    formations_home = (
+        Programme.objects
+        .filter(is_active=True)
+        .select_related("cycle")
+        .order_by("cycle__min_duration_years")[:3]
+    )
+
+    context = {
+        "error_code": 404,
+        "error_title": "Page introuvable",
+        "error_message": "La page demandée n'existe pas ou a été déplacée.",
+        "formations_home": formations_home,
+        **get_institution_context(),
+    }
+
+    return render(request, "core/errors/404.html", context, status=404)
+
+def custom_403(request, exception):
+    logger.warning(
+        f"403 | User={request.user} | Path={request.path}"
+    )
+
+    context = {
+        "error_code": 403,
+        "error_title": "Accès restreint",
+        "error_message": "Vous n'êtes pas autorisé à accéder à cette ressource.",
+        **get_institution_context(),
+    }
+
+    return render(request, "core/errors/403.html", context, status=403)
+
+
+def custom_500(request):
+    logger.error("500 | Internal server error")
+
+    context = {
+        "error_code": 500,
+        "error_title": "Erreur interne",
+        "error_message": "Une erreur inattendue s'est produite. Notre équipe technique a été informée.",
+        **get_institution_context(),
+    }
+
+    return render(request, "core/errors/500.html", context, status=500)
+
+
+def custom_400(request, exception):
+    logger.warning(
+        f"400 | Bad request | Path={request.path}"
+    )
+
+    context = {
+        "error_code": 400,
+        "error_title": "Requête invalide",
+        "error_message": "La requête envoyée est invalide ou mal formée.",
+        **get_institution_context(),
+    }
+
+    return render(request, "core/errors/400.html", context, status=400)

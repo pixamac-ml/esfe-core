@@ -19,9 +19,10 @@ load_dotenv(BASE_DIR / ".env")
 # ==================================================
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
-DEBUG = os.getenv("DEBUG", "True") == "True"
-ALLOWED_HOSTS = []
-
+#DEBUG = os.getenv("DEBUG", "True") == "True"
+#ALLOWED_HOSTS = []
+DEBUG = True
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 # ==================================================
 # APPLICATIONS
 # ==================================================
@@ -60,7 +61,7 @@ INSTALLED_APPS = [
     "formations",
 
     # Contenu
-    "blog",
+    'blog.apps.BlogConfig',
     "news",
 ]
 
@@ -85,7 +86,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-
+    "core.middleware.SecurityShieldMiddleware",
     # Live reload (dev)
     "django_browser_reload.middleware.BrowserReloadMiddleware",
 ]
@@ -162,7 +163,7 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-# STATIC_ROOT = BASE_DIR / "staticfiles"  # pour prod
+STATIC_ROOT = BASE_DIR / "staticfiles"  # pour prod
 
 # ==================================================
 # MEDIA FILES

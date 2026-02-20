@@ -23,7 +23,7 @@
     <div class="max-w-3xl space-y-8">
 
       <div class="inline-flex items-center gap-3
-                  bg-blend-normal/10 backdrop-blur-md
+                  bg-white/10 backdrop-blur-md
                   px-6 py-3 rounded-full text-sm tracking-wide">
 
         <svg class="w-5 h-5 text-secondary" fill="currentColor" viewBox="0 0 20 20">
@@ -70,23 +70,22 @@
       </aside>
 
       <!-- Grid -->
-      <div class="lg:col-span-3">
+      <div class="lg:col-span-3 relative">
 
-        <div
-          id="programme-container"
-          hx-get="{% url 'formations:list' %}"
-          hx-trigger="load"
-          hx-target="#programme-container"
-          hx-swap="innerHTML"
-          hx-push-url="true"
-          hx-history-elt
-          hx-indicator="#loader"
-          class="min-h-[400px]"
-        ></div>
-
+        <!-- Loader -->
         <div id="loader"
-             class="hidden flex items-center justify-center py-16">
+             class="hidden absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex items-center justify-center">
           <div class="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div>
+        </div>
+
+        <!-- Conteneur programmes -->
+        <div id="programme-container">
+            {% include "formations/fragments/_programme_list.html" %}
+        </div>
+                  <!-- Fallback SEO / No-JS -->
+          <noscript>
+            {% include "formations/fragments/_programme_list.html" %}
+          </noscript>
         </div>
 
       </div>

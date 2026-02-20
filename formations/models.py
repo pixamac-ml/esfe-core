@@ -66,6 +66,9 @@ class Filiere(models.Model):
 # ==================================================
 # PROGRAMME
 # ==================================================
+# ==================================================
+# PROGRAMME
+# ==================================================
 class Programme(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(unique=True, blank=True)
@@ -90,6 +93,33 @@ class Programme(models.Model):
 
     short_description = models.CharField(max_length=300)
     description = models.TextField()
+
+    # ==================================================
+    # 🔵 CONTENU LANDING PAGE (NOUVEAU)
+    # ==================================================
+
+    learning_outcomes = models.TextField(
+        blank=True,
+        help_text="Compétences et savoir-faire développés durant la formation"
+    )
+
+    career_opportunities = models.TextField(
+        blank=True,
+        help_text="Métiers et secteurs accessibles après la formation"
+    )
+
+    program_structure = models.TextField(
+        blank=True,
+        help_text="Organisation pédagogique : cours, stages, travaux pratiques, etc."
+    )
+
+    illustration = models.ImageField(
+        upload_to="programmes/illustrations/",
+        blank=True,
+        null=True
+    )
+
+    # ==================================================
 
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
@@ -126,13 +156,9 @@ class Programme(models.Model):
         super().save(*args, **kwargs)
 
     # ==================================================
-    # LOGIQUE FINANCIÈRE (CLÉ)
+    # LOGIQUE FINANCIÈRE
     # ==================================================
     def get_inscription_amount_for_year(self, year_number):
-        """
-        Montant total à payer pour une année donnée :
-        somme de toutes les tranches (Fee) de cette année.
-        """
         programme_year = self.years.filter(
             year_number=year_number
         ).first()

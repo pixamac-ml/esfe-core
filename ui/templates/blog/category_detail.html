@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load component_tags %}
+
+{% block title %}
+{{ category.name }} – Blog ESFE
+{% endblock %}
+
+{% block content %}
+
+<section class="max-w-7xl mx-auto px-6 py-16">
+
+  <!-- HEADER -->
+  <div class="mb-12">
+    <h1 class="text-4xl font-poppins font-bold text-gray-900">
+      {{ category.name }}
+    </h1>
+    {% if category.description %}
+      <p class="mt-4 text-gray-600 max-w-2xl">
+        {{ category.description }}
+      </p>
+    {% endif %}
+  </div>
+
+  <!-- GRID ARTICLES -->
+  {% if articles %}
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {% for article in articles %}
+        {% component "blog_article_card" article=article %}
+        {% endcomponent %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-gray-500">
+      Aucun article dans cette catégorie pour le moment.
+    </p>
+  {% endif %}
+
+  <!-- PAGINATION -->
+  {% if articles.has_other_pages %}
+    <div class="mt-12 flex justify-center items-center gap-4 text-sm">
+
+      {% if articles.has_previous %}
+        <a href="?page={{ articles.previous_page_number }}"
+           class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+          ← Précédent
+        </a>
+      {% endif %}
+
+      <span class="text-gray-500">
+        Page {{ articles.number }} sur {{ articles.paginator.num_pages }}
+      </span>
+
+      {% if articles.has_next %}
+        <a href="?page={{ articles.next_page_number }}"
+           class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+          Suivant →
+        </a>
+      {% endif %}
+
+    </div>
+  {% endif %}
+
+</section>
+
+{% endblock %}

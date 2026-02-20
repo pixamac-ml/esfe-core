@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section
+    class="relative min-h-[80vh] flex items-center justify-center bg-gradient-to-br from-gray-50 to-white py-24 overflow-hidden"
+    x-data="{ show: false }"
+    x-intersect:enter.threshold.15.once="show = true"
+>
+
+    <!-- Background décoratif subtil -->
+    <div class="absolute inset-0 opacity-5">
+        <div class="w-full h-full bg-[radial-gradient(circle_at_30%_40%,rgba(59,130,246,0.3),transparent_40%)]"></div>
+    </div>
+
+    <div class="relative text-center max-w-3xl px-6">
+
+        <!-- Icône -->
+        <div
+            class="mb-8 flex justify-center transition duration-700"
+            :class="show ? 'opacity-100 scale-100' : 'opacity-0 scale-90'"
+        >
+            <div class="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="w-10 h-10 text-primary-600"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="1.5">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M12 3v3m0 12v3m9-9h-3M6 12H3"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Code -->
+        <p class="text-primary-600 font-semibold tracking-widest mb-4">
+            ERREUR {{ error_code }}
+        </p>
+
+        <!-- Titre -->
+        <h1
+            class="text-5xl font-bold text-gray-900 mb-6 transition duration-700"
+            :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
+        >
+            {{ error_title }}
+        </h1>
+
+        <!-- Message -->
+        <p
+            class="text-lg text-gray-600 mb-10 leading-relaxed transition duration-700 delay-150"
+            :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
+        >
+            {{ error_message }}
+        </p>
+
+        <!-- Recherche -->
+        <form action="/formations" method="get"
+              class="max-w-xl mx-auto mb-10 transition duration-700 delay-300"
+              :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'">
+            <div class="flex shadow-sm">
+                <input
+                    type="text"
+                    name="q"
+                    placeholder="Rechercher une formation..."
+                    class="flex-1 px-5 py-3 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                <button
+                    type="submit"
+                    class="px-6 bg-primary-600 text-white rounded-r-lg hover:bg-primary-700 transition"
+                >
+                    Rechercher
+                </button>
+            </div>
+        </form>
+
+        <!-- Boutons -->
+        <div
+            class="flex flex-wrap justify-center gap-4 transition duration-700 delay-500"
+            :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
+        >
+            <a href="{% url 'core:home' %}"
+               class="px-8 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition">
+                Retour à l'accueil
+            </a>
+
+            <a href="/candidature/"
+               class="px-8 py-3 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition">
+                Déposer une candidature
+            </a>
+        </div>
+
+        <!-- Suggestions formations -->
+        {% if formations_home %}
+        <div class="mt-20">
+            <h3 class="text-xl font-semibold text-gray-800 mb-6">
+                Formations populaires
+            </h3>
+
+            <div class="grid md:grid-cols-3 gap-6">
+                {% for formation in formations_home %}
+                <a href="{{ formation.get_absolute_url }}"
+                   class="p-6 bg-white rounded-xl shadow-sm hover:shadow-md border border-gray-100 transition">
+                    <h4 class="font-semibold text-gray-900 mb-2">
+                        {{ formation.title }}
+                    </h4>
+                    <p class="text-sm text-gray-600">
+                        {{ formation.cycle.name }}
+                    </p>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+</section>
+
+{% endblock %}

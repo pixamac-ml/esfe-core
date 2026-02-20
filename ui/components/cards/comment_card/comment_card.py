@@ -3,7 +3,7 @@ from django_components import component
 
 @component.register("comment_card")
 class CommentCard(component.Component):
-    template_name = "ui/cards/comment_card/comment_card.html"
+    template_name = "cards/comment_card/comment_card.html"
 
     def get_context_data(self, comment):
         return {

@@ -109,6 +109,9 @@ class ProgrammeAdmin(admin.ModelAdmin):
         "title",
         "short_description",
         "description",
+        "learning_outcomes",
+        "career_opportunities",
+        "program_structure",
     )
 
     prepopulated_fields = {
@@ -138,6 +141,7 @@ class ProgrammeAdmin(admin.ModelAdmin):
                 "diploma_awarded",
             )
         }),
+
         ("Durée & statut", {
             "fields": (
                 "duration_years",
@@ -145,19 +149,30 @@ class ProgrammeAdmin(admin.ModelAdmin):
                 "is_featured",
             )
         }),
-        ("Descriptions", {
+
+        ("Présentation générale", {
             "fields": (
                 "short_description",
                 "description",
             )
         }),
+
+        ("Contenu Landing Page", {
+            "fields": (
+                "learning_outcomes",
+                "career_opportunities",
+                "program_structure",
+                "illustration",
+            ),
+            "description": "Contenu stratégique affiché dans la page détaillée de la formation."
+        }),
+
         ("Système", {
             "fields": (
                 "created_at",
             )
         }),
     )
-
 
 # ==================================================
 # ANNÉES DU PROGRAMME (ADMIN DIRECT)

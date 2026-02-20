@@ -51,6 +51,29 @@ class Program(models.Model):
 # --------------------------------------------------
 # NEWS
 # --------------------------------------------------
+from django.db import models
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from django.utils.text import slugify
+from django.urls import reverse
+
+from core.images.optimizer import optimize_image
+from .managers import PublishedNewsManager
+
+User = get_user_model()
+
+
+from django.db import models
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from django.utils.text import slugify
+from django.urls import reverse
+
+from .managers import PublishedNewsManager
+
+User = get_user_model()
+
+
 class News(models.Model):
 
     STATUS_DRAFT = "draft"
@@ -66,14 +89,16 @@ class News(models.Model):
     objects = models.Manager()
     published = PublishedNewsManager()
 
-    # Contenu
+    # ==========================
+    # CONTENU
+    # ==========================
     titre = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
     resume = models.TextField(blank=True)
     contenu = models.TextField()
 
     program = models.ForeignKey(
-        Program,
+        "Program",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -83,26 +108,92 @@ class News(models.Model):
     image = models.ImageField(upload_to="news/main/", blank=True, null=True)
 
     categorie = models.ForeignKey(
-        Category,
+        "Category",
         on_delete=models.PROTECT,
         related_name="news"
     )
 
-    # Publication
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
-    auteur = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="news_posts")
+    # ==========================
+    # PUBLICATION
+    # ==========================
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT
+    )
+
+    auteur = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="news_posts"
+    )
+
     published_at = models.DateTimeField(null=True, blank=True)
 
-    # Indicateurs éditoriaux
+    # ==========================
+    # INDICATEURS
+    # ==========================
     is_important = models.BooleanField(default=False)
     is_urgent = models.BooleanField(default=False)
 
-    # Statistiques
+    # ==========================
+    # STATISTIQUES
+    # ==========================
     views_count = models.PositiveIntegerField(default=0)
 
-    # Métadonnées
+    # ==========================
+    # MÉTADONNÉES
+    # ==========================
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # ======================================================
+    # MÉTHODES MÉTIER
+    # ======================================================
+
+    def __str__(self):
+        return self.titre
+
+    def get_absolute_url(self):
+        return reverse("news:detail", kwargs={"slug": self.slug})
+
+    def generate_unique_slug(self):
+        """
+        Génère un slug ASCII propre, sans caractères spéciaux,
+        sans accents, et garanti unique.
+        """
+        base_slug = slugify(self.titre, allow_unicode=False)
+
+        if not base_slug:
+            base_slug = "news"
+
+        slug = base_slug
+        counter = 1
+
+        while News.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+
+        return slug
+
+    def save(self, *args, **kwargs):
+
+        # Toujours régénérer si slug invalide ou vide
+        if not self.slug:
+            self.slug = self.generate_unique_slug()
+        else:
+            # Sécurise les anciens slugs corrompus
+            cleaned_slug = slugify(self.slug, allow_unicode=False)
+            if cleaned_slug != self.slug:
+                self.slug = self.generate_unique_slug()
+
+        # Auto date publication
+        if self.status == self.STATUS_PUBLISHED and not self.published_at:
+            self.published_at = timezone.now()
+
+        super().save(*args, **kwargs)
 
 
 # --------------------------------------------------

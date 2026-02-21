@@ -5,9 +5,28 @@
 
 {% block content %}
 
-{% component "formation_hero" programme=programme %}
-{% endcomponent %}
+<!-- ================= HERO ================= -->
+<div class="relative">
 
+    {% component "formation_hero" programme=programme %}
+    {% endcomponent %}
+
+    <!-- Bouton retour discret intégré au hero -->
+    <div class="absolute top-6 left-6">
+        <a href="{% url 'formations:list' %}"
+           class="inline-flex items-center gap-2
+                  text-xs uppercase tracking-wide font-medium
+                  text-white/70 hover:text-white
+                  transition duration-300">
+
+            ← Retour
+        </a>
+    </div>
+
+</div>
+
+
+<!-- ================= CONTENU PRINCIPAL ================= -->
 <section class="py-24 bg-soft">
   <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-3 gap-16">
 
@@ -25,19 +44,16 @@
         </div>
       </section>
 
-      <!-- 🔵 Ce que vous allez apprendre -->
       {% component "formation_learning_outcomes"
           learning_outcomes=programme.learning_outcomes
       %}
       {% endcomponent %}
 
-      <!-- 🟢 Débouchés professionnels -->
       {% component "formation_career_opportunities"
           career_opportunities=programme.career_opportunities
       %}
       {% endcomponent %}
 
-      <!-- Organisation financière -->
       {% if has_fees %}
         {% component "formation_finance"
             years_with_totals=years_with_totals
@@ -45,26 +61,24 @@
         {% endcomponent %}
       {% endif %}
 
-      <!-- Variation Master -->
       {% if cycle_type == "master" %}
       <section class="bg-white border border-primary/10 rounded-2xl p-10 space-y-6 shadow-sm">
         <h3 class="text-2xl font-bold text-primary">
           Approche stratégique & leadership
         </h3>
-        <p class="text-gray-700">
+        <p class="text-gray-700 leading-relaxed">
           Cette formation de niveau Master met l’accent sur la conception,
           le pilotage et l’évaluation des politiques de santé publique.
         </p>
       </section>
       {% endif %}
 
-      <!-- Variation Licence -->
       {% if cycle_type == "licence" %}
       <section class="bg-white border border-primary/10 rounded-2xl p-10 space-y-6 shadow-sm">
         <h3 class="text-2xl font-bold text-primary">
           Formation professionnalisante
         </h3>
-        <p class="text-gray-700">
+        <p class="text-gray-700 leading-relaxed">
           La formation de Licence vise l’acquisition des compétences
           techniques fondamentales et l’intégration rapide dans le milieu professionnel.
         </p>

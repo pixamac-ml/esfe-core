@@ -34,8 +34,9 @@ from .models import Programme, ProgrammeYear, Cycle
 # LISTE DES FORMATIONS (HTMX + PAGE COMPLETE)
 # ==================================================
 def formation_list(request):
-
     cycle_slug = request.GET.get("cycle")
+    if not cycle_slug:
+        cycle_slug = None
     search_query = request.GET.get("q")
     page_number = request.GET.get("page", 1)
 

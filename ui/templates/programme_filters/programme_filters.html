@@ -1,7 +1,7 @@
 <div class="bg-white rounded-3xl border border-primary/10 shadow-sm
             p-8 space-y-10 sticky top-28">
 
-  <!-- Recherche -->
+  <!-- ================= RECHERCHE ================= -->
   <form
       hx-get="{% url 'formations:list' %}"
       hx-target="#programme-container"
@@ -13,6 +13,7 @@
           Recherche
       </h3>
 
+      <!-- Conserver le cycle actif -->
       <input type="hidden" name="cycle" value="{{ current_cycle|default:'' }}">
 
       <div class="relative">
@@ -25,7 +26,8 @@
               class="w-full pl-12 py-4 rounded-xl
                      border border-primary/20
                      focus:ring-2 focus:ring-secondary/40
-                     focus:border-secondary transition"
+                     focus:border-secondary
+                     transition-all duration-200"
           />
 
           <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary"
@@ -38,48 +40,48 @@
   </form>
 
 
-  <!-- Cycle -->
-  <div class="space-y-6">
+  <!-- ================= FILTRE CYCLE ================= -->
+  <div class="space-y-3">
 
-      <h3 class="text-sm font-semibold text-primary uppercase tracking-wide">
-          Cycle
-      </h3>
+      <!-- ===== Bouton Toutes ===== -->
+      <button
+          hx-get="{% url 'formations:list' %}?q={{ search_query|default:'' }}"
+          hx-target="#programme-container"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          class="w-full px-5 py-4 rounded-xl text-sm font-medium
+                 transition-all duration-200
+                 {% if not current_cycle %}
+                      bg-primary text-white shadow-md border border-primary
+                 {% else %}
+                      bg-white text-primary border border-primary/20
+                      hover:bg-primary hover:text-white hover:border-primary hover:shadow
+                 {% endif %}"
+      >
+          Toutes les formations
+      </button>
 
-      <div class="space-y-3">
 
-          <button
-              hx-get="{% url 'formations:list' %}"
-              hx-target="#programme-container"
-              hx-swap="innerHTML"
-              hx-push-url="true"
-              class="w-full px-5 py-4 rounded-xl text-sm font-medium
-                     {% if not current_cycle %}
-                     bg-primary text-white
-                     {% else %}
-                     bg-white border border-primary/20 text-primary hover:bg-primary hover:text-white
-                     {% endif %}"
-          >
-              Toutes les formations
-          </button>
+      <!-- ===== Boutons Cycles ===== -->
+      {% for cycle in cycles %}
+      <button
+          hx-get="{% url 'formations:list' %}?cycle={{ cycle.slug }}&q={{ search_query|default:'' }}"
+          hx-target="#programme-container"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          class="w-full px-5 py-4 rounded-xl text-sm font-medium
+                 transition-all duration-200
+                 {% if current_cycle == cycle.slug %}
+                      bg-primary text-white shadow-md border border-primary
+                 {% else %}
+                      bg-white text-primary border border-primary/20
+                      hover:bg-primary hover:text-white hover:border-primary hover:shadow
+                 {% endif %}"
+      >
+          {{ cycle.name }}
+      </button>
+      {% endfor %}
 
-          {% for cycle in cycles %}
-          <button
-              hx-get="{% url 'formations:list' %}?cycle={{ cycle.slug }}"
-              hx-target="#programme-container"
-              hx-swap="innerHTML"
-              hx-push-url="true"
-              class="w-full px-5 py-4 rounded-xl text-sm font-medium
-                     {% if current_cycle == cycle.slug %}
-                     bg-secondary text-white
-                     {% else %}
-                     bg-white border border-primary/20 text-primary hover:bg-secondary hover:text-white
-                     {% endif %}"
-          >
-              {{ cycle.name }}
-          </button>
-          {% endfor %}
-
-      </div>
   </div>
 
 </div>

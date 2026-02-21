@@ -7,10 +7,32 @@ from unidecode import unidecode
 # ==================================================
 # CYCLE (Licence / Master / Doctorat)
 # ==================================================
+from django.db import models
+from django.urls import reverse
+from django.utils.text import slugify
+from unidecode import unidecode
+
+
+# ==================================================
+# CYCLE (Licence / Master / Doctorat)
+# ==================================================
 class Cycle(models.Model):
+    THEME_CHOICES = [
+        ("accent", "Bleu institutionnel"),
+        ("secondary", "Orange premium"),
+        ("dark", "Sombre (Doctorat)"),
+    ]
+
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
+
+    # 🎨 Nouveau champ pour piloter le design
+    theme = models.CharField(
+        max_length=20,
+        choices=THEME_CHOICES,
+        default="primary",
+    )
 
     min_duration_years = models.PositiveSmallIntegerField()
     max_duration_years = models.PositiveSmallIntegerField()
@@ -29,7 +51,6 @@ class Cycle(models.Model):
             base = base.replace("'", "").replace("’", "")
             self.slug = slugify(base)
         super().save(*args, **kwargs)
-
 
 # ==================================================
 # DIPLÔME

@@ -89,6 +89,8 @@ MIDDLEWARE = [
     "core.middleware.SecurityShieldMiddleware",
     # Live reload (dev)
     "django_browser_reload.middleware.BrowserReloadMiddleware",
+
+    "django_htmx.middleware.HtmxMiddleware",
 ]
 
 # ==================================================

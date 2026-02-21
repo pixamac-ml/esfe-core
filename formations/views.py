@@ -23,34 +23,48 @@ from django.core.paginator import Paginator
 from .models import Programme, ProgrammeYear, Cycle
 
 
+from django.shortcuts import render, get_object_or_404
+from django.db.models import Prefetch, Q
+from django.core.paginator import Paginator
+
+from .models import Programme, ProgrammeYear, Cycle
+
+
+# ==================================================
+# LISTE DES FORMATIONS (HTMX + PAGE COMPLETE)
+# ==================================================
 def formation_list(request):
 
     cycle_slug = request.GET.get("cycle")
     search_query = request.GET.get("q")
     page_number = request.GET.get("page", 1)
 
+    # Queryset propre
     programmes = (
         Programme.objects
         .filter(is_active=True)
         .select_related("cycle", "filiere", "diploma_awarded")
-        .annotate(years_count=Count("years"))
     )
 
+    # Recherche
     if search_query:
         programmes = programmes.filter(
             Q(title__icontains=search_query) |
             Q(short_description__icontains=search_query)
         )
 
+    # Filtrage par cycle
     if cycle_slug:
         programmes = programmes.filter(cycle__slug=cycle_slug)
 
+    # Tri stratégique
     programmes = programmes.order_by(
         "-is_featured",
         "cycle__min_duration_years",
         "title"
     )
 
+    # Pagination
     paginator = Paginator(programmes, 6)
     page_obj = paginator.get_page(page_number)
 
@@ -58,23 +72,26 @@ def formation_list(request):
         "programmes": page_obj.object_list,
         "page_obj": page_obj,
         "total_programmes": paginator.count,
-        "cycles": Cycle.objects.filter(is_active=True).order_by("min_duration_years"),
+        "cycles": Cycle.objects
+                        .filter(is_active=True)
+                        .order_by("min_duration_years"),
         "current_cycle": cycle_slug,
         "search_query": search_query,
     }
 
-    if request.headers.get("HX-Request") == "true":
+    # Gestion HTMX propre
+    if request.htmx:
         return render(
             request,
             "formations/fragments/_programme_list.html",
             context
         )
+
     return render(
         request,
         "formations/list.html",
         context
     )
-
 
 
 # ==================================================
@@ -148,44 +165,3 @@ def formation_detail(request, slug):
     )
 
 
-def formation_list_fragment(request):
-    cycle_slug = request.GET.get("cycle")
-    search_query = request.GET.get("q")
-    page_number = request.GET.get("page", 1)
-
-    programmes = (
-        Programme.objects
-        .filter(is_active=True)
-        .select_related("cycle", "filiere", "diploma_awarded")
-        .annotate(years_count=Count("years"))
-    )
-
-    if search_query:
-        programmes = programmes.filter(
-            Q(title__icontains=search_query) |
-            Q(short_description__icontains=search_query)
-        )
-
-    if cycle_slug:
-        programmes = programmes.filter(cycle__slug=cycle_slug)
-
-    programmes = programmes.order_by(
-        "-is_featured",
-        "cycle__min_duration_years",
-        "title"
-    )
-
-    paginator = Paginator(programmes, 6)
-    page_obj = paginator.get_page(page_number)
-
-    context = {
-        "programmes": page_obj.object_list,
-        "page_obj": page_obj,
-        "total_programmes": paginator.count,
-    }
-
-    return render(
-        request,
-        "formations/fragments/_programme_list.html",
-        context
-    )

@@ -17,17 +17,45 @@ from .models import (
 class CycleAdmin(admin.ModelAdmin):
     list_display = (
         "name",
+        "theme",  # 👈 important
         "min_duration_years",
         "max_duration_years",
         "is_active",
     )
 
-    list_filter = ("is_active",)
+    list_filter = (
+        "theme",  # 👈 important
+        "is_active",
+    )
+
     search_fields = ("name",)
     ordering = ("min_duration_years",)
 
-    list_per_page = 25
+    fieldsets = (
+        ("Identification", {
+            "fields": (
+                "name",
+                "slug",
+                "description",
+            )
+        }),
 
+        ("Configuration visuelle", {
+            "fields": (
+                "theme",  # 👈 ici on expose le champ
+            )
+        }),
+
+        ("Durée & statut", {
+            "fields": (
+                "min_duration_years",
+                "max_duration_years",
+                "is_active",
+            )
+        }),
+    )
+
+    list_per_page = 25
 
 # ==================================================
 # DIPLÔME

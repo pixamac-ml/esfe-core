@@ -1,0 +1,58 @@
+<div
+    x-data
+    x-init="$nextTick(() => {
+        $el.querySelectorAll('.news-card').forEach((el, index) => {
+            el.style.opacity = 0
+            el.style.transform = 'translateY(8px)'
+            setTimeout(() => {
+                el.style.transition = 'all 300ms ease'
+                el.style.opacity = 1
+                el.style.transform = 'translateY(0)'
+            }, index * 60)
+        })
+    })"
+    class="space-y-12"
+>
+
+{% for item in news %}
+    {% component "news_article_card" news=item %}
+    {% endcomponent %}
+{% empty %}
+    <div class="text-gray-500">
+        Aucune actualité disponible.
+    </div>
+{% endfor %}
+
+{% if is_paginated %}
+<div class="flex justify-center mt-12 gap-4">
+    {% if page_obj.has_previous %}
+        <a
+           hx-get="{% url 'news:list' %}?page={{ page_obj.previous_page_number }}"
+           hx-target="#news-content"
+           hx-swap="outerHTML"
+           hx-push-url="true"
+           hx-indicator="#news-loading"
+           class="px-5 py-2 bg-white border border-primary-50 rounded-xl hover:bg-primary-50 transition">
+            ← Précédent
+        </a>
+    {% endif %}
+
+    <span class="px-4 py-2 text-gray-500">
+        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </span>
+
+    {% if page_obj.has_next %}
+        <a
+           hx-get="{% url 'news:list' %}?page={{ page_obj.next_page_number }}"
+           hx-target="#news-content"
+           hx-swap="outerHTML"
+           hx-push-url="true"
+           hx-indicator="#news-loading"
+           class="px-5 py-2 bg-white border border-primary-50 rounded-xl hover:bg-primary-50 transition">
+            Suivant →
+        </a>
+    {% endif %}
+</div>
+{% endif %}
+
+</div>

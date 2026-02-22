@@ -1,14 +1,28 @@
-<div class="bg-white p-6 rounded-xl shadow">
-    <h3 class="font-semibold mb-4 text-lg">Catégories</h3>
+<div class="bg-white p-6 rounded-2xl shadow-sm border border-primary-50">
 
-    <ul class="space-y-2 text-sm text-gray-600">
+    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-6">
+        Catégories
+    </h3>
+
+    <ul class="space-y-3 text-sm">
         {% for cat in categories %}
         <li>
-            <a href="?category={{ cat.slug }}"
-               class="{% if current_category == cat.slug %}text-blue-600 font-semibold{% else %}hover:text-blue-600{% endif %}">
+            <a
+                hx-get="{% url 'news:list' %}?category={{ cat.slug }}"
+                hx-target="#news-content"
+                hx-swap="outerHTML"
+                hx-push-url="true"
+                hx-indicator="#news-loading"
+                class="block px-3 py-2 rounded-lg transition
+                {% if current_category == cat.slug %}
+                    bg-primary-50 text-primary-600 font-medium
+                {% else %}
+                    text-gray-600 hover:bg-primary-50 hover:text-primary-600
+                {% endif %}">
                 {{ cat.nom }}
             </a>
         </li>
         {% endfor %}
     </ul>
+
 </div>

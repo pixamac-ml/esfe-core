@@ -6,22 +6,16 @@ from formations.models import (
 
 
 class Command(BaseCommand):
-    help = "Seed formations propre (Cycle Licence + Cycle Master)"
+    help = "Seed complet Licence + Master ESFE"
 
     def handle(self, *args, **kwargs):
 
-        # ======================================================
-        # RÉCUPÉRATION DES CYCLES EXISTANTS
-        # ======================================================
+        # ==============================
+        # RÉCUPÉRATION DES CYCLES
+        # ==============================
 
-        try:
-            licence = Cycle.objects.get(slug="cycle-licence")
-            master = Cycle.objects.get(slug="cycle-master")
-        except Cycle.DoesNotExist:
-            self.stdout.write(self.style.ERROR(
-                "❌ Les cycles 'Cycle Licence' ou 'Cycle Master' n'existent pas."
-            ))
-            return
+        licence = Cycle.objects.get(slug="cycle-licence")
+        master = Cycle.objects.get(slug="cycle-master")
 
         diploma_sup, _ = Diploma.objects.get_or_create(
             name="Diplôme Supérieur",
@@ -32,133 +26,150 @@ class Command(BaseCommand):
             name="Sciences de la santé"
         )
 
-        # ======================================================
-        # LICENCE — INFIRMIER D'ÉTAT
-        # Structure temporaire standardisée :
-        # 130 000 + 140 000 + 140 000 = 410 000
-        # ======================================================
+        # =====================================================
+        # 🔵 BLOC LICENCE
+        # =====================================================
 
-        programme, created = Programme.objects.get_or_create(
-            title="Infirmier d’État",
-            defaults={
-                "cycle": licence,
-                "filiere": filiere_sante,
-                "diploma_awarded": diploma_sup,
-                "duration_years": 3,
-                "short_description": "Formation professionnelle en soins infirmiers et gestion clinique.",
-                "description": """
-La formation d’Infirmier d’État prépare des professionnels capables
-d’assurer la prise en charge globale des patients dans les structures sanitaires.
-""",
-                "learning_outcomes": """
-Maîtrise des soins infirmiers généraux
-Gestion des urgences médicales
-Surveillance clinique avancée
-Éducation thérapeutique des patients
-Travail en équipe pluridisciplinaire
-                """,
-                "career_opportunities": """
-Hôpitaux publics
-Cliniques privées
-Centres de santé communautaires
-ONG médicales
-Institutions internationales
-                """,
-                "is_active": True,
-            }
-        )
+        FORMATIONS_LICENCE = [
+            {
+                "title": "Infirmier d’État",
+                "duration": 3,
+                "description": "Formation professionnelle complète en soins infirmiers cliniques et communautaires.",
+            },
+            {
+                "title": "Sage-Femme",
+                "duration": 3,
+                "description": "Formation spécialisée en santé maternelle, accouchement sécurisé et soins néonatals.",
+            },
+            {
+                "title": "Biologie Médicale",
+                "duration": 3,
+                "description": "Formation en analyses biologiques, microbiologie et diagnostic médical.",
+            },
+            {
+                "title": "Technicien Supérieur en Pharmacie",
+                "duration": 3,
+                "description": "Formation en gestion pharmaceutique et dispensation des produits de santé.",
+            },
+            {
+                "title": "Santé Communautaire",
+                "duration": 3,
+                "description": "Formation orientée vers la prévention et la gestion des programmes sanitaires communautaires.",
+            },
+            {
+                "title": "Nutritionniste",
+                "duration": 3,
+                "description": "Formation en nutrition humaine et sécurité alimentaire.",
+            },
+            {
+                "title": "Santé Environnementale",
+                "duration": 3,
+                "description": "Formation en prévention des risques sanitaires liés à l’environnement.",
+            },
+            {
+                "title": "Technicien Supérieur en Dialyse",
+                "duration": 3,
+                "description": "Formation spécialisée en techniques d’hémodialyse.",
+            },
+            {
+                "title": "Optométrie",
+                "duration": 3,
+                "description": "Formation spécialisée en examen visuel et correction optique.",
+            },
+            {
+                "title": "Aide-soignant",
+                "duration": 1,
+                "description": "Formation courte en assistance directe aux soins infirmiers.",
+            },
+            {
+                "title": "Auxiliaire Infirmier",
+                "duration": 2,
+                "description": "Formation professionnalisante en appui aux soins cliniques.",
+            },
+            {
+                "title": "Employé de Pharmacie",
+                "duration": 2,
+                "description": "Formation technique en assistance pharmaceutique.",
+            },
+            {
+                "title": "Agent de Santé Communautaire",
+                "duration": 2,
+                "description": "Formation orientée vers la sensibilisation et la prévention en milieu communautaire.",
+            },
+        ]
 
-        if created:
-            self.stdout.write(self.style.SUCCESS(f"✔ Créé : {programme.title}"))
-        else:
-            self.stdout.write(self.style.WARNING(f"⚠ Mise à jour : {programme.title}"))
-            programme.years.all().delete()  # Nettoyage propre avant recréation
+        for data in FORMATIONS_LICENCE:
 
-        for year_number in range(1, programme.duration_years + 1):
-            year = ProgrammeYear.objects.create(
-                programme=programme,
-                year_number=year_number
+            programme, _ = Programme.objects.update_or_create(
+                title=data["title"],
+                defaults={
+                    "cycle": licence,
+                    "filiere": filiere_sante,
+                    "diploma_awarded": diploma_sup,
+                    "duration_years": data["duration"],
+                    "short_description": data["description"],
+                    "description": data["description"],
+                    "learning_outcomes": "Compétences professionnelles adaptées au secteur sanitaire.",
+                    "career_opportunities": "Structures publiques, privées et ONG.",
+                    "is_active": True,
+                }
             )
 
-            Fee.objects.create(
-                programme_year=year,
-                label="Inscription",
-                amount=130000,
-                due_month="Octobre"
+            programme.years.all().delete()
+
+            for year in range(1, data["duration"] + 1):
+                year_obj = ProgrammeYear.objects.create(
+                    programme=programme,
+                    year_number=year
+                )
+
+                Fee.objects.create(programme_year=year_obj, label="Inscription", amount=150000, due_month="Octobre")
+                Fee.objects.create(programme_year=year_obj, label="Janvier", amount=150000, due_month="Janvier")
+                Fee.objects.create(programme_year=year_obj, label="Mars", amount=150000, due_month="Mars")
+
+        # =====================================================
+        # 🔴 BLOC MASTER
+        # =====================================================
+
+        FORMATIONS_MASTER = [
+            "Santé Communautaire",
+            "Épidémiologie",
+            "Manager en Santé",
+            "Biochimie",
+            "Nutrition",
+            "Santé Environnementale",
+            "Suivi et Évaluation",
+            "Attaché de Recherche Clinique",
+            "Data Manager",
+        ]
+
+        for title in FORMATIONS_MASTER:
+
+            programme, _ = Programme.objects.update_or_create(
+                title=f"Master en {title}",
+                defaults={
+                    "cycle": master,
+                    "filiere": filiere_sante,
+                    "diploma_awarded": diploma_sup,
+                    "duration_years": 2,
+                    "short_description": f"Formation avancée en {title.lower()}.",
+                    "description": f"Le Master en {title} forme des experts capables d’intervenir au niveau stratégique et institutionnel.",
+                    "learning_outcomes": "Expertise avancée, analyse stratégique, leadership.",
+                    "career_opportunities": "Ministères, ONG internationales, instituts de recherche.",
+                    "is_active": True,
+                }
             )
 
-            Fee.objects.create(
-                programme_year=year,
-                label="Janvier",
-                amount=140000,
-                due_month="Janvier"
-            )
+            programme.years.all().delete()
 
-            Fee.objects.create(
-                programme_year=year,
-                label="Mars",
-                amount=140000,
-                due_month="Mars"
-            )
+            for year in range(1, 3):
+                year_obj = ProgrammeYear.objects.create(
+                    programme=programme,
+                    year_number=year
+                )
 
-        # ======================================================
-        # MASTER — SANTÉ COMMUNAUTAIRE
-        # ======================================================
+                Fee.objects.create(programme_year=year_obj, label="Inscription", amount=500000, due_month="Octobre")
+                Fee.objects.create(programme_year=year_obj, label="Janvier", amount=250000, due_month="Janvier")
+                Fee.objects.create(programme_year=year_obj, label="Mars", amount=250000, due_month="Mars")
 
-        programme_master, created = Programme.objects.get_or_create(
-            title="Santé communautaire",
-            defaults={
-                "cycle": master,
-                "filiere": filiere_sante,
-                "diploma_awarded": diploma_sup,
-                "duration_years": 2,
-                "short_description": "Formation stratégique en gestion des systèmes de santé.",
-                "description": """
-Le Master en Santé communautaire forme des cadres capables
-de concevoir, piloter et évaluer des programmes de santé publique.
-""",
-                "learning_outcomes": """
-Conception de politiques sanitaires
-Évaluation des programmes publics
-Analyse statistique avancée
-Gestion stratégique des systèmes de santé
-Leadership institutionnel
-                """,
-                "career_opportunities": """
-Ministère de la Santé
-ONG internationales
-Instituts de recherche
-Organisations de santé publique
-Consulting en santé
-                """,
-                "is_active": True,
-            }
-        )
-
-        if created:
-            self.stdout.write(self.style.SUCCESS(f"✔ Créé : {programme_master.title}"))
-        else:
-            self.stdout.write(self.style.WARNING(f"⚠ Mise à jour : {programme_master.title}"))
-            programme_master.years.all().delete()
-
-        # 1ère année
-        year1 = ProgrammeYear.objects.create(
-            programme=programme_master,
-            year_number=1
-        )
-
-        Fee.objects.create(programme_year=year1, label="Inscription", amount=410000, due_month="Octobre")
-        Fee.objects.create(programme_year=year1, label="Janvier", amount=200000, due_month="Janvier")
-        Fee.objects.create(programme_year=year1, label="Mars", amount=200000, due_month="Mars")
-
-        # 2ème année
-        year2 = ProgrammeYear.objects.create(
-            programme=programme_master,
-            year_number=2
-        )
-
-        Fee.objects.create(programme_year=year2, label="Inscription", amount=600000, due_month="Octobre")
-        Fee.objects.create(programme_year=year2, label="Janvier", amount=300000, due_month="Janvier")
-        Fee.objects.create(programme_year=year2, label="Mars", amount=300000, due_month="Mars")
-
-        self.stdout.write(self.style.SUCCESS("🎓 Seed terminé proprement."))
+        self.stdout.write(self.style.SUCCESS("🎓 Seed Licence + Master terminé proprement."))

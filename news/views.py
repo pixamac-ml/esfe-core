@@ -1,3 +1,4 @@
+from django.shortcuts import render
 from django.views.generic import ListView, DetailView
 from django.db.models import Q
 
@@ -9,6 +10,21 @@ from .filters import filter_news
 # ACTUALITÉS — LISTE
 # =====================================================
 
+from django.shortcuts import render
+from django.views.generic import ListView
+from django.shortcuts import render
+from django.db.models import Q
+
+from .models import News, Category, Program
+from .filters import filter_news
+
+from django.views.generic import ListView
+from django.shortcuts import render
+
+from .models import News, Category, Program
+from .filters import filter_news
+
+
 class NewsListView(ListView):
     template_name = "news/list.html"
     context_object_name = "news"
@@ -18,6 +34,7 @@ class NewsListView(ListView):
         queryset = (
             News.published
             .select_related("categorie", "auteur", "program")
+            .order_by("-published_at")
         )
         return filter_news(queryset, self.request.GET)
 
@@ -31,21 +48,23 @@ class NewsListView(ListView):
         )
 
         context.update({
-            "page_title": "Actualités",
             "categories": Category.objects.filter(is_active=True),
             "current_category": self.request.GET.get("category"),
-            "search_query": self.request.GET.get("q"),
 
-            "urgent_news": published_qs.filter(is_urgent=True)[:2],
-            "important_news": published_qs.filter(is_important=True, is_urgent=False)[:4],
             "featured_news": published_qs[:3],
             "recent_news": published_qs[:5],
-            "popular_news": published_qs.order_by("-views_count")[:5],
-
-            "active_programs": Program.objects.filter(is_active=True)[:5],
         })
 
         return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get("HX-Request"):
+            return render(
+                self.request,
+                "news/fragments/news_content_fragment.html",
+                context
+            )
+        return super().render_to_response(context, **response_kwargs)
 
 
 # =====================================================

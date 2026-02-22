@@ -1,13 +1,21 @@
-<section class="bg-red-50 py-10 border-b border-red-200">
-    <div class="max-w-7xl mx-auto px-4">
+{% if important_news %}
+<section class="bg-primary-50 py-16 border-b border-primary-100">
+    <div class="max-w-7xl mx-auto px-6">
 
-        <div class="flex items-center justify-between mb-8">
-            <h2 class="text-2xl font-bold text-red-700">
+        <div class="flex items-center justify-between mb-10">
+            <h2 class="text-2xl font-semibold text-primary-700 flex items-center gap-3">
+
+                <!-- Icône Megaphone -->
+                <svg class="w-6 h-6 text-secondary" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M3 10v4a1 1 0 001 1h2l3 5h2l-2-5h3l7 3V6l-7 3H4a1 1 0 00-1 1z"/>
+                </svg>
+
                 Communiqués Importants
             </h2>
 
-            <span class="text-xs uppercase tracking-wider text-red-600 font-semibold">
-                Communication Officielle
+            <span class="text-xs uppercase tracking-wider text-primary-400 font-medium">
+                Communication officielle
             </span>
         </div>
 
@@ -15,20 +23,26 @@
 
             {% for item in important_news %}
             <a href="{{ item.get_absolute_url }}"
-               class="group bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-600 hover:shadow-xl transition">
+               class="group bg-white p-8 rounded-2xl shadow-sm border border-primary-50 hover:shadow-md transition duration-300">
 
                 <!-- Meta -->
-                <div class="flex items-center justify-between text-xs text-gray-500 mb-3">
-                    <span>
+                <div class="flex items-center justify-between text-xs text-gray-400 mb-4">
+
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-primary-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M8 7V3m8 4V3m-9 8h10m-11 8h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
                         {{ item.published_at|date:"d M Y" }}
-                    </span>
+                    </div>
+
                     <span class="uppercase tracking-wide">
                         {{ item.categorie.nom }}
                     </span>
                 </div>
 
                 <!-- Titre -->
-                <h3 class="font-bold text-lg mb-3 text-gray-800 group-hover:text-red-700 transition">
+                <h3 class="font-semibold text-lg mb-3 text-primary-700 group-hover:text-secondary transition">
                     {{ item.titre }}
                 </h3>
 
@@ -39,18 +53,29 @@
                 </p>
                 {% endif %}
 
-                <!-- Indicateur -->
-                <div class="mt-4 text-sm text-red-600 font-medium">
-                    Lire le communiqué →
+                <!-- Badge dynamique -->
+                <div class="mt-5 flex items-center gap-3 text-sm font-medium">
+
+                    {% if item.is_urgent %}
+                        <span class="px-3 py-1 rounded-full bg-red-100 text-red-600 text-xs">
+                            Urgent
+                        </span>
+                    {% endif %}
+
+                    <span class="inline-flex items-center gap-2 text-primary-600 group-hover:text-secondary transition">
+                        Lire le communiqué
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"
+                             viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </span>
                 </div>
 
             </a>
-            {% empty %}
-                <div class="text-gray-500">
-                    Aucun communiqué important actuellement.
-                </div>
             {% endfor %}
 
         </div>
     </div>
 </section>
+{% endif %}

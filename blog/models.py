@@ -4,6 +4,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.db.models import Count
+from django.db.models.signals import pre_save, post_delete
+from django.dispatch import receiver
+import os
 
 
 # ==========================================================
@@ -40,9 +43,9 @@ class Category(models.Model):
 
 class PublishedManager(models.Manager):
     def get_queryset(self):
-        return (
-            super().get_queryset()
-            .filter(status='published', is_deleted=False)
+        return super().get_queryset().filter(
+            status='published',
+            is_deleted=False
         )
 
 
@@ -147,6 +150,7 @@ class ArticleImage(models.Model):
         on_delete=models.CASCADE,
         related_name='images'
     )
+
     image = models.ImageField(upload_to='blog/gallery/')
     caption = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -160,12 +164,45 @@ class ArticleImage(models.Model):
 
 
 # ==========================================================
-# COMMENT
+# SUPPRESSION AUTOMATIQUE DES IMAGES
 # ==========================================================
+
+@receiver(pre_save, sender=Article)
+def delete_old_featured_image(sender, instance, **kwargs):
+    if not instance.pk:
+        return
+
+    try:
+        old_instance = Article.objects.get(pk=instance.pk)
+    except Article.DoesNotExist:
+        return
+
+    old_image = old_instance.featured_image
+    new_image = instance.featured_image
+
+    if old_image and old_image != new_image:
+        if os.path.isfile(old_image.path):
+            os.remove(old_image.path)
+
+
+@receiver(post_delete, sender=Article)
+def delete_featured_image_on_delete(sender, instance, **kwargs):
+    if instance.featured_image:
+        if os.path.isfile(instance.featured_image.path):
+            os.remove(instance.featured_image.path)
+
+
+@receiver(post_delete, sender=ArticleImage)
+def delete_gallery_image_on_delete(sender, instance, **kwargs):
+    if instance.image:
+        if os.path.isfile(instance.image.path):
+            os.remove(instance.image.path)
+
 
 # ==========================================================
 # COMMENT
 # ==========================================================
+
 class Comment(models.Model):
 
     STATUS_PENDING = "pending"
@@ -185,11 +222,9 @@ class Comment(models.Model):
         db_index=True
     )
 
-    # Auteur texte (toujours conservé pour historique)
     author_name = models.CharField(max_length=150)
     author_email = models.EmailField(blank=True, null=True)
 
-    # Utilisateur connecté (optionnel)
     author_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -203,17 +238,12 @@ class Comment(models.Model):
     status = models.CharField(
         max_length=10,
         choices=STATUS_CHOICES,
-        default=STATUS_APPROVED,   # 🔥 publication immédiate
+        default=STATUS_APPROVED,
         db_index=True
     )
 
-    # 🔎 Indicateur interne (détection automatique)
-    flagged = models.BooleanField(
-        default=False,
-        help_text="Commentaire signalé automatiquement par le système"
-    )
+    flagged = models.BooleanField(default=False)
 
-    # 🛡️ Traçabilité modération
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -223,48 +253,21 @@ class Comment(models.Model):
     )
 
     approved_at = models.DateTimeField(null=True, blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [
-            models.Index(fields=["status"]),
-            models.Index(fields=["flagged"]),
-            models.Index(fields=["created_at"]),
-        ]
         verbose_name = "Commentaire"
         verbose_name_plural = "Commentaires"
 
     def __str__(self):
         return f"{self.author_name} - {self.article.title}"
 
-    # ------------------------------------------------------
-    # Méthodes utilitaires
-    # ------------------------------------------------------
-
-    def is_approved(self):
-        return self.status == self.STATUS_APPROVED
-
-    def mark_approved(self, moderator):
-        self.status = self.STATUS_APPROVED
-        self.approved_by = moderator
-        self.approved_at = timezone.now()
-        self.save(update_fields=["status", "approved_by", "approved_at"])
-
-    def mark_rejected(self, moderator):
-        self.status = self.STATUS_REJECTED
-        self.approved_by = moderator
-        self.approved_at = timezone.now()
-        self.save(update_fields=["status", "approved_by", "approved_at"])
-
-
-
-
 
 # ==========================================================
 # COMMENT LIKE
 # ==========================================================
+
 class CommentLike(models.Model):
 
     REACTION_LIKE = "like"
@@ -302,12 +305,7 @@ class CommentLike(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = (
-            ("comment", "ip_address"),
-        )
-        indexes = [
-            models.Index(fields=["comment", "reaction_type"]),
-        ]
+        unique_together = (("comment", "ip_address"),)
         verbose_name = "Réaction"
         verbose_name_plural = "Réactions"
 

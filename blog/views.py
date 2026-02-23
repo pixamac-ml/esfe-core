@@ -54,9 +54,17 @@ def article_list(request):
 from django.shortcuts import get_object_or_404, render, redirect
 from django.db.models import F, Count, Q
 from django.contrib import messages
+from django.templatetags.static import static
+
+from .models import Article, Comment, CommentLike
+from .services import create_comment
+
 
 def article_detail(request, slug):
 
+    # ==========================
+    # Récupération article
+    # ==========================
     article = get_object_or_404(
         Article.objects.select_related("author", "category"),
         slug=slug,
@@ -76,7 +84,7 @@ def article_detail(request, slug):
     # Calcul temps de lecture
     # ==========================
     word_count = len(article.content.split()) if article.content else 0
-    reading_time = max(1, round(word_count / 200))  # 200 mots / min
+    reading_time = max(1, round(word_count / 200))  # 200 mots/min
 
     # ==========================
     # Commentaires optimisés
@@ -98,7 +106,19 @@ def article_detail(request, slug):
         .order_by("created_at")
     )
 
+    # ==========================
+    # URLs absolues (SEO / OG)
+    # ==========================
     absolute_url = request.build_absolute_uri()
+
+    if article.featured_image:
+        absolute_image_url = request.build_absolute_uri(
+            article.featured_image.url
+        )
+    else:
+        absolute_image_url = request.build_absolute_uri(
+            static("images/default-article.jpg")
+        )
 
     # ==========================
     # Création commentaire
@@ -128,10 +148,12 @@ def article_detail(request, slug):
         "article": article,
         "comments": comments,
         "absolute_url": absolute_url,
+        "absolute_image_url": absolute_image_url,
         "reading_time": reading_time,
     }
 
     return render(request, "blog/article_detail.html", context)
+
 
 # ==========================================================
 # FILTRE PAR CATEGORIE

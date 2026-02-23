@@ -2,10 +2,14 @@
 from django.urls import path
 from . import views
 
+
+
 app_name = "core"
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("contact/", views.contact_view, name="contact"),
+
     path("mentions-legales/", views.legal_notice, name="legal_notice"),
     path("confidentialite/", views.privacy_policy, name="privacy_policy"),
     path("conditions-utilisation/", views.terms_of_service, name="terms_of_service"),
@@ -15,3 +19,4 @@ urlpatterns = [
     path("legal/<str:page_type>/pdf/", views.legal_page_pdf, name="legal_pdf"),
     path("dashboard/", views.superadmin_dashboard, name="superadmin_dashboard"),
 ]
+

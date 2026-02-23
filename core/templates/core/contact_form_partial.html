@@ -1,0 +1,100 @@
+<div class="bg-white rounded-2xl shadow-xl p-10"
+     x-data="{ loading:false }"
+     x-init="
+        document.body.addEventListener('htmx:afterRequest', () => {
+            loading = false
+        })
+     ">
+
+    <h3 class="text-xl font-semibold text-slate-800 mb-8">
+        Envoyer une demande
+    </h3>
+
+    <form method="post"
+          hx-post="{% url 'core:contact' %}"
+          hx-target="#contact-container"
+          hx-swap="outerHTML"
+          @submit="loading = true"
+          class="space-y-6">
+
+        {% csrf_token %}
+
+        <!-- Nom -->
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-2">
+                Nom complet
+            </label>
+            {{ form.full_name }}
+            {{ form.full_name.errors }}
+        </div>
+
+        <!-- Email -->
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-2">
+                Adresse email
+            </label>
+            {{ form.email }}
+            {{ form.email.errors }}
+        </div>
+
+        <!-- Téléphone -->
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-2">
+                Téléphone (optionnel)
+            </label>
+            {{ form.phone }}
+        </div>
+
+        <!-- Sujet -->
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-2">
+                Sujet
+            </label>
+            {{ form.subject }}
+        </div>
+
+        <!-- Message -->
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-2">
+                Message
+            </label>
+            {{ form.message }}
+            {{ form.message.errors }}
+        </div>
+
+        <!-- Consent -->
+        <div class="flex items-start space-x-3">
+            {{ form.consent }}
+            <label class="text-sm text-slate-600 leading-relaxed">
+                J’accepte que mes données soient utilisées pour traiter ma demande.
+            </label>
+        </div>
+
+        <!-- Bouton -->
+        <button type="submit"
+                :disabled="loading"
+                class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl font-semibold transition duration-200 flex justify-center items-center"
+                x-bind:class="loading ? 'opacity-60 cursor-not-allowed' : ''">
+
+            <span x-show="!loading">Envoyer la demande</span>
+
+            <svg x-show="loading"
+                 class="animate-spin h-5 w-5 text-white"
+                 xmlns="http://www.w3.org/2000/svg"
+                 fill="none"
+                 viewBox="0 0 24 24">
+                <circle class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"></circle>
+                <path class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+
+        </button>
+
+    </form>
+</div>

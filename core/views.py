@@ -424,3 +424,162 @@ def custom_400(request, exception):
     }
 
     return render(request, "core/errors/400.html", context, status=400)
+
+
+
+
+from django.db.models import Avg, F, ExpressionWrapper, DurationField
+from django.db.models.functions import Extract
+
+
+def changelist_view(self, request, extra_context=None):
+
+    extra_context = extra_context or {}
+
+    queryset = self.get_queryset(request)
+
+    total = queryset.count()
+    new_count = queryset.filter(status="new").count()
+    answered_qs = queryset.filter(answered_at__isnull=False)
+
+    answered_count = answered_qs.count()
+
+    # Calcul durée moyenne (answered_at - created_at)
+    duration_expr = ExpressionWrapper(
+        F("answered_at") - F("created_at"),
+        output_field=DurationField()
+    )
+
+    avg_duration = answered_qs.annotate(
+        response_time=duration_expr
+    ).aggregate(
+        avg=Avg("response_time")
+    )["avg"]
+
+    avg_hours = None
+    if avg_duration:
+        avg_hours = round(avg_duration.total_seconds() / 3600, 2)
+
+    extra_context["stats"] = {
+        "total": total,
+        "new": new_count,
+        "answered": answered_count,
+        "avg_response_hours": avg_hours,
+    }
+
+    return super().changelist_view(
+        request,
+        extra_context=extra_context
+    )
+
+
+
+from django.views.decorators.http import require_http_methods
+from django.shortcuts import render
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
+
+from .forms import ContactForm
+from .models import ContactMessage
+from .utils import get_institution_context  # évite import circulaire
+
+
+@require_http_methods(["GET", "POST"])
+def contact_view(request):
+
+    if request.method == "POST":
+
+        form = ContactForm(request.POST)
+
+        if form.is_valid():
+
+            contact_message = form.save(commit=False)
+            contact_message.ip_address = request.META.get("REMOTE_ADDR")
+            contact_message.user_agent = request.META.get("HTTP_USER_AGENT", "")
+            contact_message.save()
+
+            # ===============================
+            # Email interne HTML
+            # ===============================
+            internal_context = {
+                "message_obj": contact_message
+            }
+
+            internal_html = render_to_string(
+                "emails/contact_internal.html",
+                internal_context
+            )
+
+            internal_text = strip_tags(internal_html)
+
+            internal_email = EmailMultiAlternatives(
+                subject=f"[CONTACT] {contact_message.get_subject_display()}",
+                body=internal_text,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[settings.DEFAULT_FROM_EMAIL],
+            )
+
+            internal_email.attach_alternative(internal_html, "text/html")
+            internal_email.send()
+
+            # ===============================
+            # Email automatique utilisateur
+            # ===============================
+            user_context = {
+                "message_obj": contact_message
+            }
+
+            user_html = render_to_string(
+                "emails/contact_received.html",
+                user_context
+            )
+
+            user_text = strip_tags(user_html)
+
+            user_email = EmailMultiAlternatives(
+                subject="Votre demande a bien été reçue",
+                body=user_text,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[contact_message.email],
+            )
+
+            user_email.attach_alternative(user_html, "text/html")
+            user_email.send()
+
+            # ===============================
+            # HTMX
+            # ===============================
+            if request.headers.get("HX-Request"):
+                return render(
+                    request,
+                    "core/contact_success.html",
+                    {"reference": contact_message.reference}
+                )
+
+            return render(
+                request,
+                "core/contact_success.html",
+                {
+                    "reference": contact_message.reference,
+                    **get_institution_context(),
+                }
+            )
+
+        if request.headers.get("HX-Request"):
+            return render(
+                request,
+                "core/contact_form_partial.html",
+                {"form": form}
+            )
+
+    else:
+        form = ContactForm()
+
+    context = {
+        "form": form,
+        **get_institution_context(),
+    }
+
+    return render(request, "core/contact.html", context)

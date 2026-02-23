@@ -19,24 +19,19 @@ load_dotenv(BASE_DIR / ".env")
 # ==================================================
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
-#DEBUG = os.getenv("DEBUG", "True") == "True"
-#ALLOWED_HOSTS = []
 DEBUG = True
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+
 # ==================================================
 # APPLICATIONS
 # ==================================================
 
 INSTALLED_APPS = [
 
+    # 🔥 django-components
     "django_components",
 
-    # ============================
-    # ADMIN THEME (DOIT être avant admin)
-    # ============================
-
     # Django core
-
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -61,14 +56,13 @@ INSTALLED_APPS = [
     "formations",
 
     # Contenu
-    'blog.apps.BlogConfig',
+    "blog.apps.BlogConfig",
     "news",
 ]
 
 # ==================================================
 # DJANGO-COMPONENTS CONFIG
 # ==================================================
-
 
 COMPONENTS = {
     "template_cache_size": 128,
@@ -86,10 +80,10 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "core.middleware.SecurityShieldMiddleware",
-    # Live reload (dev)
-    "django_browser_reload.middleware.BrowserReloadMiddleware",
+    #"core.middleware.SecurityShieldMiddleware",
 
+    # Dev
+    "django_browser_reload.middleware.BrowserReloadMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
 ]
 
@@ -101,7 +95,7 @@ ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
 # ==================================================
-# TEMPLATES
+# TEMPLATES (VERSION STABLE)
 # ==================================================
 
 TEMPLATES = [
@@ -113,12 +107,8 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
-
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-            ],
-            "builtins": [
-                "django_components.templatetags.component_tags",
             ],
         },
     },
@@ -165,7 +155,7 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATIC_ROOT = BASE_DIR / "staticfiles"  # pour prod
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # ==================================================
 # MEDIA FILES
@@ -185,11 +175,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ==================================================
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
@@ -204,31 +192,17 @@ STUDENT_LOGIN_URL = "http://127.0.0.1:8000/student/login/"
 # JAZZMIN CONFIG
 # ==================================================
 
-# ==================================================
-# JAZZMIN CONFIG
-# ==================================================
-
 JAZZMIN_SETTINGS = {
-
-    # ------------------------------
-    # BRANDING
-    # ------------------------------
     "site_title": "ESFé | Administration",
     "site_header": "École de Santé Félix Houphouët Boigny",
     "site_brand": "ESFé",
     "welcome_sign": "Système de Gestion Institutionnel",
 
-    # ------------------------------
-    # UI
-    # ------------------------------
     "show_sidebar": True,
     "navigation_expanded": True,
     "show_ui_builder": False,
     "sidebar_disable_expand": False,
 
-    # ------------------------------
-    # MENU ORDER
-    # ------------------------------
     "order_with_respect_to": [
         "admissions",
         "inscriptions",
@@ -240,50 +214,26 @@ JAZZMIN_SETTINGS = {
         "news",
     ],
 
-    # ------------------------------
-    # ICONS (Font Awesome 6)
-    # ------------------------------
     "icons": {
         "auth": "fas fa-user-shield",
-
         "admissions": "fas fa-file-medical",
         "admissions.Candidature": "fas fa-user-plus",
-
         "inscriptions": "fas fa-id-card",
         "inscriptions.Inscription": "fas fa-user-check",
-
         "payments": "fas fa-money-bill-wave",
         "payments.Payment": "fas fa-credit-card",
         "payments.PaymentAgent": "fas fa-user-tie",
         "payments.CashPaymentSession": "fas fa-key",
-
         "students": "fas fa-user-graduate",
         "formations": "fas fa-graduation-cap",
-
         "blog": "fas fa-blog",
         "news": "fas fa-newspaper",
     },
 
-    # ------------------------------
-    # TOP MENU
-    # ------------------------------
     "topmenu_links": [
-        {
-            "name": "Dashboard",
-            "url": "/dashboard/",
-            "icon": "fas fa-chart-line",
-        },
-        {
-            "name": "Site public",
-            "url": "/",
-            "new_window": True,
-            "icon": "fas fa-globe",
-        },
-        {
-            "name": "Déconnexion",
-            "url": "/admin/logout/",
-            "icon": "fas fa-sign-out-alt",
-        },
+        {"name": "Dashboard", "url": "/dashboard/", "icon": "fas fa-chart-line"},
+        {"name": "Site public", "url": "/", "new_window": True, "icon": "fas fa-globe"},
+        {"name": "Déconnexion", "url": "/admin/logout/", "icon": "fas fa-sign-out-alt"},
     ],
 
     "search_model": [
@@ -292,15 +242,11 @@ JAZZMIN_SETTINGS = {
         "payments.Payment",
         "students.Student",
     ],
+
     "show_logout": True,
     "custom_css": "core/css/esfe_theme.css",
     "custom_js": "core/js/esfe_admin.js",
 }
-
-
-# ==================================================
-# JAZZMIN UI TWEAKS
-# ==================================================
 
 JAZZMIN_UI_TWEAKS = {
     "theme": "flatly",

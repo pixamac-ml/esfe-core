@@ -36,14 +36,27 @@ class CategoryAdmin(admin.ModelAdmin):
 # ARTICLE ADMIN
 # ==========================================================
 
+from django.contrib import admin
+from django.utils.html import mark_safe
+from django.utils import timezone
+from django.db.models import Count
+
+from .models import Article
+
+
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
+
+    # ==============================
+    # LIST VIEW
+    # ==============================
 
     list_display = (
         'title',
         'category',
         'author',
         'status',
+        'image_tag',
         'published_at',
         'comment_count',
         'is_deleted',
@@ -67,6 +80,7 @@ class ArticleAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('title',)}
 
     readonly_fields = (
+        'image_preview',
         'created_at',
         'updated_at',
         'published_at',
@@ -74,13 +88,29 @@ class ArticleAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Contenu', {
-            'fields': ('title', 'slug', 'excerpt', 'content', 'category')
+            'fields': (
+                'title',
+                'slug',
+                'excerpt',
+                'content',
+                'featured_image',
+                'image_preview',
+                'category'
+            )
         }),
         ('Publication', {
-            'fields': ('status', 'allow_comments')
+            'fields': (
+                'status',
+                'allow_comments'
+            )
         }),
         ('Auteur & Dates', {
-            'fields': ('author', 'published_at', 'created_at', 'updated_at')
+            'fields': (
+                'author',
+                'published_at',
+                'created_at',
+                'updated_at'
+            )
         }),
         ('Suppression', {
             'fields': ('is_deleted',)
@@ -94,19 +124,58 @@ class ArticleAdmin(admin.ModelAdmin):
         'restore_articles'
     ]
 
+    # ==============================
+    # OPTIMISATION QUERYSET
+    # ==============================
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('author', 'category').annotate(
             _comment_count=Count('comments')
         )
 
+    # ==============================
+    # IMAGE PREVIEW
+    # ==============================
+
+    def image_preview(self, obj):
+        if obj.featured_image:
+            return mark_safe(
+                f'<img src="{obj.featured_image.url}" '
+                f'style="height:120px; border-radius:8px; object-fit:cover;" />'
+            )
+        return "Aucune image"
+
+    image_preview.short_description = "Aperçu"
+
+    def image_tag(self, obj):
+        if obj.featured_image:
+            return mark_safe(
+                f'<img src="{obj.featured_image.url}" '
+                f'style="height:40px; border-radius:4px; object-fit:cover;" />'
+            )
+        return "—"
+
+    image_tag.short_description = "Image"
+
+    # ==============================
+    # COMMENT COUNT
+    # ==============================
+
     def comment_count(self, obj):
         return obj._comment_count
 
     comment_count.short_description = "Commentaires"
 
+    # ==============================
+    # ACTIONS
+    # ==============================
+
     def publish_articles(self, request, queryset):
-        queryset.update(status='published', published_at=timezone.now())
+        queryset.update(
+            status='published',
+            published_at=timezone.now()
+        )
 
     publish_articles.short_description = "Publier les articles sélectionnés"
 
@@ -124,7 +193,6 @@ class ArticleAdmin(admin.ModelAdmin):
         queryset.update(is_deleted=False)
 
     restore_articles.short_description = "Restaurer articles supprimés"
-
 
 # ==========================================================
 # COMMENT ADMIN

@@ -16,7 +16,12 @@ class BlogArticleCard(component.Component):
             if image:
                 featured_image = image.image.url
 
+        # Calcul temps de lecture
+        words = len(article.excerpt.split()) if article.excerpt else 0
+        reading_time = max(1, round(words / 200))  # 200 mots/min
+
         return {
             "article": article,
             "featured_image": featured_image,
+            "reading_time": reading_time,
         }

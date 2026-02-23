@@ -51,6 +51,10 @@ def article_list(request):
 # DETAIL ARTICLE
 # ==========================================================
 
+from django.shortcuts import get_object_or_404, render, redirect
+from django.db.models import F, Count, Q
+from django.contrib import messages
+
 def article_detail(request, slug):
 
     article = get_object_or_404(
@@ -60,12 +64,23 @@ def article_detail(request, slug):
         is_deleted=False
     )
 
-    # Incrément compteur vues (thread-safe)
-    Article.objects.filter(id=article.id).update(
+    # ==========================
+    # Incrémentation sécurisée des vues
+    # ==========================
+    Article.objects.filter(pk=article.pk).update(
         views_count=F("views_count") + 1
     )
-    article.refresh_from_db()
+    article.refresh_from_db(fields=["views_count"])
 
+    # ==========================
+    # Calcul temps de lecture
+    # ==========================
+    word_count = len(article.content.split()) if article.content else 0
+    reading_time = max(1, round(word_count / 200))  # 200 mots / min
+
+    # ==========================
+    # Commentaires optimisés
+    # ==========================
     comments = (
         article.comments
         .filter(status=Comment.STATUS_APPROVED)
@@ -80,13 +95,17 @@ def article_detail(request, slug):
                 filter=Q(reactions__reaction_type=CommentLike.REACTION_DISLIKE)
             )
         )
+        .order_by("created_at")
     )
 
     absolute_url = request.build_absolute_uri()
 
+    # ==========================
     # Création commentaire
+    # ==========================
     if request.method == "POST" and article.allow_comments:
 
+        # Honeypot anti-spam
         if request.POST.get("website"):
             return redirect(article.get_absolute_url())
 
@@ -102,12 +121,17 @@ def article_detail(request, slug):
 
         return redirect(article.get_absolute_url())
 
-    return render(request, "blog/article_detail.html", {
+    # ==========================
+    # Contexte final
+    # ==========================
+    context = {
         "article": article,
         "comments": comments,
-        "absolute_url": absolute_url
-    })
+        "absolute_url": absolute_url,
+        "reading_time": reading_time,
+    }
 
+    return render(request, "blog/article_detail.html", context)
 
 # ==========================================================
 # FILTRE PAR CATEGORIE

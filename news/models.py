@@ -230,3 +230,37 @@ class NewsImage(models.Model):
         super().save(*args, **kwargs)
 
 
+
+
+# actualites/models.py
+
+class ResultSession(models.Model):
+
+    TYPE_CHOICES = (
+        ("semestre", "Résultat semestriel"),
+        ("examen", "Examen national"),
+    )
+
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+
+    titre = models.CharField(max_length=255)
+
+    annee_academique = models.CharField(max_length=20)
+
+    annexe = models.CharField(max_length=150)
+    filiere = models.CharField(max_length=150)
+    classe = models.CharField(max_length=150)
+
+    fichier_pdf = models.FileField(
+        upload_to="resultats/pdf/"
+    )
+
+    is_published = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-annee_academique", "-created_at"]
+
+    def __str__(self):
+        return f"{self.get_type_display()} - {self.classe} - {self.annee_academique}"

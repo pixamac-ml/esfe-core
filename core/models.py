@@ -386,3 +386,19 @@ class ContactMessage(models.Model):
 
     def __str__(self):
         return f"{self.full_name} - {self.get_subject_display()}"
+
+
+
+class AboutSection(models.Model):
+    title = models.CharField(max_length=255)
+    content = RichTextField()
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["order"]
+        verbose_name = "Section À propos"
+        verbose_name_plural = "Sections À propos"
+
+    def __str__(self):
+        return self.title

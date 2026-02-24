@@ -583,3 +583,25 @@ def contact_view(request):
     }
 
     return render(request, "core/contact.html", context)
+
+
+from django.shortcuts import render
+from .models import Institution, InstitutionStat
+
+
+from .models import Institution, InstitutionStat, AboutSection
+
+def about(request):
+    institution = Institution.objects.first()
+    stats = InstitutionStat.objects.all()
+    about_sections = AboutSection.objects.filter(is_active=True)
+
+    return render(
+        request,
+        "core/about.html",
+        {
+            "institution": institution,
+            "stats": stats,
+            "about_sections": about_sections,
+        },
+    )

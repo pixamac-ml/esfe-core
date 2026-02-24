@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import News, Category, NewsImage, Program
+from .models import News, Category, NewsImage, Program, ResultSession
 
 
 # --------------------------------------------------
@@ -120,3 +120,77 @@ class NewsAdmin(admin.ModelAdmin):
 class ProgramAdmin(admin.ModelAdmin):
     list_display = ("nom", "is_active", "created_at")
     prepopulated_fields = {"slug": ("nom",)}
+
+
+@admin.register(ResultSession)
+class ResultSessionAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "titre",
+        "type",
+        "annee_academique",
+        "annexe",
+        "filiere",
+        "classe",
+        "is_published",
+        "created_at",
+    )
+
+    list_filter = (
+        "type",
+        "annee_academique",
+        "annexe",
+        "is_published",
+        "created_at",
+    )
+
+    search_fields = (
+        "titre",
+        "annexe",
+        "filiere",
+        "classe",
+    )
+
+    readonly_fields = ("created_at",)
+
+    ordering = ("-annee_academique", "-created_at")
+
+    fieldsets = (
+        (
+            "Informations générales",
+            {
+                "fields": (
+                    "titre",
+                    "type",
+                    "annee_academique",
+                )
+            },
+        ),
+        (
+            "Organisation académique",
+            {
+                "fields": (
+                    "annexe",
+                    "filiere",
+                    "classe",
+                )
+            },
+        ),
+        (
+            "Fichier officiel",
+            {
+                "fields": (
+                    "fichier_pdf",
+                    "is_published",
+                )
+            },
+        ),
+        (
+            "Métadonnées",
+            {
+                "fields": (
+                    "created_at",
+                )
+            },
+        ),
+    )

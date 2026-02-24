@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+À propos | {{ institution.short_name|default:institution.name }}
+{% endblock %}
+
+{% block content %}
+
+<!-- ============================= -->
+<!-- HERO INSTITUTIONNEL -->
+<!-- ============================= -->
+
+<section class="bg-gray-900 text-white py-24">
+    <div class="max-w-6xl mx-auto px-6 text-center">
+
+        <h1 class="text-4xl md:text-5xl font-bold mb-6">
+            {{ institution.name }}
+        </h1>
+
+        {% if institution.legal_status %}
+        <p class="text-lg text-gray-300 mb-4">
+            {{ institution.legal_status }}
+        </p>
+        {% endif %}
+
+        {% if institution.approval_number %}
+        <p class="text-sm text-gray-400">
+            Agrément officiel : {{ institution.approval_number }}
+        </p>
+        {% endif %}
+
+    </div>
+</section>
+
+
+<!-- ============================= -->
+<!-- PRÉSENTATION -->
+<!-- ============================= -->
+
+<section class="py-20 bg-white">
+    <div class="max-w-5xl mx-auto px-6">
+
+        {% if about_sections %}
+            {% for section in about_sections %}
+                {% if section.is_active %}
+                    <div class="mb-16">
+                        <h2 class="text-3xl font-semibold text-gray-900 mb-6">
+                            {{ section.title }}
+                        </h2>
+
+                        <div class="prose max-w-none text-gray-700">
+                            {{ section.content|safe }}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            <div class="text-gray-500">
+                Contenu en cours de mise à jour.
+            </div>
+        {% endif %}
+
+    </div>
+</section>
+
+
+<!-- ============================= -->
+<!-- STATISTIQUES -->
+<!-- ============================= -->
+
+{% if stats %}
+<section class="py-20 bg-gray-50">
+    <div class="max-w-6xl mx-auto px-6">
+
+        <div class="grid md:grid-cols-4 gap-8 text-center">
+
+            {% for stat in stats %}
+            <div class="bg-white shadow-sm rounded-xl p-8">
+
+                <div class="text-4xl font-bold text-blue-600 mb-2">
+                    {{ stat.value }}{{ stat.suffix }}
+                </div>
+
+                <div class="text-gray-600 font-medium">
+                    {{ stat.label }}
+                </div>
+
+            </div>
+            {% endfor %}
+
+        </div>
+
+    </div>
+</section>
+{% endif %}
+
+
+<!-- ============================= -->
+<!-- COORDONNÉES -->
+<!-- ============================= -->
+
+<section class="py-20 bg-white border-t">
+    <div class="max-w-4xl mx-auto px-6 text-center">
+
+        <h2 class="text-2xl font-semibold mb-8">
+            Contact institutionnel
+        </h2>
+
+        <div class="space-y-3 text-gray-700">
+
+            <p>{{ institution.address }}, {{ institution.city }}, {{ institution.country }}</p>
+
+            <p>
+                Téléphone : {{ institution.phone }}
+            </p>
+
+            <p>
+                Email : {{ institution.email }}
+            </p>
+
+        </div>
+
+    </div>
+</section>
+
+
+<!-- ============================= -->
+<!-- CALL TO ACTION -->
+<!-- ============================= -->
+
+<section class="py-20 bg-blue-600 text-white text-center">
+    <div class="max-w-4xl mx-auto px-6">
+
+        <h2 class="text-3xl font-bold mb-6">
+            Rejoignez une institution d'excellence
+        </h2>
+
+        <p class="mb-8 text-blue-100">
+            Déposez votre candidature en ligne et intégrez une formation reconnue.
+        </p>
+
+        <a href="{% url 'formations:list' %}"
+           class="bg-white text-blue-600 font-semibold px-8 py-3 rounded-lg shadow hover:bg-gray-100 transition">
+            Voir les formations
+        </a>
+
+    </div>
+</section>
+
+{% endblock %}

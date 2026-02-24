@@ -1,23 +1,15 @@
 {% extends "base.html" %}
 {% load component_tags static %}
-{% load static %}
+
 {% block title %}
-
 {{ article.get_meta_title }} – ESFE
-
 {% endblock %}
 
-
 {% block meta %}
-
-<!-- SEO BASIQUE -->
 <meta name="description" content="{{ article.get_meta_description }}">
 <meta name="robots" content="index, follow">
-
-<!-- CANONICAL -->
 <link rel="canonical" href="{{ absolute_url }}">
 
-<!-- OPEN GRAPH -->
 <meta property="og:title" content="{{ article.get_meta_title }}">
 <meta property="og:description" content="{{ article.get_meta_description }}">
 <meta property="og:url" content="{{ absolute_url }}">
@@ -29,112 +21,86 @@
 <meta property="article:published_time" content="{{ article.published_at|date:'c' }}">
 {% endif %}
 
-{% if article.category %}
-<meta property="article:section" content="{{ article.category.name }}">
-{% endif %}
-
-{% if article.author %}
-<meta property="article:author" content="{{ article.author.get_full_name|default:article.author.username }}">
-{% endif %}
-
-<!-- TWITTER CARD -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ article.get_meta_title }}">
 <meta name="twitter:description" content="{{ article.get_meta_description }}">
 <meta name="twitter:image" content="{{ absolute_image_url }}">
-
 {% endblock %}
-
 
 {% block content %}
 
-<!-- ================= HERO ================= -->
-<section
-  x-data="{ show: false }"
-  x-intersect:enter.threshold.20.once="show = true"
-  class="relative overflow-hidden bg-gradient-to-br
-         from-primary-800 via-primary-700 to-primary-900 text-white">
+<!-- HERO -->
+<section class="relative overflow-hidden
+               bg-gradient-to-br
+               from-primary-800 via-primary-700 to-primary-900
+               text-white">
+
+  <!-- Pattern subtil -->
+  <div class="absolute inset-0 opacity-10 pointer-events-none"
+       style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0);
+              background-size: 40px 40px;">
+  </div>
+
+  <!-- Overlay doux pour améliorer le contraste -->
+  <div class="absolute inset-0 bg-black/20"></div>
 
   <div class="relative max-w-5xl mx-auto px-6 py-32 text-center space-y-10">
 
     {% if article.category %}
     <div class="inline-flex items-center gap-3
-                bg-white/10 backdrop-blur-sm
+                bg-white/15 backdrop-blur-sm
                 px-6 py-3 rounded-full
-                text-xs uppercase tracking-wider font-medium">
+                text-xs uppercase tracking-wider font-semibold
+                text-white shadow-sm">
       <span class="w-2 h-2 bg-secondary rounded-full"></span>
       {{ article.category.name }}
     </div>
     {% endif %}
 
-    <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight">
+    <!-- Titre plus lumineux -->
+    <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight
+               text-white drop-shadow-lg">
       {{ article.title }}
     </h1>
 
-    <div class="flex flex-wrap justify-center items-center gap-8 text-sm text-white/80">
+    <!-- Meta plus lisible -->
+    <div class="flex justify-center gap-8 text-sm
+                text-white/90 font-medium">
 
-      {% if article.published_at %}
-      <span>{{ article.published_at|date:"d M Y" }}</span>
-      {% endif %}
+      <span class="tracking-wide">
+        {{ reading_time }} min de lecture
+      </span>
 
-      <span>{{ reading_time }} min de lecture</span>
-      <span>{{ article.views_count }} vues</span>
+      <span class="tracking-wide">
+        {{ article.views_count }} vues
+      </span>
 
     </div>
 
   </div>
 </section>
-
-<!-- ================= CONTENT ================= -->
 <section class="py-24 bg-white">
-
   <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-16">
 
-    <!-- MAIN -->
     <div class="lg:col-span-9 space-y-16">
 
-      <!-- IMAGE PRINCIPALE AVEC RATIO FIXE -->
+      <!-- IMAGE -->
       <div class="rounded-2xl overflow-hidden shadow-xl aspect-[16/9]">
         {% if article.featured_image %}
         <img src="{{ article.featured_image.url }}"
-             alt="{{ article.title }}"
              class="w-full h-full object-cover"
              loading="lazy">
         {% else %}
         <img src="{% static 'images/default-article.jpg' %}"
-             alt="Image par défaut"
              class="w-full h-full object-cover"
              loading="lazy">
         {% endif %}
       </div>
 
-      <!-- ARTICLE STRUCTURÉ -->
-      <article class="prose prose-lg max-w-none text-gray-800 leading-relaxed"
-               itemscope itemtype="https://schema.org/Article">
-
-        <meta itemprop="headline" content="{{ article.title }}">
-        {% if article.published_at %}
-        <meta itemprop="datePublished" content="{{ article.published_at|date:'c' }}">
-        {% endif %}
-
-        <div itemprop="articleBody">
-          {{ article.content|linebreaks }}
-        </div>
+      <!-- CONTENU -->
+      <article class="prose prose-lg max-w-none text-gray-800 leading-relaxed">
+        {{ article.content|linebreaks }}
       </article>
-
-      <!-- GALERIE -->
-      {% if article.images.all %}
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mt-12">
-        {% for image in article.images.all %}
-        <div class="rounded-xl overflow-hidden shadow">
-          <img src="{{ image.image.url }}"
-               alt="{{ image.caption }}"
-               class="w-full h-48 object-cover"
-               loading="lazy">
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
 
       <!-- SHARE -->
       <div class="border-t border-primary-50 pt-8">
@@ -146,23 +112,63 @@
       {% component "related_articles" article=article %}
       {% endcomponent %}
 
-      <!-- COMMENTS -->
-      <section class="pt-12">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-10">
-          Commentaires
+      <!-- ================= COMMENTAIRES PREMIUM ================= -->
+      <section class="pt-12" x-data="{ open: false }">
+
+        <h2 class="text-2xl font-semibold text-gray-900 mb-8">
+          Commentaires ({{ comments_count }})
         </h2>
 
         <div class="space-y-6">
-          {% for comment in comments %}
-            {% component "comment_card" comment=comment %}
-            {% endcomponent %}
-          {% empty %}
-            <div class="bg-soft border border-primary-50 rounded-xl p-6 text-gray-500">
-              Aucun commentaire pour le moment.
-            </div>
+
+          <!-- 3 premiers -->
+          {% for comment in visible_comments %}
+              {% component "comment_card" comment=comment %}
+              {% endcomponent %}
           {% endfor %}
+
+          <!-- Le reste -->
+          {% if hidden_comments %}
+          <div x-show="open"
+               x-transition
+               class="space-y-6">
+              {% for comment in hidden_comments %}
+                  {% component "comment_card" comment=comment %}
+                  {% endcomponent %}
+              {% endfor %}
+          </div>
+          {% endif %}
+
+          {% if comments_count == 0 %}
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-6 text-gray-500">
+              Aucun commentaire pour le moment.
+          </div>
+          {% endif %}
+
         </div>
 
+        <!-- Bouton déplier -->
+        {% if hidden_comments %}
+        <div class="mt-6 text-center">
+          <button
+              @click="open = !open"
+              class="inline-flex items-center gap-2 text-primary-600 font-medium hover:underline transition">
+
+              <span x-text="open ? 'Réduire les commentaires' : 'Voir plus de commentaires'"></span>
+
+              <svg class="w-4 h-4 transition-transform"
+                   :class="open ? 'rotate-180' : ''"
+                   fill="currentColor"
+                   viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                      clip-rule="evenodd"/>
+              </svg>
+          </button>
+        </div>
+        {% endif %}
+
+        <!-- FORMULAIRE -->
         {% if article.allow_comments %}
         <div class="mt-14 bg-white border border-primary-50 rounded-2xl p-10 shadow-md">
           {% component "comment_form" article=article %}

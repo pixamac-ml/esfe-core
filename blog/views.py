@@ -50,6 +50,14 @@ def article_list(request):
 # ==========================================================
 # DETAIL ARTICLE
 # ==========================================================
+from django.shortcuts import get_object_or_404, render, redirect
+from django.db.models import F, Count, Q
+from django.contrib import messages
+from django.templatetags.static import static
+
+from .models import Article, Comment, CommentLike
+from .services import create_comment
+
 
 from django.shortcuts import get_object_or_404, render, redirect
 from django.db.models import F, Count, Q
@@ -63,7 +71,7 @@ from .services import create_comment
 def article_detail(request, slug):
 
     # ==========================
-    # Récupération article
+    # Récupération article publié
     # ==========================
     article = get_object_or_404(
         Article.objects.select_related("author", "category"),
@@ -84,27 +92,34 @@ def article_detail(request, slug):
     # Calcul temps de lecture
     # ==========================
     word_count = len(article.content.split()) if article.content else 0
-    reading_time = max(1, round(word_count / 200))  # 200 mots/min
+    reading_time = max(1, round(word_count / 200))
 
     # ==========================
-    # Commentaires optimisés
+    # Tous les commentaires annotés
     # ==========================
-    comments = (
+    all_comments = (
         article.comments
         .filter(status=Comment.STATUS_APPROVED)
         .select_related("author_user")
         .annotate(
-            like_count=Count(
+            likes_count=Count(
                 "reactions",
                 filter=Q(reactions__reaction_type=CommentLike.REACTION_LIKE)
             ),
-            dislike_count=Count(
+            dislikes_count=Count(
                 "reactions",
                 filter=Q(reactions__reaction_type=CommentLike.REACTION_DISLIKE)
             )
         )
-        .order_by("created_at")
+        .order_by("-created_at")
     )
+
+    # ==========================
+    # Découpage pour empilement
+    # ==========================
+    visible_comments = all_comments[:3]
+    hidden_comments = all_comments[3:]
+    comments_count = all_comments.count()
 
     # ==========================
     # URLs absolues (SEO / OG)
@@ -125,8 +140,7 @@ def article_detail(request, slug):
     # ==========================
     if request.method == "POST" and article.allow_comments:
 
-        # Honeypot anti-spam
-        if request.POST.get("website"):
+        if request.POST.get("website"):  # honeypot anti-spam
             return redirect(article.get_absolute_url())
 
         try:
@@ -146,7 +160,9 @@ def article_detail(request, slug):
     # ==========================
     context = {
         "article": article,
-        "comments": comments,
+        "visible_comments": visible_comments,
+        "hidden_comments": hidden_comments,
+        "comments_count": comments_count,
         "absolute_url": absolute_url,
         "absolute_image_url": absolute_image_url,
         "reading_time": reading_time,

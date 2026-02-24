@@ -8,7 +8,7 @@ from .models import (
     LegalSection,
     LegalSidebarBlock,
     LegalPageHistory,
-    InstitutionStat, ContactMessage,
+    InstitutionStat, ContactMessage, AboutSection,
 )
 
 
@@ -374,3 +374,28 @@ class ContactMessageAdmin(admin.ModelAdmin):
         if obj and obj.status == "closed":
             return False
         return super().has_change_permission(request, obj)
+
+
+
+@admin.register(AboutSection)
+class AboutSectionAdmin(admin.ModelAdmin):
+
+    list_display = ("title", "is_active", "order")
+    list_editable = ("is_active", "order")
+    ordering = ("order",)
+    search_fields = ("title",)
+
+    fieldsets = (
+        ("Contenu", {
+            "fields": (
+                "title",
+                "content",
+            )
+        }),
+        ("Organisation", {
+            "fields": (
+                "is_active",
+                "order",
+            )
+        }),
+    )

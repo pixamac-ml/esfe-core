@@ -1,7 +1,7 @@
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.html import mark_safe
 from django.utils import timezone
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from .models import Article, Comment, CommentLike, Category
 
@@ -23,7 +23,6 @@ class CategoryAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     search_fields = ('name',)
     prepopulated_fields = {'slug': ('name',)}
-
     readonly_fields = ('created_at',)
 
     def article_count(self, obj):
@@ -36,20 +35,8 @@ class CategoryAdmin(admin.ModelAdmin):
 # ARTICLE ADMIN
 # ==========================================================
 
-from django.contrib import admin
-from django.utils.html import mark_safe
-from django.utils import timezone
-from django.db.models import Count
-
-from .models import Article
-
-
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
-
-    # ==============================
-    # LIST VIEW
-    # ==============================
 
     list_display = (
         'title',
@@ -124,19 +111,14 @@ class ArticleAdmin(admin.ModelAdmin):
         'restore_articles'
     ]
 
-    # ==============================
-    # OPTIMISATION QUERYSET
-    # ==============================
-
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('author', 'category').annotate(
-            _comment_count=Count('comments')
+            _comment_count=Count(
+                'comments',
+                filter=Q(comments__status=Comment.STATUS_APPROVED)
+            )
         )
-
-    # ==============================
-    # IMAGE PREVIEW
-    # ==============================
 
     def image_preview(self, obj):
         if obj.featured_image:
@@ -158,18 +140,10 @@ class ArticleAdmin(admin.ModelAdmin):
 
     image_tag.short_description = "Image"
 
-    # ==============================
-    # COMMENT COUNT
-    # ==============================
-
     def comment_count(self, obj):
         return obj._comment_count
 
-    comment_count.short_description = "Commentaires"
-
-    # ==============================
-    # ACTIONS
-    # ==============================
+    comment_count.short_description = "Commentaires approuvés"
 
     def publish_articles(self, request, queryset):
         queryset.update(
@@ -194,6 +168,7 @@ class ArticleAdmin(admin.ModelAdmin):
 
     restore_articles.short_description = "Restaurer articles supprimés"
 
+
 # ==========================================================
 # COMMENT ADMIN
 # ==========================================================
@@ -207,12 +182,14 @@ class CommentAdmin(admin.ModelAdmin):
         'author_name',
         'status',
         'likes_count',
+        'dislikes_count',
         'created_at',
     )
 
     list_filter = (
         'status',
         'created_at',
+        'flagged',
     )
 
     search_fields = (
@@ -223,6 +200,7 @@ class CommentAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         'created_at',
+        'approved_at',
     )
 
     actions = [
@@ -233,13 +211,29 @@ class CommentAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('article').annotate(
-            _likes_count=Count('likes')
+            _likes_count=Count(
+                'reactions',
+                filter=Q(
+                    reactions__reaction_type=CommentLike.REACTION_LIKE
+                )
+            ),
+            _dislikes_count=Count(
+                'reactions',
+                filter=Q(
+                    reactions__reaction_type=CommentLike.REACTION_DISLIKE
+                )
+            )
         )
 
     def likes_count(self, obj):
         return obj._likes_count
 
     likes_count.short_description = "Likes"
+
+    def dislikes_count(self, obj):
+        return obj._dislikes_count
+
+    dislikes_count.short_description = "Dislikes"
 
     def short_content(self, obj):
         if len(obj.content) > 60:
@@ -249,12 +243,16 @@ class CommentAdmin(admin.ModelAdmin):
     short_content.short_description = "Contenu"
 
     def approve_comments(self, request, queryset):
-        queryset.update(status='approved')
+        queryset.update(
+            status=Comment.STATUS_APPROVED,
+            approved_at=timezone.now(),
+            approved_by=request.user
+        )
 
     approve_comments.short_description = "Approuver"
 
     def reject_comments(self, request, queryset):
-        queryset.update(status='rejected')
+        queryset.update(status=Comment.STATUS_REJECTED)
 
     reject_comments.short_description = "Rejeter"
 
@@ -268,15 +266,19 @@ class CommentLikeAdmin(admin.ModelAdmin):
 
     list_display = (
         'comment',
+        'reaction_type',
         'ip_address',
         'created_at',
     )
 
     readonly_fields = (
         'comment',
+        'reaction_type',
         'ip_address',
         'created_at',
     )
+
+    list_filter = ('reaction_type', 'created_at')
 
     def has_add_permission(self, request):
         return False

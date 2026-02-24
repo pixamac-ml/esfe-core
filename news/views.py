@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.views.generic import ListView, DetailView
 from django.db.models import Q
 
-from .models import News, Category, Program
+from .models import News, Category, Program, ResultSession
 from .filters import filter_news
 
 
@@ -162,6 +162,93 @@ class ProgramDetailView(DetailView):
             "page_title": self.object.nom,
             "program_news": program_news,
             "recent_news": News.published[:5],
+        })
+
+        return context
+
+
+from django.views.generic import ListView
+from django.db.models import Count
+from .models import ResultSession
+
+
+class ResultSessionListView(ListView):
+    model = ResultSession
+    template_name = "news/result_list.html"
+    context_object_name = "results"
+    paginate_by = 24
+
+    def get_queryset(self):
+        queryset = (
+            ResultSession.objects
+            .filter(is_published=True)
+            .order_by("-annee_academique", "-created_at")
+        )
+
+        annee = self.request.GET.get("annee")
+        annexe = self.request.GET.get("annexe")
+        type_result = self.request.GET.get("type")
+        search = self.request.GET.get("q")
+
+        if annee:
+            queryset = queryset.filter(annee_academique=annee)
+
+        if annexe:
+            queryset = queryset.filter(annexe__iexact=annexe)
+
+        if type_result:
+            queryset = queryset.filter(type=type_result)
+
+        if search:
+            queryset = queryset.filter(
+                titre__icontains=search
+            )
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Années distinctes (pour sidebar)
+        annees = (
+            ResultSession.objects
+            .filter(is_published=True)
+            .values_list("annee_academique", flat=True)
+            .distinct()
+            .order_by("-annee_academique")
+        )
+
+        # Annexes distinctes
+        annexes = (
+            ResultSession.objects
+            .filter(is_published=True)
+            .values_list("annexe", flat=True)
+            .distinct()
+            .order_by("annexe")
+        )
+
+        # Mapping Année → Annexes
+        annexes_par_annee = {}
+        for annee in annees:
+            annexes_par_annee[annee] = (
+                ResultSession.objects
+                .filter(is_published=True, annee_academique=annee)
+                .values_list("annexe", flat=True)
+                .distinct()
+                .order_by("annexe")
+            )
+
+        context.update({
+            "page_title": "Résultats académiques",
+            "annees": annees,
+            "annexes": annexes,
+            "annexes_par_annee": annexes_par_annee,
+
+            # Garder les filtres actifs dans le template
+            "current_annee": self.request.GET.get("annee", ""),
+            "current_annexe": self.request.GET.get("annexe", ""),
+            "current_type": self.request.GET.get("type", ""),
+            "current_search": self.request.GET.get("q", ""),
         })
 
         return context

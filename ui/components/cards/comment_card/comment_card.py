@@ -8,6 +8,8 @@ class CommentCard(component.Component):
     def get_context_data(self, comment):
         return {
             "comment": comment,
-            "likes_count": comment.reactions.filter(reaction_type="like").count(),
-            "dislikes_count": comment.reactions.filter(reaction_type="dislike").count(),
+            # On récupère les annotations si elles existent,
+            # sinon fallback propre à 0
+            "likes_count": getattr(comment, "likes_count", 0),
+            "dislikes_count": getattr(comment, "dislikes_count", 0),
         }

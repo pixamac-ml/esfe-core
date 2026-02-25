@@ -25,6 +25,30 @@
 <meta name="twitter:title" content="{{ article.get_meta_title }}">
 <meta name="twitter:description" content="{{ article.get_meta_description }}">
 <meta name="twitter:image" content="{{ absolute_image_url }}">
+
+<!-- Schema.org Article (SEO Premium) -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{{ article.title|escapejs }}",
+  "description": "{{ article.get_meta_description|escapejs }}",
+  "image": "{{ absolute_image_url }}",
+  "datePublished": "{{ article.published_at|date:'c' }}",
+  "author": {
+    "@type": "Person",
+    "name": "{{ article.author.get_full_name|default:article.author.username }}"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "ESFE"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "{{ absolute_url }}"
+  }
+}
+</script>
 {% endblock %}
 
 {% block content %}
@@ -35,16 +59,13 @@
                from-primary-800 via-primary-700 to-primary-900
                text-white">
 
-  <!-- Pattern subtil -->
   <div class="absolute inset-0 opacity-10 pointer-events-none"
        style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0);
-              background-size: 40px 40px;">
-  </div>
+              background-size: 40px 40px;"></div>
 
-  <!-- Overlay doux pour améliorer le contraste -->
   <div class="absolute inset-0 bg-black/20"></div>
 
-  <div class="relative max-w-5xl mx-auto px-6 py-32 text-center space-y-10">
+  <div class="relative max-w-5xl mx-auto px-6 py-28 text-center space-y-8">
 
     {% if article.category %}
     <div class="inline-flex items-center gap-3
@@ -57,49 +78,62 @@
     </div>
     {% endif %}
 
-    <!-- Titre plus lumineux -->
     <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight
                text-white drop-shadow-lg">
       {{ article.title }}
     </h1>
 
-    <!-- Meta plus lisible -->
-    <div class="flex justify-center gap-8 text-sm
-                text-white/90 font-medium">
+    <div class="flex flex-wrap justify-center gap-6 text-sm text-white/90 font-medium">
 
-      <span class="tracking-wide">
+      <span>
         {{ reading_time }} min de lecture
       </span>
 
-      <span class="tracking-wide">
+      <span>
         {{ article.views_count }} vues
+      </span>
+
+      {% if article.published_at %}
+      <span>
+        Publié le {{ article.published_at|date:"d M Y" }}
+      </span>
+      {% endif %}
+
+      <span>
+        Par {{ article.author.get_full_name|default:article.author.username }}
       </span>
 
     </div>
 
   </div>
 </section>
+
 <section class="py-24 bg-white">
   <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-16">
 
+    <!-- CONTENU PRINCIPAL -->
     <div class="lg:col-span-9 space-y-16">
 
       <!-- IMAGE -->
       <div class="rounded-2xl overflow-hidden shadow-xl aspect-[16/9]">
         {% if article.featured_image %}
         <img src="{{ article.featured_image.url }}"
+             alt="{{ article.title }}"
              class="w-full h-full object-cover"
-             loading="lazy">
+             loading="lazy"
+             decoding="async">
         {% else %}
         <img src="{% static 'images/default-article.jpg' %}"
+             alt="Image par défaut"
              class="w-full h-full object-cover"
-             loading="lazy">
+             loading="lazy"
+             decoding="async">
         {% endif %}
       </div>
 
       <!-- CONTENU -->
       <article class="prose prose-lg max-w-none text-gray-800 leading-relaxed">
-        {{ article.content|linebreaks }}
+        {{ article.content|safe }}
       </article>
 
       <!-- SHARE -->
@@ -112,7 +146,7 @@
       {% component "related_articles" article=article %}
       {% endcomponent %}
 
-      <!-- ================= COMMENTAIRES PREMIUM ================= -->
+      <!-- ================= COMMENTAIRES ================= -->
       <section class="pt-12" x-data="{ open: false }">
 
         <h2 class="text-2xl font-semibold text-gray-900 mb-8">
@@ -121,13 +155,11 @@
 
         <div class="space-y-6">
 
-          <!-- 3 premiers -->
           {% for comment in visible_comments %}
               {% component "comment_card" comment=comment %}
               {% endcomponent %}
           {% endfor %}
 
-          <!-- Le reste -->
           {% if hidden_comments %}
           <div x-show="open"
                x-transition
@@ -147,7 +179,6 @@
 
         </div>
 
-        <!-- Bouton déplier -->
         {% if hidden_comments %}
         <div class="mt-6 text-center">
           <button
@@ -168,7 +199,6 @@
         </div>
         {% endif %}
 
-        <!-- FORMULAIRE -->
         {% if article.allow_comments %}
         <div class="mt-14 bg-white border border-primary-50 rounded-2xl p-10 shadow-md">
           {% component "comment_form" article=article %}

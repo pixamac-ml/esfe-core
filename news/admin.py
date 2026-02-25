@@ -198,6 +198,19 @@ class ResultSessionAdmin(admin.ModelAdmin):
 
 
 
+
+
+from django.contrib import admin
+from django.utils.html import format_html
+from django.db.models import Count
+
+from .models import EventType, Event, MediaItem
+
+
+# ==========================================================
+# EVENT TYPE ADMIN
+# ==========================================================
+
 @admin.register(EventType)
 class EventTypeAdmin(admin.ModelAdmin):
 
@@ -206,22 +219,30 @@ class EventTypeAdmin(admin.ModelAdmin):
     search_fields = ("name",)
     prepopulated_fields = {"slug": ("name",)}
     ordering = ("name",)
+    list_editable = ("is_active",)
 
+
+# ==========================================================
+# MEDIA INLINE
+# ==========================================================
 
 class MediaItemInline(admin.TabularInline):
 
     model = MediaItem
-    extra = 1
+    extra = 0
     fields = (
         "media_type",
         "image",
         "thumbnail_preview",
+        "video_file",
         "video_url",
         "caption",
         "is_featured",
     )
 
     readonly_fields = ("thumbnail_preview",)
+    ordering = ("-created_at",)
+    show_change_link = True
 
     def thumbnail_preview(self, obj):
         if obj.thumbnail:
@@ -233,6 +254,13 @@ class MediaItemInline(admin.TabularInline):
     thumbnail_preview.short_description = "Aperçu"
 
 
+
+from django.db import models
+
+# ==========================================================
+# EVENT ADMIN
+# ==========================================================
+
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
 
@@ -241,7 +269,9 @@ class EventAdmin(admin.ModelAdmin):
         "event_type",
         "event_date",
         "is_published",
-        "media_count",
+        "media_count_display",
+        "image_count_display",
+        "video_count_display",
         "created_at",
     )
 
@@ -249,6 +279,7 @@ class EventAdmin(admin.ModelAdmin):
         "event_type",
         "is_published",
         "event_date",
+        "created_at",
     )
 
     search_fields = (
@@ -262,11 +293,13 @@ class EventAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "cover_preview",
+        "media_statistics",
     )
 
     inlines = [MediaItemInline]
 
     ordering = ("-event_date",)
+    date_hierarchy = "event_date"
 
     fieldsets = (
         (
@@ -291,6 +324,14 @@ class EventAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Statistiques médias",
+            {
+                "fields": (
+                    "media_statistics",
+                )
+            },
+        ),
+        (
             "Publication",
             {
                 "fields": (
@@ -309,12 +350,62 @@ class EventAdmin(admin.ModelAdmin):
         ),
     )
 
+    # ======================================================
+    # OPTIMISATION QUERYSET ADMIN
+    # ======================================================
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.annotate(
+            total_media=Count("media_items", distinct=True),
+            total_images=Count(
+                "media_items",
+                filter=models.Q(media_items__media_type="image"),
+                distinct=True
+            ),
+            total_videos=Count(
+                "media_items",
+                filter=models.Q(media_items__media_type="video"),
+                distinct=True
+            ),
+        )
+
+    # ======================================================
+    # COVER PREVIEW
+    # ======================================================
+
     def cover_preview(self, obj):
         if obj.cover_thumbnail:
             return format_html(
-                '<img src="{}" width="120" style="border-radius:8px;" />',
+                '<img src="{}" width="150" style="border-radius:8px;" />',
                 obj.cover_thumbnail.url
             )
         return "-"
     cover_preview.short_description = "Aperçu couverture"
 
+    # ======================================================
+    # COMPTEURS ADMIN
+    # ======================================================
+
+    def media_count_display(self, obj):
+        return obj.total_media
+    media_count_display.short_description = "Total"
+
+    def image_count_display(self, obj):
+        return obj.total_images
+    image_count_display.short_description = "Images"
+
+    def video_count_display(self, obj):
+        return obj.total_videos
+    video_count_display.short_description = "Vidéos"
+
+    def media_statistics(self, obj):
+        return format_html(
+            "<strong>Total :</strong> {}<br>"
+            "<strong>Images :</strong> {}<br>"
+            "<strong>Vidéos :</strong> {}",
+            obj.total_media,
+            obj.total_images,
+            obj.total_videos,
+        )
+    media_statistics.short_description = "Statistiques"

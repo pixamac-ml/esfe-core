@@ -298,10 +298,14 @@ def approve_comment_view(request, comment_id):
 # ==========================================================
 # REACTION COMMENTAIRE (LIKE / DISLIKE)
 # ==========================================================
-
 from django.template.loader import render_to_string
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404
+from django.db.models import Count, Q
+
+from .models import Comment, CommentLike
+from .services import react_to_comment
 
 
 @require_POST
@@ -317,24 +321,38 @@ def react_comment_view(request, comment_id):
     ]:
         return HttpResponse(status=400)
 
-    # Enregistre la réaction
-    react_to_comment(comment, request, reaction_type)
+    # ===============================
+    # Enregistrement / toggle réaction
+    # ===============================
+    react_to_comment(
+        comment=comment,
+        request=request,
+        reaction_type=reaction_type
+    )
 
-    # Recalcul propre
-    like_count = comment.reactions.filter(
-        reaction_type=CommentLike.REACTION_LIKE
-    ).count()
+    # ===============================
+    # Recalcul sécurisé des compteurs
+    # ===============================
+    counts = comment.reactions.aggregate(
+        likes_count=Count(
+            "id",
+            filter=Q(reaction_type=CommentLike.REACTION_LIKE)
+        ),
+        dislikes_count=Count(
+            "id",
+            filter=Q(reaction_type=CommentLike.REACTION_DISLIKE)
+        )
+    )
 
-    dislike_count = comment.reactions.filter(
-        reaction_type=CommentLike.REACTION_DISLIKE
-    ).count()
+    # Refresh comment pour éviter incohérences
+    comment.refresh_from_db()
 
     html = render_to_string(
         "cards/comment_card/comment_card.html",
         {
             "comment": comment,
-            "likes_count": like_count,
-            "dislikes_count": dislike_count,
+            "likes_count": counts["likes_count"],
+            "dislikes_count": counts["dislikes_count"],
         },
         request=request
     )

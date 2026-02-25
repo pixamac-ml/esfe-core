@@ -268,6 +268,11 @@ class Comment(models.Model):
 # COMMENT LIKE
 # ==========================================================
 
+from django.db import models
+from django.conf import settings
+from django.db.models import Q, UniqueConstraint
+
+
 class CommentLike(models.Model):
 
     REACTION_LIKE = "like"
@@ -279,12 +284,13 @@ class CommentLike(models.Model):
     )
 
     comment = models.ForeignKey(
-        Comment,
+        "Comment",
         on_delete=models.CASCADE,
         related_name="reactions",
         db_index=True
     )
 
+    # Utilisateur connecté (optionnel)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -293,6 +299,7 @@ class CommentLike(models.Model):
         related_name="comment_reactions"
     )
 
+    # Toujours stocker IP pour audit minimal
     ip_address = models.GenericIPAddressField(db_index=True)
 
     reaction_type = models.CharField(
@@ -305,9 +312,22 @@ class CommentLike(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = (("comment", "ip_address"),)
         verbose_name = "Réaction"
         verbose_name_plural = "Réactions"
+        constraints = [
+            # Un utilisateur connecté = une seule réaction par commentaire
+            UniqueConstraint(
+                fields=["comment", "user"],
+                condition=Q(user__isnull=False),
+                name="unique_user_reaction_per_comment"
+            ),
+            # Un invité (pas de user) = une seule réaction par IP
+            UniqueConstraint(
+                fields=["comment", "ip_address"],
+                condition=Q(user__isnull=True),
+                name="unique_ip_reaction_per_comment"
+            ),
+        ]
 
     def __str__(self):
         return f"{self.reaction_type} - Comment {self.comment.id}"

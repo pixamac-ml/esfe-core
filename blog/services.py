@@ -1,6 +1,7 @@
 from django.utils import timezone
 from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 from .models import Comment, CommentLike
 
@@ -106,7 +107,10 @@ def approve_comment(comment, moderator):
     if comment.status == Comment.STATUS_APPROVED:
         return comment
 
-    comment.mark_approved(moderator)
+    comment.status = Comment.STATUS_APPROVED
+    comment.approved_by = moderator
+    comment.approved_at = timezone.now()
+    comment.save(update_fields=["status", "approved_by", "approved_at"])
     return comment
 
 
@@ -115,14 +119,32 @@ def approve_comment(comment, moderator):
 # ==========================================================
 
 def reject_comment(comment, moderator):
-    comment.mark_rejected(moderator)
+    comment.status = Comment.STATUS_REJECTED
+    comment.approved_by = moderator
+    comment.approved_at = timezone.now()
+    comment.save(update_fields=["status", "approved_by", "approved_at"])
     return comment
+
+
+# ==========================================================
+# UTILITAIRE IP ROBUSTE
+# ==========================================================
+
+def get_client_ip(request):
+    """
+    Récupération IP compatible reverse proxy / production.
+    """
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
 
 
 # ==========================================================
 # REACTION COMMENTAIRE (LIKE / DISLIKE)
 # ==========================================================
 
+@transaction.atomic
 def react_to_comment(comment, request, reaction_type):
 
     if comment.status != Comment.STATUS_APPROVED:
@@ -134,24 +156,46 @@ def react_to_comment(comment, request, reaction_type):
     ]:
         raise ValidationError("Type de réaction invalide.")
 
-    ip = request.META.get("REMOTE_ADDR")
+    ip = get_client_ip(request)
     user = request.user if request.user.is_authenticated else None
 
     if not ip:
         return None
 
-    existing = CommentLike.objects.filter(
-        comment=comment
-    ).filter(
-        Q(user=user) | Q(ip_address=ip)
-    ).first()
+    # ===============================
+    # Recherche réaction existante
+    # ===============================
+
+    if user:
+        existing = CommentLike.objects.filter(
+            comment=comment,
+            user=user
+        ).first()
+    else:
+        existing = CommentLike.objects.filter(
+            comment=comment,
+            user__isnull=True,
+            ip_address=ip
+        ).first()
+
+    # ===============================
+    # Toggle logique
+    # ===============================
 
     if existing:
-        # Change la réaction si différente
-        if existing.reaction_type != reaction_type:
-            existing.reaction_type = reaction_type
-            existing.save(update_fields=["reaction_type"])
+        # Même réaction → on supprime (toggle off)
+        if existing.reaction_type == reaction_type:
+            existing.delete()
+            return None
+
+        # Réaction différente → on met à jour
+        existing.reaction_type = reaction_type
+        existing.save(update_fields=["reaction_type"])
         return existing
+
+    # ===============================
+    # Nouvelle réaction
+    # ===============================
 
     return CommentLike.objects.create(
         comment=comment,

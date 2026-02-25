@@ -254,11 +254,13 @@ class ResultSessionListView(ListView):
         return context
 
 
-from django.shortcuts import render, get_object_or_404
-from django.db.models import Count, Q
-from django.core.paginator import Paginator
 
-from .models import Event, EventType
+from django.shortcuts import render, get_object_or_404
+from django.db.models import Count, Q, Prefetch
+from django.core.paginator import Paginator
+from django.utils import timezone
+
+from .models import Event, EventType, MediaItem
 
 
 # ==========================================================
@@ -267,56 +269,70 @@ from .models import Event, EventType
 
 def event_list_view(request):
 
-    events = (
+    events_queryset = (
         Event.objects
         .filter(is_published=True)
         .select_related("event_type")
-        .prefetch_related("media_items")
+        .prefetch_related(
+            Prefetch(
+                "media_items",
+                queryset=MediaItem.objects.only(
+                    "id",
+                    "media_type",
+                    "thumbnail",
+                    "video_url",
+                    "video_file",
+                    "is_featured",
+                )
+            )
+        )
     )
 
-    # ------------------------------------------------------
+    # ========================
     # FILTRAGE PAR TYPE
-    # ------------------------------------------------------
+    # ========================
 
     type_slug = request.GET.get("type")
     if type_slug:
-        events = events.filter(event_type__slug=type_slug)
+        events_queryset = events_queryset.filter(event_type__slug=type_slug)
 
-    # ------------------------------------------------------
+    # ========================
     # FILTRAGE PAR ANNÉE
-    # ------------------------------------------------------
+    # ========================
 
     year = request.GET.get("year")
-    if year:
-        events = events.filter(event_date__year=year)
+    if year and year.isdigit():
+        events_queryset = events_queryset.filter(event_date__year=int(year))
 
-    # ------------------------------------------------------
-    # ANNOTATIONS OPTIMISÉES
-    # ------------------------------------------------------
+    # ========================
+    # ANNOTATIONS
+    # ========================
 
-    events = events.annotate(
-        total_media=Count("media_items"),
+    events_queryset = events_queryset.annotate(
+        total_media=Count("media_items", distinct=True),
         total_images=Count(
             "media_items",
-            filter=Q(media_items__media_type="image")
+            filter=Q(media_items__media_type=MediaItem.IMAGE),
+            distinct=True
         ),
         total_videos=Count(
             "media_items",
-            filter=Q(media_items__media_type="video")
+            filter=Q(media_items__media_type=MediaItem.VIDEO),
+            distinct=True
         ),
     )
 
-    # ------------------------------------------------------
+    # ========================
     # PAGINATION
-    # ------------------------------------------------------
+    # ========================
 
-    paginator = Paginator(events, 9)
+    paginator = Paginator(events_queryset, 9)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    # ------------------------------------------------------
-    # SIDEBAR DATA
-    # ------------------------------------------------------
+    # ========================
+    # SIDEBAR
+    # ========================
 
     event_types = EventType.objects.filter(is_active=True)
 
@@ -346,13 +362,33 @@ def event_detail_view(request, slug):
     event = get_object_or_404(
         Event.objects
         .select_related("event_type")
-        .prefetch_related("media_items"),
+        .prefetch_related(
+            Prefetch(
+                "media_items",
+                queryset=MediaItem.objects.order_by("-is_featured", "-created_at")
+            )
+        ),
         slug=slug,
         is_published=True
     )
 
-    images = event.media_items.filter(media_type="image")
-    videos = event.media_items.filter(media_type="video")
+    # ========================
+    # MÉDIAS ORGANISÉS
+    # ========================
+
+    images = [
+        media for media in event.media_items.all()
+        if media.media_type == MediaItem.IMAGE
+    ]
+
+    videos = [
+        media for media in event.media_items.all()
+        if media.media_type == MediaItem.VIDEO
+    ]
+
+    # ========================
+    # RELATED EVENTS
+    # ========================
 
     related_events = (
         Event.objects
@@ -361,6 +397,13 @@ def event_detail_view(request, slug):
             is_published=True
         )
         .exclude(id=event.id)
+        .select_related("event_type")
+        .only(
+            "title",
+            "slug",
+            "cover_thumbnail",
+            "event_date"
+        )
         .order_by("-event_date")[:4]
     )
 

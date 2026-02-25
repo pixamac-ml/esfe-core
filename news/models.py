@@ -268,13 +268,24 @@ class ResultSession(models.Model):
 
 
 
+
+
 from django.db import models
 from django.utils.text import slugify
 from django.core.files.base import ContentFile
-from django.utils import timezone
+from django.core.exceptions import ValidationError
 from PIL import Image
 from io import BytesIO
 import os
+import subprocess
+from django.conf import settings
+
+
+# ==========================================================
+# CONFIGURATION FFMPEG
+# ==========================================================
+
+FFMPEG_PATH = os.path.join(settings.BASE_DIR, "ffmpeg", "bin", "ffmpeg.exe")
 
 
 # ==========================================================
@@ -288,8 +299,6 @@ class EventType(models.Model):
 
     class Meta:
         ordering = ["name"]
-        verbose_name = "Type d'événement"
-        verbose_name_plural = "Types d'événements"
 
     def __str__(self):
         return self.name
@@ -311,8 +320,8 @@ class Event(models.Model):
     )
 
     description = models.TextField(blank=True)
-
     event_date = models.DateField()
+
     cover_image = models.ImageField(upload_to="events/covers/", blank=True)
     cover_thumbnail = models.ImageField(upload_to="events/covers/thumbs/", blank=True)
 
@@ -323,10 +332,6 @@ class Event(models.Model):
 
     class Meta:
         ordering = ["-event_date"]
-        indexes = [
-            models.Index(fields=["event_date"]),
-            models.Index(fields=["slug"]),
-        ]
 
     def save(self, *args, **kwargs):
 
@@ -335,50 +340,44 @@ class Event(models.Model):
 
         super().save(*args, **kwargs)
 
-        # Optimisation de la cover
-        if self.cover_image:
-            self._process_image("cover_image", "cover_thumbnail")
+        if self.cover_image and not self.cover_thumbnail:
+            self._process_cover()
 
-    def _process_image(self, image_field, thumb_field):
+    def _process_cover(self):
 
-        image = getattr(self, image_field)
-
-        if not image:
-            return
-
-        img = Image.open(image)
+        img = Image.open(self.cover_image)
 
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
 
-        # HD optimisée
-        hd_buffer = BytesIO()
-        img.thumbnail((1600, 1200), Image.LANCZOS)
-        img.save(hd_buffer, format="WEBP", quality=85)
+        base_name = os.path.basename(self.cover_image.name)
+        file_root = os.path.splitext(base_name)[0]
 
-        hd_name = os.path.splitext(image.name)[0] + ".webp"
-        getattr(self, image_field).save(hd_name, ContentFile(hd_buffer.getvalue()), save=False)
+        # HD
+        buffer_hd = BytesIO()
+        img.thumbnail((1600, 1200), Image.LANCZOS)
+        img.save(buffer_hd, format="WEBP", quality=85)
+
+        self.cover_image.save(
+            f"{file_root}.webp",
+            ContentFile(buffer_hd.getvalue()),
+            save=False
+        )
 
         # Thumbnail
-        thumb_img = img.copy()
-        thumb_img.thumbnail((500, 350), Image.LANCZOS)
+        thumb = img.copy()
+        thumb.thumbnail((500, 350), Image.LANCZOS)
 
-        thumb_buffer = BytesIO()
-        thumb_img.save(thumb_buffer, format="WEBP", quality=75)
+        buffer_thumb = BytesIO()
+        thumb.save(buffer_thumb, format="WEBP", quality=75)
 
-        thumb_name = os.path.splitext(image.name)[0] + "_thumb.webp"
-        getattr(self, thumb_field).save(thumb_name, ContentFile(thumb_buffer.getvalue()), save=False)
+        self.cover_thumbnail.save(
+            f"{file_root}_thumb.webp",
+            ContentFile(buffer_thumb.getvalue()),
+            save=False
+        )
 
-        super().save(update_fields=[image_field, thumb_field])
-
-    def media_count(self):
-        return self.media_items.count()
-
-    def image_count(self):
-        return self.media_items.filter(media_type="image").count()
-
-    def video_count(self):
-        return self.media_items.filter(media_type="video").count()
+        super().save(update_fields=["cover_image", "cover_thumbnail"])
 
     def __str__(self):
         return self.title
@@ -409,27 +408,41 @@ class MediaItem(models.Model):
     image = models.ImageField(upload_to="events/media/", blank=True, null=True)
     thumbnail = models.ImageField(upload_to="events/media/thumbs/", blank=True, null=True)
 
+    video_file = models.FileField(upload_to="events/videos/", blank=True, null=True)
     video_url = models.URLField(blank=True, null=True)
 
     caption = models.CharField(max_length=255, blank=True)
-
     is_featured = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [
-            models.Index(fields=["media_type"]),
-            models.Index(fields=["created_at"]),
-        ]
+
+    # =========================
+    # VALIDATION
+    # =========================
+
+    def clean(self):
+        if self.video_file and self.video_file.size > 300 * 1024 * 1024:
+            raise ValidationError("La vidéo ne doit pas dépasser 300MB.")
+
+    # =========================
+    # SAVE
+    # =========================
 
     def save(self, *args, **kwargs):
-
         super().save(*args, **kwargs)
 
-        if self.media_type == "image" and self.image:
+        if self.media_type == self.IMAGE and self.image and not self.thumbnail:
             self._process_image()
+
+        if self.media_type == self.VIDEO and self.video_file:
+            self._process_video()
+
+    # =========================
+    # IMAGE PROCESSING
+    # =========================
 
     def _process_image(self):
 
@@ -438,25 +451,103 @@ class MediaItem(models.Model):
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
 
-        # HD optimisée
-        hd_buffer = BytesIO()
+        base_name = os.path.basename(self.image.name)
+        file_root = os.path.splitext(base_name)[0]
+
+        # HD
+        buffer_hd = BytesIO()
         img.thumbnail((1600, 1200), Image.LANCZOS)
-        img.save(hd_buffer, format="WEBP", quality=85)
+        img.save(buffer_hd, format="WEBP", quality=85)
 
-        hd_name = os.path.splitext(self.image.name)[0] + ".webp"
-        self.image.save(hd_name, ContentFile(hd_buffer.getvalue()), save=False)
+        self.image.save(
+            f"{file_root}.webp",
+            ContentFile(buffer_hd.getvalue()),
+            save=False
+        )
 
-        # Thumbnail rapide
-        thumb_img = img.copy()
-        thumb_img.thumbnail((400, 300), Image.LANCZOS)
+        # Thumbnail
+        thumb = img.copy()
+        thumb.thumbnail((400, 300), Image.LANCZOS)
 
-        thumb_buffer = BytesIO()
-        thumb_img.save(thumb_buffer, format="WEBP", quality=70)
+        buffer_thumb = BytesIO()
+        thumb.save(buffer_thumb, format="WEBP", quality=70)
 
-        thumb_name = os.path.splitext(self.image.name)[0] + "_thumb.webp"
-        self.thumbnail.save(thumb_name, ContentFile(thumb_buffer.getvalue()), save=False)
+        self.thumbnail.save(
+            f"{file_root}_thumb.webp",
+            ContentFile(buffer_thumb.getvalue()),
+            save=False
+        )
 
         super().save(update_fields=["image", "thumbnail"])
+
+    # =========================
+    # VIDEO PROCESSING (FFMPEG)
+    # =========================
+
+    def _process_video(self):
+
+        if not os.path.exists(FFMPEG_PATH):
+            return  # sécurité si ffmpeg absent
+
+        input_path = self.video_file.path
+        base = os.path.splitext(input_path)[0]
+
+        compressed_path = f"{base}_compressed.mp4"
+        thumbnail_path = f"{base}_thumb.jpg"
+
+        # Compression vidéo
+        subprocess.run([
+            FFMPEG_PATH,
+            "-i", input_path,
+            "-vcodec", "libx264",
+            "-crf", "28",
+            "-preset", "medium",
+            "-acodec", "aac",
+            compressed_path
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # Génération thumbnail
+        subprocess.run([
+            FFMPEG_PATH,
+            "-i", input_path,
+            "-ss", "00:00:01",
+            "-vframes", "1",
+            thumbnail_path
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        if os.path.exists(compressed_path):
+            os.remove(input_path)
+            os.rename(compressed_path, input_path)
+
+        if os.path.exists(thumbnail_path):
+            with open(thumbnail_path, "rb") as f:
+                self.thumbnail.save(
+                    os.path.basename(thumbnail_path),
+                    ContentFile(f.read()),
+                    save=False
+                )
+            os.remove(thumbnail_path)
+
+        super().save(update_fields=["thumbnail"])
+
+    # =========================
+    # YOUTUBE EMBED SAFE
+    # =========================
+
+    def get_embed_url(self):
+
+        if not self.video_url:
+            return None
+
+        if "watch?v=" in self.video_url:
+            vid = self.video_url.split("v=")[-1].split("&")[0]
+            return f"https://www.youtube.com/embed/{vid}"
+
+        if "youtu.be/" in self.video_url:
+            vid = self.video_url.split("/")[-1]
+            return f"https://www.youtube.com/embed/{vid}"
+
+        return self.video_url
 
     def __str__(self):
         return f"{self.event.title} - {self.media_type}"

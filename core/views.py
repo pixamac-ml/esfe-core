@@ -588,11 +588,12 @@ def contact_view(request):
 from django.shortcuts import render
 from .models import Institution, InstitutionStat
 
-
+from django.shortcuts import render, get_object_or_404
 from .models import Institution, InstitutionStat, AboutSection
 
 def about(request):
-    institution = Institution.objects.first()
+    institution = get_object_or_404(Institution)
+
     stats = InstitutionStat.objects.all()
     about_sections = AboutSection.objects.filter(is_active=True)
 

@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ event.title }} | Galeries & Médias | ESFé{% endblock %}
+
+{% block content %}
+
+<!-- ===================================================== -->
+<!-- HERO COVER -->
+<!-- ===================================================== -->
+
+<section class="relative">
+
+    {% if event.cover_image %}
+        <img src="{{ event.cover_image.url }}"
+             class="w-full h-[420px] object-cover"
+             loading="lazy">
+    {% else %}
+        <div class="w-full h-[420px] bg-gray-200"></div>
+    {% endif %}
+
+    <div class="absolute inset-0 bg-black/60"></div>
+
+    <div class="absolute inset-0 flex items-center">
+        <div class="max-w-6xl mx-auto px-6 text-white">
+
+            <span class="inline-block bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-sm mb-4">
+                {{ event.event_type.name }}
+            </span>
+
+            <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                {{ event.title }}
+            </h1>
+
+            <p class="text-white/80">
+                {{ event.event_date|date:"d F Y" }}
+            </p>
+
+        </div>
+    </div>
+
+</section>
+
+
+<!-- ===================================================== -->
+<!-- MAIN CONTENT 75 / 25 -->
+<!-- ===================================================== -->
+
+<section class="max-w-7xl mx-auto px-6 py-16">
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-12">
+
+        <!-- ================================================= -->
+        <!-- MAIN CONTENT -->
+        <!-- ================================================= -->
+
+        <div class="lg:col-span-3 space-y-16">
+
+            <!-- DESCRIPTION -->
+            {% if event.description %}
+            <div class="prose max-w-none">
+                {{ event.description|linebreaks }}
+            </div>
+            {% endif %}
+
+
+            <!-- ================================================= -->
+            <!-- IMAGES SECTION -->
+            <!-- ================================================= -->
+
+            {% if images %}
+            <div>
+
+                <h2 class="text-2xl font-bold mb-8">
+                    Galerie photos
+                </h2>
+
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                    {% for media in images %}
+                    <a href="{{ media.image.url }}"
+                       target="_blank"
+                       class="group block overflow-hidden rounded-2xl shadow-md">
+
+                        <img src="{{ media.thumbnail.url }}"
+                             width="400"
+                             height="300"
+                             loading="lazy"
+                             class="w-full h-56 object-cover group-hover:scale-105 transition duration-500">
+
+                        {% if media.caption %}
+                        <div class="p-4 bg-white text-sm text-gray-600">
+                            {{ media.caption }}
+                        </div>
+                        {% endif %}
+
+                    </a>
+                    {% endfor %}
+
+                </div>
+
+            </div>
+            {% endif %}
+
+
+            <!-- ================================================= -->
+            <!-- VIDEOS SECTION -->
+            <!-- ================================================= -->
+
+            {% if videos %}
+            <div>
+
+                <h2 class="text-2xl font-bold mb-8">
+                    Vidéos
+                </h2>
+
+                <div class="grid sm:grid-cols-2 gap-8">
+
+                    {% for media in videos %}
+                    <div class="aspect-video rounded-2xl overflow-hidden shadow-md">
+
+                        <iframe src="{{ media.video_url }}"
+                                class="w-full h-full"
+                                allowfullscreen>
+                        </iframe>
+
+                    </div>
+                    {% endfor %}
+
+                </div>
+
+            </div>
+            {% endif %}
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- SIDEBAR -->
+        <!-- ================================================= -->
+
+        <aside class="space-y-10">
+
+            <!-- EVENT META -->
+            <div class="bg-white p-6 rounded-2xl shadow-md space-y-4">
+
+                <h4 class="font-semibold text-gray-900">
+                    Informations
+                </h4>
+
+                <div class="text-sm text-gray-600 space-y-2">
+
+                    <div>
+                        <strong>Date :</strong><br>
+                        {{ event.event_date|date:"d F Y" }}
+                    </div>
+
+                    <div>
+                        <strong>Type :</strong><br>
+                        {{ event.event_type.name }}
+                    </div>
+
+                    <div>
+                        <strong>Photos :</strong>
+                        {{ images|length }}
+                    </div>
+
+                    <div>
+                        <strong>Vidéos :</strong>
+                        {{ videos|length }}
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- RELATED EVENTS -->
+            {% if related_events %}
+            <div class="bg-white p-6 rounded-2xl shadow-md">
+
+                <h4 class="font-semibold text-gray-900 mb-6">
+                    Événements similaires
+                </h4>
+
+                <div class="space-y-4">
+
+                    {% for rel in related_events %}
+                    <a href="{% url 'event_detail' rel.slug %}"
+                       class="block group">
+
+                        <div class="flex gap-4 items-center">
+
+                            {% if rel.cover_thumbnail %}
+                                <img src="{{ rel.cover_thumbnail.url }}"
+                                     class="w-20 h-20 object-cover rounded-lg">
+                            {% endif %}
+
+                            <div class="text-sm">
+
+                                <div class="font-medium group-hover:text-primary-600 transition">
+                                    {{ rel.title }}
+                                </div>
+
+                                <div class="text-gray-500">
+                                    {{ rel.event_date|date:"d M Y" }}
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </a>
+                    {% endfor %}
+
+                </div>
+
+            </div>
+            {% endif %}
+
+        </aside>
+
+    </div>
+
+</section>
+
+{% endblock %}

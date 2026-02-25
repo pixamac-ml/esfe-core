@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Galeries & Médias | ESFé{% endblock %}
+
+{% block content %}
+
+<!-- ===================================================== -->
+<!-- HERO SECTION -->
+<!-- ===================================================== -->
+
+<section class="relative bg-gradient-to-br from-primary-800 via-primary-700 to-primary-900 text-white py-24">
+
+    <div class="max-w-6xl mx-auto px-6 text-center">
+        <h1 class="text-4xl md:text-5xl font-bold mb-6">
+            Galeries & Médias
+        </h1>
+        <p class="text-lg md:text-xl text-white/80 max-w-3xl mx-auto">
+            Découvrez les activités académiques, cérémonies et événements
+            marquants de l’École de Santé Félix Houphouët Boigny.
+        </p>
+    </div>
+
+</section>
+
+
+<!-- ===================================================== -->
+<!-- MAIN CONTENT 75 / 25 -->
+<!-- ===================================================== -->
+
+<section class="max-w-7xl mx-auto px-6 py-16">
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-12">
+
+        <!-- ================================================= -->
+        <!-- LEFT CONTENT (75%) -->
+        <!-- ================================================= -->
+
+        <div class="lg:col-span-3 space-y-12">
+
+            <!-- ============================= -->
+            <!-- FILTERS -->
+            <!-- ============================= -->
+
+            <div class="flex flex-wrap gap-3">
+
+                <a href="{% url 'news:event_list' %}"
+                   class="px-4 py-2 rounded-full text-sm font-medium
+                   {% if not current_type %}bg-primary-600 text-white{% else %}bg-gray-100 hover:bg-gray-200{% endif %}">
+                    Tous
+                </a>
+
+                {% for type in event_types %}
+                    <a href="?type={{ type.slug }}"
+                       class="px-4 py-2 rounded-full text-sm font-medium
+                       {% if current_type == type.slug %}
+                       bg-primary-600 text-white
+                       {% else %}
+                       bg-gray-100 hover:bg-gray-200
+                       {% endif %}">
+                        {{ type.name }}
+                    </a>
+                {% endfor %}
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- EVENTS GRID -->
+            <!-- ============================= -->
+
+            <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-8">
+
+                {% for event in page_obj %}
+
+                <a href="{% url 'event_detail' event.slug %}"
+                   class="group block bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition">
+
+                    <!-- COVER -->
+                    <div class="relative">
+
+                        {% if event.cover_thumbnail %}
+                            <img src="{{ event.cover_thumbnail.url }}"
+                                 width="500"
+                                 height="350"
+                                 loading="lazy"
+                                 class="w-full h-56 object-cover group-hover:scale-105 transition duration-500">
+                        {% else %}
+                            <div class="w-full h-56 bg-gray-200"></div>
+                        {% endif %}
+
+                        <span class="absolute top-4 left-4
+                                     bg-white/90 text-primary-700
+                                     text-xs font-semibold
+                                     px-3 py-1 rounded-full">
+                            {{ event.event_type.name }}
+                        </span>
+
+                    </div>
+
+                    <!-- CONTENT -->
+                    <div class="p-6 space-y-3">
+
+                        <h3 class="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition">
+                            {{ event.title }}
+                        </h3>
+
+                        <p class="text-sm text-gray-500">
+                            {{ event.event_date|date:"d F Y" }}
+                        </p>
+
+                        <div class="flex items-center gap-4 text-sm text-gray-600">
+
+                            <span>
+                                {{ event.total_images }} photos
+                            </span>
+
+                            <span>
+                                {{ event.total_videos }} vidéos
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </a>
+
+                {% empty %}
+
+                <div class="col-span-full text-center py-20 text-gray-500">
+                    Aucun événement disponible pour le moment.
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- PAGINATION -->
+            <!-- ============================= -->
+
+            {% if page_obj.has_other_pages %}
+
+            <div class="flex justify-center pt-10">
+
+                <div class="flex items-center gap-2">
+
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}"
+                           class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">
+                            Précédent
+                        </a>
+                    {% endif %}
+
+                    <span class="px-4 py-2 bg-primary-600 text-white rounded">
+                        {{ page_obj.number }}
+                    </span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}"
+                           class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">
+                            Suivant
+                        </a>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+            {% endif %}
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- SIDEBAR (25%) -->
+        <!-- ================================================= -->
+
+        <aside class="space-y-10">
+
+            <!-- TYPES -->
+            <div class="bg-white p-6 rounded-2xl shadow-md">
+
+                <h4 class="font-semibold text-gray-900 mb-4">
+                    Types d’événements
+                </h4>
+
+                <ul class="space-y-2 text-sm">
+
+                    {% for type in event_types %}
+                        <li>
+                            <a href="?type={{ type.slug }}"
+                               class="hover:text-primary-600 transition">
+                                {{ type.name }}
+                            </a>
+                        </li>
+                    {% endfor %}
+
+                </ul>
+
+            </div>
+
+
+            <!-- ARCHIVES -->
+            <div class="bg-white p-6 rounded-2xl shadow-md">
+
+                <h4 class="font-semibold text-gray-900 mb-4">
+                    Archives
+                </h4>
+
+                <ul class="space-y-2 text-sm">
+
+                    {% for year in years %}
+                        <li>
+                            <a href="?year={{ year.year }}"
+                               class="hover:text-primary-600 transition">
+                                {{ year.year }}
+                            </a>
+                        </li>
+                    {% endfor %}
+
+                </ul>
+
+            </div>
+
+        </aside>
+
+    </div>
+
+</section>
+
+{% endblock %}

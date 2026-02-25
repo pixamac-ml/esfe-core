@@ -252,3 +252,123 @@ class ResultSessionListView(ListView):
         })
 
         return context
+
+
+from django.shortcuts import render, get_object_or_404
+from django.db.models import Count, Q
+from django.core.paginator import Paginator
+
+from .models import Event, EventType
+
+
+# ==========================================================
+# EVENT LIST VIEW
+# ==========================================================
+
+def event_list_view(request):
+
+    events = (
+        Event.objects
+        .filter(is_published=True)
+        .select_related("event_type")
+        .prefetch_related("media_items")
+    )
+
+    # ------------------------------------------------------
+    # FILTRAGE PAR TYPE
+    # ------------------------------------------------------
+
+    type_slug = request.GET.get("type")
+    if type_slug:
+        events = events.filter(event_type__slug=type_slug)
+
+    # ------------------------------------------------------
+    # FILTRAGE PAR ANNÉE
+    # ------------------------------------------------------
+
+    year = request.GET.get("year")
+    if year:
+        events = events.filter(event_date__year=year)
+
+    # ------------------------------------------------------
+    # ANNOTATIONS OPTIMISÉES
+    # ------------------------------------------------------
+
+    events = events.annotate(
+        total_media=Count("media_items"),
+        total_images=Count(
+            "media_items",
+            filter=Q(media_items__media_type="image")
+        ),
+        total_videos=Count(
+            "media_items",
+            filter=Q(media_items__media_type="video")
+        ),
+    )
+
+    # ------------------------------------------------------
+    # PAGINATION
+    # ------------------------------------------------------
+
+    paginator = Paginator(events, 9)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    # ------------------------------------------------------
+    # SIDEBAR DATA
+    # ------------------------------------------------------
+
+    event_types = EventType.objects.filter(is_active=True)
+
+    years = (
+        Event.objects
+        .filter(is_published=True)
+        .dates("event_date", "year", order="DESC")
+    )
+
+    context = {
+        "page_obj": page_obj,
+        "event_types": event_types,
+        "current_type": type_slug,
+        "years": years,
+        "current_year": year,
+    }
+
+    return render(request, "news/event_list.html", context)
+
+
+# ==========================================================
+# EVENT DETAIL VIEW
+# ==========================================================
+
+def event_detail_view(request, slug):
+
+    event = get_object_or_404(
+        Event.objects
+        .select_related("event_type")
+        .prefetch_related("media_items"),
+        slug=slug,
+        is_published=True
+    )
+
+    images = event.media_items.filter(media_type="image")
+    videos = event.media_items.filter(media_type="video")
+
+    related_events = (
+        Event.objects
+        .filter(
+            event_type=event.event_type,
+            is_published=True
+        )
+        .exclude(id=event.id)
+        .order_by("-event_date")[:4]
+    )
+
+    context = {
+        "event": event,
+        "images": images,
+        "videos": videos,
+        "related_events": related_events,
+    }
+
+    return render(request, "news/event_detail.html", context)

@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.utils import timezone
 
 from .models import News, Category, NewsImage, Program, ResultSession
-
+from django.utils.html import format_html
+from .models import Event, EventType, MediaItem
 
 # --------------------------------------------------
 # CATEGORY ADMIN
@@ -194,3 +195,126 @@ class ResultSessionAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+
+
+@admin.register(EventType)
+class EventTypeAdmin(admin.ModelAdmin):
+
+    list_display = ("name", "slug", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+    prepopulated_fields = {"slug": ("name",)}
+    ordering = ("name",)
+
+
+class MediaItemInline(admin.TabularInline):
+
+    model = MediaItem
+    extra = 1
+    fields = (
+        "media_type",
+        "image",
+        "thumbnail_preview",
+        "video_url",
+        "caption",
+        "is_featured",
+    )
+
+    readonly_fields = ("thumbnail_preview",)
+
+    def thumbnail_preview(self, obj):
+        if obj.thumbnail:
+            return format_html(
+                '<img src="{}" width="80" style="border-radius:6px;" />',
+                obj.thumbnail.url
+            )
+        return "-"
+    thumbnail_preview.short_description = "Aperçu"
+
+
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "title",
+        "event_type",
+        "event_date",
+        "is_published",
+        "media_count",
+        "created_at",
+    )
+
+    list_filter = (
+        "event_type",
+        "is_published",
+        "event_date",
+    )
+
+    search_fields = (
+        "title",
+        "description",
+    )
+
+    prepopulated_fields = {"slug": ("title",)}
+
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "cover_preview",
+    )
+
+    inlines = [MediaItemInline]
+
+    ordering = ("-event_date",)
+
+    fieldsets = (
+        (
+            "Informations principales",
+            {
+                "fields": (
+                    "title",
+                    "slug",
+                    "event_type",
+                    "description",
+                    "event_date",
+                )
+            },
+        ),
+        (
+            "Image de couverture",
+            {
+                "fields": (
+                    "cover_image",
+                    "cover_preview",
+                )
+            },
+        ),
+        (
+            "Publication",
+            {
+                "fields": (
+                    "is_published",
+                )
+            },
+        ),
+        (
+            "Métadonnées",
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+    )
+
+    def cover_preview(self, obj):
+        if obj.cover_thumbnail:
+            return format_html(
+                '<img src="{}" width="120" style="border-radius:8px;" />',
+                obj.cover_thumbnail.url
+            )
+        return "-"
+    cover_preview.short_description = "Aperçu couverture"
+

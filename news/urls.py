@@ -6,6 +6,7 @@ from .views import (
     ProgramListView,
     ResultSessionListView,
 )
+from .views import event_list_view, event_detail_view
 
 app_name = "news"
 
@@ -20,6 +21,10 @@ urlpatterns = [
     # PROGRAMMES
     path("programmes/", ProgramListView.as_view(), name="program_list"),
     path("programmes/<slug:slug>/", ProgramDetailView.as_view(), name="program_detail"),
+
+    # GALERIES (AVANT LE SLUG GÉNÉRIQUE)
+    path("galeries/", event_list_view, name="event_list"),
+    path("galeries/<slug:slug>/", event_detail_view, name="event_detail"),
 
     # DÉTAIL ACTUALITÉ (TOUJOURS EN DERNIER)
     path("<slug:slug>/", NewsDetailView.as_view(), name="detail"),

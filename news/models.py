@@ -264,3 +264,199 @@ class ResultSession(models.Model):
 
     def __str__(self):
         return f"{self.get_type_display()} - {self.classe} - {self.annee_academique}"
+
+
+
+
+from django.db import models
+from django.utils.text import slugify
+from django.core.files.base import ContentFile
+from django.utils import timezone
+from PIL import Image
+from io import BytesIO
+import os
+
+
+# ==========================================================
+# TYPE D'ÉVÉNEMENT
+# ==========================================================
+
+class EventType(models.Model):
+    name = models.CharField(max_length=150)
+    slug = models.SlugField(unique=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Type d'événement"
+        verbose_name_plural = "Types d'événements"
+
+    def __str__(self):
+        return self.name
+
+
+# ==========================================================
+# EVENT
+# ==========================================================
+
+class Event(models.Model):
+
+    title = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True, blank=True)
+
+    event_type = models.ForeignKey(
+        EventType,
+        on_delete=models.PROTECT,
+        related_name="events"
+    )
+
+    description = models.TextField(blank=True)
+
+    event_date = models.DateField()
+    cover_image = models.ImageField(upload_to="events/covers/", blank=True)
+    cover_thumbnail = models.ImageField(upload_to="events/covers/thumbs/", blank=True)
+
+    is_published = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-event_date"]
+        indexes = [
+            models.Index(fields=["event_date"]),
+            models.Index(fields=["slug"]),
+        ]
+
+    def save(self, *args, **kwargs):
+
+        if not self.slug:
+            self.slug = slugify(self.title)
+
+        super().save(*args, **kwargs)
+
+        # Optimisation de la cover
+        if self.cover_image:
+            self._process_image("cover_image", "cover_thumbnail")
+
+    def _process_image(self, image_field, thumb_field):
+
+        image = getattr(self, image_field)
+
+        if not image:
+            return
+
+        img = Image.open(image)
+
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
+        # HD optimisée
+        hd_buffer = BytesIO()
+        img.thumbnail((1600, 1200), Image.LANCZOS)
+        img.save(hd_buffer, format="WEBP", quality=85)
+
+        hd_name = os.path.splitext(image.name)[0] + ".webp"
+        getattr(self, image_field).save(hd_name, ContentFile(hd_buffer.getvalue()), save=False)
+
+        # Thumbnail
+        thumb_img = img.copy()
+        thumb_img.thumbnail((500, 350), Image.LANCZOS)
+
+        thumb_buffer = BytesIO()
+        thumb_img.save(thumb_buffer, format="WEBP", quality=75)
+
+        thumb_name = os.path.splitext(image.name)[0] + "_thumb.webp"
+        getattr(self, thumb_field).save(thumb_name, ContentFile(thumb_buffer.getvalue()), save=False)
+
+        super().save(update_fields=[image_field, thumb_field])
+
+    def media_count(self):
+        return self.media_items.count()
+
+    def image_count(self):
+        return self.media_items.filter(media_type="image").count()
+
+    def video_count(self):
+        return self.media_items.filter(media_type="video").count()
+
+    def __str__(self):
+        return self.title
+
+
+# ==========================================================
+# MEDIA ITEM
+# ==========================================================
+
+class MediaItem(models.Model):
+
+    IMAGE = "image"
+    VIDEO = "video"
+
+    TYPE_CHOICES = (
+        (IMAGE, "Image"),
+        (VIDEO, "Vidéo"),
+    )
+
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="media_items"
+    )
+
+    media_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+
+    image = models.ImageField(upload_to="events/media/", blank=True, null=True)
+    thumbnail = models.ImageField(upload_to="events/media/thumbs/", blank=True, null=True)
+
+    video_url = models.URLField(blank=True, null=True)
+
+    caption = models.CharField(max_length=255, blank=True)
+
+    is_featured = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["media_type"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+
+        super().save(*args, **kwargs)
+
+        if self.media_type == "image" and self.image:
+            self._process_image()
+
+    def _process_image(self):
+
+        img = Image.open(self.image)
+
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
+        # HD optimisée
+        hd_buffer = BytesIO()
+        img.thumbnail((1600, 1200), Image.LANCZOS)
+        img.save(hd_buffer, format="WEBP", quality=85)
+
+        hd_name = os.path.splitext(self.image.name)[0] + ".webp"
+        self.image.save(hd_name, ContentFile(hd_buffer.getvalue()), save=False)
+
+        # Thumbnail rapide
+        thumb_img = img.copy()
+        thumb_img.thumbnail((400, 300), Image.LANCZOS)
+
+        thumb_buffer = BytesIO()
+        thumb_img.save(thumb_buffer, format="WEBP", quality=70)
+
+        thumb_name = os.path.splitext(self.image.name)[0] + "_thumb.webp"
+        self.thumbnail.save(thumb_name, ContentFile(thumb_buffer.getvalue()), save=False)
+
+        super().save(update_fields=["image", "thumbnail"])
+
+    def __str__(self):
+        return f"{self.event.title} - {self.media_type}"

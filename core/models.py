@@ -389,16 +389,147 @@ class ContactMessage(models.Model):
 
 
 
+# ==========================================================
+# ABOUT – STRUCTURE MODULAIRE
+# ==========================================================
+
 class AboutSection(models.Model):
     title = models.CharField(max_length=255)
-    content = RichTextField()
-    order = models.PositiveIntegerField(default=0)
+
+    slug = models.SlugField(
+        unique=True,
+        blank=True,
+        help_text="Généré automatiquement si laissé vide."
+    )
+
+    description = models.TextField(
+        blank=True,
+        help_text="Courte description SEO optionnelle."
+    )
+
     is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["order"]
         verbose_name = "Section À propos"
         verbose_name_plural = "Sections À propos"
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.title)
+            slug = base_slug
+            counter = 1
+            while AboutSection.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.title
+
+
+
+class AboutContentBlock(models.Model):
+
+    LAYOUT_CHOICES = [
+        ("text_left", "Texte gauche / Image droite"),
+        ("text_right", "Texte droite / Image gauche"),
+        ("text_full", "Texte pleine largeur"),
+        ("gallery", "Galerie d’images"),
+    ]
+
+    section = models.ForeignKey(
+        AboutSection,
+        on_delete=models.CASCADE,
+        related_name="blocks"
+    )
+
+    title = models.CharField(max_length=255, blank=True)
+
+    content = RichTextField(
+        blank=True,
+        help_text="Contenu principal du bloc."
+    )
+
+    layout = models.CharField(
+        max_length=20,
+        choices=LAYOUT_CHOICES,
+        default="text_left"
+    )
+
+    image = models.ImageField(
+        upload_to="about/blocks/",
+        blank=True,
+        null=True,
+        help_text="Image principale (non utilisée pour galerie)."
+    )
+
+    background_color = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Classe Tailwind optionnelle (ex: bg-gray-50)"
+    )
+
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order"]
+        verbose_name = "Bloc À propos"
+        verbose_name_plural = "Blocs À propos"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.layout in ["text_left", "text_right"] and not self.image:
+            raise ValidationError(
+                "Une image est requise pour les layouts alternés."
+            )
+
+        if self.layout == "text_full" and self.image:
+            raise ValidationError(
+                "Le layout texte pleine largeur ne doit pas contenir d'image."
+            )
+
+    def __str__(self):
+        return f"{self.section.title} - Bloc {self.order}"
+
+
+class AboutBlockImage(models.Model):
+    block = models.ForeignKey(
+        AboutContentBlock,
+        on_delete=models.CASCADE,
+        related_name="images"
+    )
+
+    image = models.ImageField(upload_to="about/gallery/")
+
+    caption = models.CharField(
+        max_length=255,
+        blank=True
+    )
+
+    alt_text = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Texte alternatif SEO."
+    )
+
+    order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order"]
+        verbose_name = "Image Bloc À propos"
+        verbose_name_plural = "Images Bloc À propos"
+
+    def __str__(self):
+        return f"Image {self.order} - {self.block.section.title}"

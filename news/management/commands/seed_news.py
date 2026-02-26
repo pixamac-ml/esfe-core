@@ -1,115 +1,166 @@
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from news.models import Category, Program, News
 
-from news.models import News, Category
+User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = "Crée des actualités de démonstration"
+    help = "Seed initial des actualités institutionnelles"
 
     def handle(self, *args, **kwargs):
 
-        User = get_user_model()
-        user = User.objects.first()
+        self.stdout.write("🚀 Initialisation des actualités...")
 
-        if not user:
-            self.stdout.write(self.style.ERROR("Aucun utilisateur trouvé."))
-            return
+        # ==================================================
+        # AUTEUR
+        # ==================================================
+        admin_user = User.objects.first()
 
-        # -------------------------
-        # Catégories
-        # -------------------------
+        # ==================================================
+        # CATÉGORIES
+        # ==================================================
         categories_data = [
-            ("Événements", "evenements"),
-            ("Académique", "academique"),
-            ("Partenariats", "partenariats"),
+            ("Vie académique", 1),
+            ("Annonces officielles", 2),
+            ("Événements", 3),
+            ("Résultats", 4),
         ]
 
         categories = {}
-        for name, slug in categories_data:
-            category, _ = Category.objects.get_or_create(
-                slug=slug,
-                defaults={"nom": name}
+
+        for name, order in categories_data:
+            cat, _ = Category.objects.get_or_create(
+                nom=name,
+                defaults={
+                    "slug": name.lower().replace(" ", "-"),
+                    "ordre": order,
+                    "is_active": True,
+                }
             )
-            categories[slug] = category
+            categories[name] = cat
 
-        # -------------------------
-        # Actualités
-        # -------------------------
-        news_data = [
-            {
-                "titre": "Lancement officiel de la rentrée académique 2026",
-                "resume": "La rentrée académique 2026 a été officiellement lancée en présence de la direction et des étudiants.",
-                "contenu": """
-La rentrée académique 2026 a débuté dans une atmosphère dynamique et ambitieuse.
-
-La direction a rappelé l'engagement de l'établissement envers l'excellence académique et l'innovation pédagogique.
-
-Les étudiants ont découvert les laboratoires modernes et les nouvelles infrastructures.
-                """,
-                "categorie": categories["evenements"],
-            },
-            {
-                "titre": "Séminaire sur l’innovation et la transformation digitale",
-                "resume": "Un séminaire dédié à l’innovation et à l’intelligence artificielle a réuni étudiants et professionnels.",
-                "contenu": """
-Un séminaire exceptionnel a été organisé autour des enjeux de la transformation digitale.
-
-Les thèmes abordés incluent l’automatisation, la cybersécurité et l’impact de l’IA dans l’éducation.
-                """,
-                "categorie": categories["academique"],
-            },
-            {
-                "titre": "Journée portes ouvertes 2026 : forte mobilisation",
-                "resume": "La journée portes ouvertes a permis aux visiteurs de découvrir les formations et infrastructures.",
-                "contenu": """
-Les visiteurs ont exploré les filières, les laboratoires et les opportunités offertes par l’établissement.
-
-Une forte mobilisation a marqué cette édition 2026.
-                """,
-                "categorie": categories["evenements"],
-            },
-            {
-                "titre": "Signature d’un partenariat académique international",
-                "resume": "Un partenariat stratégique a été signé avec une institution étrangère.",
-                "contenu": """
-Cet accord permettra des échanges d’enseignants, des mobilités étudiantes et des projets de recherche communs.
-
-Il renforce la dimension internationale de l’établissement.
-                """,
-                "categorie": categories["partenariats"],
-            },
-            {
-                "titre": "Formation pratique en laboratoire : immersion totale",
-                "resume": "Les étudiants ont participé à une session pratique intensive en laboratoire.",
-                "contenu": """
-Encadrés par leurs enseignants, les étudiants ont réalisé des simulations professionnelles et des études de cas.
-
-Cette approche renforce les compétences pratiques.
-                """,
-                "categorie": categories["academique"],
-            },
+        # ==================================================
+        # PROGRAMS (liaison facultative)
+        # ==================================================
+        programs_data = [
+            "Licence Infirmier d’État",
+            "Master en Santé Publique",
         ]
 
-        created_count = 0
+        programs = {}
 
-        for item in news_data:
-            news, created = News.objects.get_or_create(
-                titre=item["titre"],
+        for name in programs_data:
+            prog, _ = Program.objects.get_or_create(
+                nom=name,
                 defaults={
-                    "resume": item["resume"],
-                    "contenu": item["contenu"],
-                    "categorie": item["categorie"],
-                    "status": News.STATUS_PUBLISHED,
-                    "published_at": timezone.now(),
-                    "auteur": user,
-                },
+                    "slug": name.lower().replace(" ", "-"),
+                    "description": f"Actualités liées au programme {name}.",
+                    "is_active": True,
+                }
+            )
+            programs[name] = prog
+
+        # ==================================================
+        # NEWS
+        # ==================================================
+        news_data = [
+
+            {
+                "titre": "Ouverture officielle des inscriptions 2025-2026",
+                "resume": "Les inscriptions pour l’année académique 2025-2026 sont officiellement ouvertes.",
+                "contenu": """
+L’École de Santé Félix Houphouët-Boigny annonce l’ouverture officielle des inscriptions pour l’année académique 2025-2026.
+
+Les candidats sont invités à déposer leurs dossiers conformément aux exigences académiques en vigueur.
+
+Les programmes de Licence et Master sont accessibles sous conditions d’admission définies par la direction pédagogique.
+""",
+                "categorie": categories["Annonces officielles"],
+                "program": None,
+                "is_important": True,
+                "is_urgent": False,
+                "status": News.STATUS_PUBLISHED,
+            },
+
+            {
+                "titre": "Cérémonie de rentrée académique",
+                "resume": "La rentrée académique se tiendra dans l’amphithéâtre principal.",
+                "contenu": """
+La cérémonie officielle de rentrée académique réunira les étudiants, enseignants et partenaires institutionnels.
+
+La direction présentera les orientations stratégiques et les nouvelles réformes pédagogiques.
+""",
+                "categorie": categories["Événements"],
+                "program": None,
+                "is_important": False,
+                "is_urgent": False,
+                "status": News.STATUS_PUBLISHED,
+            },
+
+            {
+                "titre": "Résultats du semestre publiés",
+                "resume": "Les résultats du semestre sont désormais disponibles.",
+                "contenu": """
+Les étudiants peuvent consulter leurs résultats via l’espace académique sécurisé.
+
+Toute réclamation doit être déposée dans un délai de 72 heures.
+""",
+                "categorie": categories["Résultats"],
+                "program": programs["Licence Infirmier d’État"],
+                "is_important": False,
+                "is_urgent": True,
+                "status": News.STATUS_PUBLISHED,
+            },
+
+            {
+                "titre": "Conférence sur la santé publique",
+                "resume": "Conférence internationale sur les enjeux sanitaires en Afrique.",
+                "contenu": """
+Une conférence internationale réunira des experts en santé publique afin d’échanger sur les stratégies de prévention et de gestion des crises sanitaires.
+
+Les étudiants du Master en Santé Publique sont invités à participer activement.
+""",
+                "categorie": categories["Vie académique"],
+                "program": programs["Master en Santé Publique"],
+                "is_important": True,
+                "is_urgent": False,
+                "status": News.STATUS_PUBLISHED,
+            },
+
+            {
+                "titre": "Mise à jour du règlement intérieur",
+                "resume": "Le règlement intérieur a été actualisé.",
+                "contenu": """
+La direction informe l’ensemble des étudiants que le règlement intérieur a été mis à jour.
+
+Les nouvelles dispositions sont applicables immédiatement.
+""",
+                "categorie": categories["Annonces officielles"],
+                "program": None,
+                "is_important": False,
+                "is_urgent": False,
+                "status": News.STATUS_DRAFT,
+            },
+
+        ]
+
+        for data in news_data:
+
+            News.objects.update_or_create(
+                titre=data["titre"],
+                defaults={
+                    "resume": data["resume"],
+                    "contenu": data["contenu"],
+                    "categorie": data["categorie"],
+                    "program": data["program"],
+                    "is_important": data["is_important"],
+                    "is_urgent": data["is_urgent"],
+                    "status": data["status"],
+                    "auteur": admin_user,
+                    "published_at": timezone.now() if data["status"] == News.STATUS_PUBLISHED else None,
+                }
             )
 
-            if created:
-                created_count += 1
-
-        self.stdout.write(
-            self.style.SUCCESS(f"{created_count} actualités créées avec succès.")
-        )
+        self.stdout.write(self.style.SUCCESS("✅ Seed News terminé proprement."))

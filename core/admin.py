@@ -377,25 +377,22 @@ class ContactMessageAdmin(admin.ModelAdmin):
 
 
 
+from django.contrib import admin
+from .models import AboutSection, AboutContentBlock, AboutBlockImage
+
+
+class AboutBlockImageInline(admin.TabularInline):
+    model = AboutBlockImage
+    extra = 1
+
+
+class AboutContentBlockInline(admin.StackedInline):
+    model = AboutContentBlock
+    extra = 1
+
+
 @admin.register(AboutSection)
 class AboutSectionAdmin(admin.ModelAdmin):
-
-    list_display = ("title", "is_active", "order")
-    list_editable = ("is_active", "order")
-    ordering = ("order",)
-    search_fields = ("title",)
-
-    fieldsets = (
-        ("Contenu", {
-            "fields": (
-                "title",
-                "content",
-            )
-        }),
-        ("Organisation", {
-            "fields": (
-                "is_active",
-                "order",
-            )
-        }),
-    )
+    inlines = [AboutContentBlockInline]
+    list_display = ("title", "order", "is_active")
+    prepopulated_fields = {"slug": ("title",)}

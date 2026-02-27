@@ -1,10 +1,16 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils.text import slugify
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.utils.functional import cached_property
 from ckeditor.fields import RichTextField
+import uuid
 
 
 # ==========================================================
-# INSTITUTION (UNE SEULE INSTANCE)
+# INSTITUTION (SINGLETON)
 # ==========================================================
 
 class Institution(models.Model):
@@ -18,22 +24,11 @@ class Institution(models.Model):
     phone = models.CharField(max_length=50)
     email = models.EmailField()
 
-    legal_status = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Statut juridique officiel"
-    )
+    is_active = models.BooleanField(default=True)
 
-    approval_number = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Numéro d’agrément ou autorisation"
-    )
-
-    director_title = models.CharField(
-        max_length=255,
-        default="Direction Générale"
-    )
+    legal_status = models.CharField(max_length=255, blank=True)
+    approval_number = models.CharField(max_length=255, blank=True)
+    director_title = models.CharField(max_length=255, default="Direction Générale")
 
     hosting_provider = models.CharField(max_length=255, blank=True)
     hosting_location = models.CharField(max_length=255, blank=True)
@@ -45,6 +40,10 @@ class Institution(models.Model):
         if Institution.objects.exclude(pk=self.pk).exists():
             raise ValidationError("Une seule institution est autorisée.")
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
 
@@ -54,25 +53,28 @@ class Institution(models.Model):
 
 
 # ==========================================================
-# LEGAL PAGE HISTORY (VERSIONNAGE)
+# INSTITUTION STATS
 # ==========================================================
 
-class LegalPageHistory(models.Model):
-    page = models.ForeignKey("LegalPage", on_delete=models.CASCADE)
-    version = models.CharField(max_length=20)
-    content_snapshot = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
+class InstitutionStat(models.Model):
+    label = models.CharField(max_length=100)
+    value = models.PositiveIntegerField()
+    suffix = models.CharField(max_length=5, blank=True)
 
-    def __str__(self):
-        return f"{self.page.title} - v{self.version}"
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        verbose_name = "Historique de page"
-        verbose_name_plural = "Historique des pages"
+        ordering = ["order"]
+        verbose_name = "Statistique"
+        verbose_name_plural = "Statistiques"
+
+    def __str__(self):
+        return self.label
 
 
 # ==========================================================
-# LEGAL PAGE
+# LEGAL PAGES
 # ==========================================================
 
 class LegalPage(models.Model):
@@ -89,57 +91,51 @@ class LegalPage(models.Model):
         ("published", "Publié"),
     )
 
-    page_type = models.CharField(
-        max_length=20,
-        choices=PAGE_TYPES,
-        unique=True
-    )
-
+    page_type = models.CharField(max_length=20, choices=PAGE_TYPES, unique=True)
     title = models.CharField(max_length=255)
     introduction = RichTextField(blank=True)
 
     version = models.CharField(max_length=20, default="1.0")
-
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default="draft"
-    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["page_type"]
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
         super().save(*args, **kwargs)
 
-        # Historique seulement si nouvelle version ou nouvelle page
         if is_new or not LegalPageHistory.objects.filter(
-            page=self,
-            version=self.version
+            page=self, version=self.version
         ).exists():
-
             LegalPageHistory.objects.create(
                 page=self,
                 version=self.version,
-                content_snapshot=self.introduction or ""
+                content_snapshot=self.introduction or "",
             )
 
     def __str__(self):
         return f"{self.title} (v{self.version})"
 
     class Meta:
+        ordering = ["page_type"]
         verbose_name = "Page légale"
         verbose_name_plural = "Pages légales"
-        ordering = ["page_type"]
 
 
-# ==========================================================
-# LEGAL SECTIONS
-# ==========================================================
+class LegalPageHistory(models.Model):
+    page = models.ForeignKey(LegalPage, on_delete=models.CASCADE)
+    version = models.CharField(max_length=20)
+    content_snapshot = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Historique de page"
+        verbose_name_plural = "Historique des pages"
+
+    def __str__(self):
+        return f"{self.page.title} - v{self.version}"
+
 
 class LegalSection(models.Model):
     page = models.ForeignKey(
@@ -151,23 +147,17 @@ class LegalSection(models.Model):
     title = models.CharField(max_length=255)
     content = RichTextField()
 
+    is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["order"]
+        verbose_name = "Section légale"
+        verbose_name_plural = "Sections légales"
 
     def __str__(self):
         return f"{self.page.title} - {self.title}"
 
-    class Meta:
-        verbose_name = "Section légale"
-        verbose_name_plural = "Sections légales"
-        ordering = ["order"]
-
-
-# ==========================================================
-# SIDEBAR BLOCKS
-# ==========================================================
 
 class LegalSidebarBlock(models.Model):
     page = models.ForeignKey(
@@ -178,37 +168,22 @@ class LegalSidebarBlock(models.Model):
 
     title = models.CharField(max_length=255)
     content = RichTextField()
+
+    is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["order"]
+        verbose_name = "Bloc sidebar légal"
+        verbose_name_plural = "Blocs sidebar légaux"
 
     def __str__(self):
-        return f"{self.page.title} - Bloc : {self.title}"
+        return f"{self.page.title} - {self.title}"
 
 
-
-class InstitutionStat(models.Model):
-    label = models.CharField(max_length=100)
-    value = models.PositiveIntegerField()
-    suffix = models.CharField(max_length=5, blank=True)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ['order']
-
-
-
-
-
-
-from django.db import models
-from django.utils import timezone
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
-from django.utils.functional import cached_property
-import uuid
-
+# ==========================================================
+# CONTACT MESSAGE (SLA + ASSIGNATION)
+# ==========================================================
 
 class ContactMessage(models.Model):
 
@@ -244,27 +219,15 @@ class ContactMessage(models.Model):
 
     subject = models.CharField(max_length=50, choices=SUBJECT_CHOICES)
     message = models.TextField()
-    reply = models.TextField(blank=True, help_text="Réponse envoyée au contact")
+    reply = models.TextField(blank=True)
 
-    priority = models.CharField(
-        max_length=10,
-        choices=PRIORITY_CHOICES,
-        default="normal"
-    )
-
-    sla_hours = models.PositiveIntegerField(
-        default=48,
-        help_text="Temps maximal de traitement en heures"
-    )
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default="normal")
+    sla_hours = models.PositiveIntegerField(default=48)
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
 
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default="new"
-    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="new")
 
     assigned_to = models.ForeignKey(
         get_user_model(),
@@ -278,17 +241,13 @@ class ContactMessage(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        verbose_name = "Message de contact"
+        verbose_name_plural = "Messages de contact"
         indexes = [
             models.Index(fields=["status"]),
             models.Index(fields=["priority"]),
             models.Index(fields=["created_at"]),
         ]
-        verbose_name = "Message de contact"
-        verbose_name_plural = "Messages de contact"
-
-    # ===============================
-    # ASSIGNATION INTELLIGENTE
-    # ===============================
 
     def auto_assign(self):
         if self.assigned_to:
@@ -317,10 +276,6 @@ class ContactMessage(models.Model):
         except Group.DoesNotExist:
             pass
 
-    # ===============================
-    # LOGIQUE MÉTIER
-    # ===============================
-
     def save(self, *args, **kwargs):
 
         if self.subject == "payment":
@@ -328,22 +283,18 @@ class ContactMessage(models.Model):
         elif self.subject == "complaint":
             self.priority = "urgent"
 
-        if self.priority == "urgent":
-            self.sla_hours = 8
-        elif self.priority == "high":
-            self.sla_hours = 24
-        elif self.priority == "normal":
-            self.sla_hours = 48
-        else:
-            self.sla_hours = 72
+        priority_sla_map = {
+            "urgent": 8,
+            "high": 24,
+            "normal": 48,
+            "low": 72,
+        }
+
+        self.sla_hours = priority_sla_map.get(self.priority, 48)
 
         self.auto_assign()
 
         super().save(*args, **kwargs)
-
-    # ===============================
-    # INDICATEURS PERFORMANCE
-    # ===============================
 
     @cached_property
     def deadline(self):
@@ -355,38 +306,8 @@ class ContactMessage(models.Model):
             return False
         return timezone.now() > self.deadline
 
-    @property
-    def remaining_hours(self):
-        if self.answered_at:
-            return 0
-        delta = self.deadline - timezone.now()
-        return round(delta.total_seconds() / 3600, 2)
-
-    @property
-    def response_time(self):
-        if self.answered_at:
-            delta = self.answered_at - self.created_at
-            return round(delta.total_seconds() / 3600, 2)
-        return None
-
-    @property
-    def sla_respected(self):
-        if not self.answered_at:
-            return None
-        return self.response_time <= self.sla_hours
-
-    def mark_as_answered(self):
-        self.status = "answered"
-        self.answered_at = timezone.now()
-        self.save(update_fields=["status", "answered_at"])
-
-    def close(self):
-        self.status = "closed"
-        self.save(update_fields=["status"])
-
     def __str__(self):
         return f"{self.full_name} - {self.get_subject_display()}"
-
 
 
 # ==========================================================
@@ -395,17 +316,8 @@ class ContactMessage(models.Model):
 
 class AboutSection(models.Model):
     title = models.CharField(max_length=255)
-
-    slug = models.SlugField(
-        unique=True,
-        blank=True,
-        help_text="Généré automatiquement si laissé vide."
-    )
-
-    description = models.TextField(
-        blank=True,
-        help_text="Courte description SEO optionnelle."
-    )
+    slug = models.SlugField(unique=True, blank=True)
+    description = models.TextField(blank=True)
 
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
@@ -433,7 +345,6 @@ class AboutSection(models.Model):
         return self.title
 
 
-
 class AboutContentBlock(models.Model):
 
     LAYOUT_CHOICES = [
@@ -450,30 +361,12 @@ class AboutContentBlock(models.Model):
     )
 
     title = models.CharField(max_length=255, blank=True)
+    content = RichTextField(blank=True)
+    layout = models.CharField(max_length=20, choices=LAYOUT_CHOICES, default="text_left")
 
-    content = RichTextField(
-        blank=True,
-        help_text="Contenu principal du bloc."
-    )
+    image = models.ImageField(upload_to="about/blocks/", blank=True, null=True)
 
-    layout = models.CharField(
-        max_length=20,
-        choices=LAYOUT_CHOICES,
-        default="text_left"
-    )
-
-    image = models.ImageField(
-        upload_to="about/blocks/",
-        blank=True,
-        null=True,
-        help_text="Image principale (non utilisée pour galerie)."
-    )
-
-    background_color = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text="Classe Tailwind optionnelle (ex: bg-gray-50)"
-    )
+    background_color = models.CharField(max_length=50, blank=True)
 
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
@@ -486,17 +379,10 @@ class AboutContentBlock(models.Model):
         verbose_name_plural = "Blocs À propos"
 
     def clean(self):
-        from django.core.exceptions import ValidationError
-
         if self.layout in ["text_left", "text_right"] and not self.image:
-            raise ValidationError(
-                "Une image est requise pour les layouts alternés."
-            )
-
+            raise ValidationError("Une image est requise pour les layouts alternés.")
         if self.layout == "text_full" and self.image:
-            raise ValidationError(
-                "Le layout texte pleine largeur ne doit pas contenir d'image."
-            )
+            raise ValidationError("Le layout texte pleine largeur ne doit pas contenir d'image.")
 
     def __str__(self):
         return f"{self.section.title} - Bloc {self.order}"
@@ -510,20 +396,10 @@ class AboutBlockImage(models.Model):
     )
 
     image = models.ImageField(upload_to="about/gallery/")
-
-    caption = models.CharField(
-        max_length=255,
-        blank=True
-    )
-
-    alt_text = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Texte alternatif SEO."
-    )
+    caption = models.CharField(max_length=255, blank=True)
+    alt_text = models.CharField(max_length=255, blank=True)
 
     order = models.PositiveIntegerField(default=0)
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -37,6 +37,5 @@ urlpatterns = [
     # INTERNAL / SUPERADMIN
     # =====================================================
 
-    path("dashboard/", views.superadmin_dashboard, name="superadmin_dashboard"),
 
 ]

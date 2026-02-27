@@ -1,213 +1,113 @@
 {% extends "base.html" %}
-{% load static %}
+{% load component_tags %}
 
 {% block title %}
-À propos | {{ institution.short_name|default:institution.name }}
+À propos |
+{% if institution %}
+    {{ institution.short_name|default:institution.name }}
+{% else %}
+    ESFé
+{% endif %}
 {% endblock %}
 
 {% block content %}
 
-
-<!-- ============================================= -->
-<!-- HERO IMMERSIF -->
-<!-- ============================================= -->
-
-<section class="relative h-[85vh] flex items-center justify-center text-white overflow-hidden">
-
-    <div class="absolute inset-0">
-        <img src="{% static 'images/campus.jpg' %}"
-             class="w-full h-full object-cover"
-             alt="{{ institution.name }}">
-        <div class="absolute inset-0 bg-black/60"></div>
-    </div>
-
-    <div class="relative text-center max-w-4xl px-6 space-y-6">
-
-        <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight">
-            {{ institution.short_name|default:institution.name }}
-        </h1>
-
-        <p class="text-xl text-gray-200">
-            Former les cadres de la santé et contribuer activement
-            au développement du système sanitaire malien.
-        </p>
-
-    </div>
-
-</section>
+    {# ============================================ #}
+    {# HERO INSTITUTIONNEL                         #}
+    {# ============================================ #}
+    {% component "about_hero"
+        label="Présentation institutionnelle"
+        title=hero_title
+        subtitle=hero_subtitle
+    %}
+    {% endcomponent %}
 
 
-
-<!-- ============================================= -->
-<!-- INTRO INSTITUTIONNELLE -->
-<!-- ============================================= -->
-
-<section class="py-28 bg-white">
-    <div class="max-w-5xl mx-auto px-6 text-center space-y-6">
-
-        <p class="text-xs uppercase tracking-wider text-teal-500">
-            À propos de l’institution
-        </p>
-
-        <h2 class="text-4xl font-bold text-gray-900">
-            Une institution engagée au service de la santé
-        </h2>
-
-        <p class="text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            {{ institution.name }} est un {{ institution.legal_status }}
-            agréé sous le numéro {{ institution.approval_number }}.
-            Notre mission est de former des professionnels compétents,
-            éthiques et immédiatement opérationnels.
-        </p>
-
-    </div>
-</section>
+    {# ============================================ #}
+    {# SECTION 1 — IDENTITÉ DE L'ÉCOLE             #}
+    {# ============================================ #}
+    {% component "sections"
+        label="QUI SOMMES-NOUS"
+        title="L’École de Santé Félix Houphouët Boigny Mali"
+        subtitle="École supérieure privée spécialisée dans les sciences de la santé"
+        content=section1_content
+        image=section1_image
+        highlights=section1_highlights
+        background="white"
+        icon="fa-solid fa-school"
+    %}
+    {% endcomponent %}
 
 
-
-<!-- ============================================= -->
-<!-- SECTIONS DYNAMIQUES (MISSION / VISION / VALEURS) -->
-<!-- ============================================= -->
-
-<section class="py-24 bg-gray-50">
-    <div class="max-w-6xl mx-auto px-6">
-
-        {% if about_sections %}
-            {% for section in about_sections %}
-                {% if section.is_active %}
-                    <div class="grid md:grid-cols-12 gap-12 items-start mb-28">
-
-                        <div class="md:col-span-4">
-                            <h3 class="text-3xl font-semibold text-gray-900 sticky top-28">
-                                {{ section.title }}
-                            </h3>
-                        </div>
-
-                        <div class="md:col-span-8">
-                            <div class="prose max-w-none text-gray-700 leading-relaxed">
-                                {{ section.content|safe }}
-                            </div>
-                        </div>
-
-                    </div>
-                {% endif %}
-            {% endfor %}
-        {% else %}
-            <div class="text-center text-gray-500">
-                Contenu en cours de mise à jour.
-            </div>
-        {% endif %}
-
-    </div>
-</section>
+    {# ============================================ #}
+    {# SECTION 2 — VISION & ENGAGEMENT             #}
+    {# ============================================ #}
+    {% component "sections"
+        label="NOTRE VISION"
+        title="Former des professionnels de santé compétents et responsables"
+        content=section2_content
+        image=section2_image
+        highlights=section2_highlights
+        reverse=True
+        background="light"
+        icon="fa-solid fa-heart-pulse"
+    %}
+    {% endcomponent %}
 
 
-
-<!-- ============================================= -->
-<!-- ESFE EN CHIFFRES -->
-<!-- ============================================= -->
-
-{% if stats %}
-<section class="py-28 bg-gray-900 text-white relative overflow-hidden">
-
-    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_70%_30%,white,transparent_40%)]"></div>
-
-    <div class="relative max-w-6xl mx-auto px-6 text-center space-y-16">
-
-        <div class="space-y-4">
-            <p class="text-xs uppercase tracking-wider text-teal-400">
-                ESFE en chiffres
-            </p>
-
-            <h2 class="text-4xl font-bold">
-                Une institution qui transforme les statistiques en impact réel
-            </h2>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-12">
-
-            {% for stat in stats %}
-            <div>
-                <div class="text-5xl font-extrabold tracking-tight">
-                    {{ stat.value }}{{ stat.suffix }}
-                </div>
-
-                <div class="mt-4 text-gray-400 uppercase text-sm tracking-wider">
-                    {{ stat.label }}
-                </div>
-            </div>
-            {% endfor %}
-
-        </div>
-
-    </div>
-</section>
-{% endif %}
+    {# ============================================ #}
+    {# SECTION 3 — GOUVERNANCE & RECTORAT          #}
+    {# ============================================ #}
+    {% component "sections"
+        label="GOUVERNANCE"
+        title="Une organisation académique structurée et transparente"
+        content=section3_content
+        image=section3_image
+        background="white"
+        icon="fa-solid fa-sitemap"
+    %}
+    {% endcomponent %}
 
 
-
-<!-- ============================================= -->
-<!-- CONTACT INSTITUTIONNEL -->
-<!-- ============================================= -->
-
-<section class="py-28 bg-white border-t">
-    <div class="max-w-4xl mx-auto px-6">
-
-        <div class="bg-gray-50 rounded-3xl p-14 text-center shadow-sm space-y-6">
-
-            <p class="text-xs uppercase tracking-wider text-teal-500">
-                Contact
-            </p>
-
-            <h2 class="text-3xl font-semibold">
-                Contact institutionnel
-            </h2>
-
-            <div class="space-y-3 text-gray-700">
-
-                <p>
-                    {{ institution.address }}, {{ institution.city }}, {{ institution.country }}
-                </p>
-
-                <p>
-                    Téléphone : {{ institution.phone }}
-                </p>
-
-                <p>
-                    Email : {{ institution.email }}
-                </p>
-
-            </div>
-
-        </div>
-
-    </div>
-</section>
+    {# ============================================ #}
+    {# SECTION 4 — INFRASTRUCTURES                 #}
+    {# ============================================ #}
+    {% component "sections"
+        label="INFRASTRUCTURES"
+        title="Un environnement académique moderne et adapté"
+        content=section4_content
+        image=section4_image
+        reverse=True
+        background="light"
+        icon="fa-solid fa-building-columns"
+    %}
+    {% endcomponent %}
 
 
+    {# ============================================ #}
+    {# SECTION 5 — VIE ÉTUDIANTE                   #}
+    {# ============================================ #}
+    {% component "sections"
+        label="VIE ESTUDIANTINE"
+        title="Un cadre dynamique favorisant l’épanouissement"
+        content=section5_content
+        image=section5_image
+        background="white"
+        icon="fa-solid fa-users"
+    %}
+    {% endcomponent %}
 
-<!-- ============================================= -->
-<!-- CALL TO ACTION -->
-<!-- ============================================= -->
 
-<section class="py-32 bg-gradient-to-r from-blue-700 to-blue-600 text-white text-center">
-    <div class="max-w-4xl mx-auto px-6 space-y-8">
-
-        <h2 class="text-4xl font-bold">
-            Rejoignez une institution d’excellence
-        </h2>
-
-        <p class="text-blue-100 text-lg">
-            Déposez votre candidature en ligne et intégrez une formation reconnue.
-        </p>
-
-        <a href="{% url 'formations:list' %}"
-           class="inline-block bg-white text-blue-700 font-semibold px-10 py-4 rounded-full shadow-lg hover:shadow-xl transition">
-            Voir les formations
-        </a>
-
-    </div>
-</section>
-
+    {# ============================================ #}
+    {# SECTION 6 — ANNEXES & PARTENARIATS          #}
+    {# ============================================ #}
+    {% component "sections"
+        label="RÉSEAU & PARTENARIATS"
+        title="Un réseau académique et professionnel solide"
+        content=section6_content
+        background="light"
+        icon="fa-solid fa-globe"
+    %}
+    {% endcomponent %}
 
 {% endblock %}

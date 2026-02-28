@@ -37,7 +37,7 @@ urlpatterns = [
 
     # Core (home + pages publiques)
     path("", include("core.urls")),
-
+    path("community/", include("community.urls")),
     # Dev only
     path("__reload__/", include("django_browser_reload.urls")),
 ]

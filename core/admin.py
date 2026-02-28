@@ -378,90 +378,109 @@ class ContactMessageAdmin(admin.ModelAdmin):
 
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import AboutSection, AboutContentBlock, AboutBlockImage
+from .models import AboutSection
 
 
-# ================================
-# INLINE – IMAGES GALERIE
-# ================================
-class AboutBlockImageInline(admin.TabularInline):
-    model = AboutBlockImage
-    extra = 1
-    fields = ("image_preview", "image", "caption", "alt_text", "order")
-    readonly_fields = ("image_preview",)
+@admin.register(AboutSection)
+class AboutSectionAdmin(admin.ModelAdmin):
+
+    # ==============================
+    # LIST VIEW
+    # ==============================
+    list_display = (
+        "section_key",
+        "title",
+        "order",
+        "is_active",
+        "updated_at",
+        "image_preview",
+    )
+
+    list_editable = (
+        "order",
+        "is_active",
+    )
+
+    list_filter = (
+        "is_active",
+        "section_key",
+        "background",
+    )
+
+    search_fields = (
+        "title",
+        "subtitle",
+        "content",
+    )
+
     ordering = ("order",)
 
+    readonly_fields = (
+        "updated_at",
+        "image_preview",
+    )
+
+    # ==============================
+    # FIELDSETS
+    # ==============================
+    fieldsets = (
+        ("Identification", {
+            "fields": (
+                "section_key",
+                "title",
+                "subtitle",
+            )
+        }),
+
+        ("Contenu principal", {
+            "fields": (
+                "content",
+                "image",
+                "image_preview",
+                "highlights",
+            )
+        }),
+
+        ("Apparence", {
+            "fields": (
+                "icon",
+                "background",
+            )
+        }),
+
+        ("Organisation", {
+            "fields": (
+                "order",
+                "is_active",
+            )
+        }),
+
+        ("Métadonnées", {
+            "fields": (
+                "updated_at",
+            ),
+            "classes": ("collapse",)
+        }),
+    )
+
+    # ==============================
+    # IMAGE PREVIEW
+    # ==============================
     def image_preview(self, obj):
         if obj.image:
             return format_html(
-                '<img src="{}" style="height:60px;border-radius:6px;" />',
+                '<img src="{}" style="height:70px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1);" />',
                 obj.image.url
             )
         return "-"
     image_preview.short_description = "Preview"
 
-
-# ================================
-# INLINE – BLOCS À PROPOS
-# ================================
-class AboutContentBlockInline(admin.StackedInline):
-    model = AboutContentBlock
-    extra = 1
-    inlines = [AboutBlockImageInline]
-    fields = (
-        "title",
-        "layout",
-        "content",
-        "image",
-        "background_color",
-        "is_active",
-        "order",
-    )
-    ordering = ("order",)
-    show_change_link = True
-
-
-# ================================
-# ADMIN – SECTION À PROPOS
-# ================================
-@admin.register(AboutSection)
-class AboutSectionAdmin(admin.ModelAdmin):
-    inlines = [AboutContentBlockInline]
-
-    list_display = (
-        "title",
-        "order",
-        "is_active",
-        "blocks_count",
-        "updated_at",
-    )
-
-    list_editable = ("order", "is_active")
-    list_filter = ("is_active",)
-    search_fields = ("title", "description")
-    prepopulated_fields = {"slug": ("title",)}
-    ordering = ("order",)
-    readonly_fields = ("created_at", "updated_at")
-
-    fieldsets = (
-        ("Informations principales", {
-            "fields": ("title", "slug", "description")
-        }),
-        ("Organisation", {
-            "fields": ("order", "is_active")
-        }),
-        ("Métadonnées", {
-            "fields": ("created_at", "updated_at"),
-            "classes": ("collapse",)
-        }),
-    )
-
-    def blocks_count(self, obj):
-        return obj.blocks.count()
-    blocks_count.short_description = "Nombre de blocs"
-
-    # 🔒 Empêche plusieurs sections About (pseudo-singleton)
+    # ==============================
+    # OPTIONNEL — Empêche doublon de section_key
+    # ==============================
     def has_add_permission(self, request):
-        if AboutSection.objects.exists():
+        # Limite au nombre défini dans SECTION_CHOICES
+        max_sections = len(AboutSection.SECTION_CHOICES)
+        if AboutSection.objects.count() >= max_sections:
             return False
         return super().has_add_permission(request)

@@ -309,20 +309,74 @@ class ContactMessage(models.Model):
     def __str__(self):
         return f"{self.full_name} - {self.get_subject_display()}"
 
+# ==========================================================
+# ABOUT PAGE — STRUCTURE SIMPLIFIÉE & STABLE
+# ==========================================================
 
-# ==========================================================
-# ABOUT – STRUCTURE MODULAIRE
-# ==========================================================
+from django.db import models
+from ckeditor.fields import RichTextField
+
 
 class AboutSection(models.Model):
+
+    SECTION_CHOICES = [
+        ("identity", "Identité de l’école"),
+        ("vision", "Vision & Mission"),
+        ("governance", "Gouvernance"),
+        ("infrastructure", "Infrastructures"),
+        ("student_life", "Vie étudiante"),
+        ("network", "Annexes & Partenariats"),
+    ]
+
+    section_key = models.CharField(
+        max_length=50,
+        choices=SECTION_CHOICES,
+        unique=True,
+        null=True,
+        blank=True
+    )
     title = models.CharField(max_length=255)
-    slug = models.SlugField(unique=True, blank=True)
-    description = models.TextField(blank=True)
+
+    subtitle = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    content = RichTextField(
+        blank=True,
+        null=True
+    )
+
+    image = models.ImageField(
+        upload_to="about/",
+        blank=True,
+        null=True
+    )
+
+    highlights = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="Liste des points clés (ex: ['Reconnu par l’État', 'Système LMD'])"
+    )
+
+    icon = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Classe icône (ex: fa-solid fa-graduation-cap)"
+    )
+
+    background = models.CharField(
+        max_length=50,
+        default="white",
+        help_text="white | light | primary"
+    )
 
     is_active = models.BooleanField(default=True)
+
     order = models.PositiveIntegerField(default=0)
 
-    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -330,82 +384,7 @@ class AboutSection(models.Model):
         verbose_name = "Section À propos"
         verbose_name_plural = "Sections À propos"
 
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            base_slug = slugify(self.title)
-            slug = base_slug
-            counter = 1
-            while AboutSection.objects.filter(slug=slug).exclude(pk=self.pk).exists():
-                slug = f"{base_slug}-{counter}"
-                counter += 1
-            self.slug = slug
-        super().save(*args, **kwargs)
-
     def __str__(self):
-        return self.title
-
-
-class AboutContentBlock(models.Model):
-
-    LAYOUT_CHOICES = [
-        ("text_left", "Texte gauche / Image droite"),
-        ("text_right", "Texte droite / Image gauche"),
-        ("text_full", "Texte pleine largeur"),
-        ("gallery", "Galerie d’images"),
-    ]
-
-    section = models.ForeignKey(
-        AboutSection,
-        on_delete=models.CASCADE,
-        related_name="blocks"
-    )
-
-    title = models.CharField(max_length=255, blank=True)
-    content = RichTextField(blank=True)
-    layout = models.CharField(max_length=20, choices=LAYOUT_CHOICES, default="text_left")
-
-    image = models.ImageField(upload_to="about/blocks/", blank=True, null=True)
-
-    background_color = models.CharField(max_length=50, blank=True)
-
-    is_active = models.BooleanField(default=True)
-    order = models.PositiveIntegerField(default=0)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["order"]
-        verbose_name = "Bloc À propos"
-        verbose_name_plural = "Blocs À propos"
-
-    def clean(self):
-        if self.layout in ["text_left", "text_right"] and not self.image:
-            raise ValidationError("Une image est requise pour les layouts alternés.")
-        if self.layout == "text_full" and self.image:
-            raise ValidationError("Le layout texte pleine largeur ne doit pas contenir d'image.")
-
-    def __str__(self):
-        return f"{self.section.title} - Bloc {self.order}"
-
-
-class AboutBlockImage(models.Model):
-    block = models.ForeignKey(
-        AboutContentBlock,
-        on_delete=models.CASCADE,
-        related_name="images"
-    )
-
-    image = models.ImageField(upload_to="about/gallery/")
-    caption = models.CharField(max_length=255, blank=True)
-    alt_text = models.CharField(max_length=255, blank=True)
-
-    order = models.PositiveIntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["order"]
-        verbose_name = "Image Bloc À propos"
-        verbose_name_plural = "Images Bloc À propos"
-
-    def __str__(self):
-        return f"Image {self.order} - {self.block.section.title}"
+        if self.section_key:
+            return self.get_section_key_display()
+        return self.title or "Section About"

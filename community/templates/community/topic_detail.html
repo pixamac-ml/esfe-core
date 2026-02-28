@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container py-5">
+
+    <div class="row">
+
+        <div class="col-lg-8">
+
+            <!-- Sujet -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+
+                    <h2 class="fw-bold mb-3">
+                        {{ topic.title }}
+                    </h2>
+
+                    <div class="mb-3 text-muted small">
+                        <span class="badge bg-light text-dark me-2">
+                            {{ topic.category.name }}
+                        </span>
+                        Par {{ topic.author }} ·
+                        {{ topic.created_at|date:"d M Y H:i" }} ·
+                        {{ topic.view_count }} vues
+                    </div>
+
+                    <div class="fs-6">
+                        {{ topic.content|linebreaks }}
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Réponses -->
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">
+                    {{ answers|length }} Réponse{{ answers|length|pluralize }}
+                </h5>
+            </div>
+
+            <div id="answers">
+                {% for answer in answers %}
+                    {% include "community/partials/answer_item.html" %}
+                {% empty %}
+                    <div class="alert alert-light border">
+                        Aucune réponse pour le moment.
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if user.is_authenticated and not topic.is_locked %}
+            <div class="card shadow-sm mt-4">
+                <div class="card-body">
+
+                    <h6 class="fw-bold mb-3">Ajouter une réponse</h6>
+
+                    <form
+                        hx-post="{% url 'community:add_answer' topic.slug %}"
+                        hx-target="#answers"
+                        hx-swap="beforeend"
+                    >
+                        {% csrf_token %}
+                        <textarea name="content"
+                                  class="form-control mb-3"
+                                  rows="4"
+                                  required></textarea>
+
+                        <button type="submit" class="btn btn-primary">
+                            Publier la réponse
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body small">
+
+                    <h6 class="fw-bold">Informations</h6>
+                    <hr>
+
+                    <p><strong>Catégorie :</strong> {{ topic.category.name }}</p>
+                    <p><strong>Auteur :</strong> {{ topic.author }}</p>
+                    <p><strong>Date :</strong> {{ topic.created_at|date:"d M Y H:i" }}</p>
+                    <p><strong>Vues :</strong> {{ topic.view_count }}</p>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

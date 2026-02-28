@@ -1,0 +1,72 @@
+<div class="card shadow-sm mb-3" id="answer-{{ answer.id }}">
+    <div class="card-body">
+
+        <div class="row">
+
+            <!-- Vote -->
+            <div class="col-1 text-center border-end">
+
+                <button
+                    hx-post="{% url 'community:vote_answer' answer.id %}"
+                    hx-vals='{"value": "1"}'
+                    hx-target="#answer-{{ answer.id }} .vote-count"
+                    hx-swap="outerHTML"
+                    class="btn btn-sm btn-outline-success mb-2">
+                    ▲
+                </button>
+
+                <div class="vote-count fw-bold fs-5 text-success">
+                    {{ answer.upvotes }}
+                </div>
+
+                <button
+                    hx-post="{% url 'community:vote_answer' answer.id %}"
+                    hx-vals='{"value": "-1"}'
+                    hx-target="#answer-{{ answer.id }} .vote-count"
+                    hx-swap="outerHTML"
+                    class="btn btn-sm btn-outline-danger mt-2">
+                    ▼
+                </button>
+
+            </div>
+
+            <!-- Contenu -->
+            <div class="col-11">
+
+                <div class="mb-2">
+                    {{ answer.content|linebreaks }}
+                </div>
+
+                <div class="small text-muted d-flex justify-content-between">
+
+                    <span>
+                        Par {{ answer.author }} ·
+                        {{ answer.created_at|date:"d M Y H:i" }}
+                    </span>
+
+                    {% if user.is_authenticated %}
+                        <button
+                            hx-post="{% url 'community:add_answer' answer.topic.slug %}"
+                            hx-vals='{"parent_id": "{{ answer.id }}"}'
+                            hx-target="#answer-{{ answer.id }} .replies"
+                            hx-swap="beforeend"
+                            class="btn btn-sm btn-outline-secondary">
+                            Répondre
+                        </button>
+                    {% endif %}
+
+                </div>
+
+                <!-- Replies -->
+                <div class="replies mt-3 ms-4">
+                    {% for reply in answer.replies.all %}
+                        {% include "community/partials/reply_item.html" with answer=reply %}
+                    {% endfor %}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>

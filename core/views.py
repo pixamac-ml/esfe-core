@@ -64,8 +64,6 @@ from .models import (
     InstitutionStat,
     LegalPage,
     AboutSection,
-    AboutContentBlock,
-    AboutBlockImage,
     ContactMessage,
 )
 
@@ -294,84 +292,54 @@ def legal_page_pdf(request, page_type):
 # ABOUT PAGE
 # ==========================================================
 
-from django.db.models import Prefetch
-from django.shortcuts import render
-
-from .models import (
-    Institution,
-    InstitutionStat,
-    AboutSection,
-    AboutContentBlock,
-    AboutBlockImage,
-)
-
-from .utils import get_institution_context
-
-
 # ==========================================================
 # ABOUT PAGE
 # ==========================================================
 
-from django.db.models import Prefetch
 from django.shortcuts import render
-
-from .models import (
-    Institution,
-    InstitutionStat,
-    AboutSection,
-    AboutContentBlock,
-    AboutBlockImage,
-)
-
+from .models import Institution, AboutSection
 from .utils import get_institution_context
 
 
 def about(request):
 
-    institution = Institution.objects.filter(is_active=True).first()
+    # ==============================
+    # Institution active
+    # ==============================
+    institution = (
+        Institution.objects
+        .filter(is_active=True)
+        .first()
+    )
 
-    if institution:
-        hero_title = institution.short_name or institution.name
-    else:
-        hero_title = "École de Santé Félix Houphouët Boigny"
+    hero_title = (
+        institution.short_name or institution.name
+        if institution
+        else "École de Santé Félix Houphouët-Boigny"
+    )
 
     hero_subtitle = (
         "Former les cadres de la santé et contribuer activement "
         "au développement du système sanitaire malien."
     )
 
-    stats = (
-        InstitutionStat.objects
-        .filter(is_active=True)
-        .order_by("order")
-    )
-
-    images_queryset = AboutBlockImage.objects.order_by("order")
-
-    blocks_queryset = (
-        AboutContentBlock.objects
-        .filter(is_active=True)
-        .order_by("order")
-        .prefetch_related(
-            Prefetch("images", queryset=images_queryset)
-        )
-    )
-
-    about_sections = (
+    # ==============================
+    # Sections dynamiques About
+    # ==============================
+    sections = (
         AboutSection.objects
         .filter(is_active=True)
         .order_by("order")
-        .prefetch_related(
-            Prefetch("blocks", queryset=blocks_queryset)
-        )
     )
 
+    # ==============================
+    # Context final
+    # ==============================
     context = {
         "institution": institution,
         "hero_title": hero_title,
         "hero_subtitle": hero_subtitle,
-        "stats": stats,
-        "about_sections": about_sections,
+        "sections": sections,
         **get_institution_context(),
     }
 

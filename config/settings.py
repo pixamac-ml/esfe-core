@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     # Contenu
     "blog.apps.BlogConfig",
     "news",
+    "community",
 ]
 
 # ==================================================

@@ -1,28 +1,25 @@
 import random
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from community.models import Category, Topic, Answer, Vote
 
 User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = "Génère des données fictives pour la communauté"
+    help = "Seed communauté propre et relançable"
 
+    @transaction.atomic
     def handle(self, *args, **kwargs):
+        self.stdout.write("Seeding communauté...")
 
-        self.stdout.write("Création des données communauté...")
+        user, _ = User.objects.get_or_create(
+            username="etudiant_test",
+            defaults={"password": "12345678"}
+        )
 
-        # Créer utilisateur test si aucun
-        if not User.objects.exists():
-            user = User.objects.create_user(
-                username="etudiant_test",
-                password="12345678"
-            )
-        else:
-            user = User.objects.first()
-
-        categories_names = [
+        category_names = [
             "Biologie médicale",
             "Soins infirmiers",
             "Obstétrique",
@@ -31,52 +28,54 @@ class Command(BaseCommand):
         ]
 
         categories = []
-
-        for name in categories_names:
-            category, _ = Category.objects.get_or_create(name=name)
+        for index, name in enumerate(category_names):
+            category, _ = Category.objects.get_or_create(
+                name=name,
+                defaults={"order": index}
+            )
             categories.append(category)
 
         topics = []
 
-        for i in range(20):
-            topic = Topic.objects.create(
+        for i in range(15):
+            topic, _ = Topic.objects.get_or_create(
                 title=f"Question pratique {i+1}",
-                author=user,
-                category=random.choice(categories),
-                content="Contenu détaillé de la question académique."
+                defaults={
+                    "author": user,
+                    "category": random.choice(categories),
+                    "content": "Contenu académique structuré pour test.",
+                }
             )
             topics.append(topic)
 
         for topic in topics:
-            answers = []
-
-            for i in range(random.randint(2, 5)):
+            for i in range(random.randint(2, 4)):
                 answer = Answer.objects.create(
                     topic=topic,
                     author=user,
-                    content="Réponse structurée à la question."
+                    content="Réponse académique structurée."
                 )
-                answers.append(answer)
 
-                # Réponse imbriquée
                 if random.choice([True, False]):
                     Answer.objects.create(
                         topic=topic,
                         author=user,
-                        content="Réponse à cette réponse.",
+                        content="Réponse imbriquée.",
                         parent=answer
                     )
 
-            # Votes
-            for answer in answers:
-                Vote.objects.create(
+                # Vote sécurisé (respecte UniqueConstraint)
+                value = random.choice([Vote.UPVOTE, Vote.DOWNVOTE])
+
+                Vote.objects.update_or_create(
                     user=user,
                     answer=answer,
-                    value=random.choice([1, -1])
+                    defaults={"value": value}
                 )
 
-                answer.upvotes = answer.votes.filter(value=1).count()
-                answer.downvotes = answer.votes.filter(value=-1).count()
-                answer.save()
+                # Mise à jour des compteurs propre
+                answer.upvotes = answer.votes.filter(value=Vote.UPVOTE).count()
+                answer.downvotes = answer.votes.filter(value=Vote.DOWNVOTE).count()
+                answer.save(update_fields=["upvotes", "downvotes"])
 
-        self.stdout.write(self.style.SUCCESS("Données générées avec succès."))
+        self.stdout.write(self.style.SUCCESS("Seed communauté terminé."))

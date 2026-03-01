@@ -1,10 +1,6 @@
 from django.conf import settings
 from django.db import models
-from django.db.models import (
-    UniqueConstraint,
-    Index,
-    Q,
-)
+from django.db.models import UniqueConstraint, Index, Q
 from django.utils.text import slugify
 from django.utils import timezone
 
@@ -54,7 +50,6 @@ class Topic(models.Model):
 
     content = models.TextField()
 
-    # Image de couverture
     cover_image = models.ImageField(
         upload_to="community/topics/%Y/%m/",
         null=True,
@@ -138,13 +133,8 @@ class Answer(models.Model):
             Index(fields=["parent"]),
             Index(fields=["created_at"]),
         ]
-        constraints = [
-            # Une réponse acceptée doit appartenir à un topic publié
-            models.CheckConstraint(
-                condition=Q(is_accepted=False) | Q(topic__is_published=True),
-                name="accepted_answer_requires_published_topic"
-            )
-        ]
+        # ❌ On retire la contrainte avec topic__is_published
+        # Ce type de logique doit être géré côté application
 
     def __str__(self):
         return f"Réponse #{self.id} par {self.author}"
@@ -227,19 +217,18 @@ class Attachment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.CheckConstraint(
-                condition=(
-                    (Q(topic__isnull=False) & Q(answer__isnull=True)) |
-                    (Q(topic__isnull=True) & Q(answer__isnull=False))
-                ),
-                name="attachment_linked_to_topic_or_answer"
-            )
-        ]
         indexes = [
             Index(fields=["topic"]),
             Index(fields=["answer"]),
         ]
+
+    def clean(self):
+        # Validation applicative propre
+        if not self.topic and not self.answer:
+            raise ValueError("Le fichier doit être lié à un topic ou une réponse.")
+
+        if self.topic and self.answer:
+            raise ValueError("Le fichier ne peut pas être lié aux deux.")
 
     def __str__(self):
         return f"Fichier #{self.id} par {self.uploaded_by}"

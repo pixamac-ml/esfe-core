@@ -1,100 +1,147 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="container py-5">
+<!-- ================= HERO ================= -->
+<div class="bg-primary-500 text-white py-16">
+    <div class="max-w-6xl mx-auto px-4">
 
-    <div class="row">
+        <h1 class="text-3xl font-bold mb-4">
+            {{ topic.title }}
+        </h1>
 
-        <div class="col-lg-8">
+        <div class="flex flex-wrap items-center gap-6 text-primary-100 text-sm">
 
-            <!-- Sujet -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
+            <span class="bg-white/20 px-3 py-1 rounded-md text-xs font-medium">
+                {{ topic.category.name }}
+            </span>
 
-                    <h2 class="fw-bold mb-3">
-                        {{ topic.title }}
-                    </h2>
+            <span>Par {{ topic.author }}</span>
 
-                    <div class="mb-3 text-muted small">
-                        <span class="badge bg-light text-dark me-2">
-                            {{ topic.category.name }}
-                        </span>
-                        Par {{ topic.author }} ·
-                        {{ topic.created_at|date:"d M Y H:i" }} ·
-                        {{ topic.view_count }} vues
-                    </div>
+            <span>{{ topic.created_at|date:"d M Y H:i" }}</span>
 
-                    <div class="fs-6">
+            <span>{{ topic.view_count }} vues</span>
+
+            {% if topic.is_locked %}
+                <span class="bg-red-400 text-white px-3 py-1 rounded-md text-xs font-medium">
+                    Verrouillé
+                </span>
+            {% endif %}
+
+        </div>
+
+    </div>
+</div>
+
+<!-- ================= CONTENU ================= -->
+<div class="bg-soft py-16">
+    <div class="max-w-6xl mx-auto px-4">
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+
+            <!-- CONTENU PRINCIPAL -->
+            <div class="lg:col-span-2">
+
+                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mb-12">
+
+                    <div class="prose max-w-none text-gray-700 leading-relaxed">
                         {{ topic.content|linebreaks }}
                     </div>
 
                 </div>
-            </div>
 
-            <!-- Réponses -->
-            <div class="mb-3 d-flex justify-content-between align-items-center">
-                <h5 class="fw-bold mb-0">
+                <!-- TITRE RÉPONSES -->
+                <h2 class="text-2xl font-semibold text-primary-700 mb-8">
                     {{ answers|length }} Réponse{{ answers|length|pluralize }}
-                </h5>
-            </div>
+                </h2>
 
-            <div id="answers">
-                {% for answer in answers %}
-                    {% include "community/partials/answer_item.html" %}
-                {% empty %}
-                    <div class="alert alert-light border">
-                        Aucune réponse pour le moment.
-                    </div>
-                {% endfor %}
-            </div>
+                <!-- LISTE -->
+                <div id="answers" class="space-y-8">
+                    {% for answer in answers %}
+                        {% include "community/partials/answer_item.html" %}
+                    {% empty %}
+                        <div class="bg-white p-8 rounded-xl border border-primary-100 text-gray-500">
+                            Aucune réponse pour le moment.
+                        </div>
+                    {% endfor %}
+                </div>
 
-            {% if user.is_authenticated and not topic.is_locked %}
-            <div class="card shadow-sm mt-4">
-                <div class="card-body">
+                <!-- FORMULAIRE -->
+                {% if user.is_authenticated and not topic.is_locked %}
+                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mt-14">
 
-                    <h6 class="fw-bold mb-3">Ajouter une réponse</h6>
+                    <h3 class="text-xl font-semibold text-primary-700 mb-6">
+                        Ajouter une réponse
+                    </h3>
 
                     <form
                         hx-post="{% url 'community:add_answer' topic.slug %}"
                         hx-target="#answers"
                         hx-swap="beforeend"
+                        hx-on="htmx:afterRequest: this.reset()"
+                        class="space-y-5"
                     >
                         {% csrf_token %}
-                        <textarea name="content"
-                                  class="form-control mb-3"
-                                  rows="4"
-                                  required></textarea>
 
-                        <button type="submit" class="btn btn-primary">
+                        <textarea
+                            name="content"
+                            rows="5"
+                            required
+                            placeholder="Rédigez votre réponse..."
+                            class="w-full border border-primary-200 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-secondary transition"
+                        ></textarea>
+
+                        <button
+                            type="submit"
+                            class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg font-semibold transition"
+                        >
                             Publier la réponse
                         </button>
+
                     </form>
 
                 </div>
+                {% endif %}
+
             </div>
-            {% endif %}
 
-        </div>
+            <!-- SIDEBAR -->
+            <div>
+                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8">
 
-        <!-- Sidebar -->
-        <div class="col-lg-4">
-            <div class="card shadow-sm">
-                <div class="card-body small">
+                    <h3 class="text-lg font-semibold text-primary-700 mb-8">
+                        Informations
+                    </h3>
 
-                    <h6 class="fw-bold">Informations</h6>
-                    <hr>
+                    <div class="space-y-6 text-sm text-gray-600">
 
-                    <p><strong>Catégorie :</strong> {{ topic.category.name }}</p>
-                    <p><strong>Auteur :</strong> {{ topic.author }}</p>
-                    <p><strong>Date :</strong> {{ topic.created_at|date:"d M Y H:i" }}</p>
-                    <p><strong>Vues :</strong> {{ topic.view_count }}</p>
+                        <div>
+                            <span class="font-medium text-primary-600">Catégorie :</span><br>
+                            {{ topic.category.name }}
+                        </div>
+
+                        <div>
+                            <span class="font-medium text-primary-600">Auteur :</span><br>
+                            {{ topic.author }}
+                        </div>
+
+                        <div>
+                            <span class="font-medium text-primary-600">Date :</span><br>
+                            {{ topic.created_at|date:"d M Y H:i" }}
+                        </div>
+
+                        <div>
+                            <span class="font-medium text-primary-600">Vues :</span><br>
+                            {{ topic.view_count }}
+                        </div>
+
+                    </div>
 
                 </div>
             </div>
+
         </div>
 
     </div>
-
 </div>
 
 {% endblock %}

@@ -1,65 +1,115 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="container py-5">
+<!-- ================= HERO ================= -->
+<div class="bg-primary-500 text-white py-20">
+    <div class="max-w-6xl mx-auto px-4">
 
-    <div class="row">
+        <h1 class="text-4xl font-bold mb-4">
+            Espace Communautaire Académique
+        </h1>
 
-        <div class="col-lg-8">
+        <p class="text-primary-100 max-w-2xl text-lg">
+            Un espace structuré pour poser vos questions, échanger avec les étudiants
+            et le staff académique, et trouver des réponses validées.
+        </p>
 
-            {% for topic in topics %}
-                <div class="card shadow-sm mb-3">
-                    <div class="card-body d-flex justify-content-between align-items-center">
+    </div>
+</div>
 
-                        <div>
-                            <a href="{% url 'community:topic_detail' topic.slug %}"
-                               class="fw-bold text-dark text-decoration-none">
-                                {{ topic.title }}
-                            </a>
+<!-- ================= CONTENU ================= -->
+<div class="bg-soft py-16">
+    <div class="max-w-6xl mx-auto px-4">
 
-                            <div class="small text-muted mt-1">
-                                {{ topic.category.name }} ·
-                                {{ topic.created_at|date:"d M Y" }}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+
+            <!-- LISTE DES SUJETS -->
+            <div class="lg:col-span-2">
+
+                <div class="flex justify-between items-center mb-10">
+                    <h2 class="text-2xl font-semibold text-primary-700">
+                        Discussions récentes
+                    </h2>
+
+                    <a href="#"
+                       class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg text-sm font-semibold transition shadow-sm">
+                        Nouveau sujet
+                    </a>
+                </div>
+
+                <div class="space-y-6">
+
+                    {% for topic in topics %}
+                    <div class="bg-white rounded-xl border border-primary-100 shadow-sm hover:shadow-lg transition p-6">
+
+                        <div class="flex justify-between items-start">
+
+                            <div class="flex-1">
+
+                                <a href="{% url 'community:topic_detail' topic.slug %}"
+                                   class="text-lg font-semibold text-primary-700 hover:text-secondary transition">
+                                    {{ topic.title }}
+                                </a>
+
+                                <div class="mt-4 flex flex-wrap items-center gap-5 text-sm text-gray-500">
+
+                                    <span class="bg-primary-50 text-primary-600 px-3 py-1 rounded-md text-xs font-medium">
+                                        {{ topic.category.name }}
+                                    </span>
+
+                                    <span>{{ topic.created_at|date:"d M Y" }}</span>
+
+                                    <span>{{ topic.view_count }} vues</span>
+
+                                </div>
+
                             </div>
-                        </div>
 
-                        <div class="text-center small text-muted">
-                            <div><strong>{{ topic.answer_count }}</strong></div>
-                            <div>réponses</div>
+                            <div class="ml-8 text-right">
+                                <div class="text-2xl font-bold text-primary-600">
+                                    {{ topic.answer_count }}
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    réponse{{ topic.answer_count|pluralize }}
+                                </div>
+                            </div>
+
                         </div>
 
                     </div>
-                </div>
-            {% empty %}
-                <div class="alert alert-light border">
-                    Aucun sujet pour le moment.
-                </div>
-            {% endfor %}
-
-        </div>
-
-        <div class="col-lg-4">
-            <div class="card shadow-sm">
-                <div class="card-body">
-
-                    <h6 class="fw-bold">Catégories</h6>
-                    <hr>
-
-                    {% for cat in categories %}
-                        <div class="mb-2">
-                            <a href="{% url 'community:topic_by_category' cat.slug %}"
-                               class="text-decoration-none">
-                                {{ cat.name }}
-                            </a>
-                        </div>
+                    {% empty %}
+                    <div class="bg-white p-10 rounded-xl border border-primary-100 text-gray-500 text-center">
+                        Aucun sujet pour le moment.
+                    </div>
                     {% endfor %}
 
                 </div>
+
             </div>
+
+            <!-- SIDEBAR -->
+            <div>
+                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8">
+
+                    <h3 class="text-lg font-semibold text-primary-700 mb-8">
+                        Catégories
+                    </h3>
+
+                    <div class="space-y-4">
+                        {% for cat in categories %}
+                        <a href="{% url 'community:topic_by_category' cat.slug %}"
+                           class="block text-primary-600 hover:text-secondary font-medium transition">
+                            {{ cat.name }}
+                        </a>
+                        {% endfor %}
+                    </div>
+
+                </div>
+            </div>
+
         </div>
 
     </div>
-
 </div>
 
 {% endblock %}

@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.template.loader import render_to_string
-from django.db.models import Prefetch, F, Count, Q
+from django.db.models import Prefetch, Count, F
 from django.views.decorators.http import require_POST
 
 from .models import Topic, Category, Answer, Vote
@@ -19,17 +19,16 @@ def topic_by_category(request, slug):
         .filter(category=category, is_published=True)
         .select_related("author", "category")
         .annotate(answer_count=Count("answers"))
+        .order_by("-created_at")
     )
 
     categories = Category.objects.all()
 
-    context = {
+    return render(request, "community/topic_list.html", {
         "category": category,
         "topics": topics,
         "categories": categories,
-    }
-
-    return render(request, "community/topic_list.html", context)
+    })
 
 
 # ==========================
@@ -41,16 +40,15 @@ def topic_list(request):
         .filter(is_published=True)
         .select_related("author", "category")
         .annotate(answer_count=Count("answers"))
+        .order_by("-created_at")
     )
 
     categories = Category.objects.all()
 
-    context = {
+    return render(request, "community/topic_list.html", {
         "topics": topics,
         "categories": categories,
-    }
-
-    return render(request, "community/topic_list.html", context)
+    })
 
 
 # ==========================
@@ -63,10 +61,9 @@ def topic_detail(request, slug):
         is_published=True
     )
 
-    # Incrément sécurisé du compteur de vues
-    Topic.objects.filter(pk=topic.pk).update(
-        view_count=F("view_count") + 1
-    )
+    # Incrément propre du compteur de vues
+    Topic.objects.filter(pk=topic.pk).update(view_count=F("view_count") + 1)
+    topic.refresh_from_db(fields=["view_count"])
 
     root_answers = (
         Answer.objects
@@ -83,12 +80,10 @@ def topic_detail(request, slug):
         .order_by("-upvotes", "created_at")
     )
 
-    context = {
+    return render(request, "community/topic_detail.html", {
         "topic": topic,
         "answers": root_answers,
-    }
-
-    return render(request, "community/topic_detail.html", context)
+    })
 
 
 # ==========================
@@ -106,7 +101,7 @@ def add_answer(request, slug):
 
     content = request.POST.get("content")
 
-    if not content or content.strip() == "":
+    if not content or not content.strip():
         return HttpResponseBadRequest("Contenu invalide.")
 
     parent_id = request.POST.get("parent_id")
@@ -115,8 +110,7 @@ def add_answer(request, slug):
     if parent_id:
         parent = Answer.objects.filter(
             id=parent_id,
-            topic=topic,
-            is_deleted=False
+            topic=topic
         ).first()
 
     answer = Answer.objects.create(
@@ -128,7 +122,6 @@ def add_answer(request, slug):
 
     if request.headers.get("HX-Request"):
         template_name = "community/partials/answer_item.html"
-
         if parent:
             template_name = "community/partials/reply_item.html"
 
@@ -137,7 +130,6 @@ def add_answer(request, slug):
             {"answer": answer},
             request=request
         )
-
         return HttpResponse(html)
 
     return HttpResponse(status=204)
@@ -164,24 +156,14 @@ def vote_answer(request, answer_id):
         defaults={"value": value}
     )
 
-    # Recalcul optimisé
-    counts = answer.votes.aggregate(
-        up=Count("id", filter=Q(value=1)),
-        down=Count("id", filter=Q(value=-1))
-    )
-
-    answer.upvotes = counts["up"]
-    answer.downvotes = counts["down"]
+    # Recalcul propre
+    answer.upvotes = answer.votes.filter(value=1).count()
+    answer.downvotes = answer.votes.filter(value=-1).count()
     answer.save(update_fields=["upvotes", "downvotes"])
 
     if request.headers.get("HX-Request"):
-        return HttpResponse(f"""
-            <div class="fw-bold fs-5 text-success">
-                {answer.upvotes}
-            </div>
-            <div class="small text-muted">
-                votes
-            </div>
-        """)
+        return HttpResponse(
+            f'<div class="vote-count fw-bold fs-5 text-success">{answer.upvotes}</div>'
+        )
 
     return HttpResponse(status=204)

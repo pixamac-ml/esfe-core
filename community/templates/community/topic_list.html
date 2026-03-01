@@ -2,11 +2,19 @@
 {% block content %}
 
 <!-- ================= HERO ================= -->
-<div class="bg-primary-600 text-white py-20">
-    <div class="max-w-6xl mx-auto px-4">
+<section class="relative pt-32 pb-24 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white overflow-hidden">
+
+    <!-- Overlay subtil -->
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_20%_20%,white,transparent_40%)]"></div>
+
+    <div class="relative max-w-6xl mx-auto px-4">
+
+        <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur px-4 py-2 rounded-full text-xs font-semibold uppercase tracking-wide mb-6">
+            Espace communautaire
+        </div>
 
         {% if tag %}
-            <h1 class="text-4xl font-bold mb-4">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 leading-tight">
                 #{{ tag.name }}
             </h1>
             <p class="text-primary-100 max-w-2xl text-lg">
@@ -14,7 +22,7 @@
             </p>
 
         {% elif category %}
-            <h1 class="text-4xl font-bold mb-4">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 leading-tight">
                 {{ category.name }}
             </h1>
             <p class="text-primary-100 max-w-2xl text-lg">
@@ -22,74 +30,84 @@
             </p>
 
         {% else %}
-            <h1 class="text-4xl font-bold mb-4">
-                Espace Communautaire Académique
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+                Discussions Académiques
             </h1>
             <p class="text-primary-100 max-w-2xl text-lg">
-                Posez vos questions, partagez vos expériences cliniques
-                et trouvez des réponses validées par la communauté.
+                Échangez des expériences cliniques, posez vos questions et trouvez des réponses validées.
             </p>
         {% endif %}
 
+        <div class="mt-8 text-sm text-primary-100 flex items-center gap-6">
+            <span>{{ topics|length }} sujet{{ topics|length|pluralize }}</span>
+            <span>Tri : Activité récente</span>
+        </div>
+
     </div>
-</div>
+</section>
+
 
 
 <!-- ================= CONTENU ================= -->
-<div class="bg-soft py-16">
+<section class="bg-soft py-20">
     <div class="max-w-6xl mx-auto px-4">
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-14">
 
-            <!-- ================= LISTE SUJETS ================= -->
+            <!-- ================= LISTE ================= -->
             <div class="lg:col-span-2">
 
-                <div class="flex justify-between items-center mb-10">
+                <div class="flex justify-between items-center mb-12">
+
                     <h2 class="text-2xl font-semibold text-primary-700">
                         Discussions
                     </h2>
 
                     {% if user.is_authenticated %}
                         <a href="#"
-                           class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg text-sm font-semibold transition shadow-sm">
+                           class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-xl text-sm font-semibold transition shadow-md">
                             Nouveau sujet
                         </a>
                     {% else %}
                         <a href="{% url 'login' %}?next={{ request.path }}"
-                           class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg text-sm font-semibold transition shadow-sm">
+                           class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-xl text-sm font-semibold transition shadow-md">
                             Se connecter pour publier
                         </a>
                     {% endif %}
+
                 </div>
 
-
-                <div class="space-y-6">
+                <div class="space-y-8">
 
                     {% for topic in topics %}
-                    <div class="bg-white rounded-xl border border-primary-100 shadow-sm hover:shadow-xl transition p-6">
+                    <article class="bg-white rounded-2xl border border-primary-100 shadow-sm hover:shadow-xl transition p-8">
 
-                        <div class="flex justify-between items-start">
+                        <div class="flex justify-between items-start gap-6">
 
-                            <!-- CONTENU PRINCIPAL -->
                             <div class="flex-1">
 
-                                <div class="flex items-center gap-3 mb-2">
+                                <div class="flex items-center flex-wrap gap-3 mb-4">
 
                                     {% if topic.accepted_answer %}
-                                        <span class="text-green-600 text-sm font-semibold">
+                                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
                                             ✔ Résolu
                                         </span>
                                     {% endif %}
 
+                                    {% if topic.is_locked %}
+                                        <span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-semibold">
+                                            🔒 Verrouillé
+                                        </span>
+                                    {% endif %}
+
                                     <a href="{% url 'community:topic_detail' topic.slug %}"
-                                       class="text-lg font-semibold text-primary-700 hover:text-secondary transition">
+                                       class="text-xl font-semibold text-primary-700 hover:text-secondary transition">
                                         {{ topic.title }}
                                     </a>
 
                                 </div>
 
-                                <!-- META -->
-                                <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                                <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500">
 
                                     <span class="bg-primary-50 text-primary-600 px-3 py-1 rounded-md text-xs font-medium">
                                         {{ topic.category.name }}
@@ -102,17 +120,27 @@
                                         </a>
                                     {% endfor %}
 
+                                    <span>
+                                        Par <strong class="text-primary-600">{{ topic.author }}</strong>
+                                    </span>
+
                                     <span>{{ topic.created_at|date:"d M Y" }}</span>
-                                    <span>{{ topic.view_count }} vues</span>
+
+                                    <span>{{ topic.view_count }} vue{{ topic.view_count|pluralize }}</span>
+
+                                    <span>
+                                        Dernière activité :
+                                        {{ topic.last_activity_at|date:"d M Y H:i" }}
+                                    </span>
 
                                 </div>
 
                             </div>
 
                             <!-- STATS -->
-                            <div class="ml-8 text-right">
+                            <div class="text-right min-w-[90px]">
 
-                                <div class="text-2xl font-bold
+                                <div class="text-3xl font-bold
                                     {% if topic.answer_count > 0 %}
                                         text-green-600
                                     {% else %}
@@ -130,30 +158,34 @@
 
                         </div>
 
-                    </div>
+                    </article>
 
                     {% empty %}
-                    <div class="bg-white p-10 rounded-xl border border-primary-100 text-gray-500 text-center">
+                    <div class="bg-white p-12 rounded-2xl border border-primary-100 text-gray-500 text-center">
                         Aucun sujet pour le moment.
                     </div>
                     {% endfor %}
 
                 </div>
 
+                <!-- PAGINATION -->
+                <div class="mt-16 text-center text-sm text-gray-500">
+                    Pagination à venir…
+                </div>
+
             </div>
 
 
             <!-- ================= SIDEBAR ================= -->
-            <div>
+            <aside class="space-y-10">
 
-                <!-- Catégories -->
-                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mb-8">
+                <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-8">
 
                     <h3 class="text-lg font-semibold text-primary-700 mb-6">
                         Domaines
                     </h3>
 
-                    <div class="space-y-3">
+                    <div class="space-y-4">
                         {% for cat in categories %}
                         <a href="{% url 'community:topic_by_category' cat.slug %}"
                            class="block text-primary-600 hover:text-secondary font-medium transition">
@@ -164,26 +196,24 @@
 
                 </div>
 
-                <!-- Bloc infos -->
-                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8">
+                <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-8">
 
                     <h3 class="text-lg font-semibold text-primary-700 mb-6">
                         À propos
                     </h3>
 
                     <p class="text-sm text-gray-600 leading-relaxed">
-                        Cet espace permet aux étudiants et professionnels
-                        de santé d’échanger des connaissances structurées
-                        et validées par la communauté académique.
+                        Espace académique structuré pour favoriser l’intelligence collective,
+                        la validation par les pairs et la diffusion du savoir clinique.
                     </p>
 
                 </div>
 
-            </div>
+            </aside>
 
         </div>
 
     </div>
-</div>
+</section>
 
 {% endblock %}

@@ -2,32 +2,108 @@
 {% block content %}
 
 <!-- ================= HERO ================= -->
-<div class="bg-primary-600 text-white py-16">
-    <div class="max-w-6xl mx-auto px-4">
+<!-- ================= HERO ================= -->
+<section class="relative pt-32 pb-24 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white overflow-hidden">
 
-        <div class="flex items-center gap-4 mb-4">
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_20%_20%,white,transparent_40%)]"></div>
+
+    <div class="relative max-w-6xl mx-auto px-4">
+
+        <!-- ================= RETOUR ================= -->
+        <div class="mb-8">
+            {% if topic.category %}
+                <a href="{% url 'community:topic_by_category' topic.category.slug %}"
+                   class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
+
+                    <!-- Icône flèche gauche -->
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="w-4 h-4"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M15 19l-7-7 7-7" />
+                    </svg>
+
+                    Retour aux discussions
+                </a>
+            {% else %}
+                <a href="{% url 'community:topic_list' %}"
+                   class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
+
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="w-4 h-4"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M15 19l-7-7 7-7" />
+                    </svg>
+
+                    Retour aux discussions
+                </a>
+            {% endif %}
+        </div>
+
+
+        <!-- ================= BADGES ================= -->
+        <div class="flex flex-wrap items-center gap-4 mb-6">
+
             {% if topic.accepted_answer %}
-                <span class="bg-green-500 text-white px-3 py-1 rounded-md text-xs font-semibold">
-                    ✔ Sujet résolu
+                <span class="inline-flex items-center gap-2 bg-green-500/90 text-white px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide">
+
+                    <!-- Icône check -->
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="w-4 h-4"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M5 13l4 4L19 7" />
+                    </svg>
+
+                    Sujet résolu
                 </span>
             {% endif %}
 
             {% if topic.is_locked %}
-                <span class="bg-red-500 text-white px-3 py-1 rounded-md text-xs font-semibold">
+                <span class="inline-flex items-center gap-2 bg-red-500/90 text-white px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide">
+
+                    <!-- Icône lock -->
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="w-4 h-4"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M12 11c1.657 0 3-1.343 3-3V6a3 3 0 10-6 0v2c0 1.657 1.343 3 3 3z" />
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M5 11h14v10H5z" />
+                    </svg>
+
                     Verrouillé
                 </span>
             {% endif %}
+
+            <span class="bg-white/20 px-4 py-1.5 rounded-full text-xs font-medium">
+                {{ topic.category.name }}
+            </span>
+
         </div>
 
-        <h1 class="text-3xl font-bold mb-6">
+
+        <!-- ================= TITRE ================= -->
+        <h1 class="text-3xl md:text-4xl font-bold leading-tight mb-8 text-white max-w-4xl">
             {{ topic.title }}
         </h1>
 
-        <div class="flex flex-wrap items-center gap-6 text-primary-100 text-sm">
 
-            <span class="bg-white/20 px-3 py-1 rounded-md text-xs font-medium">
-                {{ topic.category.name }}
-            </span>
+        <!-- ================= META ================= -->
+        <div class="flex flex-wrap items-center gap-6 text-primary-100 text-sm">
 
             {% for tag in topic.tags.all %}
                 <a href="{% url 'community:topic_by_tag' tag.slug %}"
@@ -36,27 +112,70 @@
                 </a>
             {% endfor %}
 
-            <span>Par {{ topic.author }}</span>
-            <span>{{ topic.created_at|date:"d M Y H:i" }}</span>
-            <span>{{ topic.view_count }} vues</span>
+            <span class="inline-flex items-center gap-2">
+                <!-- Icône user -->
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="w-4 h-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M5.121 17.804A9 9 0 1118.364 4.56M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {{ topic.author }}
+            </span>
+
+            <span class="inline-flex items-center gap-2">
+                <!-- Icône calendar -->
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="w-4 h-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
+                </svg>
+                {{ topic.created_at|date:"d M Y H:i" }}
+            </span>
+
+            <span class="inline-flex items-center gap-2">
+                <!-- Icône eye -->
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="w-4 h-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-.001.003-.001.006 0 .009C20.268 16.057 16.477 19 12 19c-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                {{ topic.view_count }} vue{{ topic.view_count|pluralize }}
+            </span>
 
         </div>
 
     </div>
-</div>
-
+</section>
 
 <!-- ================= CONTENU ================= -->
-<div class="bg-soft py-16">
+<section class="bg-soft py-20">
     <div class="max-w-6xl mx-auto px-4">
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-14">
 
             <!-- ================= CONTENU PRINCIPAL ================= -->
             <div class="lg:col-span-2">
 
                 <!-- ================= QUESTION ================= -->
-                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mb-12">
+                <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-10 mb-14">
+
+                    <h2 class="text-lg font-semibold text-primary-700 mb-6 uppercase tracking-wide">
+                        Question
+                    </h2>
 
                     <div class="prose max-w-none text-gray-700 leading-relaxed">
                         {{ topic.content|linebreaks }}
@@ -66,17 +185,21 @@
 
 
                 <!-- ================= RÉPONSES ================= -->
-                <h2 class="text-2xl font-semibold text-primary-700 mb-8">
-                    {{ answers|length }} Réponse{{ answers|length|pluralize }}
-                </h2>
+                <div class="flex items-center justify-between mb-10">
+
+                    <h2 class="text-2xl font-semibold text-primary-700">
+                        {{ answers|length }} Réponse{{ answers|length|pluralize }}
+                    </h2>
+
+                </div>
 
 
-                <div id="answers" class="space-y-8">
+                <div id="answers" class="space-y-10">
 
                     {% for answer in answers %}
 
                         {% if topic.accepted_answer and answer.id == topic.accepted_answer.id %}
-                            <div class="border-2 border-green-500 rounded-xl p-1">
+                            <div class="border-2 border-green-500 rounded-2xl p-2 bg-green-50/40">
                                 {% include "community/partials/answer_item.html" %}
                             </div>
                         {% else %}
@@ -84,7 +207,7 @@
                         {% endif %}
 
                     {% empty %}
-                        <div class="bg-white p-8 rounded-xl border border-primary-100 text-gray-500">
+                        <div class="bg-white p-10 rounded-2xl border border-primary-100 text-gray-500 text-center">
                             Aucune réponse pour le moment.
                         </div>
                     {% endfor %}
@@ -95,9 +218,9 @@
                 <!-- ================= FORMULAIRE ================= -->
                 {% if user.is_authenticated and not topic.is_locked %}
 
-                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mt-14">
+                <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-10 mt-16">
 
-                    <h3 class="text-xl font-semibold text-primary-700 mb-6">
+                    <h3 class="text-xl font-semibold text-primary-700 mb-8">
                         Ajouter une réponse
                     </h3>
 
@@ -106,7 +229,7 @@
                         hx-target="#answers"
                         hx-swap="beforeend"
                         hx-on="htmx:afterRequest: this.reset()"
-                        class="space-y-5"
+                        class="space-y-6"
                     >
                         {% csrf_token %}
 
@@ -114,13 +237,13 @@
                             name="content"
                             rows="6"
                             required
-                            placeholder="Rédigez votre réponse structurée..."
-                            class="w-full border border-primary-200 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-secondary transition"
+                            placeholder="Rédigez une réponse claire, structurée et utile..."
+                            class="w-full border border-primary-200 rounded-xl p-5 focus:outline-none focus:ring-2 focus:ring-secondary transition"
                         ></textarea>
 
                         <button
                             type="submit"
-                            class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg font-semibold transition"
+                            class="bg-accent hover:bg-accent-dark text-white px-8 py-3 rounded-xl font-semibold transition shadow-md"
                         >
                             Publier la réponse
                         </button>
@@ -131,14 +254,14 @@
 
                 {% elif not user.is_authenticated %}
 
-                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mt-14 text-center">
+                <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-10 mt-16 text-center">
 
-                    <p class="text-gray-600 mb-6">
+                    <p class="text-gray-600 mb-8">
                         Connectez-vous pour participer à la discussion.
                     </p>
 
                     <a href="{% url 'login' %}?next={{ request.path }}"
-                       class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg font-semibold transition">
+                       class="bg-accent hover:bg-accent-dark text-white px-8 py-3 rounded-xl font-semibold transition shadow-md">
                         Se connecter
                     </a>
 
@@ -149,10 +272,11 @@
             </div>
 
 
-            <!-- ================= SIDEBAR ================= -->
-            <div>
 
-                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8">
+            <!-- ================= SIDEBAR ================= -->
+            <aside class="space-y-10">
+
+                <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-8">
 
                     <h3 class="text-lg font-semibold text-primary-700 mb-8">
                         Informations
@@ -161,39 +285,48 @@
                     <div class="space-y-6 text-sm text-gray-600">
 
                         <div>
-                            <span class="font-medium text-primary-600">Domaine :</span><br>
+                            <span class="font-medium text-primary-600">Domaine</span><br>
                             {{ topic.category.name }}
                         </div>
 
                         <div>
-                            <span class="font-medium text-primary-600">Auteur :</span><br>
+                            <span class="font-medium text-primary-600">Auteur</span><br>
                             {{ topic.author }}
                         </div>
 
                         <div>
-                            <span class="font-medium text-primary-600">Créé le :</span><br>
+                            <span class="font-medium text-primary-600">Créé le</span><br>
                             {{ topic.created_at|date:"d M Y H:i" }}
                         </div>
 
                         <div>
-                            <span class="font-medium text-primary-600">Dernière activité :</span><br>
+                            <span class="font-medium text-primary-600">Dernière activité</span><br>
                             {{ topic.last_activity_at|date:"d M Y H:i" }}
                         </div>
 
                         <div>
-                            <span class="font-medium text-primary-600">Vues :</span><br>
+                            <span class="font-medium text-primary-600">Vues</span><br>
                             {{ topic.view_count }}
+                        </div>
+
+                        <div>
+                            <span class="font-medium text-primary-600">Statut</span><br>
+                            {% if topic.is_locked %}
+                                Verrouillé
+                            {% else %}
+                                Ouvert
+                            {% endif %}
                         </div>
 
                     </div>
 
                 </div>
 
-            </div>
+            </aside>
 
         </div>
 
     </div>
-</div>
+</section>
 
 {% endblock %}

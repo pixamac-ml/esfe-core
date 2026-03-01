@@ -2,27 +2,28 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.template.loader import render_to_string
-from django.db.models import Prefetch, Count, F
+from django.db.models import Prefetch, Count, F, Q
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 
-from .models import Topic, Category, Answer, Vote
+from .models import Topic, Category, Answer, Vote, TopicView
 
 
-# ==========================
-# LISTE PAR CATÉGORIE
-# ==========================
+# =====================================================
+# LISTE PAR CATÉGORIE (Domaine)
+# =====================================================
 def topic_by_category(request, slug):
-    category = get_object_or_404(Category, slug=slug)
+    category = get_object_or_404(Category, slug=slug, is_active=True)
 
     topics = (
         Topic.objects
         .filter(category=category, is_published=True)
         .select_related("author", "category")
-        .annotate(answer_count=Count("answers"))
-        .order_by("-created_at")
+        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
+        .order_by("-last_activity_at")
     )
 
-    categories = Category.objects.all()
+    categories = Category.objects.filter(is_active=True)
 
     return render(request, "community/topic_list.html", {
         "category": category,
@@ -31,19 +32,19 @@ def topic_by_category(request, slug):
     })
 
 
-# ==========================
+# =====================================================
 # LISTE GÉNÉRALE
-# ==========================
+# =====================================================
 def topic_list(request):
     topics = (
         Topic.objects
         .filter(is_published=True)
         .select_related("author", "category")
-        .annotate(answer_count=Count("answers"))
-        .order_by("-created_at")
+        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
+        .order_by("-last_activity_at")
     )
 
-    categories = Category.objects.all()
+    categories = Category.objects.filter(is_active=True)
 
     return render(request, "community/topic_list.html", {
         "topics": topics,
@@ -51,9 +52,9 @@ def topic_list(request):
     })
 
 
-# ==========================
+# =====================================================
 # DÉTAIL D’UN SUJET
-# ==========================
+# =====================================================
 def topic_detail(request, slug):
     topic = get_object_or_404(
         Topic.objects.select_related("author", "category"),
@@ -61,10 +62,32 @@ def topic_detail(request, slug):
         is_published=True
     )
 
-    # Incrément propre du compteur de vues
-    Topic.objects.filter(pk=topic.pk).update(view_count=F("view_count") + 1)
-    topic.refresh_from_db(fields=["view_count"])
+    # ==============================
+    # Anti-refresh intelligent
+    # ==============================
+    ip_address = request.META.get("REMOTE_ADDR")
+    now = timezone.now()
+    today = now.date()
 
+    view_exists = TopicView.objects.filter(
+        topic=topic,
+        user=request.user if request.user.is_authenticated else None,
+        ip_address=ip_address,
+        created_at__date=today
+    ).exists()
+
+    if not view_exists:
+        TopicView.objects.create(
+            topic=topic,
+            user=request.user if request.user.is_authenticated else None,
+            ip_address=ip_address
+        )
+        Topic.objects.filter(pk=topic.pk).update(view_count=F("view_count") + 1)
+        topic.refresh_from_db(fields=["view_count"])
+
+    # ==============================
+    # Réponses principales
+    # ==============================
     root_answers = (
         Answer.objects
         .filter(topic=topic, parent__isnull=True, is_deleted=False)
@@ -75,10 +98,21 @@ def topic_detail(request, slug):
                 queryset=Answer.objects
                 .filter(is_deleted=False)
                 .select_related("author")
+                .order_by("-upvotes", "created_at")
             )
         )
         .order_by("-upvotes", "created_at")
     )
+
+    # ==============================
+    # Mettre accepted_answer en premier
+    # ==============================
+    if topic.accepted_answer:
+        accepted = topic.accepted_answer
+        root_answers = sorted(
+            root_answers,
+            key=lambda a: a.id != accepted.id
+        )
 
     return render(request, "community/topic_detail.html", {
         "topic": topic,
@@ -86,9 +120,9 @@ def topic_detail(request, slug):
     })
 
 
-# ==========================
+# =====================================================
 # AJOUT RÉPONSE (HTMX)
-# ==========================
+# =====================================================
 @login_required
 @require_POST
 def add_answer(request, slug):
@@ -120,6 +154,10 @@ def add_answer(request, slug):
         parent=parent
     )
 
+    # Mise à jour activité du topic
+    topic.last_activity_at = timezone.now()
+    topic.save(update_fields=["last_activity_at"])
+
     if request.headers.get("HX-Request"):
         template_name = "community/partials/answer_item.html"
         if parent:
@@ -135,13 +173,13 @@ def add_answer(request, slug):
     return HttpResponse(status=204)
 
 
-# ==========================
+# =====================================================
 # VOTE RÉPONSE (HTMX)
-# ==========================
+# =====================================================
 @login_required
 @require_POST
 def vote_answer(request, answer_id):
-    answer = get_object_or_404(Answer, id=answer_id)
+    answer = get_object_or_404(Answer, id=answer_id, is_deleted=False)
 
     try:
         value = int(request.POST.get("value"))
@@ -163,7 +201,45 @@ def vote_answer(request, answer_id):
 
     if request.headers.get("HX-Request"):
         return HttpResponse(
-            f'<div class="vote-count fw-bold fs-5 text-success">{answer.upvotes}</div>'
+            f"""
+            <div class="vote-count text-lg font-bold
+                {'text-green-600' if answer.score > 0 else 'text-red-600' if answer.score < 0 else 'text-gray-500'}">
+                {answer.score}
+            </div>
+            """
         )
 
     return HttpResponse(status=204)
+
+from .models import Topic, Category, Answer, Vote, TopicView, Tag
+
+
+# =====================================================
+# LISTE PAR TAG
+# =====================================================
+def topic_by_tag(request, slug):
+    tag = get_object_or_404(Tag, slug=slug)
+
+    topics = (
+        Topic.objects
+        .filter(
+            tags=tag,
+            is_published=True
+        )
+        .select_related("author", "category")
+        .annotate(
+            answer_count=Count(
+                "answers",
+                filter=Q(answers__is_deleted=False)
+            )
+        )
+        .order_by("-last_activity_at")
+    )
+
+    categories = Category.objects.filter(is_active=True)
+
+    return render(request, "community/topic_list.html", {
+        "tag": tag,
+        "topics": topics,
+        "categories": categories,
+    })

@@ -2,10 +2,24 @@
 {% block content %}
 
 <!-- ================= HERO ================= -->
-<div class="bg-primary-500 text-white py-16">
+<div class="bg-primary-600 text-white py-16">
     <div class="max-w-6xl mx-auto px-4">
 
-        <h1 class="text-3xl font-bold mb-4">
+        <div class="flex items-center gap-4 mb-4">
+            {% if topic.accepted_answer %}
+                <span class="bg-green-500 text-white px-3 py-1 rounded-md text-xs font-semibold">
+                    ✔ Sujet résolu
+                </span>
+            {% endif %}
+
+            {% if topic.is_locked %}
+                <span class="bg-red-500 text-white px-3 py-1 rounded-md text-xs font-semibold">
+                    Verrouillé
+                </span>
+            {% endif %}
+        </div>
+
+        <h1 class="text-3xl font-bold mb-6">
             {{ topic.title }}
         </h1>
 
@@ -15,22 +29,22 @@
                 {{ topic.category.name }}
             </span>
 
+            {% for tag in topic.tags.all %}
+                <a href="{% url 'community:topic_by_tag' tag.slug %}"
+                   class="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md text-xs transition">
+                    #{{ tag.name }}
+                </a>
+            {% endfor %}
+
             <span>Par {{ topic.author }}</span>
-
             <span>{{ topic.created_at|date:"d M Y H:i" }}</span>
-
             <span>{{ topic.view_count }} vues</span>
-
-            {% if topic.is_locked %}
-                <span class="bg-red-400 text-white px-3 py-1 rounded-md text-xs font-medium">
-                    Verrouillé
-                </span>
-            {% endif %}
 
         </div>
 
     </div>
 </div>
+
 
 <!-- ================= CONTENU ================= -->
 <div class="bg-soft py-16">
@@ -38,9 +52,10 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
 
-            <!-- CONTENU PRINCIPAL -->
+            <!-- ================= CONTENU PRINCIPAL ================= -->
             <div class="lg:col-span-2">
 
+                <!-- ================= QUESTION ================= -->
                 <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mb-12">
 
                     <div class="prose max-w-none text-gray-700 leading-relaxed">
@@ -49,24 +64,37 @@
 
                 </div>
 
-                <!-- TITRE RÉPONSES -->
+
+                <!-- ================= RÉPONSES ================= -->
                 <h2 class="text-2xl font-semibold text-primary-700 mb-8">
                     {{ answers|length }} Réponse{{ answers|length|pluralize }}
                 </h2>
 
-                <!-- LISTE -->
+
                 <div id="answers" class="space-y-8">
+
                     {% for answer in answers %}
-                        {% include "community/partials/answer_item.html" %}
+
+                        {% if topic.accepted_answer and answer.id == topic.accepted_answer.id %}
+                            <div class="border-2 border-green-500 rounded-xl p-1">
+                                {% include "community/partials/answer_item.html" %}
+                            </div>
+                        {% else %}
+                            {% include "community/partials/answer_item.html" %}
+                        {% endif %}
+
                     {% empty %}
                         <div class="bg-white p-8 rounded-xl border border-primary-100 text-gray-500">
                             Aucune réponse pour le moment.
                         </div>
                     {% endfor %}
+
                 </div>
 
-                <!-- FORMULAIRE -->
+
+                <!-- ================= FORMULAIRE ================= -->
                 {% if user.is_authenticated and not topic.is_locked %}
+
                 <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mt-14">
 
                     <h3 class="text-xl font-semibold text-primary-700 mb-6">
@@ -84,9 +112,9 @@
 
                         <textarea
                             name="content"
-                            rows="5"
+                            rows="6"
                             required
-                            placeholder="Rédigez votre réponse..."
+                            placeholder="Rédigez votre réponse structurée..."
                             class="w-full border border-primary-200 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-secondary transition"
                         ></textarea>
 
@@ -100,12 +128,30 @@
                     </form>
 
                 </div>
+
+                {% elif not user.is_authenticated %}
+
+                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mt-14 text-center">
+
+                    <p class="text-gray-600 mb-6">
+                        Connectez-vous pour participer à la discussion.
+                    </p>
+
+                    <a href="{% url 'login' %}?next={{ request.path }}"
+                       class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg font-semibold transition">
+                        Se connecter
+                    </a>
+
+                </div>
+
                 {% endif %}
 
             </div>
 
-            <!-- SIDEBAR -->
+
+            <!-- ================= SIDEBAR ================= -->
             <div>
+
                 <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8">
 
                     <h3 class="text-lg font-semibold text-primary-700 mb-8">
@@ -115,7 +161,7 @@
                     <div class="space-y-6 text-sm text-gray-600">
 
                         <div>
-                            <span class="font-medium text-primary-600">Catégorie :</span><br>
+                            <span class="font-medium text-primary-600">Domaine :</span><br>
                             {{ topic.category.name }}
                         </div>
 
@@ -125,8 +171,13 @@
                         </div>
 
                         <div>
-                            <span class="font-medium text-primary-600">Date :</span><br>
+                            <span class="font-medium text-primary-600">Créé le :</span><br>
                             {{ topic.created_at|date:"d M Y H:i" }}
+                        </div>
+
+                        <div>
+                            <span class="font-medium text-primary-600">Dernière activité :</span><br>
+                            {{ topic.last_activity_at|date:"d M Y H:i" }}
                         </div>
 
                         <div>
@@ -137,6 +188,7 @@
                     </div>
 
                 </div>
+
             </div>
 
         </div>

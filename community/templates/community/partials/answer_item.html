@@ -1,44 +1,69 @@
-<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6" id="answer-{{ answer.id }}">
+<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6"
+     id="answer-{{ answer.id }}">
 
     <div class="flex gap-6">
 
-        <!-- VOTES -->
-        <div class="flex flex-col items-center border-r border-primary-100 pr-4">
+        <!-- ================= VOTES ================= -->
+        <div class="flex flex-col items-center border-r border-primary-100 pr-6 min-w-[60px]">
 
-            <button
-                hx-post="{% url 'community:vote_answer' answer.id %}"
-                hx-vals='{"value": "1"}'
-                hx-target="#answer-{{ answer.id }} .vote-count"
-                hx-swap="outerHTML"
-                class="text-secondary hover:text-secondary-dark transition"
-            >
-                ▲
-            </button>
+            {% if user.is_authenticated %}
+                <button
+                    hx-post="{% url 'community:vote_answer' answer.id %}"
+                    hx-vals='{"value": "1"}'
+                    hx-target="#answer-{{ answer.id }} .vote-count"
+                    hx-swap="outerHTML"
+                    class="text-secondary hover:text-secondary-dark transition"
+                >
+                    ▲
+                </button>
+            {% else %}
+                <a href="{% url 'login' %}?next={{ request.path }}"
+                   class="text-secondary hover:text-secondary-dark transition">
+                    ▲
+                </a>
+            {% endif %}
 
-            <div class="vote-count text-lg font-bold text-primary-600 my-2">
-                {{ answer.upvotes }}
+            <!-- SCORE NET -->
+            <div class="vote-count text-lg font-bold my-2
+                {% if answer.score > 0 %}
+                    text-green-600
+                {% elif answer.score < 0 %}
+                    text-red-600
+                {% else %}
+                    text-gray-500
+                {% endif %}
+            ">
+                {{ answer.score }}
             </div>
 
-            <button
-                hx-post="{% url 'community:vote_answer' answer.id %}"
-                hx-vals='{"value": "-1"}'
-                hx-target="#answer-{{ answer.id }} .vote-count"
-                hx-swap="outerHTML"
-                class="text-red-500 hover:text-red-600 transition"
-            >
-                ▼
-            </button>
+            {% if user.is_authenticated %}
+                <button
+                    hx-post="{% url 'community:vote_answer' answer.id %}"
+                    hx-vals='{"value": "-1"}'
+                    hx-target="#answer-{{ answer.id }} .vote-count"
+                    hx-swap="outerHTML"
+                    class="text-red-500 hover:text-red-600 transition"
+                >
+                    ▼
+                </button>
+            {% else %}
+                <a href="{% url 'login' %}?next={{ request.path }}"
+                   class="text-red-500 hover:text-red-600 transition">
+                    ▼
+                </a>
+            {% endif %}
 
-            {% if answer.is_accepted %}
-                <span class="mt-4 bg-green-100 text-green-600 px-2 py-1 rounded-md text-xs font-medium">
-                    Acceptée
+            <!-- BADGE ACCEPTED -->
+            {% if topic.accepted_answer and answer.id == topic.accepted_answer.id %}
+                <span class="mt-4 bg-green-100 text-green-700 px-2 py-1 rounded-md text-xs font-semibold">
+                    ✔ Solution validée
                 </span>
             {% endif %}
 
         </div>
 
 
-        <!-- CONTENU -->
+        <!-- ================= CONTENU ================= -->
         <div class="flex-1">
 
             <div class="text-gray-700 leading-relaxed mb-4">
@@ -48,8 +73,8 @@
             <div class="flex justify-between items-center text-sm text-gray-500">
 
                 <span>
-                    Par <strong>{{ answer.author }}</strong> ·
-                    {{ answer.created_at|date:"d M Y H:i" }}
+                    Par <strong>{{ answer.author }}</strong>
+                    · {{ answer.created_at|date:"d M Y H:i" }}
                 </span>
 
                 {% if user.is_authenticated %}
@@ -63,19 +88,18 @@
 
             </div>
 
-            <!-- FORMULAIRE INLINE -->
+            <!-- ================= FORMULAIRE INLINE ================= -->
             {% if user.is_authenticated %}
             <div id="reply-form-{{ answer.id }}" class="hidden mt-4">
 
                 <form
-                    hx-post="{% url 'community:add_answer' answer.topic.slug %}"
+                    hx-post="{% url 'community:add_answer' topic.slug %}"
                     hx-target="#answer-{{ answer.id }} .replies"
                     hx-swap="beforeend"
                     hx-on="htmx:afterRequest: this.reset(); this.parentElement.classList.add('hidden')"
                     class="space-y-3"
                 >
                     {% csrf_token %}
-
                     <input type="hidden" name="parent_id" value="{{ answer.id }}">
 
                     <textarea
@@ -98,7 +122,7 @@
             </div>
             {% endif %}
 
-            <!-- REPLIES -->
+            <!-- ================= REPLIES ================= -->
             <div class="replies mt-6 pl-6 border-l border-primary-100 space-y-4">
                 {% for reply in answer.replies.all %}
                     {% include "community/partials/reply_item.html" with answer=reply %}

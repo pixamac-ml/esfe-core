@@ -1,24 +1,44 @@
 from django.conf import settings
 from django.db import models
-from django.db.models import UniqueConstraint, Index, Q
+from django.db.models import UniqueConstraint, Index
 from django.utils.text import slugify
 from django.utils import timezone
 
 
 # ==========================
-# CATEGORY
+# CATEGORY (Domaine principal)
 # ==========================
 class Category(models.Model):
     name = models.CharField(max_length=120, unique=True)
     slug = models.SlugField(max_length=140, unique=True, blank=True)
     description = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["order", "name"]
-        indexes = [
-            Index(fields=["slug"]),
-        ]
+        indexes = [Index(fields=["slug"])]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
+# ==========================
+# TAG (Sous-thèmes dynamiques)
+# ==========================
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    slug = models.SlugField(unique=True)
+    description = models.TextField(blank=True)
+    usage_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["name"]
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -48,6 +68,12 @@ class Topic(models.Model):
         related_name="topics"
     )
 
+    tags = models.ManyToManyField(
+        Tag,
+        blank=True,
+        related_name="topics"
+    )
+
     content = models.TextField()
 
     cover_image = models.ImageField(
@@ -58,19 +84,31 @@ class Topic(models.Model):
 
     view_count = models.PositiveIntegerField(default=0)
 
+    accepted_answer = models.ForeignKey(
+        "Answer",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="accepted_for_topics"
+    )
+
+    last_activity_at = models.DateTimeField(auto_now=True)
+
     is_published = models.BooleanField(default=True)
     is_locked = models.BooleanField(default=False)
+    is_public = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-last_activity_at"]
         indexes = [
             Index(fields=["slug"]),
             Index(fields=["created_at"]),
             Index(fields=["category"]),
             Index(fields=["is_published"]),
+            Index(fields=["last_activity_at"]),
         ]
 
     def save(self, *args, **kwargs):
@@ -117,8 +155,6 @@ class Answer(models.Model):
         related_name="replies"
     )
 
-    is_accepted = models.BooleanField(default=False)
-
     upvotes = models.PositiveIntegerField(default=0)
     downvotes = models.PositiveIntegerField(default=0)
 
@@ -127,14 +163,16 @@ class Answer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["created_at"]
+        ordering = ["-upvotes", "created_at"]
         indexes = [
             Index(fields=["topic"]),
             Index(fields=["parent"]),
             Index(fields=["created_at"]),
         ]
-        # ❌ On retire la contrainte avec topic__is_published
-        # Ce type de logique doit être géré côté application
+
+    @property
+    def score(self):
+        return self.upvotes - self.downvotes
 
     def __str__(self):
         return f"Réponse #{self.id} par {self.author}"
@@ -184,6 +222,28 @@ class Vote(models.Model):
 
 
 # ==========================
+# TOPIC VIEW (Anti-refresh abuse)
+# ==========================
+class TopicView(models.Model):
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+    ip_address = models.GenericIPAddressField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            Index(fields=["topic"]),
+            Index(fields=["user"]),
+            Index(fields=["ip_address"]),
+        ]
+
+
+# ==========================
 # ATTACHMENT
 # ==========================
 def attachment_upload_path(instance, filename):
@@ -223,10 +283,8 @@ class Attachment(models.Model):
         ]
 
     def clean(self):
-        # Validation applicative propre
         if not self.topic and not self.answer:
             raise ValueError("Le fichier doit être lié à un topic ou une réponse.")
-
         if self.topic and self.answer:
             raise ValueError("Le fichier ne peut pas être lié aux deux.")
 

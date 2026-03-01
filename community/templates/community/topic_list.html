@@ -2,20 +2,38 @@
 {% block content %}
 
 <!-- ================= HERO ================= -->
-<div class="bg-primary-500 text-white py-20">
+<div class="bg-primary-600 text-white py-20">
     <div class="max-w-6xl mx-auto px-4">
 
-        <h1 class="text-4xl font-bold mb-4">
-            Espace Communautaire Académique
-        </h1>
+        {% if tag %}
+            <h1 class="text-4xl font-bold mb-4">
+                #{{ tag.name }}
+            </h1>
+            <p class="text-primary-100 max-w-2xl text-lg">
+                Discussions liées au thème <strong>{{ tag.name }}</strong>.
+            </p>
 
-        <p class="text-primary-100 max-w-2xl text-lg">
-            Un espace structuré pour poser vos questions, échanger avec les étudiants
-            et le staff académique, et trouver des réponses validées.
-        </p>
+        {% elif category %}
+            <h1 class="text-4xl font-bold mb-4">
+                {{ category.name }}
+            </h1>
+            <p class="text-primary-100 max-w-2xl text-lg">
+                Espace dédié au domaine {{ category.name }}.
+            </p>
+
+        {% else %}
+            <h1 class="text-4xl font-bold mb-4">
+                Espace Communautaire Académique
+            </h1>
+            <p class="text-primary-100 max-w-2xl text-lg">
+                Posez vos questions, partagez vos expériences cliniques
+                et trouvez des réponses validées par la communauté.
+            </p>
+        {% endif %}
 
     </div>
 </div>
+
 
 <!-- ================= CONTENU ================= -->
 <div class="bg-soft py-16">
@@ -23,60 +41,97 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
 
-            <!-- LISTE DES SUJETS -->
+            <!-- ================= LISTE SUJETS ================= -->
             <div class="lg:col-span-2">
 
                 <div class="flex justify-between items-center mb-10">
                     <h2 class="text-2xl font-semibold text-primary-700">
-                        Discussions récentes
+                        Discussions
                     </h2>
 
-                    <a href="#"
-                       class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg text-sm font-semibold transition shadow-sm">
-                        Nouveau sujet
-                    </a>
+                    {% if user.is_authenticated %}
+                        <a href="#"
+                           class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg text-sm font-semibold transition shadow-sm">
+                            Nouveau sujet
+                        </a>
+                    {% else %}
+                        <a href="{% url 'login' %}?next={{ request.path }}"
+                           class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-lg text-sm font-semibold transition shadow-sm">
+                            Se connecter pour publier
+                        </a>
+                    {% endif %}
                 </div>
+
 
                 <div class="space-y-6">
 
                     {% for topic in topics %}
-                    <div class="bg-white rounded-xl border border-primary-100 shadow-sm hover:shadow-lg transition p-6">
+                    <div class="bg-white rounded-xl border border-primary-100 shadow-sm hover:shadow-xl transition p-6">
 
                         <div class="flex justify-between items-start">
 
+                            <!-- CONTENU PRINCIPAL -->
                             <div class="flex-1">
 
-                                <a href="{% url 'community:topic_detail' topic.slug %}"
-                                   class="text-lg font-semibold text-primary-700 hover:text-secondary transition">
-                                    {{ topic.title }}
-                                </a>
+                                <div class="flex items-center gap-3 mb-2">
 
-                                <div class="mt-4 flex flex-wrap items-center gap-5 text-sm text-gray-500">
+                                    {% if topic.accepted_answer %}
+                                        <span class="text-green-600 text-sm font-semibold">
+                                            ✔ Résolu
+                                        </span>
+                                    {% endif %}
+
+                                    <a href="{% url 'community:topic_detail' topic.slug %}"
+                                       class="text-lg font-semibold text-primary-700 hover:text-secondary transition">
+                                        {{ topic.title }}
+                                    </a>
+
+                                </div>
+
+                                <!-- META -->
+                                <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
 
                                     <span class="bg-primary-50 text-primary-600 px-3 py-1 rounded-md text-xs font-medium">
                                         {{ topic.category.name }}
                                     </span>
 
-                                    <span>{{ topic.created_at|date:"d M Y" }}</span>
+                                    {% for tag in topic.tags.all %}
+                                        <a href="{% url 'community:topic_by_tag' tag.slug %}"
+                                           class="bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md text-xs transition">
+                                            #{{ tag.name }}
+                                        </a>
+                                    {% endfor %}
 
+                                    <span>{{ topic.created_at|date:"d M Y" }}</span>
                                     <span>{{ topic.view_count }} vues</span>
 
                                 </div>
 
                             </div>
 
+                            <!-- STATS -->
                             <div class="ml-8 text-right">
-                                <div class="text-2xl font-bold text-primary-600">
+
+                                <div class="text-2xl font-bold
+                                    {% if topic.answer_count > 0 %}
+                                        text-green-600
+                                    {% else %}
+                                        text-gray-400
+                                    {% endif %}
+                                ">
                                     {{ topic.answer_count }}
                                 </div>
+
                                 <div class="text-sm text-gray-500">
                                     réponse{{ topic.answer_count|pluralize }}
                                 </div>
+
                             </div>
 
                         </div>
 
                     </div>
+
                     {% empty %}
                     <div class="bg-white p-10 rounded-xl border border-primary-100 text-gray-500 text-center">
                         Aucun sujet pour le moment.
@@ -87,15 +142,18 @@
 
             </div>
 
-            <!-- SIDEBAR -->
-            <div>
-                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8">
 
-                    <h3 class="text-lg font-semibold text-primary-700 mb-8">
-                        Catégories
+            <!-- ================= SIDEBAR ================= -->
+            <div>
+
+                <!-- Catégories -->
+                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8 mb-8">
+
+                    <h3 class="text-lg font-semibold text-primary-700 mb-6">
+                        Domaines
                     </h3>
 
-                    <div class="space-y-4">
+                    <div class="space-y-3">
                         {% for cat in categories %}
                         <a href="{% url 'community:topic_by_category' cat.slug %}"
                            class="block text-primary-600 hover:text-secondary font-medium transition">
@@ -105,6 +163,22 @@
                     </div>
 
                 </div>
+
+                <!-- Bloc infos -->
+                <div class="bg-white rounded-xl border border-primary-100 shadow-sm p-8">
+
+                    <h3 class="text-lg font-semibold text-primary-700 mb-6">
+                        À propos
+                    </h3>
+
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        Cet espace permet aux étudiants et professionnels
+                        de santé d’échanger des connaissances structurées
+                        et validées par la communauté académique.
+                    </p>
+
+                </div>
+
             </div>
 
         </div>

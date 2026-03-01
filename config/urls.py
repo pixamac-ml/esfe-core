@@ -26,7 +26,8 @@ urlpatterns = [
 
     # Admin Django (protégé par défaut)
     path("admin/", admin.site.urls),
-
+    path("accounts/", include("django.contrib.auth.urls")),
+    path("accounts/", include("accounts.urls")),
     # Applications métiers
     path("formations/", include("formations.urls")),
     path("blog/", include("blog.urls")),

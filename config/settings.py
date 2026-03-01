@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "blog.apps.BlogConfig",
     "news",
     "community",
+    "accounts",
 ]
 
 # ==================================================
@@ -257,3 +258,8 @@ JAZZMIN_UI_TWEAKS = {
     "accent": "accent-primary",
     "sidebar_nav_small_text": False,
 }
+
+LOGIN_REDIRECT_URL = "/"
+LOGIN_URL = "login"
+
+LOGOUT_REDIRECT_URL = "community:topic_list"

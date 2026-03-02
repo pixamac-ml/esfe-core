@@ -1,38 +1,146 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="bg-soft min-h-screen py-16">
-    <div class="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-10 border border-primary-100">
+<!-- ================= HERO ================= -->
+<section class="relative pt-24 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
 
-        <h1 class="text-2xl font-bold text-primary-700 mb-10">
+    <div class="max-w-4xl mx-auto px-4">
+
+        <!-- Retour -->
+        <div class="mb-8">
+            <a href="{% url 'accounts:profile' %}"
+               class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
+
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="w-4 h-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M15 19l-7-7 7-7" />
+                </svg>
+
+                Retour au profil
+            </a>
+        </div>
+
+        <h1 class="text-3xl font-bold">
             Modifier mon profil
         </h1>
 
-        <form method="post" enctype="multipart/form-data" class="space-y-8">
-            {% csrf_token %}
-
-            <div>
-                <label class="block text-sm font-medium text-gray-600 mb-2">
-                    Photo de profil
-                </label>
-                {{ form.avatar }}
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-600 mb-2">
-                    Bio
-                </label>
-                {{ form.bio }}
-            </div>
-
-            <button type="submit"
-                    class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold transition">
-                Enregistrer
-            </button>
-
-        </form>
+        <p class="text-primary-100 mt-2 text-sm max-w-2xl">
+            Personnalisez votre identité sur la plateforme.
+            Une photo claire et une biographie précise renforcent votre crédibilité académique.
+        </p>
 
     </div>
-</div>
+</section>
+
+
+<!-- ================= FORMULAIRE ================= -->
+<section class="bg-soft py-20">
+    <div class="max-w-3xl mx-auto px-4">
+
+        <div class="bg-white shadow-lg rounded-2xl p-12 border border-primary-100">
+
+            {% if form.non_field_errors %}
+                <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm mb-8">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <form method="post"
+                  enctype="multipart/form-data"
+                  class="space-y-12">
+
+                {% csrf_token %}
+
+                <!-- ================= AVATAR ================= -->
+                <div class="space-y-6">
+
+                    <h2 class="text-lg font-semibold text-primary-700">
+                        Photo de profil
+                    </h2>
+
+                    <div class="flex items-center gap-8">
+
+                        <img src="{{ request.user.profile.avatar_url }}"
+                             class="w-28 h-28 rounded-full object-cover border-4 border-primary-100 shadow-md">
+
+                        <div class="flex-1">
+
+                            <label class="block text-sm font-medium text-gray-600 mb-3">
+                                Changer la photo
+                            </label>
+
+                            {{ form.avatar }}
+
+                            {% if form.avatar.errors %}
+                                <p class="text-red-500 text-sm mt-2">
+                                    {{ form.avatar.errors.0 }}
+                                </p>
+                            {% endif %}
+
+                            <p class="text-xs text-gray-400 mt-2">
+                                Format recommandé : carré, minimum 300x300px.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ================= BIO ================= -->
+                <div class="space-y-4">
+
+                    <h2 class="text-lg font-semibold text-primary-700">
+                        Biographie
+                    </h2>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-3">
+                            Présentation
+                        </label>
+
+                        {{ form.bio }}
+
+                        {% if form.bio.errors %}
+                            <p class="text-red-500 text-sm mt-2">
+                                {{ form.bio.errors.0 }}
+                            </p>
+                        {% endif %}
+
+                        <p class="text-xs text-gray-400 mt-2">
+                            Décrivez votre spécialité, votre parcours ou vos centres d'intérêt.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <!-- ================= ACTIONS ================= -->
+                <div class="flex flex-wrap gap-4 pt-6 border-t border-primary-100">
+
+                    <button type="submit"
+                            class="bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 rounded-xl font-semibold transition shadow-md">
+                        Enregistrer les modifications
+                    </button>
+
+                    <a href="{% url 'accounts:profile' %}"
+                       class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition">
+                        Annuler
+                    </a>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+</section>
 
 {% endblock %}

@@ -243,3 +243,91 @@ def topic_by_tag(request, slug):
         "topics": topics,
         "categories": categories,
     })
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.utils import timezone
+
+from .forms import TopicForm
+
+
+@login_required
+def create_topic(request):
+
+    if request.method == "POST":
+        form = TopicForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            topic = form.save(commit=False)
+            topic.author = request.user
+            topic.last_activity_at = timezone.now()
+            topic.save()
+            form.save_m2m()
+
+            # 🔥 Si requête HTMX → redirection dynamique
+            if request.headers.get("HX-Request"):
+                response = HttpResponse()
+                response["HX-Redirect"] = topic.get_absolute_url()
+                return response
+
+            # Fallback classique
+            return redirect(topic.get_absolute_url())
+
+        # 🔁 Si erreurs + HTMX → renvoyer uniquement le formulaire
+        if request.headers.get("HX-Request"):
+            html = render_to_string(
+                "community/partials/topic_form.html",
+                {"form": form},
+                request=request
+            )
+            return HttpResponse(html)
+
+    else:
+        form = TopicForm()
+
+    return render(request, "community/create_topic.html", {"form": form})
+
+
+@login_required
+def edit_topic(request, slug):
+    topic = get_object_or_404(
+        Topic,
+        slug=slug,
+        author=request.user,
+        is_deleted=False
+    )
+
+    if request.method == "POST":
+        form = TopicForm(request.POST, request.FILES, instance=topic)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            updated.updated_by = request.user
+            updated.is_edited = True
+            updated.save()
+            form.save_m2m()
+            return redirect(topic.get_absolute_url())
+    else:
+        form = TopicForm(instance=topic)
+
+    return render(request, "community/edit_topic.html", {
+        "form": form,
+        "topic": topic
+    })
+
+
+@login_required
+@require_POST
+def delete_topic(request, slug):
+    topic = get_object_or_404(
+        Topic,
+        slug=slug,
+        author=request.user,
+        is_deleted=False
+    )
+
+    topic.is_deleted = True
+    topic.save(update_fields=["is_deleted"])
+
+    return redirect("accounts:profile")

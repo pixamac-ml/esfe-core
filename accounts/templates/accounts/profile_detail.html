@@ -1,45 +1,142 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="bg-soft min-h-screen py-16">
-    <div class="max-w-3xl mx-auto bg-white p-10 rounded-xl shadow border border-primary-100">
+<!-- ================= HERO ================= -->
+<section class="relative pt-28 pb-20 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
 
-        <div class="flex items-center gap-6 mb-8">
+    <div class="relative max-w-5xl mx-auto px-4">
+
+        <!-- Bouton retour -->
+        <div class="mb-8">
+            <a href="{% url 'community:topic_list' %}"
+               class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
+
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="w-4 h-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M15 19l-7-7 7-7" />
+                </svg>
+
+                Retour à la communauté
+            </a>
+        </div>
+
+        <!-- Profil header -->
+        <div class="flex flex-col md:flex-row items-center md:items-start gap-8">
+
             <img src="{{ user_obj.profile.avatar_url }}"
-                 class="w-24 h-24 rounded-full object-cover">
+                 class="w-32 h-32 rounded-full object-cover border-4 border-white shadow-xl">
 
-            <div>
-                <h2 class="text-xl font-bold text-primary-700">
+            <div class="flex-1">
+
+                <h1 class="text-3xl font-bold mb-2">
                     {{ user_obj.username }}
-                </h2>
-                <p class="text-gray-500 text-sm">
-                    {{ user_obj.email }}
+                </h1>
+
+                <p class="text-primary-100 text-sm mb-4">
+                    Membre depuis {{ user_obj.date_joined|date:"d M Y" }}
                 </p>
+
+                {% if user_obj.profile.bio %}
+                    <p class="max-w-2xl text-primary-100 leading-relaxed">
+                        {{ user_obj.profile.bio }}
+                    </p>
+                {% else %}
+                    <p class="text-primary-200 italic">
+                        Aucune biographie renseignée.
+                    </p>
+                {% endif %}
+
             </div>
-        </div>
 
-        <div class="text-gray-700 mb-8">
-            {{ user_obj.profile.bio|default:"Aucune bio." }}
-        </div>
-
-        <div class="flex gap-4">
-            <a href="{% url 'accounts:edit_profile' %}"
-               class="bg-primary-500 text-white px-4 py-2 rounded-lg">
-                Modifier profil
-            </a>
-
-            <a href="{% url 'accounts:update_email' %}"
-               class="bg-secondary text-white px-4 py-2 rounded-lg">
-                Modifier email
-            </a>
-
-            <a href="{% url 'password_change' %}"
-               class="bg-accent text-white px-4 py-2 rounded-lg">
-                Mot de passe
-            </a>
         </div>
 
     </div>
-</div>
+</section>
+
+
+<!-- ================= CONTENU ================= -->
+<section class="bg-soft py-20">
+    <div class="max-w-5xl mx-auto px-4 space-y-16">
+
+        <!-- ================= STATS ================= -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
+
+            <div class="bg-white p-8 rounded-2xl shadow border border-primary-100">
+                <div class="text-3xl font-bold text-primary-700">
+                    {{ topics_count }}
+                </div>
+                <div class="text-sm text-gray-500 uppercase tracking-wide mt-2">
+                    Sujets créés
+                </div>
+            </div>
+
+            <div class="bg-white p-8 rounded-2xl shadow border border-primary-100">
+                <div class="text-3xl font-bold text-primary-700">
+                    {{ answers_count }}
+                </div>
+                <div class="text-sm text-gray-500 uppercase tracking-wide mt-2">
+                    Réponses publiées
+                </div>
+            </div>
+
+            <div class="bg-white p-8 rounded-2xl shadow border border-primary-100">
+                <div class="text-3xl font-bold
+                    {% if score > 0 %} text-green-600
+                    {% elif score < 0 %} text-red-600
+                    {% else %} text-gray-500 {% endif %}">
+                    {{ score }}
+                </div>
+                <div class="text-sm text-gray-500 uppercase tracking-wide mt-2">
+                    Score communautaire
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ================= ACTIONS ================= -->
+        <div class="bg-white p-10 rounded-2xl shadow border border-primary-100">
+
+            <h2 class="text-xl font-semibold text-primary-700 mb-8">
+                Paramètres du compte
+            </h2>
+
+            <div class="flex flex-wrap gap-4">
+
+                <a href="{% url 'accounts:edit_profile' %}"
+                   class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold transition shadow-md">
+                    Modifier profil
+                </a>
+
+                <a href="{% url 'accounts:update_email' %}"
+                   class="bg-secondary hover:bg-secondary-dark text-white px-6 py-3 rounded-xl font-semibold transition shadow-md">
+                    Modifier email
+                </a>
+
+                <a href="{% url 'password_change' %}"
+                   class="bg-accent hover:bg-accent-dark text-white px-6 py-3 rounded-xl font-semibold transition shadow-md">
+                    Mot de passe
+                </a>
+                <form method="post"
+                      action="{% url 'logout' %}"
+                      class="inline">
+                    {% csrf_token %}
+
+                    <button type="submit"
+                            class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-semibold transition shadow-md">
+                        Se déconnecter
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+    </div>
+</section>
 
 {% endblock %}

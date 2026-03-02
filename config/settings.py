@@ -46,7 +46,9 @@ INSTALLED_APPS = [
     # UI / Core
     "ui.apps.UiConfig",
     "core.apps.CoreConfig",
-    "ckeditor",
+
+    # ✅ CKEditor 5 (UNIQUEMENT celui-ci)
+    "django_ckeditor_5",
 
     # Métier
     "admissions.apps.AdmissionsConfig",
@@ -82,7 +84,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    #"core.middleware.SecurityShieldMiddleware",
 
     # Dev
     "django_browser_reload.middleware.BrowserReloadMiddleware",
@@ -97,7 +98,7 @@ ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
 # ==================================================
-# TEMPLATES (VERSION STABLE)
+# TEMPLATES
 # ==================================================
 
 TEMPLATES = [
@@ -185,81 +186,34 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # ==================================================
+# AUTH REDIRECTS
+# ==================================================
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "accounts:profile"
+LOGOUT_REDIRECT_URL = "community:topic_list"
+
+# ==================================================
+# CKEDITOR 5 CONFIG
+# ==================================================
+
+CKEDITOR_5_CONFIGS = {
+    "default": {
+        "toolbar": [
+            "heading", "|",
+            "bold", "italic", "link",
+            "bulletedList", "numberedList",
+            "blockQuote", "|",
+            "insertImage", "|",
+            "undo", "redo"
+        ],
+        "height": 400,
+        "width": "100%",
+    }
+}
+
+# ==================================================
 # CUSTOM
 # ==================================================
 
 STUDENT_LOGIN_URL = "http://127.0.0.1:8000/student/login/"
-
-# ==================================================
-# JAZZMIN CONFIG
-# ==================================================
-
-JAZZMIN_SETTINGS = {
-    "site_title": "ESFé | Administration",
-    "site_header": "École de Santé Félix Houphouët Boigny",
-    "site_brand": "ESFé",
-    "welcome_sign": "Système de Gestion Institutionnel",
-
-    "show_sidebar": True,
-    "navigation_expanded": True,
-    "show_ui_builder": False,
-    "sidebar_disable_expand": False,
-
-    "order_with_respect_to": [
-        "admissions",
-        "inscriptions",
-        "payments",
-        "students",
-        "formations",
-        "auth",
-        "blog",
-        "news",
-    ],
-
-    "icons": {
-        "auth": "fas fa-user-shield",
-        "admissions": "fas fa-file-medical",
-        "admissions.Candidature": "fas fa-user-plus",
-        "inscriptions": "fas fa-id-card",
-        "inscriptions.Inscription": "fas fa-user-check",
-        "payments": "fas fa-money-bill-wave",
-        "payments.Payment": "fas fa-credit-card",
-        "payments.PaymentAgent": "fas fa-user-tie",
-        "payments.CashPaymentSession": "fas fa-key",
-        "students": "fas fa-user-graduate",
-        "formations": "fas fa-graduation-cap",
-        "blog": "fas fa-blog",
-        "news": "fas fa-newspaper",
-    },
-
-    "topmenu_links": [
-        {"name": "Dashboard", "url": "/dashboard/", "icon": "fas fa-chart-line"},
-        {"name": "Site public", "url": "/", "new_window": True, "icon": "fas fa-globe"},
-        {"name": "Déconnexion", "url": "/admin/logout/", "icon": "fas fa-sign-out-alt"},
-    ],
-
-    "search_model": [
-        "admissions.Candidature",
-        "inscriptions.Inscription",
-        "payments.Payment",
-        "students.Student",
-    ],
-
-    "show_logout": True,
-    "custom_css": "core/css/esfe_theme.css",
-    "custom_js": "core/js/esfe_admin.js",
-}
-
-JAZZMIN_UI_TWEAKS = {
-    "theme": "flatly",
-    "dark_mode_theme": "darkly",
-    "navbar": "navbar-dark",
-    "sidebar": "sidebar-dark-primary",
-    "accent": "accent-primary",
-    "sidebar_nav_small_text": False,
-}
-
-LOGIN_REDIRECT_URL = "/"
-LOGIN_URL = "login"
-
-LOGOUT_REDIRECT_URL = "community:topic_list"

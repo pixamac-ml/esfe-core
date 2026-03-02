@@ -49,10 +49,25 @@ class Tag(models.Model):
         return self.name
 
 
+from django.urls import reverse
+
+from django.conf import settings
+from django.db import models
+from django.db.models import UniqueConstraint, Index
+from django.utils.text import slugify
+from django.utils import timezone
+from django.urls import reverse
+from django_ckeditor_5.fields import CKEditor5Field
+
+
 # ==========================
 # TOPIC
 # ==========================
 class Topic(models.Model):
+
+    # ----------------------
+    # Identité
+    # ----------------------
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=280, unique=True, blank=True)
 
@@ -62,19 +77,36 @@ class Topic(models.Model):
         related_name="community_topics"
     )
 
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_topics"
+    )
+
+    # ----------------------
+    # Organisation
+    # ----------------------
     category = models.ForeignKey(
-        Category,
+        "Category",
         on_delete=models.PROTECT,
         related_name="topics"
     )
 
     tags = models.ManyToManyField(
-        Tag,
+        "Tag",
         blank=True,
         related_name="topics"
     )
 
-    content = models.TextField()
+    # ----------------------
+    # Contenu riche
+    # ----------------------
+    content = CKEditor5Field(
+        "Contenu",
+        config_name="default"
+    )
 
     cover_image = models.ImageField(
         upload_to="community/topics/%Y/%m/",
@@ -82,6 +114,9 @@ class Topic(models.Model):
         blank=True
     )
 
+    # ----------------------
+    # Engagement
+    # ----------------------
     view_count = models.PositiveIntegerField(default=0)
 
     accepted_answer = models.ForeignKey(
@@ -94,24 +129,42 @@ class Topic(models.Model):
 
     last_activity_at = models.DateTimeField(auto_now=True)
 
+    # ----------------------
+    # États logiques
+    # ----------------------
     is_published = models.BooleanField(default=True)
     is_locked = models.BooleanField(default=False)
     is_public = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+    is_edited = models.BooleanField(default=False)
 
+    # ----------------------
+    # Dates
+    # ----------------------
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # ======================
+    # META
+    # ======================
     class Meta:
         ordering = ["-last_activity_at"]
         indexes = [
             Index(fields=["slug"]),
             Index(fields=["created_at"]),
             Index(fields=["category"]),
+            Index(fields=["author"]),
             Index(fields=["is_published"]),
+            Index(fields=["is_deleted"]),
             Index(fields=["last_activity_at"]),
         ]
 
+    # ======================
+    # MÉTHODES
+    # ======================
+
     def save(self, *args, **kwargs):
+        # Génération automatique du slug
         if not self.slug:
             base_slug = slugify(self.title)
             slug = base_slug
@@ -123,11 +176,32 @@ class Topic(models.Model):
 
             self.slug = slug
 
+        # Marquer comme édité si modification
+        if self.pk:
+            original = Topic.objects.filter(pk=self.pk).first()
+            if original and original.content != self.content:
+                self.is_edited = True
+
         super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse(
+            "community:topic_detail",
+            kwargs={"slug": self.slug}
+        )
+
+    def soft_delete(self):
+        self.is_deleted = True
+        self.is_published = False
+        self.save(update_fields=["is_deleted", "is_published"])
+
+    def restore(self):
+        self.is_deleted = False
+        self.is_published = True
+        self.save(update_fields=["is_deleted", "is_published"])
 
     def __str__(self):
         return self.title
-
 
 # ==========================
 # ANSWER

@@ -1,55 +1,121 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="min-h-screen bg-soft flex items-center justify-center py-16">
-    <div class="bg-white shadow-lg rounded-xl p-10 w-full max-w-md border border-primary-100">
+<!-- ================= HERO ================= -->
+<section class="relative pt-24 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
 
-        <h1 class="text-2xl font-bold text-primary-700 mb-8 text-center">
-            Créer un compte
-        </h1>
+    <div class="max-w-4xl mx-auto px-4">
 
-        <form method="post" class="space-y-6">
-            {% csrf_token %}
+        <!-- Retour -->
+        <div class="mb-8">
+            <a href="{% url 'community:topic_list' %}"
+               class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
 
-            {{ form.non_field_errors }}
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="w-4 h-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M15 19l-7-7 7-7" />
+                </svg>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-600 mb-2">
-                    Nom d'utilisateur
-                </label>
-                {{ form.username }}
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-600 mb-2">
-                    Mot de passe
-                </label>
-                {{ form.password1 }}
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-600 mb-2">
-                    Confirmation
-                </label>
-                {{ form.password2 }}
-            </div>
-
-            <button type="submit"
-                    class="w-full bg-accent hover:bg-accent-dark text-white py-3 rounded-lg font-semibold transition">
-                S'inscrire
-            </button>
-
-        </form>
-
-        <div class="text-sm text-center text-gray-500 mt-6">
-            Déjà un compte ?
-            <a href="{% url 'login' %}?next={{ request.GET.next }}"
-               class="text-primary-600 hover:text-secondary font-medium">
-                Se connecter
+                Retour à la communauté
             </a>
         </div>
 
+        <h1 class="text-3xl font-bold">
+            Créer un compte
+        </h1>
+
+        <p class="text-primary-100 mt-2 text-sm">
+            Rejoignez l’espace communautaire et participez aux échanges académiques.
+        </p>
+
     </div>
-</div>
+</section>
+
+
+<!-- ================= FORMULAIRE ================= -->
+<section class="bg-soft py-20">
+    <div class="max-w-md mx-auto px-4">
+
+        <div class="bg-white shadow-lg rounded-2xl p-12 border border-primary-100">
+
+            <form method="post" class="space-y-8">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <!-- Username -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-3">
+                        Nom d'utilisateur
+                    </label>
+
+                    {{ form.username }}
+
+                    {% if form.username.errors %}
+                        <p class="text-red-500 text-sm mt-2">
+                            {{ form.username.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-3">
+                        Mot de passe
+                    </label>
+
+                    {{ form.password1 }}
+
+                    {% if form.password1.errors %}
+                        <p class="text-red-500 text-sm mt-2">
+                            {{ form.password1.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <!-- Confirmation -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-3">
+                        Confirmation du mot de passe
+                    </label>
+
+                    {{ form.password2 }}
+
+                    {% if form.password2.errors %}
+                        <p class="text-red-500 text-sm mt-2">
+                            {{ form.password2.errors.0 }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <!-- Submit -->
+                <button type="submit"
+                        class="w-full bg-accent hover:bg-accent-dark text-white py-3 rounded-xl font-semibold transition shadow-md">
+                    S’inscrire
+                </button>
+
+            </form>
+
+            <div class="text-sm text-center text-gray-500 mt-8">
+                Déjà un compte ?
+                <a href="{% url 'login' %}?next={{ request.GET.next }}"
+                   class="text-primary-600 hover:text-secondary font-medium">
+                    Se connecter
+                </a>
+            </div>
+
+        </div>
+
+    </div>
+</section>
 
 {% endblock %}

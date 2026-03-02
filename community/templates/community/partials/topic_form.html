@@ -1,0 +1,90 @@
+<form method="post"
+      enctype="multipart/form-data"
+      hx-post="{% url 'community:create_topic' %}"
+      hx-target="#topic-form-container"
+      hx-swap="innerHTML"
+      hx-indicator="#form-loader"
+      class="bg-white shadow-lg rounded-2xl p-12 border border-primary-100 space-y-10">
+
+    {% csrf_token %}
+
+    <!-- Loader HTMX -->
+    <div id="form-loader" class="hidden text-center text-primary-600 font-semibold">
+        Publication en cours...
+    </div>
+
+    {% if form.non_field_errors %}
+        <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <!-- Titre -->
+    <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-3">
+            Titre
+        </label>
+        {{ form.title }}
+
+        {% if form.title.errors %}
+            <p class="text-red-500 text-sm mt-2">
+                {{ form.title.errors.0 }}
+            </p>
+        {% endif %}
+    </div>
+
+    <!-- Catégorie -->
+    <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-3">
+            Domaine
+        </label>
+        {{ form.category }}
+    </div>
+
+    <!-- Tags -->
+    <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-3">
+            Tags
+        </label>
+        {{ form.tags }}
+        <p class="text-xs text-gray-400 mt-2">
+            Sélection multiple autorisée.
+        </p>
+    </div>
+
+    <!-- Contenu -->
+    <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-3">
+            Description détaillée
+        </label>
+        {{ form.content }}
+
+        {% if form.content.errors %}
+            <p class="text-red-500 text-sm mt-2">
+                {{ form.content.errors.0 }}
+            </p>
+        {% endif %}
+    </div>
+
+    <!-- Image -->
+    <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-3">
+            Image (optionnel)
+        </label>
+        {{ form.cover_image }}
+    </div>
+
+    <!-- Actions -->
+    <div class="pt-6 flex gap-6">
+        <button type="submit"
+                class="bg-accent hover:bg-accent-dark text-white px-8 py-3 rounded-xl font-semibold transition shadow-md">
+            Publier le sujet
+        </button>
+
+        <a href="{% url 'community:topic_list' %}"
+           class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition">
+            Annuler
+        </a>
+    </div>
+
+</form>

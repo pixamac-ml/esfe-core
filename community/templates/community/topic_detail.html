@@ -2,7 +2,6 @@
 {% block content %}
 
 <!-- ================= HERO ================= -->
-<!-- ================= HERO ================= -->
 <section class="relative pt-32 pb-24 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white overflow-hidden">
 
     <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_20%_20%,white,transparent_40%)]"></div>
@@ -11,81 +10,24 @@
 
         <!-- ================= RETOUR ================= -->
         <div class="mb-8">
-            {% if topic.category %}
-                <a href="{% url 'community:topic_by_category' topic.category.slug %}"
-                   class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
-
-                    <!-- Icône flèche gauche -->
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         class="w-4 h-4"
-                         fill="none"
-                         viewBox="0 0 24 24"
-                         stroke="currentColor"
-                         stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                              d="M15 19l-7-7 7-7" />
-                    </svg>
-
-                    Retour aux discussions
-                </a>
-            {% else %}
-                <a href="{% url 'community:topic_list' %}"
-                   class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
-
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         class="w-4 h-4"
-                         fill="none"
-                         viewBox="0 0 24 24"
-                         stroke="currentColor"
-                         stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                              d="M15 19l-7-7 7-7" />
-                    </svg>
-
-                    Retour aux discussions
-                </a>
-            {% endif %}
+            <a href="{% if topic.category %}{% url 'community:topic_by_category' topic.category.slug %}{% else %}{% url 'community:topic_list' %}{% endif %}"
+               class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
+                ← Retour aux discussions
+            </a>
         </div>
-
 
         <!-- ================= BADGES ================= -->
         <div class="flex flex-wrap items-center gap-4 mb-6">
 
             {% if topic.accepted_answer %}
-                <span class="inline-flex items-center gap-2 bg-green-500/90 text-white px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide">
-
-                    <!-- Icône check -->
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         class="w-4 h-4"
-                         fill="none"
-                         viewBox="0 0 24 24"
-                         stroke="currentColor"
-                         stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                              d="M5 13l4 4L19 7" />
-                    </svg>
-
-                    Sujet résolu
+                <span class="bg-green-500 text-white px-4 py-1.5 rounded-full text-xs font-semibold uppercase">
+                    ✔ Résolu
                 </span>
             {% endif %}
 
             {% if topic.is_locked %}
-                <span class="inline-flex items-center gap-2 bg-red-500/90 text-white px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide">
-
-                    <!-- Icône lock -->
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         class="w-4 h-4"
-                         fill="none"
-                         viewBox="0 0 24 24"
-                         stroke="currentColor"
-                         stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                              d="M12 11c1.657 0 3-1.343 3-3V6a3 3 0 10-6 0v2c0 1.657 1.343 3 3 3z" />
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                              d="M5 11h14v10H5z" />
-                    </svg>
-
-                    Verrouillé
+                <span class="bg-red-500 text-white px-4 py-1.5 rounded-full text-xs font-semibold uppercase">
+                    🔒 Verrouillé
                 </span>
             {% endif %}
 
@@ -95,15 +37,13 @@
 
         </div>
 
-
         <!-- ================= TITRE ================= -->
-        <h1 class="text-3xl md:text-4xl font-bold leading-tight mb-8 text-white max-w-4xl">
+        <h1 class="text-3xl md:text-4xl font-bold leading-tight mb-6 max-w-4xl">
             {{ topic.title }}
         </h1>
 
-
         <!-- ================= META ================= -->
-        <div class="flex flex-wrap items-center gap-6 text-primary-100 text-sm">
+        <div class="flex flex-wrap items-center gap-6 text-primary-100 text-sm mb-6">
 
             {% for tag in topic.tags.all %}
                 <a href="{% url 'community:topic_by_tag' tag.slug %}"
@@ -112,54 +52,37 @@
                 </a>
             {% endfor %}
 
-            <span class="inline-flex items-center gap-2">
-                <!-- Icône user -->
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     class="w-4 h-4"
-                     fill="none"
-                     viewBox="0 0 24 24"
-                     stroke="currentColor"
-                     stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M5.121 17.804A9 9 0 1118.364 4.56M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                {{ topic.author }}
-            </span>
-
-            <span class="inline-flex items-center gap-2">
-                <!-- Icône calendar -->
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     class="w-4 h-4"
-                     fill="none"
-                     viewBox="0 0 24 24"
-                     stroke="currentColor"
-                     stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
-                </svg>
-                {{ topic.created_at|date:"d M Y H:i" }}
-            </span>
-
-            <span class="inline-flex items-center gap-2">
-                <!-- Icône eye -->
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     class="w-4 h-4"
-                     fill="none"
-                     viewBox="0 0 24 24"
-                     stroke="currentColor"
-                     stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-.001.003-.001.006 0 .009C20.268 16.057 16.477 19 12 19c-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                {{ topic.view_count }} vue{{ topic.view_count|pluralize }}
-            </span>
+            <span>Par <strong>{{ topic.author }}</strong></span>
+            <span>{{ topic.created_at|date:"d M Y H:i" }}</span>
+            <span>{{ topic.view_count }} vue{{ topic.view_count|pluralize }}</span>
 
         </div>
 
+        <!-- ================= ACTIONS AUTEUR ================= -->
+        {% if request.user == topic.author %}
+        <div class="flex gap-4 mt-4">
+
+            <a href="{% url 'community:edit_topic' topic.slug %}"
+               class="bg-secondary hover:bg-secondary-dark text-white px-5 py-2 rounded-lg text-sm font-semibold transition shadow">
+                Modifier
+            </a>
+
+            <form method="post"
+                  action="{% url 'community:delete_topic' topic.slug %}"
+                  onsubmit="return confirm('Confirmer la suppression définitive du sujet ?');">
+                {% csrf_token %}
+                <button type="submit"
+                        class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-semibold transition shadow">
+                    Supprimer
+                </button>
+            </form>
+
+        </div>
+        {% endif %}
+
     </div>
 </section>
+
 
 <!-- ================= CONTENU ================= -->
 <section class="bg-soft py-20">
@@ -178,7 +101,7 @@
                     </h2>
 
                     <div class="prose max-w-none text-gray-700 leading-relaxed">
-                        {{ topic.content|linebreaks }}
+                        {{ topic.content|safe }}
                     </div>
 
                 </div>
@@ -192,7 +115,6 @@
                     </h2>
 
                 </div>
-
 
                 <div id="answers" class="space-y-10">
 
@@ -270,7 +192,6 @@
                 {% endif %}
 
             </div>
-
 
 
             <!-- ================= SIDEBAR ================= -->

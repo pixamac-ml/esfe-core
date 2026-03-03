@@ -63,11 +63,19 @@ from django_ckeditor_5.fields import CKEditor5Field
 # ==========================
 # TOPIC
 # ==========================
+from django.db import models
+from django.conf import settings
+from django.utils.text import slugify
+from django.urls import reverse
+from django.db.models import Index
+from django_ckeditor_5.fields import CKEditor5Field
+
+
 class Topic(models.Model):
 
-    # ----------------------
-    # Identité
-    # ----------------------
+    # ======================
+    # IDENTITÉ
+    # ======================
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=280, unique=True, blank=True)
 
@@ -85,9 +93,9 @@ class Topic(models.Model):
         related_name="updated_topics"
     )
 
-    # ----------------------
-    # Organisation
-    # ----------------------
+    # ======================
+    # ORGANISATION
+    # ======================
     category = models.ForeignKey(
         "Category",
         on_delete=models.PROTECT,
@@ -100,9 +108,9 @@ class Topic(models.Model):
         related_name="topics"
     )
 
-    # ----------------------
-    # Contenu riche
-    # ----------------------
+    # ======================
+    # CONTENU RICHE
+    # ======================
     content = CKEditor5Field(
         "Contenu",
         config_name="default"
@@ -114,9 +122,9 @@ class Topic(models.Model):
         blank=True
     )
 
-    # ----------------------
-    # Engagement
-    # ----------------------
+    # ======================
+    # ENGAGEMENT
+    # ======================
     view_count = models.PositiveIntegerField(default=0)
 
     accepted_answer = models.ForeignKey(
@@ -129,18 +137,18 @@ class Topic(models.Model):
 
     last_activity_at = models.DateTimeField(auto_now=True)
 
-    # ----------------------
-    # États logiques
-    # ----------------------
+    # ======================
+    # ÉTATS
+    # ======================
     is_published = models.BooleanField(default=True)
     is_locked = models.BooleanField(default=False)
     is_public = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     is_edited = models.BooleanField(default=False)
 
-    # ----------------------
-    # Dates
-    # ----------------------
+    # ======================
+    # DATES
+    # ======================
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -164,7 +172,6 @@ class Topic(models.Model):
     # ======================
 
     def save(self, *args, **kwargs):
-        # Génération automatique du slug
         if not self.slug:
             base_slug = slugify(self.title)
             slug = base_slug
@@ -176,7 +183,6 @@ class Topic(models.Model):
 
             self.slug = slug
 
-        # Marquer comme édité si modification
         if self.pk:
             original = Topic.objects.filter(pk=self.pk).first()
             if original and original.content != self.content:
@@ -202,6 +208,7 @@ class Topic(models.Model):
 
     def __str__(self):
         return self.title
+
 
 # ==========================
 # ANSWER

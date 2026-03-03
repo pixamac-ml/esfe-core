@@ -1,6 +1,6 @@
 from django import forms
-from django.utils.text import slugify
 from django_ckeditor_5.widgets import CKEditor5Widget
+from django.utils.html import strip_tags
 from .models import Topic
 
 
@@ -13,71 +13,47 @@ class TopicForm(forms.ModelForm):
             "category",
             "tags",
             "content",
-            "cover_image",
         ]
         widgets = {
-            "content": CKEditor5Widget(config_name="default"),
+            "content": CKEditor5Widget(
+                attrs={"class": "django_ckeditor_5"},
+                config_name="default",
+            ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         base_input = (
-            "w-full border border-primary-200 rounded-xl "
-            "p-4 focus:ring-2 focus:ring-secondary "
-            "focus:outline-none transition"
+            "w-full border border-gray-300 rounded-lg "
+            "px-4 py-2.5 text-sm "
+            "focus:ring-2 focus:ring-primary-500 focus:border-primary-500 "
+            "transition"
         )
 
         select_input = (
-            "w-full border border-primary-200 rounded-xl "
-            "p-4 bg-white focus:ring-2 focus:ring-secondary "
-            "focus:outline-none transition"
+            "w-full border border-gray-300 rounded-lg "
+            "px-4 py-2.5 text-sm bg-white "
+            "focus:ring-2 focus:ring-primary-500 focus:border-primary-500 "
+            "transition"
         )
 
-        file_input = (
-            "block w-full text-sm text-gray-600 "
-            "file:mr-4 file:py-2 file:px-4 "
-            "file:rounded-lg file:border-0 "
-            "file:bg-primary-500 file:text-white "
-            "hover:file:bg-primary-600 transition"
-        )
-
-        # ----------------------
         # TITLE
-        # ----------------------
         self.fields["title"].widget.attrs.update({
             "class": base_input,
-            "placeholder": "Ex: Difficulté en dosage médicamenteux en pédiatrie",
+            "placeholder": "Ex : Difficulté en dosage médicamenteux en pédiatrie",
         })
 
-        # ----------------------
         # CATEGORY
-        # ----------------------
         self.fields["category"].widget.attrs.update({
             "class": select_input,
         })
 
-        # ----------------------
         # TAGS
-        # ----------------------
         self.fields["tags"].widget.attrs.update({
             "class": select_input,
         })
-        self.fields["tags"].help_text = "Maintenez Ctrl (ou Cmd) pour sélectionner plusieurs tags."
-
-        # ----------------------
-        # CONTENT (CKEditor)
-        # ----------------------
-        self.fields["content"].widget.attrs.update({
-            "class": "rounded-xl border border-primary-200",
-        })
-
-        # ----------------------
-        # IMAGE
-        # ----------------------
-        self.fields["cover_image"].widget.attrs.update({
-            "class": file_input,
-        })
+        self.fields["tags"].help_text = "Maximum 5 tags."
 
     # ======================
     # VALIDATIONS MÉTIER
@@ -89,12 +65,14 @@ class TopicForm(forms.ModelForm):
         if not title:
             raise forms.ValidationError("Le titre est obligatoire.")
 
-        if len(title.strip()) < 10:
+        title = title.strip()
+
+        if len(title) < 10:
             raise forms.ValidationError(
                 "Le titre doit contenir au moins 10 caractères."
             )
 
-        return title.strip()
+        return title
 
     def clean_content(self):
         content = self.cleaned_data.get("content")
@@ -104,12 +82,21 @@ class TopicForm(forms.ModelForm):
                 "Le contenu ne peut pas être vide."
             )
 
-        # Nettoyage basique HTML (évite validation faussée par balises vides)
-        text_only = content.strip().replace("&nbsp;", "")
+        text_only = strip_tags(content).strip()
 
         if len(text_only) < 30:
             raise forms.ValidationError(
-                "Le contenu doit être suffisamment détaillé (minimum 30 caractères)."
+                "Le contenu doit contenir au moins 30 caractères."
             )
 
         return content
+
+    def clean_tags(self):
+        tags = self.cleaned_data.get("tags")
+
+        if tags and tags.count() > 5:
+            raise forms.ValidationError(
+                "Vous ne pouvez pas ajouter plus de 5 tags."
+            )
+
+        return tags

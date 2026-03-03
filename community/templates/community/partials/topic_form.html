@@ -1,88 +1,81 @@
 <form method="post"
-      enctype="multipart/form-data"
       hx-post="{% url 'community:create_topic' %}"
       hx-target="#topic-form-container"
       hx-swap="innerHTML"
       hx-indicator="#form-loader"
-      class="bg-white shadow-lg rounded-2xl p-12 border border-primary-100 space-y-10">
+      class="bg-white shadow-lg rounded-xl p-8 md:p-10 border border-gray-200 space-y-8">
 
     {% csrf_token %}
+    {{ form.media }}
 
-    <!-- Loader HTMX -->
-    <div id="form-loader" class="hidden text-center text-primary-600 font-semibold">
+    <div id="form-loader"
+         class="hidden text-sm text-primary-600 font-medium">
         Publication en cours...
     </div>
 
     {% if form.non_field_errors %}
-        <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm">
+        <div class="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm">
             {{ form.non_field_errors }}
         </div>
     {% endif %}
 
-    <!-- Titre -->
-    <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-3">
+    <!-- TITRE -->
+    <div class="space-y-2">
+        <label class="text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <!-- Title Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary-600"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 6h16M4 12h16M4 18h7"/>
+            </svg>
             Titre
         </label>
         {{ form.title }}
-
-        {% if form.title.errors %}
-            <p class="text-red-500 text-sm mt-2">
-                {{ form.title.errors.0 }}
-            </p>
-        {% endif %}
-    </div>
-
-    <!-- Catégorie -->
-    <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-3">
-            Domaine
-        </label>
-        {{ form.category }}
-    </div>
-
-    <!-- Tags -->
-    <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-3">
-            Tags
-        </label>
-        {{ form.tags }}
-        <p class="text-xs text-gray-400 mt-2">
-            Sélection multiple autorisée.
+        <p class="text-xs text-gray-400">
+            Soyez clair et descriptif.
         </p>
     </div>
 
-    <!-- Contenu -->
-    <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-3">
+    <!-- CATÉGORIE + TAGS -->
+    <div class="grid md:grid-cols-2 gap-6">
+
+        <div class="space-y-2">
+            <label class="text-sm font-semibold text-gray-800">
+                Domaine
+            </label>
+            {{ form.category }}
+        </div>
+
+        <div class="space-y-2">
+            <label class="text-sm font-semibold text-gray-800">
+                Tags
+            </label>
+            {{ form.tags }}
+            <p class="text-xs text-gray-400">
+                Maximum 5.
+            </p>
+        </div>
+
+    </div>
+
+    <!-- CONTENU -->
+    <div class="space-y-2">
+        <label class="text-sm font-semibold text-gray-800">
             Description détaillée
         </label>
         {{ form.content }}
-
-        {% if form.content.errors %}
-            <p class="text-red-500 text-sm mt-2">
-                {{ form.content.errors.0 }}
-            </p>
-        {% endif %}
     </div>
 
-    <!-- Image -->
-    <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-3">
-            Image (optionnel)
-        </label>
-        {{ form.cover_image }}
-    </div>
-
-    <!-- Actions -->
-    <div class="pt-6 flex gap-6">
+    <!-- ACTIONS -->
+    <div class="flex items-center gap-4 pt-4">
         <button type="submit"
-                class="bg-accent hover:bg-accent-dark text-white px-8 py-3 rounded-xl font-semibold transition shadow-md">
-            Publier le sujet
+                class="bg-accent hover:bg-accent-dark text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition shadow-sm">
+            Publier
         </button>
 
         <a href="{% url 'community:topic_list' %}"
-           class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition">
+           class="text-gray-500 hover:text-gray-700 text-sm transition">
             Annuler
         </a>
     </div>

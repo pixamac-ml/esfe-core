@@ -11,33 +11,31 @@ urlpatterns = [
     path("", views.topic_list, name="topic_list"),
 
     # ==========================
+    # LISTE MEMBRES ACTIFS
+    # ==========================
+    path("membres/", views.members_list, name="members_list"),
+
+    # ==========================
+    # PROFIL PUBLIC
+    # ==========================
+    path("membre/<str:username>/", views.public_profile, name="public_profile"),
+
+    # ==========================
     # CRÉATION SUJET
     # ==========================
     path("nouveau/", views.create_topic, name="create_topic"),
 
     # ==========================
-    # PAR DOMAINE (Category)
+    # FILTRES
     # ==========================
     path("domaine/<slug:slug>/", views.topic_by_category, name="topic_by_category"),
-
-    # ==========================
-    # PAR TAG
-    # ==========================
     path("tag/<slug:slug>/", views.topic_by_tag, name="topic_by_tag"),
 
     # ==========================
-    # DÉTAIL SUJET
+    # SUJET
     # ==========================
     path("sujet/<slug:slug>/", views.topic_detail, name="topic_detail"),
-
-    # ==========================
-    # MODIFICATION SUJET
-    # ==========================
     path("sujet/<slug:slug>/modifier/", views.edit_topic, name="edit_topic"),
-
-    # ==========================
-    # SUPPRESSION SUJET (POST)
-    # ==========================
     path("sujet/<slug:slug>/supprimer/", views.delete_topic, name="delete_topic"),
 
     # ==========================

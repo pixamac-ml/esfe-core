@@ -1,0 +1,70 @@
+<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6 mb-10">
+
+    <!-- TRI -->
+    <div class="flex text-sm bg-white border border-primary-100 rounded-xl shadow-sm overflow-hidden">
+
+        <button type="button"
+                hx-get="{% url 'community:topic_list' %}?sort=active"
+                hx-target="#topic-list-container"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                hx-indicator="#list-loader"
+                class="px-5 py-2.5 transition-all duration-200
+                {% if current_sort == 'active' %}
+                    bg-primary-50 text-primary-700 font-semibold
+                {% else %}
+                    hover:bg-primary-50 text-gray-600
+                {% endif %}">
+            <i class="fa-solid fa-fire mr-2 text-xs"></i>
+            Actif
+        </button>
+
+        <button type="button"
+                hx-get="{% url 'community:topic_list' %}?sort=recent"
+                hx-target="#topic-list-container"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                hx-indicator="#list-loader"
+                class="px-5 py-2.5 transition-all duration-200
+                {% if current_sort == 'recent' %}
+                    bg-primary-50 text-primary-700 font-semibold
+                {% else %}
+                    hover:bg-primary-50 text-gray-600
+                {% endif %}">
+            <i class="fa-regular fa-clock mr-2 text-xs"></i>
+            Récent
+        </button>
+
+        <button type="button"
+                hx-get="{% url 'community:topic_list' %}?sort=answers"
+                hx-target="#topic-list-container"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                hx-indicator="#list-loader"
+                class="px-5 py-2.5 transition-all duration-200
+                {% if current_sort == 'answers' %}
+                    bg-primary-50 text-primary-700 font-semibold
+                {% else %}
+                    hover:bg-primary-50 text-gray-600
+                {% endif %}">
+            <i class="fa-regular fa-comment-dots mr-2 text-xs"></i>
+            Réponses
+        </button>
+
+    </div>
+
+    <!-- BOUTON NOUVEAU -->
+    {% if user.is_authenticated %}
+        <a href="{% url 'community:create_topic' %}"
+           class="inline-flex items-center justify-center
+                  bg-accent hover:bg-accent-dark
+                  text-white px-6 py-3 rounded-xl
+                  text-sm font-semibold
+                  transition-all duration-300
+                  shadow-md hover:shadow-lg hover:-translate-y-0.5">
+            <i class="fa-solid fa-plus mr-2 text-xs"></i>
+            Nouveau sujet
+        </a>
+    {% endif %}
+
+</div>

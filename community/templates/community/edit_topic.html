@@ -1,16 +1,28 @@
 {% extends "base.html" %}
+{% block title %}Modifier le sujet | Communauté{% endblock %}
+
 {% block content %}
 
+<!-- ================= HERO ================= -->
 <section class="relative pt-28 pb-20 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
 
-    <div class="max-w-5xl mx-auto px-4">
+    <div class="max-w-6xl mx-auto px-4">
 
-        <div class="mb-8">
-            <a href="{{ topic.get_absolute_url }}"
-               class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
-                ← Retour au sujet
-            </a>
-        </div>
+        <a href="{{ topic.get_absolute_url }}"
+           class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition mb-6">
+            <!-- Arrow Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-4 w-4"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15 19l-7-7 7-7"/>
+            </svg>
+            Retour au sujet
+        </a>
 
         <h1 class="text-3xl md:text-4xl font-bold">
             Modifier le sujet
@@ -24,75 +36,122 @@
 </section>
 
 
-<section class="bg-soft py-20">
-    <div class="max-w-5xl mx-auto px-4">
+<!-- ================= CONTENT ================= -->
+<section class="bg-gray-50 py-20">
+    <div class="max-w-6xl mx-auto px-4 grid lg:grid-cols-3 gap-12">
 
-        <form method="post"
-              enctype="multipart/form-data"
-              class="bg-white shadow-lg rounded-2xl p-12 border border-primary-100 space-y-10">
+        <!-- ================= FORM ================= -->
+        <div class="lg:col-span-2">
 
-            {% csrf_token %}
+            <form method="post"
+                  class="bg-white shadow-lg rounded-xl p-8 md:p-10 border border-gray-200 space-y-8">
 
-            <!-- Titre -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-3">
-                    Titre
-                </label>
-                {{ form.title }}
+                {% csrf_token %}
+                {{ form.media }}
+
+                <!-- Titre -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <!-- Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4 text-primary-600"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor">
+                            <path stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M4 6h16M4 12h16M4 18h7"/>
+                        </svg>
+                        Titre
+                    </label>
+                    {{ form.title }}
+                </div>
+
+                <!-- Catégorie + Tags -->
+                <div class="grid md:grid-cols-2 gap-6">
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-800">
+                            Domaine
+                        </label>
+                        {{ form.category }}
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-800">
+                            Tags
+                        </label>
+                        {{ form.tags }}
+                    </div>
+
+                </div>
+
+                <!-- Contenu -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-gray-800">
+                        Description détaillée
+                    </label>
+                    {{ form.content }}
+                </div>
+
+                <!-- Actions -->
+                <div class="flex flex-wrap gap-4 pt-6">
+
+                    <button type="submit"
+                            class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition shadow-sm">
+                        Enregistrer
+                    </button>
+
+                    <a href="{{ topic.get_absolute_url }}"
+                       class="text-gray-500 hover:text-gray-700 text-sm transition">
+                        Annuler
+                    </a>
+
+                </div>
+
+            </form>
+
+        </div>
+
+        <!-- ================= SIDEBAR ================= -->
+        <aside class="hidden lg:block space-y-6">
+
+            <!-- Information Card -->
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
+
+                <div class="flex items-center gap-3">
+                    <!-- Info Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-5 w-5 text-primary-600"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M13 16h-1v-4h-1m1-4h.01"/>
+                    </svg>
+                    <h3 class="font-semibold text-gray-800">
+                        Bonnes pratiques
+                    </h3>
+                </div>
+
+                <ul class="text-sm text-gray-600 space-y-2">
+                    <li>• Maintenez un titre précis et descriptif.</li>
+                    <li>• Clarifiez les modifications apportées.</li>
+                    <li>• Évitez de modifier le sens initial de la question.</li>
+                </ul>
+
             </div>
 
-            <!-- Catégorie -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-3">
-                    Domaine
-                </label>
-                {{ form.category }}
+            <!-- Institutional Reminder -->
+            <div class="bg-primary-50 border border-primary-100 rounded-xl p-5 text-sm text-gray-600">
+                Toute modification importante peut influencer
+                la pertinence des réponses existantes.
             </div>
 
-            <!-- Tags -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-3">
-                    Tags
-                </label>
-                {{ form.tags }}
-            </div>
-
-            <!-- Contenu -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-3">
-                    Description
-                </label>
-                {{ form.content }}
-            </div>
-
-            <!-- Image -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-3">
-                    Image
-                </label>
-
-                {% if topic.cover_image %}
-                    <img src="{{ topic.cover_image.url }}"
-                         class="w-40 rounded-lg shadow mb-4">
-                {% endif %}
-
-                {{ form.cover_image }}
-            </div>
-
-            <!-- Actions -->
-            <div class="flex gap-6 pt-6">
-                <button type="submit"
-                        class="bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 rounded-xl font-semibold transition shadow-md">
-                    Enregistrer les modifications
-                </button>
-
-                <a href="{{ topic.get_absolute_url }}"
-                   class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition">
-                    Annuler
-                </a>
-            </div>
-
-        </form>
+        </aside>
 
     </div>
 </section>

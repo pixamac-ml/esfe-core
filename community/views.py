@@ -9,48 +9,194 @@ from django.utils import timezone
 from .models import Topic, Category, Answer, Vote, TopicView
 
 
-# =====================================================
-# LISTE PAR CATÉGORIE (Domaine)
-# =====================================================
-def topic_by_category(request, slug):
-    category = get_object_or_404(Category, slug=slug, is_active=True)
+from django.shortcuts import render, get_object_or_404
+from django.db.models import Count, Q
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+from django.contrib.auth import get_user_model
 
-    topics = (
+from .models import Topic, Category, Tag
+
+User = get_user_model()
+
+
+# =====================================================
+# BUILDER : QUERY TOPICS
+# =====================================================
+def build_topic_queryset(sort="active", query=""):
+
+    queryset = (
         Topic.objects
-        .filter(category=category, is_published=True)
+        .filter(is_published=True, is_deleted=False)
         .select_related("author", "category")
-        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
-        .order_by("-last_activity_at")
+        .prefetch_related("tags")
+        .annotate(
+            answer_count=Count(
+                "answers",
+                filter=Q(answers__is_deleted=False)
+            )
+        )
     )
 
-    categories = Category.objects.filter(is_active=True)
+    if query:
+        queryset = queryset.filter(
+            Q(title__icontains=query) |
+            Q(content__icontains=query) |
+            Q(tags__name__icontains=query)
+        ).distinct()
 
-    return render(request, "community/topic_list.html", {
-        "category": category,
-        "topics": topics,
+    sort_map = {
+        "recent": "-created_at",
+        "answers": "-answer_count",
+        "views": "-view_count",
+        "active": "-last_activity_at",
+    }
+
+    return queryset.order_by(sort_map.get(sort, "-last_activity_at"))
+
+
+# =====================================================
+# BUILDER : SIDEBAR CONTEXT
+# =====================================================
+def build_sidebar_context():
+
+    categories = (
+        Category.objects
+        .filter(is_active=True)
+        .annotate(
+            topic_count=Count(
+                "topics",
+                filter=Q(
+                    topics__is_deleted=False,
+                    topics__is_published=True
+                )
+            )
+        )
+        .order_by("name")
+    )
+
+    top_users = (
+        User.objects
+        .annotate(
+            answer_count=Count(
+                "community_answers",
+                filter=Q(community_answers__is_deleted=False)
+            )
+        )
+        .filter(answer_count__gt=0)
+        .order_by("-answer_count")[:5]
+    )
+
+    popular_tags = (
+        Tag.objects
+        .annotate(
+            topic_count=Count(
+                "topics",
+                filter=Q(
+                    topics__is_deleted=False,
+                    topics__is_published=True
+                )
+            )
+        )
+        .filter(topic_count__gt=0)
+        .order_by("-topic_count")[:8]
+    )
+
+    return {
         "categories": categories,
-    })
+        "top_users": top_users,
+        "popular_tags": popular_tags,
+    }
 
 
 # =====================================================
 # LISTE GÉNÉRALE
 # =====================================================
 def topic_list(request):
-    topics = (
-        Topic.objects
-        .filter(is_published=True)
-        .select_related("author", "category")
-        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
-        .order_by("-last_activity_at")
-    )
 
-    categories = Category.objects.filter(is_active=True)
+    sort = request.GET.get("sort", "active")
+    query = request.GET.get("q", "").strip()
 
-    return render(request, "community/topic_list.html", {
+    topics = build_topic_queryset(sort=sort, query=query)
+
+    context = {
         "topics": topics,
-        "categories": categories,
-    })
+        "current_sort": sort,
+        "query": query,
+        **build_sidebar_context(),
+    }
 
+    if request.headers.get("HX-Request"):
+        html = render_to_string(
+            "community/partials/topic_list_items.html",
+            context,
+            request=request
+        )
+        return HttpResponse(html)
+
+    return render(request, "community/topic_list.html", context)
+
+
+# =====================================================
+# LISTE PAR TAG
+# =====================================================
+def topic_by_tag(request, slug):
+
+    sort = request.GET.get("sort", "active")
+    query = request.GET.get("q", "").strip()
+
+    tag = get_object_or_404(Tag, slug=slug)
+
+    topics = build_topic_queryset(sort=sort, query=query).filter(tags=tag)
+
+    context = {
+        "topics": topics,
+        "tag": tag,
+        "current_sort": sort,
+        "query": query,
+        **build_sidebar_context(),
+    }
+
+    if request.headers.get("HX-Request"):
+        html = render_to_string(
+            "community/partials/topic_list_items.html",
+            context,
+            request=request
+        )
+        return HttpResponse(html)
+
+    return render(request, "community/topic_list.html", context)
+
+
+# =====================================================
+# LISTE PAR CATÉGORIE
+# =====================================================
+def topic_by_category(request, slug):
+
+    sort = request.GET.get("sort", "active")
+    query = request.GET.get("q", "").strip()
+
+    category = get_object_or_404(Category, slug=slug, is_active=True)
+
+    topics = build_topic_queryset(sort=sort, query=query).filter(category=category)
+
+    context = {
+        "topics": topics,
+        "category": category,
+        "current_sort": sort,
+        "query": query,
+        **build_sidebar_context(),
+    }
+
+    if request.headers.get("HX-Request"):
+        html = render_to_string(
+            "community/partials/topic_list_items.html",
+            context,
+            request=request
+        )
+        return HttpResponse(html)
+
+    return render(request, "community/topic_list.html", context)
 
 # =====================================================
 # DÉTAIL D’UN SUJET
@@ -211,38 +357,7 @@ def vote_answer(request, answer_id):
 
     return HttpResponse(status=204)
 
-from .models import Topic, Category, Answer, Vote, TopicView, Tag
 
-
-# =====================================================
-# LISTE PAR TAG
-# =====================================================
-def topic_by_tag(request, slug):
-    tag = get_object_or_404(Tag, slug=slug)
-
-    topics = (
-        Topic.objects
-        .filter(
-            tags=tag,
-            is_published=True
-        )
-        .select_related("author", "category")
-        .annotate(
-            answer_count=Count(
-                "answers",
-                filter=Q(answers__is_deleted=False)
-            )
-        )
-        .order_by("-last_activity_at")
-    )
-
-    categories = Category.objects.filter(is_active=True)
-
-    return render(request, "community/topic_list.html", {
-        "tag": tag,
-        "topics": topics,
-        "categories": categories,
-    })
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
@@ -331,3 +446,61 @@ def delete_topic(request, slug):
     topic.save(update_fields=["is_deleted"])
 
     return redirect("accounts:profile")
+
+
+from django.contrib.auth import get_user_model
+from django.db.models import Count, Q
+
+
+
+def members_list(request):
+
+    users = (
+        User.objects
+        .annotate(
+            topic_count=Count(
+                "community_topics",
+                filter=Q(community_topics__is_deleted=False)
+            ),
+            answer_count=Count(
+                "community_answers",
+                filter=Q(community_answers__is_deleted=False)
+            )
+        )
+        .filter(Q(topic_count__gt=0) | Q(answer_count__gt=0))
+        .order_by("-answer_count", "-topic_count")
+    )
+
+    return render(request, "community/members_list.html", {
+        "users": users
+    })
+
+from django.shortcuts import get_object_or_404
+
+
+def public_profile(request, username):
+
+    user = get_object_or_404(User, username=username)
+
+    topics = user.community_topics.filter(
+        is_deleted=False
+    ).order_by("-created_at")
+
+    answers = user.community_answers.filter(
+        is_deleted=False
+    ).order_by("-created_at")
+
+    stats = {
+        "topic_count": topics.count(),
+        "answer_count": answers.count(),
+        "accepted_count": answers.filter(
+            accepted_for_topics__isnull=False
+        ).count()
+    }
+
+    return render(request, "community/public_profile.html", {
+        "profile_user": user,
+        "topics": topics[:5],
+        "answers": answers[:5],
+        "stats": stats,
+    })

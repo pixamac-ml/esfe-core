@@ -1,0 +1,223 @@
+<!-- ================= DOMAINES ================= -->
+<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg">
+
+    <h3 class="text-lg font-semibold text-primary-700 mb-6 flex items-center gap-2">
+        <i class="fa-solid fa-book text-secondary"></i>
+        Domaines académiques
+    </h3>
+
+    <div class="space-y-2 text-sm">
+
+        {% for cat in categories %}
+        <a hx-get="{% url 'community:topic_by_category' cat.slug %}?sort={{ current_sort }}"
+           hx-target="#topic-list-container"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           class="flex items-center justify-between px-3 py-2 rounded-lg
+                  hover:bg-primary-50 transition-all duration-200 group cursor-pointer">
+
+            <div class="flex items-center gap-2 text-primary-600 group-hover:text-secondary transition">
+                <div class="w-6 h-6 flex items-center justify-center rounded-md bg-primary-100 text-primary-500 text-xs">
+                    <i class="fa-solid fa-folder"></i>
+                </div>
+                <span>{{ cat.name }}</span>
+            </div>
+
+            <div class="flex items-center gap-2 text-xs text-gray-400">
+                <span class="bg-gray-100 px-2 py-0.5 rounded-full">
+                    {{ cat.topic_count }}
+                </span>
+                <i class="fa-solid fa-angle-right text-primary-300 group-hover:text-secondary transition"></i>
+            </div>
+
+        </a>
+        {% empty %}
+        <p class="text-gray-400 text-sm">Aucun domaine disponible.</p>
+        {% endfor %}
+
+    </div>
+
+</div>
+
+
+
+<!-- ================= CONTRIBUTEURS STACK ================= -->
+<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg">
+
+    <!-- HEADER -->
+    <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-semibold text-primary-700 flex items-center gap-2">
+            <i class="fa-solid fa-medal text-secondary"></i>
+            Contributeurs actifs
+        </h3>
+
+        <a href="{% url 'community:members_list' %}"
+           class="text-primary-500 hover:text-secondary transition text-sm flex items-center gap-1">
+            Voir tous
+            <i class="fa-solid fa-arrow-right text-xs"></i>
+        </a>
+    </div>
+
+    <!-- AVATAR STACK -->
+    <div class="flex items-center relative">
+
+        {% for user in top_users|slice:":6" %}
+            <a href="{% url 'community:public_profile' user.username %}"
+               class="-ml-3 first:ml-0 relative group z-10 hover:z-20 transition-all duration-200">
+
+                <!-- Halo pour contributeur fort -->
+                {% if user.answer_count > 5 %}
+                    <div class="absolute inset-0 rounded-full ring-2 ring-secondary"></div>
+                {% endif %}
+
+                {% if user.profile and user.profile.image %}
+                    <img src="{{ user.profile.image.url }}"
+                         alt="{{ user.username }}"
+                         class="w-11 h-11 rounded-full border-2 border-white shadow-sm object-cover
+                                group-hover:scale-110 group-hover:shadow-md
+                                transition-all duration-200">
+                {% else %}
+                    <div class="w-11 h-11 rounded-full bg-gradient-to-br
+                                from-primary-100 to-primary-200
+                                border-2 border-white flex items-center justify-center
+                                text-primary-700 text-xs font-semibold shadow-sm
+                                group-hover:scale-110 group-hover:shadow-md
+                                transition-all duration-200">
+                        {{ user.username|first|upper }}
+                    </div>
+                {% endif %}
+
+                <!-- TOOLTIP -->
+                <div class="absolute -bottom-9 left-1/2 -translate-x-1/2
+                            bg-primary-700 text-white text-[10px]
+                            px-2 py-1 rounded opacity-0
+                            group-hover:opacity-100
+                            transition whitespace-nowrap shadow-md">
+                    {{ user.username }} • {{ user.answer_count }} réponses
+                </div>
+
+            </a>
+        {% endfor %}
+
+        <!-- +X USERS -->
+        {% if top_users|length > 6 %}
+            <a href="{% url 'community:members_list' %}"
+               class="-ml-3 w-11 h-11 rounded-full bg-gray-100
+                      border-2 border-white flex items-center justify-center
+                      text-xs text-gray-600 font-semibold shadow-sm
+                      hover:bg-gray-200 transition group">
+
+                +{{ top_users|length|add:"-6" }}
+
+                <div class="absolute -bottom-9 left-1/2 -translate-x-1/2
+                            bg-primary-700 text-white text-[10px]
+                            px-2 py-1 rounded opacity-0
+                            group-hover:opacity-100
+                            transition whitespace-nowrap shadow-md">
+                    Voir tous les contributeurs
+                </div>
+
+            </a>
+        {% endif %}
+
+    </div>
+
+    <!-- DESCRIPTION -->
+    <div class="mt-5 text-xs text-gray-400 flex items-center gap-2">
+        <i class="fa-solid fa-circle-info text-primary-300 text-[10px]"></i>
+        Cliquez sur un profil pour voir ses statistiques, sujets et contributions.
+    </div>
+
+</div>
+
+<!-- ================= TAGS POPULAIRES ================= -->
+<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg">
+
+    <h3 class="text-lg font-semibold text-primary-700 mb-6 flex items-center gap-2">
+        <i class="fa-solid fa-hashtag text-secondary"></i>
+        Tags populaires
+    </h3>
+
+    <div class="flex flex-wrap gap-2 text-xs">
+
+        {% for tag in popular_tags %}
+        <a hx-get="{% url 'community:topic_by_tag' tag.slug %}?sort={{ current_sort }}"
+           hx-target="#topic-list-container"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           class="bg-primary-50 text-primary-600 px-3 py-1 rounded-md
+                  hover:bg-primary-100 hover:text-secondary transition-all duration-200
+                  flex items-center gap-1 shadow-sm hover:shadow cursor-pointer">
+
+            <i class="fa-solid fa-tag text-[9px] opacity-70"></i>
+            <span>{{ tag.name }}</span>
+            <span class="bg-white text-gray-400 px-1 rounded text-[10px]">
+                {{ tag.topic_count }}
+            </span>
+
+        </a>
+        {% empty %}
+        <p class="text-gray-400 text-sm">Aucun tag populaire.</p>
+        {% endfor %}
+
+    </div>
+
+</div>
+
+
+
+<!-- ================= STATS GLOBALES ================= -->
+<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg">
+
+    <h3 class="text-lg font-semibold text-primary-700 mb-6 flex items-center gap-2">
+        <i class="fa-solid fa-chart-line text-secondary"></i>
+        Activité
+    </h3>
+
+    <div class="space-y-4 text-sm">
+
+        <div class="flex items-center justify-between">
+            <span class="flex items-center gap-2 text-gray-600">
+                <i class="fa-solid fa-comments text-primary-400 text-xs"></i>
+                Discussions
+            </span>
+            <span class="font-semibold text-primary-700">
+                {{ topics|length }}
+            </span>
+        </div>
+
+        <div class="flex items-center justify-between">
+            <span class="flex items-center gap-2 text-gray-600">
+                <i class="fa-solid fa-users text-primary-400 text-xs"></i>
+                Membres actifs
+            </span>
+            <span class="font-semibold text-primary-700">
+                {{ top_users|length }}
+            </span>
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- ================= À PROPOS ================= -->
+<div class="bg-gradient-to-br from-primary-50 to-white rounded-xl border border-primary-100 shadow-sm p-6">
+
+    <h3 class="text-lg font-semibold text-primary-700 mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-circle-info text-secondary"></i>
+        À propos
+    </h3>
+
+    <p class="text-sm text-gray-600 leading-relaxed">
+        Plateforme académique dédiée à la validation scientifique,
+        à l'entraide professionnelle et à la diffusion rigoureuse du savoir clinique.
+    </p>
+
+    <div class="mt-5 text-xs text-gray-400 flex items-center gap-2">
+        <i class="fa-solid fa-shield-heart"></i>
+        Modération académique active & validation par les pairs
+    </div>
+
+</div>

@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.utils.functional import cached_property
-from ckeditor.fields import RichTextField
+from django_ckeditor_5.fields import CKEditor5Field
 import uuid
 
 
@@ -93,7 +93,7 @@ class LegalPage(models.Model):
 
     page_type = models.CharField(max_length=20, choices=PAGE_TYPES, unique=True)
     title = models.CharField(max_length=255)
-    introduction = RichTextField(blank=True)
+    introduction = CKEditor5Field("Introduction", config_name="default", blank=True)
 
     version = models.CharField(max_length=20, default="1.0")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
@@ -145,7 +145,10 @@ class LegalSection(models.Model):
     )
 
     title = models.CharField(max_length=255)
-    content = RichTextField()
+    content = CKEditor5Field(
+        "Contenu",
+        config_name="default"
+    )
 
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
@@ -167,7 +170,10 @@ class LegalSidebarBlock(models.Model):
     )
 
     title = models.CharField(max_length=255)
-    content = RichTextField()
+    content = CKEditor5Field(
+        "Contenu",
+        config_name="default"
+    )
 
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
@@ -313,8 +319,7 @@ class ContactMessage(models.Model):
 # ABOUT PAGE — STRUCTURE SIMPLIFIÉE & STABLE
 # ==========================================================
 
-from django.db import models
-from ckeditor.fields import RichTextField
+
 
 
 class AboutSection(models.Model):
@@ -343,7 +348,9 @@ class AboutSection(models.Model):
         null=True
     )
 
-    content = RichTextField(
+    content = CKEditor5Field(
+        "Contenu",
+        config_name="default",
         blank=True,
         null=True
     )

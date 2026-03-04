@@ -1,220 +1,110 @@
 {% load static %}
 
 <nav class="bg-primary-500 text-white sticky top-0 z-50 shadow-md">
-  <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
 
-    <!-- LOGO SEUL -->
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+
+    <!-- LOGO -->
     <a href="{% url 'core:home' %}" class="flex items-center">
       <img src="{% static 'images/logo-esfe.png' %}"
-           alt="École de Santé Félix Houphouët Boigny"
-           class="h-12 w-auto transition-transform duration-300 hover:scale-105">
+           alt="ESFE"
+           class="h-12 w-auto hover:scale-105 transition">
     </a>
 
-    <!-- MENU -->
-    <ul class="hidden md:flex items-center space-x-8 text-sm font-medium relative">
 
-      <!-- ACCUEIL -->
+    <!-- DESKTOP MENU -->
+    <ul class="hidden md:flex items-center space-x-8 text-sm font-medium">
+
       <li>
-        <a href="{% url 'core:home' %}"
-           class="hover:text-secondary-light transition">
+        <a href="{% url 'core:home' %}" class="hover:text-secondary-light transition">
           Accueil
         </a>
       </li>
 
-      <!-- ================= FORMATIONS ================= -->
+
+      <!-- FORMATIONS -->
       <li class="relative group">
 
         <a href="{% url 'formations:list' %}"
-           class="flex items-center space-x-1 hover:text-secondary-light transition">
-          <span>Formations</span>
+           class="flex items-center gap-1 hover:text-secondary-light transition">
+
+          Formations
+
           <svg class="w-4 h-4 group-hover:rotate-180 transition"
-               fill="none" stroke="currentColor" stroke-width="2"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
                viewBox="0 0 24 24">
             <path d="M6 9l6 6 6-6"/>
           </svg>
+
         </a>
 
-        <div class="absolute left-0 top-full mt-3 w-60
+        <div class="absolute left-0 mt-3 w-64
                     bg-primary-600 rounded-xl shadow-xl
-                    opacity-0 invisible translate-y-2
-                    group-hover:opacity-100 group-hover:visible
-                    group-hover:translate-y-0
-                    transition-all duration-200 ease-out">
+                    opacity-0 invisible
+                    group-hover:opacity-100
+                    group-hover:visible
+                    transition p-4">
 
           {% for cycle in cycles %}
-          <div class="relative group/cycle">
+          <div class="mb-3">
 
-            <div class="px-5 py-3 flex justify-between items-center
-                        hover:bg-primary-700 transition cursor-pointer">
-              <span class="font-semibold">{{ cycle.name }}</span>
-              <svg class="w-4 h-4 opacity-70"
-                   fill="none" stroke="currentColor" stroke-width="2"
-                   viewBox="0 0 24 24">
-                <path d="M9 6l6 6-6 6"/>
-              </svg>
-            </div>
+            <p class="font-semibold text-white/90 mb-1">
+              {{ cycle.name }}
+            </p>
 
-            <div class="absolute top-0 left-full ml-1 w-72
-                        bg-primary-700 rounded-xl shadow-xl
-                        opacity-0 invisible translate-x-2
-                        group-hover/cycle:opacity-100
-                        group-hover/cycle:visible
-                        group-hover/cycle:translate-x-0
-                        transition-all duration-200 ease-out p-5
-                        max-h-80 overflow-y-auto">
+            <ul class="text-sm space-y-1">
 
-              <ul class="space-y-2 text-sm">
-                {% for programme in cycle.programmes.all %}
-                {% if programme.is_active %}
-                <li>
-                  <a href="{{ programme.get_absolute_url }}"
-                     class="block hover:text-secondary-light transition">
-                    {{ programme.title }}
-                  </a>
-                </li>
-                {% endif %}
-                {% empty %}
-                <li class="text-white/50 text-xs">Aucun programme</li>
-                {% endfor %}
-              </ul>
+              {% for programme in cycle.programmes.all %}
+              <li>
+                <a href="{{ programme.get_absolute_url }}"
+                   class="block hover:text-secondary-light transition">
+                  {{ programme.title }}
+                </a>
+              </li>
+              {% empty %}
+              <li class="text-xs text-white/60">
+                Aucun programme
+              </li>
+              {% endfor %}
 
-            </div>
+            </ul>
 
           </div>
           {% endfor %}
 
         </div>
+
       </li>
 
-      <!-- ================= ACTUALITÉS ================= -->
-      <li class="relative group">
 
-        <a href="{% url 'news:list' %}"
-           class="flex items-center space-x-1 hover:text-secondary-light transition">
-          <span>Actualités</span>
-          <svg class="w-4 h-4 group-hover:rotate-180 transition"
-               fill="none" stroke="currentColor" stroke-width="2"
-               viewBox="0 0 24 24">
-            <path d="M6 9l6 6 6-6"/>
-          </svg>
-        </a>
-
-        <div class="absolute left-0 top-full mt-3 w-60
-                    bg-primary-600 rounded-xl shadow-xl
-                    opacity-0 invisible translate-y-2
-                    group-hover:opacity-100 group-hover:visible
-                    group-hover:translate-y-0
-                    transition-all duration-200 ease-out">
-
-          <div class="relative group/sub">
-
-            <div class="px-5 py-3 flex justify-between items-center
-                        hover:bg-primary-700 cursor-pointer">
-              <span class="font-semibold">Catégories</span>
-              <svg class="w-4 h-4 opacity-70"
-                   fill="none" stroke="currentColor" stroke-width="2"
-                   viewBox="0 0 24 24">
-                <path d="M9 6l6 6-6 6"/>
-              </svg>
-            </div>
-
-            <div class="absolute top-0 left-full ml-1 w-72
-                        bg-primary-700 rounded-xl shadow-xl
-                        opacity-0 invisible translate-x-2
-                        group-hover/sub:opacity-100
-                        group-hover/sub:visible
-                        group-hover/sub:translate-x-0
-                        transition-all duration-200 ease-out p-5
-                        max-h-80 overflow-y-auto">
-
-              <ul class="space-y-2 text-sm">
-                {% for category in news_categories %}
-                <li>
-                  <a href="{% url 'news:by_category' category.slug %}"
-                     class="block hover:text-secondary-light transition">
-                    {{ category.name }}
-                  </a>
-                </li>
-                {% empty %}
-                <li class="text-white/50 text-xs">Aucune catégorie</li>
-                {% endfor %}
-              </ul>
-
-            </div>
-
-          </div>
-
-        </div>
-      </li>
-
-      <!-- ================= BLOG ================= -->
-      <li class="relative group">
-
-        <a href="{% url 'blog:article_list' %}"
-           class="flex items-center space-x-1 hover:text-secondary-light transition">
-          <span>Blog</span>
-          <svg class="w-4 h-4 group-hover:rotate-180 transition"
-               fill="none" stroke="currentColor" stroke-width="2"
-               viewBox="0 0 24 24">
-            <path d="M6 9l6 6 6-6"/>
-          </svg>
-        </a>
-
-        <div class="absolute left-0 top-full mt-3 w-60
-                    bg-primary-600 rounded-xl shadow-xl
-                    opacity-0 invisible translate-y-2
-                    group-hover:opacity-100 group-hover:visible
-                    group-hover:translate-y-0
-                    transition-all duration-200 ease-out">
-
-          <div class="relative group/sub">
-
-            <div class="px-5 py-3 flex justify-between items-center
-                        hover:bg-primary-700 cursor-pointer">
-              <span class="font-semibold">Catégories</span>
-              <svg class="w-4 h-4 opacity-70"
-                   fill="none" stroke="currentColor" stroke-width="2"
-                   viewBox="0 0 24 24">
-                <path d="M9 6l6 6-6 6"/>
-              </svg>
-            </div>
-
-            <div class="absolute top-0 left-full ml-1 w-72
-                        bg-primary-700 rounded-xl shadow-xl
-                        opacity-0 invisible translate-x-2
-                        group-hover/sub:opacity-100
-                        group-hover/sub:visible
-                        group-hover/sub:translate-x-0
-                        transition-all duration-200 ease-out p-5
-                        max-h-80 overflow-y-auto">
-
-              <ul class="space-y-2 text-sm">
-                {% for category in blog_categories %}
-                <li>
-                  <a href="{% url 'blog:by_category' category.slug %}"
-                     class="block hover:text-secondary-light transition">
-                    {{ category.name }}
-                  </a>
-                </li>
-                {% empty %}
-                <li class="text-white/50 text-xs">Aucune catégorie</li>
-                {% endfor %}
-              </ul>
-
-            </div>
-
-          </div>
-
-        </div>
-      </li>
-
-      <!-- A PROPOS -->
+      <!-- BLOG -->
       <li>
-        <a href="{% url 'core:about' %}"
+        <a href="{% url 'blog:article_list' %}"
            class="hover:text-secondary-light transition">
-          À propos
+          Blog
         </a>
       </li>
+
+
+      <!-- ACTUALITÉS -->
+      <li>
+        <a href="{% url 'news:list' %}"
+           class="hover:text-secondary-light transition">
+          Actualités
+        </a>
+      </li>
+
+
+      <!-- COMMUNAUTÉ -->
+      <li>
+        <a href="{% url 'community:topic_list' %}"
+           class="hover:text-secondary-light transition">
+          Communauté
+        </a>
+      </li>
+
 
       <!-- CONTACT -->
       <li>
@@ -226,5 +116,130 @@
 
     </ul>
 
+
+
+    <!-- RIGHT AREA -->
+    <div class="flex items-center gap-6">
+
+      {% if user.is_authenticated %}
+
+      <!-- NOTIFICATIONS -->
+      <a href="{% url 'community:notifications' %}"
+         class="relative flex items-center"
+         aria-label="Notifications">
+
+        <span class="text-lg">🔔</span>
+
+        <!-- BADGE -->
+        <span id="notification-badge"
+              class="hidden absolute -top-1 -right-2
+                     bg-red-500 text-white text-xs
+                     px-1.5 py-0.5 rounded-full">
+        </span>
+
+      </a>
+
+
+      <!-- USER -->
+      <a href="{% url 'accounts:profile' %}"
+         class="text-sm hover:text-secondary-light transition">
+        {{ user.username }}
+      </a>
+
+      {% else %}
+
+      <!-- LOGIN -->
+      <a href="{% url 'login' %}"
+         class="bg-secondary px-4 py-2 rounded-lg text-sm hover:bg-secondary-dark transition">
+        Connexion
+      </a>
+
+      {% endif %}
+
+
+
+      <!-- MOBILE MENU BUTTON -->
+      <button id="menu-toggle"
+              class="md:hidden focus:outline-none"
+              aria-label="Menu">
+
+        <svg class="w-6 h-6"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="2"
+             viewBox="0 0 24 24">
+
+          <path d="M4 6h16M4 12h16M4 18h16"/>
+
+        </svg>
+
+      </button>
+
+    </div>
+
   </div>
+
+
+
+  <!-- MOBILE MENU -->
+  <div id="mobile-menu"
+       class="hidden md:hidden px-6 pb-6 bg-primary-500">
+
+    <ul class="space-y-4 text-sm">
+
+      <li>
+        <a href="{% url 'core:home' %}" class="block">
+          Accueil
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'formations:list' %}" class="block">
+          Formations
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'blog:article_list' %}" class="block">
+          Blog
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'news:list' %}" class="block">
+          Actualités
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'community:topic_list' %}" class="block">
+          Communauté
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'core:contact' %}" class="block">
+          Contact
+        </a>
+      </li>
+
+    </ul>
+
+  </div>
+
 </nav>
+
+
+
+<script>
+
+const btn = document.getElementById("menu-toggle")
+const menu = document.getElementById("mobile-menu")
+
+if (btn) {
+  btn.addEventListener("click", () => {
+    menu.classList.toggle("hidden")
+  })
+}
+
+</script>

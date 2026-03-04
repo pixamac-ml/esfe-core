@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="max-w-5xl mx-auto px-6 py-16">
+
+```
+<!-- HEADER -->
+<div class="flex items-center justify-between mb-10">
+
+    <h1 class="text-2xl font-bold text-primary-700">
+        Notifications
+    </h1>
+
+    {% if unread_count %}
+    <span class="text-sm bg-red-500 text-white px-3 py-1 rounded-full">
+        {{ unread_count }} non lue{{ unread_count|pluralize }}
+    </span>
+    {% endif %}
+
+</div>
+
+
+<!-- LISTE -->
+<div class="space-y-4">
+
+    {% for notification in notifications %}
+
+    <div class="bg-white border border-primary-100 rounded-xl p-6 shadow-sm hover:shadow-md transition">
+
+        <div class="flex items-start gap-4">
+
+            <!-- ICON -->
+            <div class="text-primary-600 text-lg pt-1">
+
+                {% if notification.notification_type == "new_topic" %}
+
+                    <i class="fa-solid fa-file-lines"></i>
+
+                {% elif notification.notification_type == "new_answer" %}
+
+                    <i class="fa-solid fa-comment-dots"></i>
+
+                {% elif notification.notification_type == "accepted_answer" %}
+
+                    <i class="fa-solid fa-circle-check text-green-500"></i>
+
+                {% else %}
+
+                    <i class="fa-solid fa-bell"></i>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- MESSAGE -->
+            <div class="flex-1 text-sm text-gray-700">
+
+                {% if notification.notification_type == "new_topic" %}
+
+                    <strong>{{ notification.actor }}</strong>
+                    a publié un nouveau sujet :
+
+                    <a href="{{ notification.topic.get_absolute_url }}"
+                       class="text-primary-600 hover:underline font-medium">
+
+                        {{ notification.topic.title }}
+
+                    </a>
+
+                {% elif notification.notification_type == "new_answer" %}
+
+                    <strong>{{ notification.actor }}</strong>
+                    a répondu à votre question :
+
+                    <a href="{{ notification.topic.get_absolute_url }}"
+                       class="text-primary-600 hover:underline font-medium">
+
+                        {{ notification.topic.title }}
+
+                    </a>
+
+                {% elif notification.notification_type == "accepted_answer" %}
+
+                    Votre réponse a été acceptée sur :
+
+                    <a href="{{ notification.topic.get_absolute_url }}"
+                       class="text-primary-600 hover:underline font-medium">
+
+                        {{ notification.topic.title }}
+
+                    </a>
+
+                {% endif %}
+
+
+                <!-- DATE -->
+                <div class="text-xs text-gray-400 mt-2">
+
+                    {{ notification.created_at|timesince }} ago
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% empty %}
+
+    <div class="bg-white border border-primary-100 rounded-xl p-10 text-center text-gray-500">
+
+        Aucune notification pour le moment.
+
+    </div>
+
+    {% endfor %}
+
+</div>
+```
+
+</section>
+
+{% endblock %}

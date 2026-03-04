@@ -371,3 +371,61 @@ class Attachment(models.Model):
 
     def __str__(self):
         return f"Fichier #{self.id} par {self.uploaded_by}"
+
+
+
+# ==========================
+# NOTIFICATION
+# ==========================
+class Notification(models.Model):
+
+    TYPE_CHOICES = (
+        ("new_topic", "Nouveau sujet"),
+        ("new_answer", "Nouvelle réponse"),
+        ("accepted_answer", "Réponse acceptée"),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications"
+    )
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="actions"
+    )
+
+    topic = models.ForeignKey(
+        Topic,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE
+    )
+
+    answer = models.ForeignKey(
+        Answer,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE
+    )
+
+    notification_type = models.CharField(
+        max_length=30,
+        choices=TYPE_CHOICES
+    )
+
+    is_read = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            Index(fields=["user"]),
+            Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Notification pour {self.user}"

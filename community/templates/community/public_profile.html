@@ -1,78 +1,195 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block content %}
 
-<section class="bg-gradient-to-br from-primary-700 to-primary-800 text-white py-20">
-    <div class="max-w-5xl mx-auto px-4 flex items-center gap-6">
+<div class="bg-soft min-h-screen">
 
-        {% if profile_user.profile.image %}
-            <img src="{{ profile_user.profile.image.url }}"
-                 class="w-24 h-24 rounded-full border-4 border-white object-cover shadow-lg">
-        {% else %}
-            <div class="w-24 h-24 rounded-full bg-white text-primary-700
-                        flex items-center justify-center text-3xl font-bold">
-                {{ profile_user.username|first|upper }}
-            </div>
-        {% endif %}
+<!-- HEADER PROFIL -->
 
-        <div>
-            <h1 class="text-3xl font-bold">{{ profile_user.username }}</h1>
-            <div class="text-primary-200 text-sm mt-2">
-                Membre actif de la communauté académique
-            </div>
-        </div>
+<section class="bg-primary-700 text-white py-16">
 
-    </div>
+<div class="max-w-6xl mx-auto px-4 flex items-center gap-6">
+
+{% if profile_user.profile.avatar %}
+<img src="{{ profile_user.profile.avatar.url }}"
+class="w-20 h-20 rounded-full border-4 border-white object-cover">
+{% else %}
+<div class="w-20 h-20 rounded-full bg-white text-primary-700 flex items-center justify-center text-2xl font-bold">
+{{ profile_user.username|first|upper }}
+</div>
+{% endif %}
+
+<div>
+
+<h1 class="text-2xl font-bold">
+{{ profile_user.username }}
+</h1>
+
+<p class="text-primary-100 text-sm mt-1">
+{{ profile_user.profile.bio|default:"Membre de la communauté académique" }}
+</p>
+
+<div class="flex gap-4 mt-3 text-primary-200 text-sm">
+
+<span class="flex items-center gap-1">
+<i data-lucide="calendar"></i>
+{{ profile_user.date_joined|date:"F Y" }}
+</span>
+
+<span class="flex items-center gap-1">
+<i data-lucide="award"></i>
+{{ stats.reputation }}
+</span>
+
+</div>
+
+</div>
+
+</div>
+
 </section>
 
 
-<section class="bg-soft py-16">
-    <div class="max-w-5xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- ANALYTICS -->
 
-        <!-- Stats -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-primary-100 text-center">
-            <div class="text-2xl font-bold text-primary-700">
-                {{ stats.topic_count }}
-            </div>
-            <div class="text-sm text-gray-500">Sujets publiés</div>
-        </div>
+<section class="py-12">
 
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-primary-100 text-center">
-            <div class="text-2xl font-bold text-primary-700">
-                {{ stats.answer_count }}
-            </div>
-            <div class="text-sm text-gray-500">Réponses</div>
-        </div>
+<div class="max-w-6xl mx-auto px-4 grid md:grid-cols-4 gap-6">
 
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-primary-100 text-center">
-            <div class="text-2xl font-bold text-green-600">
-                {{ stats.accepted_count }}
-            </div>
-            <div class="text-sm text-gray-500">Réponses acceptées</div>
-        </div>
+<div class="md:col-span-3 bg-white border rounded-xl shadow-sm p-6">
 
-    </div>
+<h2 class="font-semibold text-primary-700 mb-6 flex items-center gap-2">
+<i data-lucide="bar-chart"></i>
+Statistiques
+</h2>
+
+{% include "community/partials/profile/stats.html" %}
+
+</div>
+
+<div class="bg-white border rounded-xl shadow-sm p-6">
+
+<h2 class="font-semibold text-primary-700 mb-4 flex items-center gap-2">
+<i data-lucide="activity"></i>
+Activité
+</h2>
+
+<div class="h-32 flex items-center justify-center text-gray-400 text-sm">
+
+Graphique d'activité
+
+</div>
+
+</div>
+
+</div>
+
 </section>
 
 
-<section class="bg-white py-16">
-    <div class="max-w-5xl mx-auto px-4">
+<!-- CONTENU PRINCIPAL -->
 
-        <h2 class="text-xl font-semibold text-primary-700 mb-6">
-            Derniers sujets
-        </h2>
+<section class="pb-16">
 
-        <div class="space-y-4">
-            {% for topic in topics %}
-                <a href="{{ topic.get_absolute_url }}"
-                   class="block p-4 rounded-lg border border-primary-100 hover:bg-primary-50 transition">
-                    {{ topic.title }}
-                </a>
-            {% empty %}
-                <p class="text-gray-400">Aucun sujet publié.</p>
-            {% endfor %}
-        </div>
+<div class="max-w-6xl mx-auto px-4">
 
-    </div>
+<div class="bg-white border rounded-xl shadow-sm p-6">
+
+{% include "community/partials/profile/tabs.html" %}
+
+<div
+id="profile-content"
+hx-get="{% url 'community:profile_activity' profile_user.username %}"
+hx-trigger="load"
+hx-target="this"
+hx-swap="innerHTML"
+class="min-h-[200px]"
+>
+</div>
+
+</div>
+
+</div>
+
 </section>
+
+
+<!-- MODULES -->
+
+<section class="pb-20">
+
+<div class="max-w-6xl mx-auto px-4 grid md:grid-cols-3 gap-6">
+
+<div class="bg-white border rounded-xl shadow-sm p-6">
+
+<h3 class="font-semibold text-primary-700 mb-4 flex items-center gap-2">
+<i data-lucide="compass"></i>
+Domaines d'activité
+</h3>
+
+<div class="flex flex-wrap gap-2">
+
+{% for category in top_categories %}
+
+<span class="px-3 py-1 bg-primary-50 text-primary-700 text-sm rounded-full">
+{{ category.name }}
+</span>
+
+{% empty %}
+
+<span class="text-gray-400 text-sm">
+Aucune spécialité
+</span>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+
+<div class="md:col-span-2 bg-white border rounded-xl shadow-sm p-6">
+
+<h3 class="font-semibold text-primary-700 mb-4 flex items-center gap-2">
+<i data-lucide="trending-up"></i>
+Contributions populaires
+</h3>
+
+<div class="space-y-3">
+
+{% for answer in best_answers %}
+
+<a href="{{ answer.topic.get_absolute_url }}"
+class="flex justify-between items-center border rounded-lg p-3 hover:bg-primary-50">
+
+<span class="text-primary-700 font-medium">
+{{ answer.topic.title }}
+</span>
+
+<span class="text-green-600 flex items-center gap-1 text-sm">
+<i data-lucide="thumbs-up"></i>
+{{ answer.upvotes }}
+</span>
+
+</a>
+
+{% empty %}
+
+<p class="text-gray-400 text-sm">
+Aucune contribution notable
+</p>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+</div>
 
 {% endblock %}

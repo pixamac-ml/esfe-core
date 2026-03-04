@@ -7,6 +7,7 @@ from .models import (
     Vote,
     Attachment,
     TopicView,
+    Notification,
 )
 
 
@@ -47,6 +48,7 @@ class AttachmentInline(admin.TabularInline):
 # ==========================
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
+
     list_display = (
         "title",
         "author",
@@ -69,12 +71,26 @@ class TopicAdmin(admin.ModelAdmin):
     )
 
     search_fields = ("title", "content")
-    prepopulated_fields = {"slug": ("title",)}
-    raw_id_fields = ("author", "accepted_answer")
+
+    prepopulated_fields = {
+        "slug": ("title",)
+    }
+
+    raw_id_fields = (
+        "author",
+        "accepted_answer",
+    )
+
     filter_horizontal = ("tags",)
+
     inlines = [AttachmentInline]
 
-    readonly_fields = ("view_count", "last_activity_at", "created_at", "updated_at")
+    readonly_fields = (
+        "view_count",
+        "last_activity_at",
+        "created_at",
+        "updated_at",
+    )
 
     ordering = ("-last_activity_at",)
 
@@ -84,6 +100,7 @@ class TopicAdmin(admin.ModelAdmin):
 # ==========================
 @admin.register(Answer)
 class AnswerAdmin(admin.ModelAdmin):
+
     list_display = (
         "author",
         "topic",
@@ -100,7 +117,12 @@ class AnswerAdmin(admin.ModelAdmin):
     )
 
     search_fields = ("content",)
-    raw_id_fields = ("topic", "parent", "author")
+
+    raw_id_fields = (
+        "topic",
+        "parent",
+        "author",
+    )
 
     readonly_fields = ("created_at",)
 
@@ -112,9 +134,24 @@ class AnswerAdmin(admin.ModelAdmin):
 # ==========================
 @admin.register(Vote)
 class VoteAdmin(admin.ModelAdmin):
-    list_display = ("user", "answer", "value", "created_at")
-    list_filter = ("value", "created_at")
-    raw_id_fields = ("user", "answer")
+
+    list_display = (
+        "user",
+        "answer",
+        "value",
+        "created_at",
+    )
+
+    list_filter = (
+        "value",
+        "created_at",
+    )
+
+    raw_id_fields = (
+        "user",
+        "answer",
+    )
+
     ordering = ("-created_at",)
 
 
@@ -123,9 +160,21 @@ class VoteAdmin(admin.ModelAdmin):
 # ==========================
 @admin.register(TopicView)
 class TopicViewAdmin(admin.ModelAdmin):
-    list_display = ("topic", "user", "ip_address", "created_at")
+
+    list_display = (
+        "topic",
+        "user",
+        "ip_address",
+        "created_at",
+    )
+
     list_filter = ("created_at",)
-    raw_id_fields = ("topic", "user")
+
+    raw_id_fields = (
+        "topic",
+        "user",
+    )
+
     ordering = ("-created_at",)
 
 
@@ -134,6 +183,58 @@ class TopicViewAdmin(admin.ModelAdmin):
 # ==========================
 @admin.register(Attachment)
 class AttachmentAdmin(admin.ModelAdmin):
-    list_display = ("uploaded_by", "topic", "answer", "created_at")
-    raw_id_fields = ("uploaded_by", "topic", "answer")
+
+    list_display = (
+        "uploaded_by",
+        "topic",
+        "answer",
+        "created_at",
+    )
+
+    raw_id_fields = (
+        "uploaded_by",
+        "topic",
+        "answer",
+    )
+
+    ordering = ("-created_at",)
+
+
+# ==========================
+# NOTIFICATION
+# ==========================
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "user",
+        "actor",
+        "notification_type",
+        "topic",
+        "answer",
+        "is_read",
+        "created_at",
+    )
+
+    list_filter = (
+        "notification_type",
+        "is_read",
+        "created_at",
+    )
+
+    search_fields = (
+        "user__username",
+        "actor__username",
+        "topic__title",
+    )
+
+    raw_id_fields = (
+        "user",
+        "actor",
+        "topic",
+        "answer",
+    )
+
+    readonly_fields = ("created_at",)
+
     ordering = ("-created_at",)

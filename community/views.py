@@ -269,55 +269,102 @@ def topic_detail(request, slug):
 # =====================================================
 # AJOUT RÉPONSE (HTMX)
 # =====================================================
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404
+from django.http import HttpResponse, HttpResponseBadRequest
+from django.template.loader import render_to_string
+from django.utils import timezone
+
 @login_required
 @require_POST
 def add_answer(request, slug):
+
+    # ===============================
+    # Récupération du sujet
+    # ===============================
     topic = get_object_or_404(
-        Topic,
+        Topic.objects.select_related("author", "category"),
         slug=slug,
         is_locked=False,
         is_published=True
     )
 
-    content = request.POST.get("content")
+    # ===============================
+    # Récupération contenu
+    # ===============================
+    content = request.POST.get("content", "").strip()
 
-    if not content or not content.strip():
-        return HttpResponseBadRequest("Contenu invalide.")
+    if not content:
+        return HttpResponseBadRequest("Contenu vide ou invalide.")
 
-    parent_id = request.POST.get("parent_id")
+    # ===============================
+    # Gestion réponse ou sous-réponse
+    # ===============================
     parent = None
+    parent_id = request.POST.get("parent_id")
 
     if parent_id:
         parent = Answer.objects.filter(
             id=parent_id,
-            topic=topic
-        ).first()
+            topic=topic,
+            is_deleted=False
+        ).select_related("author").first()
 
+        if not parent:
+            return HttpResponseBadRequest("Réponse parent invalide.")
+
+    # ===============================
+    # Création réponse
+    # ===============================
     answer = Answer.objects.create(
         topic=topic,
         author=request.user,
-        content=content.strip(),
+        content=content,
         parent=parent
     )
 
-    # Mise à jour activité du topic
-    topic.last_activity_at = timezone.now()
-    topic.save(update_fields=["last_activity_at"])
+    # ===============================
+    # Mise à jour activité du sujet
+    # ===============================
+    Topic.objects.filter(pk=topic.pk).update(
+        last_activity_at=timezone.now()
+    )
 
+    # ===============================
+    # Préchargement auteur pour template
+    # ===============================
+    answer = (
+        Answer.objects
+        .select_related("author")
+        .get(pk=answer.pk)
+    )
+
+    # ===============================
+    # Réponse HTMX
+    # ===============================
     if request.headers.get("HX-Request"):
+
         template_name = "community/partials/answer_item.html"
+
         if parent:
             template_name = "community/partials/reply_item.html"
 
         html = render_to_string(
             template_name,
-            {"answer": answer},
+            {
+                "answer": answer,
+                "topic": topic,
+            },
             request=request
         )
+
         return HttpResponse(html)
 
+    # ===============================
+    # Fallback (sécurité)
+    # ===============================
     return HttpResponse(status=204)
-
 
 # =====================================================
 # VOTE RÉPONSE (HTMX)
@@ -364,45 +411,90 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 from .forms import TopicForm
+from .models import Category
+from community.services.notifications import create_notification
+
+
+User = get_user_model()
 
 
 @login_required
 def create_topic(request):
 
     if request.method == "POST":
+
         form = TopicForm(request.POST, request.FILES)
 
         if form.is_valid():
+
             topic = form.save(commit=False)
             topic.author = request.user
             topic.last_activity_at = timezone.now()
             topic.save()
+
             form.save_m2m()
 
-            # 🔥 Si requête HTMX → redirection dynamique
+            # ==================================================
+            # NOTIFICATIONS EXPERTS DU DOMAINE
+            # ==================================================
+
+            category = topic.category
+
+            # Utilisateurs intéressés par cette catégorie
+            experts = User.objects.filter(
+                profile__specialties=category
+            ).exclude(id=request.user.id)
+
+            for user in experts:
+
+                create_notification(
+                    user=user,
+                    actor=request.user,
+                    topic=topic,
+                    notification_type="new_topic",
+                    send_email=True   # email pour nouvelle question
+                )
+
+            # ==================================================
+            # REDIRECTION HTMX
+            # ==================================================
+
             if request.headers.get("HX-Request"):
+
                 response = HttpResponse()
                 response["HX-Redirect"] = topic.get_absolute_url()
+
                 return response
 
-            # Fallback classique
             return redirect(topic.get_absolute_url())
 
-        # 🔁 Si erreurs + HTMX → renvoyer uniquement le formulaire
+        # ==================================================
+        # ERREURS FORMULAIRE HTMX
+        # ==================================================
+
         if request.headers.get("HX-Request"):
+
             html = render_to_string(
                 "community/partials/topic_form.html",
                 {"form": form},
                 request=request
             )
+
             return HttpResponse(html)
 
     else:
+
         form = TopicForm()
 
-    return render(request, "community/create_topic.html", {"form": form})
+    return render(
+        request,
+        "community/create_topic.html",
+        {"form": form}
+    )
+
 
 
 @login_required
@@ -475,32 +567,366 @@ def members_list(request):
         "users": users
     })
 
-from django.shortcuts import get_object_or_404
+
+
+
+# ==========================================
+# PROFIL PUBLIC UTILISATEUR
+# ==========================================
+
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth import get_user_model
+from django.db.models import Count, Sum
+from django.db.models.functions import Coalesce
+
+from .models import Category
+
+User = get_user_model()
 
 
 def public_profile(request, username):
 
-    user = get_object_or_404(User, username=username)
+    user = get_object_or_404(
+        User.objects.select_related("profile"),
+        username=username
+    )
 
-    topics = user.community_topics.filter(
-        is_deleted=False
-    ).order_by("-created_at")
+    profile = user.profile
 
-    answers = user.community_answers.filter(
-        is_deleted=False
-    ).order_by("-created_at")
+    # ======================================
+    # SUJETS DE L'UTILISATEUR
+    # ======================================
+
+    topics = (
+        user.community_topics
+        .filter(is_deleted=False)
+        .select_related("category")
+        .annotate(answer_count=Count("answers"))
+        .order_by("-created_at")
+    )
+
+    # ======================================
+    # RÉPONSES UTILISATEUR
+    # ======================================
+
+    answers = (
+        user.community_answers
+        .filter(is_deleted=False)
+        .select_related("topic")
+        .order_by("-created_at")
+    )
+
+    # ======================================
+    # CONTRIBUTIONS POPULAIRES
+    # ======================================
+
+    best_answers = answers.order_by("-upvotes")[:5]
+
+    # ======================================
+    # DOMAINES D'ACTIVITÉ
+    # ======================================
+
+    top_categories = (
+        Category.objects
+        .filter(topics__answers__author=user)
+        .annotate(
+            answer_count=Count("topics__answers")
+        )
+        .order_by("-answer_count")[:5]
+    )
+
+    # ======================================
+    # STATISTIQUES
+    # ======================================
+
+    total_upvotes = answers.aggregate(
+        total=Coalesce(Sum("upvotes"), 0)
+    )["total"]
+
+    total_downvotes = answers.aggregate(
+        total=Coalesce(Sum("downvotes"), 0)
+    )["total"]
+
+    score = total_upvotes - total_downvotes
 
     stats = {
-        "topic_count": topics.count(),
-        "answer_count": answers.count(),
-        "accepted_count": answers.filter(
-            accepted_for_topics__isnull=False
-        ).count()
+        "topics": profile.total_topics,
+        "answers": profile.total_answers,
+        "accepted": profile.total_accepted_answers,
+        "upvotes": total_upvotes,
+        "views": profile.total_views_generated,
+        "reputation": score,
     }
 
-    return render(request, "community/public_profile.html", {
+    # ======================================
+    # ACTIVITÉ RÉCENTE
+    # ======================================
+
+    recent_activity = list(answers[:5]) + list(topics[:5])
+    recent_activity = sorted(
+        recent_activity,
+        key=lambda x: x.created_at,
+        reverse=True
+    )[:8]
+
+    # ======================================
+    # CONTEXTE TEMPLATE
+    # ======================================
+
+    context = {
         "profile_user": user,
+        "profile": profile,
+
         "topics": topics[:5],
         "answers": answers[:5],
+
+        "best_answers": best_answers,
+        "top_categories": top_categories,
+
+        "recent_activity": recent_activity,
+
         "stats": stats,
-    })
+    }
+
+    return render(
+        request,
+        "community/public_profile.html",
+        context
+    )
+
+def profile_activity(request, username):
+
+    if not request.htmx:
+        return redirect("community:public_profile", username=username)
+
+    user = get_object_or_404(
+        User.objects.select_related("profile"),
+        username=username
+    )
+
+    answers = (
+        user.community_answers
+        .filter(is_deleted=False)
+        .select_related("topic", "topic__category")
+        .order_by("-created_at")[:10]
+    )
+
+    topics = (
+        user.community_topics
+        .filter(is_deleted=False)
+        .select_related("category")
+        .order_by("-created_at")[:5]
+    )
+
+    return render(
+        request,
+        "community/partials/profile/activity.html",
+        {
+            "profile_user": user,
+            "answers": answers,
+            "topics": topics,
+        },
+    )
+
+def profile_answers(request, username):
+
+    if not request.htmx:
+        return redirect("community:public_profile", username=username)
+
+    user = get_object_or_404(
+        User.objects.select_related("profile"),
+        username=username
+    )
+
+    answers = (
+        user.community_answers
+        .filter(is_deleted=False)
+        .select_related("topic", "topic__category")
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "community/partials/profile/answers.html",
+        {
+            "profile_user": user,
+            "answers": answers,
+        },
+    )
+
+from django.db.models import Count
+
+
+def profile_topics(request, username):
+
+    if not request.htmx:
+        return redirect("community:public_profile", username=username)
+
+    user = get_object_or_404(
+        User.objects.select_related("profile"),
+        username=username
+    )
+
+    topics = (
+        user.community_topics
+        .filter(is_deleted=False)
+        .select_related("category")
+        .annotate(
+            answers_count=Count("answers")
+        )
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "community/partials/profile/topics.html",
+        {
+            "profile_user": user,
+            "topics": topics,
+        },
+    )
+
+
+from django.db.models import Count
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+def profile_badges(request, username):
+
+    if not request.htmx:
+        return redirect("community:public_profile", username=username)
+
+    user = get_object_or_404(
+        User.objects.select_related("profile"),
+        username=username
+    )
+
+    answers = (
+        user.community_answers
+        .filter(is_deleted=False)
+    )
+
+    topics = (
+        user.community_topics
+        .filter(is_deleted=False)
+    )
+
+    # statistiques
+    answers_count = answers.count()
+
+    accepted_answers = answers.filter(
+        accepted_for_topics__isnull=False
+    ).count()
+
+    upvotes = answers.aggregate(
+        total=Count("votes")
+    )["total"] or 0
+
+    # logique badges
+
+    badges = {
+
+        "beginner": {
+            "title": "Débutant",
+            "description": "Première réponse publiée",
+            "icon": "award",
+            "earned": answers_count >= 1,
+            "progress": min(answers_count, 1),
+            "target": 1,
+        },
+
+        "contributor": {
+            "title": "Contributeur",
+            "description": "10 réponses utiles",
+            "icon": "star",
+            "earned": answers_count >= 10,
+            "progress": min(answers_count, 10),
+            "target": 10,
+        },
+
+        "expert": {
+            "title": "Expert",
+            "description": "50 réponses utiles",
+            "icon": "medal",
+            "earned": answers_count >= 50,
+            "progress": min(answers_count, 50),
+            "target": 50,
+        },
+
+        "specialist": {
+            "title": "Spécialiste",
+            "description": "Réponse acceptée comme solution",
+            "icon": "brain",
+            "earned": accepted_answers >= 5,
+            "progress": min(accepted_answers, 5),
+            "target": 5,
+        },
+
+    }
+
+    return render(
+        request,
+        "community/partials/profile/badges.html",
+        {
+            "profile_user": user,
+            "badges": badges,
+        },
+    )
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.db.models import Prefetch
+from django.utils import timezone
+
+from .models import Notification
+
+
+@login_required
+def notifications(request):
+
+    # ==============================
+    # Récupération optimisée
+    # ==============================
+
+    notifications = (
+        Notification.objects
+        .filter(user=request.user)
+        .select_related(
+            "actor",
+            "topic",
+            "answer"
+        )
+        .order_by("-created_at")
+    )
+
+    # ==============================
+    # Statistiques rapides
+    # ==============================
+
+    unread_count = notifications.filter(is_read=False).count()
+
+    # ==============================
+    # Marquer comme lues
+    # ==============================
+
+    notifications.filter(is_read=False).update(
+        is_read=True
+    )
+
+    # ==============================
+    # Contexte
+    # ==============================
+
+    context = {
+        "notifications": notifications,
+        "unread_count": unread_count,
+    }
+
+    return render(
+        request,
+        "community/notifications.html",
+        context
+    )

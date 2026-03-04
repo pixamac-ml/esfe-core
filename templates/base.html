@@ -25,7 +25,8 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script defer src="https://unpkg.com/@alpinejs/intersect@3.13.5/dist/cdn.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
-
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   {% block extra_head %}{% endblock %}
 </head>
 <style>
@@ -140,7 +141,7 @@
     <div x-show="visible"
          x-transition
          class="w-full backdrop-blur-md bg-white/80 shadow-md">
-      {% component "navbar" %}{% endcomponent %}
+      {% component "navbar" request=request %}{% endcomponent %}
     </div>
   </div>
 
@@ -231,6 +232,31 @@
 <script src="{% static 'admin/js/SelectBox.js' %}"></script>
 <script src="{% static 'admin/js/SelectFilter2.js' %}"></script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+
+<script>
+
+document.body.addEventListener("htmx:afterSwap", function(evt){
+
+    if(evt.target.id !== "profile-content") return;
+
+    const tabs = document.querySelectorAll(".profile-tab");
+
+    tabs.forEach(tab=>{
+        tab.classList.remove("border-primary-600","text-primary-700");
+    });
+
+    const url = evt.detail.requestConfig.path;
+
+    tabs.forEach(tab=>{
+        if(tab.getAttribute("hx-get") === url){
+            tab.classList.add("border-primary-600","text-primary-700");
+        }
+    });
+
+});
+
+</script>
 
 </body>
 </html>

@@ -20,7 +20,7 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
 DEBUG = True
-ALLOWED_HOSTS = ["127.0.0.1", "localhost","192.168.93.68"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost","192.168.93.68","192.168.2.5"]
 
 # ==================================================
 # APPLICATIONS
@@ -30,7 +30,7 @@ INSTALLED_APPS = [
 
     # 🔥 django-components
     "django_components",
-
+    "channels",
     # Django core
     "django.contrib.admin",
     "django.contrib.auth",
@@ -61,7 +61,7 @@ INSTALLED_APPS = [
     "blog.apps.BlogConfig",
     "news",
     "community",
-    "accounts",
+    "accounts.apps.AccountsConfig",
 ]
 
 # ==================================================
@@ -91,11 +91,16 @@ MIDDLEWARE = [
 ]
 
 # ==================================================
-# URLS / WSGI
+# URLS / WSGI / ASGI
 # ==================================================
 
 ROOT_URLCONF = "config.urls"
+
+# WSGI (HTTP classique)
 WSGI_APPLICATION = "config.wsgi.application"
+
+# ASGI (WebSockets / temps réel)
+ASGI_APPLICATION = "config.asgi.application"
 
 # ==================================================
 # TEMPLATES
@@ -130,6 +135,20 @@ DATABASES = {
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
     }
+}
+
+
+# ==================================================
+# DJANGO CHANNELS (WebSockets)
+# ==================================================
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
 }
 
 # ==================================================

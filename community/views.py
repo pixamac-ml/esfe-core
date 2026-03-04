@@ -77,6 +77,7 @@ def build_sidebar_context():
 
     top_users = (
         User.objects
+        .select_related("profile")
         .annotate(
             answer_count=Count(
                 "community_answers",
@@ -84,9 +85,8 @@ def build_sidebar_context():
             )
         )
         .filter(answer_count__gt=0)
-        .order_by("-answer_count")[:5]
+        .order_by("-answer_count")[:10]
     )
-
     popular_tags = (
         Tag.objects
         .annotate(

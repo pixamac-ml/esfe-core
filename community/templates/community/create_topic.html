@@ -4,134 +4,256 @@
 {% block content %}
 
 <!-- ================= HERO ================= -->
-<section class="relative pt-24 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+
+<section class="relative pt-28 pb-20 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+
     <div class="max-w-6xl mx-auto px-4">
 
+        <!-- retour -->
         <a href="{% url 'community:topic_list' %}"
            class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition mb-6">
-            <!-- Arrow Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                 viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      stroke-width="2" d="M15 19l-7-7 7-7"/>
+
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-4 w-4"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor">
+
+                <path stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15 19l-7-7 7-7"/>
+
             </svg>
+
             Retour aux discussions
+
         </a>
 
+        <!-- titre -->
         <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
-            Publier un nouveau sujet
+            Publier une nouvelle question
         </h1>
 
+        <!-- description -->
         <p class="text-primary-100 mt-3 max-w-2xl text-sm leading-relaxed">
-            Formulez votre question avec clarté afin de permettre à notre communauté académique
-            de vous accompagner efficacement.
+            Posez une question claire et précise afin de bénéficier de l’expertise
+            de la communauté académique et professionnelle de l’École de Santé.
         </p>
 
     </div>
+
 </section>
 
+
+
 <!-- ================= CONTENT ================= -->
+
 <section class="bg-gray-50 py-20">
+
     <div class="max-w-6xl mx-auto px-4 grid lg:grid-cols-3 gap-12">
 
-        <!-- ================= FORM ================= -->
+        <!-- ================================================= -->
+        <!-- FORMULAIRE PRINCIPAL -->
+        <!-- ================================================= -->
+
         <div class="lg:col-span-2">
-            <div id="topic-form-container">
-                {% include "community/partials/topic_form.html" %}
+
+            <!-- Django messages -->
+            {% if messages %}
+            <div class="mb-6 space-y-3">
+
+                {% for message in messages %}
+
+                <div class="rounded-lg px-4 py-3 text-sm border
+
+                    {% if message.tags == 'success' %}
+                        bg-green-50 text-green-700 border-green-200
+                    {% elif message.tags == 'error' %}
+                        bg-red-50 text-red-700 border-red-200
+                    {% else %}
+                        bg-gray-100 text-gray-700 border-gray-200
+                    {% endif %}">
+
+                    {{ message }}
+
+                </div>
+
+                {% endfor %}
+
             </div>
+            {% endif %}
+
+
+            <!-- ================= FORM CARD ================= -->
+
+            <div id="topic-form-container"
+                 class="bg-white border border-gray-200 rounded-xl shadow-sm p-8 space-y-6">
+
+                <!-- header -->
+                <div class="flex items-center justify-between">
+
+                    <h2 class="text-lg font-semibold text-gray-800">
+                        Votre question
+                    </h2>
+
+                    <span class="text-xs text-gray-400">
+                        Les champs marqués * sont obligatoires
+                    </span>
+
+                </div>
+
+                <!-- formulaire -->
+                {% include "community/partials/topic_form.html" %}
+
+            </div>
+
         </div>
 
-        <!-- ================= SIDEBAR ================= -->
+
+
+        <!-- ================================================= -->
+        <!-- SIDEBAR -->
+        <!-- ================================================= -->
+
         <aside class="space-y-6 hidden lg:block">
 
-            <!-- Guidance Card -->
+            <!-- ================= GUIDE ================= -->
+
             <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-5">
 
                 <div class="flex items-center gap-3">
-                    <!-- Book Icon -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary-600"
-                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
+
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-5 w-5 text-primary-600"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
                               stroke-width="2"
                               d="M12 6v12m8-6H4"/>
+
                     </svg>
+
                     <h3 class="font-semibold text-gray-800">
                         Guide de rédaction
                     </h3>
+
                 </div>
+
 
                 <div class="space-y-4 text-sm text-gray-600">
 
                     <div class="flex gap-3">
+
                         <svg xmlns="http://www.w3.org/2000/svg"
                              class="h-4 w-4 mt-1 text-primary-500"
-                             fill="none" viewBox="0 0 24 24"
+                             fill="none"
+                             viewBox="0 0 24 24"
                              stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
+
+                            <path stroke-linecap="round"
+                                  stroke-linejoin="round"
                                   stroke-width="2"
                                   d="M5 13l4 4L19 7"/>
+
                         </svg>
+
                         <div>
                             Résumez clairement le problème dans le titre.
                         </div>
+
                     </div>
 
+
                     <div class="flex gap-3">
+
                         <svg xmlns="http://www.w3.org/2000/svg"
                              class="h-4 w-4 mt-1 text-primary-500"
-                             fill="none" viewBox="0 0 24 24"
+                             fill="none"
+                             viewBox="0 0 24 24"
                              stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
+
+                            <path stroke-linecap="round"
+                                  stroke-linejoin="round"
                                   stroke-width="2"
                                   d="M5 13l4 4L19 7"/>
+
                         </svg>
+
                         <div>
-                            Décrivez le contexte académique ou clinique.
+                            Expliquez le contexte académique ou clinique.
                         </div>
+
                     </div>
 
+
                     <div class="flex gap-3">
+
                         <svg xmlns="http://www.w3.org/2000/svg"
                              class="h-4 w-4 mt-1 text-primary-500"
-                             fill="none" viewBox="0 0 24 24"
+                             fill="none"
+                             viewBox="0 0 24 24"
                              stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
+
+                            <path stroke-linecap="round"
+                                  stroke-linejoin="round"
                                   stroke-width="2"
                                   d="M5 13l4 4L19 7"/>
+
                         </svg>
+
                         <div>
                             Mentionnez les démarches déjà effectuées.
                         </div>
+
                     </div>
 
                 </div>
+
             </div>
 
-            <!-- Institutional Note -->
+
+
+            <!-- ================= NOTE ================= -->
+
             <div class="bg-primary-50 border border-primary-100 rounded-xl p-5 text-sm text-gray-600">
 
                 <div class="flex items-center gap-2 mb-2">
+
                     <svg xmlns="http://www.w3.org/2000/svg"
                          class="h-5 w-5 text-primary-600"
-                         fill="none" viewBox="0 0 24 24"
+                         fill="none"
+                         viewBox="0 0 24 24"
                          stroke="currentColor">
+
                         <path stroke-linecap="round"
                               stroke-linejoin="round"
                               stroke-width="2"
                               d="M13 16h-1v-4h-1m1-4h.01"/>
+
                     </svg>
+
                     <span class="font-medium text-primary-700">
                         Conseil académique
                     </span>
+
                 </div>
 
                 Les questions bien structurées reçoivent en moyenne
-                <span class="font-semibold">3 fois plus de réponses pertinentes</span>.
+                <span class="font-semibold">
+                    trois fois plus de réponses pertinentes
+                </span>
+                au sein de la communauté.
+
             </div>
 
         </aside>
 
     </div>
+
 </section>
 
 {% endblock %}

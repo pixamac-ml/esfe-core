@@ -1,10 +1,17 @@
 from django import forms
 from django_ckeditor_5.widgets import CKEditor5Widget
 from django.utils.html import strip_tags
-from .models import Topic
+
+from .models import Topic, Category
 
 
 class TopicForm(forms.ModelForm):
+
+    subscribe = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Suivre automatiquement ce domaine"
+    )
 
     class Meta:
         model = Topic
@@ -14,6 +21,7 @@ class TopicForm(forms.ModelForm):
             "tags",
             "content",
         ]
+
         widgets = {
             "content": CKEditor5Widget(
                 attrs={"class": "django_ckeditor_5"},
@@ -38,6 +46,9 @@ class TopicForm(forms.ModelForm):
             "transition"
         )
 
+        # limiter aux catégories actives
+        self.fields["category"].queryset = Category.objects.filter(is_active=True)
+
         # TITLE
         self.fields["title"].widget.attrs.update({
             "class": base_input,
@@ -53,6 +64,7 @@ class TopicForm(forms.ModelForm):
         self.fields["tags"].widget.attrs.update({
             "class": select_input,
         })
+
         self.fields["tags"].help_text = "Maximum 5 tags."
 
     # ======================
@@ -60,6 +72,7 @@ class TopicForm(forms.ModelForm):
     # ======================
 
     def clean_title(self):
+
         title = self.cleaned_data.get("title")
 
         if not title:
@@ -75,6 +88,7 @@ class TopicForm(forms.ModelForm):
         return title
 
     def clean_content(self):
+
         content = self.cleaned_data.get("content")
 
         if not content:
@@ -92,9 +106,10 @@ class TopicForm(forms.ModelForm):
         return content
 
     def clean_tags(self):
+
         tags = self.cleaned_data.get("tags")
 
-        if tags and tags.count() > 5:
+        if tags and len(tags) > 5:
             raise forms.ValidationError(
                 "Vous ne pouvez pas ajouter plus de 5 tags."
             )

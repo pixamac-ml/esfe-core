@@ -8,24 +8,122 @@ from django.utils import timezone
 # ==========================
 # CATEGORY (Domaine principal)
 # ==========================
-class Category(models.Model):
-    name = models.CharField(max_length=120, unique=True)
-    slug = models.SlugField(max_length=140, unique=True, blank=True)
-    description = models.TextField(blank=True)
-    order = models.PositiveIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
 
+from django.conf import settings
+from django.db import models
+from django.db.models import Index
+from django.utils.text import slugify
+
+
+class Category(models.Model):
+
+    # ======================
+    # IDENTITÉ
+    # ======================
+    name = models.CharField(
+        max_length=120,
+        unique=True
+    )
+
+    slug = models.SlugField(
+        max_length=140,
+        unique=True,
+        blank=True
+    )
+
+    description = models.TextField(
+        blank=True
+    )
+
+    # ======================
+    # ORGANISATION
+    # ======================
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Ordre d'affichage dans la liste des catégories"
+    )
+
+    icon = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Nom de l'icône (ex: bi-flask, bi-heart-pulse)"
+    )
+
+    color = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Couleur associée (ex: #4CAF50)"
+    )
+
+    # ======================
+    # ABONNEMENTS (clé du système de notification)
+    # ======================
+    subscribers = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="subscribed_categories",
+        help_text="Utilisateurs abonnés à ce domaine"
+    )
+
+    # ======================
+    # STATUT
+    # ======================
+    is_active = models.BooleanField(
+        default=True
+    )
+
+    # ======================
+    # DATES
+    # ======================
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    # ======================
+    # META
+    # ======================
     class Meta:
         ordering = ["order", "name"]
-        indexes = [Index(fields=["slug"])]
+        indexes = [
+            Index(fields=["slug"]),
+            Index(fields=["is_active"]),
+            Index(fields=["order"]),
+        ]
 
+    # ======================
+    # MÉTHODES
+    # ======================
     def save(self, *args, **kwargs):
+
         if not self.slug:
-            self.slug = slugify(self.name)
+            base_slug = slugify(self.name)
+            slug = base_slug
+            counter = 1
+
+            while Category.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+
+            self.slug = slug
+
         super().save(*args, **kwargs)
+
+    def topic_count(self):
+        return self.topics.filter(
+            is_deleted=False,
+            is_published=True
+        ).count()
+
+    def subscriber_count(self):
+        return self.subscribers.count()
 
     def __str__(self):
         return self.name
+
 
 
 # ==========================

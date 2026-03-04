@@ -8,10 +8,14 @@
     {% csrf_token %}
     {{ form.media }}
 
+    <!-- ================= LOADER ================= -->
+
     <div id="form-loader"
          class="hidden text-sm text-primary-600 font-medium">
         Publication en cours...
     </div>
+
+    <!-- ================= GLOBAL ERRORS ================= -->
 
     {% if form.non_field_errors %}
         <div class="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm">
@@ -19,65 +23,126 @@
         </div>
     {% endif %}
 
-    <!-- TITRE -->
+
+    <!-- ================= TITRE ================= -->
+
     <div class="space-y-2">
+
         <label class="text-sm font-semibold text-gray-800 flex items-center gap-2">
-            <!-- Title Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary-600"
-                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round"
+
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-4 w-4 text-primary-600"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor">
+
+                <path stroke-linecap="round"
+                      stroke-linejoin="round"
                       stroke-width="2"
                       d="M4 6h16M4 12h16M4 18h7"/>
+
             </svg>
+
             Titre
+
         </label>
+
         {{ form.title }}
+
         <p class="text-xs text-gray-400">
             Soyez clair et descriptif.
         </p>
+
     </div>
 
-    <!-- CATÉGORIE + TAGS -->
+
+    <!-- ================= CATÉGORIE + TAGS ================= -->
+
     <div class="grid md:grid-cols-2 gap-6">
 
         <div class="space-y-2">
+
             <label class="text-sm font-semibold text-gray-800">
                 Domaine
             </label>
+
             {{ form.category }}
+
         </div>
 
         <div class="space-y-2">
+
             <label class="text-sm font-semibold text-gray-800">
                 Tags
             </label>
+
             {{ form.tags }}
+
             <p class="text-xs text-gray-400">
                 Maximum 5.
             </p>
+
         </div>
 
     </div>
 
-    <!-- CONTENU -->
+
+    <!-- ================= FOLLOW CATEGORY ================= -->
+
+    <div class="flex items-start gap-3 p-4 rounded-lg border border-gray-200 bg-gray-50">
+
+        {{ form.subscribe }}
+
+        <div class="text-sm text-gray-600">
+
+            <label for="{{ form.subscribe.id_for_label }}"
+                   class="font-medium cursor-pointer">
+
+                Suivre automatiquement ce domaine
+
+            </label>
+
+            <p class="text-xs text-gray-500 mt-1">
+                Vous recevrez une notification lorsqu’une nouvelle discussion
+                sera publiée dans ce domaine.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================= CONTENU ================= -->
+
     <div class="space-y-2">
+
         <label class="text-sm font-semibold text-gray-800">
             Description détaillée
         </label>
+
         {{ form.content }}
+
     </div>
 
-    <!-- ACTIONS -->
+
+    <!-- ================= ACTIONS ================= -->
+
     <div class="flex items-center gap-4 pt-4">
+
         <button type="submit"
                 class="bg-accent hover:bg-accent-dark text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition shadow-sm">
+
             Publier
+
         </button>
 
         <a href="{% url 'community:topic_list' %}"
            class="text-gray-500 hover:text-gray-700 text-sm transition">
+
             Annuler
+
         </a>
+
     </div>
 
 </form>

@@ -411,18 +411,17 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.contrib.auth import get_user_model
 
 from .forms import TopicForm
-from .models import Category
 from community.services.notifications import create_notification
-
-
-User = get_user_model()
 
 
 @login_required
 def create_topic(request):
+
+    # ==================================================
+    # POST : création du sujet
+    # ==================================================
 
     if request.method == "POST":
 
@@ -437,26 +436,44 @@ def create_topic(request):
 
             form.save_m2m()
 
-            # ==================================================
-            # NOTIFICATIONS EXPERTS DU DOMAINE
-            # ==================================================
-
             category = topic.category
 
-            # Utilisateurs intéressés par cette catégorie
-            experts = User.objects.filter(
-                profile__specialties=category
-            ).exclude(id=request.user.id)
+            # ==================================================
+            # AUTO-ABONNEMENT OPTIONNEL
+            # ==================================================
 
-            for user in experts:
+            if form.cleaned_data.get("subscribe"):
+                try:
+                    category.subscribers.add(request.user)
+                except Exception:
+                    pass
 
-                create_notification(
-                    user=user,
-                    actor=request.user,
-                    topic=topic,
-                    notification_type="new_topic",
-                    send_email=True   # email pour nouvelle question
-                )
+            # ==================================================
+            # NOTIFICATIONS DES ABONNÉS
+            # ==================================================
+
+            subscribers = (
+                category.subscribers
+                .filter(is_active=True)
+                .exclude(id=request.user.id)
+                .distinct()
+            )
+
+            for user in subscribers:
+
+                try:
+
+                    create_notification(
+                        user=user,
+                        actor=request.user,
+                        topic=topic,
+                        notification_type="new_topic",
+                        send_email=True
+                    )
+
+                except Exception:
+                    # sécurité : ne jamais casser la création du topic
+                    pass
 
             # ==================================================
             # REDIRECTION HTMX
@@ -466,13 +483,16 @@ def create_topic(request):
 
                 response = HttpResponse()
                 response["HX-Redirect"] = topic.get_absolute_url()
-
                 return response
+
+            # ==================================================
+            # REDIRECTION CLASSIQUE
+            # ==================================================
 
             return redirect(topic.get_absolute_url())
 
         # ==================================================
-        # ERREURS FORMULAIRE HTMX
+        # ERREURS FORMULAIRE (HTMX)
         # ==================================================
 
         if request.headers.get("HX-Request"):
@@ -485,6 +505,10 @@ def create_topic(request):
 
             return HttpResponse(html)
 
+    # ==================================================
+    # GET : affichage du formulaire
+    # ==================================================
+
     else:
 
         form = TopicForm()
@@ -494,6 +518,8 @@ def create_topic(request):
         "community/create_topic.html",
         {"form": form}
     )
+
+
 
 
 

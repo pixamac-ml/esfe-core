@@ -94,6 +94,27 @@ urlpatterns = [
     ),
 
     # ======================================================
+    # ABONNEMENTS AUX DOMAINES (ÉTAPE 2)
+    # ======================================================
+    path(
+        "domaine/<slug:slug>/abonner/",
+        views.subscribe_category,
+        name="subscribe_category"
+    ),
+
+    path(
+        "domaine/<slug:slug>/desabonner/",
+        views.unsubscribe_category,
+        name="unsubscribe_category"
+    ),
+
+    path(
+        "mes-abonnements/",
+        views.my_subscriptions,
+        name="my_subscriptions"
+    ),
+
+    # ======================================================
     # SUJET
     # ======================================================
     path(
@@ -127,5 +148,11 @@ urlpatterns = [
         "vote/<int:answer_id>/",
         views.vote_answer,
         name="vote_answer"
+    ),
+
+    path(
+        "notifications/partial/",
+        views.notifications_partial,
+        name="notifications_partial"
     ),
 ]

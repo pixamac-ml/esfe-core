@@ -1,4 +1,5 @@
-from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.models import User
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.template.loader import render_to_string
@@ -6,25 +7,15 @@ from django.db.models import Prefetch, Count, F, Q
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
-from .models import Topic, Category, Answer, Vote, TopicView
-
-
-from django.shortcuts import render, get_object_or_404
-from django.db.models import Count, Q
-from django.template.loader import render_to_string
-from django.http import HttpResponse
-from django.contrib.auth import get_user_model
-
-from .models import Topic, Category, Tag
-
-User = get_user_model()
+from .forms import TopicForm
+from .models import Topic, Category, Answer, Vote, TopicView, Tag, Notification
+from community.services.notifications import create_notification
 
 
 # =====================================================
 # BUILDER : QUERY TOPICS
 # =====================================================
 def build_topic_queryset(sort="active", query=""):
-
     queryset = (
         Topic.objects
         .filter(is_published=True, is_deleted=False)
@@ -58,8 +49,7 @@ def build_topic_queryset(sort="active", query=""):
 # =====================================================
 # BUILDER : SIDEBAR CONTEXT
 # =====================================================
-def build_sidebar_context():
-
+def build_sidebar_context(request=None):
     categories = (
         Category.objects
         .filter(is_active=True)
@@ -74,6 +64,15 @@ def build_sidebar_context():
         )
         .order_by("name")
     )
+
+    # Si utilisateur connecté, récupérer ses abonnements
+    user_subscriptions = []
+    if request and request.user.is_authenticated:
+        user_subscriptions = list(
+            Category.objects
+            .filter(subscribers=request.user, is_active=True)
+            .values_list("id", flat=True)
+        )
 
     top_users = (
         User.objects
@@ -106,6 +105,7 @@ def build_sidebar_context():
         "categories": categories,
         "top_users": top_users,
         "popular_tags": popular_tags,
+        "user_subscriptions": user_subscriptions,
     }
 
 
@@ -113,7 +113,6 @@ def build_sidebar_context():
 # LISTE GÉNÉRALE
 # =====================================================
 def topic_list(request):
-
     sort = request.GET.get("sort", "active")
     query = request.GET.get("q", "").strip()
 
@@ -123,7 +122,7 @@ def topic_list(request):
         "topics": topics,
         "current_sort": sort,
         "query": query,
-        **build_sidebar_context(),
+        **build_sidebar_context(request),  # <- Modifier ici : passer request
     }
 
     if request.headers.get("HX-Request"):
@@ -135,7 +134,6 @@ def topic_list(request):
         return HttpResponse(html)
 
     return render(request, "community/topic_list.html", context)
-
 
 # =====================================================
 # LISTE PAR TAG
@@ -154,7 +152,7 @@ def topic_by_tag(request, slug):
         "tag": tag,
         "current_sort": sort,
         "query": query,
-        **build_sidebar_context(),
+        **build_sidebar_context(request),  # <- Modifier ici
     }
 
     if request.headers.get("HX-Request"):
@@ -166,7 +164,6 @@ def topic_by_tag(request, slug):
         return HttpResponse(html)
 
     return render(request, "community/topic_list.html", context)
-
 
 # =====================================================
 # LISTE PAR CATÉGORIE
@@ -185,7 +182,7 @@ def topic_by_category(request, slug):
         "category": category,
         "current_sort": sort,
         "query": query,
-        **build_sidebar_context(),
+        **build_sidebar_context(request),  # <- Modifier ici
     }
 
     if request.headers.get("HX-Request"):
@@ -199,7 +196,7 @@ def topic_by_category(request, slug):
     return render(request, "community/topic_list.html", context)
 
 # =====================================================
-# DÉTAIL D’UN SUJET
+# DÉTAIL D'UN SUJET
 # =====================================================
 def topic_detail(request, slug):
     topic = get_object_or_404(
@@ -269,17 +266,9 @@ def topic_detail(request, slug):
 # =====================================================
 # AJOUT RÉPONSE (HTMX)
 # =====================================================
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse, HttpResponseBadRequest
-from django.template.loader import render_to_string
-from django.utils import timezone
-
 @login_required
 @require_POST
 def add_answer(request, slug):
-
     # ===============================
     # Récupération du sujet
     # ===============================
@@ -331,6 +320,60 @@ def add_answer(request, slug):
         last_activity_at=timezone.now()
     )
 
+    # ===============================================================
+    # NOTIFICATIONS - ÉTAPE 1 :Notifier l'auteur du sujet
+    # ===============================================================
+
+    # 1.Notifier l'auteur du sujet (si ce n'est pas lui qui répond)
+    if topic.author != request.user:
+        try:
+            create_notification(
+                user=topic.author,
+                actor=request.user,
+                topic=topic,
+                answer=answer,
+                notification_type="new_answer",
+                send_email=False  # Mettre True si tu veuxenvoyer des emails
+            )
+        except Exception:
+            pass
+
+    # 2.Notifier les personnes qui ont répondu au sujet (autres que l'auteur et le réponder)
+    try:
+        previous_responders = (
+            Answer.objects
+            .filter(topic=topic, is_deleted=False)
+            .exclude(author=request.user)
+            .exclude(author=topic.author)
+            .values_list("author_id", flat=True)
+            .distinct()
+        )
+
+        for responder_id in previous_responders:
+            # Éviter les doublons de notification
+            existing_notification = Notification.objects.filter(
+                user_id=responder_id,
+                actor=request.user,
+                topic=topic,
+                answer=answer,
+                notification_type="new_answer"
+            ).exists()
+
+            if not existing_notification:
+                try:
+                    create_notification(
+                        user_id=responder_id,
+                        actor=request.user,
+                        topic=topic,
+                        answer=answer,
+                        notification_type="new_answer",
+                        send_email=False
+                    )
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     # ===============================
     # Préchargement auteur pour template
     # ===============================
@@ -365,6 +408,7 @@ def add_answer(request, slug):
     # Fallback (sécurité)
     # ===============================
     return HttpResponse(status=204)
+
 
 # =====================================================
 # VOTE RÉPONSE (HTMX)
@@ -405,20 +449,11 @@ def vote_answer(request, answer_id):
     return HttpResponse(status=204)
 
 
-
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from django.utils import timezone
-
-from .forms import TopicForm
-from community.services.notifications import create_notification
-
-
+# =====================================================
+# CRÉATION SUJET
+# =====================================================
 @login_required
 def create_topic(request):
-
     # ==================================================
     # POST : création du sujet
     # ==================================================
@@ -480,7 +515,6 @@ def create_topic(request):
             # ==================================================
 
             if request.headers.get("HX-Request"):
-
                 response = HttpResponse()
                 response["HX-Redirect"] = topic.get_absolute_url()
                 return response
@@ -496,7 +530,6 @@ def create_topic(request):
         # ==================================================
 
         if request.headers.get("HX-Request"):
-
             html = render_to_string(
                 "community/partials/topic_form.html",
                 {"form": form},
@@ -518,9 +551,6 @@ def create_topic(request):
         "community/create_topic.html",
         {"form": form}
     )
-
-
-
 
 
 @login_required
@@ -566,12 +596,100 @@ def delete_topic(request, slug):
     return redirect("accounts:profile")
 
 
-from django.contrib.auth import get_user_model
-from django.db.models import Count, Q
+# =====================================================
+# ABONNEMENT AUX DOMAINES (ÉTAPE 2)
+# =====================================================
+@login_required
+@require_POST
+def subscribe_category(request, slug):
+    """
+    Permet à un utilisateur de s'abonner à un domaine (catégorie)
+    """
+    category = get_object_or_404(Category, slug=slug, is_active=True)
 
+    # Ajouter l'utilisateur aux abonnés
+    category.subscribers.add(request.user)
+
+    if request.headers.get("HX-Request"):
+        # Retourner le bouton de désabonnement
+        html = render_to_string(
+            "community/partials/subscribe_button.html",
+            {
+                "category": category,
+                "is_subscribed": True
+            },
+            request=request
+        )
+        return HttpResponse(html)
+
+    return redirect("community:topic_by_category", slug=slug)
+
+
+@login_required
+@require_POST
+def unsubscribe_category(request, slug):
+    """
+    Permet à un utilisateur de se désabonner d'un domaine (catégorie)
+    """
+    category = get_object_or_404(Category, slug=slug, is_active=True)
+
+    # Retirer l'utilisateur des abonnés
+    category.subscribers.remove(request.user)
+
+    if request.headers.get("HX-Request"):
+        # Retourner le bouton d'abonnement
+        html = render_to_string(
+            "community/partials/subscribe_button.html",
+            {
+                "category": category,
+                "is_subscribed": False
+            },
+            request=request
+        )
+        return HttpResponse(html)
+
+    return redirect("community:topic_by_category", slug=slug)
+
+
+@login_required
+def my_subscriptions(request):
+    """
+    Page affichant les abonnements de l'utilisateur
+    """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    # Récupérer les catégories auxquelles l'utilisateur est abonné
+    subscriptions = (
+        Category.objects
+        .filter(subscribers=request.user, is_active=True)
+        .annotate(
+            topic_count=Count(
+                "topics",
+                filter=Q(
+                    topics__is_deleted=False,
+                    topics__is_published=True
+                )
+            )
+        )
+        .order_by("name")
+    )
+
+    context = {
+        "subscriptions": subscriptions,
+    }
+
+    return render(request, "community/my_subscriptions.html", context)
+
+
+# =====================================================
+# MEMBRES
+# =====================================================
+from django.contrib.auth import get_user_model
 
 
 def members_list(request):
+    User = get_user_model()
 
     users = (
         User.objects
@@ -594,23 +712,16 @@ def members_list(request):
     })
 
 
-
-
 # ==========================================
 # PROFIL PUBLIC UTILISATEUR
 # ==========================================
 
-from django.shortcuts import render, get_object_or_404
-from django.contrib.auth import get_user_model
-from django.db.models import Count, Sum
 from django.db.models.functions import Coalesce
-
-from .models import Category
-
-User = get_user_model()
 
 
 def public_profile(request, username):
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
 
     user = get_object_or_404(
         User.objects.select_related("profile"),
@@ -720,10 +831,13 @@ def public_profile(request, username):
         context
     )
 
-def profile_activity(request, username):
 
+def profile_activity(request, username):
     if not request.htmx:
         return redirect("community:public_profile", username=username)
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
 
     user = get_object_or_404(
         User.objects.select_related("profile"),
@@ -754,10 +868,13 @@ def profile_activity(request, username):
         },
     )
 
-def profile_answers(request, username):
 
+def profile_answers(request, username):
     if not request.htmx:
         return redirect("community:public_profile", username=username)
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
 
     user = get_object_or_404(
         User.objects.select_related("profile"),
@@ -780,13 +897,13 @@ def profile_answers(request, username):
         },
     )
 
-from django.db.models import Count
-
 
 def profile_topics(request, username):
-
     if not request.htmx:
         return redirect("community:public_profile", username=username)
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
 
     user = get_object_or_404(
         User.objects.select_related("profile"),
@@ -813,17 +930,12 @@ def profile_topics(request, username):
     )
 
 
-from django.db.models import Count
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
-
-
 def profile_badges(request, username):
-
     if not request.htmx:
         return redirect("community:public_profile", username=username)
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
 
     user = get_object_or_404(
         User.objects.select_related("profile"),
@@ -902,17 +1014,12 @@ def profile_badges(request, username):
         },
     )
 
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from django.db.models import Prefetch
-from django.utils import timezone
 
-from .models import Notification
-
-
+# =====================================================
+# NOTIFICATIONS
+# =====================================================
 @login_required
 def notifications(request):
-
     # ==============================
     # Récupération optimisée
     # ==============================
@@ -955,4 +1062,26 @@ def notifications(request):
         request,
         "community/notifications.html",
         context
+    )
+
+
+# =====================================================
+# NOTIFICATIONS - VUE PARTIELLE (HTMX)
+# =====================================================
+@login_required
+def notifications_partial(request):
+    """
+    Vue partielle pour afficher les notifications dans le dropdown
+    """
+    notifications = (
+        Notification.objects
+        .filter(user=request.user)
+        .select_related("actor", "topic", "answer")
+        .order_by("-created_at")[:10]
+    )
+
+    return render(
+        request,
+        "community/partials/notifications_list.html",
+        {"notifications": notifications}
     )

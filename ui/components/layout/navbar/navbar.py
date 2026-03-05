@@ -4,6 +4,7 @@ from django.db.models import Prefetch
 from formations.models import Cycle, Programme
 from news.models import Category as NewsCategory
 from blog.models import Category as BlogCategory
+from community.models import Notification
 
 
 @component.register("navbar")
@@ -39,8 +40,17 @@ class Navbar(component.Component):
             .order_by("name")
         )
 
+        # NOTIFICATIONS - COMPTEUR
+        unread_notification_count = 0
+        if request.user.is_authenticated:
+            unread_notification_count = Notification.objects.filter(
+                user=request.user,
+                is_read=False
+            ).count()
+
         return {
             "cycles": cycles,
             "news_categories": news_categories,
             "blog_categories": blog_categories,
+            "unread_notification_count": unread_notification_count,
         }

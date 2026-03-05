@@ -1,0 +1,65 @@
+{% load humanize %}
+{% if notifications %}
+    {% for notif in notifications %}
+    <a href="{{ notif.topic.get_absolute_url|default:'/' }}"
+       class="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0
+              {% if not notif.is_read %}bg-primary-50{% endif %}">
+
+        <div class="flex items-start gap-3">
+            <!-- AVATAR -->
+            <div class="flex-shrink-0">
+                {% if notif.actor.profile.avatar %}
+                    <img src="{{ notif.actor.profile.avatar.url }}"
+                         alt="{{ notif.actor.username }}"
+                         class="w-10 h-10 rounded-full object-cover">
+                {% else %}
+                    <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-semibold">
+                        {{ notif.actor.username|first|upper }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- CONTENT -->
+            <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-800">
+                    <span class="font-semibold">{{ notif.actor.username }}</span>
+                    {% if notif.notification_type == "new_answer" %}
+                        a répondu à votre question
+                    {% elif notif.notification_type == "new_topic" %}
+                        a publié un nouveau sujet
+                    {% elif notif.notification_type == "accepted_answer" %}
+                        a accepté votre réponse
+                    {% else %}
+                        {{ notif.notification_type }}
+                    {% endif %}
+                </p>
+
+                {% if notif.topic %}
+                <p class="text-sm text-gray-500 truncate mt-0.5">
+                    {{ notif.topic.title|truncatechars:50 }}
+                </p>
+                {% endif %}
+
+                <p class="text-xs text-gray-400 mt-1">
+                    {{ notif.created_at|timesince }}
+                </p>
+            </div>
+
+            <!-- INDICATOR -->
+            {% if not notif.is_read %}
+            <div class="flex-shrink-0">
+                <div class="w-2 h-2 bg-primary-500 rounded-full"></div>
+            </div>
+            {% endif %}
+        </div>
+
+    </a>
+    {% endfor %}
+{% else %}
+    <div class="p-6 text-center text-gray-500">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        <p class="text-sm">Aucune notification</p>
+    </div>
+{% endif %}

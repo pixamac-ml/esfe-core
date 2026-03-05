@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Mes abonnements | Communauté{% endblock %}
+
+{% block content %}
+
+<!-- ================= HERO ================= -->
+<section class="relative pt-28 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+    <div class="max-w-6xl mx-auto px-4">
+        <a href="{% url 'community:topic_list' %}"
+           class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-4 w-4"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Retour aux discussions
+        </a>
+        <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
+            Mes abonnements
+        </h1>
+        <p class="text-primary-100 mt-3 max-w-2xl text-sm leading-relaxed">
+            Gérez les domaines que vous suivez pour recevoir des notifications
+            lorsqu'un nouveau sujet est publié.
+        </p>
+    </div>
+</section>
+
+<!-- ================= CONTENT ================= -->
+<section class="bg-gray-50 py-20">
+    <div class="max-w-6xl mx-auto px-4">
+
+        {% if subscriptions %}
+            <!-- LISTE DES ABONNEMENTS -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for category in subscriptions %}
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6
+                            hover:shadow-md transition-shadow duration-300">
+
+                    <!-- HEADER -->
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            {% if category.icon %}
+                            <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+                                <i class="fa-solid {{ category.icon }} text-primary-600"></i>
+                            </div>
+                            {% else %}
+                            <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                                </svg>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <h3 class="font-semibold text-gray-800">
+                                    {{ category.name }}
+                                </h3>
+                                <p class="text-xs text-gray-500">
+                                    {{ category.topic_count }} sujet{{ category.topic_count|pluralize }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DESCRIPTION -->
+                    {% if category.description %}
+                    <p class="text-sm text-gray-600 mb-4 line-clamp-2">
+                        {{ category.description }}
+                    </p>
+                    {% endif %}
+
+                    <!-- ACTIONS -->
+                    <div class="flex items-center gap-3 pt-4 border-t border-gray-100">
+                        <a href="{% url 'community:topic_by_category' category.slug %}"
+                           class="flex-1 text-center px-4 py-2 rounded-lg text-sm font-medium
+                                  bg-primary-50 text-primary-600 hover:bg-primary-100
+                                  transition-colors duration-200">
+                            Voir les sujets
+                        </a>
+
+                        <div id="subscribe-btn-{{ category.slug }}">
+                            {% include "community/partials/subscribe_button.html" with category=category is_subscribed=True %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+        {% else %}
+            <!-- AUCUN ABONNEMENT -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+                <div class="w-16 h-16 mx-auto mb-6 rounded-full bg-gray-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">
+                    Aucun abonnement
+                </h2>
+                <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                    Vous ne suivez actuellement aucun domaine. Abonnez-vous à des domaines
+                    qui vous intéressent pour recevoir des notifications lorsqu'un nouveau sujet est publié.
+                </p>
+                <a href="{% url 'community:topic_list' %}"
+                   class="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-medium
+                          bg-primary-600 text-white hover:bg-primary-700
+                          transition-colors duration-200 shadow-sm hover:shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Découvrir les domaines
+                </a>
+            </div>
+        {% endif %}
+
+    </div>
+</section>
+
+{% endblock %}

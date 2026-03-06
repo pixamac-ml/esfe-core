@@ -2,125 +2,116 @@
 
 {% block content %}
 
-<section class="max-w-5xl mx-auto px-6 py-16">
+<!-- HERO SPACING - Évite que le contenu touche la nav -->
+<div class="pt-24 pb-8"></div>
 
-```
-<!-- HEADER -->
-<div class="flex items-center justify-between mb-10">
+<section class="max-w-5xl mx-auto px-6">
 
-    <h1 class="text-2xl font-bold text-primary-700">
-        Notifications
-    </h1>
+    <!-- HEADER -->
+    <div class="flex items-center justify-between mb-8">
 
-    {% if unread_count %}
-    <span class="text-sm bg-red-500 text-white px-3 py-1 rounded-full">
-        {{ unread_count }} non lue{{ unread_count|pluralize }}
-    </span>
-    {% endif %}
+        <h1 class="text-2xl font-bold text-primary-700">
+            <i class="fa-solid fa-bell mr-3"></i>
+            Notifications
+        </h1>
 
-</div>
+        <div class="flex items-center gap-4">
+            {% if unread_count > 0 %}
+            <span class="bg-red-500 text-white text-sm px-3 py-1 rounded-full">
+                {{ unread_count }} non lue{{ unread_count|pluralize }}
+            </span>
 
-
-<!-- LISTE -->
-<div class="space-y-4">
-
-    {% for notification in notifications %}
-
-    <div class="bg-white border border-primary-100 rounded-xl p-6 shadow-sm hover:shadow-md transition">
-
-        <div class="flex items-start gap-4">
-
-            <!-- ICON -->
-            <div class="text-primary-600 text-lg pt-1">
-
-                {% if notification.notification_type == "new_topic" %}
-
-                    <i class="fa-solid fa-file-lines"></i>
-
-                {% elif notification.notification_type == "new_answer" %}
-
-                    <i class="fa-solid fa-comment-dots"></i>
-
-                {% elif notification.notification_type == "accepted_answer" %}
-
-                    <i class="fa-solid fa-circle-check text-green-500"></i>
-
-                {% else %}
-
-                    <i class="fa-solid fa-bell"></i>
-
-                {% endif %}
-
-            </div>
-
-
-            <!-- MESSAGE -->
-            <div class="flex-1 text-sm text-gray-700">
-
-                {% if notification.notification_type == "new_topic" %}
-
-                    <strong>{{ notification.actor }}</strong>
-                    a publié un nouveau sujet :
-
-                    <a href="{{ notification.topic.get_absolute_url }}"
-                       class="text-primary-600 hover:underline font-medium">
-
-                        {{ notification.topic.title }}
-
-                    </a>
-
-                {% elif notification.notification_type == "new_answer" %}
-
-                    <strong>{{ notification.actor }}</strong>
-                    a répondu à votre question :
-
-                    <a href="{{ notification.topic.get_absolute_url }}"
-                       class="text-primary-600 hover:underline font-medium">
-
-                        {{ notification.topic.title }}
-
-                    </a>
-
-                {% elif notification.notification_type == "accepted_answer" %}
-
-                    Votre réponse a été acceptée sur :
-
-                    <a href="{{ notification.topic.get_absolute_url }}"
-                       class="text-primary-600 hover:underline font-medium">
-
-                        {{ notification.topic.title }}
-
-                    </a>
-
-                {% endif %}
-
-
-                <!-- DATE -->
-                <div class="text-xs text-gray-400 mt-2">
-
-                    {{ notification.created_at|timesince }} ago
-
-                </div>
-
-            </div>
-
+            <button
+                hx-post="{% url 'community:mark_all_notifications_read' %}"
+                hx-swap="outerHTML"
+                class="text-primary-600 hover:text-primary-700 text-sm font-medium transition"
+            >
+                <i class="fa-solid fa-check-double mr-1"></i>
+                Tout marquer comme lu
+            </button>
+            {% endif %}
         </div>
 
     </div>
 
-    {% empty %}
+    <!-- FILTRES -->
+    <div class="flex flex-wrap gap-2 mb-6">
+        <a href="{% url 'community:notifications' %}"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if not current_type and not current_is_read %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
+            <i class="fa-solid fa-list mr-2"></i>
+            Toutes
+        </a>
 
-    <div class="bg-white border border-primary-100 rounded-xl p-10 text-center text-gray-500">
+        <a href="?is_read=false"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if current_is_read == 'false' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
+            <i class="fa-solid fa-envelope mr-2"></i>
+            Non lues
+        </a>
 
-        Aucune notification pour le moment.
+        <a href="?is_read=true"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if current_is_read == 'true' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
+            <i class="fa-solid fa-envelope-open mr-2"></i>
+            Lues
+        </a>
 
+        <span class="border-l border-primary-200 mx-2"></span>
+
+        <a href="?type=new_topic"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if current_type == 'new_topic' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
+            <i class="fa-solid fa-file-lines mr-2"></i>
+            Sujets
+        </a>
+
+        <a href="?type=new_answer"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if current_type == 'new_answer' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
+            <i class="fa-solid fa-comment-dots mr-2"></i>
+            Réponses
+        </a>
+
+        <a href="?type=upvote"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if current_type == 'upvote' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
+            <i class="fa-solid fa-thumbs-up mr-2"></i>
+            Votes
+        </a>
+
+        <a href="?type=accepted_answer"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if current_type == 'accepted_answer' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
+            <i class="fa-solid fa-check-circle mr-2"></i>
+            Solutions
+        </a>
     </div>
 
-    {% endfor %}
+    <!-- LISTE DES NOTIFICATIONS -->
+    <div id="notifications-list" class="space-y-4">
+        {% include "community/partials/notifications_list.html" %}
+    </div>
 
-</div>
-```
+    <!-- PAGINATION HTMX -->
+    {% if page_obj.has_next %}
+    <div class="mt-8 text-center">
+        <button
+            hx-get="?page={{ page_obj.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_is_read %}&is_read={{ current_is_read }}{% endif %}"
+            hx-target="#notifications-list"
+            hx-swap="afterend"
+            hx-trigger="revealed"
+            class="px-6 py-3 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 transition font-medium"
+        >
+            <i class="fa-solid fa-plus mr-2"></i>
+            Charger plus...
+        </button>
+    </div>
+    {% endif %}
 
 </section>
+
+<!-- BOTTOM SPACING -->
+<div class="pb-16"></div>
 
 {% endblock %}

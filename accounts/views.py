@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count
 from django.db.models.functions import Coalesce
-
+from django.db.models import Sum, Count  # ← Assure-toi que c'est présent
 from .models import Profile
 from .forms import CustomUserCreationForm, ProfileForm, EmailUpdateForm
 
@@ -189,4 +189,172 @@ def profile_detail(request):
         request,
         "accounts/profile_detail.html",
         context
+    )
+
+
+# =====================================================
+# PROFIL - ONGLETS HTMX
+# =====================================================
+
+@login_required
+def profile_activity(request):
+    """Onglet Activité - Affiche l'activité récente"""
+    from community.models import Answer, Topic
+
+    # Derniers sujets
+    recent_topics = (
+        Topic.objects
+        .filter(author=request.user, is_deleted=False)
+        .select_related("category")
+        .order_by("-created_at")[:5]
+    )
+
+    # Dernières réponses
+    recent_answers = (
+        Answer.objects
+        .filter(author=request.user, is_deleted=False)
+        .select_related("topic")
+        .order_by("-created_at")[:5]
+    )
+
+    return render(
+        request,
+        "accounts/partials/profile_activity.html",
+        {
+            "recent_topics": recent_topics,
+            "recent_answers": recent_answers
+        }
+    )
+
+@login_required
+def profile_topics(request):
+    """Onglet Sujets - Liste des sujets créés"""
+    from community.models import Topic
+
+    topics = (
+        Topic.objects
+        .filter(author=request.user, is_deleted=False)
+        .select_related("category")
+        .annotate(answer_count=Count("answers"))
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "accounts/partials/profile_topics.html",
+        {"topics": topics}
+    )
+
+
+@login_required
+def profile_answers(request):
+    """Onglet Réponses - Liste des réponses données"""
+    from community.models import Answer
+
+    answers = (
+        Answer.objects
+        .filter(author=request.user, is_deleted=False)
+        .select_related("topic", "topic__author")
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "accounts/partials/profile_answers.html",
+        {"answers": answers}
+    )
+
+
+@login_required
+def profile_badges(request):
+    """Onglet Badges - Affiche les badges et leur progression"""
+    from community.models import Answer
+
+    # Calculer les stats pour les badges
+    answers_count = Answer.objects.filter(author=request.user, is_deleted=False).count()
+
+    accepted_answers = (
+        Answer.objects
+        .filter(author=request.user, is_deleted=False)
+        .filter(accepted_for_topics__isnull=False)
+        .count()
+    )
+
+    upvotes_received = (
+            Answer.objects
+            .filter(author=request.user, is_deleted=False)
+            .aggregate(total=Sum("upvotes"))["total"] or 0
+    )
+
+    badges = {
+        "beginner": {
+            "title": "Débutant",
+            "description": "Première réponse publiée",
+            "icon": "fa-star",
+            "color": "text-gray-600",
+            "bg": "bg-gray-100",
+            "earned": answers_count >= 1,
+            "progress": min(answers_count, 1),
+            "target": 1,
+        },
+        "contributor": {
+            "title": "Contributeur",
+            "description": "10 réponses utiles",
+            "icon": "fa-star",
+            "color": "text-blue-600",
+            "bg": "bg-blue-100",
+            "earned": answers_count >= 10,
+            "progress": min(answers_count, 10),
+            "target": 10,
+        },
+        "expert": {
+            "title": "Expert",
+            "description": "50 réponses utiles",
+            "icon": "fa-star",
+            "color": "text-purple-600",
+            "bg": "bg-purple-100",
+            "earned": answers_count >= 50,
+            "progress": min(answers_count, 50),
+            "target": 50,
+        },
+        "helper": {
+            "title": "Aidant",
+            "description": "Premiers upvotes reçus",
+            "icon": "fa-thumbs-up",
+            "color": "text-green-600",
+            "bg": "bg-green-100",
+            "earned": upvotes_received >= 10,
+            "progress": min(upvotes_received, 10),
+            "target": 10,
+        },
+        "specialist": {
+            "title": "Spécialiste",
+            "description": "5 réponses acceptées",
+            "icon": "fa-check-circle",
+            "color": "text-emerald-600",
+            "bg": "bg-emerald-100",
+            "earned": accepted_answers >= 5,
+            "progress": min(accepted_answers, 5),
+            "target": 5,
+        },
+    }
+
+    return render(
+        request,
+        "accounts/partials/profile_badges.html",
+        {"badges": badges, "stats": {
+            "answers": answers_count,
+            "accepted": accepted_answers,
+            "upvotes": upvotes_received
+        }}
+    )
+
+
+@login_required
+def profile_settings(request):
+    """Onglet Paramètres - Actions rapides"""
+    return render(
+        request,
+        "accounts/partials/profile_settings.html",
+        {}
     )

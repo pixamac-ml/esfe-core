@@ -1,0 +1,120 @@
+<div
+    class="notification-item bg-white border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200
+           {% if not notification.is_read %}border-l-4 border-l-primary-500 border-primary-100{% else %}border-primary-100{% endif %}"
+    id="notification-{{ notification.id }}"
+>
+    <div class="flex items-start gap-6">
+
+        <!-- ICON -->
+        <div class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center
+                    {% if notification.notification_type == 'new_topic' %}bg-blue-100 text-blue-600
+                    {% elif notification.notification_type == 'new_answer' %}bg-primary-100 text-primary-600
+                    {% elif notification.notification_type == 'reply_to_reply' %}bg-indigo-100 text-indigo-600
+                    {% elif notification.notification_type == 'upvote' %}bg-green-100 text-green-600
+                    {% elif notification.notification_type == 'accepted_answer' %}bg-emerald-100 text-emerald-600
+                    {% else %}bg-gray-100 text-gray-600{% endif %}">
+
+            {% if notification.notification_type == 'new_topic' %}
+                <i class="fa-solid fa-file-lines text-lg"></i>
+            {% elif notification.notification_type == 'new_answer' %}
+                <i class="fa-solid fa-comment-dots text-lg"></i>
+            {% elif notification.notification_type == 'reply_to_reply' %}
+                <i class="fa-solid fa-reply text-lg"></i>
+            {% elif notification.notification_type == 'upvote' %}
+                <i class="fa-solid fa-thumbs-up text-lg"></i>
+            {% elif notification.notification_type == 'accepted_answer' %}
+                <i class="fa-solid fa-check-circle text-lg"></i>
+            {% else %}
+                <i class="fa-solid fa-bell text-lg"></i>
+            {% endif %}
+
+        </div>
+
+        <!-- CONTENU -->
+        <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex-1">
+
+                    <!-- MESSAGE -->
+                    <p class="text-sm text-gray-700 {% if not notification.is_read %}font-medium{% endif %}">
+
+                        <span class="font-semibold text-primary-700">{{ notification.actor.username }}</span>
+
+                        {% if notification.notification_type == 'new_topic' %}
+                            a publié un nouveau sujet
+                        {% elif notification.notification_type == 'new_answer' %}
+                            a répondu à votre sujet
+                        {% elif notification.notification_type == 'reply_to_reply' %}
+                            a répondu à votre commentaire
+                        {% elif notification.notification_type == 'upvote' %}
+                            {% if notification.vote_count > 1 %}
+                                et <span class="font-semibold">{{ notification.vote_count|add:"-1" }} autres</span> ont voted sur votre contribution
+                            {% else %}
+                                a voted sur votre contribution
+                            {% endif %}
+                        {% elif notification.notification_type == 'accepted_answer' %}
+                            a accepté votre réponse comme solution
+                        {% endif %}
+
+                    </p>
+
+                    <!-- TITRE DU SUJET -->
+                    {% if notification.topic %}
+                    <a href="{{ notification.get_target_url }}"
+                       class="block mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium truncate">
+                        <i class="fa-solid fa-arrow-right mr-1"></i>
+                        {{ notification.topic.title }}
+                    </a>
+                    {% endif %}
+
+                    <!-- DATE & STATUT -->
+                    <div class="flex items-center gap-3 mt-3">
+                        <span class="text-xs text-gray-400">
+                            <i class="fa-regular fa-clock mr-1"></i>
+                            {{ notification.created_at|timesince }}
+                        </span>
+
+                        {% if notification.is_read %}
+                        <span class="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                            <i class="fa-solid fa-check mr-1"></i>
+                            Lu
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+                            <i class="fa-solid fa-circle text-xs mr-1"></i>
+                            Nouveau
+                        </span>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <!-- ACTIONS -->
+                <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {% if not notification.is_read %}
+                    <button
+                        hx-post="{% url 'community:mark_notification_read' notification.id %}"
+                        hx-swap="outerHTML"
+                        hx-target="#notification-{{ notification.id }}"
+                        class="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition"
+                        title="Marquer comme lu"
+                    >
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                    {% endif %}
+
+                    <button
+                        hx-delete="{% url 'community:delete_notification' notification.id %}"
+                        hx-swap="outerHTML"
+                        hx-target="#notification-{{ notification.id }}"
+                        class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                        title="Supprimer"
+                    >
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>

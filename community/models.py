@@ -475,14 +475,31 @@ class Attachment(models.Model):
 # ==========================
 # NOTIFICATION
 # ==========================
+# ==========================
+# NOTIFICATION
+# ==========================
 class Notification(models.Model):
+    # ======================
+    # TYPES DE NOTIFICATIONS
+    # ======================
+    TYPE_CHOICES = [
+        # Nouveaux contenus
+        ("new_topic", "Nouveau sujet dans votre domaine"),
+        ("new_answer", "Nouvelle réponse à votre sujet"),
 
-    TYPE_CHOICES = (
-        ("new_topic", "Nouveau sujet"),
-        ("new_answer", "Nouvelle réponse"),
-        ("accepted_answer", "Réponse acceptée"),
-    )
+        # Réponses
+        ("reply_to_reply", "Réponse à votre commentaire"),
 
+        # Votes (groupés)
+        ("upvote", "Nouveau(x) vote(s) sur votre contribution"),
+
+        # Réponse acceptée
+        ("accepted_answer", "Votre réponse a été acceptée"),
+    ]
+
+    # ======================
+    # RELATIONS
+    # ======================
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -492,38 +509,126 @@ class Notification(models.Model):
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="actions"
+        related_name="performed_actions",
+        help_text="L'utilisateur qui a déclenché la notification"
     )
 
     topic = models.ForeignKey(
         Topic,
         null=True,
         blank=True,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name="notifications"
     )
 
     answer = models.ForeignKey(
         Answer,
         null=True,
         blank=True,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name="notifications"
     )
 
+    # ======================
+    # TYPE ET MÉTADONNÉES
+    # ======================
     notification_type = models.CharField(
         max_length=30,
         choices=TYPE_CHOICES
     )
 
+    # Pour grouper les votes (Option B : notifications groupées)
+    vote_count = models.PositiveIntegerField(
+        default=1,
+        help_text="Nombre de votes agrupés (pour les notifications de type upvote)"
+    )
+
+    # Pour éviter les doublons
     is_read = models.BooleanField(default=False)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    # Pour suivre si on a déjà envoyé l'email
+    email_sent = models.BooleanField(default=False)
 
+    # ======================
+    # DATES
+    # ======================
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date de lecture de la notification"
+    )
+
+    # ======================
+    # META
+    # ======================
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            Index(fields=["user"]),
+            Index(fields=["user", "is_read"]),
+            Index(fields=["user", "notification_type"]),
             Index(fields=["created_at"]),
+            Index(fields=["topic"]),
+            Index(fields=["answer"]),
+        ]
+        # Contrainte pour éviter les doublons de notifications
+        constraints = [
+            UniqueConstraint(
+                fields=["user", "topic", "answer", "notification_type"],
+                name="unique_notification"
+            )
         ]
 
+    # ======================
+    # PROPRIÉTÉS
+    # ======================
+    @property
+    def get_target_url(self):
+        """Retourne l'URL cible de la notification"""
+        from django.urls import reverse
+
+        if self.notification_type == "new_topic" and self.topic:
+            return self.topic.get_absolute_url()
+
+        if self.notification_type in ["new_answer", "reply_to_reply", "accepted_answer"]:
+            if self.answer and self.answer.topic:
+                # Ajouter un anchor vers la réponse
+                return f"{self.answer.topic.get_absolute_url()}#answer-{self.answer.id}"
+
+        if self.notification_type == "upvote":
+            if self.answer:
+                return self.answer.topic.get_absolute_url()
+            if self.topic:
+                return self.topic.get_absolute_url()
+
+        return "/"
+
+    @property
+    def get_icon(self):
+        """Retourne l'icône对应的 au type de notification"""
+        icons = {
+            "new_topic": "📝",
+            "new_answer": "💬",
+            "reply_to_reply": "↩️",
+            "upvote": "⬆️",
+            "accepted_answer": "✅",
+        }
+        return icons.get(self.notification_type, "🔔")
+
+    @property
+    def get_actor_display_name(self):
+        """Retourne le nom de l'acteur"""
+        return self.actor.get_full_name() or self.actor.username
+
+    # ======================
+    # MÉTHODES
+    # ======================
+    def mark_as_read(self):
+        """Marque la notification comme lue"""
+        from django.utils import timezone
+        self.is_read = True
+        self.read_at = timezone.now()
+        self.save(update_fields=["is_read", "read_at"])
+
     def __str__(self):
-        return f"Notification pour {self.user}"
+        return f"[{self.get_notification_type_display()}] Pour {self.user.username}"

@@ -1,0 +1,28 @@
+{% for answer in answers %}
+<a href="{{ answer.topic.get_absolute_url }}" class="block p-4 hover:bg-primary-50 rounded-xl transition border-b border-primary-50 last:border-b-0">
+    <div class="flex items-start justify-between gap-4">
+        <div class="flex-1">
+            <h3 class="font-medium text-gray-800 hover:text-primary-600">{{ answer.topic.title }}</h3>
+            <p class="text-sm text-gray-500 mt-1 line-clamp-2">{{ answer.content|truncatewords:20 }}</p>
+            <div class="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                <span class="flex items-center gap-1 {% if answer.upvotes > 0 %}text-green-600{% endif %}">
+                    <i class="fa-solid fa-arrow-up"></i>
+                    {{ answer.upvotes }}
+                </span>
+                {% if answer in topic.accepted_answer %}
+                <span class="flex items-center gap-1 text-green-600">
+                    <i class="fa-solid fa-check-circle"></i>
+                    Solution acceptée
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <span class="text-xs text-gray-400">{{ answer.created_at|date:"d M Y" }}</span>
+    </div>
+</a>
+{% empty %}
+<div class="text-center py-12 text-gray-500">
+    <i class="fa-regular fa-comment-dots text-4xl mb-4"></i>
+    <p>Vous n'avez pas encore répondu</p>
+</div>
+{% endfor %}

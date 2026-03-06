@@ -1,0 +1,213 @@
+<div class="space-y-6">
+
+    <!-- En-tête avec filtres -->
+    <div class="flex items-center justify-between pb-4 border-b border-primary-100">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-800">Mon activité récente</h2>
+            <p class="text-sm text-gray-500">Vos dernières contributions à la communauté</p>
+        </div>
+
+        <!-- Stats rapides -->
+        <div class="flex items-center gap-4 text-sm">
+            <span class="flex items-center gap-1 text-blue-600">
+                <i class="fa-solid fa-file-lines"></i>
+                <strong>{{ recent_topics|length }}</strong> sujets
+            </span>
+            <span class="flex items-center gap-1 text-green-600">
+                <i class="fa-solid fa-comment-dots"></i>
+                <strong>{{ recent_answers|length }}</strong> réponses
+            </span>
+        </div>
+    </div>
+
+    <!-- ================= SUJETS CRÉÉS ================= -->
+    {% if recent_topics %}
+    <div>
+        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-pen-to-square text-blue-500"></i>
+            Sujets créés
+        </h3>
+
+        <div class="space-y-3">
+            {% for topic in recent_topics %}
+            <a href="{{ topic.get_absolute_url }}"
+               class="block bg-white rounded-xl border border-primary-100 p-5 hover:shadow-lg hover:border-primary-200 transition-all duration-300 group">
+
+                <div class="flex items-start gap-4">
+                    <!-- Icône -->
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+                        <i class="fa-solid fa-file-lines text-lg"></i>
+                    </div>
+
+                    <!-- Contenu -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors truncate">
+                                    {{ topic.title }}
+                                </h4>
+
+                                <!-- Catégorie -->
+                                <div class="flex items-center gap-2 mt-2">
+                                    <span class="px-2 py-1 bg-primary-50 text-primary-700 text-xs rounded-lg font-medium">
+                                        {{ topic.category.name }}
+                                    </span>
+                                </div>
+
+                                <!-- Stats -->
+                                <div class="flex items-center gap-4 mt-3 text-xs text-gray-400">
+                                    <span class="flex items-center gap-1">
+                                        <i class="fa-regular fa-comment"></i>
+                                        {{ topic.answer_count|default:0 }} réponses
+                                    </span>
+                                    <span class="flex items-center gap-1">
+                                        <i class="fa-regular fa-eye"></i>
+                                        {{ topic.view_count }} vues
+                                    </span>
+                                    <span class="flex items-center gap-1">
+                                        <i class="fa-regular fa-clock"></i>
+                                        {{ topic.created_at|timesince }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Flèche -->
+                            <div class="text-gray-300 group-hover:text-blue-500 transition-colors">
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Badge statut -->
+                <div class="mt-3 pt-3 border-t border-primary-50 flex items-center justify-between">
+                    {% if topic.is_published %}
+                    <span class="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                        <i class="fa-solid fa-check-circle"></i>
+                        Publié
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        <i class="fa-solid fa-file"></i>
+                        Brouillon
+                    </span>
+                    {% endif %}
+
+                    <span class="text-xs text-gray-400">
+                        {{ topic.created_at|date:"d M Y" }}
+                    </span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================= RÉPONSES DONNÉES ================= -->
+    {% if recent_answers %}
+    <div>
+        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-reply text-green-500"></i>
+            Réponses données
+        </h3>
+
+        <div class="space-y-3">
+            {% for answer in recent_answers %}
+            <a href="{{ answer.topic.get_absolute_url }}"
+               class="block bg-white rounded-xl border border-primary-100 p-5 hover:shadow-lg hover:border-green-200 transition-all duration-300 group">
+
+                <div class="flex items-start gap-4">
+                    <!-- Icône -->
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+                        <i class="fa-solid fa-comment-dots text-lg"></i>
+                    </div>
+
+                    <!-- Contenu -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-gray-800 group-hover:text-green-600 transition-colors truncate">
+                                    {{ answer.topic.title }}
+                                </h4>
+
+                                <!-- Aperçu du contenu -->
+                                <p class="text-sm text-gray-500 mt-2 line-clamp-2">
+                                    {{ answer.content|truncatewords:30 }}
+                                </p>
+
+                                <!-- Stats -->
+                                <div class="flex items-center gap-4 mt-3 text-xs text-gray-400">
+                                    <span class="flex items-center gap-1 {% if answer.upvotes > 0 %}text-green-600{% endif %}">
+                                        <i class="fa-solid fa-arrow-up"></i>
+                                        {{ answer.upvotes }} upvotes
+                                    </span>
+                                    <span class="flex items-center gap-1">
+                                        <i class="fa-regular fa-clock"></i>
+                                        {{ answer.created_at|timesince }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Flèche -->
+                            <div class="text-gray-300 group-hover:text-green-500 transition-colors">
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Badges -->
+                <div class="mt-3 pt-3 border-t border-primary-50 flex items-center gap-2 flex-wrap">
+                    {% if answer in answer.topic.accepted_answer %}
+                    <span class="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full font-medium">
+                        <i class="fa-solid fa-check-circle"></i>
+                        Réponse acceptée
+                    </span>
+                    {% endif %}
+
+                    <span class="text-xs text-gray-400">
+                        {{ answer.created_at|date:"d M Y" }}
+                    </span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================= SI VIDE ================= -->
+    {% if not recent_topics and not recent_answers %}
+    <div class="text-center py-16 bg-gradient-to-br from-primary-50 to-white rounded-2xl border border-primary-100">
+        <div class="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-rocket text-3xl text-primary-500"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">Commencez votre parcours !</h3>
+        <p class="text-gray-500 mb-6 max-w-md mx-auto">
+            Partagez vos connaissances avec la communauté. Créez votre premier sujet ou répondez aux questions des autres membres.
+        </p>
+        <div class="flex items-center justify-center gap-4">
+            <a href="{% url 'community:create_topic' %}"
+               class="px-6 py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition shadow-lg hover:shadow-xl">
+                <i class="fa-solid fa-plus mr-2"></i>
+                Créer un sujet
+            </a>
+            <a href="{% url 'community:topic_list' %}"
+               class="px-6 py-3 bg-white text-primary-600 border border-primary-200 rounded-xl font-medium hover:bg-primary-50 transition">
+                <i class="fa-solid fa-compass mr-2"></i>
+                Explorer la communauté
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- CSS pour line-clamp si pas déjà défini -->
+<style>
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+</style>

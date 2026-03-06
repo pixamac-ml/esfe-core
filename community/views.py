@@ -1,7 +1,8 @@
+from django.contrib import messages
 from django.contrib.auth.models import User
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.template.loader import render_to_string
 from django.db.models import Prefetch, Count, F, Q
 from django.views.decorators.http import require_POST
@@ -715,12 +716,12 @@ def members_list(request):
 # ==========================================
 # PROFIL PUBLIC UTILISATEUR
 # ==========================================
-
-from django.db.models.functions import Coalesce
-
-
 def public_profile(request, username):
     from django.contrib.auth import get_user_model
+    from django.db.models import Sum, Count
+    from django.db.models.functions import Coalesce
+    from community.models import Category
+
     User = get_user_model()
 
     user = get_object_or_404(
@@ -730,10 +731,7 @@ def public_profile(request, username):
 
     profile = user.profile
 
-    # ======================================
-    # SUJETS DE L'UTILISATEUR
-    # ======================================
-
+    # Sujets
     topics = (
         user.community_topics
         .filter(is_deleted=False)
@@ -742,95 +740,46 @@ def public_profile(request, username):
         .order_by("-created_at")
     )
 
-    # ======================================
-    # RÉPONSES UTILISATEUR
-    # ======================================
-
+    # Réponses
     answers = (
         user.community_answers
         .filter(is_deleted=False)
-        .select_related("topic")
+        .select_related("topic", "topic__category")
         .order_by("-created_at")
     )
 
-    # ======================================
-    # CONTRIBUTIONS POPULAIRES
-    # ======================================
-
+    # Meilleures réponses
     best_answers = answers.order_by("-upvotes")[:5]
 
-    # ======================================
-    # DOMAINES D'ACTIVITÉ
-    # ======================================
-
+    # Domaines d'activité
     top_categories = (
         Category.objects
-        .filter(topics__answers__author=user)
-        .annotate(
-            answer_count=Count("topics__answers")
-        )
+        .filter(topics__answers__author=user, topics__is_deleted=False)
+        .annotate(answer_count=Count("topics__answers"))
         .order_by("-answer_count")[:5]
     )
 
-    # ======================================
-    # STATISTIQUES
-    # ======================================
-
-    total_upvotes = answers.aggregate(
-        total=Coalesce(Sum("upvotes"), 0)
-    )["total"]
-
-    total_downvotes = answers.aggregate(
-        total=Coalesce(Sum("downvotes"), 0)
-    )["total"]
-
-    score = total_upvotes - total_downvotes
-
+    # Stats
     stats = {
-        "topics": profile.total_topics,
-        "answers": profile.total_answers,
-        "accepted": profile.total_accepted_answers,
-        "upvotes": total_upvotes,
+        "topics": topics.count(),
+        "answers": answers.count(),
+        "accepted": answers.filter(accepted_for_topics__isnull=False).count(),
+        "upvotes": answers.aggregate(total=Coalesce(Sum("upvotes"), 0))["total"],
         "views": profile.total_views_generated,
-        "reputation": score,
+        "reputation": profile.reputation,
     }
-
-    # ======================================
-    # ACTIVITÉ RÉCENTE
-    # ======================================
-
-    recent_activity = list(answers[:5]) + list(topics[:5])
-    recent_activity = sorted(
-        recent_activity,
-        key=lambda x: x.created_at,
-        reverse=True
-    )[:8]
-
-    # ======================================
-    # CONTEXTE TEMPLATE
-    # ======================================
 
     context = {
         "profile_user": user,
         "profile": profile,
-
-        "topics": topics[:5],
-        "answers": answers[:5],
-
+        "topics": topics[:10],
+        "answers": answers[:10],
         "best_answers": best_answers,
         "top_categories": top_categories,
-
-        "recent_activity": recent_activity,
-
         "stats": stats,
     }
 
-    return render(
-        request,
-        "community/public_profile.html",
-        context
-    )
-
+    return render(request, "community/public_profile.html", context)
 
 def profile_activity(request, username):
     if not request.htmx:
@@ -1018,70 +967,212 @@ def profile_badges(request, username):
 # =====================================================
 # NOTIFICATIONS
 # =====================================================
+# =====================================================
+# NOTIFICATIONS - LISTE COMPLÈTE AVEC PAGINATION
+# =====================================================
+# =====================================================
+# NOTIFICATIONS - LISTE COMPLÈTE AVEC PAGINATION
+# =====================================================
 @login_required
 def notifications(request):
+    """
+    Page principale des notifications avec pagination.
+    Supporte le filtrage par type et par statut de lecture.
+    """
     # ==============================
-    # Récupération optimisée
+    # Paramètres de filtrage
     # ==============================
+    notification_type = request.GET.get("type", "")
+    is_read = request.GET.get("is_read", "")
 
-    notifications = (
+    # ==============================
+    # Construction de la requête
+    # ==============================
+    notifications_qs = (
         Notification.objects
         .filter(user=request.user)
-        .select_related(
-            "actor",
-            "topic",
-            "answer"
+        .select_related("actor", "topic", "topic__category", "answer", "answer__author")
+    )
+
+    # Appliquer les filtres
+    if notification_type:
+        notifications_qs = notifications_qs.filter(notification_type=notification_type)
+
+    if is_read == "true":
+        notifications_qs = notifications_qs.filter(is_read=True)
+    elif is_read == "false":
+        notifications_qs = notifications_qs.filter(is_read=False)
+
+    # ==============================
+    # Pagination (20 par page)
+    # ==============================
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    paginator = Paginator(notifications_qs, 20)
+
+    page = request.GET.get("page", 1)
+    try:
+        notifications_page = paginator.page(page)
+    except PageNotAnInteger:
+        notifications_page = paginator.page(1)
+    except EmptyPage:
+        notifications_page = paginator.page(paginator.num_pages)
+
+    # ==============================
+    # Statistiques
+    # ==============================
+    unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+    total_count = Notification.objects.filter(user=request.user).count()
+
+    # ==============================
+    # Marquer tout lu (action)
+    # ==============================
+    if request.GET.get("mark_all_read") == "true":
+        Notification.objects.filter(user=request.user, is_read=False).update(
+            is_read=True,
+            read_at=timezone.now()
         )
-        .order_by("-created_at")
-    )
+        unread_count = 0
 
     # ==============================
-    # Statistiques rapides
+    # Réponse HTMX (pagination)
     # ==============================
-
-    unread_count = notifications.filter(is_read=False).count()
+    if request.headers.get("HX-Request"):
+        return render(
+            request,
+            "community/partials/notifications_list.html",
+            {
+                "notifications": notifications_page,
+                "page_obj": notifications_page,
+            }
+        )
 
     # ==============================
-    # Marquer comme lues
+    # Réponse normale
     # ==============================
-
-    notifications.filter(is_read=False).update(
-        is_read=True
-    )
-
-    # ==============================
-    # Contexte
-    # ==============================
-
     context = {
-        "notifications": notifications,
+        "notifications": notifications_page,
+        "page_obj": notifications_page,
         "unread_count": unread_count,
+        "total_count": total_count,
+        "current_type": notification_type,
+        "current_is_read": is_read,
     }
 
-    return render(
-        request,
-        "community/notifications.html",
-        context
-    )
+    return render(request, "community/notifications.html", context)
 
 
 # =====================================================
-# NOTIFICATIONS - VUE PARTIELLE (HTMX)
+# NOTIFICATIONS - VUE PARTIELLE (dropdown)
 # =====================================================
 @login_required
 def notifications_partial(request):
     """
-    Vue partielle pour afficher les notifications dans le dropdown
+    Vue partielle pour afficher les notifications dans le dropdown.
+    Retourne les 7 dernières notifications non lues.
     """
     notifications = (
         Notification.objects
         .filter(user=request.user)
-        .select_related("actor", "topic", "answer")
-        .order_by("-created_at")[:10]
+        .select_related("actor", "topic", "topic__category", "answer")
+        .order_by("-created_at")[:7]
     )
+
+    unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
 
     return render(
         request,
-        "community/partials/notifications_list.html",
-        {"notifications": notifications}
+        "community/partials/notifications_dropdown.html",
+        {
+            "notifications": notifications,
+            "unread_count": unread_count,
+        }
     )
+
+
+# =====================================================
+# NOTIFICATIONS - MARQUER COMME LU
+# =====================================================
+@login_required
+@require_POST
+def mark_notification_read(request, pk):
+    """
+    Marque une notification spécifique comme lue.
+    Retourne la notification mise à jour (pour HTMX).
+    """
+    notification = get_object_or_404(
+        Notification,
+        pk=pk,
+        user=request.user
+    )
+
+    notification.mark_as_read()
+
+    if request.headers.get("HX-Request"):
+        return render(
+            request,
+            "community/partials/notification_item.html",
+            {"notification": notification}
+        )
+
+    return HttpResponse(status=204)
+
+
+# =====================================================
+# NOTIFICATIONS - MARQUER TOUT COMME LU
+# =====================================================
+@login_required
+@require_POST
+def mark_all_notifications_read(request):
+    """
+    Marque toutes les notifications comme lues.
+    """
+    Notification.objects.filter(user=request.user, is_read=False).update(
+        is_read=True,
+        read_at=timezone.now()
+    )
+
+    if request.headers.get("HX-Request"):
+        # Retourner un snippet vide pour mettre à jour l'interface
+        return HttpResponse("")
+
+    messages.success(request, "Toutes les notifications ont été marquées comme lues.")
+    return redirect("community:notifications")
+
+
+# =====================================================
+# NOTIFICATIONS - SUPPRIMER
+# =====================================================
+@login_required
+@require_POST  # ← Changed from @require_DELETE to @require_POST
+def delete_notification(request, pk):
+    """
+    Supprime une notification.
+    HTMX utilise POST pour les suppressions.
+    """
+    notification = get_object_or_404(
+        Notification,
+        pk=pk,
+        user=request.user
+    )
+
+    notification.delete()
+
+    if request.headers.get("HX-Request"):
+        return HttpResponse("")
+
+    return HttpResponse(status=204)
+
+# =====================================================
+# COMPTEUR DE NOTIFICATIONS (pour AJAX/HTMX)
+# =====================================================
+@login_required
+def notifications_unread_count(request):
+    """
+    Retourne le nombre de notifications non lues (pour polling ou WebSocket).
+    """
+    count = Notification.objects.filter(user=request.user, is_read=False).count()
+
+    if request.headers.get("HX-Request"):
+        return HttpResponse(f'<span id="unread-count">{count}</span>')
+
+    return JsonResponse({"unread_count": count})

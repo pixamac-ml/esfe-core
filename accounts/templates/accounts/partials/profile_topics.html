@@ -1,0 +1,32 @@
+{% for topic in topics %}
+<a href="{{ topic.get_absolute_url }}" class="block p-4 hover:bg-primary-50 rounded-xl transition border-b border-primary-50 last:border-b-0">
+    <div class="flex items-start justify-between gap-4">
+        <div class="flex-1">
+            <h3 class="font-medium text-gray-800 hover:text-primary-600">{{ topic.title }}</h3>
+            <div class="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                <span class="flex items-center gap-1">
+                    <i class="fa-regular fa-comment"></i>
+                    {{ topic.answer_count }} réponses
+                </span>
+                <span class="flex items-center gap-1">
+                    <i class="fa-regular fa-eye"></i>
+                    {{ topic.view_count }} vues
+                </span>
+                <span class="px-2 py-0.5 rounded-full 
+                            {% if topic.is_published %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-700{% endif %}">
+                    {% if topic.is_published %}Publié{% else %}Brouillon{% endif %}
+                </span>
+            </div>
+        </div>
+        <span class="text-xs text-gray-400">{{ topic.created_at|date:"d M Y" }}</span>
+    </div>
+</a>
+{% empty %}
+<div class="text-center py-12 text-gray-500">
+    <i class="fa-regular fa-file-lines text-4xl mb-4"></i>
+    <p>Vous n'avez pas encore créé de sujet</p>
+    <a href="{% url 'community:create_topic' %}" class="text-primary-600 hover:underline mt-2 inline-block">
+        Créer un sujet
+    </a>
+</div>
+{% endfor %}

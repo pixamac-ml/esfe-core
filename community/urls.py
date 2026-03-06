@@ -63,12 +63,48 @@ urlpatterns = [
     # ======================================================
     # NOTIFICATIONS
     # ======================================================
+
+    # Liste principale avec pagination
     path(
         "notifications/",
         views.notifications,
         name="notifications"
     ),
 
+    # Vue partielle pour le dropdown
+    path(
+        "notifications/partial/",
+        views.notifications_partial,
+        name="notifications_partial"
+    ),
+
+    # Marquer une notification comme lue
+    path(
+        "notifications/<int:pk>/read/",
+        views.mark_notification_read,
+        name="mark_notification_read"
+    ),
+
+    # Marquer toutes les notifications comme lues
+    path(
+        "notifications/read-all/",
+        views.mark_all_notifications_read,
+        name="mark_all_notifications_read"
+    ),
+
+    # Supprimer une notification
+    path(
+        "notifications/<int:pk>/delete/",
+        views.delete_notification,
+        name="delete_notification"
+    ),
+
+    # Compteur de notifications non lues
+    path(
+        "notifications/unread-count/",
+        views.notifications_unread_count,
+        name="notifications_unread_count"
+    ),
     # ======================================================
     # CRÉATION SUJET
     # ======================================================

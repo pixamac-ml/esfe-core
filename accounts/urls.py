@@ -1,10 +1,5 @@
 from django.urls import path
-from .views import (
-    register,
-    edit_profile,
-    update_email,
-    profile_detail,
-)
+from .views import *
 from django.contrib.auth import views as auth_views
 app_name = "accounts"
 
@@ -36,4 +31,36 @@ urlpatterns = [
     path("profile/edit/", edit_profile, name="edit_profile"),
     path("profile/email/", update_email, name="update_email"),
 
+    # ======================================================
+    # PROFIL - ONGLETS HTMX
+    # ======================================================
+    path(
+        "profile/activity/",
+        profile_activity,
+        name="profile_activity"
+    ),
+
+    path(
+        "profile/topics/",
+        profile_topics,
+        name="profile_topics"
+    ),
+
+    path(
+        "profile/answers/",
+        profile_answers,
+        name="profile_answers"
+    ),
+
+    path(
+        "profile/badges/",
+        profile_badges,
+        name="profile_badges"
+    ),
+
+    path(
+        "profile/settings/",
+        profile_settings,
+        name="profile_settings"
+    ),
 ]

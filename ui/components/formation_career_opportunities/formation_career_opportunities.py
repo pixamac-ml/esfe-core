@@ -5,7 +5,7 @@ from django_components import component
 class FormationCareerOpportunities(component.Component):
     template_name = "formation_career_opportunities/formation_career_opportunities.html"
 
-    def get_context_data(self, career_opportunities: str):
+    def get_context_data(self, career_opportunities: str, programme=None, can_apply: bool = False):
 
         items = []
 
@@ -17,5 +17,7 @@ class FormationCareerOpportunities(component.Component):
             ]
 
         return {
-            "items": items
+            "items": items,
+            "programme": programme,
+            "can_apply": can_apply,
         }

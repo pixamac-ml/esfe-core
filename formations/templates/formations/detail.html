@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load component_tags %}
+{% load humanize %}
 
 {% block title %}{{ programme.title }} – ESFE{% endblock %}
 
@@ -12,7 +13,7 @@
     {% endcomponent %}
 
     <!-- Bouton retour discret intégré au hero -->
-    <div class="absolute top-6 left-6">
+    <div class="absolute top-6 left-6 z-10">
         <a href="{% url 'formations:list' %}"
            class="inline-flex items-center gap-2
                   text-xs uppercase tracking-wide font-medium
@@ -27,19 +28,18 @@
 
 
 <!-- ================= CONTENU PRINCIPAL ================= -->
-<section class="py-24 bg-soft">
-  <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-3 gap-16">
+<section class="py-20 bg-gradient-to-b from-white to-gray-50/50">
+  <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-3 gap-12">
 
     <!-- ================= COLONNE PRINCIPALE ================= -->
-    <div class="lg:col-span-2 space-y-20">
+    <div class="lg:col-span-2 space-y-16">
 
       <!-- Présentation -->
-      <section class="space-y-6">
-        <h2 class="text-3xl font-bold text-primary">
+      <section class="max-w-3xl">
+        <h2 class="text-3xl md:text-4xl font-bold text-primary mb-4">
           Présentation de la formation
         </h2>
-
-        <div class="prose max-w-none text-gray-700 leading-relaxed">
+        <div class="prose max-w-none text-gray-600 leading-relaxed text-lg">
           {{ programme.description|linebreaks }}
         </div>
       </section>
@@ -51,6 +51,8 @@
 
       {% component "formation_career_opportunities"
           career_opportunities=programme.career_opportunities
+          programme=programme
+          can_apply=can_apply
       %}
       {% endcomponent %}
 
@@ -61,40 +63,91 @@
         {% endcomponent %}
       {% endif %}
 
+      <!-- Approche spécifique selon le cycle -->
       {% if cycle_type == "master" %}
-      <section class="bg-white border border-primary/10 rounded-2xl p-10 space-y-6 shadow-sm">
-        <h3 class="text-2xl font-bold text-primary">
-          Approche stratégique & leadership
-        </h3>
-        <p class="text-gray-700 leading-relaxed">
-          Cette formation de niveau Master met l’accent sur la conception,
-          le pilotage et l’évaluation des politiques de santé publique.
-        </p>
+      <section class="max-w-3xl">
+        <div class="bg-white rounded-3xl p-8 shadow-lg border border-gray-100">
+          <div class="flex items-start gap-5">
+            <div class="flex-shrink-0">
+              <div class="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center">
+                <svg class="w-7 h-7 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-xl font-bold text-primary mb-3">
+                Approche stratégique & leadership
+              </h3>
+              <p class="text-gray-600 leading-relaxed">
+                Cette formation de niveau Master met l'accent sur la conception,
+                le pilotage et l'évaluation des politiques de santé publique.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
       {% endif %}
 
       {% if cycle_type == "licence" %}
-      <section class="bg-white border border-primary/10 rounded-2xl p-10 space-y-6 shadow-sm">
-        <h3 class="text-2xl font-bold text-primary">
-          Formation professionnalisante
-        </h3>
-        <p class="text-gray-700 leading-relaxed">
-          La formation de Licence vise l’acquisition des compétences
-          techniques fondamentales et l’intégration rapide dans le milieu professionnel.
-        </p>
+      <section class="max-w-3xl">
+        <div class="bg-white rounded-3xl p-8 shadow-lg border border-gray-100">
+          <div class="flex items-start gap-5">
+            <div class="flex-shrink-0">
+              <div class="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center">
+                <svg class="w-7 h-7 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-xl font-bold text-primary mb-3">
+                Formation professionnalisante
+              </h3>
+              <p class="text-gray-600 leading-relaxed">
+                La formation de Licence vise l'acquisition des compétences
+                techniques fondamentales et l'intégration rapide dans le milieu professionnel.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
       {% endif %}
 
     </div>
 
     <!-- ================= SIDEBAR ================= -->
-    <aside class="space-y-10">
+    <aside class="lg:col-span-1 space-y-6">
 
-      {% component "formation_admission"
-          programme=programme
-          can_apply=can_apply
-      %}
-      {% endcomponent %}
+      <!-- Admission Card -->
+      <div class="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 sticky top-8">
+
+        <h3 class="text-lg font-bold text-primary mb-6 flex items-center gap-3">
+          <svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+          </svg>
+          Admission
+        </h3>
+
+        {% if can_apply %}
+          <a href="{% url 'admissions:apply' programme.slug %}"
+             class="block text-center bg-secondary text-white py-4 rounded-2xl
+                    font-semibold text-lg hover:bg-secondary/90 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+            Candidater en ligne
+          </a>
+
+          <p class="text-sm text-gray-500 text-center mt-4">
+            La candidature se fait entièrement en ligne
+          </p>
+        {% else %}
+          <div class="bg-gray-50 rounded-xl p-4 text-center">
+            <p class="text-sm text-gray-600">
+              Les inscriptions sont actuellement fermées
+            </p>
+          </div>
+        {% endif %}
+
+      </div>
 
       {% if has_documents %}
         {% component "formation_documents"

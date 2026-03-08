@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import *
 from django.contrib.auth import views as auth_views
+from .dashboard_views import *
 app_name = "accounts"
 
 urlpatterns = [
@@ -19,6 +20,12 @@ urlpatterns = [
         ),
         name="logout",
     ),
+
+    path("dashboard/", dashboard_redirect, name="dashboard_redirect"),
+    path("dashboard/admissions/", admissions_dashboard, name="admissions_dashboard"),
+    path("dashboard/finance/", finance_dashboard, name="finance_dashboard"),
+    path("dashboard/executive/", executive_dashboard, name="executive_dashboard"),
+
     # ========================
     # AUTH PERSONNALISÉ
     # ========================

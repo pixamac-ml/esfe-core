@@ -1,0 +1,240 @@
+{% extends "accounts/dashboard/base_dashboard.html" %}
+{% load humanize %}
+
+{% block dashboard_title %}Gestion des Paiements{% endblock %}
+{% block dashboard_subtitle %}Suivez les encaissements et transactions{% endblock %}
+
+{% block dashboard_content %}
+<!-- ================= STATS CARDS ================= -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Paiements aujourd'hui -->
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Paiements aujourd'hui</p>
+                <p class="text-3xl font-bold text-gray-800">{{ daily_stats.count|default:0 }}</p>
+            </div>
+            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-receipt text-green-600 text-xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Montant du jour -->
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Collecte du jour</p>
+                <p class="text-3xl font-bold text-green-600">{{ daily_stats.total|default:0|intcomma }} F</p>
+            </div>
+            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-money-bill-wave text-green-600 text-xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- En attente validation -->
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 mb-1">En attente validation</p>
+                <p class="text-3xl font-bold text-amber-600">{{ pending_payments|length }}</p>
+            </div>
+            <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-hourglass-half text-amber-600 text-xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inscriptions en attente -->
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Inscriptions en attente</p>
+                <p class="text-3xl font-bold text-blue-600">{{ inscriptions_pending|length }}</p>
+            </div>
+            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-user-clock text-blue-600 text-xl"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= MAIN CONTENT ================= -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <!-- Paiements en attente de validation -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="font-semibold text-gray-800">
+                <i class="fas fa-clock mr-2 text-amber-500"></i>
+                Paiements en attente
+            </h2>
+            <span class="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                {{ pending_payments|length }} en attente
+            </span>
+        </div>
+        <div class="p-6">
+            {% if pending_payments %}
+            <div class="space-y-4">
+                {% for payment in pending_payments %}
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-gray-800">
+                            {{ payment.inscription.candidature.full_name }}
+                        </p>
+                        <p class="text-sm text-gray-500 truncate">
+                            {{ payment.inscription.candidature.programme.title }}
+                        </p>
+                        <p class="text-xs text-gray-400">
+                            {{ payment.amount|intcomma }} F - {{ payment.get_method_display }}
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200">
+                            <i class="fas fa-check mr-1"></i> Valider
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-check-circle text-4xl text-green-500 mb-3"></i>
+                <p>Aucun paiement en attente</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Inscriptions en attente de paiement -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="font-semibold text-gray-800">
+                <i class="fas fa-user-plus mr-2 text-blue-500"></i>
+                Inscriptions en attente de paiement
+            </h2>
+            <span class="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                {{ inscriptions_pending|length }}
+            </span>
+        </div>
+        <div class="p-6">
+            {% if inscriptions_pending %}
+            <div class="space-y-4">
+                {% for ins in inscriptions_pending %}
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-gray-800">
+                            {{ ins.candidature.full_name }}
+                        </p>
+                        <p class="text-sm text-gray-500 truncate">
+                            {{ ins.candidature.programme.title }}
+                        </p>
+                        <p class="text-xs text-gray-400">
+                            Montant: {{ ins.amount_due|intcomma }} F | Payé: {{ ins.amount_paid|intcomma }} F
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-lg font-bold text-amber-600">{{ ins.balance|intcomma }} F</p>
+                        <p class="text-xs text-gray-500">solde restant</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-check-double text-4xl text-green-500 mb-3"></i>
+                <p>Aucune inscription en attente</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ================= TODAY PAYMENTS ================= -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-semibold text-gray-800">
+            <i class="fas fa-list-alt mr-2 text-green-500"></i>
+            Paiements du jour
+        </h2>
+        <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+            {{ today_payments|length }} transactions
+        </span>
+    </div>
+    <div class="p-6">
+        {% if today_payments %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="text-left text-sm text-gray-500 border-b border-gray-200">
+                        <th class="pb-3 font-medium">Heure</th>
+                        <th class="pb-3 font-medium">Étudiant</th>
+                        <th class="pb-3 font-medium">Formation</th>
+                        <th class="pb-3 font-medium">Méthode</th>
+                        <th class="pb-3 font-medium">Montant</th>
+                        <th class="pb-3 font-medium">Statut</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for payment in today_payments %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-4 text-gray-600">
+                            {{ payment.paid_at|date:"H:i" }}
+                        </td>
+                        <td class="py-4">
+                            <p class="font-medium text-gray-800">{{ payment.inscription.candidature.full_name }}</p>
+                        </td>
+                        <td class="py-4 text-gray-600">
+                            {{ payment.inscription.candidature.programme.title|truncatechars:30 }}
+                        </td>
+                        <td class="py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded
+                                {% if payment.method == 'cash' %}bg-gray-100 text-gray-600
+                                {% elif payment.method == 'orange_money' %}bg-orange-100 text-orange-600
+                                {% else %}bg-blue-100 text-blue-600{% endif %}">
+                                {{ payment.get_method_display }}
+                            </span>
+                        </td>
+                        <td class="py-4 font-medium text-gray-800">
+                            {{ payment.amount|intcomma }} F
+                        </td>
+                        <td class="py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-600">
+                                {{ payment.get_status_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-receipt text-4xl text-gray-300 mb-3"></i>
+            <p>Aucun paiement enregistré aujourd'hui</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ================= PAYMENTS BY METHOD ================= -->
+{% if payments_by_method %}
+<div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+    {% for method in payments_by_method %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <span class="px-3 py-1 text-xs font-medium rounded
+                {% if method.method == 'cash' %}bg-gray-100 text-gray-600
+                {% elif method.method == 'orange_money' %}bg-orange-100 text-orange-600
+                {% else %}bg-blue-100 text-blue-600{% endif %}">
+                {{ method.get_method_display|default:method.method }}
+            </span>
+            <span class="text-sm text-gray-500">{{ method.count }} transactions</span>
+        </div>
+        <p class="text-2xl font-bold text-gray-800">{{ method.total|intcomma }} F</p>
+        <p class="text-sm text-gray-500">Total collectées</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

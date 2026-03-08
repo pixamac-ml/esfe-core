@@ -358,3 +358,5 @@ def profile_settings(request):
         "accounts/partials/profile_settings.html",
         {}
     )
+
+

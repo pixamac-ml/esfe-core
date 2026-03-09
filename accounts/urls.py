@@ -2,6 +2,7 @@ from django.urls import path
 from .views import *
 from django.contrib.auth import views as auth_views
 from .dashboard_views import *
+
 app_name = "accounts"
 
 urlpatterns = [
@@ -11,6 +12,58 @@ urlpatterns = [
             template_name="accounts/registration/login.html"
         ),
         name="login",
+    ),
+
+    # ========================
+    # HTMX ENDPOINTS - FINANCE
+    # ========================
+    path(
+        "dashboard/finance/payment/<int:payment_id>/validate/",
+        validate_payment_htmx,
+        name="validate_payment_htmx"
+    ),
+    path(
+        "dashboard/finance/payment/<int:payment_id>/reject/",
+        reject_payment_htmx,
+        name="reject_payment_htmx"
+    ),
+
+    # ========================
+    # HTMX ENDPOINTS - CASH PAYMENT SESSIONS
+    # ========================
+    path(
+        "dashboard/finance/cash-session/create/",
+        create_cash_session_htmx,
+        name="create_cash_session_htmx"
+    ),
+    path(
+        "dashboard/finance/cash-session/<int:session_id>/regenerate-code/",
+        regenerate_code_htmx,
+        name="regenerate_code_htmx"
+    ),
+    path(
+        "dashboard/finance/cash-session/<int:session_id>/mark-used/",
+        mark_session_used_htmx,
+        name="mark_session_used_htmx"
+    ),
+
+    # ========================
+    # HTMX ENDPOINTS - ADMISSIONS
+    # ========================
+    path(
+        "dashboard/admissions/candidature/<int:candidature_id>/approve/",
+        approve_candidature_htmx,
+        name="approve_candidature_htmx"
+    ),
+    path(
+        "dashboard/admissions/candidature/<int:candidature_id>/reject/",
+        reject_candidature_htmx,
+        name="reject_candidature_htmx"
+    ),
+    path(
+        "dashboard/admissions/document/<int:document_id>/validate/",
+        validate_document_htmx,
+        name="validate_document_htmx"
     ),
 
     path(
@@ -70,4 +123,42 @@ urlpatterns = [
         profile_settings,
         name="profile_settings"
     ),
+
+
+    # ========================
+    # HTMX ENDPOINTS - ADMISSIONS
+    # ========================
+    path(
+        "dashboard/admissions/candidature/<int:candidature_id>/approve/",
+        approve_candidature_htmx,
+        name="approve_candidature_htmx"
+    ),
+    path(
+        "dashboard/admissions/candidature/<int:candidature_id>/under-review/",
+        set_candidature_under_review_htmx,
+        name="set_candidature_under_review_htmx"
+    ),
+    path(
+        "dashboard/admissions/candidature/<int:candidature_id>/to-complete/",
+        set_candidature_to_complete_htmx,
+        name="set_candidature_to_complete_htmx"
+    ),
+    path(
+        "dashboard/admissions/candidature/<int:candidature_id>/reject/",
+        reject_candidature_htmx,
+        name="reject_candidature_htmx"
+    ),
+    path(
+        "dashboard/admissions/candidature/<int:candidature_id>/create-inscription/",
+        create_inscription_htmx,
+        name="create_inscription_htmx"
+    ),
+    path(
+        "dashboard/admissions/document/<int:document_id>/validate/",
+        validate_document_htmx,
+        name="validate_document_htmx"
+    ),
+
+
+
 ]

@@ -1,12 +1,13 @@
 {% extends "accounts/dashboard/base_dashboard.html" %}
 {% load humanize %}
+{% load custom_filters %}
 
 {% block dashboard_title %}Gestion des Paiements{% endblock %}
 {% block dashboard_subtitle %}Suivez les encaissements et transactions{% endblock %}
 
 {% block dashboard_content %}
 <!-- ================= STATS CARDS ================= -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
     <!-- Paiements aujourd'hui -->
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between">
@@ -58,12 +59,25 @@
             </div>
         </div>
     </div>
+
+    <!-- Sessions espèces aujourd'hui -->
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Sessions espèces</p>
+                <p class="text-3xl font-bold text-purple-600">{{ today_sessions|length }}</p>
+            </div>
+            <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <i class="fas fa-money-bill-alt text-purple-600 text-xl"></i>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ================= MAIN CONTENT ================= -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
     <!-- Paiements en attente de validation -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100" id="pending-payments-section">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 class="font-semibold text-gray-800">
                 <i class="fas fa-clock mr-2 text-amber-500"></i>
@@ -77,7 +91,7 @@
             {% if pending_payments %}
             <div class="space-y-4">
                 {% for payment in pending_payments %}
-                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg payment-item" id="payment-row-{{ payment.id }}">
                     <div class="flex-1 min-w-0">
                         <p class="font-medium text-gray-800">
                             {{ payment.inscription.candidature.full_name }}
@@ -89,18 +103,35 @@
                             {{ payment.amount|intcomma }} F - {{ payment.get_method_display }}
                         </p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button class="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200">
-                            <i class="fas fa-check mr-1"></i> Valider
+                    <div class="flex items-center gap-2" id="payment-actions-{{ payment.id }}">
+                        <!-- Bouton Valider -->
+                        <button
+                            hx-post="{% url 'accounts:validate_payment_htmx' payment.id %}"
+                            hx-target="#payment-row-{{ payment.id }}"
+                            hx-swap="outerHTML"
+                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                            class="px-3 py-1.5 bg-green-100 text-green-700 text-sm font-medium rounded-lg hover:bg-green-200 transition-all duration-200 flex items-center gap-1.5">
+                            <i class="fas fa-check"></i> Valider
+                        </button>
+
+                        <!-- Bouton Rejeter -->
+                        <button
+                            hx-post="{% url 'accounts:reject_payment_htmx' payment.id %}"
+                            hx-target="#payment-row-{{ payment.id }}"
+                            hx-swap="outerHTML swap:0.5s"
+                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                            class="px-3 py-1.5 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 transition-all duration-200 flex items-center gap-1.5">
+                            <i class="fas fa-times"></i> Rejeter
                         </button>
                     </div>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
-            <div class="text-center py-8 text-gray-500">
-                <i class="fas fa-check-circle text-4xl text-green-500 mb-3"></i>
-                <p>Aucun paiement en attente</p>
+            <div class="text-center py-8 text-gray-500" id="pending-payments-empty">
+                <i class="fas fa-check-circle text-5xl text-green-400 mb-3"></i>
+                <p class="text-lg font-medium">Aucun paiement en attente</p>
+                <p class="text-sm text-gray-400 mt-1">Tous les paiements ont été traités</p>
             </div>
             {% endif %}
         </div>
@@ -142,16 +173,135 @@
             </div>
             {% else %}
             <div class="text-center py-8 text-gray-500">
-                <i class="fas fa-check-double text-4xl text-green-500 mb-3"></i>
-                <p>Aucune inscription en attente</p>
+                <i class="fas fa-check-double text-5xl text-green-400 mb-3"></i>
+                <p class="text-lg font-medium">Aucune inscription en attente</p>
+                <p class="text-sm text-gray-400 mt-1">Tous les étudiants ont payé</p>
             </div>
             {% endif %}
         </div>
     </div>
 </div>
 
+<!-- ================= CASH PAYMENT SESSIONS ================= -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8" id="cash-sessions-section">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="font-semibold text-gray-800">
+            <i class="fas fa-money-bill-alt mr-2 text-purple-500"></i>
+            Sessions de paiement espèces
+        </h2>
+        <button
+            onclick="document.getElementById('create-session-form').classList.toggle('hidden')"
+            class="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 flex items-center gap-2">
+            <i class="fas fa-plus"></i>
+            Nouvelle session
+        </button>
+    </div>
+
+    <!-- Formulaire de création de session -->
+    <div id="create-session-form" class="hidden px-6 py-4 bg-purple-50 border-b border-purple-100">
+        <form hx-post="{% url 'accounts:create_cash_session_htmx' %}"
+              hx-target="#active-sessions-list"
+              hx-swap="afterbegin"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+              class="space-y-4">
+            <div class="flex items-end gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sélectionner l'étudiant</label>
+                    <select name="inscription_id" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">-- Choisir une inscription --</option>
+                        {% for ins in available_inscriptions %}
+                        <option value="{{ ins.id }}">
+                            {{ ins.candidature.full_name }} - {{ ins.candidature.programme.title }} ({{ ins.balance|intcomma }} F)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit"
+                        class="px-6 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-all duration-200 flex items-center gap-2">
+                    <i class="fas fa-check"></i>
+                    Créer la session
+                </button>
+                <button type="button"
+                        onclick="document.getElementById('create-session-form').classList.add('hidden')"
+                        class="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-all duration-200">
+                    Annuler
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="p-6">
+        <!-- Sessions actives -->
+        {% if active_sessions %}
+        <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-500 mb-3">Sessions actives (en attente de paiement)</h3>
+            <div class="space-y-4" id="active-sessions-list">
+                {% for session in active_sessions %}
+                {% include 'accounts/dashboard/partials/cash_session_created.html' %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Sessions utilisées aujourd'hui -->
+        {% if today_sessions %}
+        <div class="mb-6">
+            <h3 class="text-sm font-medium text-gray-500 mb-3">Sessions utilisées aujourd'hui</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-sm text-gray-500 border-b border-gray-200">
+                            <th class="pb-3 font-medium">Heure</th>
+                            <th class="pb-3 font-medium">Étudiant</th>
+                            <th class="pb-3 font-medium">Formation</th>
+                            <th class="pb-3 font-medium">Code</th>
+                            <th class="pb-3 font-medium">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for session in today_sessions %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="py-3 text-gray-600 font-mono">
+                                {{ session.created_at|date:"H:i" }}
+                            </td>
+                            <td class="py-3">
+                                <p class="font-medium text-gray-800">{{ session.inscription.candidature.full_name }}</p>
+                            </td>
+                            <td class="py-3 text-gray-600">
+                                {{ session.inscription.candidature.programme.title|truncatechars:25 }}
+                            </td>
+                            <td class="py-3 font-mono font-bold text-gray-800">
+                                {{ session.verification_code }}
+                            </td>
+                            <td class="py-3">
+                                <span class="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    Payé
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Aucune session -->
+        {% if not active_sessions and not today_sessions %}
+        <div class="text-center py-8 text-gray-500">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-money-bill-alt text-2xl text-gray-300"></i>
+            </div>
+            <p class="text-lg font-medium">Aucune session de paiement espèces</p>
+            <p class="text-sm text-gray-400 mt-1">Créez une nouvelle session pour encaisser un paiement en espèces</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <!-- ================= TODAY PAYMENTS ================= -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+<div class="bg-white rounded-xl shadow-sm border border-gray-100" id="today-payments-section">
     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <h2 class="font-semibold text-gray-800">
             <i class="fas fa-list-alt mr-2 text-green-500"></i>
@@ -177,8 +327,8 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     {% for payment in today_payments %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="py-4 text-gray-600">
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="py-4 text-gray-600 font-mono">
                             {{ payment.paid_at|date:"H:i" }}
                         </td>
                         <td class="py-4">
@@ -188,18 +338,19 @@
                             {{ payment.inscription.candidature.programme.title|truncatechars:30 }}
                         </td>
                         <td class="py-4">
-                            <span class="px-2 py-1 text-xs font-medium rounded
+                            <span class="px-2.5 py-1 text-xs font-medium rounded-full
                                 {% if payment.method == 'cash' %}bg-gray-100 text-gray-600
                                 {% elif payment.method == 'orange_money' %}bg-orange-100 text-orange-600
                                 {% else %}bg-blue-100 text-blue-600{% endif %}">
                                 {{ payment.get_method_display }}
                             </span>
                         </td>
-                        <td class="py-4 font-medium text-gray-800">
+                        <td class="py-4 font-bold text-gray-800">
                             {{ payment.amount|intcomma }} F
                         </td>
                         <td class="py-4">
-                            <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-600">
+                            <span class="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                <i class="fas fa-check-circle mr-1"></i>
                                 {{ payment.get_status_display }}
                             </span>
                         </td>
@@ -209,9 +360,12 @@
             </table>
         </div>
         {% else %}
-        <div class="text-center py-8 text-gray-500">
-            <i class="fas fa-receipt text-4xl text-gray-300 mb-3"></i>
-            <p>Aucun paiement enregistré aujourd'hui</p>
+        <div class="text-center py-12 text-gray-500">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-receipt text-2xl text-gray-300"></i>
+            </div>
+            <p class="text-lg font-medium">Aucun paiement enregistré aujourd'hui</p>
+            <p class="text-sm text-gray-400 mt-1">Les nouveaux paiements apparaîtront ici</p>
         </div>
         {% endif %}
     </div>
@@ -221,9 +375,9 @@
 {% if payments_by_method %}
 <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
     {% for method in payments_by_method %}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
         <div class="flex items-center justify-between mb-4">
-            <span class="px-3 py-1 text-xs font-medium rounded
+            <span class="px-3 py-1.5 text-xs font-semibold rounded-full
                 {% if method.method == 'cash' %}bg-gray-100 text-gray-600
                 {% elif method.method == 'orange_money' %}bg-orange-100 text-orange-600
                 {% else %}bg-blue-100 text-blue-600{% endif %}">
@@ -231,10 +385,81 @@
             </span>
             <span class="text-sm text-gray-500">{{ method.count }} transactions</span>
         </div>
-        <p class="text-2xl font-bold text-gray-800">{{ method.total|intcomma }} F</p>
-        <p class="text-sm text-gray-500">Total collectées</p>
+        <p class="text-3xl font-bold text-gray-800">{{ method.total|intcomma }} F</p>
+        <p class="text-sm text-gray-500 mt-1">Total collectées</p>
     </div>
     {% endfor %}
 </div>
 {% endif %}
+
+<!-- ================= TOAST EVENT HANDLERS ================= -->
+<script>
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    // Re-initialiser les écouteurs d'événements après chaque swap HTMX
+    initializePaymentListeners();
+});
+
+function initializePaymentListeners() {
+    // Écouter les événements de validation
+    document.querySelectorAll('[hx-post*="validate_payment"]').forEach(function(btn) {
+        btn.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.xhr.status === 200) {
+                window.dispatchEvent(new CustomEvent('toast', {
+                    detail: {
+                        message: 'Paiement validé avec succès!',
+                        type: 'success'
+                    }
+                }));
+            }
+        });
+    });
+
+    // Écouter les événements de rejet
+    document.querySelectorAll('[hx-post*="reject_payment"]').forEach(function(btn) {
+        btn.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.xhr.status === 200) {
+                window.dispatchEvent(new CustomEvent('toast', {
+                    detail: {
+                        message: 'Paiement rejeté',
+                        type: 'warning'
+                    }
+                }));
+            }
+        });
+    });
+
+    // Écouter les événements de session espèces - marquer comme payé
+    document.querySelectorAll('[hx-post*="mark_session_used"]').forEach(function(btn) {
+        btn.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.xhr.status === 200) {
+                window.dispatchEvent(new CustomEvent('toast', {
+                    detail: {
+                        message: 'Session marquée comme payée',
+                        type: 'success'
+                    }
+                }));
+            }
+        });
+    });
+
+    // Écouter les événements de création de session
+    document.querySelectorAll('[hx-post*="create_cash_session"]').forEach(function(form) {
+        form.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.xhr.status === 200) {
+                // Masquer le formulaire
+                document.getElementById('create-session-form').classList.add('hidden');
+                window.dispatchEvent(new CustomEvent('toast', {
+                    detail: {
+                        message: 'Session créée! Communiquez le code à l\'étudiant.',
+                        type: 'success'
+                    }
+                }));
+            }
+        });
+    });
+}
+
+// Initialiser au chargement
+document.addEventListener('DOMContentLoaded', initializePaymentListeners);
+</script>
 {% endblock %}

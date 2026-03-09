@@ -1,5 +1,6 @@
 {% extends "accounts/dashboard/base_dashboard.html" %}
 {% load humanize %}
+{% load custom_filters %}
 
 {% block dashboard_title %}Gestion des Candidatures{% endblock %}
 {% block dashboard_subtitle %}Suivez et gérez les dossiers d'admission{% endblock %}
@@ -7,7 +8,6 @@
 {% block dashboard_content %}
 <!-- ================= STATS CARDS ================= -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <!-- Total Candidatures -->
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between">
             <div>
@@ -19,8 +19,6 @@
             </div>
         </div>
     </div>
-
-    <!-- En attente -->
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between">
             <div>
@@ -32,8 +30,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Acceptées -->
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between">
             <div>
@@ -45,8 +41,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Refusées -->
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between">
             <div>
@@ -55,48 +49,6 @@
             </div>
             <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
                 <i class="fas fa-times-circle text-red-600 text-xl"></i>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ================= SECONDARY STATS ================= -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <!-- Cette semaine -->
-    <div class="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl shadow-lg p-6 text-white">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-primary-100 text-sm mb-1">Candidatures cette semaine</p>
-                <p class="text-3xl font-bold">{{ weekly_candidacies|default:0 }}</p>
-            </div>
-            <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <i class="fas fa-calendar-week text-2xl"></i>
-            </div>
-        </div>
-    </div>
-
-    <!-- En cours d'analyse -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-gray-500 text-sm mb-1">En cours d'analyse</p>
-                <p class="text-3xl font-bold text-blue-600">{{ stats.under_review|default:0 }}</p>
-            </div>
-            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <i class="fas fa-search text-blue-600 text-xl"></i>
-            </div>
-        </div>
-    </div>
-
-    <!-- Taux d'admission -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-gray-500 text-sm mb-1">Taux d'admission</p>
-                <p class="text-3xl font-bold text-purple-600">{{ admission_rate }}%</p>
-            </div>
-            <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <i class="fas fa-percentage text-purple-600 text-xl"></i>
             </div>
         </div>
     </div>
@@ -112,29 +64,51 @@
                 Candidatures en attente
             </h2>
             <span class="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
-                {{ pending_candidatures|length }} en attente
+                {{ pending_candidatures|length }}
             </span>
         </div>
         <div class="p-6">
             {% if pending_candidatures %}
             <div class="space-y-4">
                 {% for cand in pending_candidatures %}
-                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg" id="candidature-row-{{ cand.id }}">
                     <div class="flex-1 min-w-0">
                         <p class="font-medium text-gray-800">{{ cand.full_name }}</p>
                         <p class="text-sm text-gray-500 truncate">{{ cand.programme.title }}</p>
                         <p class="text-xs text-gray-400">{{ cand.submitted_at|date:"d/m/Y H:i" }}</p>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1">
                         <span class="px-2 py-1 text-xs font-medium rounded
                             {% if cand.status == 'submitted' %}bg-gray-100 text-gray-600
                             {% elif cand.status == 'under_review' %}bg-blue-100 text-blue-600
                             {% else %}bg-amber-100 text-amber-600{% endif %}">
                             {{ cand.get_status_display }}
                         </span>
-                        <a href="#" class="p-2 text-primary-600 hover:bg-primary-50 rounded-lg">
-                            <i class="fas fa-eye"></i>
-                        </a>
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open" class="p-2 text-gray-500 hover:bg-gray-200 rounded-lg">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10" style="display: none;">
+                                <div class="py-1">
+                                    {% if cand.status == 'submitted' %}
+                                    <button hx-post="{% url 'accounts:set_candidature_under_review_htmx' cand.id %}" hx-target="#candidature-row-{{ cand.id }}" hx-swap="outerHTML swap:0.5s" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                        <i class="fas fa-search text-blue-500 w-4"></i> Analyser
+                                    </button>
+                                    {% endif %}
+                                    {% if cand.status != 'to_complete' %}
+                                    <button hx-post="{% url 'accounts:set_candidature_to_complete_htmx' cand.id %}" hx-target="#candidature-row-{{ cand.id }}" hx-swap="outerHTML swap:0.5s" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                        <i class="fas fa-edit text-amber-500 w-4"></i> Demander complément
+                                    </button>
+                                    {% endif %}
+                                    <button hx-post="{% url 'accounts:approve_candidature_htmx' cand.id %}" hx-target="#candidature-row-{{ cand.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2">
+                                        <i class="fas fa-check w-4"></i> Accepter & Inscrire
+                                    </button>
+                                    <button hx-post="{% url 'accounts:reject_candidature_htmx' cand.id %}" hx-target="#candidature-row-{{ cand.id }}" hx-swap="outerHTML swap:0.5s" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center gap-2">
+                                        <i class="fas fa-times w-4"></i> Rejeter
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
@@ -156,24 +130,22 @@
                 Documents à valider
             </h2>
             <span class="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
-                {{ pending_docs|length }} documents
+                {{ pending_docs|length }}
             </span>
         </div>
         <div class="p-6">
             {% if pending_docs %}
             <div class="space-y-4">
                 {% for doc in pending_docs|slice:":10" %}
-                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg" id="doc-row-{{ doc.id }}">
                     <div class="flex-1 min-w-0">
                         <p class="font-medium text-gray-800">{{ doc.candidature.full_name }}</p>
                         <p class="text-sm text-gray-500">{{ doc.document_type.name }}</p>
                         <p class="text-xs text-gray-400">{{ doc.uploaded_at|date:"d/m/Y H:i" }}</p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button class="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200">
-                            <i class="fas fa-check mr-1"></i> Valider
-                        </button>
-                    </div>
+                    <button hx-post="{% url 'accounts:validate_document_htmx' doc.id %}" hx-target="#doc-row-{{ doc.id }}" hx-swap="outerHTML swap:0.5s" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200">
+                        <i class="fas fa-check mr-1"></i> Valider
+                    </button>
                 </div>
                 {% endfor %}
             </div>
@@ -189,14 +161,11 @@
 
 <!-- ================= ACCEPTED CANDIDATURES ================= -->
 <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100">
-    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div class="px-6 py-4 border-b border-gray-100">
         <h2 class="font-semibold text-gray-800">
             <i class="fas fa-user-check mr-2 text-green-500"></i>
-            Candidatures acceptées (prêtes pour inscription)
+            Candidatures acceptées
         </h2>
-        <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-            {{ accepted_candidatures|length }} acceptées
-        </span>
     </div>
     <div class="p-6">
         {% if accepted_candidatures %}
@@ -207,24 +176,40 @@
                         <th class="pb-3 font-medium">Candidat</th>
                         <th class="pb-3 font-medium">Programme</th>
                         <th class="pb-3 font-medium">Année</th>
-                        <th class="pb-3 font-medium">Date acceptation</th>
+                        <th class="pb-3 font-medium">Statut</th>
                         <th class="pb-3 font-medium">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     {% for cand in accepted_candidatures %}
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50" id="accepted-row-{{ cand.id }}">
                         <td class="py-4">
                             <p class="font-medium text-gray-800">{{ cand.full_name }}</p>
                             <p class="text-sm text-gray-500">{{ cand.email }}</p>
                         </td>
                         <td class="py-4 text-gray-600">{{ cand.programme.title }}</td>
                         <td class="py-4 text-gray-600">Année {{ cand.entry_year }}</td>
-                        <td class="py-4 text-gray-600">{{ cand.reviewed_at|date:"d/m/Y" }}</td>
                         <td class="py-4">
-                            <button class="px-3 py-1 bg-primary-100 text-primary-700 text-sm rounded-lg hover:bg-primary-200">
+                            {% if cand.inscription %}
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                <i class="fas fa-check-circle mr-1"></i> Créée
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-700">
+                                <i class="fas fa-clock mr-1"></i> En attente
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-4">
+                            {% if cand.inscription %}
+                            <button onclick="showInscriptionModal('{{ cand.full_name }}', '{{ cand.inscription.access_code }}', '{{ cand.inscription.get_public_url }}')" class="px-3 py-1 bg-primary-100 text-primary-700 text-sm rounded-lg hover:bg-primary-200">
+                                <i class="fas fa-link mr-1"></i> Voir lien
+                            </button>
+                            {% else %}
+                            <button hx-post="{% url 'accounts:create_inscription_htmx' cand.id %}" hx-target="#accepted-row-{{ cand.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200">
                                 <i class="fas fa-plus mr-1"></i> Créer inscription
                             </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -234,9 +219,73 @@
         {% else %}
         <div class="text-center py-8 text-gray-500">
             <i class="fas fa-user-plus text-4xl text-gray-300 mb-3"></i>
-            <p>Aucune candidature acceptée en attente d'inscription</p>
+            <p>Aucune candidature acceptée</p>
         </div>
         {% endif %}
     </div>
 </div>
+
+<!-- ================= MODAL ================= -->
+<div id="inscription-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full mx-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">Lien d'inscription</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div id="modal-content"></div>
+        <div class="mt-6 flex justify-end">
+            <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<!-- ================= JAVASCRIPT ================= -->
+<script>
+function showInscriptionModal(name, code, url) {
+    const content = document.getElementById('modal-content');
+    content.innerHTML = `
+        <p class="text-gray-600 mb-4">Informations pour <strong>${name}</strong>:</p>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Lien public</label>
+                <div class="flex gap-2">
+                    <input type="text" readonly value="${window.location.origin}${url}" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono">
+                    <button onclick="copyToClipboard('${window.location.origin}${url}')" class="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><i class="fas fa-copy"></i></button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Code d'accès</label>
+                <div class="flex gap-2">
+                    <input type="text" readonly value="${code}" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono font-bold text-lg text-center">
+                    <button onclick="copyToClipboard('${code}')" class="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><i class="fas fa-copy"></i></button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('inscription-modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('inscription-modal').classList.add('hidden'); }
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Copié!', type: 'success' } }));
+    });
+}
+
+document.body.addEventListener('htmx:afterSwap', initializeAdmissionsListeners);
+
+function initializeAdmissionsListeners() {
+    document.querySelectorAll('[hx-post*="approve_candidature"], [hx-post*="create_inscription"]').forEach(function(btn) {
+        btn.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.xhr.status === 200) {
+                window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Opération réussie!', type: 'success' } }));
+            }
+        });
+    });
+}
+document.addEventListener('DOMContentLoaded', initializeAdmissionsListeners);
+</script>
 {% endblock %}

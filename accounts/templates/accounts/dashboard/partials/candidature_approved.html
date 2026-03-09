@@ -1,0 +1,71 @@
+{% load humanize %}
+<div class="bg-green-50 border border-green-200 rounded-xl p-6 animate-pulse-once" id="candidature-row-{{ candidature.id }}">
+    <div class="flex items-start justify-between">
+        <div class="flex-1">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                <span class="text-sm font-medium text-green-700">Inscription créée avec succès!</span>
+            </div>
+
+            <div class="bg-white rounded-lg p-4 border border-green-200 mb-4">
+                <p class="text-sm text-gray-600 mb-1">Candidat</p>
+                <p class="font-semibold text-gray-800">{{ candidature.full_name }}</p>
+                <p class="text-sm text-gray-500">{{ candidature.email }}</p>
+            </div>
+
+            <div class="bg-white rounded-lg p-4 border border-green-200 mb-4">
+                <p class="text-sm text-gray-600 mb-2">Programme</p>
+                <p class="font-medium text-gray-800">{{ candidature.programme.title }}</p>
+                <p class="text-sm text-gray-500">Année d'entrée: {{ candidature.entry_year }}</p>
+            </div>
+
+            <div class="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-4 text-white mb-4">
+                <p class="text-sm opacity-90 mb-1">Montant à payer</p>
+                <p class="text-3xl font-bold">{{ inscription.amount_due|intcomma }} F</p>
+            </div>
+
+            <div class="bg-white rounded-lg p-4 border border-green-200">
+                <p class="text-sm font-medium text-gray-700 mb-3">Lien à envoyer à l'étudiant</p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Lien public</label>
+                        <div class="flex gap-2">
+                            <input type="text" readonly value="{{ request.get_host }}{{ inscription.get_public_url }}"
+                                   class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono text-gray-600">
+                            <button onclick="copyToClipboard('{{ request.get_host }}{{ inscription.get_public_url }}')"
+                                    class="px-3 py-2 bg-primary-100 text-primary-700 rounded-lg hover:bg-primary-200">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Code d'accès</label>
+                        <div class="flex gap-2">
+                            <input type="text" readonly value="{{ inscription.access_code }}"
+                                   class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono font-bold text-gray-800">
+                            <button onclick="copyToClipboard('{{ inscription.access_code }}')"
+                                    class="px-3 py-2 bg-primary-100 text-primary-700 rounded-lg hover:bg-primary-200">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="ml-4">
+            <span class="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">
+                <i class="fas fa-check-circle mr-1"></i> Acceptée
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        window.dispatchEvent(new CustomEvent('toast', {
+            detail: { message: 'Copié dans le presse-papiers!', type: 'success' }
+        }));
+    });
+}
+</script>

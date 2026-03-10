@@ -232,6 +232,118 @@ class Fee(models.Model):
         return f"{self.label} – {self.amount} FCFA"
 
 
+
+
+# ==================================================
+# FAITS RAPIDES (QUICK FACTS)
+# ==================================================
+class ProgrammeQuickFact(models.Model):
+    ICON_CHOICES = [
+        ("academic_cap", "Capacité académique"),
+        ("calendar", "Calendrier"),
+        ("clock", "Horloge/Durée"),
+        ("location", "Localisation"),
+        ("certificate", "Certification"),
+        ("user", "Profil étudiant"),
+        ("briefcase", "Valise/Métier"),
+    ]
+
+    programme = models.ForeignKey(Programme, related_name="quick_facts", on_delete=models.CASCADE)
+    icon = models.CharField(max_length=30, choices=ICON_CHOICES, default="academic_cap")
+    label = models.CharField(max_length=100, help_text="Ex: Niveau, Durée, Rentrée")
+    value = models.CharField(max_length=200, help_text="Ex: Bac+5, 2 ans, Septembre 2026")
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+        unique_together = ("programme", "icon", "label")
+
+    def __str__(self):
+        return f"{self.programme.title} - {self.label}: {self.value}"
+
+
+# ==================================================
+# ONGLETS DE LA PAGE DÉTAIL
+# ==================================================
+class ProgrammeTab(models.Model):
+    TAB_TYPE_CHOICES = [
+        ("key_info", "Infos clés"),
+        ("program", "Programme"),
+        ("careers", "Débouchés"),
+        ("admission", "Admission"),
+        ("custom", "Personnalisé"),
+    ]
+
+    programme = models.ForeignKey(Programme, related_name="tabs", on_delete=models.CASCADE)
+    tab_type = models.CharField(max_length=20, choices=TAB_TYPE_CHOICES, default="custom")
+    title = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=50)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        unique_together = ("programme", "slug")
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.title)
+        super().save(*args, **kwargs)
+
+
+# ==================================================
+# SECTIONS DE CONTENU
+# ==================================================
+class ProgrammeSection(models.Model):
+    SECTION_TYPE_CHOICES = [
+        ("text", "Texte simple"),
+        ("heading", "Titre + Description"),
+        ("list", "Liste à puces"),
+        ("cards", "Cartes/Blocs"),
+        ("cta", "Appel à l'action"),
+    ]
+
+    tab = models.ForeignKey(ProgrammeTab, related_name="sections", on_delete=models.CASCADE)
+    section_type = models.CharField(max_length=20, choices=SECTION_TYPE_CHOICES, default="text")
+    title = models.CharField(max_length=200, blank=True)
+    content = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+
+# ==================================================
+# BLOCS DE COMPÉTENCES
+# ==================================================
+class CompetenceBlock(models.Model):
+    programme = models.ForeignKey(Programme, related_name="competence_blocks", on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+
+# ==================================================
+# ITEMS DE COMPÉTENCES
+# ==================================================
+class CompetenceItem(models.Model):
+    block = models.ForeignKey(CompetenceBlock, related_name="items", on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+
+
+
+
+
+
 # ==================================================
 # DOCUMENTS REQUIS
 # ==================================================

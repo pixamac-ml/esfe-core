@@ -1,50 +1,195 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-</head>
-<body style="font-family: Arial, sans-serif; background:#f5f5f5; padding:20px;">
+{% extends "emails/base_email.html" %}
 
-    <div style="max-width:600px; margin:auto; background:white; padding:30px; border-radius:8px;">
+{% block content %}
 
-        <h2 style="color:#1e3a8a;">🎓 Bienvenue à l’ESFE</h2>
+<!-- Hero Section -->
+<div style="text-align:center; margin-bottom:35px;">
+    <div style="display:inline-block; width:80px; height:80px; background:linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%); border-radius:50%; margin-bottom:20px;">
+        <!-- Graduation Cap Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; margin:20px auto 0;"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+    </div>
+    <h2 style="color:#1e4f6f; font-size:26px; margin:0 0 10px 0;">
+        Bienvenue à l'EPSFé !
+    </h2>
+    <p style="color:#64748b; font-size:15px; margin:0;">
+        Votre parcours vers l'excellence commence ici
+    </p>
+</div>
 
-        <p>Bonjour <strong>{{ user.first_name }} {{ user.last_name }}</strong>,</p>
+<!-- Greeting -->
+<p>
+    Chère étudiante, Cher étudiant <strong style="color:#1e4f6f;">{{ user.first_name|default:user.last_name }}</strong>,
+</p>
 
-        <p>Votre premier paiement a été validé avec succès.</p>
+<p>
+    C'est avec une immense joie que nous vous accueillons au sein de l'<strong>École Privée de Santé Félix Houphouët Boigny (EPSFé)</strong>.
+    Votre inscription a été confirmée avec succès et votre compte étudiant a été créé.
+</p>
 
-        <p>Votre compte étudiant a été automatiquement créé.</p>
+<!-- Credentials Card -->
+<div style="background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border:2px solid #1e4f6f; border-radius:16px; padding:30px; margin:35px 0; text-align:center;">
+    <h3 style="color:#1e4f6f; margin:0 0 25px 0; font-size:18px;">
+        <!-- Lock Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:8px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        Vos identifiants de connexion
+    </h3>
 
-        <hr>
-
-        <h3>🔐 Vos identifiants</h3>
-
-        <p>
-            <strong>Identifiant :</strong> {{ user.username }}<br>
-            <strong>Mot de passe :</strong> {{ password }}
-        </p>
-
-        <hr>
-
-        <p>
-            📂 <strong>Dossier d’inscription :</strong><br>
-            <a href="{{ public_link }}">{{ public_link }}</a>
-        </p>
-
-        <p>
-            🎓 <strong>Plateforme pédagogique :</strong><br>
-            <a href="{{ login_url }}">{{ login_url }}</a>
-        </p>
-
-        <p style="margin-top:20px;">
-            Nous vous recommandons de changer votre mot de passe dès votre première connexion.
-        </p>
-
-        <p style="margin-top:30px; font-size:13px; color:#777;">
-            Administration ESFE
-        </p>
-
+    <div style="background:#ffffff; border-radius:12px; padding:25px; margin-bottom:20px;">
+        <table style="width:100%; max-width:350px; margin:0 auto;">
+            <tr>
+                <td style="padding:12px 0; color:#64748b; font-size:14px; text-align:left; border-bottom:1px solid #e2e8f0;">
+                    Nom d'utilisateur
+                </td>
+                <td style="padding:12px 0; color:#1e4f6f; font-weight:700; font-size:15px; text-align:right; border-bottom:1px solid #e2e8f0; font-family:monospace;">
+                    {{ user.username }}
+                </td>
+            </tr>
+            <tr>
+                <td style="padding:12px 0; color:#64748b; font-size:14px; text-align:left;">
+                    Mot de passe temporaire
+                </td>
+                <td style="padding:12px 0; color:#f59e0b; font-weight:700; font-size:15px; text-align:right; font-family:monospace;">
+                    {{ password }}
+                </td>
+            </tr>
+        </table>
     </div>
 
-</body>
-</html>
+    <p style="color:#dc2626; font-size:13px; margin:0; font-style:italic;">
+        <!-- Warning Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Veuillez changer votre mot de passe dès votre première connexion
+    </p>
+</div>
+
+<!-- Programme Info -->
+{% if inscription %}
+<div style="background:#f8fafc; border-radius:12px; padding:25px; margin:30px 0;">
+    <h4 style="color:#1e4f6f; margin:0 0 15px 0; font-size:15px;">
+        <!-- Book Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:8px;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        Votre formation
+    </h4>
+    <table style="width:100%;">
+        <tr>
+            <td style="padding:8px 0; color:#64748b; font-size:14px; width:40%;">
+                Formation
+            </td>
+            <td style="padding:8px 0; color:#334155; font-weight:600; font-size:14px;">
+                {{ inscription.candidature.programme.title }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:8px 0; color:#64748b; font-size:14px;">
+                Niveau
+            </td>
+            <td style="padding:8px 0; color:#334155; font-size:14px;">
+                {{ inscription.candidature.programme.cycle.title|default:"Licence" }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:8px 0; color:#64748b; font-size:14px;">
+                Année académique
+            </td>
+            <td style="padding:8px 0; color:#334155; font-size:14px;">
+                {{ inscription.candidature.entry_year|default:"2025-2026" }}
+            </td>
+        </tr>
+    </table>
+</div>
+{% endif %}
+
+<!-- Important Links -->
+<h4 style="color:#1e4f6f; margin:35px 0 20px 0; font-size:16px;">
+    <!-- Globe Icon SVG -->
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:8px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+    Liens importants
+</h4>
+
+<div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:30px;">
+    {% if public_link %}
+    <div style="flex:1; min-width:200px; background:#f8fafc; border-radius:12px; padding:20px; text-align:center;">
+        <!-- Folder Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1e4f6f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; margin:0 auto 10px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        <p style="margin:0 0 10px 0; color:#1e4f6f; font-weight:600; font-size:14px;">
+            Dossier d'inscription
+        </p>
+        <a href="{{ public_link }}"
+           style="display:inline-block; background:#1db5b0; color:#ffffff; padding:10px 20px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500;">
+            Accéder
+        </a>
+    </div>
+    {% endif %}
+
+    {% if login_url %}
+    <div style="flex:1; min-width:200px; background:#f8fafc; border-radius:12px; padding:20px; text-align:center;">
+        <!-- Graduation Cap Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1e4f6f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; margin:0 auto 10px;"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+        <p style="margin:0 0 10px 0; color:#1e4f6f; font-weight:600; font-size:14px;">
+            Portail étudiant
+        </p>
+        <a href="{{ login_url|default:"https://www.esfe-mali.org/accounts/login/" }}"
+           style="display:inline-block; background:#1e4f6f; color:#ffffff; padding:10px 20px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500;">
+            Se connecter
+        </a>
+    </div>
+    {% endif %}
+
+    <div style="flex:1; min-width:200px; background:#f8fafc; border-radius:12px; padding:20px; text-align:center;">
+        <!-- Globe Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1e4f6f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; margin:0 auto 10px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <p style="margin:0 0 10px 0; color:#1e4f6f; font-weight:600; font-size:14px;">
+            Site officiel
+        </p>
+        <a href="https://www.esfe-mali.org"
+           style="display:inline-block; background:#64748b; color:#ffffff; padding:10px 20px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500;">
+            Visiter
+        </a>
+    </div>
+</div>
+
+<!-- Welcome Message from Director -->
+<div style="background:linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%); border-radius:12px; padding:30px; margin:35px 0; color:#ffffff;">
+    <h4 style="margin:0 0 15px 0; font-size:16px; color:#ffffff;">
+        <!-- Quote Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:8px;"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"></path></svg>
+        Message du Directeur
+    </h4>
+    <p style="margin:0; font-size:14px; line-height:1.7; color:rgba(255,255,255,0.9);">
+        "Chers étudiants, votre présence ici est le fruit d'un choix. Celui de vous engager dans une voie noble, exigeante et profondément humaine.
+        Cette école est le lieu où se forgent les savoirs, les savoir-faire et les savoir-être qui vous permettront, demain, de soigneer, d'accompagner, de soulager."
+    </p>
+    <p style="margin:15px 0 0 0; font-size:13px; color:rgba(255,255,255,0.7);">
+        — Dr SANOGO Mamadou, Directeur Général
+    </p>
+</div>
+
+<!-- Contact Info -->
+<div style="margin-top:35px; padding-top:25px; border-top:1px solid #e2e8f0;">
+    <p style="margin:0 0 15px 0; color:#334155; font-size:14px;">
+        <strong>Une question ?</strong> Notre équipe est là pour vous aider :
+    </p>
+    <p style="margin:0; color:#64748b; font-size:13px; line-height:1.8;">
+        <!-- Email Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+        <a href="mailto:esfeho@gmail.com" style="color:#1db5b0; text-decoration:none;">esfeho@gmail.com</a><br>
+        <!-- Phone Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        (+223) 76 37 88 66 / 66 37 88 66<br>
+        <!-- Location Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        BP E2087, Bamako, MALI
+    </p>
+</div>
+
+<!-- Closing -->
+<div style="margin-top:40px; text-align:center;">
+    <p style="margin:0; color:#1e4f6f; font-size:18px; font-weight:600;">
+        Au plaisir de vous accompagner vers l'excellence !
+    </p>
+    <p style="margin:15px 0 0 0; color:#64748b; font-size:14px;">
+        L'équipe Administrative EPSFé
+    </p>
+</div>
+
+{% endblock %}

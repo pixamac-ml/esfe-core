@@ -2,23 +2,153 @@
 
 {% block content %}
 
-<h2 style="color:#f39c12;margin-top:0;">
-  Nouveau message reçu
-</h2>
-
-<p><strong>Nom :</strong> {{ message_obj.full_name }}</p>
-<p><strong>Email :</strong> {{ message_obj.email }}</p>
-<p><strong>Sujet :</strong> {{ message_obj.get_subject_display }}</p>
-
-<hr style="margin:30px 0;border:none;border-top:1px solid #d6e4ec;">
-
-<div style="background:#f4fbfb;padding:20px;border-radius:8px;">
-  {{ message_obj.message }}
+<!-- Alert Header -->
+<div style="text-align:center; margin-bottom:30px;">
+    <div style="display:inline-block; width:80px; height:80px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius:50%; margin-bottom:20px;">
+        <!-- Inbox Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; margin:20px auto 0;"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>
+    </div>
+    <h2 style="color:#1e4f6f; font-size:24px; margin:0 0 10px 0;">
+        Nouveau message reçu
+    </h2>
+    <p style="color:#64748b; font-size:15px; margin:0;">
+        Un nouveau message nécessite votre attention
+    </p>
 </div>
 
-<p style="margin-top:25px;font-size:13px;color:#5b93b3;">
-IP : {{ message_obj.ip_address }}<br>
-Navigateur : {{ message_obj.user_agent }}
-</p>
+<!-- Sender Info Card -->
+<div style="background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border:2px solid #1e4f6f; border-radius:12px; padding:25px; margin:30px 0;">
+    <h4 style="color:#1e4f6f; margin:0 0 20px 0; font-size:16px; display:flex; align-items:center;">
+        <!-- User Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:8px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        Informations expéditeur
+    </h4>
+
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td style="padding:10px 0; color:#64748b; font-size:14px; border-bottom:1px solid #e2e8f0; width:40%;">
+                Nom complet
+            </td>
+            <td style="padding:10px 0; color:#334155; font-weight:600; font-size:14px; border-bottom:1px solid #e2e8f0;">
+                {{ message_obj.full_name }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:10px 0; color:#64748b; font-size:14px; border-bottom:1px solid #e2e8f0;">
+                Adresse email
+            </td>
+            <td style="padding:10px 0; color:#1db5b0; font-size:14px; border-bottom:1px solid #e2e8f0;">
+                <a href="mailto:{{ message_obj.email }}" style="color:#1db5b0; text-decoration:none;">{{ message_obj.email }}</a>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:10px 0; color:#64748b; font-size:14px; border-bottom:1px solid #e2e8f0;">
+                Téléphone
+            </td>
+            <td style="padding:10px 0; color:#334155; font-size:14px; border-bottom:1px solid #e2e8f0;">
+                {{ message_obj.phone|default:"Non fourni" }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:10px 0; color:#64748b; font-size:14px;">
+                Sujet
+            </td>
+            <td style="padding:10px 0; color:#1e4f6f; font-weight:600; font-size:14px;">
+                {{ message_obj.get_subject_display }}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- Message Content -->
+<div style="background:#f8fafc; border-radius:12px; padding:25px; margin:30px 0;">
+    <h4 style="color:#1e4f6f; margin:0 0 15px 0; font-size:14px; display:flex; align-items:center;">
+        <!-- Message Circle Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:8px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        Contenu du message
+    </h4>
+    <div style="background:#ffffff; border-radius:8px; padding:20px; border:1px solid #e2e8f0;">
+        <p style="margin:0; color:#334155; font-size:14px; line-height:1.8; white-space:pre-wrap;">{{ message_obj.message }}</p>
+    </div>
+</div>
+
+<!-- Technical Info -->
+<div style="background:#f1f5f9; border-radius:12px; padding:25px; margin:30px 0;">
+    <h4 style="color:#64748b; margin:0 0 15px 0; font-size:12px; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center;">
+        <!-- Tool Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:6px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+        Informations techniques
+    </h4>
+
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td style="padding:8px 0; color:#64748b; font-size:13px; border-bottom:1px solid #e2e8f0; width:30%;">
+                ID Message
+            </td>
+            <td style="padding:8px 0; color:#1e4f6f; font-weight:600; font-size:13px; border-bottom:1px solid #e2e8f0; font-family:monospace;">
+                #MSG{{ message_obj.id }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:8px 0; color:#64748b; font-size:13px; border-bottom:1px solid #e2e8f0;">
+                Date de réception
+            </td>
+            <td style="padding:8px 0; color:#334155; font-size:13px; border-bottom:1px solid #e2e8f0;">
+                {{ message_obj.created_at|date:"d/m/Y à H:i" }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:8px 0; color:#64748b; font-size:13px; border-bottom:1px solid #e2e8f0;">
+                Adresse IP
+            </td>
+            <td style="padding:8px 0; color:#334155; font-size:13px; border-bottom:1px solid #e2e8f0; font-family:monospace;">
+                {{ message_obj.ip_address|default:"N/A" }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:8px 0; color:#64748b; font-size:13px;">
+                Statut
+            </td>
+            <td style="padding:8px 0; font-weight:600; font-size:13px;">
+                {% if message_obj.is_read %}
+                <!-- Check Icon SVG -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span style="color:#16a34a;">Lu</span>
+                {% else %}
+                <!-- Clock Icon SVG -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span style="color:#f59e0b;">Non lu</span>
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- Action Required -->
+<div style="background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius:12px; padding:25px; margin:30px 0; text-align:center;">
+    <h4 style="color:#92400e; margin:0 0 15px 0; font-size:16px; display:flex; align-items:center; justify-content:center;">
+        <!-- Zap Icon SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:8px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        Action requise
+    </h4>
+    <p style="margin:0; color:#78350f; font-size:14px; line-height:1.7;">
+        Veuillez traiter ce message dans les meilleurs délais. Cliquez ci-dessous pour répondre :
+    </p>
+    <div style="margin-top:20px;">
+        <a href="https://www.esfe-mali.org/admin/contact/contactmessage/{{ message_obj.id }}/change/"
+           style="display:inline-block; background:#1e4f6f; color:#ffffff; padding:12px 25px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:500;">
+            <!-- Arrow Right Icon SVG -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:6px;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            Traiter le message
+        </a>
+    </div>
+</div>
+
+<!-- Quick Info -->
+<div style="margin-top:35px; padding-top:25px; border-top:1px solid #e2e8f0;">
+    <p style="margin:0; color:#64748b; font-size:12px; text-align:center;">
+        Ce message a été envoyé automatiquement via le formulaire de contact du site EPSFé.
+    </p>
+</div>
 
 {% endblock %}

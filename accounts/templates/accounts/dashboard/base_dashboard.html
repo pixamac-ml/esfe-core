@@ -5,154 +5,134 @@
 
 {% block extra_head %}
 <style>
-    .dashboard-gradient {
-        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+    :root {
+        --primary: #1e4f6f;
+        --primary-light: #2d6a8f;
+        --primary-dark: #163b53;
+        --secondary: #1db5b0;
+        --secondary-light: #49c7c3;
+        --accent: #f39c12;
+        --accent-light: #f7b955;
+        --soft: #f4fbfb;
     }
-
-    .stat-card {
-        transition: all 0.3s ease;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
-    }
-
-    .sidebar-link {
-        transition: all 0.2s ease;
-    }
-
-    .sidebar-link:hover {
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    .sidebar-link.active {
-        background: rgba(255, 255, 255, 0.2);
-        border-left: 3px solid #f59e0b;
-    }
-
-    .data-table {
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-
-    .data-table thead th {
-        position: sticky;
-        top: 0;
-        background: #f8fafc;
-        z-index: 10;
-    }
+    .dashboard-gradient { background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%); }
+    .stat-card { transition: all 0.3s ease; }
+    .stat-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(30, 79, 111, 0.15); }
+    .sidebar-link { transition: all 0.2s ease; }
+    .sidebar-link:hover { background: rgba(255, 255, 255, 0.1); }
+    .sidebar-link.active { background: rgba(255, 255, 255, 0.2); border-left: 3px solid #f39c12; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .pulse-soft { animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 flex">
-    <!-- ================= SIDEBAR ================= -->
-    <aside class="w-64 bg-primary-600 text-white flex-shrink-0 fixed h-full">
-        <!-- Logo -->
+<div class="min-h-screen flex" style="background-color: #f4fbfb;">
+    <aside class="w-64 bg-gradient-to-b from-[#1e4f6f] to-[#163b53] text-white flex-shrink-0 fixed h-full shadow-xl z-50">
         <div class="p-6 border-b border-white/10">
             <a href="{% url 'core:home' %}" class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-university text-xl"></i>
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="fas fa-university text-xl text-[#f39c12]"></i>
                 </div>
                 <div>
-                    <p class="text-xs text-white/60">ESFE</p>
-                    <p class="font-bold">Dashboard</p>
+                    <p class="text-xs text-white/60 uppercase tracking-wider">ESFE</p>
+                    <p class="font-bold text-lg">Dashboard</p>
                 </div>
             </a>
         </div>
-
-        <!-- User Info -->
         <div class="p-4 border-b border-white/10">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                    <i class="fas fa-user"></i>
+                <div class="w-12 h-12 bg-[#1db5b0] rounded-full flex items-center justify-center shadow-lg">
+                    <i class="fas fa-user text-lg"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium truncate">{{ user.get_full_name|default:user.username }}</p>
+                    <p class="text-sm font-semibold truncate">{{ user.get_full_name|default:user.username }}</p>
                     {% get_user_group user as user_group %}
-                    {% if user_group %}
-                        <p class="text-xs text-white/60">{{ user_group.name }}</p>
-                    {% endif %}
+                    {% if user_group %}<p class="text-xs text-white/60">{{ user_group.name }}</p>{% endif %}
                 </div>
             </div>
         </div>
-
-        <!-- Navigation -->
-        <nav class="p-4 space-y-1">
+        <nav class="p-4 space-y-2">
             {% if request.user|has_group:'admissions_managers' or request.user.is_superuser %}
-            <a href="{% url 'accounts:admissions_dashboard' %}"
-               class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg {% if dashboard_type == 'admissions' %}active{% endif %}">
-                <i class="fas fa-file-alt w-5"></i>
-                <span>Candidatures</span>
+            <a href="{% url 'accounts:admissions_dashboard' %}" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl {% if dashboard_type == 'admissions' %}active{% endif %}">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center {% if dashboard_type == 'admissions' %}bg-[#f39c12] text-white{% else %}bg-white/10{% endif %}">
+                    <i class="fas fa-file-alt text-sm"></i>
+                </div>
+                <span class="font-medium">Candidatures</span>
             </a>
             {% endif %}
-
             {% if request.user|has_group:'finance_agents' or request.user.is_superuser %}
-            <a href="{% url 'accounts:finance_dashboard' %}"
-               class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg {% if dashboard_type == 'finance' %}active{% endif %}">
-                <i class="fas fa-money-bill-wave w-5"></i>
-                <span>Paiements</span>
+            <a href="{% url 'accounts:finance_dashboard' %}" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl {% if dashboard_type == 'finance' %}active{% endif %}">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center {% if dashboard_type == 'finance' %}bg-[#f39c12] text-white{% else %}bg-white/10{% endif %}">
+                    <i class="fas fa-money-bill-wave text-sm"></i>
+                </div>
+                <span class="font-medium">Paiements</span>
             </a>
             {% endif %}
-
             {% if request.user|has_group:'executive_director' or request.user.is_superuser %}
-            <a href="{% url 'accounts:executive_dashboard' %}"
-               class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg {% if dashboard_type == 'executive' %}active{% endif %}">
-                <i class="fas fa-chart-line w-5"></i>
-                <span>Vue Globale</span>
+            <a href="{% url 'accounts:executive_dashboard' %}" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl {% if dashboard_type == 'executive' %}active{% endif %}">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center {% if dashboard_type == 'executive' %}bg-[#f39c12] text-white{% else %}bg-white/10{% endif %}">
+                    <i class="fas fa-chart-line text-sm"></i>
+                </div>
+                <span class="font-medium">Vue Globale</span>
             </a>
             {% endif %}
         </nav>
-
-        <!-- Bottom Links -->
         <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
-            <a href="{% url 'core:home' %}" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg">
-                <i class="fas fa-home w-5"></i>
-                <span>Retour au site</span>
+            <a href="{% url 'core:home' %}" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl mb-2">
+                <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center"><i class="fas fa-home text-sm"></i></div>
+                <span class="font-medium">Retour au site</span>
             </a>
-
-            <!-- CORRECTION: Formulaire POST pour la déconnexion -->
             <form action="{% url 'accounts:logout' %}" method="post" class="w-full">
                 {% csrf_token %}
-                <button type="submit" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg w-full text-left bg-transparent border-none cursor-pointer">
-                    <i class="fas fa-sign-out-alt w-5"></i>
-                    <span>Déconnexion</span>
+                <button type="submit" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left bg-transparent border-none cursor-pointer">
+                    <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center"><i class="fas fa-sign-out-alt text-sm"></i></div>
+                    <span class="font-medium">Déconnexion</span>
                 </button>
             </form>
         </div>
     </aside>
 
-    <!-- ================= MAIN CONTENT ================= -->
     <main class="flex-1 ml-64">
-        <!-- Top Header -->
-        <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-            <div class="px-8 py-4 flex items-center justify-between">
+        <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-40">
+            <div class="px-8 py-5 flex items-center justify-between">
                 <div>
-                    <h1 class="text-xl font-bold text-gray-800">
-                        {% block dashboard_title %}
-                        Dashboard
-                        {% endblock %}
-                    </h1>
-                    <p class="text-sm text-gray-500">
-                        {% block dashboard_subtitle %}
-                        Bienvenue sur votre espace de gestion
-                        {% endblock %}
-                    </p>
+                    <h1 class="text-2xl font-bold" style="color: #1e4f6f;">{% block dashboard_title %}Dashboard{% endblock %}</h1>
+                    <p class="text-slate-500 mt-1">{% block dashboard_subtitle %}Bienvenue sur votre espace de gestion{% endblock %}</p>
                 </div>
                 <div class="flex items-center gap-4">
-                    <span class="text-sm text-gray-500">
-                        {{ now|date:"d/m/Y" }}
-                    </span>
+                    <div class="flex items-center gap-2 px-4 py-2 bg-[#f4fbfb] rounded-xl">
+                        <i class="fas fa-calendar-alt text-[#1db5b0]"></i>
+                        <span class="text-sm font-medium text-slate-600">{{ now|date:"d/m/Y" }}</span>
+                    </div>
+                    <button class="relative p-3 text-slate-500 hover:text-[#1e4f6f] hover:bg-[#f4fbfb] rounded-xl transition-colors">
+                        <i class="fas fa-bell text-lg"></i>
+                        <span class="absolute top-1 right-1 w-2.5 h-2.5 bg-[#f39c12] rounded-full pulse-soft"></span>
+                    </button>
                 </div>
             </div>
         </header>
-
-        <!-- Dashboard Content -->
-        <div class="p-8">
-            {% block dashboard_content %}
-            {% endblock %}
-        </div>
+        <div class="p-8">{% block dashboard_content %}{% endblock %}</div>
     </main>
 </div>
+
+<div id="toast-container" class="fixed bottom-6 right-6 z-50 space-y-3"></div>
+<script>
+    window.dispatchEvent(new CustomEvent('toast', function(e) {
+        const { message, type = 'info' } = e.detail || {};
+        const container = document.getElementById('toast-container');
+        const colors = { success: 'bg-green-500', error: 'bg-red-500', warning: 'bg-[#f39c12]', info: 'bg-[#1db5b0]' };
+        const icons = { success: 'fa-check-circle', error: 'fa-times-circle', warning: 'fa-exclamation-circle', info: 'fa-info-circle' };
+        const toast = document.createElement('div');
+        toast.className = colors[type] + ' text-white px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 transform transition-all duration-300 translate-x-full opacity-0';
+        toast.innerHTML = '<i class="fas ' + icons[type] + ' text-lg"></i><span class="font-medium">' + message + '</span>';
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.remove('translate-x-full', 'opacity-0'), 100);
+        setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 4000);
+    }));
+</script>
 {% endblock %}

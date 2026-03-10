@@ -132,11 +132,15 @@ def admissions_dashboard(request):
         status='accepted'
     ).select_related('programme').order_by('-reviewed_at')[:10]
 
-    # === Taux d'admission ===
+    # === Taux de conversion ===
     total_reviewed = candidacy_stats['accepted'] + candidacy_stats['rejected']
     admission_rate = 0
     if total_reviewed > 0:
         admission_rate = round((candidacy_stats['accepted'] / total_reviewed) * 100, 1)
+
+    # === LISTE DES PROGRAMMES POUR FILTRES ===
+    from formations.models import Programme
+    programmes_list = Programme.objects.all().order_by('title')
 
     context = {
         'stats': candidacy_stats,
@@ -146,6 +150,7 @@ def admissions_dashboard(request):
         'accepted_candidatures': accepted_candidatures,
         'admission_rate': admission_rate,
         'dashboard_type': 'admissions',
+        'programmes_list': programmes_list,
     }
 
     return render(request, 'accounts/dashboard/admissions.html', context)
@@ -324,6 +329,11 @@ def executive_dashboard(request):
         count=Count('id')
     )
 
+    # === TAUX DE CONVERSION (candidatures -> inscriptions) ===
+    conversion_rate = 0
+    if total_candidatures > 0:
+        conversion_rate = round((total_inscriptions / total_candidatures) * 100, 1)
+
     # === RÉCENTS ACTIVITÉS ===
     # Dernières inscriptions
     recent_inscriptions = Inscription.objects.select_related(
@@ -338,17 +348,23 @@ def executive_dashboard(request):
         'inscription__candidature__programme'
     ).order_by('-paid_at')[:10]
 
+    # === LISTE DES PROGRAMMES POUR FILTRES ===
+    from formations.models import Programme
+    programmes_list = Programme.objects.all().order_by('title')
+
     context = {
         'total_students': total_students,
         'total_inscriptions': total_inscriptions,
         'total_candidatures': total_candidatures,
         'total_revenue': total_revenue,
         'monthly_revenue': monthly_revenue,
+        'conversion_rate': conversion_rate,
         'programmes_popularity': programmes_popularity,
         'admission_stats': admission_stats,
         'recent_inscriptions': recent_inscriptions,
         'recent_payments': recent_payments,
         'dashboard_type': 'executive',
+        'programmes_list': programmes_list,
     }
 
     return render(request, 'accounts/dashboard/executive.html', context)
@@ -593,9 +609,6 @@ def create_inscription_htmx(request, candidature_id):
         })
 
 
-
-
-
 # =====================================================
 # HTMX ENDPOINTS - CASH PAYMENT SESSIONS
 # =====================================================
@@ -736,45 +749,6 @@ def mark_session_used_htmx(request, session_id):
         })
 
 
-# =====================================================
-# HTMX ENDPOINTS - ADMISSIONS
-# =====================================================
-
-@login_required
-def approve_candidature_htmx(request, candidature_id):
-    """
-    Endpoint HTMX pour approuver une candidature.
-    Accessible uniquement aux responsables admissions.
-    """
-    # Vérification de permission
-    user = request.user
-    if not (user.is_superuser or user_has_group(user, 'admissions_managers')):
-        return render(request, 'accounts/dashboard/partials/error.html', {
-            'message': 'Accès refusé.'
-        })
-
-    try:
-        candidature = Candidature.objects.select_related('programme').get(
-            pk=candidature_id,
-            status__in=['submitted', 'under_review', 'to_complete']
-        )
-    except Candidature.DoesNotExist:
-        return render(request, 'accounts/dashboard/partials/error.html', {
-            'message': 'Candidature non trouvée ou déjà traitée.'
-        })
-
-    # Approbation de la candidature
-    candidature.status = 'accepted'
-    candidature.save()
-    candidature.mark_reviewed()
-
-    # Retourner une réponse de succès
-    from django.http import HttpResponse
-    response = HttpResponse('')
-    response['HX-Trigger'] = 'candidature-approved'
-    return response
-
-
 @login_required
 def reject_candidature_htmx(request, candidature_id):
     """
@@ -837,3 +811,216 @@ def validate_document_htmx(request, document_id):
     # Retourner une réponse vide (l'élément sera supprimé)
     from django.http import HttpResponse
     return HttpResponse('')
+
+
+
+
+
+
+
+
+
+@login_required
+def finance_dashboard(request):
+    """
+    Dashboard de l'agent de paiement.
+    Affiche:
+    - Statistiques des paiements du jour (agent-specific)
+    - Transactions en attente de validation (agent-specific)
+    - Sessions de paiement espèces
+    - Historique des paiements (agent-specific)
+    - Comparaison avec les autres agents (pour directeurs)
+    """
+    # Vérification de permission
+    user = request.user
+    is_executive = user.is_superuser or user_has_group(user, 'executive_director')
+    is_finance_agent = user.is_superuser or user_has_group(user, 'finance_agents')
+
+    if not (is_executive or is_finance_agent):
+        messages.error(request, "Accès refusé. Vous n'avez pas la permission.")
+        return redirect('core:home')
+
+    # === RÉCUPÉRER L'AGENT DE PAIEMENT ===
+    try:
+        payment_agent = PaymentAgent.objects.get(user=user)
+    except PaymentAgent.DoesNotExist:
+        payment_agent = None
+
+    # === STATISTIQUES ===
+    today = timezone.now().date()
+    today_start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time()))
+    today_end = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.max.time()))
+
+    # === DONNÉES FILTRÉES PAR AGENT ===
+    if payment_agent and not is_executive:
+        # Agent de paiement - voir seulement son travail
+
+        # Paiements validés aujourd'hui par CET agent (via session)
+        today_session_ids = CashPaymentSession.objects.filter(
+            agent=payment_agent,
+            created_at__gte=today_start,
+            is_used=True
+        ).values_list('inscription_id', flat=True)
+
+        daily_payments = Payment.objects.filter(
+            paid_at__gte=today_start,
+            paid_at__lte=today_end,
+            status='validated',
+            inscription_id__in=today_session_ids
+        )
+
+        # Paiements en attente - voir seulement les inscriptions assignées
+        assigned_inscription_ids = CashPaymentSession.objects.filter(
+            agent=payment_agent,
+            is_used=False,
+            expires_at__gte=timezone.now()
+        ).values_list('inscription_id', flat=True)
+
+        pending_payments = Payment.objects.filter(
+            status='pending',
+            inscription_id__in=assigned_inscription_ids
+        ).select_related(
+            'inscription__candidature__programme'
+        ).order_by('-created_at')[:20]
+
+        # Inscriptions en attente de paiement - seulement celles assignées
+        inscriptions_pending = Inscription.objects.filter(
+            status='created',
+            id__in=assigned_inscription_ids
+        ).select_related(
+            'candidature__programme'
+        ).order_by('-created_at')[:20]
+
+        # Tous les paiements du jour pour cet agent
+        today_payments = daily_payments.select_related(
+            'inscription__candidature__programme'
+        ).order_by('-paid_at')[:50]
+
+    else:
+        # Directeur ou superuser - voir TOUT
+        daily_payments = Payment.objects.filter(
+            paid_at__gte=today_start,
+            paid_at__lte=today_end,
+            status='validated'
+        )
+
+        pending_payments = Payment.objects.filter(
+            status='pending'
+        ).select_related(
+            'inscription__candidature__programme'
+        ).order_by('-created_at')[:20]
+
+        inscriptions_pending = Inscription.objects.filter(
+            status='created'
+        ).select_related(
+            'candidature__programme'
+        ).order_by('-created_at')[:20]
+
+        today_payments = daily_payments.select_related(
+            'inscription__candidature__programme'
+        ).order_by('-paid_at')[:50]
+
+    # === STATISTIQUES DU JOUR ===
+    daily_stats = daily_payments.aggregate(
+        count=Count('id'),
+        total=Sum('amount')
+    )
+
+    # === PAR MÉTHODE DE PAIEMENT ===
+    payments_by_method = Payment.objects.filter(
+        status='validated'
+    ).values('method').annotate(
+        count=Count('id'),
+        total=Sum('amount')
+    )
+
+    # === SESSIONS DE PAIEMENT ESPÈCES ===
+    if payment_agent:
+        active_sessions = CashPaymentSession.objects.filter(
+            agent=payment_agent,
+            is_used=False,
+            expires_at__gte=timezone.now()
+        ).select_related('inscription__candidature').order_by('-created_at')
+
+        today_sessions = CashPaymentSession.objects.filter(
+            agent=payment_agent,
+            created_at__gte=today_start,
+            is_used=True
+        ).select_related('inscription__candidature')
+
+        recent_sessions = CashPaymentSession.objects.filter(
+            agent=payment_agent
+        ).select_related('inscription__candidature').order_by('-created_at')[:10]
+    else:
+        active_sessions = []
+        today_sessions = []
+        recent_sessions = []
+
+    # === INSCRIPTIONS DISPONIBLES POUR CRÉATION DE SESSION ===
+    if payment_agent and not is_executive:
+        assigned_ids = CashPaymentSession.objects.filter(
+            agent=payment_agent
+        ).values_list('inscription_id', flat=True)
+
+        available_inscriptions = Inscription.objects.filter(
+            status='created'
+        ).exclude(
+            id__in=assigned_ids
+        ).select_related(
+            'candidature__programme'
+        ).order_by('-created_at')[:50]
+    else:
+        available_inscriptions = Inscription.objects.filter(
+            status='created'
+        ).select_related(
+            'candidature__programme'
+        ).order_by('-created_at')[:50]
+
+    # === COMPARAISON DES AGENTS (pour directeurs) ===
+    agent_performance = []
+    if is_executive:
+        all_agents = PaymentAgent.objects.select_related('user').all()
+
+        for agent in all_agents:
+            sessions_today = CashPaymentSession.objects.filter(
+                agent=agent,
+                created_at__gte=today_start
+            ).count()
+
+            session_ids = CashPaymentSession.objects.filter(
+                agent=agent,
+                created_at__gte=today_start,
+                is_used=True
+            ).values_list('inscription_id', flat=True)
+
+            amount_today = Payment.objects.filter(
+                inscription_id__in=session_ids,
+                status='validated'
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            agent_performance.append({
+                'agent': agent,
+                'user': agent.user,
+                'sessions_today': sessions_today,
+                'amount_today': amount_today,
+            })
+
+        agent_performance.sort(key=lambda x: x['amount_today'], reverse=True)
+
+    context = {
+        'daily_stats': daily_stats,
+        'pending_payments': pending_payments,
+        'today_payments': today_payments,
+        'inscriptions_pending': inscriptions_pending,
+        'payments_by_method': payments_by_method,
+        'dashboard_type': 'finance',
+        'payment_agent': payment_agent,
+        'active_sessions': active_sessions,
+        'today_sessions': today_sessions,
+        'recent_sessions': recent_sessions,
+        'available_inscriptions': available_inscriptions,
+        'agent_performance': agent_performance,
+        'is_executive_view': is_executive,
+    }
+
+    return render(request, 'accounts/dashboard/finance.html', context)

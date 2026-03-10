@@ -1,6 +1,5 @@
 {% load static component_tags humanize %}
 
-
 <!DOCTYPE html>
 <html lang="fr" class="scroll-smooth">
 <head>
@@ -14,23 +13,26 @@
   <link rel="stylesheet" href="{% static 'public/css/main.css' %}">
   <link rel="stylesheet" href="{% static 'core/css/esfe_theme.css' %}">
   <link rel="stylesheet" href="{% static 'admin/css/widgets.css' %}">
+
   <!-- FONTS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- ICONS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
   <!-- LIBS -->
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script defer src="https://unpkg.com/@alpinejs/intersect@3.13.5/dist/cdn.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
-<link rel="stylesheet"
-href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
   {% block extra_head %}{% endblock %}
 </head>
-<style>
 
+<style>
+/* ================= ANIMATIONS ================= */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
@@ -40,6 +42,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
     animation: fadeIn 0.35s ease-out;
 }
 
+/* ================= CK EDITOR ================= */
 .ck-editor__editable {
     min-height: 300px !important;
     padding: 1rem !important;
@@ -48,6 +51,8 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
 .ck-editor {
     border-radius: 0.75rem !important;
 }
+
+/* ================= TOPIC CARDS ================= */
 .topic-card {
     transition: all 0.2s ease;
 }
@@ -77,7 +82,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
     line-height: 1.7;
 }
 
-
+/* ================= ANSWERS ================= */
 .answer-card {
     transition: all 0.2s ease;
 }
@@ -94,7 +99,22 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
     background: #fafafa;
     padding-top: 10px;
 }
+
+/* ================= SCROLLBAR CUSTOM ================= */
+.scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 3px;
+}
 </style>
+
 <body class="min-h-screen flex flex-col bg-gray-50 text-gray-800 font-roboto antialiased overflow-x-hidden"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
@@ -132,7 +152,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
   </div>
   {% endif %}
 
-  <!-- HTMX Triggered Toasts (toast component) - CENTRÉ SOUS LA NAVBAR -->
+  <!-- HTMX Triggered Toasts (toast component) -->
   <div
       x-data="toastComponent()"
       x-show="show"
@@ -199,8 +219,8 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
       <!-- Progress bar -->
       <div class="h-1 bg-black/10">
         <div
-            class="h-full bg-white/50 transition-all duration-[duration] ease-linear"
-            :style="`width: ${progress}%`"
+            class="h-full bg-white/50 transition-all ease-linear"
+            :style="`width: ${progress}%; transition-duration: ${duration}ms`"
         ></div>
       </div>
     </div>
@@ -256,13 +276,18 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
   <!-- ================= GLOBAL LOADER ================= -->
   <div id="global-loader"
        class="hidden fixed bottom-6 right-6 z-50">
-    <div class="h-6 w-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin"></div>
+    <div class="h-6 w-6 border-2 border-gray-300 border-t-primary-500 rounded-full animate-spin"></div>
   </div>
 
   <!-- ================= NAVBAR ================= -->
   <div x-data="navbarObserver()" x-init="init()" class="fixed top-0 left-0 w-full z-50">
     <div x-show="visible"
-         x-transition
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 -translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-4"
          class="w-full backdrop-blur-md bg-white/80 shadow-md">
       {% component "navbar" request=request %}{% endcomponent %}
     </div>
@@ -276,27 +301,24 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
   <!-- ================= FOOTER ================= -->
   {% component "footer"
      site_name="ESFE"
-     site_description="Établissement supérieur de formation professionnelle orienté vers l'excellence académique, l'innovation pédagogique et l'employabilité."
-     footer_navigation=[
-         {'label': 'À propos', 'url': '/a-propos/'},
-         {'label': 'Formations', 'url': '/formations/'},
-         {'label': 'Blog', 'url': '/actualites/'},
-         {'label': 'Contact', 'url': '/contact/'}
-     ]
+     site_slogan="Excellence • Innovation • Engagement"
+     site_description="Établissement supérieur de formation en sciences de la santé, orienté vers l'excellence académique, l'innovation pédagogique et l'employabilité."
      footer_contact={
-         'address': 'Bamako, Mali',
+         'address': 'Djélibougou, Bamako, Mali',
          'phone': '+223 XX XX XX XX',
          'email': 'contact@esfe.ml'
      }
+     opening_hours="Lun-Ven : 8h00 - 17h00"
      footer_legal_links=[
          {'label': 'Mentions légales', 'url': '/mentions-legales/'},
-         {'label': 'Politique de confidentialité', 'url': '/confidentialite/'}
+         {'label': 'Confidentialité', 'url': '/confidentialite/'}
      ]
   %}
   {% endcomponent %}
 
   <!-- ================= SCRIPTS ================= -->
 
+  <!-- Lucide Icons Init -->
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       if (window.lucide) {
@@ -350,48 +372,55 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
     });
   </script>
 
-{% block extra_scripts %}{% endblock %}
-<script src="{% static 'admin/js/core.js' %}"></script>
-<script src="{% static 'admin/js/SelectBox.js' %}"></script>
-<script src="{% static 'admin/js/SelectFilter2.js' %}"></script>
-<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  {% block extra_scripts %}{% endblock %}
 
+  <!-- Admin Scripts -->
+  <script src="{% static 'admin/js/core.js' %}"></script>
+  <script src="{% static 'admin/js/SelectBox.js' %}"></script>
+  <script src="{% static 'admin/js/SelectFilter2.js' %}"></script>
 
-<script>
+  <!-- Profile Tabs Handler -->
+  <script>
+    document.body.addEventListener("htmx:afterSwap", function(evt){
+      if(evt.target.id !== "profile-content") return;
 
-document.body.addEventListener("htmx:afterSwap", function(evt){
+      const tabs = document.querySelectorAll(".profile-tab");
 
-    if(evt.target.id !== "profile-content") return;
+      tabs.forEach(tab => {
+        tab.classList.remove("border-primary-600", "text-primary-700");
+      });
 
-    const tabs = document.querySelectorAll(".profile-tab");
+      const url = evt.detail.requestConfig.path;
 
-    tabs.forEach(tab=>{
-        tab.classList.remove("border-primary-600","text-primary-700");
-    });
-
-    const url = evt.detail.requestConfig.path;
-
-    tabs.forEach(tab=>{
+      tabs.forEach(tab => {
         if(tab.getAttribute("hx-get") === url){
-            tab.classList.add("border-primary-600","text-primary-700");
+          tab.classList.add("border-primary-600", "text-primary-700");
         }
+      });
     });
+  </script>
 
-});
+  <!-- WebSocket Notifications -->
+  <script>
+    (function() {
+      try {
+        const socket = new WebSocket(
+          "ws://" + window.location.host + "/ws/notifications/"
+        );
 
-    const socket = new WebSocket(
-    "ws://" + window.location.host + "/ws/notifications/"
-);
+        socket.onmessage = function(e) {
+          const data = JSON.parse(e.data);
+          console.log("Notification reçue :", data);
+        };
 
-socket.onmessage = function(e) {
-
-    const data = JSON.parse(e.data);
-
-    console.log("Notification reçue :", data);
-
-};
-
-</script>
+        socket.onerror = function(e) {
+          console.warn("WebSocket connection failed (notifications)");
+        };
+      } catch (err) {
+        console.warn("WebSocket not available");
+      }
+    })();
+  </script>
 
 </body>
 </html>

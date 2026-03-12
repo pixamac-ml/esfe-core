@@ -6,6 +6,13 @@ from django.utils import timezone
 from .models import Candidature, CandidatureDocument
 from inscriptions.services import create_inscription_from_candidature
 
+# EMAILS
+from admissions.services.emails import (
+    send_application_accepted_email,
+    send_application_rejected_email,
+    send_application_to_complete_email,
+)
+
 
 # ==================================================
 # INLINE : DOCUMENTS DE LA CANDIDATURE
@@ -30,15 +37,9 @@ class CandidatureDocumentInline(admin.TabularInline):
 @admin.register(Candidature)
 class CandidatureAdmin(admin.ModelAdmin):
 
-    # ----------------------------------------------
-    # PERFORMANCE
-    # ----------------------------------------------
     list_select_related = ("programme",)
     date_hierarchy = "submitted_at"
 
-    # ----------------------------------------------
-    # LISTE
-    # ----------------------------------------------
     list_display = (
         "full_name",
         "programme",
@@ -71,18 +72,12 @@ class CandidatureAdmin(admin.ModelAdmin):
     list_per_page = 25
     autocomplete_fields = ("programme",)
 
-    # ----------------------------------------------
-    # LECTURE SEULE
-    # ----------------------------------------------
     readonly_fields = (
         "submitted_at",
         "reviewed_at",
         "updated_at",
     )
 
-    # ----------------------------------------------
-    # STRUCTURE FORMULAIRE
-    # ----------------------------------------------
     fieldsets = (
         ("Programme académique", {
             "fields": (
@@ -127,9 +122,6 @@ class CandidatureAdmin(admin.ModelAdmin):
 
     inlines = (CandidatureDocumentInline,)
 
-    # ----------------------------------------------
-    # ACTIONS
-    # ----------------------------------------------
     actions = (
         "mark_under_review",
         "mark_accepted",
@@ -148,10 +140,12 @@ class CandidatureAdmin(admin.ModelAdmin):
 
     @admin.display(description="Documents")
     def documents_progress(self, obj):
+
         total = obj.documents_count
         valid = obj.validated_documents_count
 
         color = "danger"
+
         if total and valid == total:
             color = "success"
         elif valid > 0:
@@ -166,6 +160,7 @@ class CandidatureAdmin(admin.ModelAdmin):
 
     @admin.display(description="Statut", ordering="status")
     def status_badge(self, obj):
+
         classes = {
             "submitted": "secondary",
             "under_review": "primary",
@@ -186,9 +181,9 @@ class CandidatureAdmin(admin.ModelAdmin):
     # ==================================================
 
     def get_actions(self, request):
+
         actions = super().get_actions(request)
 
-        # Exemple futur : restreindre certaines actions
         if not request.user.is_superuser:
             actions.pop("mark_rejected", None)
 
@@ -200,11 +195,15 @@ class CandidatureAdmin(admin.ModelAdmin):
 
     @admin.action(description="📂 Passer en cours d’analyse")
     def mark_under_review(self, request, queryset):
+
         updated = queryset.exclude(status="accepted").update(
             status="under_review",
             reviewed_at=timezone.now()
         )
+
         messages.success(request, f"{updated} dossier(s) mis en analyse.")
+
+    # --------------------------------------------------
 
     @admin.action(description="✅ Accepter et créer inscription")
     def mark_accepted(self, request, queryset):
@@ -247,14 +246,22 @@ class CandidatureAdmin(admin.ModelAdmin):
                 continue
 
             with transaction.atomic():
+
+                # 1️⃣ accepter la candidature
+                candidature.status = "accepted"
+                candidature.reviewed_at = timezone.now()
+                candidature.save(update_fields=["status", "reviewed_at"])
+
+                # 2️⃣ créer l'inscription
                 create_inscription_from_candidature(
                     candidature=candidature,
                     amount_due=amount_due
                 )
 
-                candidature.status = "accepted"
-                candidature.reviewed_at = timezone.now()
-                candidature.save(update_fields=["status", "reviewed_at"])
+            # EMAIL ACCEPTATION
+            transaction.on_commit(
+                lambda c=candidature: send_application_accepted_email(c)
+            )
 
             accepted += 1
 
@@ -270,6 +277,8 @@ class CandidatureAdmin(admin.ModelAdmin):
                 f"{skipped} dossier(s) ignoré(s)."
             )
 
+    # --------------------------------------------------
+
     @admin.action(description="⚠️ Accepter sous réserve")
     def mark_accepted_with_reserve(self, request, queryset):
 
@@ -283,25 +292,43 @@ class CandidatureAdmin(admin.ModelAdmin):
             f"{updated} dossier(s) acceptée(s) sous réserve."
         )
 
+    # --------------------------------------------------
+
     @admin.action(description="📝 Dossier à compléter")
     def mark_to_complete(self, request, queryset):
-        updated = queryset.update(
-            status="to_complete",
-            reviewed_at=timezone.now()
-        )
-        messages.success(request, f"{updated} dossier(s) marqués à compléter.")
+
+        for candidature in queryset:
+
+            candidature.status = "to_complete"
+            candidature.reviewed_at = timezone.now()
+            candidature.save(update_fields=["status", "reviewed_at"])
+
+            transaction.on_commit(
+                lambda c=candidature: send_application_to_complete_email(c)
+            )
+
+        messages.success(request, "Dossiers marqués à compléter.")
+
+    # --------------------------------------------------
 
     @admin.action(description="❌ Refuser")
     def mark_rejected(self, request, queryset):
-        updated = queryset.update(
-            status="rejected",
-            reviewed_at=timezone.now()
-        )
-        messages.success(request, f"{updated} dossier(s) refusé(s).")
+
+        for candidature in queryset:
+
+            candidature.status = "rejected"
+            candidature.reviewed_at = timezone.now()
+            candidature.save(update_fields=["status", "reviewed_at"])
+
+            transaction.on_commit(
+                lambda c=candidature: send_application_rejected_email(c)
+            )
+
+        messages.success(request, "Dossiers refusés.")
 
 
 # ==================================================
-# ADMIN : DOCUMENTS DE CANDIDATURE
+# ADMIN : DOCUMENTS
 # ==================================================
 @admin.register(CandidatureDocument)
 class CandidatureDocumentAdmin(admin.ModelAdmin):

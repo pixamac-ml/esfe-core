@@ -9,11 +9,13 @@ from community.models import Notification
 
 @component.register("navbar")
 class Navbar(component.Component):
-
     template_name = "layout/navbar/navbar.html"
 
-    def get_context_data(self, request, **kwargs):
+    def get_context_data(self, **kwargs):
+        # Récupérer request depuis le contexte (fourni par Django)
+        request = self.request
 
+        # FORMATIONS - Cycles et programmes
         cycles = (
             Cycle.objects
             .filter(is_active=True)
@@ -26,18 +28,18 @@ class Navbar(component.Component):
             .order_by("min_duration_years")
         )
 
-        # NEWS
+        # NEWS CATEGORIES
         news_categories = (
             NewsCategory.objects
             .filter(is_active=True)
-            .order_by("nom")
+            .order_by("nom")[:6]
         )
 
-        # BLOG
+        # BLOG CATEGORIES
         blog_categories = (
             BlogCategory.objects
             .filter(is_active=True)
-            .order_by("name")
+            .order_by("name")[:6]
         )
 
         # NOTIFICATIONS - COMPTEUR

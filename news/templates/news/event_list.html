@@ -1,233 +1,348 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static humanize %}
 
-{% block title %}Galeries & Médias | ESFé{% endblock %}
+{% block title %}Galeries - ESFE{% endblock %}
 
 {% block content %}
 
-<!-- ===================================================== -->
-<!-- HERO SECTION -->
-<!-- ===================================================== -->
+<!-- ================= HERO SECTION ================= -->
+<section class="relative bg-gradient-to-br from-primary-600 via-primary-500 to-secondary pt-32 pb-16">
+    <div class="absolute inset-0 bg-[url('data:image/svg+xml,...')] opacity-10"></div>
 
-<section class="relative bg-gradient-to-br from-primary-800 via-primary-700 to-primary-900 text-white py-24">
+    <div class="container mx-auto px-6 relative z-10">
 
-    <div class="max-w-6xl mx-auto px-6 text-center">
-        <h1 class="text-4xl md:text-5xl font-bold mb-6">
-            Galeries & Médias
-        </h1>
-        <p class="text-lg md:text-xl text-white/80 max-w-3xl mx-auto">
-            Découvrez les activités académiques, cérémonies et événements
-            marquants de l’École de Santé Félix Houphouët Boigny.
-        </p>
+        <!-- Breadcrumb -->
+        <nav class="flex items-center gap-2 text-primary-200 text-sm mb-6">
+            <a href="{% url 'core:home' %}" class="hover:text-white transition">Accueil</a>
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            <span class="text-white">Galeries</span>
+        </nav>
+
+        <div class="max-w-3xl">
+            <h1 class="text-4xl md:text-5xl font-poppins font-bold text-white mb-4">
+                Nos Galeries
+            </h1>
+            <p class="text-xl text-primary-100">
+                Découvrez les moments forts de la vie à l'ESFE à travers nos photos et vidéos.
+            </p>
+        </div>
+
+        <!-- Boutons de bascule : Événements / Photos -->
+        <div class="flex gap-4 mt-10">
+            <a href="{% url 'news:event_list' %}?mode=events{% if current_type %}&type={{ current_type }}{% endif %}"
+               class="flex items-center gap-2 px-6 py-3 rounded-full font-medium transition
+                      {% if view_mode == 'events' %}bg-white text-primary-600{% else %}bg-white/20 text-white hover:bg-white/30{% endif %}">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+                événements
+            </a>
+            <a href="{% url 'news:event_list' %}?mode=photos{% if current_type %}&type={{ current_type }}{% endif %}"
+               class="flex items-center gap-2 px-6 py-3 rounded-full font-medium transition
+                      {% if view_mode == 'photos' %}bg-white text-primary-600{% else %}bg-white/20 text-white hover:bg-white/30{% endif %}">
+                <i data-lucide="camera" class="w-5 h-5"></i>
+                photos
+            </a>
+        </div>
+
     </div>
-
 </section>
 
 
-<!-- ===================================================== -->
-<!-- MAIN CONTENT 75 / 25 -->
-<!-- ===================================================== -->
+<!-- ================= FILTRES PAR TYPE ================= -->
+<section class="bg-white border-b border-gray-100 sticky top-16 z-30">
+    <div class="container mx-auto px-6">
+        <div class="flex items-center gap-3 py-4 overflow-x-auto scrollbar-thin">
 
-<section class="max-w-7xl mx-auto px-6 py-16">
+            <a href="{% url 'news:event_list' %}?mode={{ view_mode }}"
+               class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap
+                      {% if not current_type %}bg-primary-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                Tous
+            </a>
 
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-12">
+            {% for type in event_types %}
+            <a href="{% url 'news:event_list' %}?mode={{ view_mode }}&type={{ type.slug }}"
+               class="px-4 py-2 rounded-full text-sm font-medium transition whitespace-nowrap
+                      {% if current_type == type.slug %}bg-primary-500 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                {{ type.name }}
+            </a>
+            {% endfor %}
 
-        <!-- ================================================= -->
-        <!-- LEFT CONTENT (75%) -->
-        <!-- ================================================= -->
-
-        <div class="lg:col-span-3 space-y-12">
-
-            <!-- ============================= -->
-            <!-- FILTERS -->
-            <!-- ============================= -->
-
-            <div class="flex flex-wrap gap-3">
-
-                <a href="{% url 'news:event_list' %}"
-                   class="px-4 py-2 rounded-full text-sm font-medium
-                   {% if not current_type %}bg-primary-600 text-white{% else %}bg-gray-100 hover:bg-gray-200{% endif %}">
-                    Tous
-                </a>
-
-                {% for type in event_types %}
-                    <a href="?type={{ type.slug }}"
-                       class="px-4 py-2 rounded-full text-sm font-medium
-                       {% if current_type == type.slug %}
-                       bg-primary-600 text-white
-                       {% else %}
-                       bg-gray-100 hover:bg-gray-200
-                       {% endif %}">
-                        {{ type.name }}
-                    </a>
-                {% endfor %}
-
-            </div>
+        </div>
+    </div>
+</section>
 
 
-            <!-- ============================= -->
-            <!-- EVENTS GRID -->
-            <!-- ============================= -->
+<!-- ================= CONTENU PRINCIPAL ================= -->
+<section class="bg-soft py-16">
+    <div class="container mx-auto px-6">
 
-            <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-8">
+        {% if view_mode == 'events' %}
+        <!-- ==================== MODE ÉVÉNEMENTS ==================== -->
 
-                {% for event in page_obj %}
+        {% if page_obj %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 
-               <a href="{% url 'news:event_detail' event.slug %}"
-                   class="group block bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition">
+            {% for event in page_obj %}
+            <article class="group bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
 
-                    <!-- COVER -->
-                    <div class="relative">
-
-                        {% if event.cover_thumbnail %}
-                            <img src="{{ event.cover_thumbnail.url }}"
-                                 width="500"
-                                 height="350"
-                                 loading="lazy"
-                                 class="w-full h-56 object-cover group-hover:scale-105 transition duration-500">
-                        {% else %}
-                            <div class="w-full h-56 bg-gray-200"></div>
-                        {% endif %}
-
-                        <span class="absolute top-4 left-4
-                                     bg-white/90 text-primary-700
-                                     text-xs font-semibold
-                                     px-3 py-1 rounded-full">
-                            {{ event.event_type.name }}
-                        </span>
-
-                    </div>
-
-                    <!-- CONTENT -->
-                    <div class="p-6 space-y-3">
-
-                        <h3 class="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition">
-                            {{ event.title }}
-                        </h3>
-
-                        <p class="text-sm text-gray-500">
-                            {{ event.event_date|date:"d F Y" }}
-                        </p>
-
-                        <div class="flex items-center gap-4 text-sm text-gray-600">
-
-                            <span>
-                                {{ event.total_images }} photos
-                            </span>
-
-                            <span>
-                                {{ event.total_videos }} vidéos
-                            </span>
-
+                <!-- Image de couverture -->
+                <a href="{% url 'news:event_detail' event.slug %}" class="block relative aspect-[4/3] overflow-hidden">
+                    {% if event.cover_thumbnail %}
+                        <img src="{{ event.cover_thumbnail.url }}"
+                             alt="{{ event.title }}"
+                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                    {% else %}
+                        <div class="w-full h-full bg-gradient-to-br from-primary-100 to-secondary/20 flex items-center justify-center">
+                            <i data-lucide="image" class="w-16 h-16 text-primary-300"></i>
                         </div>
+                    {% endif %}
 
+                    <!-- Badge type -->
+                    {% if event.event_type %}
+                    <span class="absolute top-4 left-4 bg-secondary text-white text-xs font-medium px-3 py-1 rounded-full">
+                        {{ event.event_type.name }}
+                    </span>
+                    {% endif %}
+
+                    <!-- Compteurs médias -->
+                    <div class="absolute bottom-4 right-4 flex items-center gap-2">
+                        {% if event.total_images > 0 %}
+                        <span class="bg-black/60 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                            <i data-lucide="camera" class="w-3 h-3"></i>
+                            {{ event.total_images }}
+                        </span>
+                        {% endif %}
+                        {% if event.total_videos > 0 %}
+                        <span class="bg-black/60 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                            <i data-lucide="video" class="w-3 h-3"></i>
+                            {{ event.total_videos }}
+                        </span>
+                        {% endif %}
                     </div>
-
                 </a>
 
-                {% empty %}
+                <!-- Contenu -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <time datetime="{{ event.event_date|date:'Y-m-d' }}">
+                            {{ event.event_date|date:"d F Y" }}
+                        </time>
+                    </div>
 
-                <div class="col-span-full text-center py-20 text-gray-500">
-                    Aucun événement disponible pour le moment.
+                    <h3 class="text-lg font-semibold text-gray-800 line-clamp-2 group-hover:text-primary-500 transition">
+                        <a href="{% url 'news:event_detail' event.slug %}">
+                            {{ event.title }}
+                        </a>
+                    </h3>
                 </div>
 
-                {% endfor %}
-
-            </div>
-
-
-            <!-- ============================= -->
-            <!-- PAGINATION -->
-            <!-- ============================= -->
-
-            {% if page_obj.has_other_pages %}
-
-            <div class="flex justify-center pt-10">
-
-                <div class="flex items-center gap-2">
-
-                    {% if page_obj.has_previous %}
-                        <a href="?page={{ page_obj.previous_page_number }}"
-                           class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">
-                            Précédent
-                        </a>
-                    {% endif %}
-
-                    <span class="px-4 py-2 bg-primary-600 text-white rounded">
-                        {{ page_obj.number }}
-                    </span>
-
-                    {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}"
-                           class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">
-                            Suivant
-                        </a>
-                    {% endif %}
-
-                </div>
-
-            </div>
-
-            {% endif %}
+            </article>
+            {% endfor %}
 
         </div>
 
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <nav class="mt-12 flex justify-center">
+            <div class="flex items-center gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?mode={{ view_mode }}&page={{ page_obj.previous_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}"
+                   class="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:bg-primary-50 hover:border-primary-200 transition">
+                    <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                </a>
+                {% endif %}
 
-        <!-- ================================================= -->
-        <!-- SIDEBAR (25%) -->
-        <!-- ================================================= -->
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <span class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary-500 text-white font-medium">
+                        {{ num }}
+                    </span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <a href="?mode={{ view_mode }}&page={{ num }}{% if current_type %}&type={{ current_type }}{% endif %}"
+                       class="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:bg-primary-50 hover:border-primary-200 transition">
+                        {{ num }}
+                    </a>
+                    {% endif %}
+                {% endfor %}
 
-        <aside class="space-y-10">
-
-            <!-- TYPES -->
-            <div class="bg-white p-6 rounded-2xl shadow-md">
-
-                <h4 class="font-semibold text-gray-900 mb-4">
-                    Types d’événements
-                </h4>
-
-                <ul class="space-y-2 text-sm">
-
-                    {% for type in event_types %}
-                        <li>
-                            <a href="?type={{ type.slug }}"
-                               class="hover:text-primary-600 transition">
-                                {{ type.name }}
-                            </a>
-                        </li>
-                    {% endfor %}
-
-                </ul>
-
+                {% if page_obj.has_next %}
+                <a href="?mode={{ view_mode }}&page={{ page_obj.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}"
+                   class="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:bg-primary-50 hover:border-primary-200 transition">
+                    <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                </a>
+                {% endif %}
             </div>
+        </nav>
+        {% endif %}
 
-
-            <!-- ARCHIVES -->
-            <div class="bg-white p-6 rounded-2xl shadow-md">
-
-                <h4 class="font-semibold text-gray-900 mb-4">
-                    Archives
-                </h4>
-
-                <ul class="space-y-2 text-sm">
-
-                    {% for year in years %}
-                        <li>
-                            <a href="?year={{ year.year }}"
-                               class="hover:text-primary-600 transition">
-                                {{ year.year }}
-                            </a>
-                        </li>
-                    {% endfor %}
-
-                </ul>
-
+        {% else %}
+        <!-- État vide événements -->
+        <div class="text-center py-20">
+            <div class="w-24 h-24 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="calendar-x" class="w-12 h-12 text-primary-400"></i>
             </div>
+            <h3 class="text-xl font-semibold text-gray-700 mb-2">Aucune galerie disponible</h3>
+            <p class="text-gray-500">Revenez bientôt pour découvrir nos événements.</p>
+        </div>
+        {% endif %}
 
-        </aside>
+
+        {% else %}
+        <!-- ==================== MODE PHOTOS ==================== -->
+
+        {% if photos %}
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+
+            {% for photo in photos %}
+            <div class="group relative aspect-square rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-xl transition-shadow"
+                 onclick="openLightbox({{ forloop.counter0 }})">
+
+                <img src="{{ photo.thumbnail.url }}"
+                     alt="{{ photo.caption|default:photo.event.title }}"
+                     class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+
+                <!-- Overlay hover -->
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <i data-lucide="zoom-in" class="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                </div>
+
+                <!-- Badge événement -->
+                <div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p class="text-white text-xs line-clamp-1">{{ photo.event.title }}</p>
+                </div>
+            </div>
+            {% endfor %}
+
+        </div>
+
+        <!-- Pagination photos -->
+        {% if photos_page.has_other_pages %}
+        <nav class="mt-12 flex justify-center">
+            <div class="flex items-center gap-2">
+                {% if photos_page.has_previous %}
+                <a href="?mode=photos&page={{ photos_page.previous_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}"
+                   class="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:bg-primary-50 transition">
+                    <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                </a>
+                {% endif %}
+
+                {% for num in photos_page.paginator.page_range %}
+                    {% if photos_page.number == num %}
+                    <span class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary-500 text-white font-medium">
+                        {{ num }}
+                    </span>
+                    {% elif num > photos_page.number|add:'-3' and num < photos_page.number|add:'3' %}
+                    <a href="?mode=photos&page={{ num }}{% if current_type %}&type={{ current_type }}{% endif %}"
+                       class="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:bg-primary-50 transition">
+                        {{ num }}
+                    </a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if photos_page.has_next %}
+                <a href="?mode=photos&page={{ photos_page.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}"
+                   class="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:bg-primary-50 transition">
+                    <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                </a>
+                {% endif %}
+            </div>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <!-- État vide photos -->
+        <div class="text-center py-20">
+            <div class="w-24 h-24 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="image-off" class="w-12 h-12 text-primary-400"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-700 mb-2">Aucune photo disponible</h3>
+            <p class="text-gray-500">Revenez bientôt pour découvrir nos photos.</p>
+        </div>
+        {% endif %}
+
+        {% endif %}
 
     </div>
-
 </section>
+
+
+{% if view_mode == 'photos' and photos %}
+<!-- ================= LIGHTBOX PHOTOS ================= -->
+<div id="lightbox"
+     class="fixed inset-0 z-50 bg-black/95 hidden"
+     onclick="closeLightbox()">
+
+    <!-- Bouton fermer -->
+    <button onclick="closeLightbox()"
+            class="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition z-10">
+        <i data-lucide="x" class="w-6 h-6"></i>
+    </button>
+
+    <!-- Navigation -->
+    <button onclick="event.stopPropagation(); prevImage()"
+            class="absolute left-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition">
+        <i data-lucide="chevron-left" class="w-8 h-8"></i>
+    </button>
+
+    <button onclick="event.stopPropagation(); nextImage()"
+            class="absolute right-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition">
+        <i data-lucide="chevron-right" class="w-8 h-8"></i>
+    </button>
+
+    <!-- Image -->
+    <div class="flex items-center justify-center h-full p-16" onclick="event.stopPropagation()">
+        <img id="lightbox-img" src="" alt="" class="max-w-full max-h-full object-contain">
+    </div>
+
+    <!-- Counter -->
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+        <span id="lightbox-counter"></span>
+    </div>
+</div>
+
+<script>
+const photos = [
+    {% for photo in photos %}
+    { src: "{{ photo.image.url }}", caption: "{{ photo.caption|escapejs }}" },
+    {% endfor %}
+];
+
+let currentIndex = 0;
+
+function openLightbox(index) {
+    currentIndex = index;
+    updateLightbox();
+    document.getElementById('lightbox').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function updateLightbox() {
+    document.getElementById('lightbox-img').src = photos[currentIndex].src;
+    document.getElementById('lightbox-counter').textContent = `${currentIndex + 1} / ${photos.length}`;
+}
+
+function nextImage() {
+    currentIndex = (currentIndex + 1) % photos.length;
+    updateLightbox();
+}
+
+function prevImage() {
+    currentIndex = (currentIndex - 1 + photos.length) % photos.length;
+    updateLightbox();
+}
+
+document.addEventListener('keydown', (e) => {
+    if (document.getElementById('lightbox').classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowRight') nextImage();
+    if (e.key === 'ArrowLeft') prevImage();
+});
+</script>
+{% endif %}
 
 {% endblock %}

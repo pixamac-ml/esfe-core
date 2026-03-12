@@ -1,10 +1,11 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.utils import timezone
+from django.templatetags.static import static
 
 from formations.models import Programme
 from .forms import CandidatureForm
 from .models import CandidatureDocument, Candidature
-from django.templatetags.static import static
 
 
 def apply_to_programme(request, slug):
@@ -13,6 +14,7 @@ def apply_to_programme(request, slug):
     - formation préchargée
     - formulaire candidat
     - dépôt des documents requis
+    - prévention des doublons d'email
     """
 
     programme = get_object_or_404(
@@ -25,42 +27,82 @@ def apply_to_programme(request, slug):
     required_documents = programme.required_documents.select_related("document")
 
     if request.method == "POST":
-        # IMPORTANT : request.FILES pour les pièces jointes
+
         form = CandidatureForm(request.POST)
 
         if form.is_valid():
+
+            # On prépare la candidature sans sauvegarder
             candidature = form.save(commit=False)
             candidature.programme = programme
-            candidature.save()
+
+            # année académique actuelle
+            current_year = timezone.now().year
+            candidature.academic_year = current_year
 
             # ==============================
-            # TRAITEMENT DES DOCUMENTS
+            # VERIFICATION EMAIL EXISTANT
             # ==============================
-            for prd in required_documents:
-                uploaded_file = request.FILES.get(
-                    f"document_{prd.document.id}"
+
+            email = candidature.email
+
+            existing = Candidature.objects.filter(
+                email=email,
+                programme=programme,
+                academic_year=current_year
+            ).exists()
+
+            if existing:
+
+                form.add_error(
+                    "email",
+                    "Une candidature existe déjà avec cette adresse email pour ce programme cette année."
                 )
 
-                if uploaded_file:
-                    CandidatureDocument.objects.create(
-                        candidature=candidature,
-                        document_type=prd.document,
-                        file=uploaded_file
+                messages.warning(
+                    request,
+                    "Une candidature avec cette adresse email existe déjà."
+                )
+
+            else:
+
+                # ==============================
+                # ENREGISTREMENT CANDIDATURE
+                # ==============================
+
+                candidature.save()
+
+                # ==============================
+                # TRAITEMENT DES DOCUMENTS
+                # ==============================
+
+                for prd in required_documents:
+
+                    uploaded_file = request.FILES.get(
+                        f"document_{prd.document.id}"
                     )
 
-            messages.success(
-                request,
-                "Votre candidature a été envoyée avec succès. "
-                "Elle sera analysée par l’administration."
-            )
+                    if uploaded_file:
 
-            # Redirection vers la page de confirmation
-            return redirect(
-                "admissions:confirmation",
-                candidature_id=candidature.id
-            )
+                        CandidatureDocument.objects.create(
+                            candidature=candidature,
+                            document_type=prd.document,
+                            file=uploaded_file
+                        )
+
+                messages.success(
+                    request,
+                    "Votre candidature a été envoyée avec succès. "
+                    "Elle sera analysée par l’administration."
+                )
+
+                return redirect(
+                    "admissions:confirmation",
+                    candidature_id=candidature.id
+                )
 
         else:
+
             messages.error(
                 request,
                 "Veuillez corriger les erreurs du formulaire."
@@ -82,8 +124,13 @@ def apply_to_programme(request, slug):
         context
     )
 
+
 def candidature_confirmation(request, candidature_id):
-    candidature = get_object_or_404(Candidature, id=candidature_id)
+
+    candidature = get_object_or_404(
+        Candidature,
+        id=candidature_id
+    )
 
     return render(
         request,

@@ -7,962 +7,464 @@
 
 {% block content %}
 
-  <!-- HERO -->
-  {% component "hero"
-     title="ESFE"
-     subtitle="Former les cadres de la santé"
-     cities="['Abidjan','Kati','Koulikoro','San','Gao','Bobo']"
-  %}{% endcomponent %}
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 1 : HERO
+   ══════════════════════════════════════════════════════════════════════════════ #}
+{% component "hero"
+   title="ESFE"
+   subtitle="Former les cadres de la santé"
+   cities="['Abidjan','Kati','Koulikoro','San','Gao','Bobo']"
+%}{% endcomponent %}
 
-  <!-- SECTION INSTITUTION -->
-  <section
-    id="explorer"
-    class="bg-soft py-24"
-    x-data="{ show: false }"
-    x-intersect:enter.threshold.30.once="show = true"
-  >
 
-    <div class="max-w-7xl mx-auto px-6">
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 2 : À PROPOS (Fusion Qui sommes-nous + Vision)
+   ══════════════════════════════════════════════════════════════════════════════ #}
+<section id="a-propos" class="py-24 lg:py-32 bg-soft">
+  <div class="max-w-7xl mx-auto px-6"
+       x-data="{ show: false }"
+       x-intersect:enter.threshold.30.once="show = true">
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-
-        <!-- TEXTE -->
-        <div
-          :class="show
-            ? 'opacity-100 translate-y-0'
-            : 'opacity-0 translate-y-8'"
-          class="transition-all duration-1000 ease-out"
-        >
-          <span class="inline-block text-sm font-semibold text-primary-500 uppercase tracking-wider mb-4">
-            Qui sommes-nous
-          </span>
-
-          <h2 class="text-3xl md:text-4xl font-bold mb-6 leading-tight text-primary-700">
-            Une institution dédiée aux sciences de la santé
-          </h2>
-
-          <p class="text-lg mb-4">
-            <strong>L’École de Santé Félix Houphouët-Boigny</strong>
-            est un établissement d’enseignement supérieur spécialisé dans les sciences de la santé.
-          </p>
-
-          <p class="text-gray-600 mb-4">
-            Elle forme des professionnels compétents, responsables et engagés,
-            selon des standards académiques rigoureux adaptés aux réalités nationales.
-          </p>
-
-          <p class="text-gray-600">
-            L’institution accueille des étudiants issus de différents horizons
-            et met l’accent sur l’excellence pédagogique, l’éthique professionnelle
-            et l’employabilité.
-          </p>
-        </div>
-
-        <!-- IMAGE -->
-        <div
-          :class="show
-            ? 'opacity-100 translate-x-0 scale-100'
-            : 'opacity-0 translate-x-8 scale-95'"
-          class="flex justify-center lg:justify-end transition-all duration-1000 ease-out delay-200"
-        >
-          <img
-            src="{% static 'images/institution/students-academic.jpg' %}"
-            class="w-full max-w-lg rounded-3xl shadow-xl object-cover"
-            alt="Étudiants ESFE"
-            loading="lazy"
-          >
-        </div>
-
-      </div>
-
-      {% if pillars %}
-      <div class="mt-20">
-
-        <!-- 🔥 GRILLE RESTAURÉE -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-
-          {% for pillar in pillars %}
-            {% component "base_card"
-               content="
-                 <h3 class='font-semibold text-lg mb-2 text-primary-600'>
-                   {{ pillar.title }}
-                 </h3>
-                 <p class='text-sm text-gray-600'>
-                   {{ pillar.description }}
-                 </p>
-               "
-            %}
-            {% endcomponent %}
-          {% endfor %}
-
-        </div>
-
-      </div>
-      {% endif %}
-
+    {# Header #}
+    <div class="text-center mb-16 lg:mb-20"
+         :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
+         class="transition-all duration-700">
+      <span class="inline-block text-sm font-semibold text-secondary uppercase tracking-wider mb-4">
+        Qui sommes-nous
+      </span>
+      <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold text-primary-700 mb-6">
+        Une institution dédiée aux <span class="text-secondary">sciences de la santé</span>
+      </h2>
+      <p class="text-gray-600 text-lg max-w-3xl mx-auto">
+        ESFE forme les professionnels de santé de demain selon des standards académiques
+        rigoureux adaptés aux réalités du Mali.
+      </p>
     </div>
 
-  </section>
+    {# Grid Principal #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-20">
 
-<section id="formations-home"
-         class="relative py-32 bg-gradient-to-b from-soft/70 to-white overflow-hidden"
-         x-data="{ show: false }"
-         x-intersect:enter.threshold.20.once="show = true">
+      {# Image #}
+      <div :class="show ? 'opacity-100 scale-100' : 'opacity-0 scale-95'"
+           class="transition-all duration-1000 delay-200">
+        <div class="relative">
+          <img src="{% static 'images/institution/students-academic.jpg' %}"
+               class="w-full rounded-3xl shadow-2xl object-cover"
+               alt="Étudiants ESFE"
+               loading="lazy">
+          {# Badge flottant #}
+          <div class="absolute -bottom-6 -right-6 bg-white rounded-2xl shadow-xl p-6 hidden lg:block">
+            <div class="text-3xl font-bold text-secondary">15+</div>
+            <div class="text-sm text-gray-600">Années d'excellence</div>
+          </div>
+        </div>
+      </div>
 
-  <div class="max-w-7xl mx-auto px-6">
+      {# Contenu texte #}
+      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
+           class="transition-all duration-1000 delay-300">
 
-    <!-- ================= HEADER ================= -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-end mb-24">
+        <h3 class="text-2xl font-bold text-primary-700 mb-6">
+          Former les acteurs clés du système de santé malien
+        </h3>
 
-      <!-- LEFT -->
-      <div>
-        <span class="text-sm uppercase tracking-wider font-semibold text-primary-500">
-          Catalogue académique
-        </span>
-
-        <h2 class="mt-4 text-3xl md:text-4xl font-bold leading-tight
-                   bg-gradient-to-r from-primary-700 to-secondary
-                   bg-clip-text text-transparent">
-          Nos Formations Professionnelles
-        </h2>
-
-        <p class="mt-6 text-gray-600 max-w-xl leading-relaxed">
-          Des parcours structurés, reconnus par l’État,
-          conçus pour former les professionnels de santé de demain.
+        <p class="text-gray-600 mb-6 leading-relaxed">
+          <strong class="text-primary-700">L'École de Santé Félix Houphouët-Boigny</strong>
+          est un établissement d'enseignement supérieur spécialisé dans les sciences de la santé,
+          qui ambitionne de devenir une référence nationale en matière de formation paramédicale.
         </p>
-      </div>
 
-      <!-- RIGHT CTA -->
-      <div class="lg:text-right">
-        <a href="{% url 'formations:list' %}"
-           class="inline-block bg-secondary hover:bg-secondary/90
-                  text-white px-8 py-3 rounded-xl
-                  font-semibold transition-all duration-300
-                  shadow-md hover:shadow-xl hover:-translate-y-1">
-          Explorer toutes les formations →
-        </a>
-      </div>
+        <p class="text-gray-600 mb-8 leading-relaxed">
+          Notre approche combine excellence académique, rigueur professionnelle
+          et engagement social durable pour transformer les compétences en impact réel sur le terrain.
+        </p>
 
-    </div>
-
-    <!-- ================= GRID ================= -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-
-      {% for formation in formations_home %}
-
-        <div
-          :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'"
-          style="transition-delay: {{ forloop.counter0 }}00ms"
-          class="relative bg-white rounded-2xl p-8
-                 shadow-md hover:shadow-2xl
-                 transition-all duration-700 ease-out
-                 hover:-translate-y-3
-                 border-l-4
-                 {% if formation.is_featured %}
-                   border-secondary
-                 {% else %}
-                   border-primary
-                 {% endif %}">
-
-          <!-- META -->
-          <div class="flex justify-between items-center mb-6">
-
-            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              {{ formation.cycle.name }}
-            </span>
-
-            {% if formation.is_featured %}
-              <span class="text-xs bg-secondary/20 text-secondary px-3 py-1 rounded-full">
-                Recommandé
-              </span>
-            {% endif %}
-
+        {# Points clés #}
+        <div class="space-y-4">
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center flex-shrink-0">
+              <i data-lucide="award" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h4 class="font-semibold text-primary-700">Diplômes reconnus par l'État</h4>
+              <p class="text-sm text-gray-600">Validés pour concours et fonction publique.</p>
+            </div>
           </div>
 
-          <!-- TITLE -->
-          <h3 class="text-xl font-semibold mb-4 text-primary-700 leading-snug">
-            {{ formation.title }}
-          </h3>
-
-          <!-- DESCRIPTION -->
-          <p class="text-sm text-gray-600 mb-8 leading-relaxed">
-            {{ formation.short_description|truncatewords:18 }}
-          </p>
-
-          <!-- INFOS -->
-          <div class="flex justify-between text-xs text-gray-400 mb-8">
-            <span>
-              {{ formation.duration_years }} an{% if formation.duration_years > 1 %}s{% endif %}
-            </span>
-
-            <span>
-              {{ formation.diploma_awarded.name }}
-            </span>
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center flex-shrink-0">
+              <i data-lucide="users" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h4 class="font-semibold text-primary-700">Encadrement expérimenté</h4>
+              <p class="text-sm text-gray-600">Corps enseignant issu du terrain professionnel.</p>
+            </div>
           </div>
 
-          <!-- LINK -->
-          <a href="{{ formation.get_absolute_url }}"
-             class="inline-flex items-center text-primary-600 font-medium
-                    hover:text-secondary transition-colors duration-300">
-            Voir le programme
-            <span class="ml-2 transition-transform duration-300 group-hover:translate-x-1">→</span>
-          </a>
-
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center flex-shrink-0">
+              <i data-lucide="heart-pulse" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h4 class="font-semibold text-primary-700">Impact sanitaire durable</h4>
+              <p class="text-sm text-gray-600">Contribution directe au renforcement du système de santé.</p>
+            </div>
+          </div>
         </div>
 
+      </div>
+    </div>
+
+    {# Piliers (si disponibles) #}
+    {% if pillars %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+         :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
+         class="transition-all duration-700 delay-500">
+      {% for pillar in pillars %}
+        <div class="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-t-4 border-secondary">
+          <h3 class="font-semibold text-lg mb-2 text-primary-700">{{ pillar.title }}</h3>
+          <p class="text-sm text-gray-600">{{ pillar.description }}</p>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</section>
+
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 3 : STATISTIQUES (Compacte, intégrée)
+   ══════════════════════════════════════════════════════════════════════════════ #}
+<section id="stats" class="py-16 bg-primary-700 text-white">
+  <div class="max-w-7xl mx-auto px-6"
+       x-data="{ show: false }"
+       x-intersect:enter.threshold.50.once="show = true">
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12">
+
+      {% for stat in stats %}
+      <div class="text-center"
+           x-data="advancedCounter({{ stat.value }}, '{{ stat.suffix }}')"
+           x-intersect.once="start()"
+           :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
+           style="transition-delay: {{ forloop.counter0 }}50ms"
+           class="transition-all duration-700">
+
+        <div class="text-4xl lg:text-5xl font-bold text-white mb-2">
+          <span x-text="display"></span>{{ stat.suffix }}
+        </div>
+        <div class="text-sm text-white/70 uppercase tracking-wider">
+          {{ stat.label }}
+        </div>
+
+      </div>
       {% endfor %}
 
     </div>
+  </div>
+</section>
+
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 4 : FORMATIONS
+   ══════════════════════════════════════════════════════════════════════════════ #}
+<section id="formations" class="py-24 lg:py-32 bg-gradient-to-b from-white to-soft/50">
+  <div class="max-w-7xl mx-auto px-6"
+       x-data="{ show: false }"
+       x-intersect:enter.threshold.20.once="show = true">
+
+    {# Header #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end mb-16">
+      <div>
+        <span class="text-sm uppercase tracking-wider font-semibold text-secondary">
+          Catalogue académique
+        </span>
+        <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700">
+          Nos Formations Professionnelles
+        </h2>
+        <p class="mt-4 text-gray-600 max-w-xl">
+          Des parcours structurés, reconnus par l'État, conçus pour former les professionnels de santé de demain.
+        </p>
+      </div>
+      <div class="lg:text-right">
+        <a href="{% url 'formations:list' %}"
+           class="inline-flex items-center gap-2 bg-secondary hover:bg-secondary/90 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-1">
+          Explorer toutes les formations
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    {# Grid Formations #}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {% for formation in formations_home %}
+      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'"
+           style="transition-delay: {{ forloop.counter0 }}00ms"
+           class="group relative bg-white rounded-2xl p-8 shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border-l-4 {% if formation.is_featured %}border-secondary{% else %}border-primary{% endif %}">
+
+        {# Meta #}
+        <div class="flex justify-between items-center mb-6">
+          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            {{ formation.cycle.name }}
+          </span>
+          {% if formation.is_featured %}
+          <span class="text-xs bg-secondary/20 text-secondary px-3 py-1 rounded-full font-medium">
+            Recommandé
+          </span>
+          {% endif %}
+        </div>
+
+        {# Titre #}
+        <h3 class="text-xl font-semibold mb-4 text-primary-700 leading-snug group-hover:text-secondary transition-colors">
+          {{ formation.title }}
+        </h3>
+
+        {# Description #}
+        <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+          {{ formation.short_description|truncatewords:18 }}
+        </p>
+
+        {# Infos #}
+        <div class="flex justify-between text-xs text-gray-400 mb-6 pb-6 border-b border-gray-100">
+          <span class="flex items-center gap-1">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+            {{ formation.duration_years }} an{% if formation.duration_years > 1 %}s{% endif %}
+          </span>
+          <span>{{ formation.diploma_awarded.name }}</span>
+        </div>
+
+        {# Link #}
+        <a href="{{ formation.get_absolute_url }}"
+           class="inline-flex items-center text-primary-600 font-medium hover:text-secondary transition-colors duration-300 group/link">
+          Voir le programme
+          <svg class="w-4 h-4 ml-2 transform group-hover/link:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+          </svg>
+        </a>
+
+      </div>
+      {% endfor %}
+    </div>
 
   </div>
-
 </section>
-<section id="why-esfe"
-         class="py-32 bg-gradient-to-b from-white to-soft"
-         x-data="{ show: false }"
-         x-intersect:enter.threshold.20.once="show = true">
 
-  <div class="max-w-7xl mx-auto px-6">
 
-    <!-- ================= HEADER ================= -->
-    <div class="mb-20">
-      <span class="text-sm uppercase tracking-wider font-semibold text-primary-500">
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 5 : POURQUOI ESFE (Simplifiée)
+   ══════════════════════════════════════════════════════════════════════════════ #}
+<section id="pourquoi-esfe" class="py-24 lg:py-32 bg-soft">
+  <div class="max-w-7xl mx-auto px-6"
+       x-data="{ show: false }"
+       x-intersect:enter.threshold.20.once="show = true">
+
+    {# Header #}
+    <div class="text-center mb-16">
+      <span class="text-sm uppercase tracking-wider font-semibold text-secondary">
         Notre engagement
       </span>
-
       <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700">
         Pourquoi choisir <span class="text-secondary">ESFE</span> ?
       </h2>
     </div>
 
-
-    <!-- ================= GRID PRINCIPAL ================= -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-
-      <!-- ================= LEFT : BLOCS VISUELS AMÉLIORÉS ================= -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
-
-        <!-- CARD -->
-        {% for item in why_blocks %}
-
-        <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-             class="group relative rounded-2xl overflow-hidden shadow-xl transition-all duration-700">
-
-          <img src="{% static 'images/esfe/' %}{{ item.img }}"
-               class="w-full h-60 object-cover transition duration-700 group-hover:scale-105"
-               alt="ESFE">
-
-          <!-- Overlay amélioré -->
-          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-
-          <!-- Texte -->
-          <div class="absolute bottom-6 left-6 right-6 text-white">
-            <h4 class="font-semibold text-base mb-1">
-              {{ item.title }}
-            </h4>
-            <p class="text-sm text-white/80">
-              {{ item.desc }}
-            </p>
-          </div>
-
-        </div>
-
-        {% endfor %}
-
-      </div>
-
-
-      <!-- ================= RIGHT : BLOC STRATÉGIQUE ================= -->
-      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'"
-           class="transition-all duration-700 ease-out delay-200">
-
-        <div class="bg-white rounded-3xl shadow-2xl p-10 border border-gray-100
-                    hover:shadow-3xl transition duration-500">
-
-          <div class="space-y-8">
-
-            <div class="flex items-start gap-4">
-              <div class="w-10 h-10 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center font-bold">
-                01
-              </div>
-              <div>
-                <h4 class="font-semibold text-primary-700">Diplômes reconnus</h4>
-                <p class="text-sm text-gray-600 mt-1">
-                  Validés pour concours et fonction publique.
-                </p>
-              </div>
-            </div>
-
-            <div class="flex items-start gap-4">
-              <div class="w-10 h-10 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center font-bold">
-                02
-              </div>
-              <div>
-                <h4 class="font-semibold text-primary-700">Encadrement expérimenté</h4>
-                <p class="text-sm text-gray-600 mt-1">
-                  Corps enseignant issu du terrain.
-                </p>
-              </div>
-            </div>
-
-            <div class="flex items-start gap-4">
-              <div class="w-10 h-10 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center font-bold">
-                03
-              </div>
-              <div>
-                <h4 class="font-semibold text-primary-700">Approche pratique</h4>
-                <p class="text-sm text-gray-600 mt-1">
-                  Immersion progressive et professionnalisation.
-                </p>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
-        <!-- ================= NOUVEAU TEXTE ENRICHISSANT ================= -->
-        <div class="mt-12 space-y-6">
-
-          <div class="flex items-start gap-4">
-            <div class="text-secondary">
-              <i data-lucide="graduation-cap"></i>
-            </div>
-            <p class="text-gray-600 text-sm">
-              Programmes structurés selon les standards académiques nationaux.
-            </p>
-          </div>
-
-          <div class="flex items-start gap-4">
-            <div class="text-secondary">
-              <i data-lucide="stethoscope"></i>
-            </div>
-            <p class="text-gray-600 text-sm">
-              Formation orientée terrain et réalités sanitaires du Mali.
-            </p>
-          </div>
-
-          <div class="flex items-start gap-4">
-            <div class="text-secondary">
-              <i data-lucide="building-2"></i>
-            </div>
-            <p class="text-gray-600 text-sm">
-              Présence stratégique à travers plusieurs annexes nationales.
-            </p>
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <!-- ================= BLOCS BAS ================= -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mt-24">
-
-      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2">
-        <h4 class="font-semibold text-primary-700 mb-3">Excellence académique</h4>
-        <p class="text-sm text-gray-600">
-          Rigueur pédagogique et suivi individualisé.
-        </p>
-      </div>
-
-      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2">
-        <h4 class="font-semibold text-primary-700 mb-3">Insertion professionnelle</h4>
-        <p class="text-sm text-gray-600">
-          Formations alignées avec le terrain.
-        </p>
-      </div>
-
-      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2">
-        <h4 class="font-semibold text-primary-700 mb-3">Environnement structuré</h4>
-        <p class="text-sm text-gray-600">
-          Cadre académique stable et moderne.
-        </p>
-      </div>
-
-      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2">
-        <h4 class="font-semibold text-primary-700 mb-3">Ouverture nationale</h4>
-        <p class="text-sm text-gray-600">
-          Présence sur plusieurs annexes stratégiques.
-        </p>
-      </div>
-
-    </div>
-
-  </div>
-</section>
-
-<section id="annexes"
-         class="relative py-32 bg-white overflow-hidden">
-
-  <div class="max-w-7xl mx-auto px-6">
-
-    <!-- ================= HEADER LATÉRAL ================= -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-end mb-24">
-
-      <!-- LEFT HEADER -->
-      <div>
-        <span class="text-sm uppercase tracking-wider font-semibold text-primary-500">
-          Présence nationale
-        </span>
-
-        <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700 leading-tight">
-          Nos Annexes Stratégiques
-        </h2>
-
-        <p class="mt-6 text-gray-600 max-w-xl leading-relaxed">
-          ESFE déploie ses formations à travers plusieurs régions du Mali,
-          afin de garantir accessibilité, proximité et excellence académique
-          sur l’ensemble du territoire.
-        </p>
-      </div>
-
-      <!-- RIGHT CTA OPTIONAL -->
-      <div class="lg:text-right">
-        <div class="inline-flex items-center gap-3 text-sm text-gray-500">
-          <i data-lucide="map-pin" class="w-5 h-5 text-secondary"></i>
-          Implantations nationales certifiées
-        </div>
-      </div>
-
-    </div>
-
-
-
-    <!-- ================= SPLIT GRID ================= -->
-    <div class="relative grid grid-cols-1 lg:grid-cols-2">
-
-      <!-- Ligne centrale raffinée -->
-      <div class="hidden lg:block absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent"></div>
-
-
-      <!-- ================= LEFT SIDE ================= -->
-      <div class="px-12 py-16">
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-12">
-
-          <!-- CARD -->
-          <div class="group relative rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition duration-500 hover:-translate-y-3">
-
-            <img src="https://images.unsplash.com/photo-1581093458791-9d09c7b8e36d"
-                 class="w-full h-56 object-cover group-hover:scale-105 transition duration-700"
-                 alt="ESFE Djélibougou">
-
-            <div class="p-6 bg-white">
-              <h4 class="font-semibold text-primary-700 mb-2">
-                ESFE Djélibougou
-              </h4>
-
-              <a href="tel:+22370000000"
-                 class="flex items-center gap-2 text-secondary font-medium hover:underline">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-                +223 70 00 00 00
-              </a>
-            </div>
-
-          </div>
-
-
-          <div class="group relative rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition duration-500 hover:-translate-y-6">
-
-            <img src="https://images.unsplash.com/photo-1579684385127-1ef15d508118"
-                 class="w-full h-56 object-cover group-hover:scale-105 transition duration-700"
-                 alt="ESFE Ségou">
-
-            <div class="p-6 bg-white">
-              <h4 class="font-semibold text-primary-700 mb-2">
-                ESFE Ségou
-              </h4>
-
-              <a href="tel:+22371000000"
-                 class="flex items-center gap-2 text-secondary font-medium hover:underline">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-                +223 71 00 00 00
-              </a>
-            </div>
-
-          </div>
-
-
-          <div class="group relative rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition duration-500 hover:-translate-y-4">
-
-            <img src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b"
-                 class="w-full h-56 object-cover group-hover:scale-105 transition duration-700"
-                 alt="ESFE Sikasso">
-
-            <div class="p-6 bg-white">
-              <h4 class="font-semibold text-primary-700 mb-2">
-                ESFE Sikasso
-              </h4>
-
-              <a href="tel:+22374000000"
-                 class="flex items-center gap-2 text-secondary font-medium hover:underline">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-                +223 74 00 00 00
-              </a>
-            </div>
-
-          </div>
-
-
-          <div class="group relative rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition duration-500 hover:-translate-y-8">
-
-            <img src="https://images.unsplash.com/photo-1504439468489-c8920d796a29"
-                 class="w-full h-56 object-cover group-hover:scale-105 transition duration-700"
-                 alt="ESFE Kayes">
-
-            <div class="p-6 bg-white">
-              <h4 class="font-semibold text-primary-700 mb-2">
-                ESFE Kayes
-              </h4>
-
-              <a href="tel:+22375000000"
-                 class="flex items-center gap-2 text-secondary font-medium hover:underline">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-                +223 75 00 00 00
-              </a>
-            </div>
-
-          </div>
-
-        </div>
-      </div>
-
-
-
-      <!-- ================= RIGHT SIDE ================= -->
-      <div class="bg-primary-700 text-white px-12 py-16 relative">
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-12">
-
-          <!-- CARD -->
-          <div class="group relative rounded-3xl overflow-hidden shadow-2xl hover:shadow-3xl transition duration-500 hover:-translate-y-4">
-
-            <img src="https://images.unsplash.com/photo-1588776814546-ec7e2b7c2d94"
-                 class="w-full h-56 object-cover opacity-80 group-hover:opacity-100 transition duration-700"
-                 alt="ESFE Mopti">
-
-            <div class="p-6 bg-primary-700">
-              <h4 class="font-semibold mb-2">
-                ESFE Mopti
-              </h4>
-
-              <a href="tel:+22376000000"
-                 class="flex items-center gap-2 text-secondary font-medium hover:underline">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-                +223 76 00 00 00
-              </a>
-            </div>
-
-          </div>
-
-
-          <div class="group relative rounded-3xl overflow-hidden shadow-2xl hover:shadow-3xl transition duration-500 hover:-translate-y-6">
-
-            <img src="https://images.unsplash.com/photo-1581090700227-4c4f50e6d2b6"
-                 class="w-full h-56 object-cover opacity-80 group-hover:opacity-100 transition duration-700"
-                 alt="ESFE Koulikoro">
-
-            <div class="p-6 bg-primary-700">
-              <h4 class="font-semibold mb-2">
-                ESFE Koulikoro
-              </h4>
-
-              <a href="tel:+22377000000"
-                 class="flex items-center gap-2 text-secondary font-medium hover:underline">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-                +223 77 00 00 00
-              </a>
-            </div>
-
-          </div>
-
-
-          <div class="group relative rounded-3xl overflow-hidden shadow-2xl hover:shadow-3xl transition duration-500 hover:-translate-y-3">
-
-            <img src="https://images.unsplash.com/photo-1581594693702-fbdc51b2763b"
-                 class="w-full h-56 object-cover opacity-80 group-hover:opacity-100 transition duration-700"
-                 alt="ESFE San">
-
-            <div class="p-6 bg-primary-700">
-              <h4 class="font-semibold mb-2">
-                ESFE San
-              </h4>
-
-              <a href="tel:+22378000000"
-                 class="flex items-center gap-2 text-secondary font-medium hover:underline">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-                +223 78 00 00 00
-              </a>
-            </div>
-
-          </div>
-
-
-          <div class="group relative rounded-3xl overflow-hidden shadow-2xl hover:shadow-3xl transition duration-500 hover:-translate-y-7">
-
-            <img src="https://images.unsplash.com/photo-1576765607924-6f5fdb5f9c5d"
-                 class="w-full h-56 object-cover opacity-80 group-hover:opacity-100 transition duration-700"
-                 alt="ESFE Bougouni">
-
-            <div class="p-6 bg-primary-700">
-              <h4 class="font-semibold mb-2">
-                ESFE Bougouni
-              </h4>
-
-              <a href="tel:+22379000000"
-                 class="flex items-center gap-2 text-secondary font-medium hover:underline">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-                +223 79 00 00 00
-              </a>
-            </div>
-
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-
-  </div>
-</section>
-<section id="impact"
-         class="py-32 bg-gradient-to-b from-soft to-white"
-         x-data="{ show: false }"
-         x-intersect:enter.threshold.20.once="show = true">
-
-  <div class="max-w-7xl mx-auto px-6">
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-
-      <!-- ================= LEFT : VISION ================= -->
+    {# Grid visuel #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {% for item in why_blocks %}
       <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-           class="transition-all duration-700 ease-out">
+           style="transition-delay: {{ forloop.counter0 }}00ms"
+           class="group relative rounded-2xl overflow-hidden shadow-xl transition-all duration-500 hover:-translate-y-3">
 
-        <span class="text-sm uppercase tracking-wider font-semibold text-primary-500">
-          Notre vision
-        </span>
+        <img src="{% static 'images/esfe/' %}{{ item.img }}"
+             class="w-full h-56 object-cover transition duration-700 group-hover:scale-110"
+             alt="{{ item.title }}"
+             loading="lazy">
 
-        <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700 leading-tight">
-          Former les acteurs clés du système de santé malien
-        </h2>
+        {# Overlay #}
+        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
 
-        <p class="mt-6 text-gray-600 leading-relaxed max-w-xl">
-          ESFE ambitionne de devenir une référence nationale en matière
-          de formation paramédicale, en combinant excellence académique,
-          rigueur professionnelle et engagement social durable.
-        </p>
-
-        <p class="mt-4 text-gray-600 leading-relaxed max-w-xl">
-          Notre approche vise à transformer les compétences en impact réel
-          sur le terrain, au service des communautés.
-        </p>
-
-      </div>
-
-
-      <!-- ================= RIGHT : INDICATEURS QUALITATIFS ================= -->
-      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-           class="transition-all duration-700 ease-out delay-200">
-
-        <div class="space-y-10">
-
-          <div class="flex items-start gap-5">
-            <div class="w-12 h-12 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center">
-              <i data-lucide="award" class="w-6 h-6"></i>
-            </div>
-            <div>
-              <h4 class="font-semibold text-primary-700 mb-2">
-                Standards académiques exigeants
-              </h4>
-              <p class="text-sm text-gray-600">
-                Programmes structurés selon les référentiels nationaux.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-start gap-5">
-            <div class="w-12 h-12 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center">
-              <i data-lucide="users" class="w-6 h-6"></i>
-            </div>
-            <div>
-              <h4 class="font-semibold text-primary-700 mb-2">
-                Formation centrée sur l’humain
-              </h4>
-              <p class="text-sm text-gray-600">
-                Encadrement personnalisé et accompagnement continu.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-start gap-5">
-            <div class="w-12 h-12 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center">
-              <i data-lucide="heart-pulse" class="w-6 h-6"></i>
-            </div>
-            <div>
-              <h4 class="font-semibold text-primary-700 mb-2">
-                Impact sanitaire durable
-              </h4>
-              <p class="text-sm text-gray-600">
-                Contribution directe au renforcement du système de santé.
-              </p>
-            </div>
-          </div>
-
+        {# Texte #}
+        <div class="absolute bottom-0 left-0 right-0 p-6 text-white">
+          <h4 class="font-semibold text-lg mb-2">{{ item.title }}</h4>
+          <p class="text-sm text-white/80">{{ item.desc }}</p>
         </div>
 
       </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<section id="stats"
-         class="relative py-32 bg-gradient-to-b from-soft to-white overflow-hidden"
-         x-data="{ show: false }"
-         x-intersect:enter.threshold.20.once="show = true">
-
-  <div class="max-w-7xl mx-auto px-6">
-
-    <!-- HEADER -->
-    <div class="mb-20 max-w-3xl"
-         :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
-         class="transition-all duration-700 ease-out">
-
-      <span class="text-sm uppercase tracking-wider font-semibold text-primary-500">
-        ESFE en chiffres
-      </span>
-
-      <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700 leading-tight">
-        Une institution qui transforme les statistiques en impact réel
-      </h2>
-
-      <p class="mt-6 text-gray-600 leading-relaxed">
-        Des indicateurs clés qui illustrent notre engagement académique,
-        notre présence nationale et notre contribution au système de santé.
-      </p>
-
-    </div>
-
-    <!-- GRID -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
-
-      {% for stat in stats %}
-
-      <div x-data="advancedCounter({{ stat.value }}, '{{ stat.suffix }}')"
-           x-intersect.once="start()"
-           :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-           class="group bg-white rounded-2xl p-10 text-center
-                  border border-gray-100
-                  shadow-md hover:shadow-lg
-                  transition-all duration-500">
-
-        <!-- Circle -->
-        <div class="relative w-28 h-28 mx-auto">
-
-          <svg class="w-28 h-28 transform -rotate-90">
-
-            <circle cx="56" cy="56" r="48"
-                    stroke="#e5e7eb"
-                    stroke-width="8"
-                    fill="none"/>
-
-            <circle cx="56" cy="56" r="48"
-                    :stroke-dasharray="circumference"
-                    :stroke-dashoffset="offset"
-                    stroke="#14b8a6"
-                    stroke-width="8"
-                    fill="none"
-                    class="transition-all duration-700 ease-out"/>
-          </svg>
-
-          <div class="absolute inset-0 flex items-center justify-center">
-            <div class="text-2xl font-bold text-primary-700">
-              <span x-text="display"></span>{{ stat.suffix }}
-            </div>
-          </div>
-
-        </div>
-
-        <div class="mt-6 text-xs uppercase tracking-widest text-gray-500">
-          {{ stat.label }}
-        </div>
-
-      </div>
-
       {% endfor %}
+    </div>
+
+    {# Points clés #}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12"
+         :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
+         class="transition-all duration-700 delay-300">
+
+      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2 text-center">
+        <div class="w-14 h-14 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <i data-lucide="graduation-cap" class="w-7 h-7"></i>
+        </div>
+        <h4 class="font-semibold text-primary-700 mb-2">Excellence académique</h4>
+        <p class="text-sm text-gray-600">Rigueur pédagogique et suivi individualisé.</p>
+      </div>
+
+      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2 text-center">
+        <div class="w-14 h-14 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <i data-lucide="briefcase" class="w-7 h-7"></i>
+        </div>
+        <h4 class="font-semibold text-primary-700 mb-2">Insertion professionnelle</h4>
+        <p class="text-sm text-gray-600">Formations alignées avec les besoins du terrain.</p>
+      </div>
+
+      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2 text-center">
+        <div class="w-14 h-14 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <i data-lucide="map-pin" class="w-7 h-7"></i>
+        </div>
+        <h4 class="font-semibold text-primary-700 mb-2">Présence nationale</h4>
+        <p class="text-sm text-gray-600">{{ annexes|length }} annexes stratégiques au Mali.</p>
+      </div>
 
     </div>
 
   </div>
-  <div class="absolute right-0 top-0 h-full w-1/3 opacity-10 hidden lg:block">
-  <img src="{% static 'images/students/group.png' %}"
-       class="h-full w-full object-cover">
-  </div>
-
 </section>
 
 
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 6 : GALERIE SPOTLIGHT (NOUVELLE)
+   ══════════════════════════════════════════════════════════════════════════════ #}
+{% component "gallery_spotlight"
+   title="Instants Capturés"
+   subtitle="Revivez les moments forts de notre communauté"
+   gallery_url="/galerie/"
+   total_count=48
+%}{% endcomponent %}
 
 
-<section id="editorial"
-         class="py-32 bg-white"
-         x-data="{ show: false }"
-         x-intersect:enter.threshold.15.once="show = true">
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 7 : ANNEXES (Simplifiée - Slider)
+   ══════════════════════════════════════════════════════════════════════════════ #}
+<section id="annexes" class="py-24 lg:py-32 bg-white">
+  <div class="max-w-7xl mx-auto px-6"
+       x-data="{ show: false }"
+       x-intersect:enter.threshold.20.once="show = true">
 
-  <div class="max-w-7xl mx-auto px-6">
-
-    <!-- HEADER -->
-    <div class="mb-24 max-w-3xl transition-all duration-700 ease-out"
-         :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'">
-
-      <span class="text-sm uppercase tracking-wider font-semibold text-primary-500">
-        Actualités & Publications
+    {# Header #}
+    <div class="text-center mb-16">
+      <span class="text-sm uppercase tracking-wider font-semibold text-secondary">
+        Présence nationale
       </span>
-
       <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700">
-        La vie académique et les analyses pédagogiques
+        Nos Annexes Stratégiques
       </h2>
-
-      <p class="mt-6 text-gray-600 leading-relaxed">
-        Suivez les événements institutionnels et découvrez nos articles
-        approfondis sur les enjeux de la formation paramédicale.
+      <p class="mt-4 text-gray-600 max-w-2xl mx-auto">
+        ESFE déploie ses formations à travers plusieurs régions du Mali pour garantir
+        accessibilité et excellence académique sur l'ensemble du territoire.
       </p>
-
     </div>
 
+    {# Grid Annexes #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-20">
-
-      <!-- ================= ACTUALITÉS ================= -->
-      <div>
-        <h3 class="text-xl font-semibold text-primary-700 mb-10">
-          Nos actualités
-        </h3>
-
-        <div class="relative max-h-[520px] overflow-y-auto pr-2 space-y-6
-                    scrollbar-thin scrollbar-thumb-gray-300">
-
-          {% for news in latest_news %}
-
-          <a href="{{ news.get_absolute_url }}"
-             class="group flex gap-6 items-center bg-soft
-                    rounded-2xl p-6
-                    hover:shadow-md transition duration-300">
-
-            <!-- TEXTE -->
-            <div class="flex-1">
-
-              <div class="flex items-center gap-3 mb-3">
-
-                {% if news.is_urgent %}
-                <span class="text-[10px] px-3 py-1 bg-red-100 text-red-600 rounded-full uppercase tracking-wide">
-                  Urgent
-                </span>
-                {% endif %}
-
-                {% if news.is_important %}
-                <span class="text-[10px] px-3 py-1 bg-amber-100 text-amber-600 rounded-full uppercase tracking-wide">
-                  Important
-                </span>
-                {% endif %}
-
-                <span class="text-xs text-gray-400">
-                  {{ news.published_at|date:"d M Y" }}
-                </span>
-
-              </div>
-
-              <h4 class="font-semibold text-primary-700 group-hover:text-secondary transition">
-                {{ news.titre }}
-              </h4>
-
-              <p class="text-sm text-gray-600 mt-2">
-                {{ news.resume|truncatewords:18 }}
-              </p>
-
-            </div>
-
-            <!-- IMAGE MINIATURE -->
-            {% if news.image %}
-            <div class="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
-              <img src="{{ news.image.url }}"
-                   class="w-full h-full object-cover
-                          group-hover:scale-110 transition duration-500">
-            </div>
-            {% endif %}
-
-          </a>
-
-          {% endfor %}
-
+      {# Annexe Card - Répéter pour chaque annexe #}
+      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
+           class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
+        <div class="relative h-48 overflow-hidden">
+          <img src="{% static 'images/annexes/dielibougou.jpg' %}"
+               class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
+               alt="ESFE Djélibougou"
+               loading="lazy">
+          <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
+          <div class="absolute bottom-4 left-4 text-white">
+            <h4 class="font-semibold text-lg">ESFE Djélibougou</h4>
+            <p class="text-white/80 text-sm">Siège principal</p>
+          </div>
         </div>
-
+        <div class="p-4">
+          <a href="tel:+22370000000" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
+            <i data-lucide="phone" class="w-4 h-4"></i>
+            +223 70 00 00 00
+          </a>
+        </div>
       </div>
 
-
-      <!-- ================= BLOG ================= -->
-      <div>
-        <h3 class="text-xl font-semibold text-primary-700 mb-10">
-          Articles & analyses
-        </h3>
-
-        <div class="space-y-6">
-
-          {% for article in latest_articles %}
-
-          <a href="{{ article.get_absolute_url }}"
-             class="group flex gap-6 items-center bg-white
-                    border border-gray-100
-                    rounded-2xl p-6
-                    hover:shadow-md transition duration-300">
-
-            {% if article.image %}
-            <div class="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
-              <img src="{{ article.image.url }}"
-                   class="w-full h-full object-cover
-                          group-hover:scale-110 transition duration-500">
-            </div>
-            {% endif %}
-
-            <div class="flex-1">
-
-              <div class="text-xs text-gray-400 mb-2">
-                {{ article.published_at|date:"d M Y" }}
-              </div>
-
-              <h4 class="font-semibold text-primary-700 group-hover:text-secondary transition">
-                {{ article.title }}
-              </h4>
-
-            </div>
-
-          </a>
-
-          {% endfor %}
-
+      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
+           style="transition-delay: 100ms"
+           class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
+        <div class="relative h-48 overflow-hidden">
+          <img src="{% static 'images/annexes/segou.jpg' %}"
+               class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
+               alt="ESFE Ségou"
+               loading="lazy">
+          <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
+          <div class="absolute bottom-4 left-4 text-white">
+            <h4 class="font-semibold text-lg">ESFE Ségou</h4>
+            <p class="text-white/80 text-sm">Annexe régionale</p>
+          </div>
         </div>
+        <div class="p-4">
+          <a href="tel:+22371000000" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
+            <i data-lucide="phone" class="w-4 h-4"></i>
+            +223 71 00 00 00
+          </a>
+        </div>
+      </div>
 
+      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
+           style="transition-delay: 200ms"
+           class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
+        <div class="relative h-48 overflow-hidden">
+          <img src="{% static 'images/annexes/sikasso.jpg' %}"
+               class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
+               alt="ESFE Sikasso"
+               loading="lazy">
+          <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
+          <div class="absolute bottom-4 left-4 text-white">
+            <h4 class="font-semibold text-lg">ESFE Sikasso</h4>
+            <p class="text-white/80 text-sm">Annexe régionale</p>
+          </div>
+        </div>
+        <div class="p-4">
+          <a href="tel:+22374000000" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
+            <i data-lucide="phone" class="w-4 h-4"></i>
+            +223 74 00 00 00
+          </a>
+        </div>
+      </div>
+
+      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
+           style="transition-delay: 300ms"
+           class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
+        <div class="relative h-48 overflow-hidden">
+          <img src="{% static 'images/annexes/kayes.jpg' %}"
+               class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
+               alt="ESFE Kayes"
+               loading="lazy">
+          <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
+          <div class="absolute bottom-4 left-4 text-white">
+            <h4 class="font-semibold text-lg">ESFE Kayes</h4>
+            <p class="text-white/80 text-sm">Annexe régionale</p>
+          </div>
+        </div>
+        <div class="p-4">
+          <a href="tel:+22375000000" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
+            <i data-lucide="phone" class="w-4 h-4"></i>
+            +223 75 00 00 00
+          </a>
+        </div>
       </div>
 
     </div>
 
-    <!-- CTA GLOBAL -->
-    <div class="mt-24 text-center">
-      <a href="{% url 'news:list' %}"
-         class="inline-flex items-center gap-2
-                bg-secondary text-white
-                px-8 py-3 rounded-xl
-                font-semibold
-                hover:bg-secondary/90 transition">
-
-        Voir toutes les publications
-        <span>→</span>
+    {# Voir plus #}
+    <div class="text-center mt-12">
+      <a href="#"
+         class="inline-flex items-center gap-2 text-primary-700 font-semibold hover:text-secondary transition-colors">
+        Voir toutes nos implantations
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+        </svg>
       </a>
     </div>
 
@@ -970,4 +472,133 @@
 </section>
 
 
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 8 : ACTUALITÉS & BLOG (Simplifiée)
+   ══════════════════════════════════════════════════════════════════════════════ #}
+<section id="actualites" class="py-24 lg:py-32 bg-soft">
+  <div class="max-w-7xl mx-auto px-6"
+       x-data="{ show: false }"
+       x-intersect:enter.threshold.15.once="show = true">
+
+    {# Header #}
+    <div class="text-center mb-16"
+         :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
+         class="transition-all duration-700">
+      <span class="text-sm uppercase tracking-wider font-semibold text-secondary">
+        Actualités & Publications
+      </span>
+      <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700">
+        La vie académique en continu
+      </h2>
+      <p class="mt-4 text-gray-600 max-w-2xl mx-auto">
+        Suivez les événements institutionnels et découvrez nos analyses pédagogiques.
+      </p>
+    </div>
+
+    {# Grid Actualités + Blog #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+
+      {# Actualités #}
+      <div>
+        <h3 class="text-xl font-semibold text-primary-700 mb-8 flex items-center gap-2">
+          <i data-lucide="newspaper" class="w-5 h-5 text-secondary"></i>
+          Actualités
+        </h3>
+
+        <div class="space-y-4">
+          {% for news in latest_news %}
+          <a href="{{ news.get_absolute_url }}"
+             class="group flex gap-5 items-center bg-white rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all duration-300">
+
+            {% if news.image %}
+            <div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+              <img src="{{ news.image.url }}"
+                   class="w-full h-full object-cover group-hover:scale-110 transition duration-500"
+                   alt="{{ news.titre }}">
+            </div>
+            {% endif %}
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-2">
+                {% if news.is_urgent %}
+                <span class="text-[10px] px-2 py-0.5 bg-red-100 text-red-600 rounded-full uppercase font-medium">
+                  Urgent
+                </span>
+                {% endif %}
+                {% if news.is_important %}
+                <span class="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-600 rounded-full uppercase font-medium">
+                  Important
+                </span>
+                {% endif %}
+                <span class="text-xs text-gray-400">{{ news.published_at|date:"d M Y" }}</span>
+              </div>
+              <h4 class="font-semibold text-primary-700 group-hover:text-secondary transition truncate">
+                {{ news.titre }}
+              </h4>
+            </div>
+
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-secondary group-hover:translate-x-1 transition-all flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Blog #}
+      <div>
+        <h3 class="text-xl font-semibold text-primary-700 mb-8 flex items-center gap-2">
+          <i data-lucide="book-open" class="w-5 h-5 text-secondary"></i>
+          Articles & Analyses
+        </h3>
+
+        <div class="space-y-4">
+          {% for article in latest_articles %}
+          <a href="{{ article.get_absolute_url }}"
+             class="group flex gap-5 items-center bg-white rounded-2xl p-5 border border-gray-100 hover:shadow-lg transition-all duration-300">
+
+            {% if article.image %}
+            <div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+              <img src="{{ article.image.url }}"
+                   class="w-full h-full object-cover group-hover:scale-110 transition duration-500"
+                   alt="{{ article.title }}">
+            </div>
+            {% endif %}
+
+            <div class="flex-1 min-w-0">
+              <span class="text-xs text-gray-400">{{ article.published_at|date:"d M Y" }}</span>
+              <h4 class="font-semibold text-primary-700 group-hover:text-secondary transition truncate mt-1">
+                {{ article.title }}
+              </h4>
+            </div>
+
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-secondary group-hover:translate-x-1 transition-all flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+
+    {# CTA #}
+    <div class="text-center mt-16">
+      <a href="{% url 'news:list' %}"
+         class="inline-flex items-center gap-3 bg-secondary hover:bg-secondary/90 text-white px-8 py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-1">
+        <i data-lucide="arrow-right" class="w-5 h-5"></i>
+        Voir toutes les publications
+      </a>
+    </div>
+
+  </div>
+</section>
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   SECTION 7 : FAQ
+   ══════════════════════════════════════════════════════════════════════════════ #}
+{% component "faq"
+   title="Questions Fréquentes"
+   subtitle="Trouvez rapidement les réponses à vos interrogations"
+%}{% endcomponent %}
 {% endblock %}

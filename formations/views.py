@@ -82,6 +82,8 @@ def formation_list(request):
     )
 
 
+import json  # ← AJOUTE EN HAUT DU FICHIER
+
 # ==================================================
 # DÉTAIL D'UNE FORMATION
 # ==================================================
@@ -134,6 +136,14 @@ def formation_detail(request, slug):
     cycle_name = programme.cycle.name.lower()
     cycle_type = "licence" if "licence" in cycle_name else "master" if "master" in cycle_name else "doctorat"
 
+    # =============================================
+    # OBJECTIFS DE FORMATION (JSON)
+    # =============================================
+    try:
+        learning_objectives = json.loads(programme.learning_outcomes) if programme.learning_outcomes else []
+    except (json.JSONDecodeError, TypeError):
+        learning_objectives = []
+
     context = {
         "programme": programme,
         "programme_years": programme_years,
@@ -144,8 +154,9 @@ def formation_detail(request, slug):
         "can_apply": programme.is_active,
         "cycle_type": cycle_type,
         "total_cost": total_programme_cost,
+        "total_programme_cost": total_programme_cost,
+        "learning_objectives": learning_objectives,  # ← NOUVEAU
     }
-
     return render(
         request,
         "formations/detail.html",

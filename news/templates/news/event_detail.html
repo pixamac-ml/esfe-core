@@ -1,252 +1,298 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static humanize %}
 
-{% block title %}{{ event.title }} | Galeries & Médias | ESFé{% endblock %}
+{% block title %}{{ event.title }} - Galerie ESFE{% endblock %}
 
 {% block content %}
 
-<!-- HERO COVER -->
-<section class="relative">
-
+<!-- ================= HERO COVER ================= -->
+<section class="relative h-[50vh] min-h-[400px]">
     {% if event.cover_image %}
         <img src="{{ event.cover_image.url }}"
-             class="w-full h-[420px] object-cover"
-             loading="lazy">
+             alt="{{ event.title }}"
+             class="absolute inset-0 w-full h-full object-cover">
     {% else %}
-        <div class="w-full h-[420px] bg-gray-200"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-primary-600 to-secondary"></div>
     {% endif %}
 
-    <div class="absolute inset-0 bg-black/60"></div>
+    <!-- Overlay gradient -->
+    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
 
-    <div class="absolute inset-0 flex items-center">
-        <div class="max-w-6xl mx-auto px-6 text-white">
-            <span class="inline-block bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-sm mb-4">
+    <!-- Contenu -->
+    <div class="absolute bottom-0 left-0 right-0 p-8">
+        <div class="container mx-auto">
+
+            <!-- Breadcrumb -->
+            <nav class="flex items-center gap-2 text-white/70 text-sm mb-4">
+                <a href="{% url 'core:home' %}" class="hover:text-white transition">Accueil</a>
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                <a href="{% url 'news:event_list' %}" class="hover:text-white transition">Galeries</a>
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                <span class="text-white">{{ event.title|truncatewords:5 }}</span>
+            </nav>
+
+            <!-- Badge type -->
+            {% if event.event_type %}
+            <span class="inline-block bg-secondary text-white text-sm font-medium px-4 py-1 rounded-full mb-4">
                 {{ event.event_type.name }}
             </span>
+            {% endif %}
 
-            <h1 class="text-4xl md:text-5xl font-bold mb-4">
+            <h1 class="text-3xl md:text-4xl lg:text-5xl font-poppins font-bold text-white mb-4 max-w-4xl">
                 {{ event.title }}
             </h1>
 
-            <p class="text-white/80">
-                {{ event.event_date|date:"d F Y" }}
+            <div class="flex flex-wrap items-center gap-6 text-white/80">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="calendar" class="w-5 h-5"></i>
+                    <time datetime="{{ event.event_date|date:'Y-m-d' }}">
+                        {{ event.event_date|date:"d F Y" }}
+                    </time>
+                </div>
+                {% if images %}
+                <div class="flex items-center gap-2">
+                    <i data-lucide="camera" class="w-5 h-5"></i>
+                    <span>{{ images|length }} photo{{ images|length|pluralize }}</span>
+                </div>
+                {% endif %}
+                {% if videos %}
+                <div class="flex items-center gap-2">
+                    <i data-lucide="video" class="w-5 h-5"></i>
+                    <span>{{ videos|length }} vidéo{{ videos|length|pluralize }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Bouton retour -->
+    <a href="{% url 'news:event_list' %}"
+       class="absolute top-8 left-8 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+    </a>
+</section>
+
+
+<!-- ================= DESCRIPTION ================= -->
+{% if event.description %}
+<section class="bg-white py-12 border-b border-gray-100">
+    <div class="container mx-auto px-6">
+        <div class="max-w-3xl mx-auto text-center">
+            <p class="text-lg text-gray-600 leading-relaxed">
+                {{ event.description }}
             </p>
         </div>
     </div>
 </section>
+{% endif %}
 
 
-<!-- MAIN CONTENT -->
-<section class="max-w-7xl mx-auto px-6 py-16">
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-12">
+<!-- ================= GALERIE PHOTOS ================= -->
+{% if images %}
+<section class="bg-soft py-16">
+    <div class="container mx-auto px-6">
 
-        <!-- MAIN -->
-        <div class="lg:col-span-3 space-y-16">
-
-            {% if event.description %}
-            <div class="prose max-w-none">
-                {{ event.description|linebreaks }}
-            </div>
-            {% endif %}
-
-            <!-- IMAGES -->
-            {% if images %}
-            <div>
-                <h2 class="text-2xl font-bold mb-8">Galerie photos</h2>
-
-                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {% for media in images %}
-                    <div class="group relative cursor-pointer rounded-2xl overflow-hidden shadow-md"
-                         onclick="openLightbox({{ forloop.counter0 }})">
-
-                        <img src="{{ media.thumbnail.url }}"
-                             class="w-full h-56 object-cover transition duration-500 group-hover:scale-110">
-
-                        <div class="absolute inset-0 bg-black/40 opacity-0
-                                    group-hover:opacity-100 transition
-                                    flex items-center justify-center">
-                            <span class="text-white text-sm font-semibold">
-                                Voir en grand
-                            </span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- VIDEOS -->
-            {% if videos %}
-            <div>
-                <h2 class="text-2xl font-bold mb-8">Vidéos</h2>
-
-                <div class="grid sm:grid-cols-2 gap-8">
-
-                    {% for media in videos %}
-
-                        {% if media.video_file %}
-                            <!-- VIDEO LOCALE -->
-                            <div class="relative rounded-2xl overflow-hidden shadow-md cursor-pointer"
-                                 onclick="openLocalVideo('{{ media.video_file.url|escapejs }}')">
-
-                                {% if media.thumbnail %}
-                                    <img src="{{ media.thumbnail.url }}"
-                                         class="w-full aspect-video object-cover">
-                                {% else %}
-                                    <div class="aspect-video bg-black flex items-center justify-center text-white text-lg">
-                                        ▶ Lire la vidéo
-                                    </div>
-                                {% endif %}
-                            </div>
-
-                        {% elif media.video_url %}
-                            <!-- VIDEO YOUTUBE -->
-                            <div class="relative rounded-2xl overflow-hidden shadow-md cursor-pointer"
-                                 onclick="openVideo('{{ media.get_embed_url|escapejs }}')">
-
-                                <div class="aspect-video bg-black flex items-center justify-center text-white text-lg">
-                                    ▶ Lire la vidéo
-                                </div>
-                            </div>
-
-                        {% endif %}
-
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
+        <div class="flex items-center justify-between mb-8">
+            <h2 class="text-2xl font-poppins font-bold text-gray-800 flex items-center gap-3">
+                <i data-lucide="camera" class="w-6 h-6 text-secondary"></i>
+                Photos
+            </h2>
+            <span class="text-gray-500">{{ images|length }} image{{ images|length|pluralize }}</span>
         </div>
 
-        <!-- SIDEBAR -->
-        <aside class="space-y-10">
-            <div class="bg-white p-6 rounded-2xl shadow-md space-y-4">
-                <h4 class="font-semibold text-gray-900">Informations</h4>
-                <div class="text-sm text-gray-600 space-y-2">
-                    <div><strong>Date :</strong><br>{{ event.event_date|date:"d F Y" }}</div>
-                    <div><strong>Type :</strong><br>{{ event.event_type.name }}</div>
-                    <div><strong>Photos :</strong> {{ images|length }}</div>
-                    <div><strong>Vidéos :</strong> {{ videos|length }}</div>
+        <!-- Grille photos -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {% for photo in images %}
+            <div class="group relative aspect-square rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-xl transition-shadow"
+                 onclick="openLightbox({{ forloop.counter0 }})">
+
+                <img src="{{ photo.thumbnail.url }}"
+                     alt="{{ photo.caption|default:event.title }}"
+                     class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+
+                <!-- Overlay hover -->
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <i data-lucide="zoom-in" class="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity"></i>
                 </div>
+
+                {% if photo.caption %}
+                <div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p class="text-white text-sm line-clamp-2">{{ photo.caption }}</p>
+                </div>
+                {% endif %}
             </div>
-        </aside>
+            {% endfor %}
+        </div>
 
     </div>
 </section>
+{% endif %}
 
 
-<!-- LIGHTBOX -->
+<!-- ================= VIDÉOS ================= -->
+{% if videos %}
+<section class="bg-white py-16">
+    <div class="container mx-auto px-6">
+
+        <div class="flex items-center justify-between mb-8">
+            <h2 class="text-2xl font-poppins font-bold text-gray-800 flex items-center gap-3">
+                <i data-lucide="video" class="w-6 h-6 text-secondary"></i>
+                Vidéos
+            </h2>
+            <span class="text-gray-500">{{ videos|length }} vidéo{{ videos|length|pluralize }}</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {% for video in videos %}
+            <div class="bg-gray-50 rounded-2xl overflow-hidden shadow-sm">
+
+                {% if video.video_url %}
+                <!-- YouTube / URL externe -->
+                <div class="aspect-video">
+                    <iframe src="{{ video.get_embed_url }}"
+                            class="w-full h-full"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen></iframe>
+                </div>
+                {% elif video.video_file %}
+                <!-- Vidéo locale -->
+                <div class="aspect-video bg-black">
+                    <video controls
+                           class="w-full h-full"
+                           {% if video.thumbnail %}poster="{{ video.thumbnail.url }}"{% endif %}>
+                        <source src="{{ video.video_file.url }}" type="video/mp4">
+                    </video>
+                </div>
+                {% endif %}
+
+                {% if video.caption %}
+                <div class="p-4">
+                    <p class="text-gray-700">{{ video.caption }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+</section>
+{% endif %}
+
+
+<!-- ================= ÉVÉNEMENTS SIMILAIRES ================= -->
+{% if related_events %}
+<section class="bg-soft py-16 border-t border-gray-100">
+    <div class="container mx-auto px-6">
+
+        <h2 class="text-2xl font-poppins font-bold text-gray-800 mb-8">
+            Autres événements
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {% for related in related_events %}
+            <a href="{% url 'news:event_detail' related.slug %}"
+               class="group bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition">
+                <div class="aspect-[16/10] overflow-hidden">
+                    {% if related.cover_thumbnail %}
+                    <img src="{{ related.cover_thumbnail.url }}"
+                         alt="{{ related.title }}"
+                         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    {% else %}
+                    <div class="w-full h-full bg-primary-100 flex items-center justify-center">
+                        <i data-lucide="image" class="w-10 h-10 text-primary-300"></i>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="p-4">
+                    <p class="text-sm text-gray-500 mb-1">{{ related.event_date|date:"d M Y" }}</p>
+                    <h3 class="font-medium text-gray-800 group-hover:text-primary-500 transition line-clamp-2">
+                        {{ related.title }}
+                    </h3>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+    </div>
+</section>
+{% endif %}
+
+
+<!-- ================= LIGHTBOX ================= -->
+{% if images %}
 <div id="lightbox"
-     class="fixed inset-0 bg-black/90 hidden items-center justify-center z-50">
+     class="fixed inset-0 z-50 bg-black/95 hidden"
+     onclick="closeLightbox()">
 
     <button onclick="closeLightbox()"
-            class="absolute top-6 right-6 text-white text-3xl z-50">✕</button>
+            class="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition z-10">
+        <i data-lucide="x" class="w-6 h-6"></i>
+    </button>
 
-    <button onclick="prevImage()"
-            class="absolute left-6 text-white text-4xl">‹</button>
+    <button onclick="event.stopPropagation(); prevImage()"
+            class="absolute left-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition">
+        <i data-lucide="chevron-left" class="w-8 h-8"></i>
+    </button>
 
-    <button onclick="nextImage()"
-            class="absolute right-6 text-white text-4xl">›</button>
+    <button onclick="event.stopPropagation(); nextImage()"
+            class="absolute right-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition">
+        <i data-lucide="chevron-right" class="w-8 h-8"></i>
+    </button>
 
-    <div id="lightboxContent"
-         class="max-w-6xl w-full px-6"></div>
+    <div class="flex items-center justify-center h-full p-16" onclick="event.stopPropagation()">
+        <img id="lightbox-img" src="" alt="" class="max-w-full max-h-full object-contain">
+    </div>
+
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+        <span id="lightbox-counter"></span>
+    </div>
 </div>
 
-
 <script>
-
-// IMAGE LIGHTBOX
-
-let images = [
-{% for media in images %}
-    "{{ media.image.url }}",
-{% endfor %}
+const photos = [
+    {% for photo in images %}
+    { src: "{{ photo.image.url }}", caption: "{{ photo.caption|escapejs }}" },
+    {% endfor %}
 ];
 
 let currentIndex = 0;
 
 function openLightbox(index) {
     currentIndex = index;
-    showImage();
-    document.getElementById("lightbox").classList.remove("hidden");
-    document.getElementById("lightbox").classList.add("flex");
+    updateLightbox();
+    document.getElementById('lightbox').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
 }
 
-function showImage() {
-    const content = document.getElementById("lightboxContent");
-    content.innerHTML = `
-        <img src="${images[currentIndex]}"
-             class="w-full max-h-[80vh] object-contain mx-auto rounded-xl">
-    `;
+function closeLightbox() {
+    document.getElementById('lightbox').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function updateLightbox() {
+    document.getElementById('lightbox-img').src = photos[currentIndex].src;
+    document.getElementById('lightbox-counter').textContent = `${currentIndex + 1} / ${photos.length}`;
 }
 
 function nextImage() {
-    if (!images.length) return;
-    currentIndex = (currentIndex + 1) % images.length;
-    showImage();
+    currentIndex = (currentIndex + 1) % photos.length;
+    updateLightbox();
 }
 
 function prevImage() {
-    if (!images.length) return;
-    currentIndex = (currentIndex - 1 + images.length) % images.length;
-    showImage();
+    currentIndex = (currentIndex - 1 + photos.length) % photos.length;
+    updateLightbox();
 }
 
-
-// VIDEO YOUTUBE (URL DÉJÀ CONVERTIE PAR DJANGO)
-
-function openVideo(url) {
-    if (!url) return;
-
-    const content = document.getElementById("lightboxContent");
-
-    content.innerHTML = `
-        <div class="aspect-video">
-            <iframe src="${url}"
-                    class="w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-            </iframe>
-        </div>
-    `;
-
-    document.getElementById("lightbox").classList.remove("hidden");
-    document.getElementById("lightbox").classList.add("flex");
-}
-
-
-// VIDEO LOCALE
-
-function openLocalVideo(url) {
-    if (!url) return;
-
-    const content = document.getElementById("lightboxContent");
-
-    content.innerHTML = `
-        <video controls autoplay class="w-full max-h-[80vh] mx-auto rounded-xl">
-            <source src="${url}" type="video/mp4">
-            Votre navigateur ne supporte pas la vidéo.
-        </video>
-    `;
-
-    document.getElementById("lightbox").classList.remove("hidden");
-    document.getElementById("lightbox").classList.add("flex");
-}
-
-
-// CLOSE
-
-function closeLightbox() {
-    document.getElementById("lightbox").classList.add("hidden");
-    document.getElementById("lightboxContent").innerHTML = "";
-}
-
-document.addEventListener("keydown", function(e) {
-    if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowRight") nextImage();
-    if (e.key === "ArrowLeft") prevImage();
+document.addEventListener('keydown', (e) => {
+    if (document.getElementById('lightbox').classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowRight') nextImage();
+    if (e.key === 'ArrowLeft') prevImage();
 });
-
 </script>
+{% endif %}
 
 {% endblock %}

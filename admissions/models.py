@@ -154,9 +154,8 @@ class Candidature(models.Model):
 
     @property
     def all_documents_valid(self):
-        required_count = RequiredDocument.objects.count()
+        required_count = self.programme.required_documents.count()  # ✅ Correct
         return self.validated_documents_count >= required_count
-
 
 class CandidatureDocument(models.Model):
 

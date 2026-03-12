@@ -395,3 +395,245 @@ class AboutSection(models.Model):
         if self.section_key:
             return self.get_section_key_display()
         return self.title or "Section About"
+
+
+
+# ==========================================================
+# NOTIFICATIONS AUTOMATIQUES
+# ==========================================================
+
+class Notification(models.Model):
+    """
+    Notifications automatiques pour les candidats
+    Declarative - Pas de logique, juste du stockage
+    """
+
+    TYPE_CHOICES = [
+        ("candidature_submitted", "Candidature soumise"),
+        ("candidature_under_review", "Candidature en cours d'analyse"),
+        ("candidature_to_complete", "Candidature a completer"),
+        ("candidature_accepted", "Candidature acceptee"),
+        ("candidature_accepted_with_reserve", "Candidature acceptee sous reserve"),
+        ("candidature_rejected", "Candidature refusee"),
+        ("inscription_created", "Inscription creee"),
+        ("inscription_active", "Inscription active"),
+        ("payment_received", "Paiement recu"),
+        ("payment_validated", "Paiement valide"),
+        ("document_missing", "Document manquant"),
+    ]
+
+    recipient_email = models.EmailField()
+    recipient_name = models.CharField(max_length=150)
+
+    notification_type = models.CharField(max_length=50, choices=TYPE_CHOICES)
+
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+
+    related_candidature = models.ForeignKey(
+        "admissions.Candidature",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications"
+    )
+
+    related_inscription = models.ForeignKey(
+        "inscriptions.Inscription",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications"
+    )
+
+    related_payment = models.ForeignKey(
+        "payments.Payment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications"
+    )
+
+    email_sent = models.BooleanField(default=False)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Notification"
+        verbose_name_plural = "Notifications"
+        indexes = [
+            models.Index(fields=["notification_type"]),
+            models.Index(fields=["recipient_email"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_notification_type_display()} - {self.recipient_email}"
+
+
+# ==========================================================
+# HISTORIQUE DES CHANGEMENTS DE STATUT
+# ==========================================================
+
+class StatusHistory(models.Model):
+    """
+    Historique des changements de statut pour les candidatures
+    """
+
+    candidature = models.ForeignKey(
+        "admissions.Candidature",
+        on_delete=models.CASCADE,
+        related_name="status_history"
+    )
+
+    old_status = models.CharField(max_length=30)
+    new_status = models.CharField(max_length=30)
+
+    changed_by = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="status_changes"
+    )
+
+    comment = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Historique de statut"
+        verbose_name_plural = "Historique des statuts"
+
+    def __str__(self):
+        return f"{self.candidature.full_name}: {self.old_status} -> {self.new_status}"
+
+
+# ==========================================================
+# TÉMOIGNAGES (Section A)
+# ==========================================================
+
+class Testimonial(models.Model):
+    """Témoignages vidéo des anciens étudiants"""
+
+    video_url = models.URLField(
+        blank=True,
+        help_text="URL YouTube ou Vimeo (ex: https://youtube.com/watch?v=...)"
+    )
+
+    video_thumbnail = models.ImageField(
+        upload_to='temoignages/thumbnails/',
+        blank=True,
+        null=True,
+        help_text="Image de prévisualisation si pas de vidéo"
+    )
+
+    quote = models.TextField(
+        help_text="Le témoignage en quelques phrases"
+    )
+
+    author_name = models.CharField(
+        max_length=150,
+        help_text="Nom complet du diplômé"
+    )
+
+    author_role = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Poste actuel (ex: Directeur des ressources humaines)"
+    )
+
+    author_photo = models.ImageField(
+        upload_to='temoignages/photos/',
+        blank=True,
+        null=True
+    )
+
+    promotion = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Année de promotion (ex: Promo 2019)"
+    )
+
+    programme = models.ForeignKey(
+        'formations.Programme',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='testimonials',
+        help_text="Formation suivie (laisser vide pour témoignage global)"
+    )
+
+    is_featured = models.BooleanField(
+        default=False,
+        help_text="Afficher en priorité sur la page d'accueil"
+    )
+
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-is_featured", "order", "-pk"]
+        verbose_name = "Témoignage"
+        verbose_name_plural = "Témoignages"
+
+    def __str__(self):
+        return f"{self.author_name} - {self.promotion}"
+
+
+# ==========================================================
+# PARTENAIRES (Section C)
+# ==========================================================
+
+class Partner(models.Model):
+    """Partenaires de l'institution (ministères, hôpitaux, organisations)"""
+
+    PARTNER_TYPES = [
+        ("ministere", "Ministère"),
+        ("hospital", "Centre Hospitalier"),
+        ("international", "Organisation Internationale"),
+        ("ong", "ONG"),
+        ("entreprise", "Entreprise"),
+        ("university", "Université"),
+        ("autre", "Autre"),
+    ]
+
+    name = models.CharField(
+        max_length=200,
+        help_text="Nom du partenaire"
+    )
+
+    logo = models.ImageField(
+        upload_to='partners/logos/',
+        help_text="Logo du partenaire"
+    )
+
+    website = models.URLField(
+        blank=True,
+        help_text="Site web du partenaire"
+    )
+
+    description = models.TextField(
+        blank=True,
+        help_text="Description du partenariat"
+    )
+
+    partner_type = models.CharField(
+        max_length=20,
+        choices=PARTNER_TYPES,
+        default="autre"
+    )
+
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "name"]
+        verbose_name = "Partenaire"
+        verbose_name_plural = "Partenaires"
+
+    def __str__(self):
+        return self.name

@@ -7,15 +7,6 @@ from unidecode import unidecode
 # ==================================================
 # CYCLE (Licence / Master / Doctorat)
 # ==================================================
-from django.db import models
-from django.urls import reverse
-from django.utils.text import slugify
-from unidecode import unidecode
-
-
-# ==================================================
-# CYCLE (Licence / Master / Doctorat)
-# ==================================================
 class Cycle(models.Model):
     THEME_CHOICES = [
         ("accent", "Bleu institutionnel"),
@@ -27,11 +18,10 @@ class Cycle(models.Model):
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
 
-    # 🎨 Nouveau champ pour piloter le design
     theme = models.CharField(
         max_length=20,
         choices=THEME_CHOICES,
-        default="primary",
+        default="accent",  # ✅ CORRIGÉ : était "primary" qui n'existe pas
     )
 
     min_duration_years = models.PositiveSmallIntegerField()
@@ -48,9 +38,10 @@ class Cycle(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             base = unidecode(self.name).lower()
-            base = base.replace("'", "").replace("’", "")
+            base = base.replace("'", "").replace("'", "")
             self.slug = slugify(base)
         super().save(*args, **kwargs)
+
 
 # ==================================================
 # DIPLÔME
@@ -87,9 +78,6 @@ class Filiere(models.Model):
 # ==================================================
 # PROGRAMME
 # ==================================================
-# ==================================================
-# PROGRAMME
-# ==================================================
 class Programme(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(unique=True, blank=True)
@@ -116,7 +104,7 @@ class Programme(models.Model):
     description = models.TextField()
 
     # ==================================================
-    # 🔵 CONTENU LANDING PAGE (NOUVEAU)
+    # CONTENU LANDING PAGE
     # ==================================================
 
     learning_outcomes = models.TextField(
@@ -146,6 +134,7 @@ class Programme(models.Model):
     is_featured = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  # ✅ NOUVEAU
 
     class Meta:
         ordering = ["title"]
@@ -163,7 +152,7 @@ class Programme(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             base = unidecode(self.title).lower()
-            base = base.replace("'", "").replace("’", "")
+            base = base.replace("'", "").replace("'", "")
             slug = slugify(base)
 
             counter = 1
@@ -232,8 +221,6 @@ class Fee(models.Model):
         return f"{self.label} – {self.amount} FCFA"
 
 
-
-
 # ==================================================
 # FAITS RAPIDES (QUICK FACTS)
 # ==================================================
@@ -248,7 +235,11 @@ class ProgrammeQuickFact(models.Model):
         ("briefcase", "Valise/Métier"),
     ]
 
-    programme = models.ForeignKey(Programme, related_name="quick_facts", on_delete=models.CASCADE)
+    programme = models.ForeignKey(
+        Programme,
+        related_name="quick_facts",
+        on_delete=models.CASCADE
+    )
     icon = models.CharField(max_length=30, choices=ICON_CHOICES, default="academic_cap")
     label = models.CharField(max_length=100, help_text="Ex: Niveau, Durée, Rentrée")
     value = models.CharField(max_length=200, help_text="Ex: Bac+5, 2 ans, Septembre 2026")
@@ -274,7 +265,11 @@ class ProgrammeTab(models.Model):
         ("custom", "Personnalisé"),
     ]
 
-    programme = models.ForeignKey(Programme, related_name="tabs", on_delete=models.CASCADE)
+    programme = models.ForeignKey(
+        Programme,
+        related_name="tabs",
+        on_delete=models.CASCADE
+    )
     tab_type = models.CharField(max_length=20, choices=TAB_TYPE_CHOICES, default="custom")
     title = models.CharField(max_length=100)
     slug = models.SlugField(max_length=50)
@@ -303,7 +298,11 @@ class ProgrammeSection(models.Model):
         ("cta", "Appel à l'action"),
     ]
 
-    tab = models.ForeignKey(ProgrammeTab, related_name="sections", on_delete=models.CASCADE)
+    tab = models.ForeignKey(
+        ProgrammeTab,
+        related_name="sections",
+        on_delete=models.CASCADE
+    )
     section_type = models.CharField(max_length=20, choices=SECTION_TYPE_CHOICES, default="text")
     title = models.CharField(max_length=200, blank=True)
     content = models.TextField(blank=True)
@@ -317,7 +316,11 @@ class ProgrammeSection(models.Model):
 # BLOCS DE COMPÉTENCES
 # ==================================================
 class CompetenceBlock(models.Model):
-    programme = models.ForeignKey(Programme, related_name="competence_blocks", on_delete=models.CASCADE)
+    programme = models.ForeignKey(
+        Programme,
+        related_name="competence_blocks",
+        on_delete=models.CASCADE
+    )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
@@ -330,18 +333,17 @@ class CompetenceBlock(models.Model):
 # ITEMS DE COMPÉTENCES
 # ==================================================
 class CompetenceItem(models.Model):
-    block = models.ForeignKey(CompetenceBlock, related_name="items", on_delete=models.CASCADE)
+    block = models.ForeignKey(
+        CompetenceBlock,
+        related_name="items",
+        on_delete=models.CASCADE
+    )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["order", "id"]
-
-
-
-
-
 
 
 # ==================================================

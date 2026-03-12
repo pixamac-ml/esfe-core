@@ -135,24 +135,10 @@ def about(request):
         is_active=True
     ).order_by("order")
 
-    images_queryset = AboutBlockImage.objects.order_by("order")
-
-    blocks_queryset = (
-        AboutContentBlock.objects
-        .filter(is_active=True)
-        .order_by("order")
-        .prefetch_related(
-            Prefetch("images", queryset=images_queryset)
-        )
-    )
-
     about_sections = (
         AboutSection.objects
         .filter(is_active=True)
         .order_by("order")
-        .prefetch_related(
-            Prefetch("blocks", queryset=blocks_queryset)
-        )
     )
 
     context = {
@@ -288,62 +274,6 @@ def legal_page_pdf(request, page_type):
     return response
 
 
-# ==========================================================
-# ABOUT PAGE
-# ==========================================================
-
-# ==========================================================
-# ABOUT PAGE
-# ==========================================================
-
-from django.shortcuts import render
-from .models import Institution, AboutSection
-from .utils import get_institution_context
-
-
-def about(request):
-
-    # ==============================
-    # Institution active
-    # ==============================
-    institution = (
-        Institution.objects
-        .filter(is_active=True)
-        .first()
-    )
-
-    hero_title = (
-        institution.short_name or institution.name
-        if institution
-        else "École de Santé Félix Houphouët-Boigny"
-    )
-
-    hero_subtitle = (
-        "Former les cadres de la santé et contribuer activement "
-        "au développement du système sanitaire malien."
-    )
-
-    # ==============================
-    # Sections dynamiques About
-    # ==============================
-    sections = (
-        AboutSection.objects
-        .filter(is_active=True)
-        .order_by("order")
-    )
-
-    # ==============================
-    # Context final
-    # ==============================
-    context = {
-        "institution": institution,
-        "hero_title": hero_title,
-        "hero_subtitle": hero_subtitle,
-        "sections": sections,
-        **get_institution_context(),
-    }
-
-    return render(request, "core/about.html", context)
 
 # ==========================================================
 # CONTACT

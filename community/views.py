@@ -196,12 +196,16 @@ def topic_by_category(request, slug):
 
     return render(request, "community/topic_list.html", context)
 
+
+
+
+
 # =====================================================
 # DÉTAIL D'UN SUJET
 # =====================================================
 def topic_detail(request, slug):
     topic = get_object_or_404(
-        Topic.objects.select_related("author", "category"),
+        Topic.objects.select_related("author", "author__profile", "category"),
         slug=slug,
         is_published=True
     )
@@ -235,22 +239,20 @@ def topic_detail(request, slug):
     root_answers = (
         Answer.objects
         .filter(topic=topic, parent__isnull=True, is_deleted=False)
-        .select_related("author")
+        .select_related("author", "author__profile")
         .prefetch_related(
             Prefetch(
                 "replies",
                 queryset=Answer.objects
                 .filter(is_deleted=False)
-                .select_related("author")
+                .select_related("author", "author__profile")
                 .order_by("-upvotes", "created_at")
             )
         )
         .order_by("-upvotes", "created_at")
     )
 
-    # ==============================
     # Mettre accepted_answer en premier
-    # ==============================
     if topic.accepted_answer:
         accepted = topic.accepted_answer
         root_answers = sorted(
@@ -258,11 +260,39 @@ def topic_detail(request, slug):
             key=lambda a: a.id != accepted.id
         )
 
+    # ==============================
+    # Sujets similaires (même catégorie)
+    # ==============================
+    similar_topics = (
+        Topic.objects
+        .filter(
+            category=topic.category,
+            is_published=True,
+            is_deleted=False
+        )
+        .exclude(pk=topic.pk)
+        .select_related("author")
+        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
+        .order_by("-view_count")[:5]
+    )
+
+    # ==============================
+    # Abonnements utilisateur
+    # ==============================
+    user_subscriptions = []
+    if request.user.is_authenticated:
+        user_subscriptions = list(
+            Category.objects
+            .filter(subscribers=request.user, is_active=True)
+            .values_list("id", flat=True)
+        )
+
     return render(request, "community/topic_detail.html", {
         "topic": topic,
         "answers": root_answers,
+        "similar_topics": similar_topics,
+        "user_subscriptions": user_subscriptions,
     })
-
 
 # =====================================================
 # AJOUT RÉPONSE (HTMX)

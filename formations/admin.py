@@ -45,7 +45,6 @@ class CompetenceBlockInline(admin.TabularInline):
     extra = 0
     ordering = ("order",)
     min_num = 0
-    inlines = [CompetenceItemInline]
 
 
 # ==================================================
@@ -66,7 +65,6 @@ class ProgrammeTabInline(admin.TabularInline):
     extra = 0
     ordering = ("order",)
     min_num = 0
-    inlines = [ProgrammeSectionInline]
 
 
 # ==================================================
@@ -77,6 +75,16 @@ class ProgrammeYearInline(admin.TabularInline):
     extra = 0
     ordering = ("year_number",)
     min_num = 1
+
+
+# ==================================================
+# INLINE : FRAIS PAR ANNÉE
+# ==================================================
+class FeeInline(admin.TabularInline):
+    model = Fee
+    extra = 0
+    ordering = ("amount",)
+    min_num = 0
 
 
 # ==================================================
@@ -97,10 +105,11 @@ class CycleAdmin(admin.ModelAdmin):
     list_filter = ("theme", "is_active")
     search_fields = ("name",)
     ordering = ("min_duration_years",)
+    prepopulated_fields = {"slug": ("name",)}
     fieldsets = (
         ("Identification", {"fields": ("name", "slug", "description")}),
         ("Configuration visuelle", {"fields": ("theme",)}),
-        ("Duree & statut", {"fields": ("min_duration_years", "max_duration_years", "is_active")}),
+        ("Durée & statut", {"fields": ("min_duration_years", "max_duration_years", "is_active")}),
     )
     list_per_page = 25
 
@@ -133,13 +142,27 @@ class FiliereAdmin(admin.ModelAdmin):
 # ==================================================
 @admin.register(Programme)
 class ProgrammeAdmin(admin.ModelAdmin):
-    list_display = ("title", "cycle", "filiere", "diploma_awarded", "duration_years", "is_active", "is_featured",
-                    "created_at")
+    list_display = (
+        "title",
+        "cycle",
+        "filiere",
+        "diploma_awarded",
+        "duration_years",
+        "is_active",
+        "is_featured",
+        "created_at",
+    )
     list_filter = ("cycle", "filiere", "diploma_awarded", "is_active", "is_featured")
-    search_fields = ("title", "short_description", "description", "learning_outcomes", "career_opportunities",
-                     "program_structure")
+    search_fields = (
+        "title",
+        "short_description",
+        "description",
+        "learning_outcomes",
+        "career_opportunities",
+        "program_structure",
+    )
     prepopulated_fields = {"slug": ("title",)}
-    readonly_fields = ("created_at",)
+    readonly_fields = ("created_at", "updated_at")
     ordering = ("title",)
 
     inlines = (
@@ -151,12 +174,35 @@ class ProgrammeAdmin(admin.ModelAdmin):
     )
 
     fieldsets = (
-        ("Identification", {"fields": ("title", "slug", "cycle", "filiere", "diploma_awarded")}),
-        ("Duree & statut", {"fields": ("duration_years", "is_active", "is_featured")}),
-        ("Presentation generale", {"fields": ("short_description", "description")}),
-        ("Contenu Landing Page",
-         {"fields": ("learning_outcomes", "career_opportunities", "program_structure", "illustration")}),
-        ("Systeme", {"fields": ("created_at",)}),
+        ("Identification", {
+            "fields": ("title", "slug", "cycle", "filiere", "diploma_awarded")
+        }),
+        ("Durée & statut", {
+            "fields": ("duration_years", "is_active", "is_featured")
+        }),
+        ("Présentation générale", {
+            "fields": ("short_description", "description")
+        }),
+        # =============================================
+        # SECTION OBJECTIFS - VISIBLE PAR DÉFAUT
+        # =============================================
+        ("Objectifs de la formation (JSON)", {
+            "fields": ("learning_outcomes",),
+            "description": """
+            <strong>Format JSON requis :</strong><br>
+            <code>[{"icon": "chart", "color": "secondary", "title": "Titre", "desc": "Description"}]</code><br><br>
+            <strong>Icônes disponibles :</strong> chart, users, trending, lightbulb, target, briefcase, globe, code<br>
+            <strong>Couleurs disponibles :</strong> secondary (turquoise), accent (orange), primary (bleu)
+            """,
+        }),
+        ("Autres contenus Landing Page", {
+            "fields": ("career_opportunities", "program_structure", "illustration"),
+            "classes": ("collapse",),
+        }),
+        ("Système", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",),
+        }),
     )
     list_per_page = 25
 
@@ -170,6 +216,7 @@ class ProgrammeYearAdmin(admin.ModelAdmin):
     list_filter = ("year_number",)
     search_fields = ("programme__title",)
     ordering = ("programme", "year_number")
+    inlines = (FeeInline,)
     list_per_page = 25
 
 
@@ -229,7 +276,7 @@ class ProgrammeTabAdmin(admin.ModelAdmin):
     list_filter = ("tab_type", "is_active")
     search_fields = ("programme__title", "title")
     ordering = ("programme", "order")
-    inlines = [ProgrammeSectionInline]
+    inlines = (ProgrammeSectionInline,)
     list_per_page = 25
 
 
@@ -253,7 +300,7 @@ class CompetenceBlockAdmin(admin.ModelAdmin):
     list_display = ("programme", "title", "order")
     search_fields = ("programme__title", "title", "description")
     ordering = ("programme", "order")
-    inlines = [CompetenceItemInline]
+    inlines = (CompetenceItemInline,)
     list_per_page = 25
 
 

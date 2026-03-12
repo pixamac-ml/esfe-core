@@ -9,6 +9,8 @@ from .models import (
     LegalSidebarBlock,
     LegalPageHistory,
     InstitutionStat, ContactMessage, AboutSection,
+    Notification,
+    StatusHistory,
 )
 
 
@@ -177,19 +179,15 @@ class InstitutionStatAdmin(admin.ModelAdmin):
     )
 
 
+# ==========================================================
+# MESSAGES DE CONTACT
+# ==========================================================
 
-
-
-
-from django.contrib import admin, messages
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags, format_html
-from django.utils.safestring import mark_safe
 from django.conf import settings
 from django.utils import timezone
-
-from .models import ContactMessage
 
 
 @admin.register(ContactMessage)
@@ -233,17 +231,9 @@ class ContactMessageAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     list_per_page = 25
 
-    # ==================================
-    # AFFICHAGE RÉFÉRENCE COURTE
-    # ==================================
-
     def reference_short(self, obj):
         return str(obj.reference)[:8]
     reference_short.short_description = "Réf."
-
-    # ==================================
-    # RESPONSABLE
-    # ==================================
 
     def assigned_display(self, obj):
         if obj.assigned_to:
@@ -257,10 +247,6 @@ class ContactMessageAdmin(admin.ModelAdmin):
         )
     assigned_display.short_description = "Responsable"
 
-    # ==================================
-    # BADGE PRIORITÉ
-    # ==================================
-
     def colored_priority(self, obj):
         colors = {
             "low": "#94a3b8",
@@ -268,19 +254,13 @@ class ContactMessageAdmin(admin.ModelAdmin):
             "high": "#f97316",
             "urgent": "#dc2626",
         }
-
         color = colors.get(obj.priority, "#2563eb")
-
         return format_html(
             '<span style="color:white;background:{};padding:5px 10px;border-radius:20px;font-weight:600;">{}</span>',
             color,
             obj.get_priority_display()
         )
     colored_priority.short_description = "Priorité"
-
-    # ==================================
-    # BADGE STATUT
-    # ==================================
 
     def colored_status(self, obj):
         colors = {
@@ -289,9 +269,7 @@ class ContactMessageAdmin(admin.ModelAdmin):
             "answered": "#16a34a",
             "closed": "#64748b",
         }
-
         color = colors.get(obj.status, "#64748b")
-
         return format_html(
             '<span style="color:white;background:{};padding:5px 10px;border-radius:20px;font-weight:600;">{}</span>',
             color,
@@ -299,41 +277,27 @@ class ContactMessageAdmin(admin.ModelAdmin):
         )
     colored_status.short_description = "Statut"
 
-    # ==================================
-    # INDICATEUR SLA
-    # ==================================
-
     def sla_indicator(self, obj):
-
         if obj.status in ["answered", "closed"]:
             return mark_safe(
                 '<span style="color:#16a34a;font-weight:600;">✓ Traité</span>'
             )
-
         if obj.is_overdue:
             return mark_safe(
                 '<span style="color:white;background:#dc2626;padding:5px 10px;border-radius:20px;font-weight:600;">⚠ En retard</span>'
             )
-
         return format_html(
             '<span style="color:#2563eb;font-weight:600;">{} h restantes</span>',
             obj.remaining_hours
         )
     sla_indicator.short_description = "SLA"
 
-    # ==================================
-    # ENVOI EMAIL + WORKFLOW
-    # ==================================
-
     def save_model(self, request, obj, form, change):
-
         reply_added = "reply" in form.changed_data and obj.reply
         already_answered = obj.answered_at is not None
 
         if reply_added and not already_answered:
-
             staff_name = request.user.get_full_name() or request.user.username
-
             context = {
                 "message_obj": obj,
                 "institution_name": "École de Santé Félix Houphouët Boigny",
@@ -341,34 +305,21 @@ class ContactMessageAdmin(admin.ModelAdmin):
                 "contact_email": settings.DEFAULT_FROM_EMAIL,
                 "reply_date": timezone.now(),
             }
-
-            html_content = render_to_string(
-                "emails/contact_reply.html",
-                context
-            )
-
+            html_content = render_to_string("emails/contact_reply.html", context)
             text_content = strip_tags(html_content)
-
             email = EmailMultiAlternatives(
                 subject=f"[ESFé] Réponse à votre demande - {obj.get_subject_display()}",
                 body=text_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[obj.email],
             )
-
             email.attach_alternative(html_content, "text/html")
             email.send(fail_silently=False)
-
             obj.status = "answered"
             obj.answered_at = timezone.now()
-
             messages.success(request, "✔ Réponse envoyée avec succès.")
 
         super().save_model(request, obj, form, change)
-
-    # ==================================
-    # PROTECTION APRÈS CLÔTURE
-    # ==================================
 
     def has_change_permission(self, request, obj=None):
         if obj and obj.status == "closed":
@@ -376,17 +327,13 @@ class ContactMessageAdmin(admin.ModelAdmin):
         return super().has_change_permission(request, obj)
 
 
-from django.contrib import admin
-from django.utils.html import format_html
-from .models import AboutSection
-
+# ==========================================================
+# ABOUT SECTION
+# ==========================================================
 
 @admin.register(AboutSection)
 class AboutSectionAdmin(admin.ModelAdmin):
 
-    # ==============================
-    # LIST VIEW
-    # ==============================
     list_display = (
         "section_key",
         "title",
@@ -420,9 +367,6 @@ class AboutSectionAdmin(admin.ModelAdmin):
         "image_preview",
     )
 
-    # ==============================
-    # FIELDSETS
-    # ==============================
     fieldsets = (
         ("Identification", {
             "fields": (
@@ -431,7 +375,6 @@ class AboutSectionAdmin(admin.ModelAdmin):
                 "subtitle",
             )
         }),
-
         ("Contenu principal", {
             "fields": (
                 "content",
@@ -440,21 +383,18 @@ class AboutSectionAdmin(admin.ModelAdmin):
                 "highlights",
             )
         }),
-
         ("Apparence", {
             "fields": (
                 "icon",
                 "background",
             )
         }),
-
         ("Organisation", {
             "fields": (
                 "order",
                 "is_active",
             )
         }),
-
         ("Métadonnées", {
             "fields": (
                 "updated_at",
@@ -463,9 +403,6 @@ class AboutSectionAdmin(admin.ModelAdmin):
         }),
     )
 
-    # ==============================
-    # IMAGE PREVIEW
-    # ==============================
     def image_preview(self, obj):
         if obj.image:
             return format_html(
@@ -475,12 +412,139 @@ class AboutSectionAdmin(admin.ModelAdmin):
         return "-"
     image_preview.short_description = "Preview"
 
-    # ==============================
-    # OPTIONNEL — Empêche doublon de section_key
-    # ==============================
     def has_add_permission(self, request):
-        # Limite au nombre défini dans SECTION_CHOICES
         max_sections = len(AboutSection.SECTION_CHOICES)
         if AboutSection.objects.count() >= max_sections:
             return False
         return super().has_add_permission(request)
+
+
+# ==========================================================
+# NOTIFICATIONS
+# ==========================================================
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "notification_type_display",
+        "recipient_name",
+        "recipient_email",
+        "title",
+        "email_status_badge",
+        "sent_at",
+        "created_at",
+    )
+
+    list_filter = (
+        "notification_type",
+        "email_sent",
+        "created_at",
+    )
+
+    search_fields = (
+        "recipient_name",
+        "recipient_email",
+        "title",
+        "message",
+    )
+
+    readonly_fields = (
+        "recipient_email",
+        "recipient_name",
+        "notification_type",
+        "title",
+        "message",
+        "related_candidature",
+        "related_inscription",
+        "related_payment",
+        "email_sent",
+        "sent_at",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+    def notification_type_display(self, obj):
+        return obj.get_notification_type_display()
+    notification_type_display.short_description = "Type"
+
+    def email_status_badge(self, obj):
+        if obj.email_sent:
+            return format_html(
+                '<span style="color:white;background:#16a34a;padding:4px 8px;border-radius:4px;font-weight:600;">✓ Envoyé</span>'
+            )
+        return format_html(
+            '<span style="color:white;background:#f59e0b;padding:4px 8px;border-radius:4px;font-weight:600;">En attente</span>'
+        )
+    email_status_badge.short_description = "Email"
+
+    def has_add_permission(self, request):
+        return False
+
+from django.utils.safestring import mark_safe
+# ==========================================================
+# HISTORIQUE DES STATUTS
+# ==========================================================
+
+@admin.register(StatusHistory)
+class StatusHistoryAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "entity_display",
+        "old_status",
+        "new_status",
+        "changed_by_display",
+        "created_at",
+    )
+
+    list_filter = (
+        "new_status",
+        "created_at",
+    )
+
+    search_fields = (
+        "candidature__last_name",
+        "candidature__first_name",
+        "candidature__email",
+        "inscription__public_token",
+    )
+
+    # Plus de readonly_fields avec ForeignKey
+    # On utilise list_display avec des méthodes
+    readonly_fields = (
+        "old_status",
+        "new_status",
+        "comment",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+    def entity_display(self, obj):
+        if obj.candidature:
+            c = obj.candidature
+            return mark_safe(f"<span class='text-blue-600'>Candidature:</span> {c.last_name} {c.first_name}")
+        elif obj.inscription:
+            return mark_safe(f"<span class='text-green-600'>Inscription:</span> {obj.inscription.public_token}")
+        return "-"
+    entity_display.short_description = "Entité"
+    entity_display.admin_order_field = "inscription"
+
+    def changed_by_display(self, obj):
+        if obj.changed_by:
+            return obj.changed_by.get_full_name() or obj.changed_by.username
+        return "-"
+    changed_by_display.short_description = "Modifié par"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+

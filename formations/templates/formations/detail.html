@@ -6,162 +6,549 @@
 
 {% block content %}
 
-<!-- ================= HERO ================= -->
-<div class="relative">
 
-    {% component "formation_hero" programme=programme %}
-    {% endcomponent %}
+<!-- ========================================================= -->
+<!-- HERO -->
+<!-- ========================================================= -->
 
-    <!-- Bouton retour discret intégré au hero -->
-    <div class="absolute top-6 left-6 z-10">
-        <a href="{% url 'formations:list' %}"
-           class="inline-flex items-center gap-2
-                  text-xs uppercase tracking-wide font-medium
-                  text-white/70 hover:text-white
-                  transition duration-300">
+{% component "formation_hero" programme=programme %}
+{% endcomponent %}
 
-            ← Retour
-        </a>
-    </div>
+
+
+<!-- ========================================================= -->
+<!-- PRESENTATION + INFOS CLES -->
+<!-- ========================================================= -->
+
+<section id="presentation" class="py-20 bg-soft">
+
+<div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-3 gap-10 items-start">
+
+
+<!-- PRESENTATION (2/3) -->
+
+<div class="lg:col-span-2">
+
+<div class="bg-white rounded-3xl border border-gray-100 p-10 shadow-sm">
+
+<h2 class="text-3xl font-bold text-primary-800 mb-2">
+Présentation
+</h2>
+
+<p class="text-gray-400 text-sm mb-6">
+{{ programme.title }}
+</p>
+
+<div class="prose prose-lg max-w-none text-gray-600 leading-relaxed">
+{{ programme.description|linebreaks }}
+</div>
+
+<!-- DATE MISE A JOUR -->
+<p class="text-xs text-gray-400 mt-8 pt-6 border-t border-gray-100">
+Dernière mise à jour : {{ programme.created_at|date:"d F Y" }}
+</p>
+
+</div>
 
 </div>
 
 
-<!-- ================= CONTENU PRINCIPAL ================= -->
-<section class="py-20 bg-gradient-to-b from-white to-gray-50/50">
-  <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-3 gap-12">
 
-    <!-- ================= COLONNE PRINCIPALE ================= -->
-    <div class="lg:col-span-2 space-y-16">
+<!-- INFOS CLES (1/3) -->
 
-      <!-- Présentation -->
-      <section class="max-w-3xl">
-        <h2 class="text-3xl md:text-4xl font-bold text-primary mb-4">
-          Présentation de la formation
-        </h2>
-        <div class="prose max-w-none text-gray-600 leading-relaxed text-lg">
-          {{ programme.description|linebreaks }}
-        </div>
-      </section>
+<div>
 
-      {% component "formation_learning_outcomes"
-          learning_outcomes=programme.learning_outcomes
-      %}
-      {% endcomponent %}
+<div class="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm sticky top-6">
 
-      {% component "formation_career_opportunities"
-          career_opportunities=programme.career_opportunities
-          programme=programme
-          can_apply=can_apply
-      %}
-      {% endcomponent %}
+<h3 class="text-lg font-bold text-primary-800 mb-6">
+Infos clés
+</h3>
 
-      {% if has_fees %}
-        {% component "formation_finance"
-            years_with_totals=years_with_totals
-        %}
-        {% endcomponent %}
-      {% endif %}
+<ul class="space-y-5">
 
-      <!-- Approche spécifique selon le cycle -->
-      {% if cycle_type == "master" %}
-      <section class="max-w-3xl">
-        <div class="bg-white rounded-3xl p-8 shadow-lg border border-gray-100">
-          <div class="flex items-start gap-5">
-            <div class="flex-shrink-0">
-              <div class="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center">
-                <svg class="w-7 h-7 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                </svg>
-              </div>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xl font-bold text-primary mb-3">
-                Approche stratégique & leadership
-              </h3>
-              <p class="text-gray-600 leading-relaxed">
-                Cette formation de niveau Master met l'accent sur la conception,
-                le pilotage et l'évaluation des politiques de santé publique.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-      {% endif %}
+<!-- RENTREE -->
+<li class="flex items-center justify-between">
 
-      {% if cycle_type == "licence" %}
-      <section class="max-w-3xl">
-        <div class="bg-white rounded-3xl p-8 shadow-lg border border-gray-100">
-          <div class="flex items-start gap-5">
-            <div class="flex-shrink-0">
-              <div class="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center">
-                <svg class="w-7 h-7 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                </svg>
-              </div>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-xl font-bold text-primary mb-3">
-                Formation professionnalisante
-              </h3>
-              <p class="text-gray-600 leading-relaxed">
-                La formation de Licence vise l'acquisition des compétences
-                techniques fondamentales et l'intégration rapide dans le milieu professionnel.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-      {% endif %}
+<span class="flex items-center gap-3 text-gray-600">
+<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+<svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+</svg>
+</div>
+Rentrée
+</span>
 
-    </div>
+<span class="font-semibold text-primary-800">Septembre</span>
 
-    <!-- ================= SIDEBAR ================= -->
-    <aside class="lg:col-span-1 space-y-6">
+</li>
 
-      <!-- Admission Card -->
-      <div class="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 sticky top-8">
 
-        <h3 class="text-lg font-bold text-primary mb-6 flex items-center gap-3">
-          <svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
-          </svg>
-          Admission
-        </h3>
+<!-- DUREE -->
+<li class="flex items-center justify-between">
 
-        {% if can_apply %}
-          <a href="{% url 'admissions:apply' programme.slug %}"
-             class="block text-center bg-secondary text-white py-4 rounded-2xl
-                    font-semibold text-lg hover:bg-secondary/90 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
-            Candidater en ligne
-          </a>
+<span class="flex items-center gap-3 text-gray-600">
+<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+<svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+</svg>
+</div>
+Durée
+</span>
 
-          <p class="text-sm text-gray-500 text-center mt-4">
-            La candidature se fait entièrement en ligne
-          </p>
-        {% else %}
-          <div class="bg-gray-50 rounded-xl p-4 text-center">
-            <p class="text-sm text-gray-600">
-              Les inscriptions sont actuellement fermées
-            </p>
-          </div>
-        {% endif %}
+<span class="font-semibold text-primary-800">{{ programme.duration_years }} ans</span>
 
-      </div>
+</li>
 
-      {% if has_documents %}
-        {% component "formation_documents"
-            required_documents=required_documents
-        %}
-        {% endcomponent %}
-      {% endif %}
 
-      {% component "formation_trust_block" %}
-      {% endcomponent %}
+<!-- LANGUE -->
+<li class="flex items-center justify-between">
 
-    </aside>
+<span class="flex items-center gap-3 text-gray-600">
+<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+<svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+</svg>
+</div>
+Langue
+</span>
 
-  </div>
+<span class="font-semibold text-primary-800">Français</span>
+
+</li>
+
+
+<!-- CAMPUS -->
+<li class="flex items-center justify-between">
+
+<span class="flex items-center gap-3 text-gray-600">
+<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+<svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+</svg>
+</div>
+Campus
+</span>
+
+<span class="font-semibold text-primary-800">Dakar</span>
+
+</li>
+
+</ul>
+
+</div>
+
+</div>
+
+
+</div>
+
 </section>
+
+
+
+<!-- OBJECTIFS DE LA FORMATION -->
+{% if learning_objectives %}
+<section id="objectifs" class="py-20 bg-white">
+<div class="max-w-7xl mx-auto px-6">
+
+<div class="mb-12">
+<h2 class="text-3xl font-bold text-primary-800">Objectifs de la formation</h2>
+<p class="text-gray-500 mt-3">Les compétences clés développées tout au long de ce programme</p>
+</div>
+
+<div class="grid md:grid-cols-2 gap-6">
+{% for obj in learning_objectives %}
+<div class="bg-soft rounded-2xl p-8 flex items-start gap-5 hover:shadow-md transition">
+
+<div class="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0
+    {% if obj.color == 'secondary' %}bg-secondary/20{% elif obj.color == 'accent' %}bg-accent/20{% else %}bg-primary-100{% endif %}">
+<svg class="w-7 h-7 {% if obj.color == 'secondary' %}text-secondary{% elif obj.color == 'accent' %}text-accent{% else %}text-primary-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+{% if obj.icon == 'chart' %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+{% elif obj.icon == 'users' %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+{% elif obj.icon == 'trending' %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+{% elif obj.icon == 'lightbulb' %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+{% endif %}
+</svg>
+</div>
+
+<div>
+<h3 class="font-bold text-primary-800 mb-2">{{ obj.title }}</h3>
+<p class="text-gray-600 text-sm leading-relaxed">{{ obj.desc }}</p>
+</div>
+
+</div>
+{% endfor %}
+</div>
+
+</div>
+</section>
+
+
+{% endif %}
+
+<!-- ========================================================= -->
+<!-- ORGANISATION DE LA FORMATION -->
+<!-- ========================================================= -->
+
+{% if has_fees %}
+
+<section id="organisation" class="py-20 bg-soft">
+
+<div class="max-w-7xl mx-auto px-6">
+
+<!-- TITRE + DROPDOWN -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-10 gap-6">
+
+<div>
+<h2 class="text-3xl font-bold text-primary-800">
+Organisation de la formation
+</h2>
+<p class="text-gray-500 mt-2">
+Détail des frais par année d'études
+</p>
+</div>
+
+<!-- DROPDOWN FILTRER (optionnel) -->
+<div class="relative" x-data="{ open: false }">
+<button @click="open = !open"
+        class="flex items-center gap-2 bg-white border border-gray-200 px-5 py-3 rounded-xl text-primary-800 font-medium hover:border-primary-300 transition">
+    Tous alles
+    <svg class="w-4 h-4" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+</button>
+</div>
+
+</div>
+
+
+<!-- GRILLE 2 COLONNES CÔTE À CÔTE -->
+<div class="grid md:grid-cols-2 gap-6">
+
+{% for item in years_with_totals %}
+
+<div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+
+<!-- HEADER ANNÉE -->
+<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+
+<span class="inline-flex items-center gap-2 bg-primary-800 text-white px-5 py-2 rounded-full text-sm font-semibold">
+    {% if item.year.year_number == 1 %}
+    Année 1
+    {% else %}
+    {{ item.year.year_number }}<sup>ème</sup> année
+    {% endif %}
+</span>
+
+<!-- HEURES (si disponible) -->
+{% if item.year.hours %}
+<span class="flex items-center gap-2 text-gray-500 text-sm">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    {{ item.year.hours }} heures
+</span>
+{% endif %}
+
+</div>
+
+<!-- LIGNES DE FRAIS -->
+<div class="divide-y divide-gray-100">
+
+{% for fee in item.fees %}
+<div class="px-6 py-4 flex justify-between items-center">
+    <span class="flex items-center gap-3 text-gray-600">
+        <span class="w-2 h-2 rounded-full bg-gray-300"></span>
+        {{ fee.label }}
+    </span>
+    <span class="font-semibold text-primary-800">{{ fee.amount|intcomma }} FCFA</span>
+</div>
+{% endfor %}
+
+</div>
+
+<!-- TOTAL ANNUEL -->
+<div class="px-6 py-4 bg-soft flex justify-between items-center border-t border-gray-100">
+    <span class="font-semibold text-primary-800">Total annuel atteint</span>
+    <span class="font-bold text-secondary text-lg">{{ item.year_total|intcomma }} FCFA</span>
+</div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+</section>
+
+{% endif %}
+
+
+
+<!-- ========================================================= -->
+<!-- FINANCEMENT -->
+<!-- ========================================================= -->
+
+<section id="financement" class="py-20 bg-white">
+
+<div class="max-w-7xl mx-auto px-6">
+
+<h2 class="text-3xl font-bold text-primary-800 mb-10">
+Financement
+</h2>
+
+<div class="grid md:grid-cols-3 gap-6">
+
+<!-- CARTE 1 : COÛT DE LA FORMATION -->
+<div class="bg-soft rounded-2xl p-8 border border-gray-100">
+
+<div class="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center mb-5">
+<svg class="w-6 h-6 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+</svg>
+</div>
+
+<h3 class="font-bold text-primary-800 text-lg mb-3">
+Coût de la formation
+</h3>
+
+<p class="text-2xl font-bold text-secondary mb-2">
+{% if total_programme_cost %}
+{{ total_programme_cost|intcomma }} FCFA
+{% else %}
+—
+{% endif %}
+</p>
+
+<p class="text-gray-500 text-sm">
+sur {{ programme.duration_years }} ans
+</p>
+
+</div>
+
+
+<!-- CARTE 2 : MODALITÉS DE PAIEMENT -->
+<div class="bg-soft rounded-2xl p-8 border border-gray-100">
+
+<div class="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center mb-5">
+<svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+</svg>
+</div>
+
+<h3 class="font-bold text-primary-800 text-lg mb-4">
+Modalités de paiement
+</h3>
+
+<ul class="space-y-3">
+<li class="flex items-start gap-2 text-gray-600 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0"></span>
+    Échelonnement acquis en fois
+</li>
+<li class="flex items-start gap-2 text-gray-600 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0"></span>
+    Prélèvements automatique en différé
+</li>
+<li class="flex items-start gap-2 text-gray-600 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0"></span>
+    Financement par un tiers
+</li>
+</ul>
+
+</div>
+
+
+<!-- CARTE 3 : AIDES & BOURSES -->
+<div class="bg-soft rounded-2xl p-8 border border-gray-100">
+
+<div class="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mb-5">
+<svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+</svg>
+</div>
+
+<h3 class="font-bold text-primary-800 text-lg mb-4">
+Aides & bourses
+</h3>
+
+<ul class="space-y-3">
+<li class="flex items-start gap-2 text-gray-600 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 flex-shrink-0"></span>
+    Bourses d'excellence
+</li>
+<li class="flex items-start gap-2 text-gray-600 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 flex-shrink-0"></span>
+    Bourses sociales
+</li>
+<li class="flex items-start gap-2 text-gray-600 text-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 flex-shrink-0"></span>
+    Accès à un prêt étudiant
+</li>
+</ul>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- ADMISSIONS -->
+<!-- ========================================================= -->
+
+<section id="admissions" class="py-20 bg-soft">
+
+<div class="max-w-4xl mx-auto px-6">
+
+<div class="text-center mb-12">
+<h2 class="text-3xl font-bold text-primary-800 mb-3">
+Procédure d'admission
+</h2>
+<p class="text-gray-500">
+La procédure d'admission se fait entièrement en ligne
+</p>
+</div>
+
+
+<!-- ETAPES -->
+<div class="space-y-4">
+
+<!-- ETAPE 1 -->
+<div class="bg-white rounded-2xl p-6 flex items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition">
+
+<div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
+1
+</div>
+
+<div class="flex-1">
+<h3 class="font-semibold text-primary-800">Dépôt de la candidature en ligne</h3>
+<p class="text-gray-500 text-sm">Remplissez le formulaire et soumettez vos documents</p>
+</div>
+
+<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+</svg>
+
+</div>
+
+
+<!-- ETAPE 2 -->
+<div class="bg-white rounded-2xl p-6 flex items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition">
+
+<div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
+2
+</div>
+
+<div class="flex-1">
+<h3 class="font-semibold text-primary-800">Étude du dossier</h3>
+<p class="text-gray-500 text-sm">Notre équipe pédagogique examine votre candidature</p>
+</div>
+
+<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+</svg>
+
+</div>
+
+
+<!-- ETAPE 3 -->
+<div class="bg-white rounded-2xl p-6 flex items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition">
+
+<div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
+3
+</div>
+
+<div class="flex-1">
+<h3 class="font-semibold text-primary-800">Entretien de motivation</h3>
+<p class="text-gray-500 text-sm">Échange avec un membre du jury d'admission</p>
+</div>
+
+<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+</svg>
+
+</div>
+
+
+<!-- ETAPE 4 -->
+<div class="bg-white rounded-2xl p-6 flex items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition">
+
+<div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
+4
+</div>
+
+<div class="flex-1">
+<h3 class="font-semibold text-primary-800">Résultat et inscription</h3>
+<p class="text-gray-500 text-sm">Notification de la décision et finalisation de l'inscription</p>
+</div>
+
+<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+</svg>
+
+</div>
+
+</div>
+
+
+<!-- CTA -->
+{% if can_apply %}
+<div class="text-center mt-10">
+
+<a href="{% url 'admissions:apply' programme.slug %}"
+   class="inline-flex items-center gap-2 bg-secondary text-white px-10 py-4 rounded-xl font-semibold text-lg hover:bg-secondary-dark transition shadow-lg">
+
+Candidater maintenant
+
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+</svg>
+
+</a>
+
+</div>
+{% endif %}
+
+</div>
+
+</section>
+
+
+
+<!-- ========================================================= -->
+<!-- DOCUMENTS REQUIS -->
+<!-- ========================================================= -->
+
+{% if has_documents %}
+
+<section class="py-20 bg-white">
+
+<div class="max-w-4xl mx-auto px-6">
+
+{% component "formation_documents"
+required_documents=required_documents
+%}
+{% endcomponent %}
+
+</div>
+
+</section>
+
+{% endif %}
+
 
 {% endblock %}

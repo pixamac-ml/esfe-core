@@ -3,6 +3,7 @@
 from django.contrib import admin, messages
 from django.db import transaction
 from django.utils.html import format_html
+from django.utils import timezone
 import secrets
 
 from .models import Inscription
@@ -13,7 +14,7 @@ from admissions.models import Candidature
 # ==================================================
 # ACTION ADMIN : ACCEPTER CANDIDATURE
 # ==================================================
-@admin.action(description="✅ Accepter la candidature et créer l’inscription")
+@admin.action(description="✅ Accepter la candidature et creer l'inscription")
 def accepter_candidature(modeladmin, request, queryset):
 
     created_count = 0
@@ -46,23 +47,23 @@ def accepter_candidature(modeladmin, request, queryset):
     if created_count:
         modeladmin.message_user(
             request,
-            f"{created_count} inscription(s) créée(s) avec succès.",
+            f"{created_count} inscription(s) creee(s) avec succes.",
             level=messages.SUCCESS
         )
 
     if skipped_count:
         modeladmin.message_user(
             request,
-            f"{skipped_count} candidature(s) ignorée(s) "
-            f"(déjà acceptée ou inscription existante).",
+            f"{skipped_count} candidature(s) ignoree(s) "
+            f"(deja acceptee ou inscription existante).",
             level=messages.WARNING
         )
 
 
 # ==================================================
-# ACTION ADMIN : RÉGÉNÉRER CODE D’ACCÈS
+# ACTION ADMIN : REGENERER CODE D'ACCES
 # ==================================================
-@admin.action(description="🔁 Régénérer le code d'accès")
+@admin.action(description="Regenerer le code d'acces")
 def regenerate_access_code(modeladmin, request, queryset):
 
     for inscription in queryset:
@@ -71,9 +72,39 @@ def regenerate_access_code(modeladmin, request, queryset):
 
     modeladmin.message_user(
         request,
-        "Code(s) d’accès régénéré(s) avec succès.",
+        "Code(s) d'acces regeneré(s) avec succes.",
         level=messages.SUCCESS
     )
+
+
+# ==================================================
+# ACTIONS POUR CHANGER LE STATUT
+# ==================================================
+
+@admin.action(description="Passer en Active")
+def mark_active(modeladmin, request, queryset):
+    updated = queryset.exclude(status="active").update(status="active")
+    messages.success(request, f"{updated} inscription(s) passee(s) en Active.")
+
+@admin.action(description="Passer en Suspendue")
+def mark_suspended(modeladmin, request, queryset):
+    updated = queryset.update(status="suspended")
+    messages.success(request, f"{updated} inscription(s) suspendue(s).")
+
+@admin.action(description="Passer en Expiree")
+def mark_expired(modeladmin, request, queryset):
+    updated = queryset.update(status="expired")
+    messages.success(request, f"{updated} inscription(s) expiree(s).")
+
+@admin.action(description="Passer en Transferlee")
+def mark_transferred(modeladmin, request, queryset):
+    updated = queryset.update(status="transferred")
+    messages.success(request, f"{updated} inscription(s) transferee(s).")
+
+@admin.action(description="Passer en Terminee")
+def mark_completed(modeladmin, request, queryset):
+    updated = queryset.update(status="completed")
+    messages.success(request, f"{updated} inscription(s) terminee(s).")
 
 
 # ==================================================
@@ -130,25 +161,25 @@ class InscriptionAdmin(admin.ModelAdmin):
         ("Statut", {
             "fields": ("status",)
         }),
-        ("Finances (copie figée)", {
+        ("Finances (copie figee)", {
             "description": (
-                "Le montant à payer est copié depuis le programme "
-                "au moment de l’acceptation. "
-                "Il peut être ajusté ici en cas particulier."
+                "Le montant a payer est copie depuis le programme "
+                "au moment de l'acceptation. "
+                "Il peut etre ajuste ici en cas particulier."
             ),
             "fields": (
                 "amount_due",
                 "amount_paid",
             )
         }),
-        ("Sécurité d'accès", {
-            "description": "Code requis pour accéder au dossier étudiant.",
+        ("Securite d'acces", {
+            "description": "Code requis pour acceder au dossier etudiant.",
             "fields": (
                 "public_token",
                 "access_code",
             )
         }),
-        ("Système", {
+        ("Systeme", {
             "fields": (
                 "reference",
                 "created_at",
@@ -158,10 +189,10 @@ class InscriptionAdmin(admin.ModelAdmin):
 
 
     # ==================================================
-    # MÉTHODES D’AFFICHAGE
+    # METHODES D'AFFICHAGE
     # ==================================================
 
-    @admin.action(description="🔐 Générer code d'accès si absent")
+    @admin.action(description="Generer code d'acces si absent")
     def generate_missing_access_codes(modeladmin, request, queryset):
 
         generated = 0
@@ -174,7 +205,7 @@ class InscriptionAdmin(admin.ModelAdmin):
 
         modeladmin.message_user(
             request,
-            f"{generated} code(s) généré(s).",
+            f"{generated} code(s) genere(s).",
             level=messages.SUCCESS
         )
 
@@ -193,6 +224,9 @@ class InscriptionAdmin(admin.ModelAdmin):
             "created": "#0d6efd",
             "active": "#198754",
             "suspended": "#dc3545",
+            "expired": "#6c757d",
+            "transferred": "#fd7e14",
+            "completed": "#20c997",
         }
         return format_html(
             '<span style="padding:4px 8px; border-radius:4px; '
@@ -205,7 +239,7 @@ class InscriptionAdmin(admin.ModelAdmin):
     def amount_due_display(self, obj):
         return format_html("<strong>{} FCFA</strong>", obj.amount_due)
 
-    @admin.display(description="Payé")
+    @admin.display(description="Paye")
     def amount_paid_display(self, obj):
         return format_html("{} FCFA", obj.amount_paid)
 
@@ -216,24 +250,29 @@ class InscriptionAdmin(admin.ModelAdmin):
             obj.balance
         )
 
-    @admin.display(description="Code d'accès")
+    @admin.display(description="Code d'acces")
     def access_code_display(self, obj):
         return format_html(
             '<span style="font-weight:600; color:#0d6efd;">{}</span>',
             obj.access_code
         )
 
-    @admin.display(description="Lien public étudiant")
+    @admin.display(description="Lien public etudiant")
     def public_link(self, obj):
         return format_html(
             '<a href="{}" target="_blank" style="font-weight:600;">'
-            '🔗 Ouvrir le dossier</a>',
+            'Ouvrir le dossier</a>',
             obj.get_public_url()
         )
 
+    # AJOUT DES NOUVELLES ACTIONS
     actions = [
         accepter_candidature,
         regenerate_access_code,
         generate_missing_access_codes,
+        mark_active,
+        mark_suspended,
+        mark_expired,
+        mark_transferred,
+        mark_completed,
     ]
-

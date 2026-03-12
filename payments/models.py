@@ -1,8 +1,7 @@
-# payments/models.py
-
 from django.db import models, transaction
 from django.utils import timezone
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
 from django.db.models import Sum
 
 from inscriptions.models import Inscription
@@ -13,6 +12,7 @@ from payments.utils.pdf import render_pdf
 from students.services.create_student import (
     create_student_after_first_payment
 )
+
 from students.services.email import (
     send_student_credentials_email,
     send_payment_confirmation_email
@@ -48,8 +48,10 @@ class PaymentAgent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
+
         if not self.agent_code:
             self.agent_code = secrets.token_hex(3).upper()
+
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -79,11 +81,14 @@ class CashPaymentSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def generate_code(self):
+
         self.verification_code = str(random.randint(100000, 999999))
         self.expires_at = timezone.now() + timedelta(minutes=5)
+
         self.save(update_fields=["verification_code", "expires_at"])
 
     def is_valid(self, code):
+
         return (
             not self.is_used
             and self.verification_code == code
@@ -105,10 +110,14 @@ class Payment(models.Model):
         ("bank_transfer", "Virement bancaire"),
     )
 
+    STATUS_PENDING = "pending"
+    STATUS_VALIDATED = "validated"
+    STATUS_CANCELLED = "cancelled"
+
     STATUS_CHOICES = (
-        ("pending", "En attente"),
-        ("validated", "Validé"),
-        ("cancelled", "Annulé"),
+        (STATUS_PENDING, "En attente"),
+        (STATUS_VALIDATED, "Validé"),
+        (STATUS_CANCELLED, "Annulé"),
     )
 
     inscription = models.ForeignKey(
@@ -138,7 +147,7 @@ class Payment(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default="pending",
+        default=STATUS_PENDING,
         db_index=True
     )
 
@@ -173,6 +182,43 @@ class Payment(models.Model):
         return f"{self.amount} FCFA – {self.inscription.reference}"
 
     # ==================================================
+    # VALIDATION MÉTIER
+    # ==================================================
+    def clean(self):
+
+        if self.amount <= 0:
+            raise ValidationError("Le montant doit être supérieur à zéro.")
+
+        inscription = self.inscription
+
+        if inscription.status in ["cancelled", "expired"]:
+            raise ValidationError(
+                "Impossible de payer une inscription annulée ou expirée."
+            )
+
+        if inscription.status == "completed":
+            raise ValidationError(
+                "L'inscription est déjà terminée."
+            )
+
+        # Vérifier dépassement incohérent
+        total_paid = (
+            inscription.payments
+            .filter(status="validated")
+            .aggregate(total=Sum("amount"))["total"]
+            or 0
+        )
+
+        if self.status == self.STATUS_VALIDATED:
+
+            future_total = total_paid + self.amount
+
+            if future_total > inscription.amount_due * 2:
+                raise ValidationError(
+                    "Montant incohérent détecté."
+                )
+
+    # ==================================================
     # PIPELINE MÉTIER SÉCURISÉ
     # ==================================================
     def save(self, *args, **kwargs):
@@ -180,32 +226,42 @@ class Payment(models.Model):
         previous_status = None
 
         if self.pk:
+
             previous_status = (
                 Payment.objects.only("status")
                 .get(pk=self.pk)
                 .status
             )
 
-            # 🔒 Empêcher rétrogradation d’un paiement validé
-            if previous_status == "validated" and self.status != "validated":
-                raise ValueError("Un paiement validé ne peut pas être modifié.")
+            if previous_status == self.STATUS_VALIDATED and self.status != self.STATUS_VALIDATED:
+                raise ValueError(
+                    "Un paiement validé ne peut pas être modifié."
+                )
+
+        self.full_clean()
 
         with transaction.atomic():
 
             super().save(*args, **kwargs)
 
             just_validated = (
-                self.status == "validated"
-                and previous_status != "validated"
+                self.status == self.STATUS_VALIDATED
+                and previous_status != self.STATUS_VALIDATED
             )
 
             if not just_validated:
                 return
 
-            # 1️⃣ Mise à jour financière inscription
+            # ==================================================
+            # MISE À JOUR FINANCIÈRE INSCRIPTION
+            # ==================================================
+
             self.inscription.update_financial_state()
 
-            # 2️⃣ Génération reçu UNIQUE
+            # ==================================================
+            # GÉNÉRATION REÇU
+            # ==================================================
+
             if not self.receipt_number:
 
                 self.receipt_number = generate_receipt_number(self)
@@ -230,24 +286,28 @@ class Payment(models.Model):
                     update_fields=["receipt_number", "receipt_pdf"]
                 )
 
-        # ==========================================
-        # ACTIONS POST-COMMIT SÉCURISÉES
-        # ==========================================
+        # ==================================================
+        # ACTIONS POST-COMMIT
+        # ==================================================
+
         transaction.on_commit(
             lambda: self._post_commit_actions()
         )
 
     # ==================================================
-    # POST-COMMIT
+    # ACTIONS APRÈS COMMIT
     # ==================================================
     def _post_commit_actions(self):
 
         result = create_student_after_first_payment(self.inscription)
 
         if result:
+
             send_student_credentials_email(
                 student=result["student"],
                 raw_password=result["password"]
             )
+
         else:
+
             send_payment_confirmation_email(payment=self)

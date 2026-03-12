@@ -1,0 +1,68 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2 style="color:#1e4f6f; margin:0 0 20px 0; font-size:20px;">
+    Bonjour {{ recipient_name }},
+</h2>
+
+<div style="background:#f8fafc; border-left:4px solid #1db5b0; padding:20px; margin:25px 0; border-radius:0 8px 8px 0;">
+    <p style="margin:0; font-size:16px; color:#334155;">
+        {{ message }}
+    </p>
+</div>
+
+{% if candidate_reference %}
+<p style="margin:20px 0 10px 0; color:#64748b; font-size:13px;">
+    <strong>Reference de votre candidature :</strong> {{ candidate_reference }}
+</p>
+{% endif %}
+
+{% if programme_name %}
+<p style="margin:10px 0; color:#64748b; font-size:13px;">
+    <strong>Formation :</strong> {{ programme_name }}
+</p>
+{% endif %}
+
+{% if required_documents %}
+<div style="margin:25px 0; padding:20px; background:#fef3c7; border-radius:8px;">
+    <h3 style="color:#b45309; margin:0 0 15px 0; font-size:16px;">
+        Documents a televerser :
+    </h3>
+    <ul style="margin:0; padding-left:20px; color:#92400e;">
+        {% for doc in required_documents %}
+        <li style="margin-bottom:8px;">{{ doc }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if next_steps %}
+<div style="margin:25px 0; padding:20px; background:#ecfdf5; border-radius:8px;">
+    <h3 style="color:#047857; margin:0 0 15px 0; font-size:16px;">
+        Prochaines etapes :
+    </h3>
+    <ul style="margin:0; padding-left:20px; color:#065f46;">
+        {% for step in next_steps %}
+        <li style="margin-bottom:8px;">{{ step }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<p style="margin-top:30px; color:#64748b; font-size:14px;">
+    Vous pouvez suivre l'etat de votre dossier en vous connectant sur votre espace candidat.
+</p>
+
+{% endblock %}
+
+{% block cta_button %}
+<tr>
+    <td style="padding:0 40px 40px 40px; text-align:center;">
+        <a href="{{ dashboard_url }}"
+           style="display:inline-block; background:#1db5b0; color:#ffffff; padding:14px 32px;
+                  text-decoration:none; border-radius:8px; font-weight:600; font-size:15px;">
+            Voir mon dossier
+        </a>
+    </td>
+</tr>
+{% endblock %}

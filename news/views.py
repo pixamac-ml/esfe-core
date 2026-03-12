@@ -264,93 +264,105 @@ from .models import Event, EventType, MediaItem
 
 
 # ==========================================================
-# EVENT LIST VIEW
+# EVENT LIST VIEW (avec mode événements / photos)
 # ==========================================================
 
 def event_list_view(request):
-
-    events_queryset = (
-        Event.objects
-        .filter(is_published=True)
-        .select_related("event_type")
-        .prefetch_related(
-            Prefetch(
-                "media_items",
-                queryset=MediaItem.objects.only(
-                    "id",
-                    "media_type",
-                    "thumbnail",
-                    "video_url",
-                    "video_file",
-                    "is_featured",
-                )
-            )
-        )
-    )
+    # ========================
+    # MODE DE VUE
+    # ========================
+    view_mode = request.GET.get("mode", "events")  # 'events' ou 'photos'
 
     # ========================
     # FILTRAGE PAR TYPE
     # ========================
-
     type_slug = request.GET.get("type")
-    if type_slug:
-        events_queryset = events_queryset.filter(event_type__slug=type_slug)
 
-    # ========================
-    # FILTRAGE PAR ANNÉE
-    # ========================
-
-    year = request.GET.get("year")
-    if year and year.isdigit():
-        events_queryset = events_queryset.filter(event_date__year=int(year))
-
-    # ========================
-    # ANNOTATIONS
-    # ========================
-
-    events_queryset = events_queryset.annotate(
-        total_media=Count("media_items", distinct=True),
-        total_images=Count(
-            "media_items",
-            filter=Q(media_items__media_type=MediaItem.IMAGE),
-            distinct=True
-        ),
-        total_videos=Count(
-            "media_items",
-            filter=Q(media_items__media_type=MediaItem.VIDEO),
-            distinct=True
-        ),
-    )
-
-    # ========================
-    # PAGINATION
-    # ========================
-
-    paginator = Paginator(events_queryset, 9)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-    # ========================
-    # SIDEBAR
-    # ========================
-
+    # Types d'événements pour filtres
     event_types = EventType.objects.filter(is_active=True)
 
-    years = (
-        Event.objects
-        .filter(is_published=True)
-        .dates("event_date", "year", order="DESC")
-    )
+    # ========================
+    # MODE ÉVÉNEMENTS
+    # ========================
+    if view_mode == "events":
 
-    context = {
-        "page_obj": page_obj,
-        "event_types": event_types,
-        "current_type": type_slug,
-        "years": years,
-        "current_year": year,
-    }
+        events_queryset = (
+            Event.objects
+            .filter(is_published=True)
+            .select_related("event_type")
+            .prefetch_related(
+                Prefetch(
+                    "media_items",
+                    queryset=MediaItem.objects.only(
+                        "id", "media_type", "thumbnail", "video_url", "video_file", "is_featured"
+                    )
+                )
+            )
+        )
+
+        if type_slug:
+            events_queryset = events_queryset.filter(event_type__slug=type_slug)
+
+        # Annotations compteurs
+        events_queryset = events_queryset.annotate(
+            total_media=Count("media_items", distinct=True),
+            total_images=Count(
+                "media_items",
+                filter=Q(media_items__media_type=MediaItem.IMAGE),
+                distinct=True
+            ),
+            total_videos=Count(
+                "media_items",
+                filter=Q(media_items__media_type=MediaItem.VIDEO),
+                distinct=True
+            ),
+        ).order_by("-event_date")
+
+        # Pagination événements
+        paginator = Paginator(events_queryset, 9)
+        page_number = request.GET.get("page")
+        page_obj = paginator.get_page(page_number)
+
+        context = {
+            "view_mode": view_mode,
+            "page_obj": page_obj,
+            "event_types": event_types,
+            "current_type": type_slug,
+        }
+
+    # ========================
+    # MODE PHOTOS
+    # ========================
+    else:
+
+        photos_queryset = (
+            MediaItem.objects
+            .filter(
+                media_type=MediaItem.IMAGE,
+                event__is_published=True
+            )
+            .select_related("event", "event__event_type")
+            .order_by("-created_at")
+        )
+
+        if type_slug:
+            photos_queryset = photos_queryset.filter(event__event_type__slug=type_slug)
+
+        # Pagination photos
+        paginator = Paginator(photos_queryset, 30)
+        page_number = request.GET.get("page")
+        photos_page = paginator.get_page(page_number)
+
+        context = {
+            "view_mode": view_mode,
+            "photos": photos_page,
+            "photos_page": photos_page,
+            "event_types": event_types,
+            "current_type": type_slug,
+        }
 
     return render(request, "news/event_list.html", context)
+
 
 
 # ==========================================================
@@ -387,7 +399,7 @@ def event_detail_view(request, slug):
     ]
 
     # ========================
-    # RELATED EVENTS
+    # RELATED EVENTS (CORRIGÉ)
     # ========================
 
     related_events = (
@@ -397,13 +409,6 @@ def event_detail_view(request, slug):
             is_published=True
         )
         .exclude(id=event.id)
-        .select_related("event_type")
-        .only(
-            "title",
-            "slug",
-            "cover_thumbnail",
-            "event_date"
-        )
         .order_by("-event_date")[:4]
     )
 

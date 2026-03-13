@@ -2,267 +2,384 @@
 {% load humanize %}
 {% load custom_filters %}
 
-{% block dashboard_title %}Vue Globale{% endblock %}
-{% block dashboard_subtitle %}Statistiques et indicateurs clés de l'établissement{% endblock %}
+{% block dashboard_title %}Vue Globale - Direction{% endblock %}
+{% block dashboard_subtitle %}Statistiques consolidées de toutes les annexes{% endblock %}
 
 {% block dashboard_content %}
-<!-- ================= STATS CARDS ================= -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <!-- Total Étudiants -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-        <div class="flex items-center justify-between mb-3">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(30, 79, 111, 0.1);">
-                <i class="fas fa-user-graduate text-xl" style="color: #1e4f6f;"></i>
+<div class="space-y-8">
+
+    <!-- ============================================== -->
+    <!-- STATISTIQUES GLOBALES -->
+    <!-- ============================================== -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+
+        <!-- Total Candidatures -->
+        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm text-slate-500 mb-1">Total Candidatures</p>
+                    <h3 class="text-3xl font-bold" style="color: #1e4f6f;">{{ total_candidatures|default:0|intcomma }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(30, 79, 111, 0.1);">
+                    <i class="fas fa-users text-xl" style="color: #1e4f6f;"></i>
+                </div>
             </div>
         </div>
-        <p class="text-3xl font-bold" style="color: #1e4f6f;">{{ total_students|default:0 }}</p>
-        <p class="text-sm text-slate-500 mt-1">Étudiants actifs</p>
+
+        <!-- Total Inscriptions -->
+        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm text-slate-500 mb-1">Inscriptions Actives</p>
+                    <h3 class="text-3xl font-bold" style="color: #1db5b0;">{{ total_inscriptions|default:0|intcomma }}</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(29, 181, 176, 0.1);">
+                    <i class="fas fa-user-check text-xl" style="color: #1db5b0;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenus Totaux -->
+        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm text-slate-500 mb-1">Revenus Totaux</p>
+                    <h3 class="text-2xl font-bold" style="color: #f39c12;">{{ total_revenue|default:0|intcomma }} <span class="text-sm font-normal">F</span></h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(243, 156, 18, 0.1);">
+                    <i class="fas fa-coins text-xl" style="color: #f39c12;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenus du Mois -->
+        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm text-slate-500 mb-1">Revenus du Mois</p>
+                    <h3 class="text-2xl font-bold text-green-600">{{ monthly_revenue|default:0|intcomma }} <span class="text-sm font-normal">F</span></h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-green-50">
+                    <i class="fas fa-chart-line text-xl text-green-500"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Taux de Conversion -->
+        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm text-slate-500 mb-1">Taux de Conversion</p>
+                    <h3 class="text-3xl font-bold text-slate-700">{{ conversion_rate|default:0 }}%</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-100">
+                    <i class="fas fa-percentage text-xl text-slate-500"></i>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- Total Inscriptions -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-        <div class="flex items-center justify-between mb-3">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(59, 130, 246, 0.1);">
-                <i class="fas fa-user-plus text-xl" style="color: #3b82f6;"></i>
-            </div>
-        </div>
-        <p class="text-3xl font-bold" style="color: #3b82f6;">{{ total_inscriptions|default:0 }}</p>
-        <p class="text-sm text-slate-500 mt-1">Inscriptions actives</p>
-    </div>
-
-    <!-- Total Candidatures -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-        <div class="flex items-center justify-between mb-3">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(139, 92, 246, 0.1);">
-                <i class="fas fa-file-alt text-xl" style="color: #8b5cf6;"></i>
-            </div>
-        </div>
-        <p class="text-3xl font-bold" style="color: #8b5cf6;">{{ total_candidatures|default:0 }}</p>
-        <p class="text-sm text-slate-500 mt-1">Candidatures</p>
-    </div>
-
-    <!-- Revenus Totaux -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-        <div class="flex items-center justify-between mb-3">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(29, 181, 176, 0.1);">
-                <i class="fas fa-coins text-xl" style="color: #1db5b0;"></i>
-            </div>
-        </div>
-        <p class="text-3xl font-bold text-green-600">{{ total_revenue|intcomma }} F</p>
-        <p class="text-sm text-slate-500 mt-1">Revenus totaux</p>
-    </div>
-</div>
-
-<!-- ================= SECONDARY STATS ================= -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <!-- Revenus ce mois -->
-    <div class="rounded-2xl shadow-lg p-6 text-white" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-white/70 text-sm mb-1">Revenus ce mois</p>
-                <p class="text-4xl font-bold">{{ monthly_revenue|intcomma }} F</p>
-            </div>
-            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
-                <i class="fas fa-calendar-alt text-3xl"></i>
-            </div>
-        </div>
-        <div class="mt-4 pt-4 border-t border-white/20">
-            <p class="text-sm text-white/70">
-                <i class="fas fa-chart-line mr-2"></i>
-                {% if conversion_rate > 0 %}Taux de conversion: {{ conversion_rate }}%{% else %}Aucune inscription encore{% endif %}
-            </p>
-        </div>
-    </div>
-
-    <!-- Taux de conversion -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-slate-500 text-sm mb-1">Taux de conversion</p>
-                <p class="text-4xl font-bold" style="color: #1db5b0;">{{ conversion_rate }}%</p>
-            </div>
-            <div class="w-16 h-16 rounded-xl flex items-center justify-center" style="background-color: rgba(29, 181, 176, 0.1);">
-                <i class="fas fa-percentage text-3xl" style="color: #1db5b0;"></i>
-            </div>
-        </div>
-        <p class="text-sm text-slate-500 mt-3">{{ total_inscriptions }} inscriptions sur {{ total_candidatures }} candidatures</p>
-        <!-- Progress bar -->
-        <div class="mt-4">
-            <div class="w-full bg-slate-100 rounded-full h-2.5">
-                <div class="h-2.5 rounded-full" style="width: {{ conversion_rate }}%; background: linear-gradient(90deg, #1db5b0 0%, #1e4f6f 100%);"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ================= MAIN CONTENT ================= -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <!-- Programmes populaires -->
+    <!-- ============================================== -->
+    <!-- PERFORMANCE PAR ANNEXE -->
+    <!-- ============================================== -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100" style="background-color: #f4fbfb;">
-            <h2 class="font-bold text-lg" style="color: #1e4f6f;">
-                <i class="fas fa-chart-bar mr-2" style="color: #1db5b0;"></i>
-                Programmes les plus demandés
-            </h2>
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(30, 79, 111, 0.1);">
+                    <i class="fas fa-building" style="color: #1e4f6f;"></i>
+                </div>
+                <h2 class="text-lg font-bold" style="color: #1e4f6f;">Performance par Annexe</h2>
+            </div>
+            <span class="px-3 py-1 rounded-full text-xs font-medium" style="background: rgba(29, 181, 176, 0.1); color: #1db5b0;">
+                {{ branch_stats|length }} annexe{{ branch_stats|length|pluralize:"s" }}
+            </span>
         </div>
-        <div class="p-4">
-            {% if programmes_popularity %}
-            <div class="space-y-4">
-                {% for prog in programmes_popularity %}
-                <div class="flex items-center justify-between">
-                    <div class="flex-1 min-w-0 mr-4">
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-sm font-semibold text-slate-800 truncate">
-                                {{ prog.candidature__programme__title|default:"Programme" }}
+
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-slate-50 text-left text-sm text-slate-500">
+                        <th class="px-6 py-4 font-semibold">Annexe</th>
+                        <th class="px-6 py-4 font-semibold text-center">Candidatures</th>
+                        <th class="px-6 py-4 font-semibold text-center">Acceptées</th>
+                        <th class="px-6 py-4 font-semibold text-center">Inscriptions</th>
+                        <th class="px-6 py-4 font-semibold text-center">Agents</th>
+                        <th class="px-6 py-4 font-semibold text-right">Revenus Total</th>
+                        <th class="px-6 py-4 font-semibold text-right">Ce Mois</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for stat in branch_stats %}
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(30, 79, 111, 0.1);">
+                                    <i class="fas fa-map-marker-alt" style="color: #1e4f6f;"></i>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-slate-800">{{ stat.branch.name }}</p>
+                                    <p class="text-xs text-slate-400">{{ stat.branch.code }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-700">
+                                {{ stat.candidatures_total }}
                             </span>
-                            <span class="text-sm font-bold" style="color: #1e4f6f;">{{ prog.count }}</span>
-                        </div>
-                        <!-- Barre de progression -->
-                        <div class="w-full bg-slate-100 rounded-full h-2">
-                            <div class="h-2 rounded-full" style="width: {% widthratio prog.count programmes_popularity.0.count 100 %}%; background: linear-gradient(90deg, #1db5b0 0%, #1e4f6f 100%);"></div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="text-center py-8">
-                <div class="w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center" style="background-color: rgba(30, 79, 111, 0.1);">
-                    <i class="fas fa-chart-bar text-2xl" style="color: #1e4f6f;"></i>
-                </div>
-                <p class="text-slate-500">Aucune donnée disponible</p>
-            </div>
-            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" style="background: rgba(29, 181, 176, 0.1); color: #1db5b0;">
+                                {{ stat.candidatures_accepted }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-600">
+                                {{ stat.inscriptions_count }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-50 text-purple-600">
+                                {{ stat.agents_count }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="font-bold" style="color: #f39c12;">{{ stat.total_revenue|intcomma }}</span>
+                            <span class="text-xs text-slate-400">F</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="font-bold text-green-600">{{ stat.monthly_revenue|intcomma }}</span>
+                            <span class="text-xs text-slate-400">F</span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-slate-400">
+                            <i class="fas fa-inbox text-4xl mb-3"></i>
+                            <p>Aucune annexe configurée</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if branch_stats %}
+                <tfoot class="bg-slate-50 font-bold">
+                    <tr>
+                        <td class="px-6 py-4 text-slate-700">TOTAL</td>
+                        <td class="px-6 py-4 text-center text-slate-700">{{ total_candidatures }}</td>
+                        <td class="px-6 py-4 text-center text-slate-700">-</td>
+                        <td class="px-6 py-4 text-center text-slate-700">{{ total_inscriptions }}</td>
+                        <td class="px-6 py-4 text-center text-slate-700">-</td>
+                        <td class="px-6 py-4 text-right" style="color: #f39c12;">{{ total_revenue|intcomma }} F</td>
+                        <td class="px-6 py-4 text-right text-green-600">{{ monthly_revenue|intcomma }} F</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
         </div>
     </div>
 
-    <!-- Statut des admissions -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100" style="background-color: #f4fbfb;">
-            <h2 class="font-bold text-lg" style="color: #1e4f6f;">
-                <i class="fas fa-chart-pie mr-2" style="color: #8b5cf6;"></i>
-                Répartition des candidatures
-            </h2>
+    <!-- ============================================== -->
+    <!-- CLASSEMENT AGENTS + PROGRAMMES POPULAIRES -->
+    <!-- ============================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Top Agents -->
+        <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(243, 156, 18, 0.1);">
+                        <i class="fas fa-trophy" style="color: #f39c12;"></i>
+                    </div>
+                    <h2 class="text-lg font-bold" style="color: #1e4f6f;">Top Agents de Paiement</h2>
+                </div>
+                <span class="px-3 py-1 rounded-full text-xs font-medium" style="background: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
+                    Tous temps
+                </span>
+            </div>
+
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-slate-50 text-left text-sm text-slate-500">
+                            <th class="px-6 py-3 font-semibold w-16">Rang</th>
+                            <th class="px-6 py-3 font-semibold">Agent</th>
+                            <th class="px-6 py-3 font-semibold">Annexe</th>
+                            <th class="px-6 py-3 font-semibold text-right">Total Collecté</th>
+                            <th class="px-6 py-3 font-semibold text-right">Ce Mois</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in agent_ranking %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4">
+                                {% if forloop.counter == 1 %}
+                                    <span class="w-8 h-8 rounded-full flex items-center justify-center text-white" style="background: #f39c12;">
+                                        <i class="fas fa-crown text-xs"></i>
+                                    </span>
+                                {% elif forloop.counter == 2 %}
+                                    <span class="w-8 h-8 rounded-full flex items-center justify-center bg-slate-400 text-white">
+                                        <i class="fas fa-medal text-xs"></i>
+                                    </span>
+                                {% elif forloop.counter == 3 %}
+                                    <span class="w-8 h-8 rounded-full flex items-center justify-center bg-amber-700 text-white">
+                                        <i class="fas fa-award text-xs"></i>
+                                    </span>
+                                {% else %}
+                                    <span class="text-slate-500 font-bold pl-2">{{ forloop.counter }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
+                                        {{ item.agent.user.first_name.0|upper|default:"?" }}{{ item.agent.user.last_name.0|upper|default:"?" }}
+                                    </div>
+                                    <div>
+                                        <span class="font-medium text-slate-800">{{ item.agent.user.get_full_name|default:item.agent.user.username }}</span>
+                                        <p class="text-xs text-slate-400">{{ item.agent.agent_code }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
+                                    {{ item.branch.name|default:"Non assigné" }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <span class="font-bold" style="color: #f39c12;">{{ item.total_revenue|intcomma }}</span>
+                                <span class="text-xs text-slate-400">F</span>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <span class="font-bold text-green-600">{{ item.monthly_revenue|intcomma }}</span>
+                                <span class="text-xs text-slate-400">F</span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-8 text-center text-slate-400">
+                                Aucun agent de paiement
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <div class="p-4">
-            {% if admission_stats %}
-            <div class="space-y-3">
-                {% for stat in admission_stats %}
+
+        <!-- Programmes Populaires -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100" style="background-color: #f4fbfb;">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(29, 181, 176, 0.1);">
+                        <i class="fas fa-graduation-cap" style="color: #1db5b0;"></i>
+                    </div>
+                    <h2 class="text-lg font-bold" style="color: #1e4f6f;">Top Programmes</h2>
+                </div>
+            </div>
+
+            <div class="p-4 space-y-3">
+                {% for prog in programmes_popularity %}
                 <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50">
                     <div class="flex items-center gap-3">
-                        <span class="w-3 h-3 rounded-full
-                            {% if stat.status == 'submitted' %}bg-slate-400
-                            {% elif stat.status == 'under_review' %}bg-blue-500
-                            {% elif stat.status == 'to_complete' %}bg-amber-500
-                            {% elif stat.status == 'accepted' %}bg-green-500
-                            {% elif stat.status == 'accepted_with_reserve' %}bg-teal-500
-                            {% else %}bg-red-500{% endif %}">
+                        <span class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm
+                            {% if forloop.counter == 1 %}text-white{% else %}text-slate-600 bg-slate-200{% endif %}"
+                            {% if forloop.counter == 1 %}style="background: #1db5b0;"{% endif %}>
+                            {{ forloop.counter }}
                         </span>
-                        <span class="text-sm text-slate-600 font-medium">
-                            {% if stat.status == 'submitted' %}Soumises
-                            {% elif stat.status == 'under_review' %}En analyse
-                            {% elif stat.status == 'to_complete' %}À compléter
-                            {% elif stat.status == 'accepted' %}Acceptées
-                            {% elif stat.status == 'accepted_with_reserve' %}Avec réserve
-                            {% else %}Refusées{% endif %}
+                        <span class="text-sm font-medium text-slate-700 truncate" style="max-width: 150px;">
+                            {{ prog.candidature__programme__title }}
                         </span>
                     </div>
-                    <span class="font-bold text-slate-800">{{ stat.count }}</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-bold" style="background: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
+                        {{ prog.count }}
+                    </span>
+                </div>
+                {% empty %}
+                <div class="text-center py-6 text-slate-400">
+                    <i class="fas fa-book text-2xl mb-2"></i>
+                    <p class="text-sm">Aucune inscription</p>
                 </div>
                 {% endfor %}
             </div>
-            {% else %}
-            <div class="text-center py-8">
-                <div class="w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center" style="background-color: rgba(139, 92, 246, 0.1);">
-                    <i class="fas fa-chart-pie text-2xl" style="color: #8b5cf6;"></i>
-                </div>
-                <p class="text-slate-500">Aucune donnée disponible</p>
-            </div>
-            {% endif %}
         </div>
-    </div>
-</div>
 
-<!-- ================= RECENT ACTIVITIES ================= -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Dernières inscriptions -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100" style="background-color: #f4fbfb;">
-            <h2 class="font-bold text-lg" style="color: #1e4f6f;">
-                <i class="fas fa-user-plus mr-2" style="color: #1db5b0;"></i>
-                Dernières inscriptions
-            </h2>
-        </div>
-        <div class="p-4 max-h-[400px] overflow-y-auto custom-scrollbar">
-            {% if recent_inscriptions %}
-            <div class="space-y-3">
+    </div>
+
+    <!-- ============================================== -->
+    <!-- ACTIVITÉS RÉCENTES -->
+    <!-- ============================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Inscriptions Récentes -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
+                <h2 class="font-bold text-lg" style="color: #1e4f6f;">
+                    <i class="fas fa-user-plus mr-2" style="color: #1db5b0;"></i>
+                    Inscriptions Récentes
+                </h2>
+            </div>
+            <div class="p-4 max-h-[400px] overflow-y-auto custom-scrollbar">
                 {% for ins in recent_inscriptions %}
-                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white text-sm" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
                             {{ ins.candidature.first_name.0|upper }}{{ ins.candidature.last_name.0|upper }}
                         </div>
                         <div>
-                            <p class="font-semibold text-slate-800">{{ ins.candidature.full_name }}</p>
-                            <p class="text-sm text-slate-500">{{ ins.candidature.programme.title|truncatechars:25 }}</p>
+                            <p class="font-medium text-slate-800 text-sm">{{ ins.candidature.full_name }}</p>
+                            <p class="text-xs text-slate-400">{{ ins.candidature.programme.title|truncatechars:25 }}</p>
                         </div>
                     </div>
                     <div class="text-right">
-                        <p class="font-semibold text-slate-700">{{ ins.amount_due|intcomma }} F</p>
-                        <p class="text-xs text-slate-400">{{ ins.created_at|date:"d/m/Y" }}</p>
+                        <span class="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
+                            {{ ins.candidature.branch.name|default:"N/A" }}
+                        </span>
+                        <p class="text-xs text-slate-400 mt-1">{{ ins.created_at|date:"d/m/Y" }}</p>
                     </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8 text-slate-400">
+                    <i class="fas fa-inbox text-2xl mb-2"></i>
+                    <p class="text-sm">Aucune inscription récente</p>
                 </div>
                 {% endfor %}
             </div>
-            {% else %}
-            <div class="text-center py-8">
-                <div class="w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center" style="background-color: rgba(29, 181, 176, 0.1);">
-                    <i class="fas fa-user-plus text-2xl" style="color: #1db5b0;"></i>
-                </div>
-                <p class="text-slate-500">Aucune inscription récente</p>
-            </div>
-            {% endif %}
         </div>
-    </div>
 
-    <!-- Derniers paiements -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100" style="background-color: #f4fbfb;">
-            <h2 class="font-bold text-lg" style="color: #1e4f6f;">
-                <i class="fas fa-money-bill-wave mr-2" style="color: #22c55e;"></i>
-                Derniers paiements validés
-            </h2>
-        </div>
-        <div class="p-4 max-h-[400px] overflow-y-auto custom-scrollbar">
-            {% if recent_payments %}
-            <div class="space-y-3">
-                {% for pay in recent_payments %}
-                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+        <!-- Paiements Récents -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
+                <h2 class="font-bold text-lg" style="color: #1e4f6f;">
+                    <i class="fas fa-money-bill-wave mr-2" style="color: #f39c12;"></i>
+                    Paiements Récents
+                </h2>
+            </div>
+            <div class="p-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+                {% for payment in recent_payments %}
+                <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white text-sm" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);">
-                            {{ pay.inscription.candidature.first_name.0|upper }}{{ pay.inscription.candidature.last_name.0|upper }}
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: rgba(243, 156, 18, 0.1);">
+                            <i class="fas fa-receipt" style="color: #f39c12;"></i>
                         </div>
                         <div>
-                            <p class="font-semibold text-slate-800">{{ pay.inscription.candidature.full_name }}</p>
-                            <p class="text-sm text-slate-500">{{ pay.inscription.candidature.programme.title|truncatechars:25 }}</p>
+                            <p class="font-medium text-slate-800 text-sm">{{ payment.inscription.candidature.full_name }}</p>
+                            <p class="text-xs text-slate-400">{{ payment.get_method_display }}</p>
                         </div>
                     </div>
                     <div class="text-right">
-                        <p class="font-bold text-green-600">{{ pay.amount|intcomma }} F</p>
-                        <p class="text-xs text-slate-400">{{ pay.paid_at|date:"d/m/Y H:i" }}</p>
+                        <p class="font-bold" style="color: #f39c12;">{{ payment.amount|intcomma }} F</p>
+                        <p class="text-xs text-slate-400">{{ payment.paid_at|date:"d/m/Y H:i" }}</p>
                     </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8 text-slate-400">
+                    <i class="fas fa-receipt text-2xl mb-2"></i>
+                    <p class="text-sm">Aucun paiement récent</p>
                 </div>
                 {% endfor %}
             </div>
-            {% else %}
-            <div class="text-center py-8">
-                <div class="w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center" style="background-color: rgba(34, 197, 94, 0.1);">
-                    <i class="fas fa-money-bill-wave text-2xl" style="color: #22c55e;"></i>
-                </div>
-                <p class="text-slate-500">Aucun paiement récent</p>
-            </div>
-            {% endif %}
         </div>
+
     </div>
+
 </div>
 {% endblock %}

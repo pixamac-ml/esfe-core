@@ -2,13 +2,27 @@
 
 from django import forms
 from .models import Candidature
+from branches.models import Branch
 
 
 class CandidatureForm(forms.ModelForm):
+    # ==============================
+    # CHAMP ANNEXE - EXPLICITE
+    # ==============================
+    branch = forms.ModelChoiceField(
+        queryset=Branch.objects.filter(
+            is_active=True,
+            accepts_online_registration=True
+        ),
+        label="Annexe d'inscription",
+        empty_label="-- Choisissez votre annexe --",
+        help_text="Votre dossier sera traité par cette annexe"
+    )
 
     class Meta:
         model = Candidature
         fields = (
+            "branch",  # 👈 AJOUTÉ EN PREMIER
             "first_name",
             "last_name",
             "gender",
@@ -61,42 +75,16 @@ class CandidatureForm(forms.ModelForm):
         )
 
         for field_name, field in self.fields.items():
-
-            # Gestion spécifique des Select
             if isinstance(field.widget, forms.Select):
-                field.widget.attrs.update({
-                    "class": select_classes
-                })
+                field.widget.attrs.update({"class": select_classes})
             else:
-                field.widget.attrs.update({
-                    "class": base_input_classes
-                })
+                field.widget.attrs.update({"class": base_input_classes})
 
-        # Placeholders professionnels
-        self.fields["first_name"].widget.attrs.update({
-            "placeholder": "Votre prénom"
-        })
-
-        self.fields["last_name"].widget.attrs.update({
-            "placeholder": "Votre nom"
-        })
-
-        self.fields["birth_place"].widget.attrs.update({
-            "placeholder": "Ville ou commune de naissance"
-        })
-
-        self.fields["phone"].widget.attrs.update({
-            "placeholder": "+223 XX XX XX XX"
-        })
-
-        self.fields["email"].widget.attrs.update({
-            "placeholder": "exemple@email.com"
-        })
-
-        self.fields["address"].widget.attrs.update({
-            "placeholder": "Adresse complète"
-        })
-
-        self.fields["city"].widget.attrs.update({
-            "placeholder": "Votre ville"
-        })
+        # Placeholders
+        self.fields["first_name"].widget.attrs["placeholder"] = "Votre prénom"
+        self.fields["last_name"].widget.attrs["placeholder"] = "Votre nom"
+        self.fields["birth_place"].widget.attrs["placeholder"] = "Ville de naissance"
+        self.fields["phone"].widget.attrs["placeholder"] = "+223 XX XX XX XX"
+        self.fields["email"].widget.attrs["placeholder"] = "exemple@email.com"
+        self.fields["address"].widget.attrs["placeholder"] = "Adresse complète"
+        self.fields["city"].widget.attrs["placeholder"] = "Votre ville"

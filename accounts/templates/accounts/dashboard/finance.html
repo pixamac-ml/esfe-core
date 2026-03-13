@@ -10,7 +10,7 @@
 {% block dashboard_content %}
 
 <!-- ================= AGENT INFO BANNER ================= -->
-{% if not is_executive_view and payment_agent %}
+{% if not is_global_view %}
 <div class="bg-gradient-to-r from-[#1e4f6f] to-[#2d6a8f] rounded-2xl p-4 mb-6 text-white">
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
@@ -18,18 +18,46 @@
                 <i class="fas fa-user-tie text-xl"></i>
             </div>
             <div>
+                {% if payment_agent %}
                 <p class="font-semibold">Agent: {{ payment_agent.user.get_full_name|default:payment_agent.user.username }}</p>
-                <p class="text-sm text-white/70">Code agent: {{ payment_agent.agent_code }}</p>
+                <p class="text-sm text-white/70">Code: {{ payment_agent.agent_code }}</p>
+                {% else %}
+                <p class="font-semibold">{{ user.get_full_name|default:user.username }}</p>
+                {% endif %}
             </div>
         </div>
-        <div class="text-right">
-            <p class="text-sm text-white/70">Vue actuelle</p>
-            <p class="font-semibold">Vos inscriptions uniquement</p>
+        <div class="flex items-center gap-6">
+            <div class="text-center px-4 border-r border-white/20">
+                <p class="text-sm text-white/70">Annexe</p>
+                <p class="font-bold">{{ user_branch.name|default:"Non assignée" }}</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-white/70">Périmètre</p>
+                <p class="font-semibold">Cette annexe uniquement</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="bg-gradient-to-r from-[#1db5b0] to-[#49c7c3] rounded-2xl p-4 mb-6 text-white">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                <i class="fas fa-globe text-xl"></i>
+            </div>
+            <div>
+                <p class="text-sm text-white/70">Mode Direction</p>
+                <p class="font-bold text-lg">Vue Globale - Toutes les annexes</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/20">
+                <i class="fas fa-eye mr-1"></i> Tous les paiements
+            </span>
         </div>
     </div>
 </div>
 {% endif %}
-
 <!-- ================= FILTERS BAR ================= -->
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-6">
     <form method="get" class="flex flex-wrap items-center gap-4">

@@ -195,9 +195,9 @@ from .models import PaymentAgent, CashPaymentSession
 
 @admin.register(PaymentAgent)
 class PaymentAgentAdmin(admin.ModelAdmin):
-    list_display = ("user", "agent_code", "is_active", "created_at")
+    list_display = ("user", "agent_code", "is_active", "created_at","branch")
     search_fields = ("user__first_name", "user__last_name")
-    list_filter = ("is_active",)
+    list_filter = ("is_active","branch")
 
 
 @admin.register(CashPaymentSession)

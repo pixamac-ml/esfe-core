@@ -49,6 +49,7 @@ class CandidatureAdmin(admin.ModelAdmin):
         "status_badge",
         "submitted_at",
         "reviewed_at",
+        "branch",
     )
 
     list_filter = (
@@ -58,6 +59,7 @@ class CandidatureAdmin(admin.ModelAdmin):
         "programme__filiere",
         "programme",
         "entry_year",
+        "branch",
     )
 
     search_fields = (

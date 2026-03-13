@@ -1,3 +1,5 @@
+# admissions/views.py
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
@@ -12,7 +14,7 @@ def apply_to_programme(request, slug):
     """
     Vue publique de candidature :
     - formation préchargée
-    - formulaire candidat
+    - formulaire candidat avec choix d'annexe
     - dépôt des documents requis
     - prévention des doublons d'email
     """
@@ -38,7 +40,7 @@ def apply_to_programme(request, slug):
 
             # année académique actuelle
             current_year = timezone.now().year
-            candidature.academic_year = current_year
+            candidature.academic_year = f"{current_year}-{current_year + 1}"
 
             # ==============================
             # VERIFICATION EMAIL EXISTANT
@@ -49,7 +51,7 @@ def apply_to_programme(request, slug):
             existing = Candidature.objects.filter(
                 email=email,
                 programme=programme,
-                academic_year=current_year
+                academic_year=candidature.academic_year
             ).exists()
 
             if existing:
@@ -92,8 +94,7 @@ def apply_to_programme(request, slug):
 
                 messages.success(
                     request,
-                    "Votre candidature a été envoyée avec succès. "
-                    "Elle sera analysée par l’administration."
+                    f"Votre candidature à l'annexe {candidature.branch.name} a été envoyée avec succès."
                 )
 
                 return redirect(
@@ -128,7 +129,7 @@ def apply_to_programme(request, slug):
 def candidature_confirmation(request, candidature_id):
 
     candidature = get_object_or_404(
-        Candidature,
+        Candidature.objects.select_related("programme", "branch"),
         id=candidature_id
     )
 

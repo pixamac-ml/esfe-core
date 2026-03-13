@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 
+from branches.models import Branch
 from formations.models import Programme, RequiredDocument
 
 
@@ -16,6 +17,18 @@ class Candidature(models.Model):
         related_name="candidatures"
     )
 
+    # ==================================================
+    # ANNEXE D'INSCRIPTION
+    # ==================================================
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="candidatures",
+        verbose_name="Annexe",
+        help_text="Annexe choisie pour l'inscription",
+        null=True,  # Temporaire pour la migration
+        blank=True
+    )
     # Année académique réelle (ex: 2025-2026)
     academic_year = models.CharField(
         max_length=9,

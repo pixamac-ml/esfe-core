@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     "payments.apps.PaymentsConfig",
     "students",
     "formations",
-
+    "branches",
     # Contenu
     "blog.apps.BlogConfig",
     "news",

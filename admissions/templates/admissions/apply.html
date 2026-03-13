@@ -26,16 +26,79 @@ Inscription – {{ programme.title }} | ESFE
     {% fill "content" %}
 
         {% component "admission_form_card"
-            title="Créez votre dossier d’admission" %}
+            title="Créez votre dossier d'admission" %}
 
             {% fill "card_body" %}
 
                 <form method="post" enctype="multipart/form-data" class="space-y-10">
                     {% csrf_token %}
 
+                    <!-- ================= CHOIX DE L'ANNEXE ================= -->
+                    <div class="bg-gradient-to-r from-primary-50 to-blue-50 rounded-2xl p-6 border border-primary-200 shadow-sm">
+                        <div class="flex items-start gap-4">
+                            <!-- Icône -->
+                            <div class="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center shadow-md">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                </svg>
+                            </div>
+
+                            <!-- Contenu -->
+                            <div class="flex-1">
+                                <h3 class="text-lg font-bold text-gray-900 mb-1">
+                                    Choisissez votre annexe
+                                </h3>
+                                <p class="text-sm text-gray-600 mb-4">
+                                    Sélectionnez le campus où vous souhaitez suivre votre formation.
+                                    Votre dossier sera traité par l'équipe de cette annexe.
+                                </p>
+
+                                <!-- Sélecteur d'annexe -->
+                                <div class="relative">
+                                    <label for="{{ form.branch.id_for_label }}" class="sr-only">
+                                        {{ form.branch.label }}
+                                    </label>
+
+                                    <div class="relative">
+                                        {{ form.branch }}
+
+                                        <!-- Icône décorative dans le select -->
+                                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    {% if form.branch.errors %}
+                                        <div class="mt-2 flex items-center gap-1 text-red-600">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <span class="text-sm">{{ form.branch.errors.0 }}</span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Info supplémentaire -->
+                                <div class="mt-3 flex items-center gap-2 text-xs text-primary-700 bg-primary-100 rounded-lg px-3 py-2">
+                                    <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>Vous pourrez contacter directement l'annexe choisie pour le suivi de votre dossier.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
                     <!-- ================= INFORMATIONS PERSONNELLES ================= -->
                     <div>
-                        <h3 class="text-lg font-semibold mb-4 border-l-4 border-primary-600 pl-3">
+                        <h3 class="text-lg font-semibold mb-4 border-l-4 border-primary-600 pl-3 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
                             Informations personnelles
                         </h3>
 
@@ -43,42 +106,52 @@ Inscription – {{ programme.title }} | ESFE
 
                             <div class="space-y-1">
                                 <label class="block text-sm font-medium text-gray-700">
-                                    {{ form.first_name.label }}
+                                    {{ form.first_name.label }} <span class="text-red-500">*</span>
                                 </label>
                                 {{ form.first_name }}
-                                {{ form.first_name.errors }}
+                                {% if form.first_name.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.first_name.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                             <div class="space-y-1">
                                 <label class="block text-sm font-medium text-gray-700">
-                                    {{ form.last_name.label }}
+                                    {{ form.last_name.label }} <span class="text-red-500">*</span>
                                 </label>
                                 {{ form.last_name }}
-                                {{ form.last_name.errors }}
+                                {% if form.last_name.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.last_name.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                             <div class="space-y-1">
                                 <label class="block text-sm font-medium text-gray-700">
-                                    {{ form.gender.label }}
+                                    {{ form.gender.label }} <span class="text-red-500">*</span>
                                 </label>
                                 {{ form.gender }}
-                                {{ form.gender.errors }}
+                                {% if form.gender.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.gender.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                             <div class="space-y-1">
                                 <label class="block text-sm font-medium text-gray-700">
-                                    {{ form.birth_date.label }}
+                                    {{ form.birth_date.label }} <span class="text-red-500">*</span>
                                 </label>
                                 {{ form.birth_date }}
-                                {{ form.birth_date.errors }}
+                                {% if form.birth_date.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.birth_date.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                             <div class="md:col-span-2 space-y-1">
                                 <label class="block text-sm font-medium text-gray-700">
-                                    {{ form.birth_place.label }}
+                                    {{ form.birth_place.label }} <span class="text-red-500">*</span>
                                 </label>
                                 {{ form.birth_place }}
-                                {{ form.birth_place.errors }}
+                                {% if form.birth_place.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.birth_place.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                         </div>
@@ -87,7 +160,10 @@ Inscription – {{ programme.title }} | ESFE
 
                     <!-- ================= COORDONNÉES ================= -->
                     <div>
-                        <h3 class="text-lg font-semibold mb-4 border-l-4 border-primary-600 pl-3">
+                        <h3 class="text-lg font-semibold mb-4 border-l-4 border-primary-600 pl-3 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
                             Coordonnées
                         </h3>
 
@@ -95,18 +171,22 @@ Inscription – {{ programme.title }} | ESFE
 
                             <div class="space-y-1">
                                 <label class="block text-sm font-medium text-gray-700">
-                                    {{ form.phone.label }}
+                                    {{ form.phone.label }} <span class="text-red-500">*</span>
                                 </label>
                                 {{ form.phone }}
-                                {{ form.phone.errors }}
+                                {% if form.phone.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.phone.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                             <div class="space-y-1">
                                 <label class="block text-sm font-medium text-gray-700">
-                                    {{ form.email.label }}
+                                    {{ form.email.label }} <span class="text-red-500">*</span>
                                 </label>
                                 {{ form.email }}
-                                {{ form.email.errors }}
+                                {% if form.email.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.email.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                             <div class="space-y-1">
@@ -114,7 +194,9 @@ Inscription – {{ programme.title }} | ESFE
                                     {{ form.address.label }}
                                 </label>
                                 {{ form.address }}
-                                {{ form.address.errors }}
+                                {% if form.address.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.address.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                             <div class="space-y-1">
@@ -122,7 +204,9 @@ Inscription – {{ programme.title }} | ESFE
                                     {{ form.city.label }}
                                 </label>
                                 {{ form.city }}
-                                {{ form.city.errors }}
+                                {% if form.city.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.city.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                             <div class="md:col-span-2 space-y-1">
@@ -130,7 +214,9 @@ Inscription – {{ programme.title }} | ESFE
                                     {{ form.country.label }}
                                 </label>
                                 {{ form.country }}
-                                {{ form.country.errors }}
+                                {% if form.country.errors %}
+                                    <p class="text-xs text-red-500 mt-1">{{ form.country.errors.0 }}</p>
+                                {% endif %}
                             </div>
 
                         </div>
@@ -140,7 +226,10 @@ Inscription – {{ programme.title }} | ESFE
                     <!-- ================= DOCUMENTS ================= -->
                     {% if required_documents %}
                     <div>
-                        <h3 class="text-lg font-semibold mb-4 border-l-4 border-primary-600 pl-3">
+                        <h3 class="text-lg font-semibold mb-4 border-l-4 border-primary-600 pl-3 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
                             Dossier de candidature
                         </h3>
 
@@ -158,18 +247,41 @@ Inscription – {{ programme.title }} | ESFE
                                     <input
                                         type="file"
                                         name="document_{{ prd.document.id }}"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        class="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white text-gray-900
+                                               file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0
+                                               file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700
+                                               hover:file:bg-primary-100 transition duration-200
+                                               focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                     />
                                 </div>
                             {% endfor %}
 
                         </div>
 
-                        <p class="mt-3 text-sm text-gray-500">
-                            Les documents marqués d’un astérisque (*) sont obligatoires.
+                        <p class="mt-3 text-sm text-gray-500 flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                            Les documents marqués d'un astérisque (*) sont obligatoires.
                         </p>
                     </div>
                     {% endif %}
+
+
+                    <!-- ================= RÉCAPITULATIF ANNEXE (Dynamique) ================= -->
+                    <div id="branch-summary" class="hidden bg-green-50 border border-green-200 rounded-xl p-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-green-800">Annexe sélectionnée</p>
+                                <p id="selected-branch-name" class="text-green-700 font-semibold"></p>
+                            </div>
+                        </div>
+                    </div>
 
 
                     <!-- ================= BOUTON ================= -->
@@ -177,13 +289,21 @@ Inscription – {{ programme.title }} | ESFE
                         <button
                             type="submit"
                             class="w-full bg-primary-600 hover:bg-primary-700
-                                   text-white font-semibold py-3 rounded-xl
-                                   transition duration-200 shadow-md hover:shadow-lg">
+                                   text-white font-semibold py-4 rounded-xl
+                                   transition duration-200 shadow-lg hover:shadow-xl
+                                   flex items-center justify-center gap-2
+                                   transform hover:scale-[1.02] active:scale-[0.98]">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
                             Soumettre ma candidature
                         </button>
 
-                        <p class="text-sm text-gray-500 text-center mt-3">
-                            🔒 Vos données sont protégées et traitées en toute confidentialité.
+                        <p class="text-sm text-gray-500 text-center mt-4 flex items-center justify-center gap-1">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                            </svg>
+                            Vos données sont protégées et traitées en toute confidentialité.
                         </p>
                     </div>
 
@@ -201,4 +321,42 @@ Inscription – {{ programme.title }} | ESFE
 
 </section>
 
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const branchSelect = document.querySelector('#id_branch');
+    const branchSummary = document.querySelector('#branch-summary');
+    const selectedBranchName = document.querySelector('#selected-branch-name');
+
+    if (branchSelect) {
+        branchSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+
+            if (this.value && selectedOption.text !== '-- Choisissez votre annexe --') {
+                branchSummary.classList.remove('hidden');
+                selectedBranchName.textContent = selectedOption.text;
+
+                // Animation d'apparition
+                branchSummary.style.opacity = '0';
+                branchSummary.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    branchSummary.style.transition = 'all 0.3s ease';
+                    branchSummary.style.opacity = '1';
+                    branchSummary.style.transform = 'translateY(0)';
+                }, 10);
+            } else {
+                branchSummary.classList.add('hidden');
+            }
+        });
+
+        // Déclencher au chargement si une valeur existe déjà
+        if (branchSelect.value) {
+            branchSelect.dispatchEvent(new Event('change'));
+        }
+    }
+});
+</script>
 {% endblock %}

@@ -4,6 +4,7 @@ from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
 
+from branches.models import Branch
 from inscriptions.models import Inscription
 from payments.services.receipt import generate_receipt_number
 from payments.services.qrcode import generate_qr_image
@@ -46,6 +47,16 @@ class PaymentAgent(models.Model):
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="payment_agents",
+        verbose_name="Annexe",
+        help_text="Annexe de l'agent"
+    )
 
     def save(self, *args, **kwargs):
 

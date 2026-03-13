@@ -20,6 +20,26 @@
     %}
     {% endcomponent %}
 
+    {# STATISTIQUES #}
+    {% if stats %}
+    <section class="py-16 bg-primary-600">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center text-white">
+                {% for stat in stats %}
+                <div>
+                    <p class="text-4xl md:text-5xl font-bold">
+                        {{ stat.value }}{{ stat.suffix }}
+                    </p>
+                    <p class="text-sm uppercase tracking-wider mt-2 text-white/80">
+                        {{ stat.label }}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
     {# SECTIONS DYNAMIQUES #}
     {% for section in sections %}
         {% component "sections"
@@ -31,6 +51,7 @@
             highlights=section.highlights
             background=section.background
             icon=section.icon
+            reverse=forloop.counter|divisibleby:2
         %}
         {% endcomponent %}
     {% endfor %}

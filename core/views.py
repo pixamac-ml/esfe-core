@@ -135,20 +135,27 @@ def about(request):
         is_active=True
     ).order_by("order")
 
-    about_sections = (
+    sections = (
         AboutSection.objects
         .filter(is_active=True)
         .order_by("order")
     )
 
+    # Hero data - on peut le rendre dynamique via l'admin plus tard
+    hero_title = institution.name if institution else "Notre Institution"
+    hero_subtitle = "Excellence académique et formation professionnelle de qualité"
+
     context = {
         "institution": institution,
         "stats": stats,
-        "about_sections": about_sections,
+        "sections": sections,  # Renommé pour correspondre au template
+        "hero_title": hero_title,
+        "hero_subtitle": hero_subtitle,
         **get_institution_context(),
     }
 
     return render(request, "core/about.html", context)
+
 
 # ==========================================================
 # HOME

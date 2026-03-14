@@ -360,3 +360,144 @@ def profile_settings(request):
     )
 
 
+@login_required
+def export_executive_csv(request):
+    """Exporter le rapport exécutif complet en CSV."""
+    user = request.user
+    if not check_executive_access(user):
+        messages.error(request, "Accès refusé.")
+        return redirect('accounts:executive_dashboard')
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response[
+        'Content-Disposition'] = f'attachment; filename="rapport_executif_{timezone.now().strftime("%Y%m%d_%H%M")}.csv"'
+    response.write('\ufeff')  # BOM pour Excel
+
+    writer = csv.writer(response, delimiter=';')
+
+    # === DATES ===
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+    month_start_dt = timezone.make_aware(timezone.datetime.combine(month_start, timezone.datetime.min.time()))
+
+    # === SECTION 1: RÉSUMÉ GLOBAL ===
+    writer.writerow(['=== RÉSUMÉ GLOBAL ==='])
+    writer.writerow(['Métrique', 'Valeur'])
+
+    total_candidatures = Candidature.objects.count()
+    total_inscriptions = Inscription.objects.count()
+    total_revenue = Payment.objects.filter(status='validated').aggregate(total=Sum('amount'))['total'] or 0
+    monthly_revenue = Payment.objects.filter(
+        status='validated', paid_at__gte=month_start_dt
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    writer.writerow(['Total Candidatures', total_candidatures])
+    writer.writerow(['Total Inscriptions', total_inscriptions])
+    writer.writerow(['Revenus Totaux (F)', total_revenue])
+    writer.writerow(['Revenus du Mois (F)', monthly_revenue])
+    writer.writerow(['Taux de Conversion (%)',
+                     round((total_inscriptions / total_candidatures * 100), 1) if total_candidatures > 0 else 0])
+    writer.writerow([])
+
+    # === SECTION 2: PERFORMANCE PAR ANNEXE ===
+    writer.writerow(['=== PERFORMANCE PAR ANNEXE ==='])
+    writer.writerow(['Annexe', 'Code', 'Candidatures', 'Acceptées', 'Inscriptions', 'Agents', 'Revenus Total (F)',
+                     'Revenus Mois (F)'])
+
+    branches = Branch.objects.filter(is_active=True)
+    for branch in branches:
+        branch_candidatures = Candidature.objects.filter(branch=branch)
+        candidatures_count = branch_candidatures.count()
+        candidatures_accepted = branch_candidatures.filter(status='accepted').count()
+        inscriptions_count = Inscription.objects.filter(candidature__branch=branch).count()
+        agents_count = PaymentAgent.objects.filter(branch=branch, is_active=True).count()
+
+        branch_revenue = Payment.objects.filter(
+            status='validated',
+            inscription__candidature__branch=branch
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        branch_monthly = Payment.objects.filter(
+            status='validated',
+            inscription__candidature__branch=branch,
+            paid_at__gte=month_start_dt
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        writer.writerow([
+            branch.name,
+            branch.code,
+            candidatures_count,
+            candidatures_accepted,
+            inscriptions_count,
+            agents_count,
+            branch_revenue,
+            branch_monthly
+        ])
+
+    writer.writerow([])
+
+    # === SECTION 3: TOP AGENTS ===
+    writer.writerow(['=== TOP 10 AGENTS ==='])
+    writer.writerow(['Rang', 'Agent', 'Code', 'Annexe', 'Sessions Total', 'Revenus Total (F)', 'Revenus Mois (F)'])
+
+    all_agents = PaymentAgent.objects.filter(is_active=True).select_related('user', 'branch')
+    agent_ranking = []
+
+    for agent in all_agents:
+        session_ids = CashPaymentSession.objects.filter(
+            agent=agent, is_used=True
+        ).values_list('inscription_id', flat=True)
+
+        agent_revenue = Payment.objects.filter(
+            inscription_id__in=session_ids, status='validated'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        agent_monthly = Payment.objects.filter(
+            inscription_id__in=session_ids, status='validated', paid_at__gte=month_start_dt
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        sessions_total = CashPaymentSession.objects.filter(agent=agent, is_used=True).count()
+
+        agent_ranking.append({
+            'agent': agent,
+            'revenue': agent_revenue,
+            'monthly': agent_monthly,
+            'sessions': sessions_total
+        })
+
+    agent_ranking.sort(key=lambda x: x['revenue'], reverse=True)
+
+    for i, item in enumerate(agent_ranking[:10], 1):
+        agent = item['agent']
+        writer.writerow([
+            i,
+            agent.user.get_full_name() or agent.user.username,
+            agent.agent_code,
+            agent.branch.name if agent.branch else 'Non assigné',
+            item['sessions'],
+            item['revenue'],
+            item['monthly']
+        ])
+
+    writer.writerow([])
+
+    # === SECTION 4: TOP PROGRAMMES ===
+    writer.writerow(['=== TOP PROGRAMMES ==='])
+    writer.writerow(['Rang', 'Programme', 'Inscriptions', 'Revenus (F)'])
+
+    programmes_stats = Inscription.objects.values(
+        'candidature__programme__title'
+    ).annotate(
+        count=Count('id'),
+        revenue=Sum('amount_paid')
+    ).order_by('-count')[:10]
+
+    for i, prog in enumerate(programmes_stats, 1):
+        writer.writerow([
+            i,
+            prog['candidature__programme__title'],
+            prog['count'],
+            prog['revenue'] or 0
+        ])
+
+    return response

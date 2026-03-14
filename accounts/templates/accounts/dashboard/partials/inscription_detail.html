@@ -1,0 +1,179 @@
+{# templates/accounts/dashboard/partials/inscription_detail.html #}
+
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title">
+            <i class="fas fa-file-invoice me-2"></i>
+            Détails de l'inscription
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+
+    <div class="modal-body">
+        {# Référence et statut #}
+        <div class="alert alert-info d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Référence :</strong> {{ inscription.reference }}
+            </div>
+            <span class="badge
+                {% if inscription.status == 'created' %}bg-primary
+                {% elif inscription.status == 'active' %}bg-success
+                {% elif inscription.status == 'suspended' %}bg-danger
+                {% elif inscription.status == 'expired' %}bg-secondary
+                {% elif inscription.status == 'completed' %}bg-info
+                {% endif %} fs-6">
+                {{ inscription.get_status_display }}
+            </span>
+        </div>
+
+        {# Informations du candidat #}
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-user me-2"></i>Candidat
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Nom complet :</strong> {{ candidature.last_name }} {{ candidature.first_name }}</p>
+                        <p><strong>Email :</strong> <a href="mailto:{{ candidature.email }}">{{ candidature.email }}</a></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Téléphone :</strong> {{ candidature.phone }}</p>
+                        <p><strong>Annexe :</strong> {{ candidature.branch.name|default:"Non assignée" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Programme #}
+        <div class="card mb-3">
+            <div class="card-header bg-info text-white">
+                <i class="fas fa-graduation-cap me-2"></i>Programme
+            </div>
+            <div class="card-body">
+                <p><strong>Formation :</strong> {{ candidature.programme.title }}</p>
+                <p><strong>Année académique :</strong> {{ candidature.academic_year }}</p>
+                <p><strong>Année d'entrée :</strong> {{ candidature.entry_year }}</p>
+            </div>
+        </div>
+
+        {# Finances #}
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-money-bill-wave me-2"></i>Finances
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <h4 class="text-primary">{{ inscription.amount_due|floatformat:0 }} FCFA</h4>
+                            <small class="text-muted">Montant dû</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <h4 class="text-success">{{ inscription.amount_paid|floatformat:0 }} FCFA</h4>
+                            <small class="text-muted">Montant payé</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <h4 class="{% if balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                                {{ balance|floatformat:0 }} FCFA
+                            </h4>
+                            <small class="text-muted">Solde restant</small>
+                        </div>
+                    </div>
+                </div>
+
+                {# Barre de progression #}
+                {% with percent=inscription.amount_paid|divisibleby:inscription.amount_due %}
+                <div class="progress mt-3" style="height: 25px;">
+                    {% widthratio inscription.amount_paid inscription.amount_due 100 as payment_percent %}
+                    <div class="progress-bar bg-success" role="progressbar"
+                         style="width: {{ payment_percent }}%">
+                        {{ payment_percent }}% payé
+                    </div>
+                </div>
+                {% endwith %}
+            </div>
+        </div>
+
+        {# Historique des paiements #}
+        <div class="card mb-3">
+            <div class="card-header bg-warning text-dark">
+                <i class="fas fa-history me-2"></i>Historique des paiements ({{ payments|length }})
+            </div>
+            <div class="card-body">
+                {% if payments %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Montant</th>
+                                <th>Méthode</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in payments %}
+                            <tr>
+                                <td>{{ payment.created_at|date:"d/m/Y H:i" }}</td>
+                                <td><strong>{{ payment.amount|floatformat:0 }} FCFA</strong></td>
+                                <td>
+                                    {% if payment.method == 'cash' %}
+                                    <span class="badge bg-success"><i class="fas fa-money-bill"></i> Espèces</span>
+                                    {% elif payment.method == 'mobile_money' %}
+                                    <span class="badge bg-info"><i class="fas fa-mobile-alt"></i> Mobile Money</span>
+                                    {% elif payment.method == 'bank_transfer' %}
+                                    <span class="badge bg-primary"><i class="fas fa-university"></i> Virement</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ payment.method }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if payment.status == 'validated' %}
+                                    <span class="badge bg-success"><i class="fas fa-check"></i> Validé</span>
+                                    {% elif payment.status == 'pending' %}
+                                    <span class="badge bg-warning"><i class="fas fa-clock"></i> En attente</span>
+                                    {% elif payment.status == 'cancelled' %}
+                                    <span class="badge bg-danger"><i class="fas fa-times"></i> Annulé</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Aucun paiement enregistré pour cette inscription.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Accès étudiant #}
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-key me-2"></i>Accès étudiant
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Token public :</strong> <code>{{ inscription.public_token }}</code></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Code d'accès :</strong> <code class="fs-5 text-primary">{{ inscription.access_code }}</code></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+    </div>
+</div>

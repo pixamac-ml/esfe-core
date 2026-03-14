@@ -6,100 +6,127 @@ from django.utils.html import format_html
 from django.utils import timezone
 import secrets
 
-from .models import Inscription
+from .models import Inscription, StatusHistory
 from inscriptions.services import create_inscription_from_candidature
 from admissions.models import Candidature
 
 
 # ==================================================
-# ACTION ADMIN : ACCEPTER CANDIDATURE
+# ACTION : ACCEPTER CANDIDATURE
 # ==================================================
-@admin.action(description="✅ Accepter la candidature et creer l'inscription")
+
+@admin.action(description="Accepter la candidature et creer l'inscription")
 def accepter_candidature(modeladmin, request, queryset):
 
-    created_count = 0
-    skipped_count = 0
+    created = 0
+    skipped = 0
 
     for candidature in queryset:
 
-        if candidature.status in ("accepted", "accepted_with_reserve"):
-            skipped_count += 1
+        if candidature.status not in ["submitted", "under_review"]:
+            skipped += 1
             continue
 
         if hasattr(candidature, "inscription"):
-            skipped_count += 1
+            skipped += 1
             continue
 
         programme = candidature.programme
         amount_due = programme.total_price
 
         with transaction.atomic():
+
+            candidature.status = "accepted"
+            candidature.reviewed_at = timezone.now()
+            candidature.save(update_fields=["status", "reviewed_at"])
+
             create_inscription_from_candidature(
                 candidature=candidature,
                 amount_due=amount_due
             )
 
-            candidature.status = "accepted"
-            candidature.save(update_fields=["status"])
+        created += 1
 
-        created_count += 1
-
-    if created_count:
+    if created:
         modeladmin.message_user(
             request,
-            f"{created_count} inscription(s) creee(s) avec succes.",
-            level=messages.SUCCESS
+            f"{created} inscription(s) creee(s).",
+            messages.SUCCESS
         )
 
-    if skipped_count:
+    if skipped:
         modeladmin.message_user(
             request,
-            f"{skipped_count} candidature(s) ignoree(s) "
-            f"(deja acceptee ou inscription existante).",
-            level=messages.WARNING
+            f"{skipped} candidature(s) ignoree(s).",
+            messages.WARNING
         )
 
 
 # ==================================================
-# ACTION ADMIN : REGENERER CODE D'ACCES
+# ACTION : REGENERER CODE ACCES
 # ==================================================
-@admin.action(description="Regenerer le code d'acces")
+
+@admin.action(description="Regenerer code d'acces")
 def regenerate_access_code(modeladmin, request, queryset):
 
     for inscription in queryset:
         inscription.access_code = secrets.token_urlsafe(6)
         inscription.save(update_fields=["access_code"])
 
-    modeladmin.message_user(
-        request,
-        "Code(s) d'acces regeneré(s) avec succes.",
-        level=messages.SUCCESS
-    )
+    messages.success(request, "Code(s) regeneres.")
 
 
 # ==================================================
-# ACTIONS POUR CHANGER LE STATUT
+# ACTION : ARCHIVER
+# ==================================================
+
+@admin.action(description="Archiver inscription")
+def archive_inscriptions(modeladmin, request, queryset):
+
+    updated = queryset.update(
+        is_archived=True,
+        archived_at=timezone.now()
+    )
+
+    messages.success(request, f"{updated} inscription(s) archivee(s).")
+
+
+# ==================================================
+# ACTION : RESTAURER
+# ==================================================
+
+@admin.action(description="Restaurer inscription archivee")
+def restore_inscriptions(modeladmin, request, queryset):
+
+    updated = queryset.update(
+        is_archived=False,
+        archived_at=None
+    )
+
+    messages.success(request, f"{updated} inscription(s) restauree(s).")
+
+
+# ==================================================
+# ACTIONS STATUT
 # ==================================================
 
 @admin.action(description="Passer en Active")
 def mark_active(modeladmin, request, queryset):
     updated = queryset.exclude(status="active").update(status="active")
-    messages.success(request, f"{updated} inscription(s) passee(s) en Active.")
+    messages.success(request, f"{updated} inscription(s) active(s).")
+
 
 @admin.action(description="Passer en Suspendue")
 def mark_suspended(modeladmin, request, queryset):
     updated = queryset.update(status="suspended")
     messages.success(request, f"{updated} inscription(s) suspendue(s).")
 
+
 @admin.action(description="Passer en Expiree")
 def mark_expired(modeladmin, request, queryset):
     updated = queryset.update(status="expired")
     messages.success(request, f"{updated} inscription(s) expiree(s).")
 
-@admin.action(description="Passer en Transferlee")
-def mark_transferred(modeladmin, request, queryset):
-    updated = queryset.update(status="transferred")
-    messages.success(request, f"{updated} inscription(s) transferee(s).")
 
 @admin.action(description="Passer en Terminee")
 def mark_completed(modeladmin, request, queryset):
@@ -110,29 +137,38 @@ def mark_completed(modeladmin, request, queryset):
 # ==================================================
 # ADMIN INSCRIPTION
 # ==================================================
+
 @admin.register(Inscription)
 class InscriptionAdmin(admin.ModelAdmin):
 
     # ==================================================
-    # LISTE
+    # LIST DISPLAY
     # ==================================================
+
     list_display = (
         "id",
         "reference",
         "candidate_name",
         "programme_title",
+        "access_code",
         "status_badge",
         "amount_due_display",
         "amount_paid_display",
         "balance_display",
-        "access_code_display",
+        "archive_badge",
         "created_at",
         "public_link",
     )
 
-    list_filter = ("status",)
+    list_filter = (
+        "status",
+        "is_archived",
+        "created_at",
+    )
+
     ordering = ("-created_at",)
-    list_per_page = 25
+
+    list_per_page = 30
 
     search_fields = (
         "reference",
@@ -143,136 +179,179 @@ class InscriptionAdmin(admin.ModelAdmin):
         "candidature__programme__title",
     )
 
+    autocomplete_fields = ("candidature",)
+
     # ==================================================
-    # CHAMPS
+    # READONLY
     # ==================================================
+
     readonly_fields = (
         "reference",
         "public_token",
         "access_code",
         "amount_paid",
         "created_at",
+        "archived_at",
     )
 
+    # ==================================================
+    # FIELDSETS
+    # ==================================================
+
     fieldsets = (
+
         ("Candidature", {
             "fields": ("candidature",)
         }),
+
         ("Statut", {
             "fields": ("status",)
         }),
-        ("Finances (copie figee)", {
-            "description": (
-                "Le montant a payer est copie depuis le programme "
-                "au moment de l'acceptation. "
-                "Il peut etre ajuste ici en cas particulier."
-            ),
+
+        ("Finances", {
             "fields": (
                 "amount_due",
                 "amount_paid",
             )
         }),
-        ("Securite d'acces", {
-            "description": "Code requis pour acceder au dossier etudiant.",
+
+        ("Acces", {
             "fields": (
                 "public_token",
                 "access_code",
             )
         }),
+
+        ("Archivage", {
+            "fields": (
+                "is_archived",
+                "archived_at",
+            )
+        }),
+
         ("Systeme", {
             "fields": (
                 "reference",
                 "created_at",
             )
         }),
+
     )
 
-
     # ==================================================
-    # METHODES D'AFFICHAGE
+    # DISPLAY METHODS
     # ==================================================
-
-    @admin.action(description="Generer code d'acces si absent")
-    def generate_missing_access_codes(modeladmin, request, queryset):
-
-        generated = 0
-
-        for inscription in queryset:
-            if not inscription.access_code:
-                inscription.access_code = secrets.token_urlsafe(6)
-                inscription.save(update_fields=["access_code"])
-                generated += 1
-
-        modeladmin.message_user(
-            request,
-            f"{generated} code(s) genere(s).",
-            level=messages.SUCCESS
-        )
 
     @admin.display(description="Candidat")
     def candidate_name(self, obj):
+
         c = obj.candidature
         return f"{c.last_name} {c.first_name}"
 
-    @admin.display(description="Formation")
+    @admin.display(description="Programme")
     def programme_title(self, obj):
+
         return obj.candidature.programme.title
 
     @admin.display(description="Statut")
     def status_badge(self, obj):
+
         colors = {
             "created": "#0d6efd",
+            "awaiting_payment": "#ffc107",
+            "partial_paid": "#0dcaf0",
             "active": "#198754",
             "suspended": "#dc3545",
             "expired": "#6c757d",
-            "transferred": "#fd7e14",
             "completed": "#20c997",
         }
+
         return format_html(
-            '<span style="padding:4px 8px; border-radius:4px; '
-            'background:{}; color:white; font-weight:600;">{}</span>',
+            '<span style="padding:4px 8px;border-radius:4px;background:{};color:white;font-weight:600;">{}</span>',
             colors.get(obj.status, "#6c757d"),
             obj.get_status_display()
         )
 
+    @admin.display(description="Archive")
+    def archive_badge(self, obj):
+        if obj.is_archived:
+            return format_html(
+                '<span style="color:{};font-weight:600;">{}</span>',
+                "#dc3545",
+                "Archivé"
+            )
+
+        return format_html(
+            '<span style="color:{};font-weight:600;">{}</span>',
+            "#198754",
+            "Actif"
+        )
+
     @admin.display(description="Total")
     def amount_due_display(self, obj):
-        return format_html("<strong>{} FCFA</strong>", obj.amount_due)
+        return format_html("<strong>{} FCFA</strong>", obj.amount_due or 0)
+
 
     @admin.display(description="Paye")
     def amount_paid_display(self, obj):
+
         return format_html("{} FCFA", obj.amount_paid)
 
     @admin.display(description="Solde")
     def balance_display(self, obj):
-        return format_html(
-            "<strong>{} FCFA</strong>",
-            obj.balance
-        )
 
-    @admin.display(description="Code d'acces")
-    def access_code_display(self, obj):
-        return format_html(
-            '<span style="font-weight:600; color:#0d6efd;">{}</span>',
-            obj.access_code
-        )
+        return format_html("<strong>{} FCFA</strong>", obj.balance)
 
-    @admin.display(description="Lien public etudiant")
+    @admin.display(description="Lien dossier")
     def public_link(self, obj):
+
         return format_html(
-            '<a href="{}" target="_blank" style="font-weight:600;">'
-            'Ouvrir le dossier</a>',
+            '<a href="{}" target="_blank">Ouvrir</a>',
             obj.get_public_url()
         )
 
-    # AJOUT DES NOUVELLES ACTIONS
+    # ==================================================
+    # ACTIONS
+    # ==================================================
+
     actions = [
-        accepter_candidature,
+
         regenerate_access_code,
-        generate_missing_access_codes,
+
+        archive_inscriptions,
+        restore_inscriptions,
+
         mark_active,
         mark_suspended,
         mark_expired,
-        mark_transferred,
         mark_completed,
+
     ]
+
+
+# ==================================================
+# ADMIN HISTORIQUE
+# ==================================================
+
+@admin.register(StatusHistory)
+class StatusHistoryAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "inscription",
+        "previous_status",
+        "new_status",
+        "created_at",
+    )
+
+    search_fields = (
+        "inscription__reference",
+    )
+
+    ordering = ("-created_at",)
+
+    readonly_fields = (
+        "inscription",
+        "previous_status",
+        "new_status",
+        "created_at",
+    )

@@ -5,98 +5,247 @@
 {% block dashboard_title %}Vue Globale - Direction{% endblock %}
 {% block dashboard_subtitle %}Statistiques consolidées de toutes les annexes{% endblock %}
 
+{% block extra_head %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
 {% block dashboard_content %}
-<div class="space-y-8">
+<div class="space-y-6 sm:space-y-8">
 
-    <!-- ============================================== -->
-    <!-- STATISTIQUES GLOBALES -->
-    <!-- ============================================== -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <!-- ================= ALERTES ================= -->
+    {% if alerts %}
+    <div class="space-y-3">
+        {% for alert in alerts %}
+        <div class="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl border
+            {% if alert.type == 'warning' %}bg-amber-50 border-amber-200{% elif alert.type == 'danger' %}bg-red-50 border-red-200{% elif alert.type == 'success' %}bg-green-50 border-green-200{% else %}bg-blue-50 border-blue-200{% endif %}">
+            <div class="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center
+                {% if alert.type == 'warning' %}bg-amber-100{% elif alert.type == 'danger' %}bg-red-100{% elif alert.type == 'success' %}bg-green-100{% else %}bg-blue-100{% endif %}">
+                <i class="fas {% if alert.type == 'warning' %}fa-exclamation-triangle text-amber-500{% elif alert.type == 'danger' %}fa-times-circle text-red-500{% elif alert.type == 'success' %}fa-check-circle text-green-500{% else %}fa-info-circle text-blue-500{% endif %} text-sm sm:text-base"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-semibold text-sm sm:text-base {% if alert.type == 'warning' %}text-amber-800{% elif alert.type == 'danger' %}text-red-800{% elif alert.type == 'success' %}text-green-800{% else %}text-blue-800{% endif %}">
+                    {{ alert.title }}
+                </p>
+                <p class="text-xs sm:text-sm mt-1 {% if alert.type == 'warning' %}text-amber-600{% elif alert.type == 'danger' %}text-red-600{% elif alert.type == 'success' %}text-green-600{% else %}text-blue-600{% endif %}">
+                    {{ alert.message }}
+                </p>
+            </div>
+            <button class="text-slate-400 hover:text-slate-600 p-1" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
+    <!-- ================= HEADER ACTIONS ================= -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background: rgba(30, 79, 111, 0.1);">
+                <i class="fas fa-chart-bar text-lg sm:text-xl" style="color: #1e4f6f;"></i>
+            </div>
+            <div>
+                <p class="text-xs sm:text-sm text-slate-500">Tableau de bord</p>
+                <p class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">Vue Direction</p>
+            </div>
+        </div>
+        <div class="flex gap-2 sm:gap-3">
+            <a href="{% url 'accounts:export_executive_csv' %}"
+               class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1db5b0] text-white font-medium rounded-xl hover:bg-[#19a09b] transition-colors text-sm">
+                <i class="fas fa-download"></i>
+                <span>Export CSV</span>
+            </a>
+            <button onclick="window.print()"
+                    class="px-4 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition-colors text-sm">
+                <i class="fas fa-print"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ================= STATISTIQUES GLOBALES ================= -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <!-- Total Candidatures -->
-        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="text-sm text-slate-500 mb-1">Total Candidatures</p>
-                    <h3 class="text-3xl font-bold" style="color: #1e4f6f;">{{ total_candidatures|default:0|intcomma }}</h3>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
+                <div class="order-2 sm:order-1">
+                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Total Candidatures</p>
+                    <h3 class="text-2xl sm:text-3xl font-bold" style="color: #1e4f6f;">{{ total_candidatures|default:0|intcomma }}</h3>
                 </div>
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(30, 79, 111, 0.1);">
-                    <i class="fas fa-users text-xl" style="color: #1e4f6f;"></i>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center order-1 sm:order-2" style="background: rgba(30, 79, 111, 0.1);">
+                    <i class="fas fa-users text-lg sm:text-xl" style="color: #1e4f6f;"></i>
                 </div>
             </div>
         </div>
 
         <!-- Total Inscriptions -->
-        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="text-sm text-slate-500 mb-1">Inscriptions Actives</p>
-                    <h3 class="text-3xl font-bold" style="color: #1db5b0;">{{ total_inscriptions|default:0|intcomma }}</h3>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
+                <div class="order-2 sm:order-1">
+                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Inscriptions Actives</p>
+                    <h3 class="text-2xl sm:text-3xl font-bold" style="color: #1db5b0;">{{ total_inscriptions|default:0|intcomma }}</h3>
                 </div>
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(29, 181, 176, 0.1);">
-                    <i class="fas fa-user-check text-xl" style="color: #1db5b0;"></i>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center order-1 sm:order-2" style="background: rgba(29, 181, 176, 0.1);">
+                    <i class="fas fa-user-check text-lg sm:text-xl" style="color: #1db5b0;"></i>
                 </div>
             </div>
         </div>
 
         <!-- Revenus Totaux -->
-        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="text-sm text-slate-500 mb-1">Revenus Totaux</p>
-                    <h3 class="text-2xl font-bold" style="color: #f39c12;">{{ total_revenue|default:0|intcomma }} <span class="text-sm font-normal">F</span></h3>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
+                <div class="order-2 sm:order-1">
+                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Revenus Totaux</p>
+                    <h3 class="text-xl sm:text-2xl font-bold truncate" style="color: #f39c12;">{{ total_revenue|default:0|intcomma }} <span class="text-xs sm:text-sm font-normal">F</span></h3>
                 </div>
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(243, 156, 18, 0.1);">
-                    <i class="fas fa-coins text-xl" style="color: #f39c12;"></i>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center order-1 sm:order-2" style="background: rgba(243, 156, 18, 0.1);">
+                    <i class="fas fa-coins text-lg sm:text-xl" style="color: #f39c12;"></i>
                 </div>
             </div>
         </div>
 
         <!-- Revenus du Mois -->
-        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="text-sm text-slate-500 mb-1">Revenus du Mois</p>
-                    <h3 class="text-2xl font-bold text-green-600">{{ monthly_revenue|default:0|intcomma }} <span class="text-sm font-normal">F</span></h3>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
+                <div class="order-2 sm:order-1">
+                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Revenus du Mois</p>
+                    <h3 class="text-xl sm:text-2xl font-bold text-green-600 truncate">{{ monthly_revenue|default:0|intcomma }} <span class="text-xs sm:text-sm font-normal">F</span></h3>
                 </div>
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-green-50">
-                    <i class="fas fa-chart-line text-xl text-green-500"></i>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-green-50 order-1 sm:order-2">
+                    <i class="fas fa-chart-line text-lg sm:text-xl text-green-500"></i>
                 </div>
             </div>
         </div>
 
         <!-- Taux de Conversion -->
-        <div class="stat-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="text-sm text-slate-500 mb-1">Taux de Conversion</p>
-                    <h3 class="text-3xl font-bold text-slate-700">{{ conversion_rate|default:0 }}%</h3>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 col-span-2 sm:col-span-1">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
+                <div class="order-2 sm:order-1">
+                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Taux de Conversion</p>
+                    <h3 class="text-2xl sm:text-3xl font-bold text-slate-700">{{ conversion_rate|default:0 }}%</h3>
                 </div>
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-100">
-                    <i class="fas fa-percentage text-xl text-slate-500"></i>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-slate-100 order-1 sm:order-2">
+                    <i class="fas fa-percentage text-lg sm:text-xl text-slate-500"></i>
                 </div>
             </div>
         </div>
-
     </div>
 
-    <!-- ============================================== -->
-    <!-- PERFORMANCE PAR ANNEXE -->
-    <!-- ============================================== -->
+    <!-- ================= CHARTS SECTION ================= -->
+    {% if stats_for_charts %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Revenue Trend Chart -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6">
+            <h3 class="font-bold text-base sm:text-lg mb-4" style="color: #1e4f6f;">
+                <i class="fas fa-chart-line mr-2" style="color: #22c55e;"></i>Évolution des revenus (30 jours)
+            </h3>
+            <div class="relative h-56 sm:h-64">
+                <canvas id="revenueTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Branch Performance Chart -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6">
+            <h3 class="font-bold text-base sm:text-lg mb-4" style="color: #1e4f6f;">
+                <i class="fas fa-chart-pie mr-2" style="color: #1db5b0;"></i>Revenus par annexe
+            </h3>
+            <div class="relative h-56 sm:h-64">
+                <canvas id="branchChart"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================= PERFORMANCE PAR ANNEXE ================= -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
+        <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style="background-color: #f4fbfb;">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(30, 79, 111, 0.1);">
                     <i class="fas fa-building" style="color: #1e4f6f;"></i>
                 </div>
-                <h2 class="text-lg font-bold" style="color: #1e4f6f;">Performance par Annexe</h2>
+                <h2 class="text-base sm:text-lg font-bold" style="color: #1e4f6f;">Performance par Annexe</h2>
             </div>
-            <span class="px-3 py-1 rounded-full text-xs font-medium" style="background: rgba(29, 181, 176, 0.1); color: #1db5b0;">
+            <span class="px-3 py-1 rounded-full text-xs font-medium w-fit" style="background: rgba(29, 181, 176, 0.1); color: #1db5b0;">
                 {{ branch_stats|length }} annexe{{ branch_stats|length|pluralize:"s" }}
             </span>
         </div>
 
-        <div class="overflow-x-auto custom-scrollbar">
+        <!-- Mobile Cards View -->
+        <div class="block lg:hidden p-3 sm:p-4 space-y-3">
+            {% for stat in branch_stats %}
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(30, 79, 111, 0.1);">
+                        <i class="fas fa-map-marker-alt" style="color: #1e4f6f;"></i>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-slate-800">{{ stat.branch.name }}</p>
+                        <p class="text-xs text-slate-400">{{ stat.branch.code }}</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <p class="text-xs text-slate-400">Candidatures</p>
+                        <p class="font-semibold text-slate-700">{{ stat.candidatures_total }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Acceptées</p>
+                        <p class="font-semibold" style="color: #1db5b0;">{{ stat.candidatures_accepted }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Inscriptions</p>
+                        <p class="font-semibold text-blue-600">{{ stat.inscriptions_count }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Agents</p>
+                        <p class="font-semibold text-purple-600">{{ stat.agents_count }}</p>
+                    </div>
+                </div>
+                <div class="mt-3 pt-3 border-t border-slate-200 flex justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400">Revenus Total</p>
+                        <p class="font-bold" style="color: #f39c12;">{{ stat.total_revenue|intcomma }} F</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-400">Ce mois</p>
+                        <p class="font-bold text-green-600">{{ stat.monthly_revenue|intcomma }} F</p>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-12 text-slate-400">
+                <i class="fas fa-inbox text-4xl mb-3"></i>
+                <p>Aucune annexe configurée</p>
+            </div>
+            {% endfor %}
+
+            {% if branch_stats %}
+            <div class="p-4 rounded-xl bg-slate-100 border-2 border-slate-200">
+                <p class="font-bold text-slate-700 mb-2">TOTAL</p>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <p class="text-xs text-slate-500">Candidatures</p>
+                        <p class="font-bold text-slate-700">{{ total_candidatures }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500">Inscriptions</p>
+                        <p class="font-bold text-slate-700">{{ total_inscriptions }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500">Revenus Total</p>
+                        <p class="font-bold" style="color: #f39c12;">{{ total_revenue|intcomma }} F</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500">Ce mois</p>
+                        <p class="font-bold text-green-600">{{ monthly_revenue|intcomma }} F</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Desktop Table View -->
+        <div class="hidden lg:block overflow-x-auto custom-scrollbar">
             <table class="w-full">
                 <thead>
                     <tr class="bg-slate-50 text-left text-sm text-slate-500">
@@ -178,26 +327,73 @@
         </div>
     </div>
 
-    <!-- ============================================== -->
-    <!-- CLASSEMENT AGENTS + PROGRAMMES POPULAIRES -->
-    <!-- ============================================== -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- ================= TOP AGENTS + PROGRAMMES ================= -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
         <!-- Top Agents -->
-        <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
+        <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style="background-color: #f4fbfb;">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(243, 156, 18, 0.1);">
                         <i class="fas fa-trophy" style="color: #f39c12;"></i>
                     </div>
-                    <h2 class="text-lg font-bold" style="color: #1e4f6f;">Top Agents de Paiement</h2>
+                    <h2 class="text-base sm:text-lg font-bold" style="color: #1e4f6f;">Top Agents de Paiement</h2>
                 </div>
-                <span class="px-3 py-1 rounded-full text-xs font-medium" style="background: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
+                <span class="px-3 py-1 rounded-full text-xs font-medium w-fit" style="background: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
                     Tous temps
                 </span>
             </div>
 
-            <div class="overflow-x-auto custom-scrollbar">
+            <!-- Mobile Cards -->
+            <div class="block lg:hidden p-3 sm:p-4 space-y-3">
+                {% for item in agent_ranking %}
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                    <div class="flex items-center gap-3 mb-3">
+                        {% if forloop.counter == 1 %}
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center text-white" style="background: #f39c12;">
+                            <i class="fas fa-crown text-xs"></i>
+                        </span>
+                        {% elif forloop.counter == 2 %}
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center bg-slate-400 text-white">
+                            <i class="fas fa-medal text-xs"></i>
+                        </span>
+                        {% elif forloop.counter == 3 %}
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center bg-amber-700 text-white">
+                            <i class="fas fa-award text-xs"></i>
+                        </span>
+                        {% else %}
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center bg-slate-200 text-slate-600 font-bold text-sm">
+                            {{ forloop.counter }}
+                        </span>
+                        {% endif %}
+                        <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
+                            {{ item.agent.user.first_name.0|upper|default:"?" }}{{ item.agent.user.last_name.0|upper|default:"?" }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-slate-800 truncate">{{ item.agent.user.get_full_name|default:item.agent.user.username }}</p>
+                            <p class="text-xs text-slate-400">{{ item.agent.agent_code }}</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
+                            {{ item.branch.name|default:"Non assigné" }}
+                        </span>
+                        <div class="text-right">
+                            <p class="font-bold" style="color: #f39c12;">{{ item.total_revenue|intcomma }} F</p>
+                            <p class="text-xs text-green-600">+{{ item.monthly_revenue|intcomma }} F ce mois</p>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8 text-slate-400">
+                    <i class="fas fa-user-tie text-2xl mb-2"></i>
+                    <p class="text-sm">Aucun agent de paiement</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Desktop Table -->
+            <div class="hidden lg:block overflow-x-auto custom-scrollbar">
                 <table class="w-full">
                     <thead>
                         <tr class="bg-slate-50 text-left text-sm text-slate-500">
@@ -213,19 +409,19 @@
                         <tr class="hover:bg-slate-50 transition-colors">
                             <td class="px-6 py-4">
                                 {% if forloop.counter == 1 %}
-                                    <span class="w-8 h-8 rounded-full flex items-center justify-center text-white" style="background: #f39c12;">
-                                        <i class="fas fa-crown text-xs"></i>
-                                    </span>
+                                <span class="w-8 h-8 rounded-full flex items-center justify-center text-white" style="background: #f39c12;">
+                                    <i class="fas fa-crown text-xs"></i>
+                                </span>
                                 {% elif forloop.counter == 2 %}
-                                    <span class="w-8 h-8 rounded-full flex items-center justify-center bg-slate-400 text-white">
-                                        <i class="fas fa-medal text-xs"></i>
-                                    </span>
+                                <span class="w-8 h-8 rounded-full flex items-center justify-center bg-slate-400 text-white">
+                                    <i class="fas fa-medal text-xs"></i>
+                                </span>
                                 {% elif forloop.counter == 3 %}
-                                    <span class="w-8 h-8 rounded-full flex items-center justify-center bg-amber-700 text-white">
-                                        <i class="fas fa-award text-xs"></i>
-                                    </span>
+                                <span class="w-8 h-8 rounded-full flex items-center justify-center bg-amber-700 text-white">
+                                    <i class="fas fa-award text-xs"></i>
+                                </span>
                                 {% else %}
-                                    <span class="text-slate-500 font-bold pl-2">{{ forloop.counter }}</span>
+                                <span class="text-slate-500 font-bold pl-2">{{ forloop.counter }}</span>
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4">
@@ -267,29 +463,29 @@
 
         <!-- Programmes Populaires -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="px-6 py-5 border-b border-slate-100" style="background-color: #f4fbfb;">
+            <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100" style="background-color: #f4fbfb;">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(29, 181, 176, 0.1);">
                         <i class="fas fa-graduation-cap" style="color: #1db5b0;"></i>
                     </div>
-                    <h2 class="text-lg font-bold" style="color: #1e4f6f;">Top Programmes</h2>
+                    <h2 class="text-base sm:text-lg font-bold" style="color: #1e4f6f;">Top Programmes</h2>
                 </div>
             </div>
 
-            <div class="p-4 space-y-3">
+            <div class="p-3 sm:p-4 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
                 {% for prog in programmes_popularity %}
-                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50">
-                    <div class="flex items-center gap-3">
-                        <span class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0
                             {% if forloop.counter == 1 %}text-white{% else %}text-slate-600 bg-slate-200{% endif %}"
                             {% if forloop.counter == 1 %}style="background: #1db5b0;"{% endif %}>
                             {{ forloop.counter }}
                         </span>
-                        <span class="text-sm font-medium text-slate-700 truncate" style="max-width: 150px;">
+                        <span class="text-sm font-medium text-slate-700 truncate">
                             {{ prog.candidature__programme__title }}
                         </span>
                     </div>
-                    <span class="px-3 py-1 rounded-full text-xs font-bold" style="background: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
+                    <span class="px-3 py-1 rounded-full text-xs font-bold flex-shrink-0" style="background: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
                         {{ prog.count }}
                     </span>
                 </div>
@@ -301,39 +497,36 @@
                 {% endfor %}
             </div>
         </div>
-
     </div>
 
-    <!-- ============================================== -->
-    <!-- ACTIVITÉS RÉCENTES -->
-    <!-- ============================================== -->
+    <!-- ================= ACTIVITÉS RÉCENTES ================= -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <!-- Inscriptions Récentes -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
-                <h2 class="font-bold text-lg" style="color: #1e4f6f;">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
+                <h2 class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">
                     <i class="fas fa-user-plus mr-2" style="color: #1db5b0;"></i>
                     Inscriptions Récentes
                 </h2>
             </div>
-            <div class="p-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+            <div class="p-3 sm:p-4 max-h-[350px] sm:max-h-[400px] overflow-y-auto custom-scrollbar">
                 {% for ins in recent_inscriptions %}
-                <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white text-sm" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors gap-2 sm:gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
                             {{ ins.candidature.first_name.0|upper }}{{ ins.candidature.last_name.0|upper }}
                         </div>
-                        <div>
-                            <p class="font-medium text-slate-800 text-sm">{{ ins.candidature.full_name }}</p>
-                            <p class="text-xs text-slate-400">{{ ins.candidature.programme.title|truncatechars:25 }}</p>
+                        <div class="min-w-0">
+                            <p class="font-medium text-slate-800 text-sm truncate">{{ ins.candidature.full_name }}</p>
+                            <p class="text-xs text-slate-400 truncate">{{ ins.candidature.programme.title|truncatechars:25 }}</p>
                         </div>
                     </div>
-                    <div class="text-right">
+                    <div class="text-left sm:text-right flex sm:flex-col items-center sm:items-end gap-2 sm:gap-0 flex-shrink-0 pl-13 sm:pl-0">
                         <span class="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
                             {{ ins.candidature.branch.name|default:"N/A" }}
                         </span>
-                        <p class="text-xs text-slate-400 mt-1">{{ ins.created_at|date:"d/m/Y" }}</p>
+                        <p class="text-xs text-slate-400">{{ ins.created_at|date:"d/m/Y" }}</p>
                     </div>
                 </div>
                 {% empty %}
@@ -347,25 +540,25 @@
 
         <!-- Paiements Récents -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
-                <h2 class="font-bold text-lg" style="color: #1e4f6f;">
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
+                <h2 class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">
                     <i class="fas fa-money-bill-wave mr-2" style="color: #f39c12;"></i>
                     Paiements Récents
                 </h2>
             </div>
-            <div class="p-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+            <div class="p-3 sm:p-4 max-h-[350px] sm:max-h-[400px] overflow-y-auto custom-scrollbar">
                 {% for payment in recent_payments %}
-                <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: rgba(243, 156, 18, 0.1);">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors gap-2 sm:gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background: rgba(243, 156, 18, 0.1);">
                             <i class="fas fa-receipt" style="color: #f39c12;"></i>
                         </div>
-                        <div>
-                            <p class="font-medium text-slate-800 text-sm">{{ payment.inscription.candidature.full_name }}</p>
+                        <div class="min-w-0">
+                            <p class="font-medium text-slate-800 text-sm truncate">{{ payment.inscription.candidature.full_name }}</p>
                             <p class="text-xs text-slate-400">{{ payment.get_method_display }}</p>
                         </div>
                     </div>
-                    <div class="text-right">
+                    <div class="text-left sm:text-right flex sm:flex-col items-center sm:items-end gap-2 sm:gap-0 flex-shrink-0 pl-13 sm:pl-0">
                         <p class="font-bold" style="color: #f39c12;">{{ payment.amount|intcomma }} F</p>
                         <p class="text-xs text-slate-400">{{ payment.paid_at|date:"d/m/Y H:i" }}</p>
                     </div>
@@ -378,8 +571,86 @@
                 {% endfor %}
             </div>
         </div>
-
     </div>
 
 </div>
+
+<!-- ================= SCRIPTS ================= -->
+{% if stats_for_charts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Revenue Trend Chart
+    const trendCtx = document.getElementById('revenueTrendChart');
+    if (trendCtx) {
+        const trendData = {{ stats_for_charts.revenue_trend|safe|default:'[]' }};
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: trendData.map(d => d.date),
+                datasets: [{
+                    label: 'Revenus',
+                    data: trendData.map(d => d.amount),
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#22c55e',
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString() + ' F';
+                            }
+                        }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // Branch Performance Pie Chart
+    const branchCtx = document.getElementById('branchChart');
+    if (branchCtx) {
+        const branchData = {{ stats_for_charts.branch_revenue|safe|default:'[]' }};
+        new Chart(branchCtx, {
+            type: 'doughnut',
+            data: {
+                labels: branchData.map(d => d.name),
+                datasets: [{
+                    data: branchData.map(d => d.revenue),
+                    backgroundColor: ['#1e4f6f', '#1db5b0', '#f39c12', '#3b82f6', '#8b5cf6', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            font: { size: 11 }
+                        }
+                    }
+                },
+                cutout: '55%'
+            }
+        });
+    }
+});
+</script>
+{% endif %}
 {% endblock %}

@@ -1,0 +1,197 @@
+{# templates/accounts/dashboard/partials/candidature_detail.html #}
+
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title">
+            <i class="fas fa-user-graduate me-2"></i>
+            Détails de la candidature
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+
+    <div class="modal-body">
+        {# Informations personnelles #}
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-id-card me-2"></i>Informations personnelles
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Nom :</strong> {{ candidature.last_name }}</p>
+                        <p><strong>Prénom :</strong> {{ candidature.first_name }}</p>
+                        <p><strong>Genre :</strong> {{ candidature.get_gender_display }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Date de naissance :</strong> {{ candidature.birth_date|date:"d/m/Y" }}</p>
+                        <p><strong>Lieu de naissance :</strong> {{ candidature.birth_place }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Coordonnées #}
+        <div class="card mb-3">
+            <div class="card-header bg-info text-white">
+                <i class="fas fa-phone me-2"></i>Coordonnées
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Email :</strong> <a href="mailto:{{ candidature.email }}">{{ candidature.email }}</a></p>
+                        <p><strong>Téléphone :</strong> <a href="tel:{{ candidature.phone }}">{{ candidature.phone }}</a></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Adresse :</strong> {{ candidature.address|default:"-" }}</p>
+                        <p><strong>Ville :</strong> {{ candidature.city|default:"-" }}</p>
+                        <p><strong>Pays :</strong> {{ candidature.country|default:"-" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Programme #}
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-graduation-cap me-2"></i>Programme
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Programme :</strong> {{ candidature.programme.title }}</p>
+                        <p><strong>Année académique :</strong> {{ candidature.academic_year }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Année d'entrée :</strong> {{ candidature.entry_year }}</p>
+                        <p><strong>Annexe :</strong> {{ candidature.branch.name|default:"Non assignée" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Statut #}
+        <div class="card mb-3">
+            <div class="card-header bg-secondary text-white">
+                <i class="fas fa-info-circle me-2"></i>Statut
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p>
+                            <strong>Statut :</strong>
+                            <span class="badge
+                                {% if candidature.status == 'submitted' %}bg-secondary
+                                {% elif candidature.status == 'under_review' %}bg-primary
+                                {% elif candidature.status == 'to_complete' %}bg-warning
+                                {% elif candidature.status == 'accepted' %}bg-success
+                                {% elif candidature.status == 'rejected' %}bg-danger
+                                {% endif %}">
+                                {{ candidature.get_status_display }}
+                            </span>
+                        </p>
+                        <p><strong>Soumise le :</strong> {{ candidature.submitted_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Révisée le :</strong> {{ candidature.reviewed_at|date:"d/m/Y H:i"|default:"-" }}</p>
+                        {% if candidature.admin_comment %}
+                        <p><strong>Commentaire :</strong> {{ candidature.admin_comment }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Documents #}
+        <div class="card mb-3">
+            <div class="card-header bg-warning text-dark">
+                <i class="fas fa-file-alt me-2"></i>Documents ({{ documents|length }})
+            </div>
+            <div class="card-body">
+                {% if documents %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Fichier</th>
+                                <th>Validé</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in documents %}
+                            <tr>
+                                <td>{{ doc.document_type.name }}</td>
+                                <td>
+                                    <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i> Voir
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if doc.is_valid %}
+                                    <span class="badge bg-success"><i class="fas fa-check"></i> Validé</span>
+                                    {% else %}
+                                    <span class="badge bg-warning"><i class="fas fa-clock"></i> En attente</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not doc.is_valid %}
+                                    <button type="button"
+                                            class="btn btn-sm btn-success"
+                                            hx-post="{% url 'accounts:validate_document_htmx' doc.id %}"
+                                            hx-swap="outerHTML"
+                                            hx-confirm="Valider ce document ?">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">Aucun document soumis.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Inscription liée #}
+        {% if has_inscription %}
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-file-signature me-2"></i>Inscription créée
+            </div>
+            <div class="card-body">
+                <p><strong>Référence :</strong> {{ inscription.reference }}</p>
+                <p><strong>Montant dû :</strong> {{ inscription.amount_due }} FCFA</p>
+                <p><strong>Montant payé :</strong> {{ inscription.amount_paid }} FCFA</p>
+                <p><strong>Solde :</strong> {{ inscription.balance }} FCFA</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+
+        {% if candidature.status == 'submitted' or candidature.status == 'under_review' or candidature.status == 'to_complete' %}
+        <button type="button"
+                class="btn btn-success"
+                hx-post="{% url 'accounts:approve_candidature_htmx' candidature.id %}"
+                hx-target="#candidature-row-{{ candidature.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Accepter cette candidature et créer l'inscription ?">
+            <i class="fas fa-check"></i> Accepter
+        </button>
+        <button type="button"
+                class="btn btn-danger"
+                hx-post="{% url 'accounts:reject_candidature_htmx' candidature.id %}"
+                hx-target="#candidature-row-{{ candidature.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Rejeter cette candidature ?">
+            <i class="fas fa-times"></i> Rejeter
+        </button>
+        {% endif %}
+    </div>
+</div>

@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models import Sum
 from django.urls import reverse
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from admissions.models import Candidature
 
@@ -245,6 +246,23 @@ class Inscription(models.Model):
     def is_active(self):
         return self.status == self.STATUS_ACTIVE
 
+    # ==================================================
+    # ARCHIVAGE
+    # ==================================================
+
+    is_archived = models.BooleanField(
+        default=False,
+        db_index=True
+    )
+
+    archived_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+    def archive(self):
+        self.is_archived = True
+        self.archived_at = timezone.now()
+        self.save(update_fields=["is_archived", "archived_at"])
 
 class StatusHistory(models.Model):
 

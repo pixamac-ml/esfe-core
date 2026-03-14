@@ -125,6 +125,21 @@ urlpatterns = [
     ),
 
 
+    # Dans accounts/urls.py, ajouter :
+
+    # Détails
+    path('htmx/candidature/<int:candidature_id>/detail/', get_candidature_detail_htmx, name='candidature_detail_htmx'),
+    path('htmx/inscription/<int:inscription_id>/detail/', get_inscription_detail_htmx, name='inscription_detail_htmx'),
+
+    # Suppression
+    path('htmx/candidature/<int:candidature_id>/delete/', delete_candidature_htmx, name='delete_candidature_htmx'),
+
+    # Exports
+    path('export/candidatures/', export_candidatures_csv, name='export_candidatures_csv'),
+    path('export/payments/', export_payments_csv, name='export_payments_csv'),
+    path('dashboard/executive/export/', export_executive_csv, name='export_executive_csv'),
+
+
     # ========================
     # HTMX ENDPOINTS - ADMISSIONS
     # ========================

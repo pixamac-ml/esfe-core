@@ -2,9 +2,9 @@
 
 from django.utils import timezone
 from datetime import timedelta
-import random
-
+import secrets
 from django.db.models import Q
+from django.db import transaction
 
 from payments.models import PaymentAgent, CashPaymentSession
 
@@ -12,17 +12,11 @@ from payments.models import PaymentAgent, CashPaymentSession
 # ============================================================
 # 1️⃣ Vérifier agent + créer (ou récupérer) session active
 # ============================================================
-from django.utils import timezone
-from datetime import timedelta
-import random
-from django.db.models import Q
-
-from payments.models import PaymentAgent, CashPaymentSession
-
 
 def verify_agent_and_create_session(inscription, agent_full_name):
     """
     Vérifie que l’agent existe.
+
     Réutilise une session active si elle existe.
     Sinon crée une nouvelle session (valide 5 minutes).
 
@@ -45,6 +39,7 @@ def verify_agent_and_create_session(inscription, agent_full_name):
     )
 
     query = Q()
+
     for part in parts:
         query &= (
             Q(user__first_name__icontains=part) |
@@ -56,29 +51,40 @@ def verify_agent_and_create_session(inscription, agent_full_name):
     if not agent:
         return None, "Agent introuvable."
 
-    # Nettoyage sessions expirées
-    CashPaymentSession.objects.filter(
-        inscription=inscription,
-        agent=agent,
-        expires_at__lt=timezone.now()
-    ).update(is_used=True)
+    with transaction.atomic():
 
-    # Vérifier session active
-    session = CashPaymentSession.objects.filter(
-        inscription=inscription,
-        agent=agent,
-        is_used=False,
-        expires_at__gt=timezone.now()
-    ).order_by("-created_at").first()
-
-    if not session:
-        session = CashPaymentSession.objects.create(
+        # Nettoyer sessions expirées
+        CashPaymentSession.objects.filter(
             inscription=inscription,
             agent=agent,
-            verification_code=str(random.randint(100000, 999999)),
-            expires_at=timezone.now() + timedelta(minutes=5),
-            is_used=False
+            expires_at__lt=timezone.now()
+        ).update(is_used=True)
+
+        # Vérifier session active
+        session = (
+            CashPaymentSession.objects
+            .select_for_update()
+            .filter(
+                inscription=inscription,
+                agent=agent,
+                is_used=False,
+                expires_at__gt=timezone.now()
+            )
+            .order_by("-created_at")
+            .first()
         )
+
+        if not session:
+
+            verification_code = str(secrets.randbelow(900000) + 100000)
+
+            session = CashPaymentSession.objects.create(
+                inscription=inscription,
+                agent=agent,
+                verification_code=verification_code,
+                expires_at=timezone.now() + timedelta(minutes=5),
+                is_used=False
+            )
 
     return agent, None
 
@@ -90,11 +96,15 @@ def verify_agent_and_create_session(inscription, agent_full_name):
 def validate_cash_code(inscription, agent, code):
     """
     Vérifie que :
+
     - une session active existe
     - le code correspond
     - il n’est pas expiré
+
     Marque la session comme utilisée si OK.
-    Retourne : (is_valid, error)
+
+    Retourne :
+        (is_valid, error)
     """
 
     if not code:
@@ -114,17 +124,17 @@ def validate_cash_code(inscription, agent, code):
     if not session:
         return False, "Aucune session active trouvée."
 
-    # ⏳ Expiration
+    # ⏳ Code expiré
     if timezone.now() > session.expires_at:
         session.is_used = True
         session.save(update_fields=["is_used"])
         return False, "Code expiré."
 
-    # ❌ Code incorrect
+    # ❌ Mauvais code
     if session.verification_code != code:
         return False, "Code invalide."
 
-    # ✅ Validation OK
+    # ✅ Validation
     session.is_used = True
     session.save(update_fields=["is_used"])
 

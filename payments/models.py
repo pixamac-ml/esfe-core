@@ -3,26 +3,24 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
+from django.contrib.auth import get_user_model
 
 from branches.models import Branch
 from inscriptions.models import Inscription
+
 from payments.services.receipt import generate_receipt_number
 from payments.services.qrcode import generate_qr_image
 from payments.utils.pdf import render_pdf
 
-from students.services.create_student import (
-    create_student_after_first_payment
-)
-
+from students.services.create_student import create_student_after_first_payment
 from students.services.email import (
     send_student_credentials_email,
     send_payment_confirmation_email
 )
 
-from django.contrib.auth import get_user_model
 import secrets
-from datetime import timedelta
 import random
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -42,21 +40,26 @@ class PaymentAgent(models.Model):
     agent_code = models.CharField(
         max_length=8,
         unique=True,
-        editable=False
+        editable=False,
+        db_index=True
     )
-
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     branch = models.ForeignKey(
         Branch,
         on_delete=models.PROTECT,
-        null=True,
-        blank=True,
         related_name="payment_agents",
-        verbose_name="Annexe",
-        help_text="Annexe de l'agent"
+        null=True,
+        blank=True
     )
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["branch"]),
+        ]
 
     def save(self, *args, **kwargs):
 
@@ -87,9 +90,17 @@ class CashPaymentSession(models.Model):
     )
 
     verification_code = models.CharField(max_length=6)
+
     expires_at = models.DateTimeField()
+
     is_used = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["expires_at"]),
+        ]
 
     def generate_code(self):
 
@@ -134,7 +145,8 @@ class Payment(models.Model):
     inscription = models.ForeignKey(
         Inscription,
         on_delete=models.CASCADE,
-        related_name="payments"
+        related_name="payments",
+        db_index=True
     )
 
     agent = models.ForeignKey(
@@ -145,9 +157,7 @@ class Payment(models.Model):
         related_name="payments"
     )
 
-    amount = models.PositiveBigIntegerField(
-        help_text="Montant payé en FCFA"
-    )
+    amount = models.PositiveBigIntegerField()
 
     method = models.CharField(
         max_length=30,
@@ -164,7 +174,8 @@ class Payment(models.Model):
 
     reference = models.CharField(
         max_length=100,
-        blank=True
+        blank=True,
+        db_index=True
     )
 
     receipt_number = models.CharField(
@@ -181,12 +192,16 @@ class Payment(models.Model):
     )
 
     paid_at = models.DateTimeField(default=timezone.now)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-paid_at"]
+
         indexes = [
             models.Index(fields=["paid_at"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["method"]),
         ]
 
     def __str__(self):
@@ -212,10 +227,9 @@ class Payment(models.Model):
                 "L'inscription est déjà terminée."
             )
 
-        # Vérifier dépassement incohérent
         total_paid = (
             inscription.payments
-            .filter(status="validated")
+            .filter(status=self.STATUS_VALIDATED)
             .aggregate(total=Sum("amount"))["total"]
             or 0
         )
@@ -230,7 +244,7 @@ class Payment(models.Model):
                 )
 
     # ==================================================
-    # PIPELINE MÉTIER SÉCURISÉ
+    # PIPELINE MÉTIER
     # ==================================================
     def save(self, *args, **kwargs):
 
@@ -244,14 +258,24 @@ class Payment(models.Model):
                 .status
             )
 
-            if previous_status == self.STATUS_VALIDATED and self.status != self.STATUS_VALIDATED:
+            if previous_status == self.STATUS_VALIDATED:
                 raise ValueError(
-                    "Un paiement validé ne peut pas être modifié."
+                    "Un paiement validé ne peut plus être modifié."
                 )
+
+        if not self.reference:
+            self.reference = f"PAY-{secrets.token_hex(4).upper()}"
 
         self.full_clean()
 
         with transaction.atomic():
+
+            # verrouillage inscription (anti double paiement concurrent)
+            inscription = (
+                Inscription.objects
+                .select_for_update()
+                .get(pk=self.inscription_id)
+            )
 
             super().save(*args, **kwargs)
 
@@ -264,10 +288,10 @@ class Payment(models.Model):
                 return
 
             # ==================================================
-            # MISE À JOUR FINANCIÈRE INSCRIPTION
+            # MISE À JOUR FINANCIÈRE
             # ==================================================
 
-            self.inscription.update_financial_state()
+            inscription.update_financial_state()
 
             # ==================================================
             # GÉNÉRATION REÇU
@@ -278,12 +302,12 @@ class Payment(models.Model):
                 self.receipt_number = generate_receipt_number(self)
 
                 qr_image = generate_qr_image(
-                    self.inscription.get_public_url()
+                    inscription.get_public_url()
                 )
 
                 pdf_bytes = render_pdf(
                     payment=self,
-                    inscription=self.inscription,
+                    inscription=inscription,
                     qr_image=qr_image
                 )
 
@@ -296,10 +320,6 @@ class Payment(models.Model):
                 super().save(
                     update_fields=["receipt_number", "receipt_pdf"]
                 )
-
-        # ==================================================
-        # ACTIONS POST-COMMIT
-        # ==================================================
 
         transaction.on_commit(
             lambda: self._post_commit_actions()

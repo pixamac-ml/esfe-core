@@ -28,6 +28,7 @@ User = get_user_model()
 # ==================================================
 # PAYMENT AGENT
 # ==================================================
+
 class PaymentAgent(models.Model):
 
     user = models.OneToOneField(
@@ -48,8 +49,7 @@ class PaymentAgent(models.Model):
         Branch,
         on_delete=models.PROTECT,
         related_name="payment_agents",
-        null=True,
-        blank=True
+        db_index=True
     )
 
     is_active = models.BooleanField(default=True)
@@ -57,8 +57,11 @@ class PaymentAgent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering = ["user__last_name"]
+
         indexes = [
             models.Index(fields=["branch"]),
+            models.Index(fields=["is_active"]),
         ]
 
     def save(self, *args, **kwargs):
@@ -75,36 +78,44 @@ class PaymentAgent(models.Model):
 # ==================================================
 # CASH PAYMENT SESSION
 # ==================================================
+
 class CashPaymentSession(models.Model):
 
     inscription = models.ForeignKey(
         Inscription,
         on_delete=models.CASCADE,
-        related_name="cash_sessions"
+        related_name="cash_sessions",
+        db_index=True
     )
 
     agent = models.ForeignKey(
         PaymentAgent,
         on_delete=models.PROTECT,
-        related_name="cash_sessions"
+        related_name="cash_sessions",
+        db_index=True
     )
 
     verification_code = models.CharField(max_length=6)
 
-    expires_at = models.DateTimeField()
+    expires_at = models.DateTimeField(db_index=True)
 
-    is_used = models.BooleanField(default=False)
+    is_used = models.BooleanField(default=False, db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering = ["-created_at"]
+
         indexes = [
             models.Index(fields=["expires_at"]),
+            models.Index(fields=["is_used"]),
+            models.Index(fields=["agent", "created_at"]),
         ]
 
     def generate_code(self):
 
         self.verification_code = str(random.randint(100000, 999999))
+
         self.expires_at = timezone.now() + timedelta(minutes=5)
 
         self.save(update_fields=["verification_code", "expires_at"])
@@ -124,12 +135,17 @@ class CashPaymentSession(models.Model):
 # ==================================================
 # PAYMENT
 # ==================================================
+
 class Payment(models.Model):
 
+    METHOD_CASH = "cash"
+    METHOD_ORANGE = "orange_money"
+    METHOD_BANK = "bank_transfer"
+
     METHOD_CHOICES = (
-        ("cash", "Espèces"),
-        ("orange_money", "Orange Money"),
-        ("bank_transfer", "Virement bancaire"),
+        (METHOD_CASH, "Espèces"),
+        (METHOD_ORANGE, "Orange Money"),
+        (METHOD_BANK, "Virement bancaire"),
     )
 
     STATUS_PENDING = "pending"
@@ -191,17 +207,25 @@ class Payment(models.Model):
         blank=True
     )
 
-    paid_at = models.DateTimeField(default=timezone.now)
+    paid_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+
         ordering = ["-paid_at"]
 
         indexes = [
+
             models.Index(fields=["paid_at"]),
             models.Index(fields=["status"]),
             models.Index(fields=["method"]),
+
+            # dashboards financiers
+            models.Index(fields=["status", "paid_at"]),
+            models.Index(fields=["method", "paid_at"]),
+            models.Index(fields=["inscription", "status"]),
+
         ]
 
     def __str__(self):
@@ -210,6 +234,7 @@ class Payment(models.Model):
     # ==================================================
     # VALIDATION MÉTIER
     # ==================================================
+
     def clean(self):
 
         if self.amount <= 0:
@@ -238,6 +263,7 @@ class Payment(models.Model):
 
             future_total = total_paid + self.amount
 
+            # protection surpaiement extrême
             if future_total > inscription.amount_due * 2:
                 raise ValidationError(
                     "Montant incohérent détecté."
@@ -246,6 +272,7 @@ class Payment(models.Model):
     # ==================================================
     # PIPELINE MÉTIER
     # ==================================================
+
     def save(self, *args, **kwargs):
 
         previous_status = None
@@ -270,7 +297,6 @@ class Payment(models.Model):
 
         with transaction.atomic():
 
-            # verrouillage inscription (anti double paiement concurrent)
             inscription = (
                 Inscription.objects
                 .select_for_update()
@@ -328,6 +354,7 @@ class Payment(models.Model):
     # ==================================================
     # ACTIONS APRÈS COMMIT
     # ==================================================
+
     def _post_commit_actions(self):
 
         result = create_student_after_first_payment(self.inscription)

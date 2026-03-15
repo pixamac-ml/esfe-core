@@ -5,39 +5,8 @@
 {% block dashboard_title %}Vue Globale - Direction{% endblock %}
 {% block dashboard_subtitle %}Statistiques consolidées de toutes les annexes{% endblock %}
 
-{% block extra_head %}
-{{ block.super }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-{% endblock %}
-
 {% block dashboard_content %}
 <div class="space-y-6 sm:space-y-8">
-
-    <!-- ================= ALERTES ================= -->
-    {% if alerts %}
-    <div class="space-y-3">
-        {% for alert in alerts %}
-        <div class="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl border
-            {% if alert.type == 'warning' %}bg-amber-50 border-amber-200{% elif alert.type == 'danger' %}bg-red-50 border-red-200{% elif alert.type == 'success' %}bg-green-50 border-green-200{% else %}bg-blue-50 border-blue-200{% endif %}">
-            <div class="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center
-                {% if alert.type == 'warning' %}bg-amber-100{% elif alert.type == 'danger' %}bg-red-100{% elif alert.type == 'success' %}bg-green-100{% else %}bg-blue-100{% endif %}">
-                <i class="fas {% if alert.type == 'warning' %}fa-exclamation-triangle text-amber-500{% elif alert.type == 'danger' %}fa-times-circle text-red-500{% elif alert.type == 'success' %}fa-check-circle text-green-500{% else %}fa-info-circle text-blue-500{% endif %} text-sm sm:text-base"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-                <p class="font-semibold text-sm sm:text-base {% if alert.type == 'warning' %}text-amber-800{% elif alert.type == 'danger' %}text-red-800{% elif alert.type == 'success' %}text-green-800{% else %}text-blue-800{% endif %}">
-                    {{ alert.title }}
-                </p>
-                <p class="text-xs sm:text-sm mt-1 {% if alert.type == 'warning' %}text-amber-600{% elif alert.type == 'danger' %}text-red-600{% elif alert.type == 'success' %}text-green-600{% else %}text-blue-600{% endif %}">
-                    {{ alert.message }}
-                </p>
-            </div>
-            <button class="text-slate-400 hover:text-slate-600 p-1" onclick="this.parentElement.remove()">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
 
     <!-- ================= HEADER ACTIONS ================= -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -64,97 +33,137 @@
     </div>
 
     <!-- ================= STATISTIQUES GLOBALES ================= -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        <!-- Total Candidatures -->
-        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
-                <div class="order-2 sm:order-1">
-                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Total Candidatures</p>
-                    <h3 class="text-2xl sm:text-3xl font-bold" style="color: #1e4f6f;">{{ total_candidatures|default:0|intcomma }}</h3>
-                </div>
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center order-1 sm:order-2" style="background: rgba(30, 79, 111, 0.1);">
-                    <i class="fas fa-users text-lg sm:text-xl" style="color: #1e4f6f;"></i>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+
+        <!-- Total Étudiants -->
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(139, 92, 246, 0.1);">
+                    <i class="fas fa-user-graduate text-lg" style="color: #8b5cf6;"></i>
                 </div>
             </div>
+            <p class="text-2xl sm:text-3xl font-bold" style="color: #8b5cf6;">{{ total_students|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500 mt-1">Étudiants actifs</p>
+        </div>
+
+        <!-- Total Candidatures -->
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(30, 79, 111, 0.1);">
+                    <i class="fas fa-users text-lg" style="color: #1e4f6f;"></i>
+                </div>
+            </div>
+            <p class="text-2xl sm:text-3xl font-bold" style="color: #1e4f6f;">{{ total_candidatures|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500 mt-1">Candidatures</p>
         </div>
 
         <!-- Total Inscriptions -->
-        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
-                <div class="order-2 sm:order-1">
-                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Inscriptions Actives</p>
-                    <h3 class="text-2xl sm:text-3xl font-bold" style="color: #1db5b0;">{{ total_inscriptions|default:0|intcomma }}</h3>
-                </div>
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center order-1 sm:order-2" style="background: rgba(29, 181, 176, 0.1);">
-                    <i class="fas fa-user-check text-lg sm:text-xl" style="color: #1db5b0;"></i>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(29, 181, 176, 0.1);">
+                    <i class="fas fa-user-check text-lg" style="color: #1db5b0;"></i>
                 </div>
             </div>
+            <p class="text-2xl sm:text-3xl font-bold" style="color: #1db5b0;">{{ total_inscriptions|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500 mt-1">Inscriptions</p>
         </div>
 
         <!-- Revenus Totaux -->
-        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
-                <div class="order-2 sm:order-1">
-                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Revenus Totaux</p>
-                    <h3 class="text-xl sm:text-2xl font-bold truncate" style="color: #f39c12;">{{ total_revenue|default:0|intcomma }} <span class="text-xs sm:text-sm font-normal">F</span></h3>
-                </div>
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center order-1 sm:order-2" style="background: rgba(243, 156, 18, 0.1);">
-                    <i class="fas fa-coins text-lg sm:text-xl" style="color: #f39c12;"></i>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(243, 156, 18, 0.1);">
+                    <i class="fas fa-coins text-lg" style="color: #f39c12;"></i>
                 </div>
             </div>
+            <p class="text-xl sm:text-2xl font-bold truncate" style="color: #f39c12;">{{ total_revenue|default:0|intcomma }} F</p>
+            <p class="text-xs text-slate-500 mt-1">Revenus totaux</p>
         </div>
 
         <!-- Revenus du Mois -->
-        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
-                <div class="order-2 sm:order-1">
-                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Revenus du Mois</p>
-                    <h3 class="text-xl sm:text-2xl font-bold text-green-600 truncate">{{ monthly_revenue|default:0|intcomma }} <span class="text-xs sm:text-sm font-normal">F</span></h3>
-                </div>
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-green-50 order-1 sm:order-2">
-                    <i class="fas fa-chart-line text-lg sm:text-xl text-green-500"></i>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-green-50">
+                    <i class="fas fa-chart-line text-lg text-green-500"></i>
                 </div>
             </div>
+            <p class="text-xl sm:text-2xl font-bold text-green-600 truncate">{{ revenue_month|default:0|intcomma }} F</p>
+            <p class="text-xs text-slate-500 mt-1">Ce mois</p>
         </div>
 
         <!-- Taux de Conversion -->
-        <div class="stat-card bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 col-span-2 sm:col-span-1">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
-                <div class="order-2 sm:order-1">
-                    <p class="text-xs sm:text-sm text-slate-500 mb-1">Taux de Conversion</p>
-                    <h3 class="text-2xl sm:text-3xl font-bold text-slate-700">{{ conversion_rate|default:0 }}%</h3>
+        <div class="stat-card bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-100">
+                    <i class="fas fa-percentage text-lg text-slate-500"></i>
                 </div>
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-slate-100 order-1 sm:order-2">
-                    <i class="fas fa-percentage text-lg sm:text-xl text-slate-500"></i>
+            </div>
+            <p class="text-2xl sm:text-3xl font-bold text-slate-700">{{ conversion_rate|default:0 }}%</p>
+            <p class="text-xs text-slate-500 mt-1">Taux conversion</p>
+        </div>
+    </div>
+
+    <!-- ================= INDICATEURS TEMPORELS ================= -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-5 border border-green-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-green-600 font-medium">Aujourd'hui</p>
+                    <p class="text-2xl font-bold text-green-700 mt-1">{{ revenue_today|default:0|intcomma }} F</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-green-200/50 flex items-center justify-center">
+                    <i class="fas fa-calendar-day text-green-600"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 border border-blue-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-blue-600 font-medium">Cette semaine</p>
+                    <p class="text-2xl font-bold text-blue-700 mt-1">{{ revenue_week|default:0|intcomma }} F</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-200/50 flex items-center justify-center">
+                    <i class="fas fa-calendar-week text-blue-600"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-5 border border-purple-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-purple-600 font-medium">Ce mois</p>
+                    <p class="text-2xl font-bold text-purple-700 mt-1">{{ revenue_month|default:0|intcomma }} F</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-purple-200/50 flex items-center justify-center">
+                    <i class="fas fa-calendar-alt text-purple-600"></i>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ================= CHARTS SECTION ================= -->
-    {% if stats_for_charts %}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Revenue Trend Chart -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6">
-            <h3 class="font-bold text-base sm:text-lg mb-4" style="color: #1e4f6f;">
-                <i class="fas fa-chart-line mr-2" style="color: #22c55e;"></i>Évolution des revenus (30 jours)
-            </h3>
-            <div class="relative h-56 sm:h-64">
-                <canvas id="revenueTrendChart"></canvas>
+    <!-- ================= ADMISSIONS OVERVIEW ================= -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <h3 class="font-bold text-lg mb-4" style="color: #1e4f6f;">
+            <i class="fas fa-clipboard-list mr-2" style="color: #1db5b0;"></i>
+            État des admissions
+        </h3>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="text-center p-4 rounded-xl bg-yellow-50 border border-yellow-200">
+                <p class="text-3xl font-bold text-yellow-600">{{ admissions_stats.submitted|default:0 }}</p>
+                <p class="text-sm text-yellow-700 mt-1">Soumises</p>
             </div>
-        </div>
-
-        <!-- Branch Performance Chart -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6">
-            <h3 class="font-bold text-base sm:text-lg mb-4" style="color: #1e4f6f;">
-                <i class="fas fa-chart-pie mr-2" style="color: #1db5b0;"></i>Revenus par annexe
-            </h3>
-            <div class="relative h-56 sm:h-64">
-                <canvas id="branchChart"></canvas>
+            <div class="text-center p-4 rounded-xl bg-blue-50 border border-blue-200">
+                <p class="text-3xl font-bold text-blue-600">{{ admissions_stats.reviewing|default:0 }}</p>
+                <p class="text-sm text-blue-700 mt-1">En révision</p>
+            </div>
+            <div class="text-center p-4 rounded-xl bg-green-50 border border-green-200">
+                <p class="text-3xl font-bold text-green-600">{{ admissions_stats.accepted|default:0 }}</p>
+                <p class="text-sm text-green-700 mt-1">Acceptées</p>
+            </div>
+            <div class="text-center p-4 rounded-xl bg-red-50 border border-red-200">
+                <p class="text-3xl font-bold text-red-600">{{ admissions_stats.rejected|default:0 }}</p>
+                <p class="text-sm text-red-700 mt-1">Rejetées</p>
             </div>
         </div>
     </div>
-    {% endif %}
 
     <!-- ================= PERFORMANCE PAR ANNEXE ================= -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -180,31 +189,31 @@
                     </div>
                     <div>
                         <p class="font-semibold text-slate-800">{{ stat.branch.name }}</p>
-                        <p class="text-xs text-slate-400">{{ stat.branch.code }}</p>
+                        <p class="text-xs text-slate-400">{{ stat.branch.code|default:"" }}</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 text-sm">
                     <div>
                         <p class="text-xs text-slate-400">Candidatures</p>
-                        <p class="font-semibold text-slate-700">{{ stat.candidatures_total }}</p>
+                        <p class="font-semibold text-slate-700">{{ stat.candidatures }}</p>
                     </div>
                     <div>
                         <p class="text-xs text-slate-400">Acceptées</p>
-                        <p class="font-semibold" style="color: #1db5b0;">{{ stat.candidatures_accepted }}</p>
+                        <p class="font-semibold" style="color: #1db5b0;">{{ stat.accepted }}</p>
                     </div>
                     <div>
                         <p class="text-xs text-slate-400">Inscriptions</p>
-                        <p class="font-semibold text-blue-600">{{ stat.inscriptions_count }}</p>
+                        <p class="font-semibold text-blue-600">{{ stat.inscriptions }}</p>
                     </div>
                     <div>
                         <p class="text-xs text-slate-400">Agents</p>
-                        <p class="font-semibold text-purple-600">{{ stat.agents_count }}</p>
+                        <p class="font-semibold text-purple-600">{{ stat.agents }}</p>
                     </div>
                 </div>
                 <div class="mt-3 pt-3 border-t border-slate-200 flex justify-between">
                     <div>
                         <p class="text-xs text-slate-400">Revenus Total</p>
-                        <p class="font-bold" style="color: #f39c12;">{{ stat.total_revenue|intcomma }} F</p>
+                        <p class="font-bold" style="color: #f39c12;">{{ stat.revenue|intcomma }} F</p>
                     </div>
                     <div class="text-right">
                         <p class="text-xs text-slate-400">Ce mois</p>
@@ -237,7 +246,7 @@
                     </div>
                     <div>
                         <p class="text-xs text-slate-500">Ce mois</p>
-                        <p class="font-bold text-green-600">{{ monthly_revenue|intcomma }} F</p>
+                        <p class="font-bold text-green-600">{{ revenue_month|intcomma }} F</p>
                     </div>
                 </div>
             </div>
@@ -268,32 +277,32 @@
                                 </div>
                                 <div>
                                     <p class="font-semibold text-slate-800">{{ stat.branch.name }}</p>
-                                    <p class="text-xs text-slate-400">{{ stat.branch.code }}</p>
+                                    <p class="text-xs text-slate-400">{{ stat.branch.code|default:"" }}</p>
                                 </div>
                             </div>
                         </td>
                         <td class="px-6 py-4 text-center">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-700">
-                                {{ stat.candidatures_total }}
+                                {{ stat.candidatures }}
                             </span>
                         </td>
                         <td class="px-6 py-4 text-center">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" style="background: rgba(29, 181, 176, 0.1); color: #1db5b0;">
-                                {{ stat.candidatures_accepted }}
+                                {{ stat.accepted }}
                             </span>
                         </td>
                         <td class="px-6 py-4 text-center">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-600">
-                                {{ stat.inscriptions_count }}
+                                {{ stat.inscriptions }}
                             </span>
                         </td>
                         <td class="px-6 py-4 text-center">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-50 text-purple-600">
-                                {{ stat.agents_count }}
+                                {{ stat.agents }}
                             </span>
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <span class="font-bold" style="color: #f39c12;">{{ stat.total_revenue|intcomma }}</span>
+                            <span class="font-bold" style="color: #f39c12;">{{ stat.revenue|intcomma }}</span>
                             <span class="text-xs text-slate-400">F</span>
                         </td>
                         <td class="px-6 py-4 text-right">
@@ -315,11 +324,11 @@
                     <tr>
                         <td class="px-6 py-4 text-slate-700">TOTAL</td>
                         <td class="px-6 py-4 text-center text-slate-700">{{ total_candidatures }}</td>
-                        <td class="px-6 py-4 text-center text-slate-700">-</td>
+                        <td class="px-6 py-4 text-center" style="color: #1db5b0;">{{ admissions_stats.accepted }}</td>
                         <td class="px-6 py-4 text-center text-slate-700">{{ total_inscriptions }}</td>
                         <td class="px-6 py-4 text-center text-slate-700">-</td>
                         <td class="px-6 py-4 text-right" style="color: #f39c12;">{{ total_revenue|intcomma }} F</td>
-                        <td class="px-6 py-4 text-right text-green-600">{{ monthly_revenue|intcomma }} F</td>
+                        <td class="px-6 py-4 text-right text-green-600">{{ revenue_month|intcomma }} F</td>
                     </tr>
                 </tfoot>
                 {% endif %}
@@ -340,13 +349,13 @@
                     <h2 class="text-base sm:text-lg font-bold" style="color: #1e4f6f;">Top Agents de Paiement</h2>
                 </div>
                 <span class="px-3 py-1 rounded-full text-xs font-medium w-fit" style="background: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
-                    Tous temps
+                    Top 10
                 </span>
             </div>
 
             <!-- Mobile Cards -->
-            <div class="block lg:hidden p-3 sm:p-4 space-y-3">
-                {% for item in agent_ranking %}
+            <div class="block lg:hidden p-3 sm:p-4 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                {% for agent in agent_ranking %}
                 <div class="p-4 rounded-xl bg-slate-50 border border-slate-100">
                     <div class="flex items-center gap-3 mb-3">
                         {% if forloop.counter == 1 %}
@@ -367,20 +376,20 @@
                         </span>
                         {% endif %}
                         <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
-                            {{ item.agent.user.first_name.0|upper|default:"?" }}{{ item.agent.user.last_name.0|upper|default:"?" }}
+                            {{ agent.user.first_name.0|upper|default:"?" }}{{ agent.user.last_name.0|upper|default:"?" }}
                         </div>
                         <div class="flex-1 min-w-0">
-                            <p class="font-medium text-slate-800 truncate">{{ item.agent.user.get_full_name|default:item.agent.user.username }}</p>
-                            <p class="text-xs text-slate-400">{{ item.agent.agent_code }}</p>
+                            <p class="font-medium text-slate-800 truncate">{{ agent.user.get_full_name|default:agent.user.username }}</p>
+                            <p class="text-xs text-slate-400">{{ agent.agent_code }}</p>
                         </div>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
-                            {{ item.branch.name|default:"Non assigné" }}
+                            {{ agent.branch.name|default:"Non assigné" }}
                         </span>
                         <div class="text-right">
-                            <p class="font-bold" style="color: #f39c12;">{{ item.total_revenue|intcomma }} F</p>
-                            <p class="text-xs text-green-600">+{{ item.monthly_revenue|intcomma }} F ce mois</p>
+                            <p class="font-bold" style="color: #f39c12;">{{ agent.total_collected|default:0|intcomma }} F</p>
+                            <p class="text-xs text-green-600">+{{ agent.monthly_collected|default:0|intcomma }} F ce mois</p>
                         </div>
                     </div>
                 </div>
@@ -405,7 +414,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        {% for item in agent_ranking %}
+                        {% for agent in agent_ranking %}
                         <tr class="hover:bg-slate-50 transition-colors">
                             <td class="px-6 py-4">
                                 {% if forloop.counter == 1 %}
@@ -427,25 +436,25 @@
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
                                     <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
-                                        {{ item.agent.user.first_name.0|upper|default:"?" }}{{ item.agent.user.last_name.0|upper|default:"?" }}
+                                        {{ agent.user.first_name.0|upper|default:"?" }}{{ agent.user.last_name.0|upper|default:"?" }}
                                     </div>
                                     <div>
-                                        <span class="font-medium text-slate-800">{{ item.agent.user.get_full_name|default:item.agent.user.username }}</span>
-                                        <p class="text-xs text-slate-400">{{ item.agent.agent_code }}</p>
+                                        <span class="font-medium text-slate-800">{{ agent.user.get_full_name|default:agent.user.username }}</span>
+                                        <p class="text-xs text-slate-400">{{ agent.agent_code }}</p>
                                     </div>
                                 </div>
                             </td>
                             <td class="px-6 py-4">
                                 <span class="px-2 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
-                                    {{ item.branch.name|default:"Non assigné" }}
+                                    {{ agent.branch.name|default:"Non assigné" }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <span class="font-bold" style="color: #f39c12;">{{ item.total_revenue|intcomma }}</span>
+                                <span class="font-bold" style="color: #f39c12;">{{ agent.total_collected|default:0|intcomma }}</span>
                                 <span class="text-xs text-slate-400">F</span>
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <span class="font-bold text-green-600">{{ item.monthly_revenue|intcomma }}</span>
+                                <span class="font-bold text-green-600">{{ agent.monthly_collected|default:0|intcomma }}</span>
                                 <span class="text-xs text-slate-400">F</span>
                             </td>
                         </tr>
@@ -574,83 +583,4 @@
     </div>
 
 </div>
-
-<!-- ================= SCRIPTS ================= -->
-{% if stats_for_charts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Revenue Trend Chart
-    const trendCtx = document.getElementById('revenueTrendChart');
-    if (trendCtx) {
-        const trendData = {{ stats_for_charts.revenue_trend|safe|default:'[]' }};
-        new Chart(trendCtx, {
-            type: 'line',
-            data: {
-                labels: trendData.map(d => d.date),
-                datasets: [{
-                    label: 'Revenus',
-                    data: trendData.map(d => d.amount),
-                    borderColor: '#22c55e',
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: '#22c55e',
-                    pointRadius: 3,
-                    pointHoverRadius: 5
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: 'rgba(0,0,0,0.05)' },
-                        ticks: {
-                            callback: function(value) {
-                                return value.toLocaleString() + ' F';
-                            }
-                        }
-                    },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-    }
-
-    // Branch Performance Pie Chart
-    const branchCtx = document.getElementById('branchChart');
-    if (branchCtx) {
-        const branchData = {{ stats_for_charts.branch_revenue|safe|default:'[]' }};
-        new Chart(branchCtx, {
-            type: 'doughnut',
-            data: {
-                labels: branchData.map(d => d.name),
-                datasets: [{
-                    data: branchData.map(d => d.revenue),
-                    backgroundColor: ['#1e4f6f', '#1db5b0', '#f39c12', '#3b82f6', '#8b5cf6', '#ef4444'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 15,
-                            usePointStyle: true,
-                            font: { size: 11 }
-                        }
-                    }
-                },
-                cutout: '55%'
-            }
-        });
-    }
-});
-</script>
-{% endif %}
 {% endblock %}

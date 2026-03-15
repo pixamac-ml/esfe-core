@@ -1,0 +1,112 @@
+{% load humanize %}
+<!-- Modal détail financier inscription -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4" x-data="{ open: true }" x-show="open" x-cloak>
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="open = false; $el.closest('#modal-container').innerHTML = ''"></div>
+
+    <!-- Modal -->
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.stop>
+        <!-- Header -->
+        <div class="sticky top-0 bg-white px-6 py-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl z-10">
+            <h3 class="font-bold text-lg" style="color: #1e4f6f;">
+                <i class="fas fa-user-graduate mr-2" style="color: #1db5b0;"></i>
+                Détail financier
+            </h3>
+            <button @click="open = false; $el.closest('#modal-container').innerHTML = ''"
+                    class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6 space-y-6">
+            <!-- Info étudiant -->
+            <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
+                <div class="w-14 h-14 rounded-xl flex items-center justify-center font-bold text-white text-xl" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
+                    {{ inscription.candidature.first_name.0|upper }}{{ inscription.candidature.last_name.0|upper }}
+                </div>
+                <div>
+                    <p class="font-bold text-lg text-slate-800">{{ inscription.candidature.full_name }}</p>
+                    <p class="text-sm text-slate-500">{{ inscription.candidature.programme.title }}</p>
+                    <p class="text-xs text-slate-400 mt-1">Token: {{ inscription.public_token }}</p>
+                </div>
+            </div>
+
+            <!-- Stats financières -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="p-3 bg-blue-50 rounded-xl text-center">
+                    <p class="text-xs text-blue-600 font-semibold">Montant dû</p>
+                    <p class="text-lg font-bold text-blue-800">{{ inscription.amount_due|intcomma }} F</p>
+                </div>
+                <div class="p-3 bg-green-50 rounded-xl text-center">
+                    <p class="text-xs text-green-600 font-semibold">Payé</p>
+                    <p class="text-lg font-bold text-green-800">{{ payments_stats.total_validated|default:0|intcomma }} F</p>
+                </div>
+                <div class="p-3 bg-yellow-50 rounded-xl text-center">
+                    <p class="text-xs text-yellow-600 font-semibold">En attente</p>
+                    <p class="text-lg font-bold text-yellow-800">{{ payments_stats.total_pending|default:0|intcomma }} F</p>
+                </div>
+                <div class="p-3 bg-orange-50 rounded-xl text-center">
+                    <p class="text-xs text-orange-600 font-semibold">Solde</p>
+                    <p class="text-lg font-bold text-orange-800">{{ inscription.balance|intcomma }} F</p>
+                </div>
+            </div>
+
+            <!-- Barre de progression -->
+            <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-500">Progression du paiement</span>
+                    <span class="font-semibold text-slate-700">
+                        {% widthratio payments_stats.total_validated|default:0 inscription.amount_due 100 %}%
+                    </span>
+                </div>
+                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all"
+                         style="width: {% widthratio payments_stats.total_validated|default:0 inscription.amount_due 100 %}%"></div>
+                </div>
+            </div>
+
+            <!-- Historique des paiements -->
+            <div>
+                <h4 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <i class="fas fa-history text-slate-400"></i>
+                    Historique des paiements ({{ payments_stats.count_validated|default:0 }} validés)
+                </h4>
+
+                {% if payments %}
+                <div class="space-y-2 max-h-48 overflow-y-auto">
+                    {% for payment in payments %}
+                    <div class="flex items-center justify-between p-3 rounded-lg {% if payment.status == 'validated' %}bg-green-50{% elif payment.status == 'pending' %}bg-yellow-50{% else %}bg-red-50{% endif %}">
+                        <div class="flex items-center gap-3">
+                            <span class="w-8 h-8 flex items-center justify-center rounded-full text-white text-xs
+                                {% if payment.status == 'validated' %}bg-green-500
+                                {% elif payment.status == 'pending' %}bg-yellow-500
+                                {% else %}bg-red-500{% endif %}">
+                                {% if payment.status == 'validated' %}<i class="fas fa-check"></i>
+                                {% elif payment.status == 'pending' %}<i class="fas fa-clock"></i>
+                                {% else %}<i class="fas fa-times"></i>{% endif %}
+                            </span>
+                            <div>
+                                <p class="font-semibold text-slate-800">{{ payment.amount|intcomma }} F</p>
+                                <p class="text-xs text-slate-500">{{ payment.get_method_display }} - {{ payment.paid_at|date:"d/m/Y H:i"|default:"-" }}</p>
+                            </div>
+                        </div>
+                        <span class="text-xs font-medium px-2 py-1 rounded
+                            {% if payment.status == 'validated' %}text-green-700
+                            {% elif payment.status == 'pending' %}text-yellow-700
+                            {% else %}text-red-700{% endif %}">
+                            {{ payment.get_status_display }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-6 text-slate-400">
+                    <i class="fas fa-inbox text-2xl mb-2"></i>
+                    <p>Aucun paiement enregistré</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

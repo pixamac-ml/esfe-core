@@ -14,22 +14,23 @@ class Inscription(models.Model):
     """
     Inscription officielle après acceptation d’une candidature.
 
-    RÈGLES FONDAMENTALES :
+    PRINCIPES :
 
-    - amount_due est FIGÉ lors de la création
-    - amount_paid est CALCULÉ uniquement via Payment
-    - Cette table est la SOURCE DE VÉRITÉ FINANCIÈRE
-    - Une inscription ne peut exister que si la candidature est ACCEPTÉE
+    - Une inscription = une candidature acceptée
+    - amount_due est figé à la création
+    - amount_paid est recalculé uniquement via Payment
+    - Cette table est la source de vérité financière
     """
 
     # ==================================================
-    # LIEN MÉTIER
+    # RELATION MÉTIER
     # ==================================================
 
     candidature = models.OneToOneField(
         Candidature,
         on_delete=models.PROTECT,
-        related_name="inscription"
+        related_name="inscription",
+        db_index=True
     )
 
     # ==================================================
@@ -57,7 +58,7 @@ class Inscription(models.Model):
     )
 
     # ==================================================
-    # STATUTS (MACHINE D'ÉTAT)
+    # MACHINE D'ÉTAT
     # ==================================================
 
     STATUS_CREATED = "created"
@@ -105,10 +106,49 @@ class Inscription(models.Model):
     # MÉTADONNÉES
     # ==================================================
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    # ==================================================
+    # ARCHIVAGE
+    # ==================================================
+
+    is_archived = models.BooleanField(
+        default=False,
+        db_index=True
+    )
+
+    archived_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    # ==================================================
+    # META
+    # ==================================================
 
     class Meta:
+
         ordering = ["-created_at"]
+
+        indexes = [
+
+            models.Index(fields=["status"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["is_archived"]),
+
+            models.Index(fields=["status", "created_at"]),
+
+            # optimisation dashboards finance
+            models.Index(fields=["status", "amount_paid"]),
+
+        ]
 
     # ==================================================
     # REPRÉSENTATION
@@ -122,11 +162,8 @@ class Inscription(models.Model):
     # ==================================================
 
     def clean(self):
-        """
-        Validation croisée métier.
-        """
 
-        if self.candidature.status != "accepted":
+        if self.candidature.status not in ["accepted", "accepted_with_reserve"]:
             raise ValidationError(
                 "Impossible de créer une inscription pour une candidature non acceptée."
             )
@@ -153,7 +190,7 @@ class Inscription(models.Model):
         super().save(*args, **kwargs)
 
     # ==================================================
-    # GÉNÉRATEURS
+    # GÉNÉRATEURS SÉCURISÉS
     # ==================================================
 
     @staticmethod
@@ -169,6 +206,7 @@ class Inscription(models.Model):
     # ==================================================
 
     def get_public_url(self):
+
         return reverse(
             "inscriptions:public_detail",
             kwargs={"token": self.public_token}
@@ -179,11 +217,30 @@ class Inscription(models.Model):
     # ==================================================
 
     VALID_TRANSITIONS = {
+
         STATUS_CREATED: [STATUS_AWAITING_PAYMENT],
-        STATUS_AWAITING_PAYMENT: [STATUS_PARTIAL, STATUS_ACTIVE, STATUS_EXPIRED],
-        STATUS_PARTIAL: [STATUS_ACTIVE, STATUS_CANCELLED],
-        STATUS_ACTIVE: [STATUS_SUSPENDED, STATUS_COMPLETED, STATUS_CANCELLED],
-        STATUS_SUSPENDED: [STATUS_ACTIVE],
+
+        STATUS_AWAITING_PAYMENT: [
+            STATUS_PARTIAL,
+            STATUS_ACTIVE,
+            STATUS_EXPIRED
+        ],
+
+        STATUS_PARTIAL: [
+            STATUS_ACTIVE,
+            STATUS_CANCELLED
+        ],
+
+        STATUS_ACTIVE: [
+            STATUS_SUSPENDED,
+            STATUS_COMPLETED,
+            STATUS_CANCELLED
+        ],
+
+        STATUS_SUSPENDED: [
+            STATUS_ACTIVE
+        ],
+
     }
 
     def change_status(self, new_status):
@@ -195,17 +252,22 @@ class Inscription(models.Model):
                 f"Transition interdite : {self.status} → {new_status}"
             )
 
+        previous = self.status
+
         self.status = new_status
         self.save(update_fields=["status"])
 
+        StatusHistory.objects.create(
+            inscription=self,
+            previous_status=previous,
+            new_status=new_status
+        )
+
     # ==================================================
-    # LOGIQUE FINANCIÈRE DÉTERMINISTE
+    # LOGIQUE FINANCIÈRE
     # ==================================================
 
     def update_financial_state(self):
-        """
-        Recalcule l'état financier à partir des paiements validés.
-        """
 
         total_paid = (
             self.payments
@@ -213,9 +275,6 @@ class Inscription(models.Model):
             .aggregate(total=Sum("amount"))["total"]
             or 0
         )
-
-        if total_paid < 0:
-            total_paid = 0
 
         self.amount_paid = total_paid
 
@@ -250,35 +309,47 @@ class Inscription(models.Model):
     # ARCHIVAGE
     # ==================================================
 
-    is_archived = models.BooleanField(
-        default=False,
-        db_index=True
-    )
-
-    archived_at = models.DateTimeField(
-        null=True,
-        blank=True
-    )
     def archive(self):
+
         self.is_archived = True
         self.archived_at = timezone.now()
+
         self.save(update_fields=["is_archived", "archived_at"])
+
 
 class StatusHistory(models.Model):
 
     inscription = models.ForeignKey(
-        "Inscription",
+        Inscription,
         on_delete=models.CASCADE,
         related_name="history"
     )
 
-    previous_status = models.CharField(max_length=20)
+    previous_status = models.CharField(
+        max_length=20
+    )
 
-    new_status = models.CharField(max_length=20)
+    new_status = models.CharField(
+        max_length=20
+    )
 
-    comment = models.TextField(blank=True)
+    comment = models.TextField(
+        blank=True
+    )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True
+    )
+
+    class Meta:
+
+        ordering = ["-created_at"]
+
+        indexes = [
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["inscription", "created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.inscription.reference} : {self.previous_status} → {self.new_status}"

@@ -1,12 +1,36 @@
 {% load humanize %}
 {% load custom_filters %}
-<div class="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200" id="payment-row-{{ payment.id }}">
-    <div>
-        <p class="font-medium text-gray-800">{{ payment.inscription.candidature.full_name }}</p>
-        <p class="text-sm text-gray-500">{{ payment.inscription.candidature.programme.title }}</p>
-        <p class="text-xs text-gray-400">{{ payment.amount|intcomma }} F - {{ payment.get_method_display }}</p>
+<!-- Fragment paiement validé (remplace la ligne dans la liste) -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-xl bg-green-50 border border-green-200 gap-3 animate-pulse-once">
+    <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-white text-sm flex-shrink-0 bg-green-500">
+            <i class="fas fa-check"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="font-semibold text-green-800 truncate">
+                {{ payment.inscription.candidature.full_name }}
+            </p>
+            <p class="text-sm text-green-600 truncate">
+                {{ payment.amount|intcomma }} FCFA - {{ payment.get_method_display }}
+            </p>
+            <p class="text-xs text-green-500 mt-1">
+                <i class="fas fa-check-circle mr-1"></i>Paiement validé
+            </p>
+        </div>
     </div>
-    <span class="px-3 py-1.5 bg-green-100 text-green-700 text-sm rounded-lg">
-        <i class="fas fa-check-circle"></i> Validé
-    </span>
+    <div class="flex items-center gap-2 justify-end flex-shrink-0">
+        <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+            <i class="fas fa-check-circle mr-1"></i>Validé
+        </span>
+    </div>
 </div>
+
+<style>
+@keyframes pulse-once {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+.animate-pulse-once {
+    animation: pulse-once 0.5s ease-in-out;
+}
+</style>

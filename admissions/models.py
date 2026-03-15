@@ -253,6 +253,8 @@ class CandidatureDocument(models.Model):
         db_index=True
     )
 
+
+
     class Meta:
 
         ordering = ["uploaded_at"]
@@ -279,3 +281,4 @@ class CandidatureDocument(models.Model):
 
     def __str__(self):
         return f"{self.document_type.name} – {self.candidature.full_name}"
+

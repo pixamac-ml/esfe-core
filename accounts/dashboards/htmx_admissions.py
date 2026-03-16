@@ -20,12 +20,13 @@ from django.db.models import Q, Count
 
 from admissions.models import Candidature, CandidatureDocument
 from inscriptions.models import Inscription
+from inscriptions.services import create_inscription_from_candidature
 
 from .permissions import check_admissions_access
 from .querysets import get_base_queryset
 from .helpers import get_user_branch
 
-
+#from django.template.loader import render_to_strings
 # ==========================================================
 # DÉCORATEUR HTMX ADMISSIONS
 # ==========================================================
@@ -87,8 +88,8 @@ def approve_candidature_htmx(request, candidature_id):
 
             candidature.status = "accepted"
             candidature.reviewed_at = timezone.now()
-            candidature.reviewed_by = request.user
-            candidature.save(update_fields=["status", "reviewed_at", "reviewed_by"])
+            # Sauvegarde uniquement les champs qui existent
+            candidature.save(update_fields=["status", "reviewed_at"])
 
         html = render_to_string(
             "accounts/dashboard/partials/candidature_row.html",
@@ -139,14 +140,8 @@ def reject_candidature_htmx(request, candidature_id):
 
             candidature.status = "rejected"
             candidature.reviewed_at = timezone.now()
-            candidature.reviewed_by = request.user
-            candidature.rejection_reason = reason or "Candidature non retenue"
-            candidature.save(update_fields=[
-                "status",
-                "reviewed_at",
-                "reviewed_by",
-                "rejection_reason"
-            ])
+            # Sauvegarde uniquement les champs qui existent
+            candidature.save(update_fields=["status", "reviewed_at"])
 
         html = render_to_string(
             "accounts/dashboard/partials/candidature_row.html",
@@ -251,8 +246,7 @@ def set_candidature_to_complete_htmx(request, candidature_id):
         with transaction.atomic():
 
             candidature.status = "to_complete"
-            candidature.completion_message = message or "Veuillez compléter votre dossier"
-            candidature.save(update_fields=["status", "completion_message"])
+            candidature.save(update_fields=["status"])
 
         html = render_to_string(
             "accounts/dashboard/partials/candidature_row.html",
@@ -312,8 +306,8 @@ def validate_document_htmx(request, document_id):
 
             document.is_validated = True
             document.validated_at = timezone.now()
-            document.validated_by = request.user
-            document.save(update_fields=["is_validated", "validated_at", "validated_by"])
+            # Sauvegarde uniquement les champs qui existent
+            document.save(update_fields=["is_validated", "validated_at"])
 
         html = render_to_string(
             "accounts/dashboard/partials/document_row.html",
@@ -346,62 +340,48 @@ def validate_document_htmx(request, document_id):
 # CRÉATION INSCRIPTION
 # ==========================================================
 
+
 @require_POST
-@htmx_admissions_required
 def create_inscription_htmx(request, candidature_id):
-    """
-    Crée une inscription à partir d'une candidature acceptée.
-    """
 
     candidature = get_object_or_404(
-        get_base_queryset(request.user, "candidature"),
+        Candidature,
         id=candidature_id,
         status="accepted"
     )
 
-    # Vérifier si inscription existe déjà
-    if Inscription.objects.filter(candidature=candidature).exists():
-        return HttpResponse(
-            "<div class='text-yellow-500'>Une inscription existe déjà pour cette candidature</div>",
-            status=400
-        )
+    if hasattr(candidature, "inscription"):
+        return HttpResponse("Inscription déjà créée", status=400)
 
     try:
-        with transaction.atomic():
 
-            inscription = Inscription.objects.create(
-                candidature=candidature,
-                status="created"
-            )
+        programme = candidature.programme
+
+        amount_due = programme.get_inscription_amount_for_year(
+            candidature.entry_year
+        )
+
+        if amount_due <= 0:
+            raise ValueError("Aucun frais configuré pour ce programme")
+
+        inscription = create_inscription_from_candidature(
+            candidature=candidature,
+            amount_due=amount_due
+        )
 
         html = render_to_string(
             "accounts/dashboard/partials/inscription_created.html",
-            {
-                "inscription": inscription,
-                "candidature": candidature
-            },
+            {"inscription": inscription},
             request=request
         )
 
-        response = HttpResponse(html)
-        response["HX-Trigger"] = json.dumps({
-            "inscriptionCreated": {
-                "id": inscription.id,
-                "candidature_id": candidature.id
-            },
-            "showToast": {
-                "message": f"Inscription créée avec succès",
-                "type": "success"
-            }
-        })
-
-        return response
+        return HttpResponse(html)
 
     except Exception as e:
-        return HttpResponse(
-            f"<div class='text-red-500'>Erreur : {str(e)}</div>",
-            status=500
-        )
+
+        print("CREATE INSCRIPTION ERROR:", e)
+
+        return HttpResponse(str(e), status=500)
 
 
 # ==========================================================
@@ -415,20 +395,66 @@ def get_candidature_detail_htmx(request, candidature_id):
     Affiche le détail complet d'une candidature dans un modal.
     """
 
+    # CORRECTION: Suppression de "reviewed_by" du select_related
     candidature = get_object_or_404(
         get_base_queryset(request.user, "candidature")
         .select_related(
             "programme",
-            "branch",
-            "reviewed_by"
+            "branch"
         )
         .prefetch_related("documents"),
         id=candidature_id
     )
 
+    # Calcul du pourcentage de complétion
+    documents = candidature.documents.all()
+    total_docs = documents.count()
+    validated_docs = documents.filter(is_validated=True).count()
+    pending_docs = total_docs - validated_docs
+
+    # Nombre de documents requis (optionnel, à adapter selon votre modèle)
+    required_docs_count = 5  # ou récupérez depuis le programme
+
+    completion_percentage = 0
+    if required_docs_count > 0:
+        completion_percentage = min(100, int((validated_docs / required_docs_count) * 100))
+
+    # Vérifier si inscription existe
+    has_inscription = False
+    inscription = None
+    try:
+        inscription = Inscription.objects.filter(candidature=candidature).first()
+        has_inscription = inscription is not None
+    except:
+        pass
+
+    # Permissions pour les boutons d'action
+    can_set_under_review = candidature.status == "submitted"
+    can_request_completion = candidature.status in ["submitted", "under_review"]
+    can_approve = candidature.status in ["submitted", "under_review"]
+    can_reject = candidature.status in ["submitted", "under_review"]
+    can_create_inscription = candidature.status == "accepted" and not has_inscription
+
+    context = {
+        "candidature": candidature,
+        "documents": documents,
+        "total_docs": total_docs,
+        "validated_docs": validated_docs,
+        "pending_docs": pending_docs,
+        "required_docs_count": required_docs_count,
+        "completion_percentage": completion_percentage,
+        "has_inscription": has_inscription,
+        "inscription": inscription,
+        "can_set_under_review": can_set_under_review,
+        "can_request_completion": can_request_completion,
+        "can_approve": can_approve,
+        "can_reject": can_reject,
+        "can_create_inscription": can_create_inscription,
+    }
+
     html = render_to_string(
-        "accounts/dashboard/partials/candidature_detail_modal.html",
-        {"candidature": candidature},
+        "accounts/dashboard/partials/candidature_detail.html",
+        context,
         request=request
     )
 
@@ -491,16 +517,13 @@ def delete_candidature_htmx(request, candidature_id):
 
     try:
         with transaction.atomic():
-
-            candidature.is_deleted = True
-            candidature.deleted_at = timezone.now()
-            candidature.deleted_by = request.user
-            candidature.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+            # Suppression définitive ou marquer comme supprimé si le champ existe
+            candidature.delete()
 
         response = HttpResponse("")
         response["HX-Trigger"] = json.dumps({
             "candidatureDeleted": {
-                "id": candidature.id
+                "id": candidature_id
             },
             "showToast": {
                 "message": f"Candidature supprimée",
@@ -536,7 +559,6 @@ def candidatures_list_htmx(request):
             "programme",
             "branch"
         )
-        .filter(is_deleted=False)
     )
 
     # Filtres
@@ -601,7 +623,6 @@ def documents_list_htmx(request):
     # Documents non validés des candidatures accessibles
     candidature_ids = (
         get_base_queryset(request.user, "candidature")
-        .filter(is_deleted=False)
         .values_list("id", flat=True)
     )
 
@@ -655,10 +676,7 @@ def refresh_admissions_stats_htmx(request):
     Utilisé pour la mise à jour automatique des compteurs.
     """
 
-    candidatures = (
-        get_base_queryset(request.user, "candidature")
-        .filter(is_deleted=False)
-    )
+    candidatures = get_base_queryset(request.user, "candidature")
 
     # Comptage par statut
     stats = candidatures.aggregate(

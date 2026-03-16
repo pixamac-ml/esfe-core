@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 
@@ -7,7 +8,6 @@ from formations.models import Programme, RequiredDocument
 
 
 class Candidature(models.Model):
-
     # ==================================================
     # LIEN ACADÉMIQUE
     # ==================================================
@@ -37,7 +37,7 @@ class Candidature(models.Model):
     entry_year = models.PositiveSmallIntegerField(
         default=1,
         validators=[MinValueValidator(1)],
-        help_text="Année d’entrée dans le programme"
+        help_text="Année d'entrée dans le programme"
     )
 
     # ==================================================
@@ -91,7 +91,7 @@ class Candidature(models.Model):
 
     STATUS_CHOICES = (
         ("submitted", "Soumise"),
-        ("under_review", "En cours d’analyse"),
+        ("under_review", "En cours d'analyse"),
         ("to_complete", "À compléter"),
         ("accepted", "Acceptée"),
         ("accepted_with_reserve", "Acceptée sous réserve"),
@@ -110,6 +110,18 @@ class Candidature(models.Model):
         help_text="Commentaire interne (non visible par le candidat)"
     )
 
+    rejection_reason = models.TextField(
+        blank=True,
+        verbose_name="Motif de refus",
+        help_text="Raison du refus de la candidature"
+    )
+
+    completion_message = models.TextField(
+        blank=True,
+        verbose_name="Message de complétion",
+        help_text="Message envoyé au candidat pour compléter son dossier"
+    )
+
     # ==================================================
     # MÉTADONNÉES
     # ==================================================
@@ -121,7 +133,17 @@ class Candidature(models.Model):
 
     reviewed_at = models.DateTimeField(
         null=True,
-        blank=True
+        blank=True,
+        verbose_name="Date de révision"
+    )
+
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_candidatures",
+        verbose_name="Révisé par"
     )
 
     updated_at = models.DateTimeField(
@@ -129,11 +151,33 @@ class Candidature(models.Model):
     )
 
     # ==================================================
+    # SOFT DELETE
+    # ==================================================
+
+    is_deleted = models.BooleanField(
+        default=False,
+        db_index=True
+    )
+
+    deleted_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deleted_candidatures",
+        verbose_name="Supprimé par"
+    )
+
+    # ==================================================
     # META
     # ==================================================
 
     class Meta:
-
         ordering = ["-submitted_at"]
 
         constraints = [
@@ -173,6 +217,11 @@ class Candidature(models.Model):
     @property
     def full_name(self):
         return f"{self.last_name} {self.first_name}"
+
+    @property
+    def reference(self):
+        """Génère une référence unique pour la candidature."""
+        return f"CAND-{self.academic_year[:4]}-{self.id:05d}"
 
     # ==================================================
     # MÉTHODES MÉTIER
@@ -221,7 +270,6 @@ class Candidature(models.Model):
 
 
 class CandidatureDocument(models.Model):
-
     candidature = models.ForeignKey(
         Candidature,
         on_delete=models.CASCADE,
@@ -239,8 +287,30 @@ class CandidatureDocument(models.Model):
 
     is_valid = models.BooleanField(
         default=False,
-        help_text="Validé par l’administration",
+        help_text="Validé par l'administration",
         db_index=True
+    )
+
+    # Ajout pour compatibilité avec htmx_admissions
+    is_validated = models.BooleanField(
+        default=False,
+        help_text="Document validé",
+        db_index=True
+    )
+
+    validated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Date de validation"
+    )
+
+    validated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="validated_documents",
+        verbose_name="Validé par"
     )
 
     admin_note = models.CharField(
@@ -253,10 +323,7 @@ class CandidatureDocument(models.Model):
         db_index=True
     )
 
-
-
     class Meta:
-
         ordering = ["uploaded_at"]
 
         constraints = [
@@ -281,4 +348,3 @@ class CandidatureDocument(models.Model):
 
     def __str__(self):
         return f"{self.document_type.name} – {self.candidature.full_name}"
-

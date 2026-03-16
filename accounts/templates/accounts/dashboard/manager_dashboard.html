@@ -1,0 +1,379 @@
+{% extends "accounts/dashboard/base_dashboard.html" %}
+{% load humanize %}
+
+{% block dashboard_title %}Dashboard Gestionnaire{% endblock %}
+{% block dashboard_subtitle %}Gestion des inscriptions et paiements – {{ branch.name }}{% endblock %}
+
+{% block dashboard_content %}
+
+<div class="space-y-6">
+
+    <!-- ================= STATS CARDS ================= -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <!-- Total Inscriptions -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total Inscriptions</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ total_inscriptions|intcomma }}</p>
+                    <p class="text-xs text-green-600 mt-1">
+                        <span class="font-medium">+{{ inscriptions_this_month }}</span> ce mois
+                    </p>
+                </div>
+                <div class="p-3 rounded-full bg-blue-100">
+                    <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paiements en attente -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Paiements en attente</p>
+                    <p class="text-3xl font-bold text-yellow-600 mt-1">{{ pending_payments }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ pending_payments_amount|intcomma }} FCFA</p>
+                </div>
+                <div class="p-3 rounded-full bg-yellow-100">
+                    <svg class="w-7 h-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Encaissé aujourd'hui -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Encaissé aujourd'hui</p>
+                    <p class="text-3xl font-bold text-green-600 mt-1">{{ total_today|intcomma }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ validated_today_count }} paiement{{ validated_today_count|pluralize }}</p>
+                </div>
+                <div class="p-3 rounded-full bg-green-100">
+                    <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total du mois -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total du mois</p>
+                    <p class="text-3xl font-bold text-purple-600 mt-1">{{ total_month|intcomma }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ total_week|intcomma }} FCFA cette semaine</p>
+                </div>
+                <div class="p-3 rounded-full bg-purple-100">
+                    <svg class="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= STATS SECONDAIRES ================= -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
+            <p class="text-blue-100 text-sm">Étudiants actifs</p>
+            <p class="text-2xl font-bold">{{ total_students }}</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white">
+            <p class="text-emerald-100 text-sm">Inscriptions actives</p>
+            <p class="text-2xl font-bold">{{ inscriptions_active }}</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-4 text-white">
+            <p class="text-amber-100 text-sm">Candidatures à traiter</p>
+            <p class="text-2xl font-bold">{{ candidatures_pending }}</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl p-4 text-white">
+            <p class="text-rose-100 text-sm">Soldes en attente</p>
+            <p class="text-2xl font-bold">{{ inscriptions_with_balance }}</p>
+        </div>
+
+    </div>
+
+    <!-- ================= ALERTES ================= -->
+    {% if candidatures_pending > 0 or candidatures_to_complete > 0 %}
+    <div class="space-y-3">
+        {% if candidatures_pending > 0 %}
+        <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg flex items-center justify-between">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 text-amber-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span class="text-amber-800">
+                    <strong>{{ candidatures_pending }}</strong> candidature{{ candidatures_pending|pluralize }} en attente de traitement
+                </span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if candidatures_to_complete > 0 %}
+        <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-r-lg flex items-center justify-between">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 text-orange-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="text-orange-800">
+                    <strong>{{ candidatures_to_complete }}</strong> dossier{{ candidatures_to_complete|pluralize }} à compléter
+                </span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ================= GRILLE PRINCIPALE ================= -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- COLONNE GAUCHE : Inscriptions + Candidatures -->
+        <div class="lg:col-span-2 space-y-6">
+
+            <!-- INSCRIPTIONS RÉCENTES -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-900">Inscriptions récentes</h3>
+                    <span class="text-xs text-gray-400">{{ total_inscriptions }} total</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Étudiant</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Programme</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Statut</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-50">
+                            {% for inscription in inscriptions %}
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm mr-3">
+                                            {{ inscription.candidature.first_name|slice:":1" }}{{ inscription.candidature.last_name|slice:":1" }}
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">
+                                                {{ inscription.candidature.last_name|upper }} {{ inscription.candidature.first_name }}
+                                            </div>
+                                            <div class="text-xs text-gray-500">{{ inscription.candidature.email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">{{ inscription.candidature.programme.title|truncatechars:25 }}</div>
+                                    <div class="text-xs text-gray-500">{{ inscription.candidature.programme.cycle.name }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                        {% if inscription.status == 'active' %}bg-green-100 text-green-800
+                                        {% elif inscription.status == 'partial_paid' %}bg-amber-100 text-amber-800
+                                        {% elif inscription.status == 'awaiting_payment' %}bg-orange-100 text-orange-800
+                                        {% elif inscription.status == 'created' %}bg-blue-100 text-blue-800
+                                        {% elif inscription.status == 'suspended' %}bg-red-100 text-red-800
+                                        {% elif inscription.status == 'cancelled' %}bg-gray-100 text-gray-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ inscription.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ inscription.created_at|date:"d/m/Y" }}
+                                    <span class="text-gray-400 text-xs block">{{ inscription.created_at|date:"H:i" }}</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="px-6 py-8 text-center text-gray-400">
+                                    <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Aucune inscription récente
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PAIEMENTS DU JOUR -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-900">Paiements du jour</h3>
+                    <span class="text-sm font-medium text-green-600">{{ total_today|intcomma }} FCFA</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Référence</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Étudiant</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Montant</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Heure</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-50">
+                            {% for payment in payments_today %}
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="text-sm font-mono font-medium text-gray-900">{{ payment.reference }}</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ payment.inscription.candidature.last_name|upper }} {{ payment.inscription.candidature.first_name }}
+                                    </div>
+                                    <div class="text-xs text-gray-500">{{ payment.inscription.candidature.programme.title|truncatechars:20 }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="text-sm font-bold text-gray-900">{{ payment.amount|intcomma }}</span>
+                                    <span class="text-xs text-gray-500">FCFA</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                        {% if payment.status == 'validated' %}bg-green-100 text-green-800
+                                        {% elif payment.status == 'pending' %}bg-yellow-100 text-yellow-800
+                                        {% elif payment.status == 'cancelled' %}bg-red-100 text-red-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ payment.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ payment.created_at|date:"H:i" }}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-gray-400">
+                                    <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    </svg>
+                                    Aucun paiement aujourd'hui
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- COLONNE DROITE : Sidebar -->
+        <div class="space-y-6">
+
+            <!-- CANDIDATURES RÉCENTES -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-900">Candidatures récentes</h3>
+                </div>
+                <div class="divide-y divide-gray-50">
+                    {% for candidature in recent_candidatures %}
+                    <div class="px-6 py-4 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm mr-3">
+                                    {{ candidature.first_name|slice:":1" }}{{ candidature.last_name|slice:":1" }}
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">{{ candidature.full_name }}</p>
+                                    <p class="text-xs text-gray-500">{{ candidature.programme.title|truncatechars:22 }}</p>
+                                </div>
+                            </div>
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if candidature.status == 'submitted' %}bg-blue-100 text-blue-700
+                                {% elif candidature.status == 'under_review' %}bg-purple-100 text-purple-700
+                                {% elif candidature.status == 'to_complete' %}bg-orange-100 text-orange-700
+                                {% elif candidature.status == 'accepted' %}bg-green-100 text-green-700
+                                {% elif candidature.status == 'rejected' %}bg-red-100 text-red-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ candidature.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="px-6 py-8 text-center text-gray-400">
+                        Aucune candidature récente
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- PAIEMENTS RÉCENTS -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-900">Paiements récents</h3>
+                </div>
+                <div class="divide-y divide-gray-50">
+                    {% for payment in recent_payments|slice:":5" %}
+                    <div class="px-6 py-4 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">
+                                    {{ payment.inscription.candidature.last_name|upper }} {{ payment.inscription.candidature.first_name|slice:":1" }}.
+                                </p>
+                                <p class="text-xs text-gray-500">{{ payment.created_at|date:"d/m/Y H:i" }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-gray-900">{{ payment.amount|intcomma }}</p>
+                                <span class="px-2 py-0.5 text-xs font-medium rounded-full
+                                    {% if payment.status == 'validated' %}bg-green-100 text-green-700
+                                    {% elif payment.status == 'pending' %}bg-yellow-100 text-yellow-700
+                                    {% else %}bg-red-100 text-red-700{% endif %}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="px-6 py-8 text-center text-gray-400">
+                        Aucun paiement récent
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- RÉSUMÉ RAPIDE -->
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 text-white">
+                <h4 class="font-semibold mb-4">Résumé {{ branch.name }}</h4>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Candidatures acceptées</span>
+                        <span class="font-medium">{{ candidatures_accepted }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Inscriptions actives</span>
+                        <span class="font-medium">{{ inscriptions_active }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Étudiants</span>
+                        <span class="font-medium">{{ total_students }}</span>
+                    </div>
+                    <hr class="border-slate-700 my-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Recettes du mois</span>
+                        <span class="font-bold text-green-400">{{ total_month|intcomma }} FCFA</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -23,6 +23,7 @@ from branches.models import Branch
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from payments.models import Payment, PaymentAgent, CashPaymentSession
+from .dashboards.helpers import is_manager
 
 from .models import Profile
 from .forms import CustomUserCreationForm, ProfileForm, EmailUpdateForm
@@ -91,24 +92,26 @@ def dashboard_redirect(request):
 
     user = request.user
 
-    # Priorité : Executive > Finance > Admissions
+    # Ordre de priorité
     if check_executive_access(user):
         return redirect("accounts:executive_dashboard")
 
     if check_finance_access(user):
         return redirect("accounts:finance_dashboard")
 
+    if is_manager(user):
+        return redirect("accounts:manager_dashboard")
+
     if check_admissions_access(user):
         return redirect("accounts:admissions_dashboard")
 
-    # Pas d'accès dashboard - retour profil
+    # Aucun dashboard
     messages.warning(
         request,
         "Vous n'avez accès à aucun dashboard."
     )
 
     return redirect("accounts:profile")
-
 
 # ==========================================================
 # PROFIL UTILISATEUR

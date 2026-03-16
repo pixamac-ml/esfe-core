@@ -6,6 +6,7 @@ Objectifs :
 - gestion annexe utilisateur
 - pagination standard
 - outils robustes pour requêtes GET
+- logique rôles staff
 """
 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -27,6 +28,38 @@ def user_has_group(user, group_name):
         return False
 
     return user.groups.filter(name=group_name).exists()
+
+
+def is_manager(user):
+    """
+    Vérifie si l'utilisateur est gestionnaire.
+    """
+
+    return user_has_group(user, "gestionnaire")
+
+
+def is_admissions(user):
+    """
+    Vérifie si l'utilisateur appartient au staff admissions.
+    """
+
+    return user_has_group(user, "admissions")
+
+
+def is_finance(user):
+    """
+    Vérifie si l'utilisateur appartient au staff finance.
+    """
+
+    return user_has_group(user, "finance")
+
+
+def is_executive(user):
+    """
+    Vérifie si l'utilisateur appartient à la direction.
+    """
+
+    return user_has_group(user, "executive") or user.is_superuser
 
 
 # ==========================================================
@@ -83,6 +116,46 @@ def get_user_branch(user):
     )
 
     return managed_branch
+
+
+# ==========================================================
+# VUE GLOBALE
+# ==========================================================
+
+def is_global_viewer(user):
+    """
+    Détermine si l'utilisateur peut voir toutes les annexes.
+    """
+
+    if not user or not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
+    return user_has_group(user, "executive")
+
+
+# ==========================================================
+# ANNEXE OBLIGATOIRE (gestionnaire)
+# ==========================================================
+
+def ensure_manager_branch(user):
+    """
+    Vérifie qu'un gestionnaire possède une annexe.
+    """
+
+    if not is_manager(user):
+        return None
+
+    branch = get_user_branch(user)
+
+    if not branch:
+        raise ValueError(
+            "Le gestionnaire doit être assigné à une annexe."
+        )
+
+    return branch
 
 
 # ==========================================================

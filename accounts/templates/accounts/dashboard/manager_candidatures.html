@@ -1,0 +1,186 @@
+{% extends "accounts/dashboard/base_dashboard.html" %}
+{% load humanize %}
+
+{% block dashboard_title %}Candidatures{% endblock %}
+{% block dashboard_subtitle %}Gestion des candidatures – {{ branch.name }}{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6">
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <a href="?status=" class="bg-white rounded-xl p-4 border {% if not status_filter %}border-blue-500 ring-2 ring-blue-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-gray-900">{{ stats.total }}</p>
+            <p class="text-sm text-gray-500">Total</p>
+        </a>
+        <a href="?status=submitted" class="bg-white rounded-xl p-4 border {% if status_filter == 'submitted' %}border-blue-500 ring-2 ring-blue-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-blue-600">{{ stats.submitted }}</p>
+            <p class="text-sm text-gray-500">Soumises</p>
+        </a>
+        <a href="?status=under_review" class="bg-white rounded-xl p-4 border {% if status_filter == 'under_review' %}border-purple-500 ring-2 ring-purple-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-purple-600">{{ stats.under_review }}</p>
+            <p class="text-sm text-gray-500">En analyse</p>
+        </a>
+        <a href="?status=to_complete" class="bg-white rounded-xl p-4 border {% if status_filter == 'to_complete' %}border-orange-500 ring-2 ring-orange-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-orange-600">{{ stats.to_complete }}</p>
+            <p class="text-sm text-gray-500">À compléter</p>
+        </a>
+        <a href="?status=accepted" class="bg-white rounded-xl p-4 border {% if status_filter == 'accepted' %}border-green-500 ring-2 ring-green-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-green-600">{{ stats.accepted }}</p>
+            <p class="text-sm text-gray-500">Acceptées</p>
+        </a>
+        <a href="?status=rejected" class="bg-white rounded-xl p-4 border {% if status_filter == 'rejected' %}border-red-500 ring-2 ring-red-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-red-600">{{ stats.rejected }}</p>
+            <p class="text-sm text-gray-500">Refusées</p>
+        </a>
+    </div>
+
+    <!-- Search -->
+    <div class="bg-white rounded-xl border border-gray-100 p-4">
+        <form method="get" class="flex items-center space-x-4">
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <div class="flex-1 relative">
+                <input type="text" name="q" value="{{ search }}" 
+                       placeholder="Rechercher par nom, prénom ou email..."
+                       class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                Rechercher
+            </button>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Candidat</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Programme</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50" id="candidatures-list">
+                    {% for candidature in candidatures %}
+                    <tr class="hover:bg-gray-50 transition-colors" id="candidature-{{ candidature.pk }}">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm mr-3">
+                                    {{ candidature.first_name|slice:":1" }}{{ candidature.last_name|slice:":1" }}
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">{{ candidature.last_name|upper }} {{ candidature.first_name }}</p>
+                                    <p class="text-xs text-gray-500">{{ candidature.email }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <p class="text-sm text-gray-900">{{ candidature.programme.title|truncatechars:30 }}</p>
+                            <p class="text-xs text-gray-500">{{ candidature.programme.cycle.name }} – Année {{ candidature.entry_year }}</p>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 text-xs font-semibold rounded-full
+                                {% if candidature.status == 'submitted' %}bg-blue-100 text-blue-700
+                                {% elif candidature.status == 'under_review' %}bg-purple-100 text-purple-700
+                                {% elif candidature.status == 'to_complete' %}bg-orange-100 text-orange-700
+                                {% elif candidature.status == 'accepted' or candidature.status == 'accepted_with_reserve' %}bg-green-100 text-green-700
+                                {% elif candidature.status == 'rejected' %}bg-red-100 text-red-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ candidature.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            {{ candidature.submitted_at|date:"d/m/Y" }}
+                            <span class="block text-xs">{{ candidature.submitted_at|date:"H:i" }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex items-center justify-end space-x-2">
+                                <button hx-get="{% url 'accounts:htmx_candidature_detail' candidature.pk %}"
+                                        hx-target="#modal-content"
+                                        hx-swap="innerHTML"
+                                        @click="modalOpen = true"
+                                        class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title="Voir détails">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                </button>
+                                
+                                {% if candidature.status in 'submitted,under_review' %}
+                                <button hx-post="{% url 'accounts:htmx_candidature_accept' candidature.pk %}"
+                                        hx-target="#candidature-{{ candidature.pk }}"
+                                        hx-swap="outerHTML"
+                                        hx-confirm="Accepter cette candidature ?"
+                                        class="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                        title="Accepter">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </button>
+                                
+                                <button hx-post="{% url 'accounts:htmx_candidature_reject' candidature.pk %}"
+                                        hx-target="#candidature-{{ candidature.pk }}"
+                                        hx-swap="outerHTML"
+                                        hx-confirm="Refuser cette candidature ?"
+                                        class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Refuser">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                                {% endif %}
+                                
+                                {% if candidature.status in 'accepted,accepted_with_reserve' and not candidature.inscription %}
+                                <button hx-post="{% url 'accounts:htmx_inscription_create' candidature.pk %}"
+                                        hx-target="#candidature-{{ candidature.pk }}"
+                                        hx-swap="afterend"
+                                        hx-confirm="Créer l'inscription pour ce candidat ?"
+                                        class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                                    Créer inscription
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p class="text-gray-500">Aucune candidature trouvée</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if candidatures.has_other_pages %}
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+            <p class="text-sm text-gray-500">
+                Page {{ candidatures.number }} sur {{ candidatures.paginator.num_pages }}
+            </p>
+            <div class="flex items-center space-x-2">
+                {% if candidatures.has_previous %}
+                <a href="?page={{ candidatures.previous_page_number }}&status={{ status_filter }}&q={{ search }}" 
+                   class="px-3 py-1 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Précédent</a>
+                {% endif %}
+                {% if candidatures.has_next %}
+                <a href="?page={{ candidatures.next_page_number }}&status={{ status_filter }}&q={{ search }}" 
+                   class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Suivant</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

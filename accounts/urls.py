@@ -59,6 +59,10 @@ from .dashboards.exports import (
     export_payments_csv,
     export_executive_csv,
 )
+from .dashboards.manager_dashboard import *
+
+
+from .dashboards.htmx_manager import *
 
 
 app_name = "accounts"
@@ -338,5 +342,44 @@ urlpatterns = [
         export_executive_csv,
         name="export_executive_csv"
     ),
+    path(
+        "manager/",
+        manager_dashboard,
+        name="manager_dashboard"
+    ),
 
+    # =============================================
+    # MANAGER DASHBOARD
+    # =============================================
+    path("manager/", manager_dashboard, name="manager_dashboard"),
+    path("manager/candidatures/", manager_candidatures, name="manager_candidatures"),
+    path("manager/inscriptions/", manager_inscriptions, name="manager_inscriptions"),
+    path("manager/paiements/", manager_paiements, name="manager_paiements"),
+
+    # =============================================
+    # HTMX ACTIONS - CANDIDATURES
+    # =============================================
+    path("htmx/candidature/<int:pk>/detail/", candidature_detail, name="htmx_candidature_detail"),
+    path("htmx/candidature/<int:pk>/accept/", candidature_accept, name="htmx_candidature_accept"),
+    path("htmx/candidature/<int:pk>/reject/", candidature_reject, name="htmx_candidature_reject"),
+    path("htmx/candidature/<int:pk>/to-complete/", candidature_to_complete,
+         name="htmx_candidature_to_complete"),
+
+    # =============================================
+    # HTMX ACTIONS - INSCRIPTIONS
+    # =============================================
+    path("htmx/inscription/<int:pk>/detail/", inscription_detail, name="htmx_inscription_detail"),
+    path("htmx/inscription/<int:pk>/create/", inscription_create, name="htmx_inscription_create"),
+
+    # =============================================
+    # HTMX ACTIONS - PAIEMENTS
+    # =============================================
+    path("htmx/payment/<int:pk>/detail/", payment_detail, name="htmx_payment_detail"),
+    path("htmx/payment/<int:pk>/validate/", payment_validate, name="htmx_payment_validate"),
+    path("htmx/payment/<int:pk>/cancel/", payment_cancel, name="htmx_payment_cancel"),
+
+    # =============================================
+    # RECHERCHE
+    # =============================================
+    path("htmx/search/", global_search, name="htmx_search"),
 ]

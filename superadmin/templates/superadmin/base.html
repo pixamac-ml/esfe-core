@@ -1,0 +1,746 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block extra_head %}
+<style>
+    :root {
+        --primary: #1e4f6f;
+        --primary-light: #2d6a8f;
+        --primary-dark: #163b53;
+        --secondary: #1db5b0;
+        --secondary-light: #49c7c3;
+        --accent: #f39c12;
+        --accent-light: #f7b955;
+        --soft: #f4fbfb;
+        --danger: #ef4444;
+        --success: #22c55e;
+        --warning: #f59e0b;
+    }
+
+    /* ========================================
+       LAYOUT PRINCIPAL
+    ======================================== */
+    .dashboard-layout {
+        min-height: 100vh;
+        display: flex;
+        background-color: var(--soft);
+    }
+
+    /* ========================================
+       SIDEBAR
+    ======================================== */
+    .sidebar {
+        width: 260px;
+        background: linear-gradient(180deg, #1e4f6f 0%, #163b53 100%);
+        color: white;
+        flex-shrink: 0;
+        position: fixed;
+        height: 100vh;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .sidebar-logo {
+        width: 42px;
+        height: 42px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar-logo i {
+        color: var(--accent);
+        font-size: 1.25rem;
+    }
+
+    .sidebar-brand {
+        font-weight: 700;
+        font-size: 1.125rem;
+        letter-spacing: -0.025em;
+    }
+
+    .sidebar-user {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .sidebar-avatar {
+        width: 44px;
+        height: 44px;
+        background: var(--accent);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .sidebar-user-info { flex: 1; min-width: 0; }
+    .sidebar-user-name { font-weight: 600; font-size: 0.875rem; }
+    .sidebar-user-role { font-size: 0.75rem; color: rgba(255, 255, 255, 0.6); }
+
+    .sidebar-nav { flex: 1; padding: 1rem; overflow-y: auto; }
+    .sidebar-nav-section { margin-bottom: 1.5rem; }
+    .sidebar-nav-title {
+        font-size: 0.625rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(255, 255, 255, 0.4);
+        padding: 0 1rem;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        color: rgba(255, 255, 255, 0.8);
+        text-decoration: none;
+        transition: all 0.2s ease;
+        margin-bottom: 0.25rem;
+    }
+
+    .sidebar-link:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .sidebar-link.active {
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+        border-left: 3px solid var(--accent);
+        margin-left: -3px;
+    }
+
+    .sidebar-link-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.1);
+        font-size: 0.875rem;
+    }
+
+    .sidebar-link.active .sidebar-link-icon {
+        background: var(--accent);
+        color: white;
+    }
+
+    .sidebar-link-text { font-weight: 500; font-size: 0.875rem; }
+    
+    .sidebar-link-badge {
+        margin-left: auto;
+        background: var(--accent);
+        color: white;
+        font-size: 0.625rem;
+        font-weight: 700;
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+    }
+
+    .sidebar-footer {
+        padding: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* ========================================
+       MAIN CONTENT
+    ======================================== */
+    .main-content {
+        flex: 1;
+        margin-left: 260px;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    .dashboard-header {
+        background: white;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 1rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .header-title h1 { font-size: 1.5rem; font-weight: 700; color: var(--primary); margin: 0; }
+    .header-title p { font-size: 0.875rem; color: #64748b; margin: 0.25rem 0 0 0; }
+    .header-right { display: flex; align-items: center; gap: 0.5rem; }
+
+    .header-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        border: none;
+        background: transparent;
+        color: #64748b;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        transition: all 0.2s ease;
+    }
+
+    .header-btn:hover { background: var(--soft); color: var(--primary); }
+
+    .page-content { padding: 2rem; flex: 1; }
+
+    /* ========================================
+       CARDS & TABLES
+    ======================================== */
+    .card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border: 1px solid #f1f5f9;
+    }
+
+    .card-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .card-body { padding: 1.5rem; }
+
+    .data-table { width: 100%; border-collapse: collapse; }
+    
+    .data-table thead th {
+        text-align: left;
+        padding: 0.875rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .data-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.2s ease;
+    }
+
+    .data-table tbody tr:hover { background: #f8fafc; }
+
+    .data-table tbody td {
+        padding: 1rem;
+        font-size: 0.875rem;
+        color: #334155;
+        vertical-align: middle;
+    }
+
+    /* ========================================
+       BUTTONS & BADGES
+    ======================================== */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-light); transform: translateY(-1px); }
+    .btn-secondary { background: var(--secondary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-outline { background: white; border: 1px solid #e2e8f0; color: #64748b; }
+    .btn-outline:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .btn-icon { width: 36px; height: 36px; padding: 0; }
+
+    .badge-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-success { background: #dcfce7; color: #16a34a; }
+    .badge-warning { background: #fef3c7; color: #d97706; }
+    .badge-danger { background: #fee2e2; color: #dc2626; }
+    .badge-draft { background: #f1f5f9; color: #64748b; }
+    .badge-info { background: #dbeafe; color: #2563eb; }
+
+    /* ========================================
+       SEARCH & FILTERS
+    ======================================== */
+    .search-box {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1rem;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        width: 280px;
+        transition: all 0.2s ease;
+    }
+
+    .search-box:focus-within {
+        border-color: var(--secondary);
+        box-shadow: 0 0 0 3px rgba(29, 181, 176, 0.1);
+    }
+
+    .search-box i { color: #94a3b8; }
+    .search-box input {
+        border: none;
+        outline: none;
+        flex: 1;
+        font-size: 0.875rem;
+        color: #334155;
+        background: transparent;
+    }
+
+    /* ========================================
+       FORMS
+    ======================================== */
+    .form-group { margin-bottom: 1.5rem; }
+    .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 0.5rem;
+    }
+    .form-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+    }
+    .form-input:focus {
+        outline: none;
+        border-color: var(--secondary);
+        box-shadow: 0 0 0 3px rgba(29, 181, 176, 0.1);
+    }
+    .form-select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        background: white;
+    }
+    .form-textarea {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        min-height: 120px;
+        resize: vertical;
+    }
+    .form-help { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+    .form-error { font-size: 0.75rem; color: var(--danger); margin-top: 0.25rem; }
+
+    /* ========================================
+       TOGGLE SWITCH
+    ======================================== */
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 26px;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #cbd5e1;
+        transition: .3s;
+        border-radius: 26px;
+    }
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+    }
+    input:checked + .toggle-slider { background-color: var(--success); }
+    input:checked + .toggle-slider:before { transform: translateX(22px); }
+
+    /* ========================================
+       MODAL
+    ======================================== */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+    .modal-overlay.active { opacity: 1; visibility: visible; }
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+    }
+    .modal-overlay.active .modal-content { transform: scale(1); }
+    .modal-header { margin-bottom: 1.5rem; }
+    .modal-title { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+    .modal-footer { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; }
+
+    /* ========================================
+       UTILITIES
+    ======================================== */
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-4 { gap: 1rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mb-6 { margin-bottom: 1.5rem; }
+    .text-right { text-align: right; }
+
+    /* ========================================
+       ANIMATIONS
+    ======================================== */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+
+    /* ========================================
+       RESPONSIVE
+    ======================================== */
+    @media (max-width: 1024px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.open { transform: translateX(0); }
+        .main-content { margin-left: 0; }
+        .menu-toggle { display: flex !important; }
+    }
+
+    .menu-toggle {
+        display: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: none;
+        background: var(--soft);
+        color: var(--primary);
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 45;
+    }
+    .sidebar-overlay.open { display: block; }
+
+
+    /* Navigation Sections */
+.nav-section {
+    padding: 1rem 1.5rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.sidebar-footer .nav-item {
+    opacity: 0.7;
+}
+
+.sidebar-footer .nav-item:hover {
+    opacity: 1;
+}
+
+
+
+
+
+
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Overlay mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="dashboard-layout">
+    <!-- ========================================
+         SIDEBAR SUPERADMIN
+    ======================================== -->
+    <aside class="sidebar" id="sidebar">
+        <!-- Logo -->
+        <div class="sidebar-header">
+            <a href="{% url 'superadmin:dashboard' %}" class="flex items-center gap-3 text-white" style="text-decoration: none;">
+                <div class="sidebar-logo">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <span class="sidebar-brand">Super Admin</span>
+            </a>
+        </div>
+
+        <!-- User Info -->
+        <div class="sidebar-user">
+            <div class="sidebar-avatar">
+                {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+            </div>
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
+                <div class="sidebar-user-role">Super Administrateur</div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="sidebar-nav">
+            <!-- Section Principale -->
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-title">Navigation</div>
+
+                <a href="{% url 'superadmin:dashboard' %}" 
+                   class="sidebar-link {% if active_menu == 'dashboard' %}active{% endif %}">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-home"></i>
+                    </div>
+                    <span class="sidebar-link-text">Dashboard</span>
+                </a>
+            </div>
+
+            <!-- Section Contenu -->
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-title">Gestion du contenu</div>
+
+                <a href="{% url 'superadmin:formation_list' %}" 
+                   class="sidebar-link {% if active_menu == 'formations' %}active{% endif %}">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-graduation-cap"></i>
+                    </div>
+                    <span class="sidebar-link-text">Formations</span>
+                </a>
+
+                <a href="{% url 'superadmin:admission_list' %}" 
+                   class="sidebar-link {% if active_menu == 'admissions' %}active{% endif %}">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <span class="sidebar-link-text">Admissions</span>
+                </a>
+
+                <a href="{% url 'superadmin:article_list' %}" 
+                   class="sidebar-link {% if active_menu == 'articles' %}active{% endif %}">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-newspaper"></i>
+                    </div>
+                    <span class="sidebar-link-text">Articles</span>
+                </a>
+
+                <a href="{% url 'superadmin:page_list' %}" 
+                   class="sidebar-link {% if active_menu == 'pages' %}active{% endif %}">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <span class="sidebar-link-text">Pages</span>
+                </a>
+            </div>
+
+            <!-- Section Système -->
+            <div class="sidebar-nav-section">
+                <div class="sidebar-nav-title">Système</div>
+
+                <a href="{% url 'admin:index' %}" class="sidebar-link" target="_blank">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-cog"></i>
+                    </div>
+                    <span class="sidebar-link-text">Django Admin</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Footer -->
+        <div class="sidebar-footer">
+            <a href="{% url 'core:home' %}" class="sidebar-link">
+                <div class="sidebar-link-icon">
+                    <i class="fas fa-external-link-alt"></i>
+                </div>
+                <span class="sidebar-link-text">Voir le site</span>
+            </a>
+
+            <form action="{% url 'accounts:logout' %}" method="post" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="sidebar-link" style="width: 100%; border: none; background: none; cursor: pointer; text-align: left;">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </div>
+                    <span class="sidebar-link-text">Déconnexion</span>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- ========================================
+         MAIN CONTENT
+    ======================================== -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="header-title">
+                    <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+                    <p>{% block page_subtitle %}Gestion centralisée{% endblock %}</p>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <button class="header-btn" onclick="location.reload()" title="Actualiser">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Messages Flash -->
+            {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                <div class="flex items-center gap-4 p-4 rounded-xl mb-2 fade-in
+                    {% if message.tags == 'success' %}badge-success
+                    {% elif message.tags == 'error' %}badge-danger
+                    {% else %}badge-info{% endif %}" style="padding: 1rem;">
+                    <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-times-circle{% else %}fa-info-circle{% endif %}"></i>
+                    <span>{{ message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Contenu dynamique -->
+            {% block content_main %}{% endblock %}
+        </div>
+    </main>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"></div>
+
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const colors = {
+        success: '#22c55e',
+        error: '#ef4444',
+        warning: '#f59e0b',
+        info: '#3b82f6'
+    };
+
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        background: ${colors[type]};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: fadeIn 0.3s ease;
+    `;
+    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'times' : 'info'}-circle" style="margin-right: 0.5rem;"></i>${message}`;
+    
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// HTMX Events
+document.body.addEventListener('htmx:afterRequest', function(event) {
+    const trigger = event.detail.xhr.getResponseHeader('HX-Trigger');
+    if (trigger) {
+        try {
+            const data = JSON.parse(trigger);
+            if (data.showToast) {
+                showToast(data.showToast.message, data.showToast.type);
+            }
+        } catch (e) {}
+    }
+});
+</script>
+
+{% block extra_js %}{% endblock %}
+{% endblock %}

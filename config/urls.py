@@ -36,7 +36,7 @@ urlpatterns = [
     path("inscriptions/", include("inscriptions.urls")),
     path("payments/", include("payments.urls")),
     path("actualites/", include("news.urls", namespace="news")),
-
+    path('superadmin/', include('superadmin.urls')),
     # Core (home + pages publiques)
     path("", include("core.urls")),
     path("community/", include("community.urls")),

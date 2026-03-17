@@ -1,0 +1,102 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}
+Formations
+{% endblock %}
+
+{% block page_subtitle %}
+Gestion des formations
+{% endblock %}
+
+{% block content_main %}
+
+<div class="card">
+
+    <!-- HEADER -->
+    <div class="card-header">
+
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Rechercher...">
+        </div>
+
+        <a href="{% url 'superadmin:formation_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            Nouvelle formation
+        </a>
+
+    </div>
+
+    <!-- TABLE -->
+    <div class="card-body">
+
+        <table class="data-table">
+
+            <thead>
+                <tr>
+                    <th>Titre</th>
+                    <th>Durée</th>
+                    <th>Statut</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for formation in formations %}
+                <tr>
+
+                    <td>
+                        <strong>{{ formation.title }}</strong>
+                    </td>
+
+                    <td>
+                        {{ formation.duration_years }} ans
+                    </td>
+
+                    <td>
+                        {% if formation.is_active %}
+                            <span class="badge-status badge-success">Actif</span>
+                        {% else %}
+                            <span class="badge-status badge-draft">Inactif</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-right">
+
+                        <div class="flex justify-between gap-2">
+
+                            <a href="{% url 'superadmin:formation_edit' formation.id %}" class="btn btn-sm btn-outline">
+                                <i class="fas fa-edit"></i>
+                            </a>
+
+                            <button
+                                class="btn btn-sm btn-secondary"
+                                onclick="toggleFormation({{ formation.id }})"
+                            >
+                                <i class="fas fa-sync"></i>
+                            </button>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<script>
+function toggleFormation(id){
+    fetch(`/superadmin/formations/${id}/toggle/`)
+    .then(() => location.reload())
+}
+</script>
+
+{% endblock %}

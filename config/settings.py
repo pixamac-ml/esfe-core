@@ -49,7 +49,7 @@ INSTALLED_APPS = [
 
     # ✅ CKEditor 5 (UNIQUEMENT celui-ci)
     "django_ckeditor_5",
-
+    'superadmin',
     # Métier
     "admissions.apps.AdmissionsConfig",
     "inscriptions.apps.InscriptionsConfig",

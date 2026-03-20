@@ -1,6 +1,6 @@
 <form method="post"
       action="{{ article.get_absolute_url }}"
-      class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-8">
+      class="space-y-6">
 
   {% csrf_token %}
 
@@ -8,12 +8,14 @@
   <input type="text"
          name="website"
          class="hidden"
-         autocomplete="off">
+         autocomplete="off"
+         tabindex="-1"
+         aria-hidden="true">
 
   <!-- Header -->
   <div class="flex items-center gap-3">
-    <div class="bg-[#0f2c59]/10 p-2 rounded-lg">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0f2c59]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div class="bg-primary-600/10 p-2.5 rounded-xl">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
               d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8L3 20l1.2-3.6A7.7 7.7 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
       </svg>
@@ -23,59 +25,74 @@
     </h3>
   </div>
 
-  <!-- Nom -->
-  <div class="space-y-2">
-    <label class="text-sm font-medium text-gray-700">
-      Votre nom
-    </label>
-    <input type="text"
-           name="author_name"
-           required
-           class="w-full rounded-xl border border-gray-300 px-4 py-3
-                  focus:ring-2 focus:ring-[#0f2c59]
-                  focus:border-[#0f2c59]
-                  transition duration-200">
-  </div>
+  <!-- Nom & Email sur même ligne en desktop -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
 
-  <!-- Email -->
-  <div class="space-y-2">
-    <label class="text-sm font-medium text-gray-700">
-      Votre email
-    </label>
-    <input type="email"
-           name="author_email"
-           required
-           class="w-full rounded-xl border border-gray-300 px-4 py-3
-                  focus:ring-2 focus:ring-[#0f2c59]
-                  focus:border-[#0f2c59]
-                  transition duration-200">
+    <!-- Nom -->
+    <div class="space-y-2">
+      <label for="author_name" class="text-sm font-medium text-gray-700">
+        Votre nom <span class="text-red-500">*</span>
+      </label>
+      <input type="text"
+             id="author_name"
+             name="author_name"
+             required
+             placeholder="Ex: Jean Dupont"
+             class="w-full rounded-xl border border-gray-300 px-4 py-3
+                    focus:ring-2 focus:ring-primary-500
+                    focus:border-primary-500
+                    transition duration-200">
+    </div>
+
+    <!-- Email (optionnel) -->
+    <div class="space-y-2">
+      <label for="author_email" class="text-sm font-medium text-gray-700">
+        Votre email <span class="text-gray-400 font-normal">(optionnel)</span>
+      </label>
+      <input type="email"
+             id="author_email"
+             name="author_email"
+             placeholder="email@exemple.com"
+             class="w-full rounded-xl border border-gray-300 px-4 py-3
+                    focus:ring-2 focus:ring-primary-500
+                    focus:border-primary-500
+                    transition duration-200">
+    </div>
+
   </div>
 
   <!-- Commentaire -->
   <div class="space-y-2">
-    <label class="text-sm font-medium text-gray-700">
-      Votre commentaire
+    <label for="content" class="text-sm font-medium text-gray-700">
+      Votre commentaire <span class="text-red-500">*</span>
     </label>
-    <textarea name="content"
-              rows="5"
+    <textarea id="content"
+              name="content"
+              rows="4"
               required
+              minlength="3"
+              maxlength="2000"
+              placeholder="Partagez votre avis sur cet article..."
               class="w-full rounded-xl border border-gray-300 px-4 py-3
-                     focus:ring-2 focus:ring-[#0f2c59]
-                     focus:border-[#0f2c59]
+                     focus:ring-2 focus:ring-primary-500
+                     focus:border-primary-500
                      transition duration-200 resize-none"></textarea>
+    <p class="text-xs text-gray-400">Maximum 2000 caractères</p>
   </div>
 
   <!-- Submit -->
   <div class="flex justify-end">
     <button type="submit"
             class="inline-flex items-center gap-2
-                   bg-[#0f2c59] text-white px-6 py-3 rounded-xl
-                   font-medium hover:bg-[#0c2347]
-                   transition duration-200 shadow-sm">
+                   bg-primary-600 text-white px-6 py-3 rounded-xl
+                   font-medium hover:bg-primary-700
+                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+                   transition duration-200 shadow-sm
+                   w-full sm:w-auto justify-center">
 
       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M3 10l9-6 9 6-9 6-9-6zm0 4l9 6 9-6" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
       </svg>
 
       Publier le commentaire

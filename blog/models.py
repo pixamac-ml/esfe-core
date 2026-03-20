@@ -3,7 +3,7 @@ from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
-from django.db.models import Count
+from django.db.models import Count, Q, UniqueConstraint
 from django.db.models.signals import pre_save, post_delete
 from django.dispatch import receiver
 import os
@@ -164,7 +164,7 @@ class ArticleImage(models.Model):
 
 
 # ==========================================================
-# SUPPRESSION AUTOMATIQUE DES IMAGES
+# SUPPRESSION AUTOMATIQUE DES IMAGES (SÉCURISÉE)
 # ==========================================================
 
 @receiver(pre_save, sender=Article)
@@ -181,22 +181,31 @@ def delete_old_featured_image(sender, instance, **kwargs):
     new_image = instance.featured_image
 
     if old_image and old_image != new_image:
-        if os.path.isfile(old_image.path):
-            os.remove(old_image.path)
+        try:
+            if os.path.isfile(old_image.path):
+                os.remove(old_image.path)
+        except Exception:
+            pass  # Fichier déjà supprimé ou inaccessible
 
 
 @receiver(post_delete, sender=Article)
 def delete_featured_image_on_delete(sender, instance, **kwargs):
     if instance.featured_image:
-        if os.path.isfile(instance.featured_image.path):
-            os.remove(instance.featured_image.path)
+        try:
+            if os.path.isfile(instance.featured_image.path):
+                os.remove(instance.featured_image.path)
+        except Exception:
+            pass
 
 
 @receiver(post_delete, sender=ArticleImage)
 def delete_gallery_image_on_delete(sender, instance, **kwargs):
     if instance.image:
-        if os.path.isfile(instance.image.path):
-            os.remove(instance.image.path)
+        try:
+            if os.path.isfile(instance.image.path):
+                os.remove(instance.image.path)
+        except Exception:
+            pass
 
 
 # ==========================================================
@@ -267,11 +276,6 @@ class Comment(models.Model):
 # ==========================================================
 # COMMENT LIKE
 # ==========================================================
-
-from django.db import models
-from django.conf import settings
-from django.db.models import Q, UniqueConstraint
-
 
 class CommentLike(models.Model):
 

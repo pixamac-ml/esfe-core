@@ -3,6 +3,9 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from django.db.models import Count, F, Q
 from django.contrib import messages
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+from django.templatetags.static import static
 
 from .models import Article, Comment, Category, CommentLike
 from .forms import ArticleForm
@@ -35,14 +38,17 @@ def article_list(request):
             Q(excerpt__icontains=query) |
             Q(content__icontains=query)
         )
-
+    # Dans article_list() et category_detail()
+    categories = Category.objects.filter(is_active=True).annotate(
+        article_count=Count('articles', filter=Q(articles__status='published', articles__is_deleted=False))
+    )
     paginator = Paginator(articles, 6)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
     return render(request, "blog/article_list.html", {
         "articles": page_obj,
-        "categories": Category.objects.filter(is_active=True),
+        "categories": categories,
         "query": query,
     })
 
@@ -50,23 +56,6 @@ def article_list(request):
 # ==========================================================
 # DETAIL ARTICLE
 # ==========================================================
-from django.shortcuts import get_object_or_404, render, redirect
-from django.db.models import F, Count, Q
-from django.contrib import messages
-from django.templatetags.static import static
-
-from .models import Article, Comment, CommentLike
-from .services import create_comment
-
-
-from django.shortcuts import get_object_or_404, render, redirect
-from django.db.models import F, Count, Q
-from django.contrib import messages
-from django.templatetags.static import static
-
-from .models import Article, Comment, CommentLike
-from .services import create_comment
-
 
 def article_detail(request, slug):
 
@@ -223,7 +212,7 @@ def article_create(request):
         messages.success(request, "Article créé avec succès.")
         return redirect(article.get_absolute_url())
 
-    return render(request, "blog/articles/article_form.html", {
+    return render(request, "blog/article_form.html", {
         "form": form,
         "title": "Créer un article"
     })
@@ -245,9 +234,9 @@ def article_edit(request, article_id):
         messages.success(request, "Article modifié avec succès.")
         return redirect(article.get_absolute_url())
 
-    return render(request, "blog/articles/article_form.html", {
+    return render(request, "blog/article_form.html", {
         "form": form,
-        "title": "Modifier l’article"
+        "title": "Modifier l'article"
     })
 
 
@@ -298,15 +287,6 @@ def approve_comment_view(request, comment_id):
 # ==========================================================
 # REACTION COMMENTAIRE (LIKE / DISLIKE)
 # ==========================================================
-from django.template.loader import render_to_string
-from django.http import HttpResponse
-from django.views.decorators.http import require_POST
-from django.shortcuts import get_object_or_404
-from django.db.models import Count, Q
-
-from .models import Comment, CommentLike
-from .services import react_to_comment
-
 
 @require_POST
 def react_comment_view(request, comment_id):
@@ -359,10 +339,10 @@ def react_comment_view(request, comment_id):
 
     return HttpResponse(html)
 
+
 # ==========================================================
 # CUSTOM 404
 # ==========================================================
 
 def custom_404(request, exception):
     return render(request, "404.html", status=404)
-

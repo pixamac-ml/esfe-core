@@ -1,38 +1,39 @@
-<div class="comment-card bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition duration-300">
+<div class="comment-card bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-sm hover:shadow-md transition duration-300">
 
-  <div class="flex items-start gap-4">
+  <div class="flex items-start gap-3 sm:gap-4">
 
     <!-- Avatar -->
-    <div class="w-10 h-10 rounded-full bg-primary-100 text-primary-700
-                flex items-center justify-center font-semibold text-sm">
+    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-primary-100 text-primary-700
+                flex items-center justify-center font-semibold text-sm flex-shrink-0">
       {{ comment.author_name|slice:":1"|upper }}
     </div>
 
-    <div class="flex-1">
+    <div class="flex-1 min-w-0">
 
       <!-- Header -->
-      <div class="flex justify-between items-center mb-2">
-        <h4 class="font-semibold text-gray-900 text-sm">
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 mb-2">
+        <h4 class="font-semibold text-gray-900 text-sm truncate">
           {{ comment.author_name }}
         </h4>
 
-        <span class="text-xs text-gray-400 flex items-center gap-1">
-          <!-- Calendar icon (inchangé) -->
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
+        <span class="text-xs text-gray-400 flex items-center gap-1 flex-shrink-0">
+          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round"
                   d="M8 7V3m8 4V3M4 11h16M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/>
           </svg>
-          {{ comment.created_at|date:"d M Y H:i" }}
+          <time datetime="{{ comment.created_at|date:'c' }}">
+            {{ comment.created_at|date:"d M Y H:i" }}
+          </time>
         </span>
       </div>
 
       <!-- Content -->
-      <p class="text-gray-700 text-sm leading-relaxed">
+      <p class="text-gray-700 text-sm leading-relaxed break-words">
         {{ comment.content }}
       </p>
 
       <!-- Reactions -->
-      <div class="flex items-center gap-6 mt-4 text-sm text-gray-500">
+      <div class="flex items-center gap-4 sm:gap-6 mt-4 text-sm text-gray-500">
 
         <!-- LIKE -->
         <button
@@ -40,15 +41,15 @@
             hx-vals='{"reaction_type": "like"}'
             hx-target="closest .comment-card"
             hx-swap="outerHTML"
-            class="flex items-center gap-2 hover:text-primary-700 transition">
+            aria-label="J'aime ce commentaire"
+            class="flex items-center gap-1.5 sm:gap-2 hover:text-primary-700 transition focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-1 py-0.5">
 
-          <!-- Thumb Up (professionnel, propre, standard) -->
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M2 10h4v12H2z"/>
             <path d="M22 10c0-1.1-.9-2-2-2h-6.3l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 6.59 7.41C6.22 7.78 6 8.3 6 8.83V20c0 1.1.9 2 2 2h8c.82 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-3z"/>
           </svg>
 
-          <span>{{ likes_count }}</span>
+          <span>{{ likes_count|default:0 }}</span>
         </button>
 
         <!-- DISLIKE -->
@@ -57,15 +58,15 @@
             hx-vals='{"reaction_type": "dislike"}'
             hx-target="closest .comment-card"
             hx-swap="outerHTML"
-            class="flex items-center gap-2 hover:text-red-600 transition">
+            aria-label="Je n'aime pas ce commentaire"
+            class="flex items-center gap-1.5 sm:gap-2 hover:text-red-600 transition focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-1 py-0.5">
 
-          <!-- Thumb Down (professionnel, propre, standard) -->
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M22 14h-4V2h4z"/>
             <path d="M2 14c0 1.1.9 2 2 2h6.3l-.95 4.57-.03.32c0 .41.17.79.44 1.06L11 23l6.41-6.41c.37-.37.59-.89.59-1.42V4c0-1.1-.9-2-2-2H8c-.82 0-1.54.5-1.84 1.22L3.14 10.27c-.09.23-.14.47-.14.73v3z"/>
           </svg>
 
-          <span>{{ dislikes_count }}</span>
+          <span>{{ dislikes_count|default:0 }}</span>
         </button>
 
       </div>

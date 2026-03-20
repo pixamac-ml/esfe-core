@@ -4,32 +4,18 @@
 
 <!-- ================= HERO ================= -->
 <section class="relative pt-24 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
-
     <div class="max-w-4xl mx-auto px-4">
 
-        <!-- Retour -->
-        <div class="mb-8">
-            <a href="{% url 'accounts:profile' %}"
-               class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
+        <!-- Bouton retour -->
+        <a href="{% url 'accounts:profile' %}"
+           class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition group mb-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Retour au profil
+        </a>
 
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     class="w-4 h-4"
-                     fill="none"
-                     viewBox="0 0 24 24"
-                     stroke="currentColor"
-                     stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M15 19l-7-7 7-7" />
-                </svg>
-
-                Retour au profil
-            </a>
-        </div>
-
-        <h1 class="text-3xl font-bold">
-            Modifier mon profil
-        </h1>
-
+        <h1 class="text-3xl font-bold">Modifier mon profil</h1>
         <p class="text-primary-100 mt-2 text-sm max-w-2xl">
             Personnalisez votre identité sur la plateforme.
             Une photo claire et une biographie précise renforcent votre crédibilité académique.
@@ -40,101 +26,147 @@
 
 
 <!-- ================= FORMULAIRE ================= -->
-<section class="bg-soft py-20">
+<section class="bg-gray-50 py-16">
     <div class="max-w-3xl mx-auto px-4">
 
-        <div class="bg-white shadow-lg rounded-2xl p-12 border border-primary-100">
+        <div class="bg-white shadow-xl rounded-2xl border border-gray-100 overflow-hidden">
 
             {% if form.non_field_errors %}
-                <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm mb-8">
-                    {{ form.non_field_errors }}
-                </div>
+            <div class="bg-red-50 border-b border-red-200 text-red-600 p-4 text-sm flex items-center gap-2">
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                {{ form.non_field_errors }}
+            </div>
             {% endif %}
 
-            <form method="post"
-                  enctype="multipart/form-data"
-                  class="space-y-12">
-
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
 
-                <!-- ================= AVATAR ================= -->
-                <div class="space-y-6">
-
-                    <h2 class="text-lg font-semibold text-primary-700">
+                <!-- ======== SECTION AVATAR ======== -->
+                <div class="p-8 border-b border-gray-100">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="w-8 h-8 bg-primary-100 text-primary-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                        </span>
                         Photo de profil
                     </h2>
 
-                    <div class="flex items-center gap-8">
+                    <div class="flex items-center gap-6">
+                        <!-- Aperçu avatar -->
+                        <div class="relative group">
+                            <img id="avatar-preview"
+                                 src="{{ request.user.profile.avatar_url }}"
+                                 class="w-28 h-28 rounded-full object-cover border-4 border-gray-100 shadow-lg">
 
-                        <img src="{{ request.user.profile.avatar_url }}"
-                             class="w-28 h-28 rounded-full object-cover border-4 border-primary-100 shadow-md">
+                            <label for="avatar-input"
+                                   class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            </label>
+                        </div>
 
                         <div class="flex-1">
-
-                            <label class="block text-sm font-medium text-gray-600 mb-3">
+                            <label for="avatar-input"
+                                   class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition cursor-pointer shadow-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                                </svg>
                                 Changer la photo
                             </label>
-
                             {{ form.avatar }}
 
                             {% if form.avatar.errors %}
-                                <p class="text-red-500 text-sm mt-2">
-                                    {{ form.avatar.errors.0 }}
-                                </p>
+                            <p class="text-red-500 text-sm mt-2">{{ form.avatar.errors.0 }}</p>
                             {% endif %}
 
-                            <p class="text-xs text-gray-400 mt-2">
-                                Format recommandé : carré, minimum 300x300px.
+                            <p class="text-xs text-gray-400 mt-3">
+                                Format : JPG, PNG ou WebP. Taille recommandée : 300×300px minimum.
                             </p>
-
                         </div>
-
                     </div>
-
                 </div>
 
-
-                <!-- ================= BIO ================= -->
-                <div class="space-y-4">
-
-                    <h2 class="text-lg font-semibold text-primary-700">
-                        Biographie
+                <!-- ======== SECTION INFOS PERSONNELLES ======== -->
+                <div class="p-8 border-b border-gray-100">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="w-8 h-8 bg-green-100 text-green-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                        </span>
+                        Informations personnelles
                     </h2>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-3">
-                            Présentation
-                        </label>
-
-                        {{ form.bio }}
-
-                        {% if form.bio.errors %}
-                            <p class="text-red-500 text-sm mt-2">
-                                {{ form.bio.errors.0 }}
+                    <div class="space-y-5">
+                        <!-- Bio -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Biographie
+                            </label>
+                            {{ form.bio }}
+                            {% if form.bio.errors %}
+                            <p class="text-red-500 text-sm mt-1">{{ form.bio.errors.0 }}</p>
+                            {% endif %}
+                            <p class="text-xs text-gray-400 mt-1">
+                                Présentez votre parcours ou vos centres d'intérêt.
                             </p>
-                        {% endif %}
+                        </div>
 
-                        <p class="text-xs text-gray-400 mt-2">
-                            Décrivez votre spécialité, votre parcours ou vos centres d'intérêt.
-                        </p>
+                        <!-- Localisation -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Localisation
+                            </label>
+                            {{ form.location }}
+                            {% if form.location.errors %}
+                            <p class="text-red-500 text-sm mt-1">{{ form.location.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Domaine principal -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Domaine d'expertise
+                            </label>
+                            {{ form.main_domain }}
+                            {% if form.main_domain.errors %}
+                            <p class="text-red-500 text-sm mt-1">{{ form.main_domain.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Site web -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Site web personnel
+                            </label>
+                            {{ form.website }}
+                            {% if form.website.errors %}
+                            <p class="text-red-500 text-sm mt-1">{{ form.website.errors.0 }}</p>
+                            {% endif %}
+                        </div>
                     </div>
-
                 </div>
 
-
-                <!-- ================= ACTIONS ================= -->
-                <div class="flex flex-wrap gap-4 pt-6 border-t border-primary-100">
-
-                    <button type="submit"
-                            class="bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 rounded-xl font-semibold transition shadow-md">
-                        Enregistrer les modifications
-                    </button>
-
+                <!-- ======== ACTIONS ======== -->
+                <div class="p-8 bg-gray-50 flex flex-wrap items-center justify-between gap-4">
                     <a href="{% url 'accounts:profile' %}"
-                       class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition">
+                       class="px-6 py-3 text-gray-600 font-medium hover:text-gray-800 transition">
                         Annuler
                     </a>
 
+                    <button type="submit"
+                            class="px-8 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition shadow-lg hover:shadow-xl flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Enregistrer les modifications
+                    </button>
                 </div>
 
             </form>
@@ -143,5 +175,19 @@
 
     </div>
 </section>
+
+<!-- Script prévisualisation avatar -->
+<script>
+document.getElementById('avatar-input')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('avatar-preview').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+</script>
 
 {% endblock %}

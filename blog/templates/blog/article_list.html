@@ -8,7 +8,7 @@
 <!-- ================= HERO ÉDITORIAL ================= -->
 <section
   x-data="{ show: false }"
-  x-intersect:enter.threshold.20.once="show = true"
+  x-init="setTimeout(() => show = true, 100)"
   class="relative overflow-hidden
          bg-gradient-to-br
          from-primary-800
@@ -16,7 +16,7 @@
          to-primary-900
          text-white">
 
-  <!-- Pattern -->
+  <!-- Pattern animé -->
   <div class="absolute inset-0 opacity-[0.05]">
     <svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -28,28 +28,35 @@
     </svg>
   </div>
 
-  <div class="relative max-w-7xl mx-auto px-6 py-28">
+  <!-- Gradient overlay animé -->
+  <div class="absolute inset-0 bg-gradient-to-t from-primary-900/40 to-transparent"></div>
 
-    <div class="max-w-4xl space-y-10">
+  <div class="relative max-w-7xl mx-auto px-6 py-20 sm:py-28">
+
+    <div class="max-w-4xl space-y-8 sm:space-y-10">
 
       <!-- Badge -->
       <div
         x-show="show"
-        x-transition
+        x-transition:enter="transition ease-out duration-500 delay-100"
+        x-transition:enter-start="opacity-0 -translate-y-4"
+        x-transition:enter-end="opacity-100 translate-y-0"
         class="inline-flex items-center gap-3
                bg-white/10 backdrop-blur-sm
-               px-6 py-3 rounded-full
+               px-5 sm:px-6 py-2.5 sm:py-3 rounded-full
                text-xs uppercase tracking-wider font-medium">
 
-        <span class="w-2 h-2 bg-secondary rounded-full"></span>
+        <span class="w-2 h-2 bg-secondary rounded-full animate-pulse"></span>
         Publications & Analyses
       </div>
 
       <!-- Titre -->
       <h1
         x-show="show"
-        x-transition
-        class="text-5xl md:text-6xl font-extrabold leading-tight text-white">
+        x-transition:enter="transition ease-out duration-500 delay-200"
+        x-transition:enter-start="opacity-0 -translate-y-4"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        class="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight text-white">
 
         Blog Institutionnel
       </h1>
@@ -57,34 +64,43 @@
       <!-- Description -->
       <p
         x-show="show"
-        x-transition
-        class="text-lg text-white/80 max-w-3xl leading-relaxed">
-        Analyses académiques, réflexions pédagogiques et actualités stratégiques de l’École de Santé Félix Houphouët-Boigny.
+        x-transition:enter="transition ease-out duration-500 delay-300"
+        x-transition:enter-start="opacity-0 -translate-y-4"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        class="text-base sm:text-lg text-white/80 max-w-3xl leading-relaxed">
+        Analyses académiques, réflexions pédagogiques et actualités stratégiques de l'École de Santé Félix Houphouët-Boigny.
       </p>
 
       <!-- Recherche -->
       <div
         x-show="show"
-        x-transition
-        class="pt-6 max-w-md">
+        x-transition:enter="transition ease-out duration-500 delay-400"
+        x-transition:enter-start="opacity-0 -translate-y-4"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        class="pt-4 sm:pt-6 max-w-md">
 
-        <form method="get" class="relative">
+        <form method="get" class="relative group">
           <input
             type="text"
             name="q"
             value="{{ request.GET.q }}"
             placeholder="Rechercher un article..."
-            class="w-full pl-12 pr-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm
+            class="w-full pl-12 pr-4 py-3 sm:py-3.5 rounded-xl bg-white/10 backdrop-blur-sm
                    border border-white/20 text-white placeholder-white/60
-                   focus:outline-none focus:ring-2 focus:ring-secondary">
+                   focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent
+                   focus:bg-white/15 transition-all duration-300">
 
           <!-- Icône recherche -->
-          <svg class="w-5 h-5 absolute left-4 top-3.5 text-white/60"
+          <svg class="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/60
+                      group-focus-within:text-secondary transition-colors duration-300"
                fill="none" stroke="currentColor" stroke-width="1.8"
                viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round"
                   d="M21 21l-4.35-4.35m2.1-5.4a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z"/>
           </svg>
+
+          <!-- Bouton submit invisible mais accessible -->
+          <button type="submit" class="sr-only">Rechercher</button>
         </form>
 
       </div>
@@ -98,50 +114,76 @@
 
 <!-- ================= FEATURED ARTICLE ================= -->
 {% if articles and articles|length > 0 %}
-<section class="max-w-7xl mx-auto px-6 py-20">
+<section class="max-w-7xl mx-auto px-6 py-16 sm:py-20"
+         x-data="{ visible: false }"
+         x-intersect:enter.once="visible = true">
 
   {% with featured=articles.0 %}
-  <div class="bg-white rounded-2xl border border-primary-50 overflow-hidden
-              shadow-sm hover:shadow-xl transition duration-300">
+  <div
+    x-show="visible"
+    x-transition:enter="transition ease-out duration-700"
+    x-transition:enter-start="opacity-0 translate-y-8"
+    x-transition:enter-end="opacity-100 translate-y-0"
+    class="bg-white rounded-2xl border border-primary-50 overflow-hidden
+           shadow-sm hover:shadow-2xl transition-all duration-500 group">
 
     <div class="grid lg:grid-cols-2">
 
-      <!-- Image -->
-      <div class="h-72 lg:h-full bg-gray-100">
+      <!-- Image avec effet zoom -->
+      <div class="h-64 sm:h-72 lg:h-full bg-gray-100 overflow-hidden">
         {% if featured.featured_image %}
           <img src="{{ featured.featured_image.url }}"
-               class="w-full h-full object-cover hover:scale-105 transition duration-500"
-               alt="{{ featured.title }}">
+               class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+               alt="{{ featured.title }}"
+               loading="lazy">
+        {% else %}
+          <div class="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+            <svg class="w-16 h-16 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14-6H5m14 12H5"/>
+            </svg>
+          </div>
         {% endif %}
       </div>
 
       <!-- Content -->
-      <div class="p-12 flex flex-col justify-center">
+      <div class="p-8 sm:p-12 flex flex-col justify-center">
 
-        <h2 class="text-3xl font-semibold text-gray-900 leading-snug">
+        {% if featured.category %}
+        <span class="inline-flex items-center gap-2 text-xs font-medium text-primary-600 uppercase tracking-wider mb-4">
+          <span class="w-2 h-2 bg-primary-500 rounded-full"></span>
+          {{ featured.category.name }}
+        </span>
+        {% endif %}
+
+        <h2 class="text-2xl sm:text-3xl font-semibold text-gray-900 leading-snug">
           <a href="{{ featured.get_absolute_url }}"
-             class="hover:text-primary-600 transition">
+             class="hover:text-primary-600 transition-colors duration-300">
             {{ featured.title }}
           </a>
         </h2>
 
-        <p class="mt-6 text-gray-600 leading-relaxed">
+        <p class="mt-4 sm:mt-6 text-gray-600 leading-relaxed line-clamp-3">
           {{ featured.excerpt|truncatechars:220 }}
         </p>
 
-        <div class="mt-8">
+        <div class="mt-6 sm:mt-8 flex items-center gap-6">
           <a href="{{ featured.get_absolute_url }}"
-             class="inline-flex items-center gap-2 text-primary-600 font-medium hover:opacity-80 transition">
+             class="inline-flex items-center gap-2 text-primary-600 font-medium
+                    hover:gap-3 transition-all duration-300 group/link">
 
-            Lire l’article
+            Lire l'article
 
-            <svg class="w-4 h-4" fill="none" stroke="currentColor"
+            <svg class="w-4 h-4 transition-transform duration-300 group-hover/link:translate-x-1"
+                 fill="none" stroke="currentColor"
                  stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round"
                     d="M9 5l7 7-7 7"/>
             </svg>
-
           </a>
+
+          <span class="text-sm text-gray-400">
+            {{ featured.published_at|date:"d M Y" }}
+          </span>
         </div>
 
       </div>
@@ -155,13 +197,13 @@
 
 
 <!-- ================= MAIN + SIDEBAR ================= -->
-<section class="max-w-7xl mx-auto px-6 pb-24">
-  <div class="grid lg:grid-cols-12 gap-16">
+<section class="max-w-7xl mx-auto px-6 pb-20 sm:pb-24">
+  <div class="grid lg:grid-cols-12 gap-10 lg:gap-16">
 
     <!-- MAIN -->
     <div class="lg:col-span-8">
 
-      <h3 class="text-xl font-semibold text-gray-900 mb-10 flex items-center gap-3">
+      <h3 class="text-xl font-semibold text-gray-900 mb-8 sm:mb-10 flex items-center gap-3">
 
         <svg class="w-5 h-5 text-primary-500" fill="none"
              stroke="currentColor" stroke-width="1.8"
@@ -173,26 +215,66 @@
         Articles récents
       </h3>
 
-      <div class="grid sm:grid-cols-2 gap-10">
+      <!-- Grid avec animations staggered -->
+      <div class="grid sm:grid-cols-2 gap-6 sm:gap-10"
+           x-data="{ shown: false }"
+           x-intersect:enter.once="shown = true">
 
         {% for article in articles|slice:"1:" %}
-          {% component "blog_article_card" article=article %}{% endcomponent %}
+          <div
+            x-show="shown"
+            x-transition:enter="transition ease-out duration-500"
+            x-transition:enter-start="opacity-0 translate-y-6"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            style="transition-delay: {{ forloop.counter0|add:1 }}00ms">
+
+            {% component "blog_article_card" article=article %}{% endcomponent %}
+          </div>
         {% empty %}
-          <p class="text-gray-500">Aucun article disponible.</p>
+          <p class="text-gray-500 col-span-full text-center py-12">Aucun article disponible.</p>
         {% endfor %}
 
       </div>
+
+      <!-- Pagination -->
+      {% if articles.has_other_pages %}
+      <nav class="mt-12 flex justify-center" aria-label="Pagination">
+        <div class="flex items-center gap-2">
+          {% if articles.has_previous %}
+          <a href="?page={{ articles.previous_page_number }}"
+             class="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-600
+                    hover:bg-primary-50 hover:border-primary-200 hover:text-primary-600
+                    transition-all duration-200">
+            Précédent
+          </a>
+          {% endif %}
+
+          <span class="px-4 py-2 text-sm text-gray-500">
+            Page {{ articles.number }} sur {{ articles.paginator.num_pages }}
+          </span>
+
+          {% if articles.has_next %}
+          <a href="?page={{ articles.next_page_number }}"
+             class="px-4 py-2 rounded-lg bg-primary-600 text-white
+                    hover:bg-primary-700 transition-all duration-200">
+            Suivant
+          </a>
+          {% endif %}
+        </div>
+      </nav>
+      {% endif %}
 
     </div>
 
 
     <!-- SIDEBAR -->
-    <aside class="lg:col-span-4 space-y-12">
+    <aside class="lg:col-span-4 space-y-8 sm:space-y-12">
 
-      {% component "blog_sidebar" %}{% endcomponent %}
+      {% component "blog_sidebar" categories=categories %}{% endcomponent %}
 
       <!-- Bloc institutionnel -->
-      <div class="bg-primary-50 rounded-2xl p-8 border border-primary-200">
+      <div class="bg-gradient-to-br from-primary-50 to-primary-100/50 rounded-2xl p-6 sm:p-8 border border-primary-200
+                  hover:shadow-lg transition-shadow duration-300">
 
         <h4 class="font-semibold text-primary-700 mb-4 flex items-center gap-2">
 
@@ -200,22 +282,24 @@
                stroke="currentColor" stroke-width="1.8"
                viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M12 8c1.657 0 3 1.343 3 3v1a3 3 0 11-6 0v-1c0-1.657 1.343-3 3-3z"/>
-            <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M12 2v2m0 16v2m10-10h-2M4 12H2"/>
+                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
 
-          Besoin d’informations ?
+          Besoin d'informations ?
         </h4>
 
-        <p class="text-sm text-gray-600">
-          Contactez l’administration pour toute question académique ou stratégique.
+        <p class="text-sm text-gray-600 leading-relaxed">
+          Contactez l'administration pour toute question académique ou stratégique.
         </p>
 
         <a href="/contact/"
-           class="inline-block mt-6 bg-primary-600 text-white px-5 py-2.5
+           class="inline-flex items-center gap-2 mt-6 bg-primary-600 text-white px-5 py-2.5
                   rounded-lg text-sm font-medium shadow-sm
-                  hover:bg-primary-700 transition">
+                  hover:bg-primary-700 hover:shadow-md
+                  active:scale-[0.98] transition-all duration-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
           Nous contacter
         </a>
 

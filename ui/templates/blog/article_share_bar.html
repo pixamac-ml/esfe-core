@@ -1,17 +1,18 @@
 {% load component_tags %}
 
-<div class="flex items-center gap-4 mt-6">
+<div class="flex flex-wrap items-center gap-3"
+     x-data="{ copied: false }">
 
   <!-- WHATSAPP -->
   <a href="https://wa.me/?text={{ article.title|urlencode }}%20{{ absolute_url|urlencode }}"
      target="_blank"
      rel="noopener noreferrer"
      aria-label="Partager sur WhatsApp"
-     class="w-10 h-10 flex items-center justify-center
+     class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center
             rounded-full bg-green-50
             text-green-600
-            hover:bg-green-600 hover:text-white
-            transition duration-300 shadow-sm">
+            hover:bg-green-600 hover:text-white hover:scale-110
+            active:scale-95 transition-all duration-300 shadow-sm">
 
     <svg xmlns="http://www.w3.org/2000/svg"
          class="w-5 h-5"
@@ -19,7 +20,6 @@
          viewBox="0 0 24 24">
       <path d="M20.52 3.48A11.89 11.89 0 0012 0C5.37 0 .03 5.34.03 11.97c0 2.11.55 4.17 1.6 5.99L0 24l6.19-1.62a11.94 11.94 0 005.81 1.48h.01c6.63 0 11.97-5.34 11.97-11.97 0-3.2-1.25-6.21-3.46-8.41z"/>
     </svg>
-
   </a>
 
   <!-- FACEBOOK -->
@@ -27,11 +27,11 @@
      target="_blank"
      rel="noopener noreferrer"
      aria-label="Partager sur Facebook"
-     class="w-10 h-10 flex items-center justify-center
+     class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center
             rounded-full bg-blue-50
             text-blue-600
-            hover:bg-blue-600 hover:text-white
-            transition duration-300 shadow-sm">
+            hover:bg-blue-600 hover:text-white hover:scale-110
+            active:scale-95 transition-all duration-300 shadow-sm">
 
     <svg xmlns="http://www.w3.org/2000/svg"
          class="w-5 h-5"
@@ -39,7 +39,6 @@
          viewBox="0 0 24 24">
       <path d="M22 12A10 10 0 1012 22v-7h-2v-3h2V9c0-2 1.2-3 3-3 .9 0 1.8.1 1.8.1v2h-1c-1 0-1.3.6-1.3 1.2V12h2.3l-.4 3h-1.9v7A10 10 0 0022 12z"/>
     </svg>
-
   </a>
 
   <!-- LINKEDIN -->
@@ -47,11 +46,11 @@
      target="_blank"
      rel="noopener noreferrer"
      aria-label="Partager sur LinkedIn"
-     class="w-10 h-10 flex items-center justify-center
+     class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center
             rounded-full bg-sky-50
             text-sky-700
-            hover:bg-sky-700 hover:text-white
-            transition duration-300 shadow-sm">
+            hover:bg-sky-700 hover:text-white hover:scale-110
+            active:scale-95 transition-all duration-300 shadow-sm">
 
     <svg xmlns="http://www.w3.org/2000/svg"
          class="w-5 h-5"
@@ -59,7 +58,57 @@
          viewBox="0 0 24 24">
       <path d="M4.98 3.5C4.98 5 3.88 6 2.49 6S0 5 0 3.5 1.1 1 2.49 1 4.98 2 4.98 3.5zM.5 8h4v14h-4V8zm7.5 0h3.8v2h.1c.5-1 1.8-2.1 3.8-2.1 4 0 4.8 2.6 4.8 6v8h-4v-7c0-1.6 0-3.7-2.2-3.7-2.2 0-2.6 1.7-2.6 3.6v7.1h-4V8z"/>
     </svg>
-
   </a>
+
+  <!-- TWITTER / X -->
+  <a href="https://twitter.com/intent/tweet?text={{ article.title|urlencode }}&url={{ absolute_url|urlencode }}"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Partager sur X (Twitter)"
+     class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center
+            rounded-full bg-gray-100
+            text-gray-700
+            hover:bg-gray-900 hover:text-white hover:scale-110
+            active:scale-95 transition-all duration-300 shadow-sm">
+
+    <svg xmlns="http://www.w3.org/2000/svg"
+         class="w-4 h-4"
+         fill="currentColor"
+         viewBox="0 0 24 24">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>
+  </a>
+
+  <!-- COPIER LE LIEN -->
+  <button
+     @click="navigator.clipboard.writeText('{{ absolute_url }}'); copied = true; setTimeout(() => copied = false, 2000)"
+     :class="copied ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+     class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center
+            rounded-full hover:scale-110
+            active:scale-95 transition-all duration-300 shadow-sm"
+     :aria-label="copied ? 'Lien copié !' : 'Copier le lien'">
+
+    <!-- Icône lien -->
+    <svg x-show="!copied" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+    </svg>
+
+    <!-- Icône check -->
+    <svg x-show="copied" x-cloak class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+    </svg>
+  </button>
+
+  <!-- Feedback copié -->
+  <span x-show="copied"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 translate-x-2"
+        x-transition:enter-end="opacity-100 translate-x-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="text-sm text-green-600 font-medium">
+    Lien copié !
+  </span>
 
 </div>

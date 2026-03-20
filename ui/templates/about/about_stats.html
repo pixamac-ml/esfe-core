@@ -1,0 +1,90 @@
+{% if stats %}
+<section class="relative py-20 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-900 overflow-hidden">
+
+    <!-- Motif décoratif -->
+    <div class="absolute inset-0 opacity-10">
+        <div class="absolute top-0 left-0 w-full h-full"
+             style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+    </div>
+
+    <div class="relative max-w-7xl mx-auto px-6">
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
+
+            {% for stat in stats %}
+            <div class="text-center group"
+                 data-aos="zoom-in"
+                 data-aos-duration="600"
+                 data-aos-delay="{{ forloop.counter0|add:forloop.counter0 }}00">
+
+                <!-- Cercle décoratif -->
+                <div class="relative inline-flex items-center justify-center mb-4">
+                    <div class="absolute w-24 h-24 bg-secondary-500/20 rounded-full
+                                group-hover:scale-110 transition-transform duration-500"></div>
+                    <div class="absolute w-20 h-20 bg-secondary-500/10 rounded-full animate-ping"
+                         style="animation-duration: 3s;"></div>
+                </div>
+
+                <!-- Valeur avec compteur -->
+                <div class="relative">
+                    <span class="text-5xl md:text-6xl font-black text-white
+                                 counter-animate"
+                          data-target="{{ stat.value }}">
+                        {{ stat.prefix }}
+                        <span class="counter" data-count="{{ stat.value }}">0</span>
+                        {{ stat.suffix }}
+                    </span>
+                </div>
+
+                <!-- Label -->
+                <p class="mt-3 text-lg text-gray-300/90 font-medium">
+                    {{ stat.label }}
+                </p>
+
+                <!-- Ligne décorative -->
+                <div class="mt-4 mx-auto w-12 h-1 bg-gradient-to-r from-secondary-400 to-secondary-600 rounded-full
+                            group-hover:w-20 transition-all duration-500"></div>
+
+            </div>
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- Script compteur -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const counters = document.querySelectorAll('.counter');
+    const speed = 200;
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const counter = entry.target;
+                const target = +counter.getAttribute('data-count');
+                const increment = target / speed;
+
+                const updateCount = () => {
+                    const count = +counter.innerText;
+                    if (count < target) {
+                        counter.innerText = Math.ceil(count + increment);
+                        setTimeout(updateCount, 10);
+                    } else {
+                        counter.innerText = target;
+                    }
+                };
+
+                updateCount();
+                observer.unobserve(counter);
+            }
+        });
+    }, { threshold: 0.5 });
+
+    counters.forEach(counter => observer.observe(counter));
+});
+</script>
+{% endif %}

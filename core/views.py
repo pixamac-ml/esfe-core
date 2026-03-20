@@ -6,36 +6,6 @@ from django.shortcuts import render, get_object_or_404
 from django.http import Http404, HttpResponse
 from django.utils.html import strip_tags
 from django.utils import timezone
-from django.db.models import Sum, Count, F, Avg, ExpressionWrapper, DurationField
-from django.db.models.functions import Extract
-from django.views.decorators.http import require_http_methods
-from django.contrib.admin.views.decorators import staff_member_required
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-from django.conf import settings
-from django.db.models import Prefetch
-
-# PDF
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import A4
-
-# Apps
-from formations.models import Programme
-from news.models import News
-from blog.models import Article
-from admissions.models import Candidature
-from inscriptions.models import Inscription
-from payments.models import Payment
-
-# core/views.py
-
-import logging
-
-from django.shortcuts import render, get_object_or_404
-from django.http import Http404, HttpResponse
-from django.utils.html import strip_tags
-from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import (
@@ -61,9 +31,14 @@ from payments.models import Payment
 
 from .models import (
     Institution,
+    InstitutionPresentation,
     InstitutionStat,
+    Value,
+    Infrastructure,
+    Staff,
+    Partner,
+    Testimonial,
     LegalPage,
-    AboutSection,
     ContactMessage,
 )
 
@@ -105,14 +80,14 @@ def get_institution_context():
         "legal_links": [
             {"label": "Mentions légales", "url": "/mentions-legales/"},
             {"label": "Politique de confidentialité", "url": "/confidentialite/"},
-            {"label": "Conditions d’utilisation", "url": "/conditions-utilisation/"},
+            {"label": "Conditions d'utilisation", "url": "/conditions-utilisation/"},
             {"label": "Plan du site", "url": "/plan-du-site/"},
         ],
     }
 
 
 # ==========================================================
-# PLAN DU SITE (RESTÉ INTACT)
+# PLAN DU SITE
 # ==========================================================
 
 def sitemap(request):
@@ -127,28 +102,85 @@ def sitemap(request):
 # ABOUT
 # ==========================================================
 
-def about(request):
+# core/views.py
 
+from django.shortcuts import render
+from django.views.decorators.cache import cache_page
+
+from core.models import (
+    Institution,
+    InstitutionPresentation,
+    InstitutionStat,
+    Value,
+    Infrastructure,
+    Staff,
+    Partner,
+)
+from formations.models import Programme
+from branches.models import Branch
+
+
+# ==========================================================
+# ABOUT
+# ==========================================================
+
+def about(request):
     institution = Institution.objects.filter(is_active=True).first()
+    presentation = InstitutionPresentation.objects.first()
 
     stats = InstitutionStat.objects.filter(
         is_active=True
     ).order_by("order")
 
-    sections = (
-        AboutSection.objects
-        .filter(is_active=True)
-        .order_by("order")
-    )
+    values = Value.objects.filter(
+        is_active=True
+    ).order_by("order")
 
-    # Hero data - on peut le rendre dynamique via l'admin plus tard
-    hero_title = institution.name if institution else "Notre Institution"
-    hero_subtitle = "Excellence académique et formation professionnelle de qualité"
+    infrastructures = Infrastructure.objects.filter(
+        is_active=True
+    ).order_by("order")
+
+    staff_direction = Staff.objects.filter(
+        is_active=True,
+        category="direction"
+    ).order_by("order")
+
+    staff_teachers = Staff.objects.filter(
+        is_active=True,
+        category="teacher"
+    ).order_by("order")
+
+    partners = Partner.objects.filter(
+        is_active=True
+    ).order_by("order")
+
+    testimonials = Testimonial.objects.filter(
+        is_active=True
+    ).order_by("-is_featured", "order")
+
+    formations = Programme.objects.filter(
+        is_active=True
+    ).select_related('cycle').order_by('-is_featured', 'title')[:6]
+
+    # ✅ AJOUTER CETTE LIGNE - BRANCHES / ANNEXES
+    branches = Branch.objects.filter(is_active=True).order_by("name")
+
+    # Hero data
+    hero_title = presentation.hero_title if presentation else (institution.name if institution else "Notre Institution")
+    hero_subtitle = presentation.hero_subtitle if presentation else "Excellence académique et formation professionnelle de qualité"
 
     context = {
         "institution": institution,
+        "presentation": presentation,
         "stats": stats,
-        "sections": sections,  # Renommé pour correspondre au template
+        "values": values,
+        "infrastructures": infrastructures,
+        "staff_direction": staff_direction,
+        "staff_teachers": staff_teachers,
+        "partners": partners,
+        "testimonials": testimonials,
+        "formations": formations,
+        "branches": branches,  # ✅ AJOUTER CETTE LIGNE
         "hero_title": hero_title,
         "hero_subtitle": hero_subtitle,
         **get_institution_context(),
@@ -162,6 +194,8 @@ def about(request):
 # ==========================================================
 
 def home(request):
+    institution = Institution.objects.filter(is_active=True).first()
+    presentation = InstitutionPresentation.objects.first()
 
     pillars = [
         {"title": "Sciences de la santé", "description": "Formations spécialisées adaptées aux exigences professionnelles."},
@@ -179,6 +213,8 @@ def home(request):
 
     stats = InstitutionStat.objects.filter(is_active=True).order_by("order")
 
+    values = Value.objects.filter(is_active=True).order_by("order")[:4]
+
     latest_news = (
         News.objects
         .filter(status="published")
@@ -191,12 +227,24 @@ def home(request):
         .order_by("-published_at")[:3]
     )
 
+    partners = Partner.objects.filter(is_active=True).order_by("order")
+
+    testimonials = Testimonial.objects.filter(
+        is_active=True,
+        is_featured=True
+    ).order_by("order")[:3]
+
     context = {
+        "institution": institution,
+        "presentation": presentation,
         "pillars": pillars,
         "formations_home": formations_home,
         "stats": stats,
+        "values": values,
         "latest_news": latest_news,
         "latest_articles": latest_articles,
+        "partners": partners,
+        "testimonials": testimonials,
         **get_institution_context(),
     }
 
@@ -208,7 +256,6 @@ def home(request):
 # ==========================================================
 
 def render_legal_page(request, page_type):
-
     page = get_object_or_404(
         LegalPage,
         page_type=page_type,
@@ -252,7 +299,6 @@ def terms_of_service(request):
 # ==========================================================
 
 def legal_page_pdf(request, page_type):
-
     page = get_object_or_404(
         LegalPage,
         page_type=page_type,
@@ -281,14 +327,12 @@ def legal_page_pdf(request, page_type):
     return response
 
 
-
 # ==========================================================
 # CONTACT
 # ==========================================================
 
 @require_http_methods(["GET", "POST"])
 def contact_view(request):
-
     if request.method == "POST":
         form = ContactForm(request.POST)
 

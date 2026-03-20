@@ -1,0 +1,124 @@
+{% if direction or teachers %}
+<section class="py-24 bg-white overflow-hidden">
+    <div class="max-w-7xl mx-auto px-6">
+
+        <!-- Header -->
+        <div class="text-center mb-16" data-aos="fade-up">
+            <span class="inline-block px-4 py-1.5 text-xs font-bold uppercase tracking-widest
+                         text-primary-600 bg-primary-50 rounded-full mb-4">
+                Équipe
+            </span>
+            <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">{{ title }}</h2>
+            {% if subtitle %}
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">{{ subtitle }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Direction -->
+        {% if direction %}
+        <div class="mb-20">
+            <h3 class="text-2xl font-bold text-gray-900 mb-10 text-center"
+                data-aos="fade-up">
+                Direction
+            </h3>
+
+            <div class="flex flex-wrap justify-center gap-8">
+                {% for person in direction %}
+                <div class="w-full sm:w-80 group"
+                     data-aos="zoom-in"
+                     data-aos-duration="600"
+                     data-aos-delay="{{ forloop.counter0 }}00">
+
+                    <div class="relative text-center p-8 bg-gradient-to-br from-gray-50 to-white
+                                rounded-3xl border border-gray-100
+                                hover:shadow-2xl hover:-translate-y-2
+                                transition-all duration-500">
+
+                        <!-- Photo -->
+                        <div class="relative w-32 h-32 mx-auto mb-6">
+                            <div class="absolute inset-0 bg-gradient-to-br from-primary-500 to-secondary-500
+                                        rounded-full transform group-hover:scale-110 transition-transform duration-500"></div>
+                            <img src="{{ person.photo.url }}"
+                                 alt="{{ person.full_name }}"
+                                 class="relative w-full h-full rounded-full object-cover border-4 border-white shadow-lg">
+                        </div>
+
+                        <!-- Infos -->
+                        <h4 class="text-xl font-bold text-gray-900 mb-1">{{ person.full_name }}</h4>
+                        <p class="text-primary-600 font-medium mb-3">{{ person.position }}</p>
+
+                        {% if person.bio %}
+                        <p class="text-gray-600 text-sm">{{ person.bio|truncatewords:20 }}</p>
+                        {% endif %}
+
+                        <!-- Social -->
+                        {% if person.linkedin or person.email %}
+                        <div class="flex justify-center gap-3 mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            {% if person.email %}
+                            <a href="mailto:{{ person.email }}"
+                               class="w-10 h-10 rounded-full bg-primary-100 text-primary-600
+                                      flex items-center justify-center hover:bg-primary-600 hover:text-white
+                                      transition-colors duration-300">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                            </a>
+                            {% endif %}
+                            {% if person.linkedin %}
+                            <a href="{{ person.linkedin }}" target="_blank"
+                               class="w-10 h-10 rounded-full bg-primary-100 text-primary-600
+                                      flex items-center justify-center hover:bg-primary-600 hover:text-white
+                                      transition-colors duration-300">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                                </svg>
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Enseignants (grille compacte) -->
+        {% if teachers %}
+        <div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-10 text-center"
+                data-aos="fade-up">
+                Corps Enseignant
+            </h3>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                {% for person in teachers|slice:":12" %}
+                <div class="group text-center"
+                     data-aos="fade-up"
+                     data-aos-duration="400"
+                     data-aos-delay="{{ forloop.counter0 }}0">
+
+                    <div class="relative w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden
+                                ring-2 ring-gray-200 group-hover:ring-primary-500
+                                transform group-hover:scale-105
+                                transition-all duration-300">
+                        <img src="{{ person.photo.url }}"
+                             alt="{{ person.full_name }}"
+                             class="w-full h-full object-cover">
+                    </div>
+
+                    <h4 class="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                        {{ person.full_name }}
+                    </h4>
+                    <p class="text-xs text-gray-500">{{ person.position|truncatewords:4 }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</section>
+{% endif %}

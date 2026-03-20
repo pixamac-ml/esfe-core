@@ -16,7 +16,7 @@ from blog.models import Article, Category as BlogCategory, Comment
 from news.models import News, Event, Category as NewsCategory
 from core.models import (
     Institution, LegalPage, LegalSection, Partner,
-    Testimonial, ContactMessage, AboutSection
+    ContactMessage,
 )
 from inscriptions.models import Inscription
 from payments.models import Payment

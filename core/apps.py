@@ -10,5 +10,9 @@ class CoreConfig(AppConfig):
         import ui.components.layout.navbar.navbar
         import ui.components.cards.base_card.base_card
         import ui.components.ui.button.button
-        import ui.components.about.hero
-        import ui.components.about.sections
+        import ui.components.about.about_hero
+        import ui.components.about.about_staff
+        import ui.components.about.about_presentation
+        import ui.components.about.about_values
+        import ui.components.about.about_stats
+        import ui.components.about.about_cta

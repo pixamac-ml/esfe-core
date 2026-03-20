@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% load component_tags %}
 
 {% block title %}
@@ -6,54 +7,166 @@
 {% if institution %}
     {{ institution.short_name|default:institution.name }}
 {% else %}
-    ESFé
+    Notre Institution
 {% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<!-- AOS Animations CSS -->
+<link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
 
-    {# HERO #}
-    {% component "about_hero"
-        label="Présentation institutionnelle"
-        title=hero_title
-        subtitle=hero_subtitle
-    %}
+{# ============================================================ #}
+{# SECTION 1 : HERO                                              #}
+{# ============================================================ #}
+{% comment %} ================================ HERO ================================ {% endcomment %}
+{% if presentation and presentation.hero_image %}
+    {% component "about_hero" title=presentation.hero_title subtitle=presentation.hero_subtitle label="À propos de nous" image=presentation.hero_image.url cta_text="Candidater maintenant" cta_url="/candidature/" %}
     {% endcomponent %}
+{% else %}
+    {% component "about_hero" title=presentation.hero_title|default:"Former les professionnels de demain" subtitle=presentation.hero_subtitle|default:"Une institution d'excellence" label="À propos de nous" image="" cta_text="Candidater maintenant" cta_url="/candidature/" %}
+    {% endcomponent %}
+{% endif %}
 
-    {# STATISTIQUES #}
-    {% if stats %}
-    <section class="py-16 bg-primary-600">
-        <div class="max-w-6xl mx-auto px-6">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center text-white">
-                {% for stat in stats %}
-                <div>
-                    <p class="text-4xl md:text-5xl font-bold">
-                        {{ stat.value }}{{ stat.suffix }}
-                    </p>
-                    <p class="text-sm uppercase tracking-wider mt-2 text-white/80">
-                        {{ stat.label }}
-                    </p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </section>
-    {% endif %}
+{# ============================================================ #}
+{# SECTION 2 : STATISTIQUES                                      #}
+{# ============================================================ #}
+{% if stats %}
+    {% component "about_stats" stats=stats %}{% endcomponent %}
+{% endif %}
 
-    {# SECTIONS DYNAMIQUES #}
-    {% for section in sections %}
-        {% component "sections"
-            label=section.get_section_key_display
-            title=section.title
-            subtitle=section.subtitle
-            content=section.content
-            image=section.image
-            highlights=section.highlights
-            background=section.background
-            icon=section.icon
-            reverse=forloop.counter|divisibleby:2
-        %}
-        {% endcomponent %}
-    {% endfor %}
 
+{# ============================================================ #}
+{# SECTION 3 : PRÉSENTATION + VISION/MISSION                     #}
+{# ============================================================ #}
+{% if presentation %}
+    {% component "about_presentation"
+        about_title=presentation.about_title
+        about_text=presentation.about_text
+        about_image=presentation.about_image
+        vision_title=presentation.vision_title
+        vision_text=presentation.vision_text
+        mission_title=presentation.mission_title
+        mission_text=presentation.mission_text
+    %}{% endcomponent %}
+{% endif %}
+
+
+{# ============================================================ #}
+{# SECTION 4 : VALEURS                                           #}
+{# ============================================================ #}
+{% if values %}
+    {% component "about_values"
+        values=values
+        title="Nos Valeurs"
+        subtitle="Les piliers qui guident notre engagement envers l'excellence"
+    %}{% endcomponent %}
+{% endif %}
+
+
+{# ============================================================ #}
+{# SECTION 5 : FORMATIONS (Aperçu)                               #}
+{# ============================================================ #}
+{% if formations %}
+    {% component "about_formations"
+        programmes=formations
+        title="Nos Formations"
+        subtitle="Des programmes adaptés aux exigences du marché professionnel"
+        cta_text="Découvrir toutes nos formations"
+        cta_url="/formations/"
+    %}{% endcomponent %}
+{% endif %}
+
+
+{# ============================================================ #}
+{# SECTION 6 : INFRASTRUCTURES                                   #}
+{# ============================================================ #}
+{% if infrastructures %}
+    {% component "about_infrastructure"
+        infrastructures=infrastructures
+        title="Nos Infrastructures"
+        subtitle="Des installations modernes pour une formation pratique de qualité"
+    %}{% endcomponent %}
+{% endif %}
+
+
+{# ============================================================ #}
+{# SECTION 7 : ANNEXES / BRANCHES                                #}
+{# ============================================================ #}
+{% if branches %}
+    {% component "about_branches"
+        branches=branches
+        title="Nos Implantations"
+        subtitle="Une présence régionale pour une formation de proximité"
+    %}{% endcomponent %}
+{% endif %}
+
+
+{# ============================================================ #}
+{# SECTION 8 : PERSONNEL / STAFF                                 #}
+{# ============================================================ #}
+{% if staff_direction or staff_teachers %}
+    {% component "about_staff"
+        direction=staff_direction
+        teachers=staff_teachers
+        title="Notre Équipe"
+        subtitle="Des professionnels dévoués à votre réussite"
+    %}{% endcomponent %}
+{% endif %}
+
+
+{# ============================================================ #}
+{# SECTION 9 : PARTENAIRES                                       #}
+{# ============================================================ #}
+{% if partners %}
+    {% component "about_partners"
+        partners=partners
+        title="Nos Partenaires"
+        subtitle="Des collaborations stratégiques pour votre insertion professionnelle"
+    %}{% endcomponent %}
+{% endif %}
+
+
+{# ============================================================ #}
+{# SECTION 10 : CTA FINAL                                        #}
+{# ============================================================ #}
+{% if presentation %}
+    {% component "about_cta"
+        title=presentation.cta_title
+        subtitle=presentation.cta_subtitle
+        button_text=presentation.cta_button_text
+        button_url=presentation.cta_button_url
+        secondary_text="Nous contacter"
+        secondary_url="/contact/"
+    %}{% endcomponent %}
+{% else %}
+    {% component "about_cta"
+        title="Rejoignez une institution d'excellence"
+        subtitle="Commencez votre parcours vers une carrière réussie."
+        button_text="Candidater maintenant"
+        button_url="/candidature/"
+        secondary_text="Nous contacter"
+        secondary_url="/contact/"
+    %}{% endcomponent %}
+{% endif %}
+
+{% endblock %}
+
+
+{% block extra_js %}
+<!-- AOS Animations JS -->
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        AOS.init({
+            duration: 800,
+            easing: 'ease-out-cubic',
+            once: true,
+            offset: 50,
+            disable: window.innerWidth < 768 ? 'mobile' : false
+        });
+    });
+</script>
 {% endblock %}

@@ -1,21 +1,36 @@
+# core/admin.py
+
 from django.contrib import admin
+from django.contrib import messages
 from django.utils.safestring import mark_safe
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
+from django.utils import timezone
 
 from .models import (
     Institution,
+    InstitutionPresentation,
+    Value,
+    Infrastructure,
+    Staff,
+    InstitutionStat,
+    Partner,
     LegalPage,
     LegalSection,
     LegalSidebarBlock,
     LegalPageHistory,
-    InstitutionStat, ContactMessage, AboutSection,
+    ContactMessage,
     Notification,
     StatusHistory,
 )
 
 
 # ==========================================================
-# INSTITUTION
+# INSTITUTION (SINGLETON)
 # ==========================================================
 
 @admin.register(Institution)
@@ -40,6 +55,7 @@ class InstitutionAdmin(admin.ModelAdmin):
                 "short_name",
                 "legal_status",
                 "approval_number",
+                "director_title",
             )
         }),
         ("Coordonnées", {
@@ -55,45 +71,394 @@ class InstitutionAdmin(admin.ModelAdmin):
             "fields": (
                 "hosting_provider",
                 "hosting_location",
-            )
+            ),
+            "classes": ("collapse",)
         }),
         ("Métadonnées", {
             "fields": (
+                "is_active",
                 "created_at",
                 "updated_at",
-            )
+            ),
+            "classes": ("collapse",)
         }),
     )
 
     def has_add_permission(self, request):
-        """
-        Empêche la création de plusieurs institutions.
-        """
         if Institution.objects.exists():
             return False
         return True
 
 
 # ==========================================================
-# SECTIONS INLINE
+# PRÉSENTATION INSTITUTIONNELLE (SINGLETON)
+# ==========================================================
+
+@admin.register(InstitutionPresentation)
+class InstitutionPresentationAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "__str__",
+        "hero_title",
+        "updated_at",
+    )
+
+    readonly_fields = ("updated_at",)
+
+    fieldsets = (
+        ("Hero (Bannière principale)", {
+            "fields": (
+                "hero_title",
+                "hero_subtitle",
+                "hero_image",
+            ),
+            "description": "Section d'en-tête de la page À propos"
+        }),
+        ("Présentation de l'école", {
+            "fields": (
+                "about_title",
+                "about_text",
+                "about_image",
+            )
+        }),
+        ("Vision & Mission", {
+            "fields": (
+                "vision_title",
+                "vision_text",
+                "mission_title",
+                "mission_text",
+            )
+        }),
+        ("Appel à l'action (CTA)", {
+            "fields": (
+                "cta_title",
+                "cta_subtitle",
+                "cta_button_text",
+                "cta_button_url",
+            )
+        }),
+        ("Métadonnées", {
+            "fields": ("updated_at",),
+            "classes": ("collapse",)
+        }),
+    )
+
+    def has_add_permission(self, request):
+        if InstitutionPresentation.objects.exists():
+            return False
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+# ==========================================================
+# VALEURS (MAX 4)
+# ==========================================================
+
+@admin.register(Value)
+class ValueAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "title",
+        "icon_preview",
+        "order",
+        "is_active",
+    )
+
+    list_editable = ("order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("title", "description")
+    ordering = ("order",)
+
+    fieldsets = (
+        ("Contenu", {
+            "fields": (
+                "title",
+                "description",
+                "icon",
+            )
+        }),
+        ("Organisation", {
+            "fields": (
+                "order",
+                "is_active",
+            )
+        }),
+    )
+
+    def icon_preview(self, obj):
+        if obj.icon:
+            return format_html(
+                '<i class="{}" style="font-size:1.5rem;color:#1e4f6f;"></i> <code>{}</code>',
+                obj.icon,
+                obj.icon
+            )
+        return "-"
+    icon_preview.short_description = "Icône"
+
+
+# ==========================================================
+# INFRASTRUCTURES
+# ==========================================================
+
+@admin.register(Infrastructure)
+class InfrastructureAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "name",
+        "category",
+        "image_preview",
+        "order",
+        "is_active",
+    )
+
+    list_editable = ("order", "is_active")
+    list_filter = ("category", "is_active")
+    search_fields = ("name", "description")
+    ordering = ("order",)
+
+    fieldsets = (
+        ("Informations", {
+            "fields": (
+                "name",
+                "category",
+                "description",
+            )
+        }),
+        ("Média", {
+            "fields": (
+                "image",
+            )
+        }),
+        ("Caractéristiques", {
+            "fields": (
+                "features",
+            ),
+            "description": "Liste JSON des équipements (ex: [\"Microscopes\", \"Analyseurs\"])"
+        }),
+        ("Organisation", {
+            "fields": (
+                "order",
+                "is_active",
+            )
+        }),
+    )
+
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="height:50px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);" />',
+                obj.image.url
+            )
+        return "-"
+    image_preview.short_description = "Photo"
+
+
+# ==========================================================
+# PERSONNEL / STAFF
+# ==========================================================
+
+@admin.register(Staff)
+class StaffAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "photo_preview",
+        "full_name",
+        "position",
+        "category_badge",
+        "is_featured",
+        "order",
+        "is_active",
+    )
+
+    list_editable = ("order", "is_active", "is_featured")
+    list_filter = ("category", "is_active", "is_featured")
+    search_fields = ("full_name", "position", "bio")
+    ordering = ("category", "order", "full_name")
+    list_per_page = 20
+
+    fieldsets = (
+        ("Identité", {
+            "fields": (
+                "full_name",
+                "position",
+                "category",
+                "photo",
+            )
+        }),
+        ("Informations complémentaires", {
+            "fields": (
+                "bio",
+                "email",
+                "linkedin",
+            ),
+            "classes": ("collapse",)
+        }),
+        ("Organisation", {
+            "fields": (
+                "is_featured",
+                "order",
+                "is_active",
+            )
+        }),
+    )
+
+    def photo_preview(self, obj):
+        if obj.photo:
+            return format_html(
+                '<img src="{}" style="width:45px;height:45px;border-radius:50%;object-fit:cover;box-shadow:0 2px 4px rgba(0,0,0,0.15);" />',
+                obj.photo.url
+            )
+        return format_html(
+            '<div style="width:45px;height:45px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:1.2rem;">?</div>'
+        )
+    photo_preview.short_description = ""
+
+    def category_badge(self, obj):
+        colors = {
+            "direction": "#7c3aed",
+            "teacher": "#2563eb",
+            "admin": "#059669",
+        }
+        color = colors.get(obj.category, "#6b7280")
+        return format_html(
+            '<span style="color:white;background:{};padding:4px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;">{}</span>',
+            color,
+            obj.get_category_display()
+        )
+    category_badge.short_description = "Catégorie"
+
+
+# ==========================================================
+# STATISTIQUES / CHIFFRES CLÉS
+# ==========================================================
+
+@admin.register(InstitutionStat)
+class InstitutionStatAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "label",
+        "stat_preview",
+        "order",
+        "is_active",
+    )
+
+    list_editable = ("order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("label",)
+    ordering = ("order",)
+
+    fieldsets = (
+        ("Statistique", {
+            "fields": (
+                "label",
+                "prefix",
+                "value",
+                "suffix",
+            )
+        }),
+        ("Organisation", {
+            "fields": (
+                "order",
+                "is_active",
+            )
+        }),
+    )
+
+    def stat_preview(self, obj):
+        return format_html(
+            '<span style="font-size:1.25rem;font-weight:700;color:#1e4f6f;">{}{}{}</span>',
+            obj.prefix or "",
+            obj.value,
+            obj.suffix or ""
+        )
+    stat_preview.short_description = "Aperçu"
+
+
+# ==========================================================
+# PARTENAIRES
+# ==========================================================
+
+@admin.register(Partner)
+class PartnerAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "logo_preview",
+        "name",
+        "partner_type",
+        "website_link",
+        "order",
+        "is_active",
+    )
+
+    list_editable = ("order", "is_active")
+    list_filter = ("partner_type", "is_active")
+    search_fields = ("name", "description")
+    ordering = ("order", "name")
+
+    fieldsets = (
+        ("Informations", {
+            "fields": (
+                "name",
+                "partner_type",
+                "logo",
+                "website",
+            )
+        }),
+        ("Description", {
+            "fields": (
+                "description",
+            ),
+            "classes": ("collapse",)
+        }),
+        ("Organisation", {
+            "fields": (
+                "order",
+                "is_active",
+            )
+        }),
+    )
+
+    def logo_preview(self, obj):
+        if obj.logo:
+            return format_html(
+                '<img src="{}" style="height:40px;max-width:100px;object-fit:contain;" />',
+                obj.logo.url
+            )
+        return "-"
+    logo_preview.short_description = "Logo"
+
+    def website_link(self, obj):
+        if obj.website:
+            return format_html(
+                '<a href="{}" target="_blank" style="color:#2563eb;">Voir →</a>',
+                obj.website
+            )
+        return "-"
+    website_link.short_description = "Site"
+
+
+# ==========================================================
+# PAGES LÉGALES - INLINES
 # ==========================================================
 
 class LegalSectionInline(admin.TabularInline):
     model = LegalSection
     extra = 1
     ordering = ("order",)
-    fields = ("order", "title", "content")
+    fields = ("order", "title", "content", "is_active")
 
 
 class LegalSidebarInline(admin.TabularInline):
     model = LegalSidebarBlock
     extra = 1
     ordering = ("order",)
-    fields = ("order", "title", "content")
+    fields = ("order", "title", "content", "is_active")
 
 
 # ==========================================================
-# PAGE LÉGALE
+# PAGES LÉGALES
 # ==========================================================
 
 @admin.register(LegalPage)
@@ -102,7 +467,7 @@ class LegalPageAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "page_type",
-        "status",
+        "status_badge",
         "version",
         "updated_at",
     )
@@ -131,13 +496,28 @@ class LegalPageAdmin(admin.ModelAdmin):
             "fields": (
                 "created_at",
                 "updated_at",
-            )
+            ),
+            "classes": ("collapse",)
         }),
     )
 
+    def status_badge(self, obj):
+        colors = {
+            "draft": "#f59e0b",
+            "review": "#3b82f6",
+            "published": "#16a34a",
+        }
+        color = colors.get(obj.status, "#6b7280")
+        return format_html(
+            '<span style="color:white;background:{};padding:4px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;">{}</span>',
+            color,
+            obj.get_status_display()
+        )
+    status_badge.short_description = "Statut"
+
 
 # ==========================================================
-# HISTORIQUE (LECTURE SEULE)
+# HISTORIQUE PAGES LÉGALES (LECTURE SEULE)
 # ==========================================================
 
 @admin.register(LegalPageHistory)
@@ -156,39 +536,8 @@ class LegalPageHistoryAdmin(admin.ModelAdmin):
 
 
 # ==========================================================
-# INSTITUTION STATS
-# ==========================================================
-
-@admin.register(InstitutionStat)
-class InstitutionStatAdmin(admin.ModelAdmin):
-
-    list_display = ("label", "value", "suffix", "order")
-    list_editable = ("value", "suffix", "order")
-    search_fields = ("label",)
-    ordering = ("order",)
-
-    fieldsets = (
-        ("Statistique", {
-            "fields": (
-                "label",
-                "value",
-                "suffix",
-                "order",
-            )
-        }),
-    )
-
-
-# ==========================================================
 # MESSAGES DE CONTACT
 # ==========================================================
-
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags, format_html
-from django.conf import settings
-from django.utils import timezone
-
 
 @admin.register(ContactMessage)
 class ContactMessageAdmin(admin.ModelAdmin):
@@ -231,6 +580,41 @@ class ContactMessageAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     list_per_page = 25
 
+    fieldsets = (
+        ("Demandeur", {
+            "fields": (
+                "reference",
+                "full_name",
+                "email",
+                "phone",
+            )
+        }),
+        ("Message", {
+            "fields": (
+                "subject",
+                "message",
+            )
+        }),
+        ("Traitement", {
+            "fields": (
+                "status",
+                "priority",
+                "assigned_to",
+                "reply",
+            )
+        }),
+        ("Métadonnées", {
+            "fields": (
+                "sla_hours",
+                "answered_at",
+                "created_at",
+                "ip_address",
+                "user_agent",
+            ),
+            "classes": ("collapse",)
+        }),
+    )
+
     def reference_short(self, obj):
         return str(obj.reference)[:8]
     reference_short.short_description = "Réf."
@@ -242,7 +626,7 @@ class ContactMessageAdmin(admin.ModelAdmin):
                 '<span style="color:#1e4f6f;font-weight:600;">{}</span>',
                 name
             )
-        return mark_safe(
+        return format_html(
             '<span style="color:#dc2626;font-weight:600;">Non assigné</span>'
         )
     assigned_display.short_description = "Responsable"
@@ -279,16 +663,19 @@ class ContactMessageAdmin(admin.ModelAdmin):
 
     def sla_indicator(self, obj):
         if obj.status in ["answered", "closed"]:
-            return mark_safe(
+            return format_html(
                 '<span style="color:#16a34a;font-weight:600;">✓ Traité</span>'
             )
         if obj.is_overdue:
-            return mark_safe(
+            return format_html(
                 '<span style="color:white;background:#dc2626;padding:5px 10px;border-radius:20px;font-weight:600;">⚠ En retard</span>'
             )
+        # Calcul des heures restantes
+        remaining = obj.deadline - timezone.now()
+        hours_remaining = max(0, int(remaining.total_seconds() // 3600))
         return format_html(
             '<span style="color:#2563eb;font-weight:600;">{} h restantes</span>',
-            obj.remaining_hours
+            hours_remaining
         )
     sla_indicator.short_description = "SLA"
 
@@ -328,99 +715,7 @@ class ContactMessageAdmin(admin.ModelAdmin):
 
 
 # ==========================================================
-# ABOUT SECTION
-# ==========================================================
-
-@admin.register(AboutSection)
-class AboutSectionAdmin(admin.ModelAdmin):
-
-    list_display = (
-        "section_key",
-        "title",
-        "order",
-        "is_active",
-        "updated_at",
-        "image_preview",
-    )
-
-    list_editable = (
-        "order",
-        "is_active",
-    )
-
-    list_filter = (
-        "is_active",
-        "section_key",
-        "background",
-    )
-
-    search_fields = (
-        "title",
-        "subtitle",
-        "content",
-    )
-
-    ordering = ("order",)
-
-    readonly_fields = (
-        "updated_at",
-        "image_preview",
-    )
-
-    fieldsets = (
-        ("Identification", {
-            "fields": (
-                "section_key",
-                "title",
-                "subtitle",
-            )
-        }),
-        ("Contenu principal", {
-            "fields": (
-                "content",
-                "image",
-                "image_preview",
-                "highlights",
-            )
-        }),
-        ("Apparence", {
-            "fields": (
-                "icon",
-                "background",
-            )
-        }),
-        ("Organisation", {
-            "fields": (
-                "order",
-                "is_active",
-            )
-        }),
-        ("Métadonnées", {
-            "fields": (
-                "updated_at",
-            ),
-            "classes": ("collapse",)
-        }),
-    )
-
-    def image_preview(self, obj):
-        if obj.image:
-            return format_html(
-                '<img src="{}" style="height:70px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1);" />',
-                obj.image.url
-            )
-        return "-"
-    image_preview.short_description = "Preview"
-
-    def has_add_permission(self, request):
-        max_sections = len(AboutSection.SECTION_CHOICES)
-        if AboutSection.objects.count() >= max_sections:
-            return False
-        return super().has_add_permission(request)
-
-
-# ==========================================================
-# NOTIFICATIONS
+# NOTIFICATIONS (LECTURE SEULE)
 # ==========================================================
 
 @admin.register(Notification)
@@ -482,18 +777,17 @@ class NotificationAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
-from django.utils.safestring import mark_safe
+
 # ==========================================================
-# HISTORIQUE DES STATUTS
+# HISTORIQUE DES STATUTS (LECTURE SEULE)
 # ==========================================================
 
 @admin.register(StatusHistory)
 class StatusHistoryAdmin(admin.ModelAdmin):
 
     list_display = (
-        "entity_display",
-        "old_status",
-        "new_status",
+        "candidature_display",
+        "status_change",
         "changed_by_display",
         "created_at",
     )
@@ -507,35 +801,39 @@ class StatusHistoryAdmin(admin.ModelAdmin):
         "candidature__last_name",
         "candidature__first_name",
         "candidature__email",
-        "inscription__public_token",
     )
 
-    # Plus de readonly_fields avec ForeignKey
-    # On utilise list_display avec des méthodes
     readonly_fields = (
+        "candidature",
         "old_status",
         "new_status",
+        "changed_by",
         "comment",
         "created_at",
     )
 
     ordering = ("-created_at",)
 
-    def entity_display(self, obj):
+    def candidature_display(self, obj):
         if obj.candidature:
             c = obj.candidature
-            return mark_safe(f"<span class='text-blue-600'>Candidature:</span> {c.last_name} {c.first_name}")
-        elif obj.inscription:
-            return mark_safe(f"<span class='text-green-600'>Inscription:</span> {obj.inscription.public_token}")
+            return f"{c.last_name} {c.first_name}"
         return "-"
-    entity_display.short_description = "Entité"
-    entity_display.admin_order_field = "inscription"
+    candidature_display.short_description = "Candidature"
+
+    def status_change(self, obj):
+        return format_html(
+            '<span style="color:#6b7280;">{}</span> → <span style="color:#1e4f6f;font-weight:600;">{}</span>',
+            obj.old_status,
+            obj.new_status
+        )
+    status_change.short_description = "Changement"
 
     def changed_by_display(self, obj):
         if obj.changed_by:
             return obj.changed_by.get_full_name() or obj.changed_by.username
         return "-"
-    changed_by_display.short_description = "Modifié par"
+    changed_by_display.short_description = "Par"
 
     def has_add_permission(self, request):
         return False
@@ -545,6 +843,3 @@ class StatusHistoryAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
-
-
-

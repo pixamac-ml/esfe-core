@@ -1,0 +1,76 @@
+<!-- community/templates/community/partials/report_form.html -->
+
+<div class="bg-white rounded-2xl border border-red-100 shadow-lg p-6 max-w-md mx-auto">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <div>
+            <h3 class="font-bold text-gray-800">Signaler ce contenu</h3>
+            <p class="text-sm text-gray-500">
+                {% if content_type == "topic" %}
+                    Sujet : {{ topic.title|truncatechars:30 }}
+                {% else %}
+                    Réponse de {{ answer.author.username }}
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Formulaire -->
+    <form
+        {% if content_type == "topic" %}
+            hx-post="{% url 'community:report_topic' topic.slug %}"
+        {% else %}
+            hx-post="{% url 'community:report_answer' answer.id %}"
+        {% endif %}
+        hx-swap="outerHTML"
+        class="space-y-4">
+
+        {% csrf_token %}
+
+        <!-- Motif -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Motif du signalement *
+            </label>
+            {{ form.reason }}
+            {% if form.reason.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ form.reason.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Détails -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Détails supplémentaires
+            </label>
+            {{ form.details }}
+        </div>
+
+        <!-- Info -->
+        <div class="bg-gray-50 rounded-xl p-3 text-xs text-gray-600">
+            <p>⚠️ Les signalements abusifs peuvent entraîner des sanctions.</p>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-3 pt-2">
+            <button
+                type="button"
+                onclick="this.closest('[hx-post]').remove()"
+                class="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium
+                       hover:bg-gray-50 transition-all duration-200">
+                Annuler
+            </button>
+            <button
+                type="submit"
+                class="flex-1 px-4 py-3 rounded-xl bg-red-600 text-white font-medium
+                       hover:bg-red-700 transition-all duration-200">
+                Envoyer le signalement
+            </button>
+        </div>
+    </form>
+</div>

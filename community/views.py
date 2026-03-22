@@ -7,10 +7,13 @@ from django.template.loader import render_to_string
 from django.db.models import Prefetch, Count, F, Q
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
-from .forms import TopicForm
-from .models import Topic, Category, Answer, Vote, TopicView, Tag, Notification
+from .forms import TopicForm, ReportForm
+from .models import Topic, Category, Answer, Vote, TopicView, Tag, Notification, Report
 from community.services.notifications import create_notification
+from community.services.gamification import GamificationService
+from community.models_gamification import GamificationProfile, UserBadge
 
 
 # =====================================================
@@ -34,7 +37,9 @@ def build_topic_queryset(sort="active", query=""):
         queryset = queryset.filter(
             Q(title__icontains=query) |
             Q(content__icontains=query) |
-            Q(tags__name__icontains=query)
+            Q(tags__name__icontains=query) |
+            Q(author__username__icontains=query) |
+            Q(category__name__icontains=query)
         ).distinct()
 
     sort_map = {
@@ -45,7 +50,6 @@ def build_topic_queryset(sort="active", query=""):
     }
 
     return queryset.order_by(sort_map.get(sort, "-last_activity_at"))
-
 
 # =====================================================
 # BUILDER : SIDEBAR CONTEXT
@@ -66,7 +70,6 @@ def build_sidebar_context(request=None):
         .order_by("name")
     )
 
-    # Si utilisateur connecté, récupérer ses abonnements
     user_subscriptions = []
     if request and request.user.is_authenticated:
         user_subscriptions = list(
@@ -87,6 +90,7 @@ def build_sidebar_context(request=None):
         .filter(answer_count__gt=0)
         .order_by("-answer_count")[:10]
     )
+
     popular_tags = (
         Tag.objects
         .annotate(
@@ -123,7 +127,7 @@ def topic_list(request):
         "topics": topics,
         "current_sort": sort,
         "query": query,
-        **build_sidebar_context(request),  # <- Modifier ici : passer request
+        **build_sidebar_context(request),
     }
 
     if request.headers.get("HX-Request"):
@@ -136,11 +140,11 @@ def topic_list(request):
 
     return render(request, "community/topic_list.html", context)
 
+
 # =====================================================
 # LISTE PAR TAG
 # =====================================================
 def topic_by_tag(request, slug):
-
     sort = request.GET.get("sort", "active")
     query = request.GET.get("q", "").strip()
 
@@ -153,7 +157,7 @@ def topic_by_tag(request, slug):
         "tag": tag,
         "current_sort": sort,
         "query": query,
-        **build_sidebar_context(request),  # <- Modifier ici
+        **build_sidebar_context(request),
     }
 
     if request.headers.get("HX-Request"):
@@ -166,11 +170,11 @@ def topic_by_tag(request, slug):
 
     return render(request, "community/topic_list.html", context)
 
+
 # =====================================================
 # LISTE PAR CATÉGORIE
 # =====================================================
 def topic_by_category(request, slug):
-
     sort = request.GET.get("sort", "active")
     query = request.GET.get("q", "").strip()
 
@@ -183,7 +187,7 @@ def topic_by_category(request, slug):
         "category": category,
         "current_sort": sort,
         "query": query,
-        **build_sidebar_context(request),  # <- Modifier ici
+        **build_sidebar_context(request),
     }
 
     if request.headers.get("HX-Request"):
@@ -197,9 +201,6 @@ def topic_by_category(request, slug):
     return render(request, "community/topic_list.html", context)
 
 
-
-
-
 # =====================================================
 # DÉTAIL D'UN SUJET
 # =====================================================
@@ -210,9 +211,7 @@ def topic_detail(request, slug):
         is_published=True
     )
 
-    # ==============================
     # Anti-refresh intelligent
-    # ==============================
     ip_address = request.META.get("REMOTE_ADDR")
     now = timezone.now()
     today = now.date()
@@ -233,9 +232,7 @@ def topic_detail(request, slug):
         Topic.objects.filter(pk=topic.pk).update(view_count=F("view_count") + 1)
         topic.refresh_from_db(fields=["view_count"])
 
-    # ==============================
     # Réponses principales
-    # ==============================
     root_answers = (
         Answer.objects
         .filter(topic=topic, parent__isnull=True, is_deleted=False)
@@ -260,9 +257,7 @@ def topic_detail(request, slug):
             key=lambda a: a.id != accepted.id
         )
 
-    # ==============================
-    # Sujets similaires (même catégorie)
-    # ==============================
+    # Sujets similaires
     similar_topics = (
         Topic.objects
         .filter(
@@ -276,9 +271,7 @@ def topic_detail(request, slug):
         .order_by("-view_count")[:5]
     )
 
-    # ==============================
     # Abonnements utilisateur
-    # ==============================
     user_subscriptions = []
     if request.user.is_authenticated:
         user_subscriptions = list(
@@ -294,15 +287,13 @@ def topic_detail(request, slug):
         "user_subscriptions": user_subscriptions,
     })
 
+
 # =====================================================
 # AJOUT RÉPONSE (HTMX)
 # =====================================================
 @login_required
 @require_POST
 def add_answer(request, slug):
-    # ===============================
-    # Récupération du sujet
-    # ===============================
     topic = get_object_or_404(
         Topic.objects.select_related("author", "category"),
         slug=slug,
@@ -310,17 +301,11 @@ def add_answer(request, slug):
         is_published=True
     )
 
-    # ===============================
-    # Récupération contenu
-    # ===============================
     content = request.POST.get("content", "").strip()
 
     if not content:
         return HttpResponseBadRequest("Contenu vide ou invalide.")
 
-    # ===============================
-    # Gestion réponse ou sous-réponse
-    # ===============================
     parent = None
     parent_id = request.POST.get("parent_id")
 
@@ -334,9 +319,6 @@ def add_answer(request, slug):
         if not parent:
             return HttpResponseBadRequest("Réponse parent invalide.")
 
-    # ===============================
-    # Création réponse
-    # ===============================
     answer = Answer.objects.create(
         topic=topic,
         author=request.user,
@@ -344,18 +326,12 @@ def add_answer(request, slug):
         parent=parent
     )
 
-    # ===============================
     # Mise à jour activité du sujet
-    # ===============================
     Topic.objects.filter(pk=topic.pk).update(
         last_activity_at=timezone.now()
     )
 
-    # ===============================================================
-    # NOTIFICATIONS - ÉTAPE 1 :Notifier l'auteur du sujet
-    # ===============================================================
-
-    # 1.Notifier l'auteur du sujet (si ce n'est pas lui qui répond)
+    # NOTIFICATIONS
     if topic.author != request.user:
         try:
             create_notification(
@@ -364,12 +340,11 @@ def add_answer(request, slug):
                 topic=topic,
                 answer=answer,
                 notification_type="new_answer",
-                send_email=False  # Mettre True si tu veuxenvoyer des emails
+                send_email=False
             )
         except Exception:
             pass
 
-    # 2.Notifier les personnes qui ont répondu au sujet (autres que l'auteur et le réponder)
     try:
         previous_responders = (
             Answer.objects
@@ -381,7 +356,6 @@ def add_answer(request, slug):
         )
 
         for responder_id in previous_responders:
-            # Éviter les doublons de notification
             existing_notification = Notification.objects.filter(
                 user_id=responder_id,
                 actor=request.user,
@@ -405,22 +379,16 @@ def add_answer(request, slug):
     except Exception:
         pass
 
-    # ===============================
     # Préchargement auteur pour template
-    # ===============================
     answer = (
         Answer.objects
         .select_related("author")
         .get(pk=answer.pk)
     )
 
-    # ===============================
     # Réponse HTMX
-    # ===============================
     if request.headers.get("HX-Request"):
-
         template_name = "community/partials/answer_item.html"
-
         if parent:
             template_name = "community/partials/reply_item.html"
 
@@ -432,12 +400,8 @@ def add_answer(request, slug):
             },
             request=request
         )
-
         return HttpResponse(html)
 
-    # ===============================
-    # Fallback (sécurité)
-    # ===============================
     return HttpResponse(status=204)
 
 
@@ -485,28 +449,17 @@ def vote_answer(request, answer_id):
 # =====================================================
 @login_required
 def create_topic(request):
-    # ==================================================
-    # POST : création du sujet
-    # ==================================================
-
     if request.method == "POST":
-
         form = TopicForm(request.POST, request.FILES)
 
         if form.is_valid():
-
             topic = form.save(commit=False)
             topic.author = request.user
             topic.last_activity_at = timezone.now()
             topic.save()
-
             form.save_m2m()
 
             category = topic.category
-
-            # ==================================================
-            # AUTO-ABONNEMENT OPTIONNEL
-            # ==================================================
 
             if form.cleaned_data.get("subscribe"):
                 try:
@@ -514,10 +467,7 @@ def create_topic(request):
                 except Exception:
                     pass
 
-            # ==================================================
             # NOTIFICATIONS DES ABONNÉS
-            # ==================================================
-
             subscribers = (
                 category.subscribers
                 .filter(is_active=True)
@@ -526,9 +476,7 @@ def create_topic(request):
             )
 
             for user in subscribers:
-
                 try:
-
                     create_notification(
                         user=user,
                         actor=request.user,
@@ -536,29 +484,15 @@ def create_topic(request):
                         notification_type="new_topic",
                         send_email=True
                     )
-
                 except Exception:
-                    # sécurité : ne jamais casser la création du topic
                     pass
-
-            # ==================================================
-            # REDIRECTION HTMX
-            # ==================================================
 
             if request.headers.get("HX-Request"):
                 response = HttpResponse()
                 response["HX-Redirect"] = topic.get_absolute_url()
                 return response
 
-            # ==================================================
-            # REDIRECTION CLASSIQUE
-            # ==================================================
-
             return redirect(topic.get_absolute_url())
-
-        # ==================================================
-        # ERREURS FORMULAIRE (HTMX)
-        # ==================================================
 
         if request.headers.get("HX-Request"):
             html = render_to_string(
@@ -566,15 +500,9 @@ def create_topic(request):
                 {"form": form},
                 request=request
             )
-
             return HttpResponse(html)
 
-    # ==================================================
-    # GET : affichage du formulaire
-    # ==================================================
-
     else:
-
         form = TopicForm()
 
     return render(
@@ -628,27 +556,18 @@ def delete_topic(request, slug):
 
 
 # =====================================================
-# ABONNEMENT AUX DOMAINES (ÉTAPE 2)
+# ABONNEMENT AUX DOMAINES
 # =====================================================
 @login_required
 @require_POST
 def subscribe_category(request, slug):
-    """
-    Permet à un utilisateur de s'abonner à un domaine (catégorie)
-    """
     category = get_object_or_404(Category, slug=slug, is_active=True)
-
-    # Ajouter l'utilisateur aux abonnés
     category.subscribers.add(request.user)
 
     if request.headers.get("HX-Request"):
-        # Retourner le bouton de désabonnement
         html = render_to_string(
             "community/partials/subscribe_button.html",
-            {
-                "category": category,
-                "is_subscribed": True
-            },
+            {"category": category, "is_subscribed": True},
             request=request
         )
         return HttpResponse(html)
@@ -659,22 +578,13 @@ def subscribe_category(request, slug):
 @login_required
 @require_POST
 def unsubscribe_category(request, slug):
-    """
-    Permet à un utilisateur de se désabonner d'un domaine (catégorie)
-    """
     category = get_object_or_404(Category, slug=slug, is_active=True)
-
-    # Retirer l'utilisateur des abonnés
     category.subscribers.remove(request.user)
 
     if request.headers.get("HX-Request"):
-        # Retourner le bouton d'abonnement
         html = render_to_string(
             "community/partials/subscribe_button.html",
-            {
-                "category": category,
-                "is_subscribed": False
-            },
+            {"category": category, "is_subscribed": False},
             request=request
         )
         return HttpResponse(html)
@@ -684,13 +594,6 @@ def unsubscribe_category(request, slug):
 
 @login_required
 def my_subscriptions(request):
-    """
-    Page affichant les abonnements de l'utilisateur
-    """
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
-
-    # Récupérer les catégories auxquelles l'utilisateur est abonné
     subscriptions = (
         Category.objects
         .filter(subscribers=request.user, is_active=True)
@@ -706,19 +609,14 @@ def my_subscriptions(request):
         .order_by("name")
     )
 
-    context = {
+    return render(request, "community/my_subscriptions.html", {
         "subscriptions": subscriptions,
-    }
-
-    return render(request, "community/my_subscriptions.html", context)
+    })
 
 
 # =====================================================
 # MEMBRES
 # =====================================================
-from django.contrib.auth import get_user_model
-
-
 def members_list(request):
     User = get_user_model()
 
@@ -743,14 +641,12 @@ def members_list(request):
     })
 
 
-# ==========================================
-# PROFIL PUBLIC UTILISATEUR
-# ==========================================
+# =====================================================
+# PROFIL PUBLIC UTILISATEUR (AVEC GAMIFICATION)
+# =====================================================
 def public_profile(request, username):
-    from django.contrib.auth import get_user_model
-    from django.db.models import Sum, Count
+    from django.db.models import Sum
     from django.db.models.functions import Coalesce
-    from community.models import Category
 
     User = get_user_model()
 
@@ -759,7 +655,17 @@ def public_profile(request, username):
         username=username
     )
 
-    profile = user.profile
+    # Récupérer ou créer le profil accounts
+    try:
+        profile = user.profile
+    except:
+        from accounts.models import Profile
+        profile = Profile.objects.create(user=user)
+
+    # ========== GAMIFICATION ==========
+    gamification = GamificationService.get_or_create_profile(user)
+    badges = UserBadge.objects.filter(user=user).select_related("badge").order_by("-earned_at")
+    # ==================================
 
     # Sujets
     topics = (
@@ -795,13 +701,15 @@ def public_profile(request, username):
         "answers": answers.count(),
         "accepted": answers.filter(accepted_for_topics__isnull=False).count(),
         "upvotes": answers.aggregate(total=Coalesce(Sum("upvotes"), 0))["total"],
-        "views": profile.total_views_generated,
-        "reputation": profile.reputation,
+        "views": profile.total_views_generated if hasattr(profile, 'total_views_generated') else 0,
+        "reputation": profile.reputation if hasattr(profile, 'reputation') else 0,
     }
 
     context = {
         "profile_user": user,
         "profile": profile,
+        "gamification": gamification,
+        "badges": badges,
         "topics": topics[:10],
         "answers": answers[:10],
         "best_answers": best_answers,
@@ -811,17 +719,13 @@ def public_profile(request, username):
 
     return render(request, "community/public_profile.html", context)
 
+
 def profile_activity(request, username):
-    if not request.htmx:
+    if not request.headers.get("HX-Request"):
         return redirect("community:public_profile", username=username)
 
-    from django.contrib.auth import get_user_model
     User = get_user_model()
-
-    user = get_object_or_404(
-        User.objects.select_related("profile"),
-        username=username
-    )
+    user = get_object_or_404(User.objects.select_related("profile"), username=username)
 
     answers = (
         user.community_answers
@@ -840,25 +744,16 @@ def profile_activity(request, username):
     return render(
         request,
         "community/partials/profile/activity.html",
-        {
-            "profile_user": user,
-            "answers": answers,
-            "topics": topics,
-        },
+        {"profile_user": user, "answers": answers, "topics": topics},
     )
 
 
 def profile_answers(request, username):
-    if not request.htmx:
+    if not request.headers.get("HX-Request"):
         return redirect("community:public_profile", username=username)
 
-    from django.contrib.auth import get_user_model
     User = get_user_model()
-
-    user = get_object_or_404(
-        User.objects.select_related("profile"),
-        username=username
-    )
+    user = get_object_or_404(User.objects.select_related("profile"), username=username)
 
     answers = (
         user.community_answers
@@ -870,119 +765,42 @@ def profile_answers(request, username):
     return render(
         request,
         "community/partials/profile/answers.html",
-        {
-            "profile_user": user,
-            "answers": answers,
-        },
+        {"profile_user": user, "answers": answers},
     )
 
 
 def profile_topics(request, username):
-    if not request.htmx:
+    if not request.headers.get("HX-Request"):
         return redirect("community:public_profile", username=username)
 
-    from django.contrib.auth import get_user_model
     User = get_user_model()
-
-    user = get_object_or_404(
-        User.objects.select_related("profile"),
-        username=username
-    )
+    user = get_object_or_404(User.objects.select_related("profile"), username=username)
 
     topics = (
         user.community_topics
         .filter(is_deleted=False)
         .select_related("category")
-        .annotate(
-            answers_count=Count("answers")
-        )
+        .annotate(answers_count=Count("answers"))
         .order_by("-created_at")
     )
 
     return render(
         request,
         "community/partials/profile/topics.html",
-        {
-            "profile_user": user,
-            "topics": topics,
-        },
+        {"profile_user": user, "topics": topics},
     )
 
 
 def profile_badges(request, username):
-    if not request.htmx:
+    if not request.headers.get("HX-Request"):
         return redirect("community:public_profile", username=username)
 
-    from django.contrib.auth import get_user_model
     User = get_user_model()
+    user = get_object_or_404(User.objects.select_related("profile"), username=username)
 
-    user = get_object_or_404(
-        User.objects.select_related("profile"),
-        username=username
-    )
-
-    answers = (
-        user.community_answers
-        .filter(is_deleted=False)
-    )
-
-    topics = (
-        user.community_topics
-        .filter(is_deleted=False)
-    )
-
-    # statistiques
-    answers_count = answers.count()
-
-    accepted_answers = answers.filter(
-        accepted_for_topics__isnull=False
-    ).count()
-
-    upvotes = answers.aggregate(
-        total=Count("votes")
-    )["total"] or 0
-
-    # logique badges
-
-    badges = {
-
-        "beginner": {
-            "title": "Débutant",
-            "description": "Première réponse publiée",
-            "icon": "award",
-            "earned": answers_count >= 1,
-            "progress": min(answers_count, 1),
-            "target": 1,
-        },
-
-        "contributor": {
-            "title": "Contributeur",
-            "description": "10 réponses utiles",
-            "icon": "star",
-            "earned": answers_count >= 10,
-            "progress": min(answers_count, 10),
-            "target": 10,
-        },
-
-        "expert": {
-            "title": "Expert",
-            "description": "50 réponses utiles",
-            "icon": "medal",
-            "earned": answers_count >= 50,
-            "progress": min(answers_count, 50),
-            "target": 50,
-        },
-
-        "specialist": {
-            "title": "Spécialiste",
-            "description": "Réponse acceptée comme solution",
-            "icon": "brain",
-            "earned": accepted_answers >= 5,
-            "progress": min(accepted_answers, 5),
-            "target": 5,
-        },
-
-    }
+    # Récupérer les badges gamification
+    badges = UserBadge.objects.filter(user=user).select_related("badge").order_by("-earned_at")
+    gamification = GamificationService.get_or_create_profile(user)
 
     return render(
         request,
@@ -990,41 +808,66 @@ def profile_badges(request, username):
         {
             "profile_user": user,
             "badges": badges,
+            "gamification": gamification,
         },
     )
 
 
 # =====================================================
+# CLASSEMENT (LEADERBOARD)
+# =====================================================
+def leaderboard(request):
+    """Affiche le classement des contributeurs"""
+    category = request.GET.get("cat", "xp")
+
+    # Classement principal
+    top_users = GamificationService.get_leaderboard(category=category, limit=20)
+
+    # Position de l'utilisateur connecté
+    user_rank = None
+    if request.user.is_authenticated:
+        try:
+            user_gam = request.user.gamification
+            if category == "xp":
+                user_rank = GamificationProfile.objects.filter(
+                    total_xp__gt=user_gam.total_xp
+                ).count() + 1
+            elif category == "answers":
+                user_rank = GamificationProfile.objects.filter(
+                    answers_given__gt=user_gam.answers_given
+                ).count() + 1
+            elif category == "accepted":
+                user_rank = GamificationProfile.objects.filter(
+                    answers_accepted__gt=user_gam.answers_accepted
+                ).count() + 1
+        except GamificationProfile.DoesNotExist:
+            pass
+
+    context = {
+        "leaderboard": top_users,
+        "category": category,
+        "user_rank": user_rank,
+    }
+
+    return render(request, "community/leaderboard.html", context)
+
+
+# =====================================================
 # NOTIFICATIONS
-# =====================================================
-# =====================================================
-# NOTIFICATIONS - LISTE COMPLÈTE AVEC PAGINATION
-# =====================================================
-# =====================================================
-# NOTIFICATIONS - LISTE COMPLÈTE AVEC PAGINATION
 # =====================================================
 @login_required
 def notifications(request):
-    """
-    Page principale des notifications avec pagination.
-    Supporte le filtrage par type et par statut de lecture.
-    """
-    # ==============================
-    # Paramètres de filtrage
-    # ==============================
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
     notification_type = request.GET.get("type", "")
     is_read = request.GET.get("is_read", "")
 
-    # ==============================
-    # Construction de la requête
-    # ==============================
     notifications_qs = (
         Notification.objects
         .filter(user=request.user)
         .select_related("actor", "topic", "topic__category", "answer", "answer__author")
     )
 
-    # Appliquer les filtres
     if notification_type:
         notifications_qs = notifications_qs.filter(notification_type=notification_type)
 
@@ -1033,13 +876,9 @@ def notifications(request):
     elif is_read == "false":
         notifications_qs = notifications_qs.filter(is_read=False)
 
-    # ==============================
-    # Pagination (20 par page)
-    # ==============================
-    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
     paginator = Paginator(notifications_qs, 20)
-
     page = request.GET.get("page", 1)
+
     try:
         notifications_page = paginator.page(page)
     except PageNotAnInteger:
@@ -1047,15 +886,9 @@ def notifications(request):
     except EmptyPage:
         notifications_page = paginator.page(paginator.num_pages)
 
-    # ==============================
-    # Statistiques
-    # ==============================
     unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
     total_count = Notification.objects.filter(user=request.user).count()
 
-    # ==============================
-    # Marquer tout lu (action)
-    # ==============================
     if request.GET.get("mark_all_read") == "true":
         Notification.objects.filter(user=request.user, is_read=False).update(
             is_read=True,
@@ -1063,43 +896,25 @@ def notifications(request):
         )
         unread_count = 0
 
-    # ==============================
-    # Réponse HTMX (pagination)
-    # ==============================
     if request.headers.get("HX-Request"):
         return render(
             request,
             "community/partials/notifications_list.html",
-            {
-                "notifications": notifications_page,
-                "page_obj": notifications_page,
-            }
+            {"notifications": notifications_page, "page_obj": notifications_page}
         )
 
-    # ==============================
-    # Réponse normale
-    # ==============================
-    context = {
+    return render(request, "community/notifications.html", {
         "notifications": notifications_page,
         "page_obj": notifications_page,
         "unread_count": unread_count,
         "total_count": total_count,
         "current_type": notification_type,
         "current_is_read": is_read,
-    }
-
-    return render(request, "community/notifications.html", context)
+    })
 
 
-# =====================================================
-# NOTIFICATIONS - VUE PARTIELLE (dropdown)
-# =====================================================
 @login_required
 def notifications_partial(request):
-    """
-    Vue partielle pour afficher les notifications dans le dropdown.
-    Retourne les 7 dernières notifications non lues.
-    """
     notifications = (
         Notification.objects
         .filter(user=request.user)
@@ -1112,29 +927,14 @@ def notifications_partial(request):
     return render(
         request,
         "community/partials/notifications_dropdown.html",
-        {
-            "notifications": notifications,
-            "unread_count": unread_count,
-        }
+        {"notifications": notifications, "unread_count": unread_count}
     )
 
 
-# =====================================================
-# NOTIFICATIONS - MARQUER COMME LU
-# =====================================================
 @login_required
 @require_POST
 def mark_notification_read(request, pk):
-    """
-    Marque une notification spécifique comme lue.
-    Retourne la notification mise à jour (pour HTMX).
-    """
-    notification = get_object_or_404(
-        Notification,
-        pk=pk,
-        user=request.user
-    )
-
+    notification = get_object_or_404(Notification, pk=pk, user=request.user)
     notification.mark_as_read()
 
     if request.headers.get("HX-Request"):
@@ -1147,44 +947,25 @@ def mark_notification_read(request, pk):
     return HttpResponse(status=204)
 
 
-# =====================================================
-# NOTIFICATIONS - MARQUER TOUT COMME LU
-# =====================================================
 @login_required
 @require_POST
 def mark_all_notifications_read(request):
-    """
-    Marque toutes les notifications comme lues.
-    """
     Notification.objects.filter(user=request.user, is_read=False).update(
         is_read=True,
         read_at=timezone.now()
     )
 
     if request.headers.get("HX-Request"):
-        # Retourner un snippet vide pour mettre à jour l'interface
         return HttpResponse("")
 
     messages.success(request, "Toutes les notifications ont été marquées comme lues.")
     return redirect("community:notifications")
 
 
-# =====================================================
-# NOTIFICATIONS - SUPPRIMER
-# =====================================================
 @login_required
-@require_POST  # ← Changed from @require_DELETE to @require_POST
+@require_POST
 def delete_notification(request, pk):
-    """
-    Supprime une notification.
-    HTMX utilise POST pour les suppressions.
-    """
-    notification = get_object_or_404(
-        Notification,
-        pk=pk,
-        user=request.user
-    )
-
+    notification = get_object_or_404(Notification, pk=pk, user=request.user)
     notification.delete()
 
     if request.headers.get("HX-Request"):
@@ -1192,17 +973,250 @@ def delete_notification(request, pk):
 
     return HttpResponse(status=204)
 
-# =====================================================
-# COMPTEUR DE NOTIFICATIONS (pour AJAX/HTMX)
-# =====================================================
+
 @login_required
 def notifications_unread_count(request):
-    """
-    Retourne le nombre de notifications non lues (pour polling ou WebSocket).
-    """
     count = Notification.objects.filter(user=request.user, is_read=False).count()
 
     if request.headers.get("HX-Request"):
         return HttpResponse(f'<span id="unread-count">{count}</span>')
 
     return JsonResponse({"unread_count": count})
+
+
+# =====================================================
+# ACCEPTER UNE RÉPONSE COMME SOLUTION
+# =====================================================
+@login_required
+@require_POST
+def accept_answer(request, answer_id):
+    answer = get_object_or_404(
+        Answer.objects.select_related("topic", "author"),
+        id=answer_id,
+        is_deleted=False
+    )
+    topic = answer.topic
+
+    if topic.author != request.user:
+        if request.headers.get("HX-Request"):
+            return HttpResponse(
+                '<span class="text-red-500 text-sm">Action non autorisée</span>',
+                status=403
+            )
+        return HttpResponseBadRequest("Seul l'auteur du sujet peut accepter une réponse.")
+
+    if topic.accepted_answer == answer:
+        topic.accepted_answer = None
+        topic.save(update_fields=["accepted_answer"])
+        is_accepted = False
+    else:
+        topic.accepted_answer = answer
+        topic.save(update_fields=["accepted_answer"])
+        is_accepted = True
+
+        # GAMIFICATION: XP pour réponse acceptée
+        if answer.author != request.user:
+            GamificationService.award_xp(answer.author, "answer_accepted")
+
+        # Notification
+        if answer.author != request.user:
+            try:
+                from community.services.notifications import notify_accepted_answer
+                notify_accepted_answer(topic, answer)
+            except Exception:
+                pass
+
+    if request.headers.get("HX-Request"):
+        html = render_to_string(
+            "community/partials/accept_button.html",
+            {"answer": answer, "topic": topic, "is_accepted": is_accepted},
+            request=request
+        )
+        return HttpResponse(html)
+
+    return redirect(topic.get_absolute_url())
+
+
+# =====================================================
+# SIGNALER UN SUJET
+# =====================================================
+@login_required
+def report_topic(request, slug):
+    topic = get_object_or_404(Topic, slug=slug, is_deleted=False)
+
+    already_reported = Report.objects.filter(
+        reporter=request.user,
+        topic=topic
+    ).exists()
+
+    if already_reported:
+        if request.headers.get("HX-Request"):
+            return HttpResponse(
+                '<div class="text-amber-600 text-sm p-4">Vous avez déjà signalé ce contenu.</div>'
+            )
+        messages.warning(request, "Vous avez déjà signalé ce contenu.")
+        return redirect(topic.get_absolute_url())
+
+    if request.method == "POST":
+        form = ReportForm(request.POST)
+
+        if form.is_valid():
+            report = form.save(commit=False)
+            report.reporter = request.user
+            report.topic = topic
+            report.save()
+
+            if request.headers.get("HX-Request"):
+                return HttpResponse(
+                    '''<div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto text-green-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p class="text-green-700 font-medium">Signalement envoyé</p>
+                        <p class="text-green-600 text-sm">Notre équipe examinera ce contenu.</p>
+                    </div>'''
+                )
+
+            messages.success(request, "Votre signalement a été envoyé.")
+            return redirect(topic.get_absolute_url())
+    else:
+        form = ReportForm()
+
+    context = {"form": form, "topic": topic, "content_type": "topic"}
+
+    if request.headers.get("HX-Request"):
+        return render(request, "community/partials/report_form.html", context)
+
+    return render(request, "community/report.html", context)
+
+
+# =====================================================
+# SIGNALER UNE RÉPONSE
+# =====================================================
+@login_required
+def report_answer(request, answer_id):
+    answer = get_object_or_404(
+        Answer.objects.select_related("topic"),
+        id=answer_id,
+        is_deleted=False
+    )
+
+    already_reported = Report.objects.filter(
+        reporter=request.user,
+        answer=answer
+    ).exists()
+
+    if already_reported:
+        if request.headers.get("HX-Request"):
+            return HttpResponse(
+                '<div class="text-amber-600 text-sm p-4">Vous avez déjà signalé ce contenu.</div>'
+            )
+        messages.warning(request, "Vous avez déjà signalé ce contenu.")
+        return redirect(answer.topic.get_absolute_url())
+
+    if request.method == "POST":
+        form = ReportForm(request.POST)
+
+        if form.is_valid():
+            report = form.save(commit=False)
+            report.reporter = request.user
+            report.answer = answer
+            report.save()
+
+            if request.headers.get("HX-Request"):
+                return HttpResponse(
+                    '''<div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto text-green-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p class="text-green-700 font-medium">Signalement envoyé</p>
+                        <p class="text-green-600 text-sm">Notre équipe examinera ce contenu.</p>
+                    </div>'''
+                )
+
+            messages.success(request, "Votre signalement a été envoyé.")
+            return redirect(answer.topic.get_absolute_url())
+    else:
+        form = ReportForm()
+
+    context = {"form": form, "answer": answer, "topic": answer.topic, "content_type": "answer"}
+
+    if request.headers.get("HX-Request"):
+        return render(request, "community/partials/report_form.html", context)
+
+    return render(request, "community/report.html", context)
+
+
+# =====================================================
+# VERROUILLER / DÉVERROUILLER UN SUJET
+# =====================================================
+@login_required
+@require_POST
+def lock_topic(request, slug):
+    topic = get_object_or_404(Topic, slug=slug, is_deleted=False)
+
+    can_lock = request.user.is_staff or topic.author == request.user
+
+    if not can_lock:
+        if request.headers.get("HX-Request"):
+            return HttpResponse(
+                '<span class="text-red-500 text-sm">Permission refusée</span>',
+                status=403
+            )
+        return HttpResponseBadRequest("Vous n'avez pas la permission de verrouiller ce sujet.")
+
+    topic.is_locked = not topic.is_locked
+    topic.save(update_fields=["is_locked"])
+
+    if request.headers.get("HX-Request"):
+        html = render_to_string(
+            "community/partials/lock_button.html",
+            {"topic": topic},
+            request=request
+        )
+        return HttpResponse(html)
+
+    action = "verrouillé" if topic.is_locked else "déverrouillé"
+    messages.success(request, f"Le sujet a été {action}.")
+
+    return redirect(topic.get_absolute_url())
+
+
+# =====================================================
+# MODÉRATION STAFF
+# =====================================================
+@login_required
+@require_POST
+def moderate_delete_topic(request, slug):
+    if not request.user.is_staff:
+        return HttpResponseBadRequest("Permission refusée.")
+
+    topic = get_object_or_404(Topic, slug=slug)
+    topic.is_deleted = True
+    topic.save(update_fields=["is_deleted"])
+
+    messages.success(request, f"Le sujet '{topic.title}' a été supprimé.")
+    return redirect("community:topic_list")
+
+
+@login_required
+@require_POST
+def moderate_delete_answer(request, answer_id):
+    if not request.user.is_staff:
+        return HttpResponseBadRequest("Permission refusée.")
+
+    answer = get_object_or_404(Answer, id=answer_id)
+    topic = answer.topic
+
+    answer.is_deleted = True
+    answer.save(update_fields=["is_deleted"])
+
+    if request.headers.get("HX-Request"):
+        return HttpResponse(
+            '<div class="bg-red-50 text-red-600 p-4 rounded-xl text-center text-sm">'
+            'Réponse supprimée par un modérateur'
+            '</div>'
+        )
+
+    messages.success(request, "La réponse a été supprimée.")
+    return redirect(topic.get_absolute_url())

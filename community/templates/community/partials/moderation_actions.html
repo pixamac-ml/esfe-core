@@ -1,0 +1,45 @@
+<!-- community/templates/community/partials/moderation_actions.html -->
+<!-- À inclure dans topic_detail.html pour le staff -->
+
+{% if request.user.is_staff %}
+<div class="bg-purple-50 border border-purple-200 rounded-2xl p-4 mb-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 text-purple-700">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+            <span class="font-semibold text-sm">Actions de modération</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <!-- Bouton verrouiller -->
+            <div id="lock-btn">
+                {% include "community/partials/lock_button.html" %}
+            </div>
+
+            <!-- Bouton supprimer -->
+            <button
+                hx-post="{% url 'community:moderate_delete_topic' topic.slug %}"
+                hx-confirm="Êtes-vous sûr de vouloir supprimer ce sujet ? Cette action est irréversible."
+                class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
+                       bg-red-100 text-red-700 border border-red-300
+                       hover:bg-red-200 transition-all duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Supprimer
+            </button>
+
+            <!-- Signalements en attente -->
+            {% if topic.reports.filter.status='pending'|length > 0 %}
+            <span class="flex items-center gap-1 px-3 py-1 rounded-full bg-red-500 text-white text-xs font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                {{ topic.reports.count }} signalement(s)
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}

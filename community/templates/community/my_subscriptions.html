@@ -4,78 +4,127 @@
 {% block content %}
 
 <!-- ================= HERO ================= -->
-<section class="relative pt-28 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
-    <div class="max-w-6xl mx-auto px-4">
+<section class="relative pt-28 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white overflow-hidden">
+    <!-- Effets décoratifs -->
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_70%,white,transparent_50%)]"></div>
+    <div class="absolute top-20 right-10 w-64 h-64 bg-secondary/20 rounded-full blur-3xl"></div>
+
+    <div class="relative max-w-6xl mx-auto px-4">
+        <!-- Bouton retour animé -->
         <a href="{% url 'community:topic_list' %}"
-           class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition mb-6">
+           class="group inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition-all duration-300 mb-6">
             <svg xmlns="http://www.w3.org/2000/svg"
-                 class="h-4 w-4"
-                 fill="none"
-                 viewBox="0 0 24 24"
-                 stroke="currentColor">
+                 class="h-4 w-4 transform group-hover:-translate-x-1 transition-transform duration-300"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
             Retour aux discussions
         </a>
-        <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
-            Mes abonnements
-        </h1>
-        <p class="text-primary-100 mt-3 max-w-2xl text-sm leading-relaxed">
-            Gérez les domaines que vous suivez pour recevoir des notifications
-            lorsqu'un nouveau sujet est publié.
-        </p>
+
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div>
+                <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur px-4 py-2 rounded-full text-xs font-semibold uppercase tracking-wide mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                    Gestion des abonnements
+                </div>
+
+                <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
+                    Mes abonnements
+                </h1>
+                <p class="text-primary-100 mt-3 max-w-2xl text-sm leading-relaxed">
+                    Gérez les domaines que vous suivez pour recevoir des notifications
+                    lorsqu'un nouveau sujet est publié.
+                </p>
+            </div>
+
+            <!-- Statistique -->
+            {% if subscriptions %}
+            <div class="bg-white/10 backdrop-blur rounded-xl px-6 py-4 text-center">
+                <div class="text-3xl font-bold">{{ subscriptions|length }}</div>
+                <div class="text-xs text-primary-200 uppercase tracking-wide">domaine{{ subscriptions|length|pluralize }} suivi{{ subscriptions|length|pluralize }}</div>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </section>
 
 <!-- ================= CONTENT ================= -->
-<section class="bg-gray-50 py-20">
+<section class="bg-gray-50 py-16">
     <div class="max-w-6xl mx-auto px-4">
 
         {% if subscriptions %}
             <!-- LISTE DES ABONNEMENTS -->
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {% for category in subscriptions %}
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6
-                            hover:shadow-md transition-shadow duration-300">
+                <div class="group bg-white rounded-2xl border border-gray-100 shadow-sm p-6
+                            hover:shadow-xl hover:border-primary-200 hover:-translate-y-1
+                            transition-all duration-300">
 
                     <!-- HEADER -->
                     <div class="flex items-start justify-between mb-4">
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-4">
                             {% if category.icon %}
-                            <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
-                                <i class="fa-solid {{ category.icon }} text-primary-600"></i>
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-primary-50
+                                        flex items-center justify-center
+                                        group-hover:scale-110 transition-transform duration-300">
+                                <i class="fa-solid {{ category.icon }} text-lg text-primary-600"></i>
                             </div>
                             {% else %}
-                            <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-primary-50
+                                        flex items-center justify-center
+                                        group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                                 </svg>
                             </div>
                             {% endif %}
+
                             <div>
-                                <h3 class="font-semibold text-gray-800">
+                                <h3 class="font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">
                                     {{ category.name }}
                                 </h3>
-                                <p class="text-xs text-gray-500">
+                                <div class="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                                    </svg>
                                     {{ category.topic_count }} sujet{{ category.topic_count|pluralize }}
-                                </p>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- Badge abonné -->
+                        <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Abonné
+                        </span>
                     </div>
 
                     <!-- DESCRIPTION -->
                     {% if category.description %}
-                    <p class="text-sm text-gray-600 mb-4 line-clamp-2">
+                    <p class="text-sm text-gray-600 mb-5 line-clamp-2 leading-relaxed">
                         {{ category.description }}
+                    </p>
+                    {% else %}
+                    <p class="text-sm text-gray-400 mb-5 italic">
+                        Aucune description disponible.
                     </p>
                     {% endif %}
 
                     <!-- ACTIONS -->
                     <div class="flex items-center gap-3 pt-4 border-t border-gray-100">
                         <a href="{% url 'community:topic_by_category' category.slug %}"
-                           class="flex-1 text-center px-4 py-2 rounded-lg text-sm font-medium
-                                  bg-primary-50 text-primary-600 hover:bg-primary-100
-                                  transition-colors duration-200">
+                           class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
+                                  bg-primary-50 text-primary-600
+                                  hover:bg-primary-100 hover:text-primary-700
+                                  transition-all duration-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
                             Voir les sujets
                         </a>
 
@@ -88,25 +137,31 @@
             </div>
 
         {% else %}
-            <!-- AUCUN ABONNEMENT -->
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
-                <div class="w-16 h-16 mx-auto mb-6 rounded-full bg-gray-100 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+            <!-- AUCUN ABONNEMENT - État vide amélioré -->
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-16 text-center">
+                <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-50
+                            flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                     </svg>
                 </div>
-                <h2 class="text-xl font-semibold text-gray-800 mb-2">
+
+                <h2 class="text-2xl font-bold text-gray-800 mb-3">
                     Aucun abonnement
                 </h2>
-                <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                <p class="text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
                     Vous ne suivez actuellement aucun domaine. Abonnez-vous à des domaines
                     qui vous intéressent pour recevoir des notifications lorsqu'un nouveau sujet est publié.
                 </p>
+
                 <a href="{% url 'community:topic_list' %}"
-                   class="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-medium
-                          bg-primary-600 text-white hover:bg-primary-700
-                          transition-colors duration-200 shadow-sm hover:shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   class="group inline-flex items-center gap-3 px-8 py-4 rounded-xl text-sm font-semibold
+                          bg-gradient-to-r from-primary-600 to-primary-700 text-white
+                          hover:from-primary-700 hover:to-primary-800
+                          shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30
+                          transform hover:-translate-y-0.5
+                          transition-all duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:rotate-90 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
                     Découvrir les domaines

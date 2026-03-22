@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.db import models
-from django.db.models import UniqueConstraint, Index
+from django.db.models import UniqueConstraint, Index, Q
 from django.utils.text import slugify
 from django.utils import timezone
 
@@ -176,7 +176,7 @@ class Topic(models.Model):
     # ======================
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=280, unique=True, blank=True)
-
+    is_pinned = models.BooleanField(default=False, verbose_name="Épinglé")
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -632,3 +632,155 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"[{self.get_notification_type_display()}] Pour {self.user.username}"
+
+
+
+# ==========================
+# SIGNALEMENT DE CONTENU
+# ==========================
+class Report(models.Model):
+    """Signalement de contenu inapproprié"""
+
+    REASON_CHOICES = [
+        ("spam", "Spam ou publicité"),
+        ("offensive", "Contenu offensant ou inapproprié"),
+        ("hors_sujet", "Hors sujet"),
+        ("plagiat", "Plagiat ou violation de droits d'auteur"),
+        ("fausse_info", "Informations fausses ou trompeuses"),
+        ("harcelement", "Harcèlement ou intimidation"),
+        ("autre", "Autre"),
+    ]
+
+    STATUS_CHOICES = [
+        ("pending", "En attente"),
+        ("reviewing", "En cours d'examen"),
+        ("resolved", "Résolu"),
+        ("dismissed", "Rejeté"),
+    ]
+
+    # ======================
+    # QUI SIGNALE
+    # ======================
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reports_made"
+    )
+
+    # ======================
+    # CE QUI EST SIGNALÉ
+    # ======================
+    topic = models.ForeignKey(
+        Topic,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="reports"
+    )
+
+    answer = models.ForeignKey(
+        Answer,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="reports"
+    )
+
+    # ======================
+    # DÉTAILS DU SIGNALEMENT
+    # ======================
+    reason = models.CharField(
+        max_length=30,
+        choices=REASON_CHOICES
+    )
+
+    details = models.TextField(
+        blank=True,
+        help_text="Détails supplémentaires (optionnel)"
+    )
+
+    # ======================
+    # TRAITEMENT
+    # ======================
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reports_reviewed"
+    )
+
+    moderator_notes = models.TextField(
+        blank=True,
+        help_text="Notes internes du modérateur"
+    )
+
+    action_taken = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Action prise (ex: contenu supprimé, utilisateur averti)"
+    )
+
+    # ======================
+    # DATES
+    # ======================
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    # ======================
+    # META
+    # ======================
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            Index(fields=["status"]),
+            Index(fields=["reporter"]),
+            Index(fields=["created_at"]),
+        ]
+        # Un utilisateur ne peut signaler qu'une fois le même contenu
+        constraints = [
+            UniqueConstraint(
+                fields=["reporter", "topic"],
+                condition=Q(topic__isnull=False),
+                name="unique_topic_report_per_user"
+            ),
+            UniqueConstraint(
+                fields=["reporter", "answer"],
+                condition=Q(answer__isnull=False),
+                name="unique_answer_report_per_user"
+            ),
+        ]
+
+    def __str__(self):
+        target = self.topic.title if self.topic else f"Réponse #{self.answer.id}"
+        return f"Signalement par {self.reporter.username}: {target}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if not self.topic and not self.answer:
+            raise ValidationError("Le signalement doit concerner un sujet ou une réponse.")
+        if self.topic and self.answer:
+            raise ValidationError("Le signalement ne peut concerner qu'un seul élément.")
+
+    def resolve(self, moderator, action="", notes=""):
+        """Marque le signalement comme résolu"""
+        self.status = "resolved"
+        self.reviewed_by = moderator
+        self.action_taken = action
+        self.moderator_notes = notes
+        self.resolved_at = timezone.now()
+        self.save()
+
+    def dismiss(self, moderator, notes=""):
+        """Rejette le signalement"""
+        self.status = "dismissed"
+        self.reviewed_by = moderator
+        self.moderator_notes = notes
+        self.resolved_at = timezone.now()
+        self.save()

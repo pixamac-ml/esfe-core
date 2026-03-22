@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Classement - Communauté{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">🏆 Classement</h1>
+        <p class="text-gray-600">Les membres les plus actifs de la communauté</p>
+    </div>
+
+    <!-- Filtres -->
+    <div class="flex justify-center gap-2 mb-8">
+        <a href="?category=xp" 
+           class="px-4 py-2 rounded-full text-sm font-medium transition {% if category == 'xp' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+            ⭐ Points XP
+        </a>
+        <a href="?category=answers" 
+           class="px-4 py-2 rounded-full text-sm font-medium transition {% if category == 'answers' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+            💬 Réponses
+        </a>
+        <a href="?category=accepted" 
+           class="px-4 py-2 rounded-full text-sm font-medium transition {% if category == 'accepted' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+            ✅ Acceptées
+        </a>
+    </div>
+
+    <!-- Podium Top 3 -->
+    {% if leaderboard|length >= 3 %}
+    <div class="flex justify-center items-end gap-4 mb-8">
+        <!-- 2ème place -->
+        <div class="text-center">
+            <div class="w-20 h-20 mx-auto mb-2 relative">
+                {% if leaderboard.1.user.profile.avatar %}
+                <img src="{{ leaderboard.1.user.profile.avatar.url }}" 
+                     class="w-full h-full rounded-full object-cover border-4 border-gray-400">
+                {% else %}
+                <img src="{% static 'images/default-avatar.png' %}" 
+                     class="w-full h-full rounded-full object-cover border-4 border-gray-400">
+                {% endif %}
+                <span class="absolute -bottom-1 -right-1 text-2xl">🥈</span>
+            </div>
+            <p class="font-semibold text-gray-800">{{ leaderboard.1.user.username }}</p>
+            <p class="text-sm text-gray-500">{{ leaderboard.1.total_xp }} XP</p>
+            <div class="w-16 h-24 bg-gray-300 rounded-t-lg mx-auto mt-2"></div>
+        </div>
+
+        <!-- 1ère place -->
+        <div class="text-center">
+            <div class="w-24 h-24 mx-auto mb-2 relative">
+                {% if leaderboard.0.user.profile.avatar %}
+                <img src="{{ leaderboard.0.user.profile.avatar.url }}" 
+                     class="w-full h-full rounded-full object-cover border-4 border-amber-400 shadow-lg">
+                {% else %}
+                <img src="{% static 'images/default-avatar.png' %}" 
+                     class="w-full h-full rounded-full object-cover border-4 border-amber-400 shadow-lg">
+                {% endif %}
+                <span class="absolute -bottom-1 -right-1 text-3xl">🥇</span>
+            </div>
+            <p class="font-bold text-gray-800 text-lg">{{ leaderboard.0.user.username }}</p>
+            <p class="text-sm text-amber-600 font-medium">{{ leaderboard.0.total_xp }} XP</p>
+            <div class="w-20 h-32 bg-amber-400 rounded-t-lg mx-auto mt-2"></div>
+        </div>
+
+        <!-- 3ème place -->
+        <div class="text-center">
+            <div class="w-20 h-20 mx-auto mb-2 relative">
+                {% if leaderboard.2.user.profile.avatar %}
+                <img src="{{ leaderboard.2.user.profile.avatar.url }}" 
+                     class="w-full h-full rounded-full object-cover border-4 border-amber-600">
+                {% else %}
+                <img src="{% static 'images/default-avatar.png' %}" 
+                     class="w-full h-full rounded-full object-cover border-4 border-amber-600">
+                {% endif %}
+                <span class="absolute -bottom-1 -right-1 text-2xl">🥉</span>
+            </div>
+            <p class="font-semibold text-gray-800">{{ leaderboard.2.user.username }}</p>
+            <p class="text-sm text-gray-500">{{ leaderboard.2.total_xp }} XP</p>
+            <div class="w-16 h-16 bg-amber-600 rounded-t-lg mx-auto mt-2"></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Liste complète -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div class="divide-y divide-gray-100">
+            {% for entry in leaderboard %}
+            <div class="flex items-center p-4 hover:bg-gray-50 transition {% if entry.user == request.user %}bg-indigo-50{% endif %}">
+                <!-- Rang -->
+                <div class="w-12 text-center">
+                    {% if forloop.counter == 1 %}
+                        <span class="text-2xl">🥇</span>
+                    {% elif forloop.counter == 2 %}
+                        <span class="text-2xl">🥈</span>
+                    {% elif forloop.counter == 3 %}
+                        <span class="text-2xl">🥉</span>
+                    {% else %}
+                        <span class="text-lg font-bold text-gray-400">#{{ forloop.counter }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Avatar + Info -->
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                    {% if entry.user.profile.avatar %}
+                    <img src="{{ entry.user.profile.avatar.url }}"
+                         alt="{{ entry.user.username }}"
+                         class="w-10 h-10 rounded-full object-cover border-2 {% if forloop.counter == 1 %}border-amber-400{% elif forloop.counter == 2 %}border-gray-400{% elif forloop.counter == 3 %}border-amber-600{% else %}border-gray-200{% endif %}">
+                    {% else %}
+                    <img src="{% static 'images/default-avatar.png' %}"
+                         alt="{{ entry.user.username }}"
+                         class="w-10 h-10 rounded-full object-cover border-2 {% if forloop.counter == 1 %}border-amber-400{% elif forloop.counter == 2 %}border-gray-400{% elif forloop.counter == 3 %}border-amber-600{% else %}border-gray-200{% endif %}">
+                    {% endif %}
+
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <a href="{% url 'community:public_profile' entry.user.username %}" 
+                               class="font-semibold text-gray-800 truncate hover:text-indigo-600">
+                                {{ entry.user.username }}
+                            </a>
+                            <span class="text-sm" title="Niveau {{ entry.level }}">{{ entry.get_level_icon }}</span>
+                        </div>
+                        <span class="text-xs text-gray-500">{{ entry.get_level_title }}</span>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="flex items-center gap-6 text-sm">
+                    <div class="text-center">
+                        <span class="font-bold text-indigo-600">{{ entry.total_xp }}</span>
+                        <span class="text-gray-400 text-xs block">XP</span>
+                    </div>
+                    <div class="text-center">
+                        <span class="font-semibold text-gray-700">{{ entry.answers_count }}</span>
+                        <span class="text-gray-400 text-xs block">Réponses</span>
+                    </div>
+                    <div class="text-center">
+                        <span class="font-semibold text-green-600">{{ entry.accepted_count }}</span>
+                        <span class="text-gray-400 text-xs block">Acceptées</span>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="p-8 text-center text-gray-500">
+                <p>Aucun classement disponible pour le moment.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Position de l'utilisateur connecté -->
+    {% if user_rank and user_rank > 10 %}
+    <div class="mt-6 bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-lg font-bold text-indigo-600">#{{ user_rank }}</span>
+                <span class="text-gray-700">Votre position dans le classement</span>
+            </div>
+            <a href="{% url 'community:public_profile' request.user.username %}" 
+               class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                Voir mon profil →
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

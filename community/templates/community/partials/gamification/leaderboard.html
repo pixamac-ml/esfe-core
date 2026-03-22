@@ -1,0 +1,61 @@
+
+Current Process
+Files
+HTML
+{# Classement des membres #}
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <!-- Header -->
+    <div class="px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+            </svg>
+            Top Contributeurs
+        </h3>
+    </div>
+
+    <!-- Liste -->
+    <div class="divide-y divide-gray-100">
+        {% for entry in leaderboard %}
+        <div class="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors duration-200 {% if forloop.counter <= 3 %}bg-amber-50/30{% endif %}">
+            <!-- Rang -->
+            <div class="flex-shrink-0 w-8 text-center">
+                {% if forloop.counter == 1 %}
+                    <span class="text-2xl">🥇</span>
+                {% elif forloop.counter == 2 %}
+                    <span class="text-2xl">🥈</span>
+                {% elif forloop.counter == 3 %}
+                    <span class="text-2xl">🥉</span>
+                {% else %}
+                    <span class="text-lg font-bold text-gray-400">#{{ forloop.counter }}</span>
+                {% endif %}
+            </div>
+
+            <!-- Avatar + Info -->
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+                <img src="{{ entry.user.profile.avatar.url|default:'/static/images/default-avatar.png' }}"
+                     alt="{{ entry.user.username }}"
+                     class="w-10 h-10 rounded-full object-cover border-2 {% if forloop.counter == 1 %}border-amber-400{% elif forloop.counter == 2 %}border-gray-400{% elif forloop.counter == 3 %}border-amber-600{% else %}border-gray-200{% endif %}">
+
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold text-gray-800 truncate">{{ entry.user.username }}</span>
+                        <span class="text-sm" title="Niveau {{ entry.level }}">{{ entry.get_level_icon }}</span>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ entry.get_level_title }}</span>
+                </div>
+            </div>
+
+            <!-- Score -->
+            <div class="text-right">
+                <div class="font-bold text-primary-600">{{ entry.total_xp }}</div>
+                <div class="text-xs text-gray-500">XP</div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="px-6 py-8 text-center text-gray-500">
+            <p>Aucun classement disponible</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>

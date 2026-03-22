@@ -1,0 +1,46 @@
+<!-- community/templates/community/partials/accept_button.html -->
+
+{% if topic.author == request.user %}
+    {% if topic.accepted_answer == answer %}
+        <!-- BOUTON : Réponse actuellement acceptée -->
+        <button
+            hx-post="{% url 'community:accept_answer' answer.id %}"
+            hx-swap="outerHTML"
+            hx-target="this"
+            class="group flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
+                   bg-green-100 text-green-700 border-2 border-green-500
+                   hover:bg-green-200 transition-all duration-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Solution acceptée
+            <span class="text-xs opacity-70">(cliquer pour retirer)</span>
+        </button>
+    {% else %}
+        <!-- BOUTON : Accepter cette réponse -->
+        <button
+            hx-post="{% url 'community:accept_answer' answer.id %}"
+            hx-swap="outerHTML"
+            hx-target="this"
+            class="group flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
+                   bg-gray-100 text-gray-600 border border-gray-300
+                   hover:bg-green-50 hover:text-green-600 hover:border-green-300
+                   transition-all duration-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Accepter comme solution
+        </button>
+    {% endif %}
+{% else %}
+    {% if topic.accepted_answer == answer %}
+        <!-- BADGE : Solution (pour les autres utilisateurs) -->
+        <div class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
+                    bg-green-100 text-green-700 border border-green-200">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            ✓ Solution
+        </div>
+    {% endif %}
+{% endif %}

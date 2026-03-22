@@ -1,114 +1,216 @@
 {% extends "base.html" %}
+{% block title %}Notifications | Communauté{% endblock %}
 
 {% block content %}
 
-<!-- HERO SPACING - Évite que le contenu touche la nav -->
-<div class="pt-24 pb-8"></div>
+<!-- ================= HERO ================= -->
+<section class="relative pt-28 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white overflow-hidden">
+    <!-- Effet décoratif -->
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_80%_20%,white,transparent_40%)]"></div>
 
-<section class="max-w-5xl mx-auto px-6">
+    <div class="relative max-w-5xl mx-auto px-6">
+        <!-- Bouton retour -->
+        <a href="{% url 'community:topic_list' %}"
+           class="group inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition-all duration-300 mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-4 w-4 transform group-hover:-translate-x-1 transition-transform duration-300"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Retour aux discussions
+        </a>
 
-    <!-- HEADER -->
-    <div class="flex items-center justify-between mb-8">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div>
+                <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur px-4 py-2 rounded-full text-xs font-semibold uppercase tracking-wide mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                    Centre de notifications
+                </div>
 
-        <h1 class="text-2xl font-bold text-primary-700">
-            <i class="fa-solid fa-bell mr-3"></i>
-            Notifications
-        </h1>
+                <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
+                    Notifications
+                </h1>
+                <p class="text-primary-100 mt-3 max-w-xl text-sm leading-relaxed">
+                    Restez informé des nouvelles réponses, votes et activités sur vos sujets.
+                </p>
+            </div>
 
-        <div class="flex items-center gap-4">
-            {% if unread_count > 0 %}
-            <span class="bg-red-500 text-white text-sm px-3 py-1 rounded-full">
-                {{ unread_count }} non lue{{ unread_count|pluralize }}
-            </span>
+            <!-- Compteur et action rapide -->
+            <div class="flex items-center gap-4">
+                {% if unread_count > 0 %}
+                <div class="bg-white/10 backdrop-blur rounded-xl px-5 py-3 text-center">
+                    <div class="text-2xl font-bold">{{ unread_count }}</div>
+                    <div class="text-xs text-primary-200">non lue{{ unread_count|pluralize }}</div>
+                </div>
 
-            <button
-                hx-post="{% url 'community:mark_all_notifications_read' %}"
-                hx-swap="outerHTML"
-                class="text-primary-600 hover:text-primary-700 text-sm font-medium transition"
-            >
-                <i class="fa-solid fa-check-double mr-1"></i>
-                Tout marquer comme lu
-            </button>
-            {% endif %}
+                <button
+                    hx-post="{% url 'community:mark_all_notifications_read' %}"
+                    hx-swap="outerHTML"
+                    class="group flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur px-5 py-3 rounded-xl text-sm font-medium transition-all duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Tout marquer lu
+                </button>
+                {% else %}
+                <div class="bg-green-500/20 backdrop-blur rounded-xl px-5 py-3 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mx-auto text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <div class="text-xs text-green-200 mt-1">Tout est lu</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ================= CONTENU ================= -->
+<section class="bg-gray-50 py-12">
+    <div class="max-w-5xl mx-auto px-6">
+
+        <!-- FILTRES avec design amélioré -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-8">
+            <div class="flex flex-wrap items-center gap-3">
+
+                <!-- Filtres de statut -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wide mr-2">Statut:</span>
+
+                    <a href="{% url 'community:notifications' %}"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                              {% if not current_type and not current_is_read %}
+                              bg-primary-500 text-white shadow-sm
+                              {% else %}
+                              bg-gray-100 text-gray-600 hover:bg-gray-200
+                              {% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        </svg>
+                        Toutes
+                    </a>
+
+                    <a href="?is_read=false"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                              {% if current_is_read == 'false' %}
+                              bg-primary-500 text-white shadow-sm
+                              {% else %}
+                              bg-gray-100 text-gray-600 hover:bg-gray-200
+                              {% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        Non lues
+                    </a>
+
+                    <a href="?is_read=true"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                              {% if current_is_read == 'true' %}
+                              bg-primary-500 text-white shadow-sm
+                              {% else %}
+                              bg-gray-100 text-gray-600 hover:bg-gray-200
+                              {% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76"/>
+                        </svg>
+                        Lues
+                    </a>
+                </div>
+
+                <span class="hidden md:block w-px h-8 bg-gray-200"></span>
+
+                <!-- Filtres par type -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wide mr-2">Type:</span>
+
+                    <a href="?type=new_topic"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                              {% if current_type == 'new_topic' %}
+                              bg-blue-500 text-white shadow-sm
+                              {% else %}
+                              bg-blue-50 text-blue-600 hover:bg-blue-100
+                              {% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Sujets
+                    </a>
+
+                    <a href="?type=new_answer"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                              {% if current_type == 'new_answer' %}
+                              bg-green-500 text-white shadow-sm
+                              {% else %}
+                              bg-green-50 text-green-600 hover:bg-green-100
+                              {% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                        Réponses
+                    </a>
+
+                    <a href="?type=upvote"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                              {% if current_type == 'upvote' %}
+                              bg-amber-500 text-white shadow-sm
+                              {% else %}
+                              bg-amber-50 text-amber-600 hover:bg-amber-100
+                              {% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/>
+                        </svg>
+                        Votes
+                    </a>
+
+                    <a href="?type=accepted_answer"
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                              {% if current_type == 'accepted_answer' %}
+                              bg-emerald-500 text-white shadow-sm
+                              {% else %}
+                              bg-emerald-50 text-emerald-600 hover:bg-emerald-100
+                              {% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Solutions
+                    </a>
+                </div>
+            </div>
         </div>
 
+        <!-- LISTE DES NOTIFICATIONS -->
+        <div id="notifications-list"
+             class="space-y-4 transition-all duration-300">
+            {% include "community/partials/notifications_list.html" %}
+        </div>
+
+        <!-- PAGINATION HTMX -->
+        {% if page_obj.has_next %}
+        <div class="mt-10 text-center">
+            <button
+                hx-get="?page={{ page_obj.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_is_read %}&is_read={{ current_is_read }}{% endif %}"
+                hx-target="#notifications-list"
+                hx-swap="afterend"
+                hx-trigger="revealed"
+                hx-indicator="#load-more-spinner"
+                class="group inline-flex items-center gap-3 px-8 py-4 bg-white border-2 border-primary-200 text-primary-600 rounded-xl hover:bg-primary-50 hover:border-primary-300 transition-all duration-300 font-medium shadow-sm">
+                <span id="load-more-spinner" class="htmx-indicator">
+                    <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Charger plus de notifications
+            </button>
+        </div>
+        {% endif %}
+
     </div>
-
-    <!-- FILTRES -->
-    <div class="flex flex-wrap gap-2 mb-6">
-        <a href="{% url 'community:notifications' %}"
-           class="px-4 py-2 rounded-lg text-sm font-medium transition
-                  {% if not current_type and not current_is_read %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
-            <i class="fa-solid fa-list mr-2"></i>
-            Toutes
-        </a>
-
-        <a href="?is_read=false"
-           class="px-4 py-2 rounded-lg text-sm font-medium transition
-                  {% if current_is_read == 'false' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
-            <i class="fa-solid fa-envelope mr-2"></i>
-            Non lues
-        </a>
-
-        <a href="?is_read=true"
-           class="px-4 py-2 rounded-lg text-sm font-medium transition
-                  {% if current_is_read == 'true' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
-            <i class="fa-solid fa-envelope-open mr-2"></i>
-            Lues
-        </a>
-
-        <span class="border-l border-primary-200 mx-2"></span>
-
-        <a href="?type=new_topic"
-           class="px-4 py-2 rounded-lg text-sm font-medium transition
-                  {% if current_type == 'new_topic' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
-            <i class="fa-solid fa-file-lines mr-2"></i>
-            Sujets
-        </a>
-
-        <a href="?type=new_answer"
-           class="px-4 py-2 rounded-lg text-sm font-medium transition
-                  {% if current_type == 'new_answer' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
-            <i class="fa-solid fa-comment-dots mr-2"></i>
-            Réponses
-        </a>
-
-        <a href="?type=upvote"
-           class="px-4 py-2 rounded-lg text-sm font-medium transition
-                  {% if current_type == 'upvote' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
-            <i class="fa-solid fa-thumbs-up mr-2"></i>
-            Votes
-        </a>
-
-        <a href="?type=accepted_answer"
-           class="px-4 py-2 rounded-lg text-sm font-medium transition
-                  {% if current_type == 'accepted_answer' %}bg-primary-500 text-white{% else %}bg-primary-50 text-primary-600 hover:bg-primary-100{% endif %}">
-            <i class="fa-solid fa-check-circle mr-2"></i>
-            Solutions
-        </a>
-    </div>
-
-    <!-- LISTE DES NOTIFICATIONS -->
-    <div id="notifications-list" class="space-y-4">
-        {% include "community/partials/notifications_list.html" %}
-    </div>
-
-    <!-- PAGINATION HTMX -->
-    {% if page_obj.has_next %}
-    <div class="mt-8 text-center">
-        <button
-            hx-get="?page={{ page_obj.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_is_read %}&is_read={{ current_is_read }}{% endif %}"
-            hx-target="#notifications-list"
-            hx-swap="afterend"
-            hx-trigger="revealed"
-            class="px-6 py-3 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 transition font-medium"
-        >
-            <i class="fa-solid fa-plus mr-2"></i>
-            Charger plus...
-        </button>
-    </div>
-    {% endif %}
-
 </section>
 
 <!-- BOTTOM SPACING -->

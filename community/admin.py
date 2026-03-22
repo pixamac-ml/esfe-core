@@ -238,3 +238,132 @@ class NotificationAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
 
     ordering = ("-created_at",)
+
+
+from .models import Report
+
+
+@admin.register(Report)
+class ReportAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "reporter",
+        "get_content",
+        "reason",
+        "status",
+        "created_at",
+        "reviewed_by",
+    )
+
+    list_filter = (
+        "status",
+        "reason",
+        "created_at",
+    )
+
+    search_fields = (
+        "reporter__username",
+        "topic__title",
+        "details",
+    )
+
+    raw_id_fields = (
+        "reporter",
+        "topic",
+        "answer",
+        "reviewed_by",
+    )
+
+    readonly_fields = ("created_at", "resolved_at")
+
+    ordering = ("-created_at",)
+
+    list_editable = ("status",)
+
+    actions = ["mark_resolved", "mark_dismissed"]
+
+    def get_content(self, obj):
+        if obj.topic:
+            return f"Sujet: {obj.topic.title[:30]}"
+        return f"Réponse #{obj.answer.id}"
+
+    get_content.short_description = "Contenu signalé"
+
+    @admin.action(description="Marquer comme résolu")
+    def mark_resolved(self, request, queryset):
+        queryset.update(status="resolved", reviewed_by=request.user)
+
+    @admin.action(description="Rejeter les signalements")
+    def mark_dismissed(self, request, queryset):
+        queryset.update(status="dismissed", reviewed_by=request.user)
+
+
+
+
+
+
+
+
+# ==========================
+# ADMIN GAMIFICATION
+# ==========================
+from .models_gamification import (
+    XPConfig,
+    GamificationProfile,
+    XPTransaction,
+    BadgeDefinition,
+    UserBadge,
+    LeaderboardEntry,
+)
+
+
+@admin.register(XPConfig)
+class XPConfigAdmin(admin.ModelAdmin):
+    list_display = ("action", "points", "is_active")
+    list_editable = ("points", "is_active")
+    list_filter = ("is_active",)
+
+
+@admin.register(GamificationProfile)
+class GamificationProfileAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "level",
+        "total_xp",
+        "answers_given",
+        "answers_accepted",
+        "current_streak",
+    )
+    list_filter = ("level",)
+    search_fields = ("user__username",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(XPTransaction)
+class XPTransactionAdmin(admin.ModelAdmin):
+    list_display = ("user", "points", "action", "balance_after", "created_at")
+    list_filter = ("action", "created_at")
+    search_fields = ("user__username",)
+    date_hierarchy = "created_at"
+
+
+@admin.register(BadgeDefinition)
+class BadgeDefinitionAdmin(admin.ModelAdmin):
+    list_display = ("icon", "name", "category", "rarity", "xp_reward", "is_active")
+    list_filter = ("category", "rarity", "is_active")
+    list_editable = ("is_active",)
+    search_fields = ("name", "code")
+
+
+@admin.register(UserBadge)
+class UserBadgeAdmin(admin.ModelAdmin):
+    list_display = ("user", "badge", "earned_at", "is_featured")
+    list_filter = ("badge", "earned_at")
+    search_fields = ("user__username", "badge__name")
+    raw_id_fields = ("user",)
+
+
+@admin.register(LeaderboardEntry)
+class LeaderboardEntryAdmin(admin.ModelAdmin):
+    list_display = ("user", "period", "category", "rank", "score")
+    list_filter = ("period", "category")

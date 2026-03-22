@@ -1,0 +1,39 @@
+{# Liste des badges d'un utilisateur #}
+{% load static %}
+
+<div class="space-y-4">
+    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        Badges ({{ badges.count }})
+    </h3>
+
+    {% if badges %}
+    <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+        {% for ub in badges %}
+        <div class="group relative flex flex-col items-center p-2 rounded-xl bg-white border-2 hover:shadow-lg transition-all duration-300 cursor-pointer"
+             style="border-color: {{ ub.badge.get_rarity_color }}20; background: linear-gradient(135deg, {{ ub.badge.get_rarity_color }}05, {{ ub.badge.get_rarity_color }}10);">
+
+            <!-- Icône -->
+            <span class="text-3xl group-hover:scale-110 transition-transform duration-300">{{ ub.badge.icon }}</span>
+
+            <!-- Tooltip -->
+            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10 pointer-events-none">
+                <div class="font-semibold">{{ ub.badge.name }}</div>
+                <div class="text-gray-300">{{ ub.badge.description }}</div>
+                <div class="text-[10px] mt-1" style="color: {{ ub.badge.get_rarity_color }}">{{ ub.badge.get_rarity_display }}</div>
+                <!-- Flèche -->
+                <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-8 text-gray-500">
+        <span class="text-4xl mb-2 block">🏅</span>
+        <p>Aucun badge pour le moment</p>
+        <p class="text-sm">Participez pour en débloquer !</p>
+    </div>
+    {% endif %}
+</div>

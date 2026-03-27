@@ -1,0 +1,85 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}Créer une inscription{% endblock %}
+{% block page_subtitle %}À partir d'une candidature acceptée{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <div style="max-width: 600px; margin: 0 auto;">
+        <div class="card" style="padding: 32px;">
+            <h2 style="font-size: 24px; font-weight: 700; color: #1f2937; margin-bottom: 24px; text-align: center;">
+                Créer une inscription
+            </h2>
+
+            {% if candidature %}
+            <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <h3 style="font-size: 16px; font-weight: 600; color: #0c4a6e; margin-bottom: 12px;">
+                    Candidature sélectionnée
+                </h3>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <p style="color: #374151;">
+                        <strong>Candidat:</strong> {{ candidature.full_name }}
+                    </p>
+                    <p style="color: #374151;">
+                        <strong>Programme:</strong> {{ candidature.programme.title }}
+                    </p>
+                    <p style="color: #374151;">
+                        <strong>Statut:</strong>
+                        <span class="badge-status badge-{% if candidature.status == 'accepted' %}success{% elif candidature.status == 'accepted_with_reserve' %}warning{% else %}danger{% endif %}">
+                            {% if candidature.status == 'accepted' %}Acceptée
+                            {% elif candidature.status == 'accepted_with_reserve' %}Sous réserve
+                            {% else %}Non éligible
+                            {% endif %}
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            <form method="POST" style="display: flex; flex-direction: column; gap: 24px;">
+                {% csrf_token %}
+                <input type="hidden" name="candidature" value="{{ candidature.pk }}">
+
+                <div class="form-group">
+                    <label for="amount_due" class="form-label">Montant dû (F CFA)</label>
+                    <input type="number" id="amount_due" name="amount_due" class="form-input"
+                           value="{{ amount_due|default:500000 }}" min="0" step="1000" required>
+                    <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                        Montant calculé automatiquement selon le programme et l'année d'entrée
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label for="status" class="form-label">Statut initial</label>
+                    <select id="status" name="status" class="form-select" required>
+                        <option value="awaiting_payment">En attente de paiement</option>
+                        <option value="active">Active</option>
+                        <option value="suspended">Suspendue</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <a href="{% url 'superadmin:candidature_detail' candidature.pk %}" class="btn btn-outline">
+                        Annuler
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-user-plus mr-2"></i>Créer l'inscription
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div style="text-align: center; padding: 40px; color: #9ca3af;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                <p style="font-size: 16px; font-weight: 500; color: #6b7280; margin-bottom: 4px;">Aucune candidature sélectionnée</p>
+                <p style="font-size: 14px;">Veuillez revenir à la liste des candidatures et utiliser le bouton "Créer inscription".</p>
+                <a href="{% url 'superadmin:candidature_list' %}" class="btn btn-primary" style="margin-top: 16px;">
+                    Retour aux candidatures
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}{% if cycle %}Modifier{% else %}Nouveau{% endif %} Cycle{% endblock %}
+{% block page_subtitle %}Cycle de formation{% endblock %}
+
+{% block content_main %}
+<div class="fade-in max-w-2xl mx-auto">
+
+    <div class="card">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-layer-group" style="color: var(--primary);"></i>
+                {% if cycle %}Modifier{% else %}Nouveau{% endif %} cycle
+            </h3>
+            <a href="{% url 'superadmin:cycle_list' %}" class="btn btn-outline btn-sm">
+                <i class="fas fa-arrow-left mr-2"></i>Retour
+            </a>
+        </div>
+
+        <form method="POST" class="card-body">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="name" class="form-label">Nom du cycle <span style="color: #ef4444;">*</span></label>
+                <input type="text" id="name" name="name" required
+                       value="{{ cycle.name|default:'' }}"
+                       class="form-input"
+                       placeholder="Ex: Licence, Master, Doctorat">
+            </div>
+
+            <div class="form-group">
+                <label for="description" class="form-label">Description</label>
+                <textarea id="description" name="description" rows="3" class="form-textarea"
+                          placeholder="Description du cycle...">{{ cycle.description|default:'' }}</textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label for="min_duration_years" class="form-label">Durée min (ans) <span style="color: #ef4444;">*</span></label>
+                    <input type="number" id="min_duration_years" name="min_duration_years" required
+                           value="{{ cycle.min_duration_years|default:'1' }}"
+                           class="form-input" min="1" max="10">
+                </div>
+
+                <div class="form-group">
+                    <label for="max_duration_years" class="form-label">Durée max (ans) <span style="color: #ef4444;">*</span></label>
+                    <input type="number" id="max_duration_years" name="max_duration_years" required
+                           value="{{ cycle.max_duration_years|default:'3' }}"
+                           class="form-input" min="1" max="10">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="theme" class="form-label">Thème visuel</label>
+                <select id="theme" name="theme" class="form-select">
+                    <option value="accent" {% if cycle.theme == 'accent' %}selected{% endif %}>Bleu institutionnel</option>
+                    <option value="secondary" {% if cycle.theme == 'secondary' %}selected{% endif %}>Orange premium</option>
+                    <option value="dark" {% if cycle.theme == 'dark' %}selected{% endif %}>Sombre (Doctorat)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" name="is_active" id="is_active"
+                               {% if cycle.is_active %}checked{% endif %}
+                               class="sr-only">
+                        <div class="toggle-slider"></div>
+                    </div>
+                    <span class="ml-3 text-gray-700 font-medium">Cycle actif</span>
+                </label>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <a href="{% url 'superadmin:cycle_list' %}" class="btn btn-outline">Annuler</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-2"></i>Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

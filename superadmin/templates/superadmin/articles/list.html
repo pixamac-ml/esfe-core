@@ -1,0 +1,40 @@
+{% extends 'superadmin/base.html' %}
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4">Liste des articles</h1>
+    <!-- Table des articles -->
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Titre</th>
+                        <th>Auteur</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Boucle sur les articles -->
+                    {% for article in articles %}
+                    <tr>
+                        <td>{{ article.title }}</td>
+                        <td>{{ article.author }}</td>
+                        <td>{{ article.created_at|date:'d/m/Y' }}</td>
+                        <td>{{ article.status }}</td>
+                        <td>
+                            <a href="{% url 'superadmin:article_detail' article.id %}" class="btn btn-sm btn-primary">Voir</a>
+                            <a href="{% url 'superadmin:article_edit' article.id %}" class="btn btn-sm btn-warning">Modifier</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5">Aucun article trouvé.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

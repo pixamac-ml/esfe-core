@@ -1,0 +1,609 @@
+{% extends 'superadmin/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Dashboard - SuperAdmin{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block page_subtitle %}Vue d'ensemble de votre plateforme ESFE{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- ========================================
+         WELCOME HERO SECTION
+    ======================================== -->
+    <div class="bg-gradient-to-r from-primary via-primary-light to-secondary rounded-2xl p-8 text-white shadow-2xl relative overflow-hidden">
+        <div class="absolute inset-0 bg-black/10"></div>
+        <div class="relative z-10 flex items-center justify-between">
+            <div class="max-w-2xl">
+                <h1 class="text-4xl font-bold mb-4 tracking-tight">
+                    Bonjour, <span class="text-gradient">{{ user.get_full_name|default:user.username }}</span> !
+                </h1>
+                <p class="text-xl text-white/90 mb-6 leading-relaxed">
+                    Bienvenue sur votre tableau de bord SuperAdmin. Gérez efficacement votre plateforme éducative avec des outils puissants et une interface intuitive.
+                </p>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2 text-white/80">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span class="text-sm">{{ "now"|date:"l j F Y" }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 text-white/80">
+                        <i class="fas fa-clock"></i>
+                        <span class="text-sm">{{ "now"|date:"H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hidden lg:block">
+                <div class="w-32 h-32 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <i class="fas fa-chart-line text-6xl text-white/80"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Stats -->
+        <div class="absolute bottom-6 right-6 flex space-x-4">
+            <div class="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 text-center">
+                <div class="text-2xl font-bold text-white">{{ formations_count|default:0 }}</div>
+                <div class="text-xs text-white/80">Formations</div>
+            </div>
+            <div class="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 text-center">
+                <div class="text-2xl font-bold text-white">{{ candidatures_count|default:0 }}</div>
+                <div class="text-xs text-white/80">Candidatures</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         STATISTICS CARDS GRID
+    ======================================== -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Formations Card -->
+        <div class="card group cursor-pointer" onclick="window.location.href='{% url 'superadmin:formation_list' %}'">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-graduation-cap text-2xl text-white"></i>
+                    </div>
+                    <div class="mini-chart">
+                        <svg viewBox="0 0 60 30">
+                            <path d="M5 25 L15 15 L25 20 L35 10 L45 15 L55 5" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-sm font-medium text-slate-600">Formations Actives</p>
+                    <p class="text-3xl font-bold text-slate-800">{{ formations_count|default:0 }}</p>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-green-600 text-sm font-medium flex items-center">
+                            <i class="fas fa-arrow-up mr-1"></i>+12.5%
+                        </span>
+                        <span class="text-slate-500 text-sm">vs mois dernier</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Candidatures Card -->
+        <div class="card group cursor-pointer" onclick="window.location.href='{% url 'superadmin:candidature_list' %}'">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-users text-2xl text-white"></i>
+                    </div>
+                    <div class="mini-chart">
+                        <svg viewBox="0 0 60 30">
+                            <path d="M5 20 L15 25 L25 15 L35 20 L45 10 L55 15" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-sm font-medium text-slate-600">Nouvelles Candidatures</p>
+                    <p class="text-3xl font-bold text-slate-800">{{ candidatures_count|default:0 }}</p>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-green-600 text-sm font-medium flex items-center">
+                            <i class="fas fa-arrow-up mr-1"></i>+8.2%
+                        </span>
+                        <span class="text-slate-500 text-sm">vs mois dernier</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Étudiants Card -->
+        <div class="card group cursor-pointer" onclick="window.location.href='{% url 'superadmin:student_list' %}'">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-user-graduate text-2xl text-white"></i>
+                    </div>
+                    <div class="mini-chart">
+                        <svg viewBox="0 0 60 30">
+                            <path d="M5 25 L15 20 L25 25 L35 15 L45 20 L55 10" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-sm font-medium text-slate-600">Étudiants Inscrits</p>
+                    <p class="text-3xl font-bold text-slate-800">{{ students_count|default:0 }}</p>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-green-600 text-sm font-medium flex items-center">
+                            <i class="fas fa-arrow-up mr-1"></i>+15.7%
+                        </span>
+                        <span class="text-slate-500 text-sm">vs mois dernier</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Articles Card -->
+        <div class="card group cursor-pointer" onclick="window.location.href='{% url 'superadmin:article_list' %}'">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-blog text-2xl text-white"></i>
+                    </div>
+                    <div class="mini-chart">
+                        <svg viewBox="0 0 60 30">
+                            <path d="M5 20 L15 15 L25 25 L35 20 L45 25 L55 15" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-sm font-medium text-slate-600">Articles Publiés</p>
+                    <p class="text-3xl font-bold text-slate-800">{{ articles_count|default:0 }}</p>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-green-600 text-sm font-medium flex items-center">
+                            <i class="fas fa-arrow-up mr-1"></i>+5.3%
+                        </span>
+                        <span class="text-slate-500 text-sm">vs mois dernier</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         MAIN DASHBOARD GRID
+    ======================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- ========================================
+             RECENT CANDIDATURES (LEFT COLUMN)
+        ======================================== -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Candidatures Section -->
+            <div class="card">
+                <div class="p-6 border-b border-slate-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800 tracking-tight">Candidatures Récentes</h3>
+                            <p class="text-sm text-slate-600 mt-1">Dernières inscriptions à traiter</p>
+                        </div>
+                        <a href="{% url 'superadmin:candidature_list' %}" class="btn btn-outline btn-sm">
+                            <i class="fas fa-arrow-right mr-2"></i>Voir tout
+                        </a>
+                    </div>
+                </div>
+                <div class="p-6">
+                    {% if recent_candidatures %}
+                        <div class="space-y-4">
+                            {% for candidature in recent_candidatures %}
+                            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer group">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                        {{ candidature.first_name.0|upper }}{{ candidature.last_name.0|upper }}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="font-semibold text-slate-800 truncate">{{ candidature.first_name }} {{ candidature.last_name }}</p>
+                                        <p class="text-sm text-slate-600 truncate">{{ candidature.programme.title }}</p>
+                                        <p class="text-xs text-slate-500 mt-1">{{ candidature.created_at|date:"d/m/Y à H:i" }}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="px-3 py-1 text-xs rounded-full font-medium mb-2 block
+                                        {% if candidature.status == 'pending' %}bg-yellow-100 text-yellow-800
+                                        {% elif candidature.status == 'approved' %}bg-green-100 text-green-800
+                                        {% elif candidature.status == 'rejected' %}bg-red-100 text-red-800
+                                        {% else %}bg-slate-100 text-slate-800{% endif %}">
+                                        {% if candidature.status == 'pending' %}En attente
+                                        {% elif candidature.status == 'approved' %}Approuvé
+                                        {% elif candidature.status == 'rejected' %}Rejeté
+                                        {% else %}{{ candidature.get_status_display }}{% endif %}
+                                    </span>
+                                    <div class="flex space-x-2">
+                                        <button class="w-8 h-8 bg-green-100 hover:bg-green-200 text-green-600 rounded-lg flex items-center justify-center transition-colors"
+                                                title="Approuver"
+                                                hx-post="{% url 'superadmin:candidature_approve' candidature.pk %}"
+                                                hx-confirm="Êtes-vous sûr d'approuver cette candidature ?">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button class="w-8 h-8 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg flex items-center justify-center transition-colors"
+                                                title="Rejeter"
+                                                hx-post="{% url 'superadmin:candidature_reject' candidature.pk %}"
+                                                hx-confirm="Êtes-vous sûr de rejeter cette candidature ?">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                        <a href="{% url 'superadmin:candidature_detail' candidature.pk %}"
+                                           class="w-8 h-8 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg flex items-center justify-center transition-colors"
+                                           title="Voir détails">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-users text-3xl"></i>
+                            </div>
+                            <h4 class="text-lg font-semibold text-slate-800 mb-2">Aucune candidature récente</h4>
+                            <p class="text-slate-600 mb-4">Les nouvelles candidatures apparaîtront ici automatiquement.</p>
+                            <a href="{% url 'superadmin:candidature_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus mr-2"></i>Créer une candidature test
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Articles Section -->
+            <div class="card">
+                <div class="p-6 border-b border-slate-100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800 tracking-tight">Articles Récents</h3>
+                            <p class="text-sm text-slate-600 mt-1">Derniers contenus publiés</p>
+                        </div>
+                        <a href="{% url 'superadmin:article_list' %}" class="btn btn-outline btn-sm">
+                            <i class="fas fa-arrow-right mr-2"></i>Voir tout
+                        </a>
+                    </div>
+                </div>
+                <div class="p-6">
+                    {% if recent_articles %}
+                        <div class="space-y-4">
+                            {% for article in recent_articles %}
+                            <div class="flex items-start space-x-4 p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer group">
+                                <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white flex-shrink-0">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1 min-w-0">
+                                            <h4 class="font-semibold text-slate-800 mb-1 truncate">{{ article.title }}</h4>
+                                            <p class="text-sm text-slate-600 mb-2 line-clamp-2">{{ article.excerpt|truncatechars:120|default:article.content|striptags|truncatechars:120 }}</p>
+                                            <div class="flex items-center space-x-4 text-xs text-slate-500">
+                                                <span class="flex items-center">
+                                                    <i class="fas fa-user mr-1"></i>{{ article.author.get_full_name|default:article.author.username }}
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <i class="fas fa-calendar mr-1"></i>{{ article.created_at|date:"d/m/Y" }}
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <i class="fas fa-eye mr-1"></i>{{ article.views|default:0 }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="ml-4 flex-shrink-0">
+                                            <span class="px-3 py-1 text-xs rounded-full font-medium
+                                                {% if article.is_published %}bg-green-100 text-green-800
+                                                {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                                {% if article.is_published %}Publié{% else %}Brouillon{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-newspaper text-3xl"></i>
+                            </div>
+                            <h4 class="text-lg font-semibold text-slate-800 mb-2">Aucun article récent</h4>
+                            <p class="text-slate-600 mb-4">Commencez à créer du contenu pour votre plateforme.</p>
+                            <a href="{% url 'superadmin:article_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus mr-2"></i>Créer un article
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================
+             RIGHT SIDEBAR
+        ======================================== -->
+        <div class="space-y-6">
+            <!-- Activity Timeline -->
+            <div class="card">
+                <div class="p-6 border-b border-slate-100">
+                    <h3 class="text-xl font-bold text-slate-800 tracking-tight">Activité Récente</h3>
+                    <p class="text-sm text-slate-600 mt-1">Dernières actions sur la plateforme</p>
+                </div>
+                <div class="p-6">
+                    <div class="timeline">
+                        {% if recent_activities %}
+                            {% for activity in recent_activities %}
+                            <div class="timeline-item">
+                                <div class="timeline-dot"></div>
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold
+                                        {% if activity.type == 'candidature' %}bg-blue-100 text-blue-600
+                                        {% elif activity.type == 'article' %}bg-purple-100 text-purple-600
+                                        {% elif activity.type == 'user' %}bg-green-100 text-green-600
+                                        {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                        {% if activity.type == 'candidature' %}<i class="fas fa-user-plus"></i>
+                                        {% elif activity.type == 'article' %}<i class="fas fa-file-alt"></i>
+                                        {% elif activity.type == 'user' %}<i class="fas fa-user"></i>
+                                        {% else %}<i class="fas fa-circle"></i>{% endif %}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-slate-800">{{ activity.description }}</p>
+                                        <p class="text-xs text-slate-500">{{ activity.timestamp|timesince }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-state">
+                                <div class="empty-state-icon">
+                                    <i class="fas fa-history text-3xl"></i>
+                                </div>
+                                <h4 class="text-sm font-semibold text-slate-800 mb-2">Aucune activité récente</h4>
+                                <p class="text-slate-600 text-xs">Les actions apparaîtront ici automatiquement.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="card">
+                <div class="p-6 border-b border-slate-100">
+                    <h3 class="text-xl font-bold text-slate-800 tracking-tight">Statistiques Rapides</h3>
+                    <p class="text-sm text-slate-600 mt-1">Aperçu des métriques clés</p>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-600">Taux de conversion</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div class="w-3/4 h-full bg-gradient-to-r from-secondary to-secondary-light rounded-full"></div>
+                            </div>
+                            <span class="text-sm font-bold text-slate-800">75%</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-600">Satisfaction client</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div class="w-4/5 h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full"></div>
+                            </div>
+                            <span class="text-sm font-bold text-slate-800">92%</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-600">Temps de réponse</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div class="w-1/2 h-full bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full"></div>
+                            </div>
+                            <span class="text-sm font-bold text-slate-800">2.3h</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Status -->
+            <div class="card">
+                <div class="p-6 border-b border-slate-100">
+                    <h3 class="text-xl font-bold text-slate-800 tracking-tight">État Système</h3>
+                    <p class="text-sm text-slate-600 mt-1">Statut des services critiques</p>
+                </div>
+                <div class="p-6 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-600 flex items-center">
+                            <i class="fas fa-server mr-2 text-green-500"></i>Serveur Web
+                        </span>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">Opérationnel</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-600 flex items-center">
+                            <i class="fas fa-database mr-2 text-green-500"></i>Base de données
+                        </span>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">Opérationnel</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-600 flex items-center">
+                            <i class="fas fa-envelope mr-2 text-yellow-500"></i>Service Email
+                        </span>
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">Maintenance</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-600 flex items-center">
+                            <i class="fas fa-cloud mr-2 text-green-500"></i>Stockage Cloud
+                        </span>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">Opérationnel</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         QUICK ACTIONS FOOTER
+    ======================================== -->
+    <div class="card">
+        <div class="p-6">
+            <div class="text-center mb-6">
+                <h3 class="text-2xl font-bold text-slate-800 tracking-tight mb-2">Actions Rapides</h3>
+                <p class="text-slate-600">Accès rapide aux fonctionnalités les plus utilisées</p>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <a href="{% url 'superadmin:formation_create' %}" class="group bg-gradient-to-r from-blue-500 to-blue-600 p-4 rounded-xl text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                    <div class="flex flex-col items-center text-center">
+                        <i class="fas fa-plus-circle text-2xl mb-2 group-hover:animate-pulse"></i>
+                        <span class="font-medium text-sm">Nouvelle Formation</span>
+                    </div>
+                </a>
+                <a href="{% url 'superadmin:candidature_create' %}" class="group bg-gradient-to-r from-green-500 to-green-600 p-4 rounded-xl text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                    <div class="flex flex-col items-center text-center">
+                        <i class="fas fa-user-plus text-2xl mb-2 group-hover:animate-pulse"></i>
+                        <span class="font-medium text-sm">Nouvelle Candidature</span>
+                    </div>
+                </a>
+                <a href="{% url 'superadmin:article_create' %}" class="group bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-xl text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                    <div class="flex flex-col items-center text-center">
+                        <i class="fas fa-edit text-2xl mb-2 group-hover:animate-pulse"></i>
+                        <span class="font-medium text-sm">Nouvel Article</span>
+                    </div>
+                </a>
+                <a href="{% url 'superadmin:news_create' %}" class="group bg-gradient-to-r from-yellow-500 to-orange-500 p-4 rounded-xl text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                    <div class="flex flex-col items-center text-center">
+                        <i class="fas fa-bullhorn text-2xl mb-2 group-hover:animate-pulse"></i>
+                        <span class="font-medium text-sm">Nouvelle Actualité</span>
+                    </div>
+                </a>
+                <a href="{% url 'superadmin:event_create' %}" class="group bg-gradient-to-r from-red-500 to-pink-500 p-4 rounded-xl text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                    <div class="flex flex-col items-center text-center">
+                        <i class="fas fa-calendar-plus text-2xl mb-2 group-hover:animate-pulse"></i>
+                        <span class="font-medium text-sm">Nouvel Événement</span>
+                    </div>
+                </a>
+                <a href="{% url 'superadmin:search_global' %}" class="group bg-gradient-to-r from-slate-500 to-slate-600 p-4 rounded-xl text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                    <div class="flex flex-col items-center text-center">
+                        <i class="fas fa-search text-2xl mb-2 group-hover:animate-pulse"></i>
+                        <span class="font-medium text-sm">Recherche Avancée</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================
+     DASHBOARD SCRIPTS
+======================================== -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh stats every 5 minutes
+    setInterval(function() {
+        // Refresh stats cards
+        htmx.ajax('GET', '{% url 'superadmin:dashboard_stats' %}', {
+            target: '#stats-container',
+            swap: 'innerHTML'
+        });
+    }, 300000); // 5 minutes
+
+    // Animate counters on load
+    const counters = document.querySelectorAll('.counter');
+    counters.forEach(counter => {
+        const target = parseInt(counter.getAttribute('data-target'));
+        let current = 0;
+        const increment = target / 100;
+        const timer = setInterval(() => {
+            current += increment;
+            if (current >= target) {
+                counter.textContent = target;
+                clearInterval(timer);
+            } else {
+                counter.textContent = Math.floor(current);
+            }
+        }, 20);
+    });
+
+    // Add loading states to action buttons
+    const actionButtons = document.querySelectorAll('.quick-action-btn');
+    actionButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Chargement...';
+            this.classList.add('btn-loading');
+        });
+    });
+});
+
+// HTMX event handlers
+document.body.addEventListener('htmx:afterRequest', function(event) {
+    // Handle successful actions
+    if (event.detail.xhr.status === 200) {
+        // Show success toast
+        showToast('Action réalisée avec succès', 'success');
+    }
+});
+
+document.body.addEventListener('htmx:beforeRequest', function(event) {
+    // Add loading indicators
+    const target = event.detail.target;
+    if (target) {
+        target.style.opacity = '0.7';
+    }
+});
+
+document.body.addEventListener('htmx:afterRequest', function(event) {
+    // Remove loading indicators
+    const target = event.detail.target;
+    if (target) {
+        target.style.opacity = '1';
+    }
+});
+
+// Toast notification system
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toast-container') || createToastContainer();
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type} animate-slide-in-right`;
+    toast.innerHTML = `
+        <div class="flex items-center space-x-3">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            <span>${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-auto">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'fixed top-4 right-4 z-50 space-y-2';
+    document.body.appendChild(container);
+    return container;
+}
+
+// Real-time updates simulation
+function simulateRealTimeUpdates() {
+    // Simulate new notifications
+    setInterval(() => {
+        if (Math.random() > 0.8) { // 20% chance every 30 seconds
+            const notificationCount = document.querySelector('.notification-badge');
+            if (notificationCount) {
+                const currentCount = parseInt(notificationCount.textContent) || 0;
+                notificationCount.textContent = currentCount + 1;
+                notificationCount.classList.add('animate-pulse');
+                setTimeout(() => notificationCount.classList.remove('animate-pulse'), 2000);
+            }
+        }
+    }, 30000);
+}
+
+// Initialize real-time features
+simulateRealTimeUpdates();
+</script>
+
+{% block extra_js %}{% endblock %}
+{% endblock %}

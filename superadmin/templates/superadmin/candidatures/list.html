@@ -1,0 +1,308 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}Candidatures{% endblock %}
+{% block page_subtitle %}Gérer les candidatures{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <!-- ========================================
+         BARRE D'ACTIONS
+    ======================================== -->
+    <div class="card mb-6">
+        <div class="card-header">
+            <!-- Recherche -->
+            <form method="GET" class="flex-1 flex flex-wrap gap-3 items-center">
+                <div class="search-box flex-1 min-w-64">
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="search" placeholder="Rechercher par nom, email..."
+                           value="{{ filters.search|default:'' }}" class="flex-1">
+                </div>
+
+                <!-- Filtre statut -->
+                <select name="status" class="form-select w-auto" onchange="this.form.submit()">
+                    <option value="">Tous les statuts</option>
+                    <option value="submitted" {% if filters.status == 'submitted' %}selected{% endif %}>Soumises</option>
+                    <option value="under_review" {% if filters.status == 'under_review' %}selected{% endif %}>En analyse</option>
+                    <option value="to_complete" {% if filters.status == 'to_complete' %}selected{% endif %}>À compléter</option>
+                    <option value="accepted" {% if filters.status == 'accepted' %}selected{% endif %}>Acceptées</option>
+                    <option value="accepted_with_reserve" {% if filters.status == 'accepted_with_reserve' %}selected{% endif %}>Acceptées sous réserve</option>
+                    <option value="rejected" {% if filters.status == 'rejected' %}selected{% endif %}>Refusées</option>
+                </select>
+
+                <!-- Filtre programme -->
+                <select name="programme" class="form-select w-auto" onchange="this.form.submit()">
+                    <option value="">Tous les programmes</option>
+                    {% for programme in programmes %}
+                    <option value="{{ programme.pk }}" {% if filters.programme == programme.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ programme.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter mr-2"></i>Filtrer
+                </button>
+            </form>
+
+            <!-- Statistiques rapides -->
+            <div style="display: flex; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7280;">
+                    <span style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></span>
+                    <span>{{ stats.submitted|default:"0" }} en attente</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7280;">
+                    <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></span>
+                    <span>{{ stats.accepted|default:"0" }} acceptées</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7280;">
+                    <span style="width: 8px; height: 8px; background: #ef4444; border-radius: 50%;"></span>
+                    <span>{{ stats.rejected|default:"0" }} refusées</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         TABLEAU DES CANDIDATURES
+    ======================================== -->
+    <div class="card">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">
+                            <input type="checkbox" id="selectAll" onchange="toggleAll(this)">
+                        </th>
+                        <th>Candidat</th>
+                        <th>Programme</th>
+                        <th>Année acad.</th>
+                        <th>Statut</th>
+                        <th>Documents</th>
+                        <th>Soumise le</th>
+                        <th style="width: 120px; text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if candidatures %}
+                        {% for cand in candidatures %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td>
+                                <input type="checkbox" name="selected" value="{{ cand.pk }}">
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-3">
+                                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                        <span style="color: white; font-weight: 600; font-size: 16px;">{{ cand.last_name.0|upper }}{{ cand.first_name.0|upper }}</span>
+                                    </div>
+                                    <div>
+                                        <p style="font-weight: 600; color: #1f2937; margin-bottom: 2px;">{{ cand.full_name }}</p>
+                                        <p style="font-size: 12px; color: #6b7280;">{{ cand.email }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <p style="font-weight: 500; color: #1f2937;">{{ cand.programme.title }}</p>
+                                    <p style="font-size: 12px; color: #6b7280;">{{ cand.programme.cycle.name }}</p>
+                                </div>
+                            </td>
+                            <td>
+                                <span style="font-size: 14px; color: #4b5563;">{{ cand.academic_year }}</span>
+                            </td>
+                            <td>
+                                {% if cand.status == 'submitted' %}
+                                <span class="badge-status" style="background: #fef3c7; color: #d97706; border: 1px solid #fcd34d;">
+                                    <i class="fas fa-clock" style="margin-right: 4px;"></i>Soumise
+                                </span>
+                                {% elif cand.status == 'under_review' %}
+                                <span class="badge-status" style="background: #dbeafe; color: #2563eb; border: 1px solid #93c5fd;">
+                                    <i class="fas fa-search" style="margin-right: 4px;"></i>En analyse
+                                </span>
+                                {% elif cand.status == 'to_complete' %}
+                                <span class="badge-status" style="background: #fef3c7; color: #b45309; border: 1px solid #fcd34d;">
+                                    <i class="fas fa-exclamation-circle" style="margin-right: 4px;"></i>À compléter
+                                </span>
+                                {% elif cand.status == 'accepted' %}
+                                <span class="badge-status badge-success">
+                                    <i class="fas fa-check-circle" style="margin-right: 4px;"></i>Acceptée
+                                </span>
+                                {% elif cand.status == 'accepted_with_reserve' %}
+                                <span class="badge-status" style="background: #fef3c7; color: #059669; border: 1px solid #6ee7b7;">
+                                    <i class="fas fa-check" style="margin-right: 4px;"></i>Sous réserve
+                                </span>
+                                {% elif cand.status == 'rejected' %}
+                                <span class="badge-status badge-danger">
+                                    <i class="fas fa-times-circle" style="margin-right: 4px;"></i>Refusée
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="display: flex; gap: 4px;">
+                                        <span style="color: #10b981; font-weight: 600;">{{ cand.validated_documents_count }}</span>
+                                        <span style="color: #9ca3af;">/</span>
+                                        <span style="color: #6b7280;">{{ cand.programme.required_documents.count }}</span>
+                                    </div>
+                                    {% if cand.missing_documents_count > 0 %}
+                                    <i class="fas fa-exclamation-circle" style="color: #f59e0b; font-size: 12px;" title="{{ cand.missing_documents_count }} document(s) manquant(s)"></i>
+                                    {% else %}
+                                    <i class="fas fa-check-circle" style="color: #10b981; font-size: 12px;" title="Documents complets"></i>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td style="color: #6b7280; font-size: 14px;">
+                                {{ cand.submitted_at|date:"d/m/Y" }}
+                            </td>
+                            <td>
+                                <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                                    <a href="{% url 'superadmin:candidature_detail' cand.pk %}"
+                                       class="btn btn-sm btn-outline" title="Voir" style="padding: 6px 10px;">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <div style="position: relative;">
+                                        <button onclick="toggleStatusMenu({{ cand.pk }})"
+                                                class="btn btn-sm btn-primary" title="Changer le statut"
+                                                style="padding: 6px 10px;">
+                                            <i class="fas fa-sync"></i>
+                                        </button>
+                                        <div id="status-menu-{{ cand.pk }}" style="display: none; position: absolute; right: 0; top: 100%; background: white; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 100; min-width: 180px; padding: 8px 0; margin-top: 4px;">
+                                            <a href="#" onclick="updateStatus({{ cand.pk }}, 'submitted')" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #4b5563; text-decoration: none; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                                                <i class="fas fa-clock" style="color: #d97706; width: 16px;"></i>Soumise
+                                            </a>
+                                            <a href="#" onclick="updateStatus({{ cand.pk }}, 'under_review')" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #4b5563; text-decoration: none; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                                                <i class="fas fa-search" style="color: #2563eb; width: 16px;"></i>En analyse
+                                            </a>
+                                            <a href="#" onclick="updateStatus({{ cand.pk }}, 'to_complete')" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #4b5563; text-decoration: none; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                                                <i class="fas fa-exclamation-circle" style="color: #b45309; width: 16px;"></i>À compléter
+                                            </a>
+                                            <div style="height: 1px; background: #e5e7eb; margin: 8px 0;"></div>
+                                            <a href="#" onclick="updateStatus({{ cand.pk }}, 'accepted')" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #4b5563; text-decoration: none; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                                                <i class="fas fa-check-circle" style="color: #10b981; width: 16px;"></i>Acceptée
+                                            </a>
+                                            <a href="#" onclick="updateStatus({{ cand.pk }}, 'accepted_with_reserve')" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #4b5563; text-decoration: none; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                                                <i class="fas fa-check" style="color: #059669; width: 16px;"></i>Sous réserve
+                                            </a>
+                                            <a href="#" onclick="updateStatus({{ cand.pk }}, 'rejected')" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #4b5563; text-decoration: none; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                                                <i class="fas fa-times-circle" style="color: #ef4444; width: 16px;"></i>Refusée
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 60px 20px;">
+                                <div style="color: #9ca3af;">
+                                    <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                                    <p style="font-size: 18px; font-weight: 500; color: #6b7280; margin-bottom: 8px;">Aucune candidature trouvée</p>
+                                    <p style="font-size: 14px; color: #9ca3af;">Les candidatures apparaîtront ici une fois soumises</p>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if candidatures.has_other_pages %}
+        <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;">
+            <p style="font-size: 14px; color: #6b7280;">
+                Page {{ candidatures.number }} sur {{ candidatures.paginator.num_pages }}
+                ({{ candidatures.paginator.count }} candidatures)
+            </p>
+            <div style="display: flex; gap: 8px;">
+                {% if candidatures.has_previous %}
+                    <a href="?page={{ candidatures.previous_page_number }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                {% endif %}
+
+                {% for num in candidatures.paginator.page_range %}
+                    {% if candidatures.number == num %}
+                        <span class="btn btn-sm btn-primary">{{ num }}</span>
+                    {% elif num > candidatures.number|add:'-3' and num < candidatures.number|add:'3' %}
+                        <a href="?page={{ num }}" class="btn btn-sm btn-outline">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if candidatures.has_next %}
+                    <a href="?page={{ candidatures.next_page_number }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAll(source) {
+    var checkboxes = document.getElementsByName('selected');
+    for (var checkbox of checkboxes) {
+        checkbox.checked = source.checked;
+    }
+}
+
+function toggleStatusMenu(pk) {
+    var menu = document.getElementById('status-menu-' + pk);
+    // Ferme tous les autres menus
+    document.querySelectorAll('[id^="status-menu-"]').forEach(function(m) {
+        if (m !== menu) m.style.display = 'none';
+    });
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function updateStatus(pk, status) {
+    fetch(`/superadmin/candidatures/${pk}/status/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'status=' + status
+    })
+    .then(response => response.text())
+    .then(() => {
+        showToast('Statut mis à jour avec succès', 'success');
+        location.reload();
+    })
+    .catch(error => {
+        showToast('Erreur lors de la mise à jour', 'error');
+    });
+}
+
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Ferme les menus si on clique ailleurs
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('button') && !e.target.closest('[id^="status-menu-"]')) {
+        document.querySelectorAll('[id^="status-menu-"]').forEach(function(m) {
+            m.style.display = 'none';
+        });
+    }
+});
+</script>
+{% endblock %}

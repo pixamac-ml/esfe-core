@@ -1,0 +1,193 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block page_title %}Tableau de bord{% endblock %}
+{% block page_subtitle %}Vue d'ensemble de votre plateforme{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <!-- STATISTIQUES PRINCIPALES -->
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-6 mb-8">
+
+        <!-- Formations -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-slate-500 text-sm mb-1">Formations</p>
+                    <h3 class="text-2xl font-bold text-primary-500">{{ formations_count }}</h3>
+                    <p class="text-xs text-green-600 mt-1">
+                        <i class="fas fa-check-circle"></i> {{ formations_published }} publiées
+                    </p>
+                </div>
+                <div class="w-14 h-14 bg-primary-500/10 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-graduation-cap text-xl text-primary-500"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Candidatures -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-slate-500 text-sm mb-1">Candidatures</p>
+                    <h3 class="text-2xl font-bold text-primary-500">{{ candidatures_count }}</h3>
+                    <p class="text-xs text-amber-600 mt-1">
+                        <i class="fas fa-clock"></i> {{ candidatures_pending }} en attente
+                    </p>
+                </div>
+                <div class="w-14 h-14 bg-accent/10 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-user-plus text-xl text-accent"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inscriptions -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-slate-500 text-sm mb-1">Inscriptions</p>
+                    <h3 class="text-2xl font-bold text-primary-500">{{ inscriptions_count }}</h3>
+                    <p class="text-xs text-green-600 mt-1">
+                        <i class="fas fa-user-check"></i> {{ inscriptions_active }} actives
+                    </p>
+                </div>
+                <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-user-graduate text-xl text-green-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-slate-500 text-sm mb-1">Messages</p>
+                    <h3 class="text-2xl font-bold text-primary-500">{{ messages_unread }}</h3>
+                    <p class="text-xs text-slate-500 mt-1">non lus</p>
+                </div>
+                <div class="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-envelope text-xl text-purple-600"></i>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- STATISTIQUES FINANCIÈRES -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <p class="text-slate-500 text-sm mb-2">Revenus totaux</p>
+            <h3 class="text-xl font-bold text-green-600">
+                {{ payments_total|intcomma }} <span class="text-sm font-normal text-slate-400">FCFA</span>
+            </h3>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <p class="text-slate-500 text-sm mb-2">Étudiants</p>
+            <h3 class="text-xl font-bold text-primary-500">{{ students_count }}</h3>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <p class="text-slate-500 text-sm mb-2">Articles</p>
+            <h3 class="text-xl font-bold text-primary-500">{{ articles_count }}</h3>
+        </div>
+
+    </div>
+
+    <!-- DEUXIÈME RANGÉE -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Actions rapides -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h3 class="text-lg font-bold text-primary-500 mb-4">
+                <i class="fas fa-bolt text-accent mr-2"></i>
+                Actions rapides
+            </h3>
+            <div class="flex flex-col gap-3">
+                <a href="{% url 'superadmin:formation_create' %}"
+                   class="flex items-center p-4 bg-primary-500/5 rounded-xl no-underline transition-all duration-200 hover:bg-primary-500/10">
+                    <div class="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center mr-3">
+                        <i class="fas fa-plus text-white"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-slate-800 m-0">Nouvelle formation</p>
+                        <p class="text-xs text-slate-500 m-0">Ajouter un programme</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-400"></i>
+                </a>
+
+                <a href="{% url 'superadmin:candidature_list' %}?status=submitted"
+                   class="flex items-center p-4 bg-accent/5 rounded-xl no-underline transition-all duration-200 hover:bg-accent/10">
+                    <div class="w-10 h-10 bg-accent rounded-xl flex items-center justify-center mr-3">
+                        <i class="fas fa-clipboard-list text-white"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-slate-800 m-0">Candidatures en attente</p>
+                        <p class="text-xs text-slate-500 m-0">{{ candidatures_pending }} à traiter</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-400"></i>
+                </a>
+
+                <a href="{% url 'superadmin:message_list' %}?status=pending"
+                   class="flex items-center p-4 bg-purple-500/5 rounded-xl no-underline transition-all duration-200 hover:bg-purple-500/10">
+                    <div class="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center mr-3">
+                        <i class="fas fa-envelope text-white"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-slate-800 m-0">Messages</p>
+                        <p class="text-xs text-slate-500 m-0">{{ messages_unread }} non répondus</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-400"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Candidatures récentes -->
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-primary-500 m-0">
+                    <i class="fas fa-clock text-accent mr-2"></i>
+                    Candidatures récentes
+                </h3>
+                <a href="{% url 'superadmin:candidature_list' %}" class="text-sm text-primary-500 no-underline">
+                    Voir tout
+                </a>
+            </div>
+            <div>
+                {% if recent_candidatures %}
+                    {% for cand in recent_candidatures|slice:":5" %}
+                    <div class="p-4 border-b border-slate-50 flex justify-between items-center hover:bg-slate-50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-blue-600"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-slate-800 m-0">
+                                    {{ cand.full_name }}
+                                </p>
+                                <p class="text-xs text-slate-500 m-0">
+                                    {{ cand.programme.title|default:"Formation non spécifiée" }}
+                                </p>
+                            </div>
+                        </div>
+                        <span class="badge-status badge-{% if cand.status == 'submitted' %}warning{% elif cand.status == 'accepted' %}success{% else %}draft{% endif %}">
+                            {{ cand.get_status_display|default:cand.status }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="p-8 text-center text-slate-400">
+                        <i class="fas fa-inbox text-4xl mb-2"></i>
+                        <p class="m-0">Aucune candidature récente</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

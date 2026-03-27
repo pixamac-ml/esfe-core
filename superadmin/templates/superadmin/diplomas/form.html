@@ -1,0 +1,58 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}{% if diploma %}Modifier{% else %}Nouveau{% endif %} Diplôme{% endblock %}
+{% block page_subtitle %}Diplôme{% endblock %}
+
+{% block content_main %}
+<div class="fade-in max-w-xl mx-auto">
+
+    <div class="card">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-certificate" style="color: #f59e0b;"></i>
+                {% if diploma %}Modifier{% else %}Nouveau{% endif %} diplôme
+            </h3>
+            <a href="{% url 'superadmin:diploma_list' %}" class="btn btn-outline btn-sm">
+                <i class="fas fa-arrow-left mr-2"></i>Retour
+            </a>
+        </div>
+
+        <form method="POST" class="card-body">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="name" class="form-label">Nom du diplôme <span style="color: #ef4444;">*</span></label>
+                <input type="text" id="name" name="name" required
+                       value="{{ diploma.name|default:'' }}"
+                       class="form-input"
+                       placeholder="Ex: Licence, Master, Bachelor...">
+            </div>
+
+            <div class="form-group">
+                <label for="abbreviation" class="form-label">Abréviation</label>
+                <input type="text" id="abbreviation" name="abbreviation"
+                       value="{{ diploma.abbreviation|default:'' }}"
+                       class="form-input"
+                       placeholder="Ex: L, M, BSc...">
+            </div>
+
+            <div class="form-group">
+                <label for="level" class="form-label">Niveau</label>
+                <select id="level" name="level" class="form-select">
+                    <option value="superieur" {% if diploma.level == 'superieur' %}selected{% endif %}>Supérieur</option>
+                    <option value="secondaire" {% if diploma.level == 'secondaire' %}selected{% endif %}>Secondaire</option>
+                </select>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <a href="{% url 'superadmin:diploma_list' %}" class="btn btn-outline">Annuler</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-2"></i>Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

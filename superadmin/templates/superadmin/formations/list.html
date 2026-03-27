@@ -1,102 +1,127 @@
 {% extends "superadmin/base.html" %}
+{% load static %}
 
-{% block page_title %}
-Formations
-{% endblock %}
-
-{% block page_subtitle %}
-Gestion des formations
-{% endblock %}
+{% block page_title %}Programmes de Formation{% endblock %}
+{% block page_subtitle %}Gérer le catalogue académique{% endblock %}
 
 {% block content_main %}
+<div class="fade-in space-y-6">
 
-<div class="card">
+    <!-- ========================================
+         BARRE D'ACTIONS & FILTRES (HTMX)
+    ======================================== -->
+    <div class="card p-4">
+        <div class="flex flex-col lg:flex-row gap-4 items-center justify-between">
 
-    <!-- HEADER -->
-    <div class="card-header">
+            <!-- Formulaire de filtrage dynamique -->
+            <form hx-get="{% url 'superadmin:formation_list' %}"
+                  hx-target="#formations-table-container"
+                  hx-trigger="change, keyup delay:500ms"
+                  hx-indicator=".loader"
+                  class="flex-1 flex flex-wrap gap-3 items-center w-full">
 
-        <div class="search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" placeholder="Rechercher...">
+                <!-- Recherche avec indicateur de chargement -->
+                <div class="search-box flex-1 min-w-[300px] relative">
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="search"
+                           placeholder="Rechercher par titre ou description..."
+                           value="{{ filters.search|default:'' }}"
+                           class="w-full">
+                    <div class="loader htmx-indicator absolute right-3 top-3">
+                        <i class="fas fa-spinner fa-spin text-secondary"></i>
+                    </div>
+                </div>
+
+                <!-- Filtres Select -->
+                <div class="flex flex-wrap gap-2">
+                    <select name="status" class="form-select text-sm border-slate-200 focus:border-secondary">
+                        <option value="">Tous les statuts</option>
+                        <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actifs</option>
+                        <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactifs</option>
+                    </select>
+
+                    <select name="cycle" class="form-select text-sm border-slate-200 focus:border-secondary">
+                        <option value="">Tous les cycles</option>
+                        {% for cycle in cycles %}
+                        <option value="{{ cycle.pk }}" {% if filters.cycle == cycle.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ cycle.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+
+                    <select name="filiere" class="form-select text-sm border-slate-200 focus:border-secondary">
+                        <option value="">Toutes les filières</option>
+                        {% for filiere in filieres %}
+                        <option value="{{ filiere.pk }}" {% if filters.filiere == filiere.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ filiere.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+
+            <!-- Bouton de création -->
+            <div class="shrink-0">
+                <a href="{% url 'superadmin:formation_create' %}" class="btn btn-primary shadow-lg shadow-primary/20">
+                    <i class="fas fa-plus-circle mr-2"></i>Nouveau programme
+                </a>
+            </div>
         </div>
-
-        <a href="{% url 'superadmin:formation_create' %}" class="btn btn-primary">
-            <i class="fas fa-plus"></i>
-            Nouvelle formation
-        </a>
-
     </div>
 
-    <!-- TABLE -->
-    <div class="card-body">
+    <!-- ========================================
+         ZONE DE LA TABLE (Injectée par HTMX)
+    ======================================== -->
+    <div class="card shadow-sm border-slate-100 overflow-hidden">
+        <div id="formations-table-container" class="min-h-[400px]">
+            <!-- On inclut le partial par défaut au premier chargement -->
+            {% include "superadmin/formations/_list_table.html" %}
+        </div>
+    </div>
 
-        <table class="data-table">
-
-            <thead>
-                <tr>
-                    <th>Titre</th>
-                    <th>Durée</th>
-                    <th>Statut</th>
-                    <th class="text-right">Actions</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for formation in formations %}
-                <tr>
-
-                    <td>
-                        <strong>{{ formation.title }}</strong>
-                    </td>
-
-                    <td>
-                        {{ formation.duration_years }} ans
-                    </td>
-
-                    <td>
-                        {% if formation.is_active %}
-                            <span class="badge-status badge-success">Actif</span>
-                        {% else %}
-                            <span class="badge-status badge-draft">Inactif</span>
-                        {% endif %}
-                    </td>
-
-                    <td class="text-right">
-
-                        <div class="flex justify-between gap-2">
-
-                            <a href="{% url 'superadmin:formation_edit' formation.id %}" class="btn btn-sm btn-outline">
-                                <i class="fas fa-edit"></i>
-                            </a>
-
-                            <button
-                                class="btn btn-sm btn-secondary"
-                                onclick="toggleFormation({{ formation.id }})"
-                            >
-                                <i class="fas fa-sync"></i>
-                            </button>
-
-                        </div>
-
-                    </td>
-
-                </tr>
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
+    <!-- Actions groupées (Optionnel, pour la présentation) -->
+    <div class="flex items-center justify-between px-2 text-slate-500 text-sm">
+        <div class="flex items-center gap-4">
+            <span id="selected-count">0 élément sélectionné</span>
+            <select name="bulk_action" class="form-select text-xs py-1" hx-include="[name='selected']" hx-post="{% url 'superadmin:bulk_action' %}">
+                <option value="">Actions groupées...</option>
+                <option value="activate">Activer la sélection</option>
+                <option value="deactivate">Désactiver la sélection</option>
+                <option value="delete">Supprimer la sélection</option>
+            </select>
+        </div>
+        <div class="flex gap-4">
+            <a href="{% url 'superadmin:export_data' 'formations' %}" class="hover:text-primary transition-colors">
+                <i class="fas fa-file-export mr-1"></i>Exporter en CSV
+            </a>
+        </div>
     </div>
 
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-function toggleFormation(id){
-    fetch(`/superadmin/formations/${id}/toggle/`)
-    .then(() => location.reload())
-}
-</script>
+    // Petite fonction pour compter les cases cochées (UX)
+    function updateSelectedCount() {
+        const count = document.querySelectorAll('input[name="selected"]:checked').length;
+        document.getElementById('selected-count').innerText = `${count} élément(s) sélectionné(s)`;
+    }
 
+    // On écoute les changements sur la table (même après recharge HTMX)
+    document.body.addEventListener('change', function(e) {
+        if (e.target.name === 'selected' || e.target.id === 'selectAll') {
+            updateSelectedCount();
+        }
+    });
+
+    // Gestion du SelectAll
+    function toggleAll(source) {
+        const checkboxes = document.getElementsByName('selected');
+        for (let checkbox of checkboxes) {
+            checkbox.checked = source.checked;
+        }
+        updateSelectedCount();
+    }
+</script>
 {% endblock %}

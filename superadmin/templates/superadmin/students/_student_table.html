@@ -1,0 +1,80 @@
+<div id="students-table-container" class="overflow-x-auto">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Étudiant</th>
+                <th>Matricule</th>
+                <th>Email / Tel</th>
+                <th>Inscriptions</th>
+                <th class="text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for student in students %}
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold shadow-sm">
+                            {{ student.user.first_name|slice:":1" }}{{ student.user.last_name|slice:":1" }}
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="font-bold text-slate-700">{{ student.user.get_full_name }}</span>
+                            <span class="text-xs text-slate-400">Inscrit le {{ student.created_at|date:"d M Y" }}</span>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <code class="text-xs bg-slate-100 px-2 py-1 rounded font-mono text-primary">{{ student.matricule|default:"SANS-MAT" }}</code>
+                </td>
+                <td>
+                    <div class="flex flex-col text-sm">
+                        <span class="text-slate-600"><i class="fas fa-envelope mr-1 text-xs"></i> {{ student.user.email }}</span>
+                        <span class="text-slate-400 text-xs"><i class="fas fa-phone mr-1 text-xs"></i> {{ student.phone|default:"Non renseigné" }}</span>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge-status {% if student.inscriptions.count > 0 %}badge-success{% else %}badge-draft{% endif %}">
+                        {{ student.inscriptions.count }} inscription{{ student.inscriptions.count|pluralize }}
+                    </span>
+                </td>
+                <td class="text-right">
+                    <div class="flex justify-end gap-2">
+                        <a href="{% url 'superadmin:student_detail' student.pk %}" class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-primary hover:border-primary">
+                            <i class="fas fa-user-graduate"></i>
+                        </a>
+                        <a href="{% url 'superadmin:student_edit' student.pk %}" class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-secondary hover:border-secondary">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="py-12 text-center text-slate-400 italic">
+                    <i class="fas fa-user-slash mb-3 text-3xl block"></i>
+                    Aucun étudiant trouvé...
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if students.has_other_pages %}
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-sm text-slate-500">Page {{ students.number }} / {{ students.paginator.num_pages }}</span>
+        <div class="flex gap-2">
+            {% if students.has_previous %}
+                <button hx-get="?page={{ students.previous_page_number }}&search={{ search }}" hx-target="#students-table-container" class="btn btn-outline btn-sm bg-white">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            {% endif %}
+            {% if students.has_next %}
+                <button hx-get="?page={{ students.next_page_number }}&search={{ search }}" hx-target="#students-table-container" class="btn btn-outline btn-sm bg-white">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,81 @@
+<div id="payments-table-container" class="overflow-x-auto">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Référence</th>
+                <th>Étudiant</th>
+                <th>Montant</th>
+                <th>Date</th>
+                <th>Statut</th>
+                <th class="text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for payment in payments %}
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td>
+                    <code class="text-xs bg-slate-100 px-2 py-1 rounded font-mono text-primary">{{ payment.reference|default:"REF-XXXX" }}</code>
+                </td>
+                <td>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold shadow-sm">
+                            {{ payment.inscription.student.user.first_name|slice:":1" }}{{ payment.inscription.student.user.last_name|slice:":1" }}
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="font-bold text-slate-700">{{ payment.inscription.student.user.get_full_name }}</span>
+                            <span class="text-xs text-slate-400">Matricule: {{ payment.inscription.student.matricule }}</span>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span class="font-semibold text-green-600">{{ payment.amount }} FCFA</span>
+                </td>
+                <td>
+                    <span class="text-sm text-slate-600">{{ payment.created_at|date:"d M Y à H:i" }}</span>
+                </td>
+                <td>
+                    <span class="badge-status {% if payment.status == 'completed' %}badge-success{% elif payment.status == 'pending' %}badge-warning{% else %}badge-danger{% endif %}">
+                        {{ payment.get_status_display|default:payment.status|title }}
+                    </span>
+                </td>
+                <td class="text-right">
+                    <div class="flex justify-end gap-2">
+                        <a href="{% url 'superadmin:payment_detail' payment.pk %}" class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-primary hover:border-primary">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{% url 'superadmin:payment_edit' payment.pk %}" class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-secondary hover:border-secondary">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="py-12 text-center text-slate-400 italic">
+                    <i class="fas fa-credit-card mb-3 text-3xl block"></i>
+                    Aucun paiement trouvé...
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if payments.has_other_pages %}
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-sm text-slate-500">Page {{ payments.number }} / {{ payments.paginator.num_pages }}</span>
+        <div class="flex gap-2">
+            {% if payments.has_previous %}
+                <button hx-get="?page={{ payments.previous_page_number }}&search={{ search }}" hx-target="#payments-table-container" class="btn btn-outline btn-sm bg-white">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            {% endif %}
+            {% if payments.has_next %}
+                <button hx-get="?page={{ payments.next_page_number }}&search={{ search }}" hx-target="#payments-table-container" class="btn btn-outline btn-sm bg-white">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>

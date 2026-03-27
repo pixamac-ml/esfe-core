@@ -1,0 +1,158 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}Inscription #{{ inscription.pk }}{% endblock %}
+{% block page_subtitle %}Détails de l'inscription{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <!-- EN-TÊTE -->
+    <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;" class="md:flex-row md:items-center justify-between">
+        <div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <a href="{% url 'superadmin:inscription_list' %}" style="color: #6b7280;">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <h2 class="text-2xl font-bold text-gray-900">Inscription #{{ inscription.pk }}</h2>
+                <span class="badge-status badge-{% if inscription.status == 'active' %}success{% elif inscription.status == 'graduated' %}info{% else %}warning{% endif %}">
+                    {{ inscription.get_status_display }}
+                </span>
+            </div>
+            <p style="color: #6b7280; font-size: 14px;">
+                Année académique: <strong>{{ inscription.candidature.academic_year }}</strong>
+                • Créée le {{ inscription.created_at|date:"d/m/Y" }}
+            </p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            {% if inscription.student %}
+            <a href="{% url 'superadmin:student_detail' inscription.student.pk %}" class="btn btn-outline">
+                <i class="fas fa-user mr-2"></i>Profil étudiant
+            </a>
+            {% endif %}
+            <a href="{% url 'superadmin:payments_create' %}?inscription={{ inscription.pk }}" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i>Nouveau paiement
+            </a>
+        </div>
+    </div>
+
+    <!-- INFORMATIONS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+
+        <!-- Étudiant -->
+        {% if inscription.student %}
+        <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-user-graduate" style="color: var(--primary);"></i>
+                Étudiant
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <span style="color: white; font-weight: 600; font-size: 18px;">
+                            {{ inscription.student.last_name.0|upper }}{{ inscription.student.first_name.0|upper }}
+                        </span>
+                    </div>
+                    <div>
+                        <p style="font-weight: 600; color: #1f2937;">{{ inscription.student.full_name }}</p>
+                        <p style="font-size: 13px; color: #6b7280; font-family: monospace;">{{ inscription.student.matricule }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-user-graduate" style="color: var(--primary);"></i>
+                Étudiant
+            </h3>
+            <div style="text-align: center; padding: 40px; color: #9ca3af;">
+                <i class="fas fa-user-slash" style="font-size: 48px; margin-bottom: 16px;"></i>
+                <p>Étudiant non créé</p>
+                <p style="font-size: 12px;">L'inscription doit être active pour créer l'étudiant</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Programme -->
+        <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-graduation-cap" style="color: var(--secondary);"></i>
+                Programme
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="color: #6b7280;">Programme:</span>
+                    <span style="font-weight: 500; color: #1f2937;">{{ inscription.candidature.programme.title }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="color: #6b7280;">Cycle:</span>
+                    <span class="badge-status badge-info">{{ inscription.candidature.programme.cycle.name }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #6b7280;">Année d'entrée:</span>
+                    <span style="font-weight: 500; color: #1f2937;">{{ inscription.candidature.entry_year }}e année</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- PAIEMENTS -->
+    <div class="card">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-receipt" style="color: #10b981;"></i>
+                Paiements
+            </h3>
+            <a href="{% url 'superadmin:payments_create' %}?inscription={{ inscription.pk }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-plus mr-2"></i>Nouveau
+            </a>
+        </div>
+        <div class="card-body">
+            {% if inscription.payments.all %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Montant</th>
+                        <th>Date</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in inscription.payments.all %}
+                    <tr>
+                        <td><code style="font-size: 12px;">{{ payment.reference }}</code></td>
+                        <td style="font-weight: 600;">{{ payment.amount }} FCFA</td>
+                        <td>{{ payment.payment_date|date:"d/m/Y" }}</td>
+                        <td>
+                            {% if payment.status == 'completed' %}
+                            <span class="badge-status badge-success">Complété</span>
+                            {% elif payment.status == 'pending' %}
+                            <span class="badge-status badge-warning">En attente</span>
+                            {% else %}
+                            <span class="badge-status badge-danger">Échoué</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'superadmin:payment_detail' payment.pk %}" class="btn btn-sm btn-outline">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="text-align: center; padding: 40px; color: #9ca3af;">
+                <i class="fas fa-receipt" style="font-size: 48px; margin-bottom: 16px;"></i>
+                <p>Aucun paiement enregistré</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

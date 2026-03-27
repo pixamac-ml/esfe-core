@@ -1,0 +1,312 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}Candidature #{{ candidature.pk }}{% endblock %}
+{% block page_subtitle %}Détails de la candidature{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <!-- ========================================
+         EN-TÊTE ET ACTIONS
+    ======================================== -->
+    <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;" class="md:flex-row md:items-center justify-between">
+        <div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <a href="{% url 'superadmin:candidature_list' %}" style="color: #6b7280; transition: color 0.2s;" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#6b7280'">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <h2 class="text-2xl font-bold text-gray-900">Candidature #{{ candidature.pk }}</h2>
+                <span class="badge-status badge-{% if candidature.status == 'accepted' %}success{% elif candidature.status == 'rejected' %}danger{% elif candidature.status == 'under_review' %}info{% else %}warning{% endif %}">
+                    {% if candidature.status == 'submitted' %}Soumise
+                    {% elif candidature.status == 'under_review' %}En analyse
+                    {% elif candidature.status == 'to_complete' %}À compléter
+                    {% elif candidature.status == 'accepted' %}Acceptée
+                    {% elif candidature.status == 'accepted_with_reserve' %}Sous réserve
+                    {% elif candidature.status == 'rejected' %}Refusée
+                    {% endif %}
+                </span>
+            </div>
+            <p style="color: #6b7280; font-size: 14px;">
+                Référence: <strong style="color: #1f2937;">{{ candidature.reference }}</strong>
+                • Soumise le {{ candidature.submitted_at|date:"d/m/Y à H:i" }}
+            </p>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <!-- Actions rapides -->
+            <div style="position: relative;">
+                <button onclick="toggleActions()" class="btn btn-outline">
+                    <i class="fas fa-bolt mr-2"></i>Actions rapides
+                    <i class="fas fa-chevron-down ml-2" style="font-size: 10px;"></i>
+                </button>
+                <div id="actions-menu" style="display: none; position: absolute; right: 0; top: 100%; background: white; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 100; min-width: 200px; padding: 8px 0; margin-top: 4px;">
+                    <form action="{% url 'superadmin:candidature_status' candidature.pk %}" method="POST" style="margin: 0;">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="under_review">
+                        <button type="submit" style="width: 100%; text-align: left; padding: 10px 16px; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 10px; color: #4b5563; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-search" style="color: #2563eb; width: 20px;"></i>Marquer en analyse
+                        </button>
+                    </form>
+                    <form action="{% url 'superadmin:candidature_status' candidature.pk %}" method="POST" style="margin: 0;">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="accepted">
+                        <button type="submit" style="width: 100%; text-align: left; padding: 10px 16px; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 10px; color: #4b5563; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-check-circle" style="color: #10b981; width: 20px;"></i>Accepter
+                        </button>
+                    </form>
+                    <form action="{% url 'superadmin:candidature_status' candidature.pk %}" method="POST" style="margin: 0;">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="rejected">
+                        <button type="submit" style="width: 100%; text-align: left; padding: 10px 16px; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 10px; color: #4b5563; font-size: 14px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-times-circle" style="color: #ef4444; width: 20px;"></i>Refuser
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <a href="{% url 'superadmin:inscription_create' %}?candidature={{ candidature.pk }}" class="btn btn-success">
+                <i class="fas fa-user-plus mr-2"></i>Créer inscription
+            </a>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+
+        <!-- ========================================
+             INFORMATIONS DU CANDIDAT
+        ======================================== -->
+        <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-user" style="color: var(--primary);"></i>
+                Informations personnelles
+            </h3>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid #f3f4f6;">
+                    <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <span style="color: white; font-weight: 600; font-size: 20px;">{{ candidature.last_name.0|upper }}{{ candidature.first_name.0|upper }}</span>
+                    </div>
+                    <div>
+                        <p style="font-weight: 600; color: #1f2937; font-size: 18px;">{{ candidature.full_name }}</p>
+                        <p style="font-size: 13px; color: #6b7280;">
+                            {% if candidature.gender == 'male' %}Homme{% else %}Femme{% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 100px; flex-shrink: 0;">
+                        <i class="fas fa-birthday-cake" style="width: 16px; margin-right: 8px; color: #9ca3af;"></i>Naissance:
+                    </span>
+                    <span style="color: #1f2937;">{{ candidature.birth_date|date:"d/m/Y" }} à {{ candidature.birth_place }}</span>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 100px; flex-shrink: 0;">
+                        <i class="fas fa-envelope" style="width: 16px; margin-right: 8px; color: #9ca3af;"></i>Email:
+                    </span>
+                    <a href="mailto:{{ candidature.email }}" style="color: #2563eb; text-decoration: none;">{{ candidature.email }}</a>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 100px; flex-shrink: 0;">
+                        <i class="fas fa-phone" style="width: 16px; margin-right: 8px; color: #9ca3af;"></i>Téléphone:
+                    </span>
+                    <a href="tel:{{ candidature.phone }}" style="color: #1f2937; text-decoration: none;">{{ candidature.phone }}</a>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 100px; flex-shrink: 0;">
+                        <i class="fas fa-map-marker-alt" style="width: 16px; margin-right: 8px; color: #9ca3af;"></i>Adresse:
+                    </span>
+                    <span style="color: #1f2937;">{{ candidature.city|default:"—" }}, {{ candidature.country }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================
+             INFORMATIONS DU PROGRAMME
+        ======================================== -->
+        <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-graduation-cap" style="color: var(--secondary);"></i>
+                Programme choisi
+            </h3>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Programme:</span>
+                    <span style="color: #1f2937; font-weight: 500;">{{ candidature.programme.title }}</span>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Cycle:</span>
+                    <span class="badge-status badge-info">{{ candidature.programme.cycle.name }}</span>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Filière:</span>
+                    <span style="color: #1f2937;">{{ candidature.programme.filiere.name }}</span>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Diplôme:</span>
+                    <span style="color: #1f2937;">{{ candidature.programme.diploma_awarded.name }}</span>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Année acad.:</span>
+                    <span style="color: #1f2937;">{{ candidature.academic_year }}</span>
+                </div>
+
+                <div style="display: flex;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Annexe:</span>
+                    <span style="color: #1f2937;">{{ candidature.branch.name|default:"—" }}</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================================
+         DOCUMENTS
+    ======================================== -->
+    <div class="card" style="margin-top: 24px;">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-file-alt" style="color: #f59e0b;"></i>
+                Documents ({{ documents|length }}/{{ candidature.programme.required_documents.count }})
+            </h3>
+            <span style="font-size: 13px; color: #6b7280;">
+                {% if candidature.missing_documents_count == 0 %}
+                <i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i>Complets
+                {% else %}
+                <i class="fas fa-exclamation-circle" style="color: #f59e0b; margin-right: 4px;"></i>{{ candidature.missing_documents_count }} manquant(s)
+                {% endif %}
+            </span>
+        </div>
+        <div class="card-body">
+            {% if documents %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                {% for doc in documents %}
+                <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; background: #f9fafb; border-radius: 10px; border: 1px solid #e5e7eb;">
+                    <div style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; {% if doc.is_valid %}background: #ecfdf5;{% else %}background: #fef3c7;{% endif %}">
+                        <i class="fas fa-{% if doc.is_valid %}check-circle{% else %}clock{% endif %}" style="color: {% if doc.is_valid %}#10b981{% else %}#d97706{% endif %}; font-size: 18px;"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <p style="font-weight: 500; color: #1f2937; margin-bottom: 4px;">{{ doc.document_type.name }}</p>
+                        <p style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">
+                            <i class="fas fa-clock" style="margin-right: 4px;"></i>{{ doc.uploaded_at|date:"d/m/Y à H:i" }}
+                        </p>
+                        {% if doc.file %}
+                        <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline" style="font-size: 12px; padding: 4px 10px;">
+                            <i class="fas fa-download" style="margin-right: 4px;"></i>Voir
+                        </a>
+                        {% endif %}
+                    </div>
+                    <form action="#" method="POST" style="margin: 0;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm {% if doc.is_valid %}btn-outline{% else %}btn-success{% endif %}" title="{% if doc.is_valid %}Marquer non validé{% else %}Valider{% endif %}">
+                            <i class="fas fa-{% if doc.is_valid %}times{% else %}check{% endif %}"></i>
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 40px; color: #9ca3af;">
+                <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                <p style="font-size: 16px; font-weight: 500; color: #6b7280; margin-bottom: 4px;">Aucun document</p>
+                <p style="font-size: 14px;">Le candidat n'a pas encore soumis de documents</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ========================================
+         COMMENTAIRES
+    ======================================== -->
+    <div class="card" style="margin-top: 24px;">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-comment" style="color: #8b5cf6;"></i>
+                Commentaires internes
+            </h3>
+        </div>
+        <div class="card-body">
+            {% if candidature.admin_comment %}
+            <div style="padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 4px solid #8b5cf6; margin-bottom: 16px;">
+                <p style="color: #374151; line-height: 1.6;">{{ candidature.admin_comment|linebreaks }}</p>
+            </div>
+            {% else %}
+            <p style="color: #9ca3af; font-style: italic; text-align: center; padding: 20px;">Aucun commentaire</p>
+            {% endif %}
+
+            <form method="POST" style="margin-top: 16px;">
+                {% csrf_token %}
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="admin_comment" class="form-label">Ajouter un commentaire</label>
+                    <textarea id="admin_comment" name="admin_comment" rows="3" class="form-textarea"
+                              placeholder="Notes internes sur cette candidature...">{{ candidature.admin_comment }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-2"></i>Enregistrer
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================
+         HISTORIQUE / MÉTADONNÉES
+    ======================================== -->
+    <div class="card" style="margin-top: 24px;">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-history" style="color: #6b7280;"></i>
+                Historique
+            </h3>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div>
+                    <p style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Soumise le</p>
+                    <p style="color: #374151;">{{ candidature.submitted_at|date:"d/m/Y à H:i" }}</p>
+                </div>
+                {% if candidature.reviewed_at %}
+                <div>
+                    <p style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Révisée le</p>
+                    <p style="color: #374151;">{{ candidature.reviewed_at|date:"d/m/Y à H:i" }}</p>
+                </div>
+                {% endif %}
+                {% if candidature.reviewed_by %}
+                <div>
+                    <p style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Révisée par</p>
+                    <p style="color: #374151;">{{ candidature.reviewed_by.get_full_name }}</p>
+                </div>
+                {% endif %}
+                <div>
+                    <p style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Dernière modification</p>
+                    <p style="color: #374151;">{{ candidature.updated_at|date:"d/m/Y à H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleActions() {
+    var menu = document.getElementById('actions-menu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+// Ferme le menu si on clique ailleurs
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('button')) {
+        var menu = document.getElementById('actions-menu');
+        if (menu) menu.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

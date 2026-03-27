@@ -1,0 +1,169 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}Inscriptions{% endblock %}
+{% block page_subtitle %}Gérer les inscriptions{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <!-- ========================================
+         BARRE D'ACTIONS
+    ======================================== -->
+    <div class="card mb-6">
+        <div class="card-header">
+            <form method="GET" class="flex-1 flex flex-wrap gap-3 items-center">
+                <div class="search-box flex-1 min-w-64">
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="search" placeholder="Rechercher par nom, matricule..."
+                           value="{{ filters.search|default:'' }}" class="flex-1">
+                </div>
+
+                <select name="status" class="form-select w-auto" onchange="this.form.submit()">
+                    <option value="">Tous les statuts</option>
+                    <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actives</option>
+                    <option value="suspended" {% if filters.status == 'suspended' %}selected{% endif %}>Suspendues</option>
+                    <option value="graduated" {% if filters.status == 'graduated' %}selected{% endif %}>Diplômées</option>
+                    <option value="withdrawn" {% if filters.status == 'withdrawn' %}selected{% endif %}>Retirées</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter mr-2"></i>Filtrer
+                </button>
+            </form>
+
+            <a href="#" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i>Nouvelle inscription
+            </a>
+        </div>
+    </div>
+
+    <!-- ========================================
+         TABLEAU DES INSCRIPTIONS
+    ======================================== -->
+    <div class="card">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Étudiant</th>
+                        <th>Programme</th>
+                        <th>Année acad.</th>
+                        <th>Statut</th>
+                        <th>Inscription</th>
+                        <th style="width: 120px; text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if inscriptions %}
+                        {% for inscription in inscriptions %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td>
+                                {% if inscription.student %}
+                                <div class="flex items-center gap-3">
+                                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                        <span style="color: white; font-weight: 600; font-size: 16px;">
+                                            {{ inscription.student.last_name.0|upper }}{{ inscription.student.first_name.0|upper }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p style="font-weight: 600; color: #1f2937;">{{ inscription.student.full_name }}</p>
+                                        <p style="font-size: 12px; color: #6b7280;">{{ inscription.student.matricule }}</p>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div class="text-center text-gray-500">
+                                    <i class="fas fa-user-slash text-2xl mb-1"></i>
+                                    <p class="text-sm">Étudiant non créé</p>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <p style="font-weight: 500; color: #1f2937;">{{ inscription.candidature.programme.title }}</p>
+                                <p style="font-size: 12px; color: #6b7280;">{{ inscription.candidature.programme.cycle.name }}</p>
+                            </td>
+                            <td>
+                                <span style="font-size: 14px; color: #4b5563;">{{ inscription.candidature.academic_year }}</span>
+                            </td>
+                            <td>
+                                {% if inscription.status == 'active' %}
+                                <span class="badge-status badge-success">
+                                    <i class="fas fa-check-circle" style="margin-right: 4px;"></i>Active
+                                </span>
+                                {% elif inscription.status == 'suspended' %}
+                                <span class="badge-status" style="background: #fef3c7; color: #d97706; border: 1px solid #fcd34d;">
+                                    <i class="fas fa-pause" style="margin-right: 4px;"></i>Suspendue
+                                </span>
+                                {% elif inscription.status == 'graduated' %}
+                                <span class="badge-status badge-info">
+                                    <i class="fas fa-graduation-cap" style="margin-right: 4px;"></i>Diplômée
+                                </span>
+                                {% elif inscription.status == 'withdrawn' %}
+                                <span class="badge-status badge-danger">
+                                    <i class="fas fa-sign-out-alt" style="margin-right: 4px;"></i>Retirée
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td style="color: #6b7280; font-size: 14px;">
+                                {{ inscription.created_at|date:"d/m/Y" }}
+                            </td>
+                            <td>
+                                <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                                    <a href="{% url 'superadmin:inscription_detail' inscription.pk %}"
+                                       class="btn btn-sm btn-outline" title="Voir" style="padding: 6px 10px;">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if inscription.student %}
+                                    <a href="{% url 'superadmin:student_detail' inscription.student.pk %}"
+                                       class="btn btn-sm btn-primary" title="Profil étudiant" style="padding: 6px 10px;">
+                                        <i class="fas fa-user"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 60px 20px;">
+                                <div style="color: #9ca3af;">
+                                    <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                                    <p style="font-size: 18px; font-weight: 500; color: #6b7280; margin-bottom: 8px;">Aucune inscription trouvée</p>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if inscriptions.has_other_pages %}
+        <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;">
+            <p style="font-size: 14px; color: #6b7280;">
+                Page {{ inscriptions.number }} sur {{ inscriptions.paginator.num_pages }}
+            </p>
+            <div style="display: flex; gap: 8px;">
+                {% if inscriptions.has_previous %}
+                    <a href="?page={{ inscriptions.previous_page_number }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                {% endif %}
+                {% for num in inscriptions.paginator.page_range %}
+                    {% if inscriptions.number == num %}
+                        <span class="btn btn-sm btn-primary">{{ num }}</span>
+                    {% elif num > inscriptions.number|add:'-3' and num < inscriptions.number|add:'3' %}
+                        <a href="?page={{ num }}" class="btn btn-sm btn-outline">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if inscriptions.has_next %}
+                    <a href="?page={{ inscriptions.next_page_number }}" class="btn btn-sm btn-outline">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

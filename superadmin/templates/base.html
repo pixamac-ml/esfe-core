@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+{% load static %}
+{% load humanize %}
+<html lang="fr" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SuperAdmin - ESFE{% endblock %}</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/ws.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary: #1e4f6f;
+            --primary-light: #2d6a8f;
+            --primary-dark: #163b53;
+            --secondary: #1db5b0;
+            --secondary-light: #49c7c3;
+            --accent: #f39c12;
+            --accent-light: #f7b955;
+            --soft: #f4fbfb;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--soft);
+        }
+
+        /* ========================================
+           LOADING BAR (HTMX)
+        ======================================== */
+        .htmx-indicator {
+            opacity: 0;
+            transition: opacity 0.3s ease-in;
+        }
+        .htmx-request .htmx-indicator {
+            opacity: 1;
+        }
+        .htmx-request.htmx-indicator {
+            opacity: 1;
+        }
+
+        #global-loading-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--secondary), var(--accent));
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            z-index: 9999;
+        }
+        .htmx-request #global-loading-bar {
+            transform: translateX(0);
+        }
+
+        /* ========================================
+           SIDEBAR STYLES
+        ======================================== */
+        .sidebar {
+            background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .sidebar-link {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-link::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .sidebar-link:hover::before {
+            left: 100%;
+        }
+
+        .sidebar-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 3px solid var(--accent);
+        }
+
+        .sidebar-link-icon {
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-link:hover .sidebar-link-icon {
+            transform: scale(1.1);
+            background: var(--accent);
+            color: white;
+        }
+
+        /* ========================================
+           HEADER STYLES
+        ======================================== */
+        .header-blur {
+            backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .search-input:focus {
+            box-shadow: 0 0 0 3px rgba(29, 181, 176, 0.1);
+        }
+
+        /* ========================================
+           CARD STYLES
+        ======================================== */
+        .card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            border: 1px solid #f1f5f9;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ========================================
+           BUTTON STYLES
+        ======================================== */
+        .btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-loading {
+            pointer-events: none;
+        }
+
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            margin: auto;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ========================================
+           ANIMATIONS
+        ======================================== */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in-up {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .animate-slide-in-right {
+            animation: slideInRight 0.5s ease-out;
+        }
+
+        /* ========================================
+           MINI CHARTS (CSS)
+        ======================================== */
+        .mini-chart {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+
+        .mini-chart svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .mini-chart path {
+            fill: none;
+            stroke: var(--secondary);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* ========================================
+           TIMELINE
+        ======================================== */
+        .timeline {
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e2e8f0;
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 40px;
+            padding-bottom: 1rem;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 8px;
+            top: 4px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--secondary);
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px #e2e8f0;
+        }
+
+        /* ========================================
+           EMPTY STATES
+        ======================================== */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+
+        .empty-state-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            background: var(--soft);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+        }
+
+        /* ========================================
+           RESPONSIVE
+        ======================================== */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+
+        /* ========================================
+           UTILITIES
+        ======================================== */
+        .text-gradient {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        }
+
+        .bg-gradient-secondary {
+            background: linear-gradient(135deg, var(--secondary), var(--secondary-light));
+        }
+
+        .shadow-soft {
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full" x-data="{ sidebarOpen: false, userMenuOpen: false }">
+    <!-- Global Loading Bar -->
+    <div id="global-loading-bar"></div>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div
+        x-show="sidebarOpen"
+        @click="sidebarOpen = false"
+        class="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+        x-transition:enter="transition-opacity ease-linear duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-linear duration-300"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+    ></div>
+
+    <div class="flex h-full">
+        <!-- ========================================
+             SIDEBAR
+        ======================================== -->
+        <aside
+            class="sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out"
+            :class="{ 'w-20': sidebarCollapsed, 'w-64': !sidebarCollapsed }"
+            x-data="{ sidebarCollapsed: false }"
+        >
+            <!-- Logo & Toggle -->
+            <div class="flex items-center justify-between p-6 border-b border-white/10">
+                <a href="{% url 'superadmin:dashboard' %}" class="flex items-center space-x-3 text-white hover:opacity-80 transition-opacity">
+                    <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-crown text-yellow-300 text-lg"></i>
+                    </div>
+                    <span x-show="!sidebarCollapsed" class="text-xl font-bold tracking-tight transition-all duration-300">SuperAdmin</span>
+                </a>
+                <button
+                    @click="sidebarCollapsed = !sidebarCollapsed"
+                    class="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
+                >
+                    <i class="fas" :class="sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'"></i>
+                </button>
+            </div>
+            <!-- User Info -->
+            <div class="p-4 border-b border-white/10" x-show="!sidebarCollapsed" x-transition>
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                        {{ user.first_name|slice:":1"|upper|default:"S" }}{{ user.last_name|slice:":1"|upper|default:"A" }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-white truncate">{{ user.get_full_name|default:user.username }}</p>
+                        <p class="text-xs text-blue-200">Super Administrateur</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Navigation -->
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <template x-for="item in [
+                    {icon: 'fa-tachometer-alt', label: 'Dashboard', url: '{% url 'superadmin:dashboard' %}', badge: 3},
+                    {icon: 'fa-graduation-cap', label: 'Formations', url: '{% url 'superadmin:formation_list' %}'},
+                    {icon: 'fa-users', label: 'Admissions', url: '{% url 'superadmin:candidature_list' %}', badge: 12},
+                    {icon: 'fa-user-graduate', label: 'Étudiants', url: '{% url 'superadmin:student_list' %}'},
+                    {icon: 'fa-blog', label: 'Articles', url: '{% url 'superadmin:article_list' %}'},
+                    {icon: 'fa-file-alt', label: 'Pages', url: '#'},
+                    {icon: 'fa-comments', label: 'Communauté', url: '{% url 'superadmin:community_category_list' %}'},
+                    {icon: 'fa-credit-card', label: 'Paiements', url: '#'},
+                    {icon: 'fa-cog', label: 'Paramètres', url: '{% url 'superadmin:settings' %}'},
+                    {icon: 'fa-sliders-h', label: 'Django Admin', url: '{% url 'admin:index' %}'},
+                    {icon: 'fa-external-link-alt', label: 'Voir le site', url: '{% url 'core:home' %}'},
+                ]" :key="item.label">
+                    <a :href="item.url" class="sidebar-link flex items-center space-x-3 px-3 py-3 rounded-xl text-white/80 hover:text-white transition-colors group relative">
+                        <div class="sidebar-link-icon w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+                            <i :class="'fas ' + item.icon"></i>
+                        </div>
+                        <span x-show="!sidebarCollapsed" class="font-medium transition-all duration-300">{{ item.label }}</span>
+                        <template x-if="item.badge">
+                            <span x-show="!sidebarCollapsed" class="sidebar-link-badge bg-accent text-white text-xs px-2 py-1 rounded-full ml-auto animate-pulse">{{ item.badge }}</span>
+                        </template>
+                    </a>
+                </template>
+            </nav>
+            <!-- Footer -->
+            <div class="p-4 border-t border-white/10">
+                <form action="{% url 'accounts:logout' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="sidebar-link w-full flex items-center space-x-3 px-3 py-3 rounded-xl text-white/80 hover:text-white transition-colors group">
+                        <div class="sidebar-link-icon w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </div>
+                        <span x-show="!sidebarCollapsed" class="font-medium transition-all duration-300">Déconnexion</span>
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <!-- ========================================
+             MAIN CONTENT
+        ======================================== -->
+        <main class="flex-1 lg:ml-64">
+            <!-- Header -->
+            <header class="header-blur sticky top-0 z-30 border-b border-slate-200">
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <button
+                                @click="sidebarOpen = true"
+                                class="lg:hidden w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors"
+                            >
+                                <i class="fas fa-bars text-slate-600"></i>
+                            </button>
+                            <div>
+                                <h1 class="text-2xl font-bold text-slate-800 tracking-tight">{% block page_title %}Dashboard{% endblock %}</h1>
+                                <p class="text-sm text-slate-600">{% block page_subtitle %}Gestion centralisée de la plateforme{% endblock %}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center space-x-4">
+                            <!-- Global Search -->
+                            <div class="relative hidden md:block">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-search text-slate-400"></i>
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Recherche globale..."
+                                    class="search-input w-64 pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent"
+                                    hx-get="{% url 'superadmin:search_global' %}"
+                                    hx-trigger="input changed delay:300ms"
+                                    hx-target="#search-results"
+                                    name="q"
+                                >
+                                <div id="search-results" class="absolute top-full mt-2 w-full bg-white rounded-xl shadow-lg border border-slate-200 max-h-64 overflow-y-auto z-50 hidden">
+                                    <!-- Search results will be loaded here -->
+                                </div>
+                            </div>
+
+                            <!-- Notifications -->
+                            <div class="relative" x-data="{ open: false }">
+                                <button
+                                    @click="open = !open"
+                                    class="w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center transition-colors relative"
+                                >
+                                    <i class="fas fa-bell text-slate-600"></i>
+                                    <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">3</span>
+                                </button>
+                                <div
+                                    x-show="open"
+                                    @click.away="open = false"
+                                    x-transition:enter="transition ease-out duration-100"
+                                    x-transition:enter-start="transform opacity-0 scale-95"
+                                    x-transition:enter-end="transform opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-75"
+                                    x-transition:leave-start="transform opacity-100 scale-100"
+                                    x-transition:leave-end="transform opacity-0 scale-95"
+                                    class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 z-50"
+                                >
+                                    <div class="p-4 border-b border-slate-200">
+                                        <h3 class="font-semibold text-slate-800">Notifications</h3>
+                                    </div>
+                                    <div class="max-h-64 overflow-y-auto">
+                                        <div class="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer">
+                                            <div class="flex items-start space-x-3">
+                                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <i class="fas fa-user-plus text-blue-600"></i>
+                                                </div>
+                                                <div class="flex-1">
+                                                    <p class="text-sm font-medium text-slate-800">Nouvelle candidature</p>
+                                                    <p class="text-xs text-slate-500">Marie Dupont a postulé</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- More notifications -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- User Menu -->
+                            <div class="relative" x-data="{ open: false }">
+                                <button
+                                    @click="open = !open"
+                                    class="flex items-center space-x-3 hover:bg-slate-100 rounded-lg p-2 transition-colors"
+                                >
+                                    <div class="w-8 h-8 bg-gradient-to-r from-primary to-primary-light rounded-full flex items-center justify-center text-white text-sm font-bold">
+                                        {{ user.first_name|slice:":1"|upper|default:"S" }}
+                                    </div>
+                                    <span class="hidden md:block text-sm font-medium text-slate-700">{{ user.get_full_name|default:user.username }}</span>
+                                    <i class="fas fa-chevron-down text-slate-400 text-xs"></i>
+                                </button>
+                                <div
+                                    x-show="open"
+                                    @click.away="open = false"
+                                    x-transition:enter="transition ease-out duration-100"
+                                    x-transition:enter-start="transform opacity-0 scale-95"
+                                    x-transition:enter-end="transform opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-75"
+                                    x-transition:leave-start="transform opacity-100 scale-100"
+                                    x-transition:leave-end="transform opacity-0 scale-95"
+                                    class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 z-50"
+                                >
+                                    <a href="{% url 'superadmin:profile' %}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Profil</a>
+                                    <a href="{% url 'superadmin:settings' %}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Paramètres</a>
+                                    <hr class="my-1">
+                                    <form action="{% url 'accounts:logout' %}" method="post">
+                                        {% csrf_token %}
+                                        <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Déconnexion</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="p-6 animate-fade-in-up">
+                <!-- Messages -->
+                {% if messages %}
+                    <div class="mb-6 space-y-3">
+                        {% for message in messages %}
+                            <div class="bg-{{ message.tags }}-50 border-l-4 border-{{ message.tags }}-400 text-{{ message.tags }}-700 px-6 py-4 rounded-xl shadow-sm animate-slide-in-right">
+                                <div class="flex items-center">
+                                    <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% elif message.tags == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %} text-{{ message.tags }}-400 mr-3"></i>
+                                    <span class="font-medium">{{ message }}</span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <!-- Main Content Block -->
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- HTMX Configuration -->
+    <script>
+        // Global HTMX config
+        htmx.config.globalViewTransitions = true;
+        htmx.config.useTemplateFragments = true;
+
+        // Add loading class to buttons
+        document.body.addEventListener('htmx:beforeRequest', function(event) {
+            const btn = event.target.closest('button, .btn');
+            if (btn) {
+                btn.classList.add('btn-loading');
+            }
+        });
+
+        document.body.addEventListener('htmx:afterRequest', function(event) {
+            const btn = event.target.closest('button, .btn');
+            if (btn) {
+                btn.classList.remove('btn-loading');
+            }
+        });
+
+        // Handle search results visibility
+        document.addEventListener('htmx:afterRequest', function(event) {
+            const searchResults = document.getElementById('search-results');
+            if (searchResults && event.detail.xhr.response) {
+                searchResults.classList.remove('hidden');
+            }
+        });
+
+        // Hide search results when clicking outside
+        document.addEventListener('click', function(event) {
+            const searchResults = document.getElementById('search-results');
+            const searchInput = document.querySelector('.search-input');
+            if (searchResults && searchInput && !searchInput.contains(event.target) && !searchResults.contains(event.target)) {
+                searchResults.classList.add('hidden');
+            }
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

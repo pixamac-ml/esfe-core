@@ -1,0 +1,93 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}Cycles{% endblock %}
+{% block page_subtitle %}Gérer les cycles de formation{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <div class="card mb-6">
+        <div class="card-header">
+            <a href="{% url 'superadmin:cycle_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i>Nouveau cycle
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Cycle</th>
+                        <th>Slug</th>
+                        <th>Durée</th>
+                        <th>Programmes</th>
+                        <th>Statut</th>
+                        <th style="width: 120px; text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if cycles %}
+                        {% for cycle in cycles %}
+                        <tr class="hover:bg-gray-50">
+                            <td>
+                                <div class="flex items-center gap-3">
+                                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, {% if cycle.theme == 'secondary' %}#f59e0b{% elif cycle.theme == 'dark' %}#1f2937{% else %}var(--primary){% endif %} 0%, {% if cycle.theme == 'secondary' %}#d97706{% elif cycle.theme == 'dark' %}#374151{% else %}var(--secondary){% endif %} 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-layer-group" style="color: white;"></i>
+                                    </div>
+                                    <div>
+                                        <p style="font-weight: 600; color: #1f2937;">{{ cycle.name }}</p>
+                                        {% if cycle.description %}
+                                        <p style="font-size: 12px; color: #6b7280; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ cycle.description }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td><code style="font-size: 12px; color: #6b7280;">{{ cycle.slug }}</code></td>
+                            <td>
+                                <span style="color: #4b5563;">{{ cycle.min_duration_years }} - {{ cycle.max_duration_years }} ans</span>
+                            </td>
+                            <td>
+                                <span class="badge-status badge-info">{{ cycle.formations_count|default:"0" }}</span>
+                            </td>
+                            <td>
+                                {% if cycle.is_active %}
+                                <span class="badge-status badge-success">Actif</span>
+                                {% else %}
+                                <span class="badge-status badge-gray">Inactif</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                                    <a href="{% url 'superadmin:cycle_edit' cycle.pk %}" class="btn btn-sm btn-primary" title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="#" class="btn btn-sm btn-danger" title="Supprimer" onclick="return confirm('Supprimer ce cycle ?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 60px;">
+                                <div style="color: #9ca3af;">
+                                    <i class="fas fa-layer-group" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                                    <p style="font-size: 18px; font-weight: 500; color: #6b7280;">Aucun cycle</p>
+                                    <a href="{% url 'superadmin:cycle_create' %}" class="btn btn-primary mt-4">
+                                        <i class="fas fa-plus mr-2"></i>Créer un cycle
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

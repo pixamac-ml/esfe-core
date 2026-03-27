@@ -1,0 +1,60 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}{% if filiere %}Modifier{% else %}Nouvelle{% endif %} Filière{% endblock %}
+{% block page_subtitle %}Filière de formation{% endblock %}
+
+{% block content_main %}
+<div class="fade-in max-w-2xl mx-auto">
+
+    <div class="card">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-book-open" style="color: #8b5cf6;"></i>
+                {% if filiere %}Modifier{% else %}Nouvelle{% endif %} filière
+            </h3>
+            <a href="{% url 'superadmin:filiere_list' %}" class="btn btn-outline btn-sm">
+                <i class="fas fa-arrow-left mr-2"></i>Retour
+            </a>
+        </div>
+
+        <form method="POST" class="card-body">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="name" class="form-label">Nom de la filière <span style="color: #ef4444;">*</span></label>
+                <input type="text" id="name" name="name" required
+                       value="{{ filiere.name|default:'' }}"
+                       class="form-input"
+                       placeholder="Ex: Sciences Informatiques, Gestion, Droit...">
+            </div>
+
+            <div class="form-group">
+                <label for="description" class="form-label">Description</label>
+                <textarea id="description" name="description" rows="4" class="form-textarea"
+                          placeholder="Description de la filière...">{{ filiere.description|default:'' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" name="is_active" id="is_active"
+                               {% if filiere.is_active %}checked{% endif %}
+                               class="sr-only">
+                        <div class="toggle-slider"></div>
+                    </div>
+                    <span class="ml-3 text-gray-700 font-medium">Filière active</span>
+                </label>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <a href="{% url 'superadmin:filiere_list' %}" class="btn btn-outline">Annuler</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save mr-2"></i>Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

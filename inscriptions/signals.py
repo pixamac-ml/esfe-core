@@ -13,6 +13,7 @@ from django.db import transaction
 
 from .models import Inscription, StatusHistory
 from core.models import Notification
+from students.services import create_student_after_first_payment
 
 
 # ==========================================================
@@ -184,6 +185,10 @@ def inscription_saved(sender, instance, created, **kwargs):
                 new_status=new_status,
                 comment=f"Statut changé de '{previous_status}' vers '{new_status}'"
             )
+
+            # Créer l'étudiant si statut devient actif
+            if new_status == "active":
+                create_student_after_first_payment(instance)
 
             # ne pas notifier si inscription archivée
             if not instance.is_archived:

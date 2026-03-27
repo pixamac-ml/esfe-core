@@ -1,0 +1,87 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}Filières{% endblock %}
+{% block page_subtitle %}Gérer les filières{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <div class="card mb-6">
+        <div class="card-header">
+            <a href="{% url 'superadmin:filiere_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i>Nouvelle filière
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Filière</th>
+                        <th>Description</th>
+                        <th>Programmes</th>
+                        <th>Statut</th>
+                        <th style="width: 120px; text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if filieres %}
+                        {% for filiere in filieres %}
+                        <tr class="hover:bg-gray-50">
+                            <td>
+                                <div class="flex items-center gap-3">
+                                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-book-open" style="color: white;"></i>
+                                    </div>
+                                    <div>
+                                        <p style="font-weight: 600; color: #1f2937;">{{ filiere.name }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <p style="color: #6b7280; font-size: 14px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    {{ filiere.description|default:"—" }}
+                                </p>
+                            </td>
+                            <td>
+                                <span class="badge-status badge-info">{{ filiere.formations_count|default:"0" }}</span>
+                            </td>
+                            <td>
+                                {% if filiere.is_active %}
+                                <span class="badge-status badge-success">Active</span>
+                                {% else %}
+                                <span class="badge-status badge-gray">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                                    <a href="{% url 'superadmin:filiere_edit' filiere.pk %}" class="btn btn-sm btn-primary" title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="#" class="btn btn-sm btn-danger" title="Supprimer" onclick="return confirm('Supprimer cette filière ?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 60px;">
+                                <div style="color: #9ca3af;">
+                                    <i class="fas fa-book-open" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                                    <p style="font-size: 18px; font-weight: 500; color: #6b7280;">Aucune filière</p>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

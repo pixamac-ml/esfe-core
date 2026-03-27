@@ -1,0 +1,303 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}{{ programme.title }}{% endblock %}
+{% block page_subtitle %}Détails du programme de formation{% endblock %}
+
+{% block content_main %}
+<div class="fade-in">
+
+    <!-- ========================================
+         EN-TÊTE ET ACTIONS
+    ======================================== -->
+    <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;" class="md:flex-row md:items-center justify-between">
+        <div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <a href="{% url 'superadmin:formation_list' %}" style="color: #6b7280; transition: color 0.2s;" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#6b7280'">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <h2 class="text-2xl font-bold text-gray-900">{{ programme.title }}</h2>
+                <span class="badge-status badge-{% if programme.is_active %}success{% else %}gray{% endif %}">
+                    {% if programme.is_active %}Actif{% else %}Inactif{% endif %}
+                </span>
+                {% if programme.is_featured %}
+                <span class="badge-status badge-warning">
+                    <i class="fas fa-star" style="margin-right: 4px;"></i>En vedette
+                </span>
+                {% endif %}
+            </div>
+            <p style="color: #6b7280; font-size: 14px;">
+                Créé le {{ programme.created_at|date:"d/m/Y à H:i" }}
+                {% if programme.updated_at %}
+                • Modifié le {{ programme.updated_at|date:"d/m/Y à H:i" }}
+                {% endif %}
+            </p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <a href="{% url 'superadmin:formation_edit' programme.pk %}" class="btn btn-primary">
+                <i class="fas fa-edit mr-2"></i>Modifier
+            </a>
+            <button onclick="toggleProgramme({{ programme.pk }})" class="btn {% if programme.is_active %}btn-warning{% else %}btn-success{% endif %}">
+                <i class="fas fa-{% if programme.is_active %}pause{% else %}play{% endif %} mr-2"></i>
+                {% if programme.is_active %}Désactiver{% else %}Activer{% endif %}
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================
+         INFORMATIONS PRINCIPALES
+    ======================================== -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+
+        <!-- Fiche d'identité -->
+        <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-id-card" style="color: var(--primary);"></i>
+                Fiche d'identité
+            </h3>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Cycle:</span>
+                    <span class="badge-status badge-info">{{ programme.cycle.name }}</span>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Filière:</span>
+                    <span style="color: #1f2937;">{{ programme.filiere.name }}</span>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Diplôme:</span>
+                    <span style="color: #1f2937;">{{ programme.diploma_awarded.name }}</span>
+                </div>
+
+                <div style="display: flex; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Durée:</span>
+                    <span style="display: flex; align-items: center; gap: 6px; color: #1f2937;">
+                        <i class="fas fa-clock" style="color: #9ca3af;"></i>
+                        {{ programme.duration_years }} an{{ programme.duration_years|pluralize:"s" }}
+                    </span>
+                </div>
+
+                <div style="display: flex;">
+                    <span style="font-weight: 500; color: #6b7280; width: 120px; flex-shrink: 0;">Statut:</span>
+                    {% if programme.is_active %}
+                    <span class="badge-status badge-success">
+                        <i class="fas fa-check-circle" style="margin-right: 4px;"></i>Actif
+                    </span>
+                    {% else %}
+                    <span class="badge-status badge-gray">
+                        <i class="fas fa-times-circle" style="margin-right: 4px;"></i>Inactif
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistiques -->
+        <div class="card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-chart-bar" style="color: #10b981;"></i>
+                Statistiques
+            </h3>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 12px;">
+                    <p style="font-size: 32px; font-weight: 700; color: #2563eb; line-height: 1;">0</p>
+                    <p style="font-size: 13px; color: #6b7280; margin-top: 4px;">Candidatures</p>
+                </div>
+
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 12px;">
+                    <p style="font-size: 32px; font-weight: 700; color: #059669; line-height: 1;">0</p>
+                    <p style="font-size: 13px; color: #6b7280; margin-top: 4px;">Inscriptions</p>
+                </div>
+
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px;">
+                    <p style="font-size: 32px; font-weight: 700; color: #d97706; line-height: 1;">{{ programme.years.count }}</p>
+                    <p style="font-size: 13px; color: #6b7280; margin-top: 4px;">Années</p>
+                </div>
+
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); border-radius: 12px;">
+                    <p style="font-size: 32px; font-weight: 700; color: #7c3aed; line-height: 1;">{{ programme.required_documents.count }}</p>
+                    <p style="font-size: 13px; color: #6b7280; margin-top: 4px;">Documents requis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         DESCRIPTION ET DÉTAILS
+    ======================================== -->
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-align-left" style="color: #8b5cf6;"></i>
+                Description
+            </h3>
+        </div>
+        <div class="card-body">
+            {% if programme.short_description %}
+            <div style="padding: 16px; background: #f9fafb; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid var(--primary);">
+                <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">{{ programme.short_description }}</p>
+            </div>
+            {% endif %}
+
+            {% if programme.description %}
+            <div style="line-height: 1.8; color: #374151;">
+                {{ programme.description|linebreaks }}
+            </div>
+            {% else %}
+            <p style="color: #9ca3af; font-style: italic;">Aucune description disponible</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ========================================
+         COMPÉTENCES ET DÉBOUCHÉS
+    ======================================== -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+
+        <!-- Compétences acquises -->
+        <div class="card">
+            <div class="card-header">
+                <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-award" style="color: #f59e0b;"></i>
+                    Compétences acquises
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if programme.learning_outcomes %}
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+                    {% for line in programme.learning_outcomes|linebreaks %}
+                    {% if line.strip %}
+                    <li style="display: flex; align-items: flex-start; gap: 10px; color: #4b5563;">
+                        <i class="fas fa-check" style="color: #10b981; margin-top: 4px; flex-shrink: 0;"></i>
+                        <span>{{ line }}</span>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p style="color: #9ca3af; font-style: italic;">Non renseigné</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Débouchés professionnels -->
+        <div class="card">
+            <div class="card-header">
+                <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-briefcase" style="color: #3b82f6;"></i>
+                    Débouchés professionnels
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if programme.career_opportunities %}
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+                    {% for line in programme.career_opportunities|linebreaks %}
+                    {% if line.strip %}
+                    <li style="display: flex; align-items: flex-start; gap: 10px; color: #4b5563;">
+                        <i class="fas fa-arrow-right" style="color: #3b82f6; margin-top: 4px; flex-shrink: 0;"></i>
+                        <span>{{ line }}</span>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p style="color: #9ca3af; font-style: italic;">Non renseigné</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         STRUCTURE PÉDAGOGIQUE
+    ======================================== -->
+    {% if programme.program_structure %}
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-book-reader" style="color: #ec4899;"></i>
+                Structure pédagogique
+            </h3>
+        </div>
+        <div class="card-body">
+            <div style="line-height: 1.8; color: #374151;">
+                {{ programme.program_structure|linebreaks }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================================
+         INFORMATIONS MÉTA
+    ======================================== -->
+    <div class="card">
+        <div class="card-header">
+            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-history" style="color: #6b7280;"></i>
+                Informations système
+            </h3>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div>
+                    <p style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">ID</p>
+                    <p style="color: #374151; font-weight: 500;">#{{ programme.pk }}</p>
+                </div>
+                <div>
+                    <p style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Slug</p>
+                    <p style="color: #374151; font-weight: 500; font-family: monospace;">{{ programme.slug }}</p>
+                </div>
+                <div>
+                    <p style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Créé le</p>
+                    <p style="color: #374151;">{{ programme.created_at|date:"d/m/Y à H:i" }}</p>
+                </div>
+                <div>
+                    <p style="font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Dernière modification</p>
+                    <p style="color: #374151;">{{ programme.updated_at|date:"d/m/Y à H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleProgramme(pk) {
+    fetch(`/superadmin/formations/${pk}/toggle/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.text())
+    .then(() => {
+        showToast('Statut mis à jour avec succès', 'success');
+        location.reload();
+    })
+    .catch(error => {
+        showToast('Erreur lors de la mise à jour', 'error');
+    });
+}
+
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

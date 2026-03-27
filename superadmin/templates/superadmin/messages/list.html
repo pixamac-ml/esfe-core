@@ -1,0 +1,38 @@
+{% extends 'superadmin/base.html' %}
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4">Liste des messages</h1>
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Expéditeur</th>
+                        <th>Objet</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for message in messages %}
+                    <tr>
+                        <td>{{ message.sender }}</td>
+                        <td>{{ message.subject }}</td>
+                        <td>{{ message.sent_at|date:'d/m/Y H:i' }}</td>
+                        <td>{{ message.status }}</td>
+                        <td>
+                            <a href="{% url 'superadmin:message_detail' message.id %}" class="btn btn-sm btn-primary">Voir</a>
+                            <a href="{% url 'superadmin:message_reply' message.id %}" class="btn btn-sm btn-success">Répondre</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5">Aucun message trouvé.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

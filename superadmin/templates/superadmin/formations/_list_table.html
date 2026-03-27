@@ -1,0 +1,111 @@
+{% load humanize %}
+
+<div id="formations-table-container" class="overflow-x-auto">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Formation</th>
+                <th>Cycle / Filière</th>
+                <th>Durée</th>
+                <th class="text-center">Statut</th>
+                <th class="text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for formation in formations %}
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="font-bold text-primary">
+                    <div class="flex flex-col">
+                        <span>{{ formation.title }}</span>
+                        <span class="text-xs font-normal text-slate-400">Réf: #{{ formation.pk }}</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="flex flex-col">
+                        <span class="badge-info btn-sm rounded-md inline-block w-fit mb-1">
+                            {{ formation.cycle.name|default:"-" }}
+                        </span>
+                        <span class="text-xs text-slate-500">{{ formation.filiere.name|default:"Général" }}</span>
+                    </div>
+                </td>
+                <td class="text-slate-600 italic text-sm">
+                    {{ formation.duration|default:"N/A" }}
+                </td>
+                <td class="text-center">
+                    <!-- Toggle Status avec HTMX -->
+                    <button hx-post="{% url 'superadmin:toggle_formation' formation.pk %}"
+                            hx-target="this"
+                            hx-swap="outerHTML"
+                            class="focus:outline-none transform active:scale-95 transition-transform">
+                        {% if formation.is_active %}
+                            <span class="badge-status badge-success cursor-pointer">
+                                <i class="fas fa-check-circle"></i> Actif
+                            </span>
+                        {% else %}
+                            <span class="badge-status badge-draft cursor-pointer">
+                                <i class="fas fa-times-circle"></i> Inactif
+                            </span>
+                        {% endif %}
+                    </button>
+                </td>
+                <td class="text-right">
+                    <div class="flex justify-end gap-2">
+                        <a href="{% url 'superadmin:formation_detail' formation.pk %}"
+                           class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-primary hover:border-primary"
+                           title="Voir">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{% url 'superadmin:formation_edit' formation.pk %}"
+                           class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-secondary hover:border-secondary"
+                           title="Modifier">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <!-- Suppression avec confirmation Alpine.js + HTMX -->
+                        <button hx-post="{% url 'superadmin:formation_delete' formation.pk %}"
+                                hx-confirm="Êtes-vous sûr de vouloir supprimer cette formation ?"
+                                hx-target="#formations-table-container"
+                                class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-danger hover:border-danger">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="py-12 text-center text-slate-400 italic">
+                    <i class="fas fa-search mb-3 text-3xl block"></i>
+                    Aucune formation trouvée...
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- PAGINATION HTMX -->
+    {% if formations.has_other_pages %}
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-sm text-slate-500">
+            Page {{ formations.number }} sur {{ formations.paginator.num_pages }}
+        </span>
+        <div class="flex gap-2">
+            {% if formations.has_previous %}
+                <button hx-get="?page={{ formations.previous_page_number }}&search={{ filters.search }}&cycle={{ filters.cycle }}"
+                        hx-target="#formations-table-container"
+                        hx-push-url="true"
+                        class="btn btn-outline btn-sm bg-white">
+                    <i class="fas fa-chevron-left"></i> Précédent
+                </button>
+            {% endif %}
+
+            {% if formations.has_next %}
+                <button hx-get="?page={{ formations.next_page_number }}&search={{ filters.search }}&cycle={{ filters.cycle }}"
+                        hx-target="#formations-table-container"
+                        hx-push-url="true"
+                        class="btn btn-outline btn-sm bg-white">
+                    Suivant <i class="fas fa-chevron-right"></i>
+                </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>

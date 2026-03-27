@@ -1,0 +1,58 @@
+{% extends "superadmin/base.html" %}
+{% load static %}
+
+{% block page_title %}Gestion des Étudiants{% endblock %}
+{% block page_subtitle %}Consulter et gérer l'annuaire des étudiants{% endblock %}
+
+{% block content_main %}
+<div class="fade-in space-y-6">
+
+    <!-- ========================================
+         BARRE D'ACTIONS & RECHERCHE (HTMX)
+    ======================================== -->
+    <div class="card p-4">
+        <div class="flex flex-col lg:flex-row gap-4 items-center justify-between">
+            
+            <!-- Formulaire de recherche dynamique -->
+            <form hx-get="{% url 'superadmin:student_list' %}" 
+                  hx-target="#students-table-container" 
+                  hx-trigger="keyup changed delay:500ms, change"
+                  hx-indicator=".loader"
+                  class="flex-1 flex items-center w-full max-w-2xl">
+                
+                <div class="search-box flex-1 relative">
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="search" 
+                           placeholder="Rechercher par nom, email ou matricule..."
+                           value="{{ filters.search|default:'' }}"
+                           class="w-full">
+                    
+                    <!-- Indicateur visuel pendant que HTMX travaille -->
+                    <div class="loader htmx-indicator absolute right-3 top-3">
+                        <i class="fas fa-spinner fa-spin text-secondary"></i>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Boutons d'export / Actions -->
+            <div class="flex gap-2">
+                <a href="{% url 'superadmin:export_data' 'students' %}" class="btn btn-outline">
+                    <i class="fas fa-file-export mr-2"></i>Exporter CSV
+                </a>
+                <!-- Si tu as une vue de création d'étudiant, ajoute le bouton ici -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         ZONE DE LA TABLE (Injectée par HTMX)
+    ======================================== -->
+    <div class="card shadow-sm border-slate-100 overflow-hidden">
+        <div id="students-table-container">
+            <!-- On inclut le partial que nous avons créé juste avant -->
+            {% include "superadmin/students/_student_table.html" %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

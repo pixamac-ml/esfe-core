@@ -1,17 +1,66 @@
-{% extends 'superadmin/base.html' %}
-{% block content %}
-<div class="container-fluid">
-    <h1 class="h3 mb-4">{{ form_title|default:'Nouvel article' }}</h1>
-    <div class="card">
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Créer ou mettre à jour un article blog{% endblock %}
+
+{% block content_main %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <h2 class="text-base font-semibold text-slate-900 mb-0">Formulaire article</h2>
+        </div>
         <div class="card-body">
-            <form method="post">
+            <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit" class="btn btn-success">Enregistrer</button>
-                <a href="{% url 'superadmin:articles' %}" class="btn btn-secondary">Annuler</a>
+
+                {% if form.non_field_errors %}
+                <div class="md:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Titre *</label>
+                    {{ form.title }}
+                    {% if form.title.errors %}<p class="text-xs text-red-600 mt-1">{{ form.title.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Résumé *</label>
+                    {{ form.excerpt }}
+                    {% if form.excerpt.errors %}<p class="text-xs text-red-600 mt-1">{{ form.excerpt.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Catégorie *</label>
+                    {{ form.category }}
+                    {% if form.category.errors %}<p class="text-xs text-red-600 mt-1">{{ form.category.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Statut</label>
+                    {{ form.status }}
+                    {% if form.status.errors %}<p class="text-xs text-red-600 mt-1">{{ form.status.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Contenu *</label>
+                    {{ form.content }}
+                    {% if form.content.errors %}<p class="text-xs text-red-600 mt-1">{{ form.content.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    {{ form.allow_comments }}
+                    <label class="text-sm text-slate-700 mb-0">Autoriser les commentaires</label>
+                </div>
+
+                <div class="md:col-span-2 flex items-center justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:article_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
             </form>
         </div>
-    </div>
+    </section>
 </div>
 {% endblock %}
 

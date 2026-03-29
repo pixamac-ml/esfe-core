@@ -1,0 +1,123 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Galerie{% endblock %}
+{% block page_subtitle %}Bibliothèque médias des événements{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total médias</p><p class="text-2xl font-bold text-slate-900 mb-0">{{ media_total_count }}</p></article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Images</p><p class="text-2xl font-bold text-sky-700 mb-0">{{ media_image_count }}</p></article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Vidéos</p><p class="text-2xl font-bold text-violet-700 mb-0">{{ media_video_count }}</p></article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">En avant</p><p class="text-2xl font-bold text-emerald-700 mb-0">{{ media_featured_count }}</p></article>
+    </section>
+
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <select name="event" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous les événements</option>
+                {% for event in events %}
+                <option value="{{ event.pk }}" {% if filters.event == event.pk|stringformat:'s' %}selected{% endif %}>{{ event.title }}</option>
+                {% endfor %}
+            </select>
+            <select name="type" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous types</option>
+                <option value="image" {% if filters.type == 'image' %}selected{% endif %}>Image</option>
+                <option value="video" {% if filters.type == 'video' %}selected{% endif %}>Vidéo</option>
+            </select>
+            <select name="featured" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Toutes priorités</option>
+                <option value="1" {% if filters.featured == '1' %}selected{% endif %}>Mis en avant</option>
+            </select>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:gallery_list' %}" class="btn btn-outline">Réinitialiser</a>
+                <button type="submit" class="btn btn-outline">Filtrer</button>
+                <a href="{% url 'superadmin:gallery_bulk_upload' %}{% if filters.event %}?event={{ filters.event }}{% endif %}" class="btn btn-secondary">Upload en lot</a>
+                <a href="{% url 'superadmin:gallery_create' %}" class="btn btn-primary">Nouveau média</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <form id="bulkActionForm" method="post" action="{% url 'superadmin:gallery_bulk_action' %}" class="flex flex-wrap items-center gap-2 w-full">
+                {% csrf_token %}
+                <input type="hidden" name="event" value="{{ filters.event|default:'' }}">
+                <input type="hidden" name="type" value="{{ filters.type|default:'' }}">
+                <input type="hidden" name="featured" value="{{ filters.featured|default:'' }}">
+                <select name="action" class="rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                    <option value="">Action groupée...</option>
+                    <option value="feature_on">Mettre en avant</option>
+                    <option value="feature_off">Retirer de la mise en avant</option>
+                    <option value="delete">Supprimer</option>
+                </select>
+                <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Appliquer cette action aux médias sélectionnés ?')">Appliquer</button>
+                <span class="text-xs text-slate-500">Astuce: coche plusieurs lignes pour traiter en masse.</span>
+            </form>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600 w-10">
+                        <input id="select-all-media" type="checkbox">
+                    </th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Aperçu</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Événement</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Type</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Légende</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                {% for media in media_items %}
+                <tr>
+                    <td class="px-4 py-3">
+                        <input type="checkbox" name="media_ids" value="{{ media.pk }}" form="bulkActionForm" class="media-row-checkbox">
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if media.thumbnail %}
+                        <img src="{{ media.thumbnail.url }}" alt="thumb" class="h-14 w-20 object-cover rounded-md">
+                        {% elif media.image %}
+                        <img src="{{ media.image.url }}" alt="img" class="h-14 w-20 object-cover rounded-md">
+                        {% else %}
+                        <span class="text-slate-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">{{ media.event.title }}</td>
+                    <td class="px-4 py-3">{{ media.get_media_type_display }}{% if media.is_featured %} <span class="badge-status badge-success">En avant</span>{% endif %}</td>
+                    <td class="px-4 py-3">{{ media.caption|default:'-' }}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            <a href="{% url 'superadmin:gallery_edit' media.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                            <form method="post" action="{% url 'superadmin:gallery_toggle_featured' media.pk %}" class="inline">{% csrf_token %}<button type="submit" class="btn btn-outline btn-sm">{% if media.is_featured %}Retirer{% else %}Mettre en avant{% endif %}</button></form>
+                            <form method="post" action="{% url 'superadmin:gallery_delete' media.pk %}" class="inline" onsubmit="return confirm('Supprimer ce média ?')">{% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Supprimer</button></form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Aucun média trouvé.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectAll = document.getElementById('select-all-media');
+    const rowCheckboxes = Array.from(document.querySelectorAll('.media-row-checkbox'));
+    if (!selectAll || rowCheckboxes.length === 0) {
+        return;
+    }
+
+    selectAll.addEventListener('change', function () {
+        rowCheckboxes.forEach(function (box) {
+            box.checked = selectAll.checked;
+        });
+    });
+});
+</script>
+{% endblock %}
+

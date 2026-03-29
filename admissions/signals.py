@@ -6,9 +6,18 @@ Signaux pour les notifications automatiques lors des changements de statut
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django.db import transaction
 
 from admissions.models import Candidature
 from core.models import Notification, StatusHistory
+from admissions.emails import send_notification_email
+from admissions.services.emails import (
+    send_application_accepted_email,
+    send_application_under_review_email,
+    send_application_accepted_with_reserve_email,
+    send_application_rejected_email,
+    send_application_to_complete_email,
+)
 
 # ==========================================================
 # MESSAGES PAR TYPE DE NOTIFICATION
@@ -46,6 +55,31 @@ NOTIFICATION_MESSAGES = {
 }
 
 
+STATUS_EMAIL_SENDERS = {
+    "candidature_under_review": send_application_under_review_email,
+    "candidature_to_complete": send_application_to_complete_email,
+    "candidature_accepted": send_application_accepted_email,
+    "candidature_accepted_with_reserve": send_application_accepted_with_reserve_email,
+    "candidature_rejected": send_application_rejected_email,
+}
+
+
+def _queue_candidature_email(*, candidature_id, notification_id, notification_type):
+    """Envoie l'email approprié après commit: premium pour les statuts métiers, générique sinon."""
+    sender = STATUS_EMAIL_SENDERS.get(notification_type)
+
+    if sender:
+        def _send_business_email():
+            candidature = Candidature.objects.select_related("programme").filter(pk=candidature_id).first()
+            if candidature:
+                sender(candidature)
+
+        transaction.on_commit(_send_business_email)
+        return
+
+    transaction.on_commit(lambda nid=notification_id: send_notification_email(nid))
+
+
 # ==========================================================
 # FONCTIONS DE CREATION DE NOTIFICATION
 # ==========================================================
@@ -68,6 +102,12 @@ def create_status_notification(candidature, notification_type):
         title=data["title"],
         message=data["message"],
         related_candidature=candidature,
+    )
+
+    _queue_candidature_email(
+        candidature_id=candidature.pk,
+        notification_id=notification.pk,
+        notification_type=notification_type,
     )
 
     return notification
@@ -180,15 +220,21 @@ def check_documents_after_status_change(sender, instance, created, **kwargs):
                 # CORRIGE: utiliser last_name et first_name au lieu de full_name
                 recipient_name = f"{instance.last_name} {instance.first_name}"
 
-                Notification.objects.create(
+                notification = Notification.objects.create(
                     recipient_email=instance.email,
                     recipient_name=recipient_name,
                     notification_type="document_missing",
                     title="Document manquant",
                     message=message,
                     related_candidature=instance,
+                    email_sent=True,
+                    sent_at=timezone.now(),
                 )
 
                 # Mettre a jour automatiquement le statut
                 instance.status = "to_complete"
-                instance.save(update_fields=["status"])
+                instance.admin_comment = message
+                update_fields = ["status", "admin_comment"]
+                if hasattr(instance, "updated_at"):
+                    update_fields.append("updated_at")
+                instance.save(update_fields=update_fields)

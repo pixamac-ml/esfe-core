@@ -34,9 +34,14 @@ def verify_agent_and_create_session(inscription, agent_full_name):
 
     parts = agent_full_name.split()
 
-    queryset = PaymentAgent.objects.select_related("user").filter(
+    queryset = PaymentAgent.objects.select_related("user", "branch").filter(
         is_active=True
     )
+
+    # Force la correspondance annexe pour eviter d'envoyer le code au mauvais agent.
+    inscription_branch = getattr(getattr(inscription, "candidature", None), "branch", None)
+    if inscription_branch:
+        queryset = queryset.filter(branch=inscription_branch)
 
     query = Q()
 
@@ -49,7 +54,7 @@ def verify_agent_and_create_session(inscription, agent_full_name):
     agent = queryset.filter(query).distinct().first()
 
     if not agent:
-        return None, "Agent introuvable."
+        return None, "Agent introuvable pour cette annexe."
 
     with transaction.atomic():
 
@@ -104,38 +109,40 @@ def validate_cash_code(inscription, agent, code):
     Marque la session comme utilisée si OK.
 
     Retourne :
-        (is_valid, error)
+        (session, error)
     """
 
     if not code:
-        return False, "Code requis."
+        return None, "Code requis."
 
-    session = (
-        CashPaymentSession.objects
-        .filter(
-            inscription=inscription,
-            agent=agent,
-            is_used=False
+    with transaction.atomic():
+        session = (
+            CashPaymentSession.objects
+            .select_for_update()
+            .filter(
+                inscription=inscription,
+                agent=agent,
+                is_used=False
+            )
+            .order_by("-created_at")
+            .first()
         )
-        .order_by("-created_at")
-        .first()
-    )
 
-    if not session:
-        return False, "Aucune session active trouvée."
+        if not session:
+            return None, "Aucune session active trouvée."
 
-    # ⏳ Code expiré
-    if timezone.now() > session.expires_at:
+        # ⏳ Code expiré
+        if timezone.now() > session.expires_at:
+            session.is_used = True
+            session.save(update_fields=["is_used"])
+            return None, "Code expiré."
+
+        # ❌ Mauvais code
+        if session.verification_code != code:
+            return None, "Code invalide."
+
+        # ✅ Validation
         session.is_used = True
         session.save(update_fields=["is_used"])
-        return False, "Code expiré."
 
-    # ❌ Mauvais code
-    if session.verification_code != code:
-        return False, "Code invalide."
-
-    # ✅ Validation
-    session.is_used = True
-    session.save(update_fields=["is_used"])
-
-    return True, None
+    return session, None

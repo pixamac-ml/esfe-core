@@ -1,0 +1,81 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Configurer un campus, ses contacts et ses options d'inscription{% endblock %}
+
+{% block content_main %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <h2 class="text-base font-semibold text-slate-900 mb-0">Informations campus</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% csrf_token %}
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Nom du campus *</label>
+                    <input type="text" name="name" required value="{{ branch.name|default:'' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Code campus</label>
+                    <input type="text" name="code" value="{{ branch.code|default:'' }}" placeholder="Auto si vide" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Slug</label>
+                    <input type="text" name="slug" value="{{ branch.slug|default:'' }}" placeholder="Auto depuis le nom" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Ville</label>
+                    <input type="text" name="city" value="{{ branch.city|default:'Bamako' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Manager</label>
+                    <select name="manager" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="">Aucun</option>
+                        {% for manager in managers %}
+                            <option value="{{ manager.pk }}" {% if branch.manager_id == manager.pk %}selected{% endif %}>{{ manager.get_full_name|default:manager.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Téléphone</label>
+                    <input type="text" name="phone" value="{{ branch.phone|default:'' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Email</label>
+                    <input type="email" name="email" value="{{ branch.email|default:'' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Adresse</label>
+                    <textarea name="address" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">{{ branch.address|default:'' }}</textarea>
+                </div>
+
+                <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        <input type="checkbox" name="is_active" {% if branch.is_active or not branch %}checked{% endif %}>
+                        Campus actif
+                    </label>
+                    <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        <input type="checkbox" name="accepts_online_registration" {% if branch.accepts_online_registration or not branch %}checked{% endif %}>
+                        Accepte les inscriptions en ligne
+                    </label>
+                </div>
+
+                <div class="md:col-span-2 flex items-center justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:branch_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

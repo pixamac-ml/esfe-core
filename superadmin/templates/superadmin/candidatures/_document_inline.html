@@ -1,0 +1,47 @@
+<div class="card">
+    <div class="card-header">
+        <h3 class="text-base font-bold text-slate-900">Documents liés</h3>
+        <span class="text-sm text-slate-500">{{ documents|length }}/{{ required_document_types|length }}</span>
+    </div>
+    <div class="card-body space-y-4">
+        <form method="post" enctype="multipart/form-data" action="{% url 'superadmin:candidature_document_add' candidature.pk %}" class="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {% csrf_token %}
+            <select name="document_type" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Type de document</option>
+                {% for doc_type in required_document_types %}
+                <option value="{{ doc_type.pk }}">{{ doc_type.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="file" name="file" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i>Ajouter</button>
+        </form>
+
+        <div class="space-y-2">
+            {% for doc in documents %}
+            <div class="rounded-lg border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="font-medium text-slate-800 mb-0">{{ doc.document_type.name }}</p>
+                    <p class="text-xs text-slate-500 mb-0">Ajouté le {{ doc.uploaded_at|date:"d/m/Y H:i" }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if doc.file %}<a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline"><i class="fas fa-download"></i></a>{% endif %}
+                    <form method="post" action="{% url 'superadmin:candidature_document_validate' candidature.pk doc.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="is_valid" value="{% if doc.is_valid %}{% else %}on{% endif %}">
+                        <button type="submit" class="btn btn-sm {% if doc.is_valid %}btn-outline{% else %}btn-secondary{% endif %}">
+                            {% if doc.is_valid %}<i class="fas fa-undo"></i>{% else %}<i class="fas fa-check"></i>{% endif %}
+                        </button>
+                    </form>
+                    <form method="post" action="{% url 'superadmin:candidature_document_delete' candidature.pk doc.pk %}" onsubmit="return confirm('Supprimer ce document ?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-sm text-slate-500">Aucun document pour cette candidature.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+

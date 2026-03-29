@@ -1,0 +1,73 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{% if media_item %}Modifier média{% else %}Nouveau média{% endif %}{% endblock %}
+{% block page_subtitle %}Gestion des médias d'événements{% endblock %}
+
+{% block content_main %}
+<section class="card max-w-4xl rounded-xl border border-slate-100 shadow-sm">
+    <form method="post" enctype="multipart/form-data" class="card-body space-y-4">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="form-label">Événement *</label>
+                <select name="event" required class="form-input">
+                    <option value="">Choisir...</option>
+                    {% for event in events %}
+                    <option value="{{ event.pk }}"
+                        {% if media_item and media_item.event_id == event.pk %}selected{% elif not media_item and selected_event_id == event.pk|stringformat:'s' %}selected{% endif %}>
+                        {{ event.title }} ({{ event.event_date|date:'d/m/Y' }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Type *</label>
+                <select name="media_type" required class="form-input">
+                    {% for value, label in media_types %}
+                    <option value="{{ value }}" {% if media_item and media_item.media_type == value %}selected{% elif not media_item and value == 'image' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="form-label">Image</label>
+                <input type="file" name="image" accept="image/*" class="form-input">
+                {% if media_item and media_item.image %}
+                <p class="text-xs text-slate-500 mt-1">Image actuelle: {{ media_item.image.name }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="form-label">Fichier vidéo</label>
+                <input type="file" name="video_file" accept="video/*" class="form-input">
+                {% if media_item and media_item.video_file %}
+                <p class="text-xs text-slate-500 mt-1">Vidéo actuelle: {{ media_item.video_file.name }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            <label class="form-label">URL vidéo (YouTube/Vimeo...)</label>
+            <input type="url" name="video_url" class="form-input" value="{{ media_item.video_url|default:'' }}" placeholder="https://...">
+        </div>
+
+        <div>
+            <label class="form-label">Légende</label>
+            <input type="text" name="caption" class="form-input" value="{{ media_item.caption|default:'' }}" maxlength="255">
+        </div>
+
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="is_featured" {% if media_item and media_item.is_featured %}checked{% endif %}>
+            Mettre ce média en avant
+        </label>
+
+        <div class="flex items-center gap-2 pt-2">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+            <a href="{% url 'superadmin:gallery_list' %}" class="btn btn-outline">Annuler</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
+

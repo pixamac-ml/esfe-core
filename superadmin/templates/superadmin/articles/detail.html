@@ -1,20 +1,60 @@
-{% extends 'superadmin/base.html' %}
-{% block content %}
-<div class="container-fluid">
-    <h1 class="h3 mb-4">Détail de l'article</h1>
-    <div class="card">
-        <div class="card-body">
-            <h2>{{ article.title }}</h2>
-            <p><strong>Auteur :</strong> {{ article.author }}</p>
-            <p><strong>Date :</strong> {{ article.created_at|date:'d/m/Y' }}</p>
-            <p><strong>Status :</strong> {{ article.status }}</p>
-            <div class="mt-4">
-                {{ article.content|safe }}
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ article.title }}{% endblock %}
+{% block page_subtitle %}Détail et pilotage de l’article{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-semibold text-slate-900 mb-0">{{ article.title }}</h2>
+                <p class="text-xs text-slate-500 mb-0">{{ article.category.name|default:'-' }} - {{ article.created_at|date:'d/m/Y H:i' }}</p>
             </div>
-            <a href="{% url 'superadmin:article_edit' article.id %}" class="btn btn-warning mt-3">Modifier</a>
-            <a href="{% url 'superadmin:articles' %}" class="btn btn-secondary mt-3">Retour à la liste</a>
+            <div class="flex items-center gap-2">
+                <a href="{% url 'superadmin:article_edit' article.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                <form method="post" action="{% url 'superadmin:toggle_article' article.pk %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline btn-sm">{% if article.status == 'published' %}Dépublier{% else %}Publier{% endif %}</button>
+                </form>
+                <form method="post" action="{% url 'superadmin:article_delete' article.pk %}" class="inline" onsubmit="return confirm('Masquer cet article (suppression logique) ?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                </form>
+                <a href="{% url 'superadmin:article_list' %}" class="btn btn-outline btn-sm">Retour liste</a>
+            </div>
         </div>
-    </div>
+        <div class="card-body space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p class="text-xs text-slate-500 mb-1">Auteur</p>
+                    <p class="font-semibold text-slate-900 mb-0">{{ article.author.get_full_name|default:article.author.username }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p class="text-xs text-slate-500 mb-1">Statut</p>
+                    <p class="font-semibold text-slate-900 mb-0">{{ article.get_status_display }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p class="text-xs text-slate-500 mb-1">Publication</p>
+                    <p class="font-semibold text-slate-900 mb-0">{{ article.published_at|date:'d/m/Y H:i'|default:'-' }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p class="text-xs text-slate-500 mb-1">Vues</p>
+                    <p class="font-semibold text-slate-900 mb-0">{{ article.views_count }}</p>
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Résumé</p>
+                <p class="text-sm text-slate-700 mb-0">{{ article.excerpt }}</p>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Contenu</p>
+                <div class="prose max-w-none text-sm text-slate-700">{{ article.content|linebreaks }}</div>
+            </div>
+        </div>
+    </section>
 </div>
 {% endblock %}
 

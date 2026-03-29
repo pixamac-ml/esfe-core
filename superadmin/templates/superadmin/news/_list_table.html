@@ -1,0 +1,78 @@
+<div class="overflow-x-auto">
+    <table class="data-table min-w-full">
+        <thead>
+            <tr>
+                <th>Titre</th>
+                <th>Catégorie</th>
+                <th>Auteur</th>
+                <th>Statut</th>
+                <th>Priorité</th>
+                <th>Publication</th>
+                <th>Vues</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for news_item in news_list %}
+            <tr>
+                <td>
+                    <a href="{% url 'superadmin:news_detail' news_item.pk %}" class="font-semibold text-slate-900 no-underline hover:underline">{{ news_item.titre }}</a>
+                    <p class="text-xs text-slate-500 mb-0">{{ news_item.resume|truncatechars:90 }}</p>
+                </td>
+                <td>{{ news_item.categorie.nom|default:"-" }}</td>
+                <td>{{ news_item.auteur.get_full_name|default:news_item.auteur.username|default:'-' }}</td>
+                <td>
+                    {% if news_item.status == 'published' %}
+                        <span class="badge-status badge-success">Publié</span>
+                    {% elif news_item.status == 'draft' %}
+                        <span class="badge-status badge-draft">Brouillon</span>
+                    {% else %}
+                        <span class="badge-status badge-warning">Archivé</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="flex items-center gap-1">
+                        {% if news_item.is_urgent %}<span class="badge-status badge-danger">Urgent</span>{% endif %}
+                        {% if news_item.is_important %}<span class="badge-status badge-info">Important</span>{% endif %}
+                        {% if not news_item.is_urgent and not news_item.is_important %}<span class="text-slate-400">-</span>{% endif %}
+                    </div>
+                </td>
+                <td>{{ news_item.published_at|date:'d/m/Y H:i'|default:'-' }}</td>
+                <td>{{ news_item.views_count }}</td>
+                <td>
+                    <div class="flex items-center gap-2">
+                        <a href="{% url 'superadmin:news_edit' news_item.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                        <form method="post" action="{% url 'superadmin:toggle_news' news_item.pk %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline btn-sm">{% if news_item.status == 'published' %}Dépublier{% else %}Publier{% endif %}</button>
+                        </form>
+                        <form method="post" action="{% url 'superadmin:news_delete' news_item.pk %}" class="inline" onsubmit="return confirm('Archiver cette actualité ?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">Archiver</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center text-slate-500 py-8">Aucune actualité trouvée.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if news_list.paginator.num_pages > 1 %}
+<div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+    <p class="text-xs text-slate-500 mb-0">Page {{ news_list.number }} / {{ news_list.paginator.num_pages }}</p>
+    <div class="flex items-center gap-2">
+        {% if news_list.has_previous %}
+            <a class="btn btn-outline btn-sm" href="?page={{ news_list.previous_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&category={{ filters.category|default:'' }}&urgent={{ filters.urgent|default:'' }}">Précédent</a>
+        {% endif %}
+        {% if news_list.has_next %}
+            <a class="btn btn-outline btn-sm" href="?page={{ news_list.next_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&category={{ filters.category|default:'' }}&urgent={{ filters.urgent|default:'' }}">Suivant</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+

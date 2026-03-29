@@ -1,6 +1,6 @@
 from django.conf import settings
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
+
+from core.emailing import send_templated_email
 
 
 def send_student_credentials_email(*, student, raw_password):
@@ -15,17 +15,15 @@ def send_student_credentials_email(*, student, raw_password):
         "password": raw_password,
         "public_link": inscription.get_public_url(),
         "login_url": settings.STUDENT_LOGIN_URL,
+        "reference": inscription.public_token,
     }
 
-    message = render_to_string("emails/student_welcome.txt", context)
-    html_message = render_to_string("emails/student_welcome.html", context)
-
-    send_mail(
+    send_templated_email(
         subject=subject,
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        html_message=html_message,
+        recipient=user.email,
+        text_template="emails/student_welcome.txt",
+        html_template="emails/student_welcome.html",
+        context=context,
         fail_silently=False,
     )
 
@@ -46,27 +44,20 @@ def send_payment_confirmation_email(*, payment):
         "payment": payment,
         "inscription": inscription,
         "candidature": candidature,
+        "student": student,
+        "recipient_first_name": candidature.first_name,
         "amount_due": inscription.amount_due,
         "amount_paid": inscription.amount_paid,
         "balance": inscription.balance,
         "public_link": inscription.get_public_url(),
+        "reference": payment.reference or payment.pk,
     }
 
-    message = render_to_string(
-        "emails/payment_confirmation.txt",
-        context
-    )
-
-    html_message = render_to_string(
-        "emails/payment_confirmation.html",
-        context
-    )
-
-    send_mail(
+    send_templated_email(
         subject=subject,
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[candidature.email],
-        html_message=html_message,
+        recipient=candidature.email,
+        text_template="emails/payment_confirmation.txt",
+        html_template="emails/payment_confirmation.html",
+        context=context,
         fail_silently=False,
     )

@@ -1,169 +1,69 @@
 {% extends "superadmin/base.html" %}
-{% load static %}
+{% load humanize %}
 
 {% block page_title %}Inscriptions{% endblock %}
-{% block page_subtitle %}Gérer les inscriptions{% endblock %}
+{% block page_subtitle %}Pilotage opérationnel du flux d'inscription{% endblock %}
 
 {% block content_main %}
-<div class="fade-in">
-
-    <!-- ========================================
-         BARRE D'ACTIONS
-    ======================================== -->
-    <div class="card mb-6">
-        <div class="card-header">
-            <form method="GET" class="flex-1 flex flex-wrap gap-3 items-center">
-                <div class="search-box flex-1 min-w-64">
-                    <i class="fas fa-search"></i>
-                    <input type="text" name="search" placeholder="Rechercher par nom, matricule..."
-                           value="{{ filters.search|default:'' }}" class="flex-1">
-                </div>
-
-                <select name="status" class="form-select w-auto" onchange="this.form.submit()">
-                    <option value="">Tous les statuts</option>
-                    <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actives</option>
-                    <option value="suspended" {% if filters.status == 'suspended' %}selected{% endif %}>Suspendues</option>
-                    <option value="graduated" {% if filters.status == 'graduated' %}selected{% endif %}>Diplômées</option>
-                    <option value="withdrawn" {% if filters.status == 'withdrawn' %}selected{% endif %}>Retirées</option>
-                </select>
-
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-filter mr-2"></i>Filtrer
-                </button>
-            </form>
-
-            <a href="#" class="btn btn-primary">
-                <i class="fas fa-plus mr-2"></i>Nouvelle inscription
-            </a>
-        </div>
-    </div>
-
-    <!-- ========================================
-         TABLEAU DES INSCRIPTIONS
-    ======================================== -->
-    <div class="card">
-        <div class="overflow-x-auto">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Étudiant</th>
-                        <th>Programme</th>
-                        <th>Année acad.</th>
-                        <th>Statut</th>
-                        <th>Inscription</th>
-                        <th style="width: 120px; text-align: right;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if inscriptions %}
-                        {% for inscription in inscriptions %}
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td>
-                                {% if inscription.student %}
-                                <div class="flex items-center gap-3">
-                                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                        <span style="color: white; font-weight: 600; font-size: 16px;">
-                                            {{ inscription.student.last_name.0|upper }}{{ inscription.student.first_name.0|upper }}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <p style="font-weight: 600; color: #1f2937;">{{ inscription.student.full_name }}</p>
-                                        <p style="font-size: 12px; color: #6b7280;">{{ inscription.student.matricule }}</p>
-                                    </div>
-                                </div>
-                                {% else %}
-                                <div class="text-center text-gray-500">
-                                    <i class="fas fa-user-slash text-2xl mb-1"></i>
-                                    <p class="text-sm">Étudiant non créé</p>
-                                </div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <p style="font-weight: 500; color: #1f2937;">{{ inscription.candidature.programme.title }}</p>
-                                <p style="font-size: 12px; color: #6b7280;">{{ inscription.candidature.programme.cycle.name }}</p>
-                            </td>
-                            <td>
-                                <span style="font-size: 14px; color: #4b5563;">{{ inscription.candidature.academic_year }}</span>
-                            </td>
-                            <td>
-                                {% if inscription.status == 'active' %}
-                                <span class="badge-status badge-success">
-                                    <i class="fas fa-check-circle" style="margin-right: 4px;"></i>Active
-                                </span>
-                                {% elif inscription.status == 'suspended' %}
-                                <span class="badge-status" style="background: #fef3c7; color: #d97706; border: 1px solid #fcd34d;">
-                                    <i class="fas fa-pause" style="margin-right: 4px;"></i>Suspendue
-                                </span>
-                                {% elif inscription.status == 'graduated' %}
-                                <span class="badge-status badge-info">
-                                    <i class="fas fa-graduation-cap" style="margin-right: 4px;"></i>Diplômée
-                                </span>
-                                {% elif inscription.status == 'withdrawn' %}
-                                <span class="badge-status badge-danger">
-                                    <i class="fas fa-sign-out-alt" style="margin-right: 4px;"></i>Retirée
-                                </span>
-                                {% endif %}
-                            </td>
-                            <td style="color: #6b7280; font-size: 14px;">
-                                {{ inscription.created_at|date:"d/m/Y" }}
-                            </td>
-                            <td>
-                                <div style="display: flex; justify-content: flex-end; gap: 6px;">
-                                    <a href="{% url 'superadmin:inscription_detail' inscription.pk %}"
-                                       class="btn btn-sm btn-outline" title="Voir" style="padding: 6px 10px;">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    {% if inscription.student %}
-                                    <a href="{% url 'superadmin:student_detail' inscription.student.pk %}"
-                                       class="btn btn-sm btn-primary" title="Profil étudiant" style="padding: 6px 10px;">
-                                        <i class="fas fa-user"></i>
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="6" style="text-align: center; padding: 60px 20px;">
-                                <div style="color: #9ca3af;">
-                                    <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
-                                    <p style="font-size: 18px; font-weight: 500; color: #6b7280; margin-bottom: 8px;">Aucune inscription trouvée</p>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-
-        {% if inscriptions.has_other_pages %}
-        <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;">
-            <p style="font-size: 14px; color: #6b7280;">
-                Page {{ inscriptions.number }} sur {{ inscriptions.paginator.num_pages }}
-            </p>
-            <div style="display: flex; gap: 8px;">
-                {% if inscriptions.has_previous %}
-                    <a href="?page={{ inscriptions.previous_page_number }}" class="btn btn-sm btn-outline">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
-                {% endif %}
-                {% for num in inscriptions.paginator.page_range %}
-                    {% if inscriptions.number == num %}
-                        <span class="btn btn-sm btn-primary">{{ num }}</span>
-                    {% elif num > inscriptions.number|add:'-3' and num < inscriptions.number|add:'3' %}
-                        <a href="?page={{ num }}" class="btn btn-sm btn-outline">{{ num }}</a>
-                    {% endif %}
-                {% endfor %}
-                {% if inscriptions.has_next %}
-                    <a href="?page={{ inscriptions.next_page_number }}" class="btn btn-sm btn-outline">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                {% endif %}
+<div class="space-y-6">
+    {% if summary.missing_student_accounts %}
+    <section class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <p class="text-sm font-semibold text-amber-900 mb-1">Alerte workflow étudiant</p>
+                <p class="text-sm text-amber-800 mb-0">
+                    {{ summary.missing_student_accounts }} inscription(s) ont déjà au moins un paiement validé mais aucun compte étudiant n'est encore visible dans le panel.
+                </p>
+            </div>
+            <div class="text-xs text-amber-700">
+                Vérifie ces dossiers puis relance le rattrapage si nécessaire.
             </div>
         </div>
-        {% endif %}
-    </div>
+    </section>
+    {% endif %}
 
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total attendu</p>
+            <p class="text-2xl font-bold text-slate-900">{{ summary.total_due|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500">FCFA</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total encaissé</p>
+            <p class="text-2xl font-bold text-emerald-700">{{ summary.total_paid|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500">FCFA</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Taux de recouvrement</p>
+            <p class="text-2xl font-bold text-[var(--primary)]">{{ summary.recovery_rate|default:0 }}%</p>
+            <p class="text-xs text-slate-500">sur le périmètre filtré</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Dossiers actifs</p>
+            <p class="text-2xl font-bold text-cyan-700">{{ summary.active|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500">{{ summary.partial_paid|default:0|intcomma }} partiels / {{ summary.awaiting_payment|default:0|intcomma }} en attente</p>
+            {% if summary.missing_student_accounts %}
+            <p class="text-xs text-amber-700 mt-1">{{ summary.missing_student_accounts|intcomma }} sans compte étudiant</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="w-full flex flex-col gap-4">
+                {% include "superadmin/inscriptions/_filters.html" %}
+                {% include "superadmin/inscriptions/_actions.html" %}
+            </div>
+        </div>
+
+        <div id="inscriptions-table-container"
+             hx-get="{% url 'superadmin:inscription_list' %}"
+             hx-trigger="refreshInscriptions from:body"
+             hx-target="this"
+             hx-swap="innerHTML"
+             hx-include="#inscription-filter-form">
+            {% include "superadmin/inscriptions/_list_table.html" %}
+        </div>
+    </div>
 </div>
 {% endblock %}

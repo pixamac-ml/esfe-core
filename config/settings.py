@@ -19,8 +19,15 @@ load_dotenv(BASE_DIR / ".env")
 # ==================================================
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
-DEBUG = True
-ALLOWED_HOSTS = ["127.0.0.1", "localhost","192.168.93.68","192.168.2.5"]
+DEBUG = os.getenv("DEBUG", "True").strip().lower() in {"1", "true", "yes", "on"}
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "ALLOWED_HOSTS",
+        "127.0.0.1,localhost,192.168.93.68,192.168.2.5",
+    ).split(",")
+    if host.strip()
+]
 
 # ==================================================
 # APPLICATIONS
@@ -193,16 +200,23 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ==================================================
+# URLS ABSOLUES (EMAILS / LIENS EXTERNES)
+# ==================================================
+
+BASE_URL = os.getenv("BASE_URL", "https://www.esfe-mali.org").rstrip("/")
+EMAIL_LOGO_PATH = os.getenv("EMAIL_LOGO_PATH", "static/images/logo-esfe.png")
+
+# ==================================================
 # EMAIL (DEV)
 # ==================================================
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").strip().lower() in {"1", "true", "yes", "on"}
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@esfe-mali.org")
 
 # ==================================================
 # AUTH REDIRECTS
@@ -235,4 +249,4 @@ CKEDITOR_5_CONFIGS = {
 # CUSTOM
 # ==================================================
 
-STUDENT_LOGIN_URL = "http://127.0.0.1:8000/student/login/"
+STUDENT_LOGIN_URL = os.getenv("STUDENT_LOGIN_URL", f"{BASE_URL}/student/login/")

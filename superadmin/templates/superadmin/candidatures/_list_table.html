@@ -1,0 +1,81 @@
+<form id="bulk-action-form" method="post" action="{% url 'superadmin:candidature_bulk_action' %}">
+    {% csrf_token %}
+    <div class="overflow-x-auto">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="w-10"><input type="checkbox" onclick="document.querySelectorAll('input[name=selected]').forEach(cb => cb.checked = this.checked)"></th>
+                    <th>Candidat</th>
+                    <th>Programme</th>
+                    <th>Année</th>
+                    <th>Statut</th>
+                    <th>Documents</th>
+                    <th>Soumise le</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cand in candidatures %}
+                <tr>
+                    <td><input type="checkbox" name="selected" value="{{ cand.pk }}"></td>
+                    <td>
+                        <div class="font-medium text-slate-800">{{ cand.full_name }}</div>
+                        <div class="text-xs text-slate-500">{{ cand.email }}</div>
+                    </td>
+                    <td>
+                        <div class="font-medium text-slate-800">{{ cand.programme.title }}</div>
+                        <div class="text-xs text-slate-500">{{ cand.branch.name }}</div>
+                    </td>
+                    <td>{{ cand.academic_year }}</td>
+                    <td>
+                        <span class="badge-status badge-{% if cand.status == 'accepted' %}success{% elif cand.status == 'rejected' %}danger{% elif cand.status == 'under_review' %}info{% elif cand.status == 'to_complete' %}warning{% else %}draft{% endif %}">
+                            {{ cand.get_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="text-sm text-slate-700">{{ cand.validated_docs }}/{{ cand.required_docs }}</span>
+                        {% if cand.missing_docs > 0 %}
+                        <span class="text-xs text-amber-600">({{ cand.missing_docs }} manquant)</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ cand.submitted_at|date:"d/m/Y H:i" }}</td>
+                    <td class="text-right">
+                        <div class="inline-flex items-center gap-1">
+                            <a href="{% url 'superadmin:candidature_detail' cand.pk %}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a>
+                            <a href="{% url 'superadmin:candidature_edit' cand.pk %}" class="btn btn-sm btn-outline"><i class="fas fa-pen"></i></a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-10 text-slate-500">Aucune candidature trouvée.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</form>
+
+{% if candidatures.has_other_pages %}
+<div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100">
+    <p class="text-sm text-slate-500">Page {{ candidatures.number }} / {{ candidatures.paginator.num_pages }} ({{ candidatures.paginator.count }} résultats)</p>
+    <div class="flex items-center gap-1">
+        {% if candidatures.has_previous %}
+            <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&branch={{ filters.branch|urlencode }}&academic_year={{ filters.academic_year|urlencode }}&page={{ candidatures.previous_page_number }}">&laquo;</a>
+        {% endif %}
+        {% for num in candidatures.paginator.page_range %}
+            {% if num >= candidatures.number|add:'-2' and num <= candidatures.number|add:'2' %}
+                {% if num == candidatures.number %}
+                    <span class="btn btn-sm btn-primary">{{ num }}</span>
+                {% else %}
+                    <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&branch={{ filters.branch|urlencode }}&academic_year={{ filters.academic_year|urlencode }}&page={{ num }}">{{ num }}</a>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% if candidatures.has_next %}
+            <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&branch={{ filters.branch|urlencode }}&academic_year={{ filters.academic_year|urlencode }}&page={{ candidatures.next_page_number }}">&raquo;</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+

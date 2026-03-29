@@ -173,6 +173,14 @@ class Payment(models.Model):
         related_name="payments"
     )
 
+    cash_session = models.ForeignKey(
+        CashPaymentSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payments",
+    )
+
     amount = models.PositiveBigIntegerField()
 
     method = models.CharField(

@@ -64,6 +64,7 @@ class StudentPaymentForm(forms.Form):
 
         self.inscription = inscription
         self.agent = None
+        self.cash_session = None
 
     # ==================================================
     # VALIDATION GLOBALE
@@ -110,16 +111,17 @@ class StudentPaymentForm(forms.Form):
                 )
 
             # 4️⃣ Validation code dynamique
-            is_valid, error = validate_cash_code(
+            session, error = validate_cash_code(
                 self.inscription,
                 agent,
                 code
             )
 
-            if not is_valid:
+            if not session:
                 raise forms.ValidationError(error)
 
             # 5️⃣ OK
             self.agent = agent
+            self.cash_session = session
 
         return cleaned_data

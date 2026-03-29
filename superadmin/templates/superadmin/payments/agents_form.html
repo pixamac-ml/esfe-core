@@ -1,0 +1,43 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{% if agent %}Modifier agent{% else %}Nouvel agent{% endif %}{% endblock %}
+{% block page_subtitle %}Affectation agent par annexe{% endblock %}
+
+{% block content_main %}
+<section class="card max-w-3xl rounded-xl border border-slate-100 shadow-sm">
+    <form method="post" class="card-body space-y-4">
+        {% csrf_token %}
+
+        <div>
+            <label class="form-label">Utilisateur staff *</label>
+            <select name="user" required class="form-input">
+                <option value="">Choisir...</option>
+                {% for u in staff_users %}
+                <option value="{{ u.pk }}" {% if agent and agent.user_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}{% if u.email %} ({{ u.email }}){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="form-label">Annexe *</label>
+            <select name="branch" required class="form-input">
+                <option value="">Choisir...</option>
+                {% for b in branches %}
+                <option value="{{ b.pk }}" {% if agent and agent.branch_id == b.pk %}selected{% endif %}>{{ b.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="is_active" {% if not agent or agent.is_active %}checked{% endif %}>
+            Agent actif
+        </label>
+
+        <div class="flex items-center gap-2 pt-2">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+            <a href="{% url 'superadmin:payment_agent_list' %}" class="btn btn-outline">Annuler</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
+

@@ -1,158 +1,251 @@
 {% extends "superadmin/base.html" %}
-{% load static %}
+{% load humanize %}
 
 {% block page_title %}Inscription #{{ inscription.pk }}{% endblock %}
-{% block page_subtitle %}Détails de l'inscription{% endblock %}
+{% block page_subtitle %}Tableau de bord de l'inscription{% endblock %}
 
 {% block content_main %}
-<div class="fade-in">
+<div class="space-y-6">
+    {% if show_missing_student_alert %}
+    <section class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <p class="text-sm font-semibold text-amber-900 mb-1">Compte étudiant non encore créé</p>
+                <p class="text-sm text-amber-800 mb-0">
+                    Cette inscription a déjà au moins un paiement validé, mais aucun étudiant n'est encore rattaché au dossier dans le superadmin.
+                </p>
+            </div>
+            <div class="text-xs text-amber-700">
+                Le compte étudiant doit apparaître automatiquement à la fin du workflow.
+            </div>
+        </div>
+    </section>
+    {% endif %}
 
-    <!-- EN-TÊTE -->
-    <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;" class="md:flex-row md:items-center justify-between">
+    <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                <a href="{% url 'superadmin:inscription_list' %}" style="color: #6b7280;">
-                    <i class="fas fa-arrow-left"></i>
-                </a>
-                <h2 class="text-2xl font-bold text-gray-900">Inscription #{{ inscription.pk }}</h2>
-                <span class="badge-status badge-{% if inscription.status == 'active' %}success{% elif inscription.status == 'graduated' %}info{% else %}warning{% endif %}">
-                    {{ inscription.get_status_display }}
-                </span>
+            <div class="flex items-center gap-2 mb-1">
+                <a href="{% url 'superadmin:inscription_list' %}" class="text-slate-500 hover:text-slate-700"><i class="fas fa-arrow-left"></i></a>
+                <h2 class="text-2xl font-bold tracking-tight text-slate-900 mb-0">{{ inscription.public_token }}</h2>
+                <span class="badge-status badge-{% if inscription.status == 'active' %}success{% elif inscription.status == 'partial_paid' %}warning{% elif inscription.status == 'awaiting_payment' %}info{% elif inscription.status == 'cancelled' %}danger{% else %}draft{% endif %}">{{ inscription.get_status_display }}</span>
             </div>
-            <p style="color: #6b7280; font-size: 14px;">
-                Année académique: <strong>{{ inscription.candidature.academic_year }}</strong>
-                • Créée le {{ inscription.created_at|date:"d/m/Y" }}
-            </p>
+            <p class="text-sm text-slate-500 mb-0">Liée à {{ inscription.candidature.full_name }} • année {{ inscription.candidature.academic_year }} • créée le {{ inscription.created_at|date:"d/m/Y H:i" }}</p>
         </div>
-        <div style="display: flex; gap: 8px;">
-            {% if inscription.student %}
-            <a href="{% url 'superadmin:student_detail' inscription.student.pk %}" class="btn btn-outline">
-                <i class="fas fa-user mr-2"></i>Profil étudiant
-            </a>
-            {% endif %}
-            <a href="{% url 'superadmin:payments_create' %}?inscription={{ inscription.pk }}" class="btn btn-primary">
-                <i class="fas fa-plus mr-2"></i>Nouveau paiement
-            </a>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{% url 'superadmin:inscription_certificate' inscription.pk %}" target="_blank" class="btn btn-outline"><i class="fas fa-file-pdf"></i>Générer certificat</a>
+            <a href="{{ inscription.get_public_url }}" target="_blank" class="btn btn-outline"><i class="fas fa-folder-open"></i>Ouvrir dossier public</a>
+            <form method="post" action="{% url 'superadmin:inscription_confirm_payment' inscription.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary"><i class="fas fa-check-circle"></i>Confirmer paiement</button>
+            </form>
+            <form method="post" action="{% url 'superadmin:inscription_relance' inscription.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary"><i class="fas fa-bell"></i>Relancer</button>
+            </form>
+            <form method="post" action="{% url 'superadmin:inscription_regenerate_access_code' inscription.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline"><i class="fas fa-key"></i>Régénérer code</button>
+            </form>
+            <form method="post" action="{% url 'superadmin:inscription_archive_toggle' inscription.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn {% if inscription.is_archived %}btn-secondary{% else %}btn-outline{% endif %}">
+                    <i class="fas {% if inscription.is_archived %}fa-box-open{% else %}fa-box-archive{% endif %}"></i>
+                    {% if inscription.is_archived %}Restaurer{% else %}Archiver{% endif %}
+                </button>
+            </form>
+            <a href="{% url 'superadmin:inscription_edit' inscription.pk %}" class="btn btn-outline"><i class="fas fa-pen"></i>Éditer</a>
+            <form method="post" action="{% url 'superadmin:inscription_delete' inscription.pk %}" onsubmit="return confirm('Archiver cette inscription (suppression logique) ?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i>Supprimer</button>
+            </form>
         </div>
     </div>
 
-    <!-- INFORMATIONS -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Montant dû</p>
+            <p class="text-2xl font-bold text-slate-900">{{ inscription.amount_due|intcomma }}</p>
+            <p class="text-xs text-slate-500">FCFA</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Montant payé</p>
+            <p class="text-2xl font-bold text-emerald-700">{{ inscription.amount_paid|intcomma }}</p>
+            <p class="text-xs text-slate-500">FCFA</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Reste à payer</p>
+            <p class="text-2xl font-bold text-amber-700">{{ inscription.balance|intcomma }}</p>
+            <p class="text-xs text-slate-500">FCFA</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Paiements</p>
+            <p class="text-2xl font-bold text-[var(--primary)]">{{ payments|length }}</p>
+            <p class="text-xs text-slate-500">transaction(s)</p>
+        </div>
+    </section>
 
-        <!-- Étudiant -->
-        {% if inscription.student %}
-        <div class="card" style="padding: 24px;">
-            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-user-graduate" style="color: var(--primary);"></i>
-                Étudiant
-            </h3>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                        <span style="color: white; font-weight: 600; font-size: 18px;">
-                            {{ inscription.student.last_name.0|upper }}{{ inscription.student.first_name.0|upper }}
-                        </span>
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-2 space-y-6">
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Bloc administratif</h3></div>
+                <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div><span class="text-slate-500">Candidat</span><p class="font-medium text-slate-800 mb-0">{{ inscription.candidature.full_name }}</p></div>
+                    <div><span class="text-slate-500">Email</span><p class="font-medium text-slate-800 mb-0">{{ inscription.candidature.email }}</p></div>
+                    <div><span class="text-slate-500">Téléphone</span><p class="font-medium text-slate-800 mb-0">{{ inscription.candidature.phone }}</p></div>
+                    <div><span class="text-slate-500">Campus</span><p class="font-medium text-slate-800 mb-0">{{ inscription.candidature.branch.name|default:"-" }}</p></div>
+                    <div><span class="text-slate-500">Programme</span><p class="font-medium text-slate-800 mb-0">{{ inscription.candidature.programme.title }}</p></div>
+                    <div><span class="text-slate-500">Cycle</span><p class="font-medium text-slate-800 mb-0">{{ inscription.candidature.programme.cycle.name|default:"-" }}</p></div>
+                    <div><span class="text-slate-500">Année académique</span><p class="font-medium text-slate-800 mb-0">{{ inscription.candidature.academic_year }}</p></div>
+                    <div><span class="text-slate-500">Année d'entrée</span><p class="font-medium text-slate-800 mb-0">{{ inscription.candidature.entry_year }}</p></div>
+                    <div><span class="text-slate-500">Code d'accès</span><p class="font-medium text-slate-800 mb-0">{{ inscription.access_code }}</p></div>
+                    <div><span class="text-slate-500">Archivage</span><p class="font-medium {% if inscription.is_archived %}text-rose-700{% else %}text-emerald-700{% endif %} mb-0">{% if inscription.is_archived %}Archivée{% else %}Active{% endif %}</p></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header flex items-center justify-between">
+                    <h3 class="text-base font-bold text-slate-900">Actions de statut</h3>
+                    <span class="text-sm text-slate-500">Transition manuelle admin</span>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'superadmin:inscription_status' inscription.pk %}" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {% csrf_token %}
+                        <div>
+                            <label for="inscription-status" class="block text-sm font-medium text-slate-700 mb-1">Nouveau statut</label>
+                            <select id="inscription-status" name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                {% for value, label in inscription.STATUS_CHOICES %}
+                                <option value="{{ value }}" {% if inscription.status == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="inscription-comment" class="block text-sm font-medium text-slate-700 mb-1">Commentaire</label>
+                            <input id="inscription-comment" type="text" name="comment" placeholder="Motif ou contexte du changement" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        </div>
+                        <div class="md:col-span-3 flex justify-end">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i>Appliquer le statut</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Historique des paiements</h3></div>
+                <div class="card-body">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Référence</th>
+                                    <th class="text-right">Montant</th>
+                                    <th>Méthode</th>
+                                    <th>Date</th>
+                                    <th>Statut</th>
+                                    <th class="text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr>
+                                    <td><span class="font-medium text-slate-800">{{ payment.reference|default:payment.receipt_number|default:'-' }}</span></td>
+                                    <td class="text-right font-semibold text-slate-800">{{ payment.amount|intcomma }} FCFA</td>
+                                    <td>{{ payment.get_method_display }}</td>
+                                    <td>{{ payment.paid_at|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        <span class="badge-status badge-{% if payment.status == 'validated' %}success{% elif payment.status == 'pending' %}warning{% else %}danger{% endif %}">{{ payment.get_status_display }}</span>
+                                    </td>
+                                    <td class="text-right">
+                                        <a href="{% url 'superadmin:payment_detail' payment.pk %}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-slate-500">Aucun paiement enregistré pour cette inscription.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    <div>
-                        <p style="font-weight: 600; color: #1f2937;">{{ inscription.student.full_name }}</p>
-                        <p style="font-size: 13px; color: #6b7280; font-family: monospace;">{{ inscription.student.matricule }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% else %}
-        <div class="card" style="padding: 24px;">
-            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-user-graduate" style="color: var(--primary);"></i>
-                Étudiant
-            </h3>
-            <div style="text-align: center; padding: 40px; color: #9ca3af;">
-                <i class="fas fa-user-slash" style="font-size: 48px; margin-bottom: 16px;"></i>
-                <p>Étudiant non créé</p>
-                <p style="font-size: 12px;">L'inscription doit être active pour créer l'étudiant</p>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Programme -->
-        <div class="card" style="padding: 24px;">
-            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-graduation-cap" style="color: var(--secondary);"></i>
-                Programme
-            </h3>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6;">
-                    <span style="color: #6b7280;">Programme:</span>
-                    <span style="font-weight: 500; color: #1f2937;">{{ inscription.candidature.programme.title }}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6;">
-                    <span style="color: #6b7280;">Cycle:</span>
-                    <span class="badge-status badge-info">{{ inscription.candidature.programme.cycle.name }}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="color: #6b7280;">Année d'entrée:</span>
-                    <span style="font-weight: 500; color: #1f2937;">{{ inscription.candidature.entry_year }}e année</span>
                 </div>
             </div>
         </div>
 
-    </div>
+        <div class="space-y-6">
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Code agent / code cash</h3></div>
+                <div class="card-body space-y-3 text-sm">
+                    {% if latest_cash_session %}
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-xs text-slate-500 mb-1">Derniere session generee</p>
+                            <p class="font-medium text-slate-900 mb-0">{{ latest_cash_session.agent.user.get_full_name|default:"-" }}</p>
+                            <p class="text-xs text-slate-600 mb-1">Code agent: <span class="font-mono">{{ latest_cash_session.agent.agent_code|default:"N/A" }}</span></p>
+                            <p class="text-xs text-slate-700 mb-0">Code cash: <span class="font-mono font-semibold">{{ latest_cash_session.verification_code }}</span></p>
+                            <p class="text-xs {% if latest_cash_session.is_used %}text-rose-600{% else %}text-slate-500{% endif %} mb-0">
+                                Expire le {{ latest_cash_session.expires_at|date:"d/m/Y H:i" }}{% if latest_cash_session.is_used %} - deja utilise{% endif %}
+                            </p>
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-slate-500 mb-0">Aucune session cash n'a ete generee pour ce dossier.</p>
+                    {% endif %}
 
-    <!-- PAIEMENTS -->
-    <div class="card">
-        <div class="card-header">
-            <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-receipt" style="color: #10b981;"></i>
-                Paiements
-            </h3>
-            <a href="{% url 'superadmin:payments_create' %}?inscription={{ inscription.pk }}" class="btn btn-sm btn-primary">
-                <i class="fas fa-plus mr-2"></i>Nouveau
-            </a>
-        </div>
-        <div class="card-body">
-            {% if inscription.payments.all %}
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Référence</th>
-                        <th>Montant</th>
-                        <th>Date</th>
-                        <th>Statut</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for payment in inscription.payments.all %}
-                    <tr>
-                        <td><code style="font-size: 12px;">{{ payment.reference }}</code></td>
-                        <td style="font-weight: 600;">{{ payment.amount }} FCFA</td>
-                        <td>{{ payment.payment_date|date:"d/m/Y" }}</td>
-                        <td>
-                            {% if payment.status == 'completed' %}
-                            <span class="badge-status badge-success">Complété</span>
-                            {% elif payment.status == 'pending' %}
-                            <span class="badge-status badge-warning">En attente</span>
-                            {% else %}
-                            <span class="badge-status badge-danger">Échoué</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <a href="{% url 'superadmin:payment_detail' payment.pk %}" class="btn btn-sm btn-outline">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div style="text-align: center; padding: 40px; color: #9ca3af;">
-                <i class="fas fa-receipt" style="font-size: 48px; margin-bottom: 16px;"></i>
-                <p>Aucun paiement enregistré</p>
+                    {% if active_cash_sessions %}
+                        <div>
+                            <p class="text-xs text-slate-500 mb-2">Sessions actives (utilisables)</p>
+                            <div class="space-y-2">
+                                {% for session in active_cash_sessions %}
+                                    <div class="rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                                        <p class="text-xs text-slate-800 mb-0">
+                                            <span class="font-medium">{{ session.agent.user.get_full_name|default:"-" }}</span>
+                                            <span class="font-mono">({{ session.agent.agent_code|default:"N/A" }})</span>
+                                        </p>
+                                        <p class="text-xs text-slate-700 mb-0">Code: <span class="font-mono font-semibold">{{ session.verification_code }}</span> - Exp: {{ session.expires_at|date:"H:i" }}</p>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            {% endif %}
+
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Navigation profonde</h3></div>
+                <div class="card-body space-y-2">
+                    <a href="{% url 'superadmin:candidature_detail' inscription.candidature.pk %}" class="btn btn-outline w-full justify-start"><i class="fas fa-file-alt"></i>Voir candidature d'origine</a>
+                    {% if linked_student %}
+                    <a href="{% url 'superadmin:student_detail' linked_student.pk %}" class="btn btn-outline w-full justify-start"><i class="fas fa-user-graduate"></i>Voir étudiant</a>
+                    {% endif %}
+                    <a href="{% url 'superadmin:formation_detail' inscription.candidature.programme.pk %}" class="btn btn-outline w-full justify-start"><i class="fas fa-graduation-cap"></i>Voir programme</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Timeline de l'inscription</h3></div>
+                <div class="card-body">
+                    <ol class="space-y-3">
+                        <li class="flex items-start gap-3">
+                            <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[var(--primary)]"><i class="fas fa-plus text-xs"></i></span>
+                            <div>
+                                <p class="text-sm font-medium text-slate-800 mb-0">Inscription créée</p>
+                                <p class="text-xs text-slate-500 mb-0">{{ inscription.created_at|date:"d/m/Y H:i" }}</p>
+                            </div>
+                        </li>
+                        {% for item in history_entries %}
+                        <li class="flex items-start gap-3">
+                            <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[var(--secondary)]"><i class="fas fa-random text-xs"></i></span>
+                            <div>
+                                <p class="text-sm font-medium text-slate-800 mb-0">{{ item.previous_status }} → {{ item.new_status }}</p>
+                                <p class="text-xs text-slate-500 mb-0">{{ item.created_at|date:"d/m/Y H:i" }}</p>
+                                {% if item.comment %}<p class="text-xs text-slate-600 mt-1">{{ item.comment }}</p>{% endif %}
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="text-sm text-slate-500">Aucun changement de statut enregistré.</li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            </div>
         </div>
     </div>
-
 </div>
 {% endblock %}

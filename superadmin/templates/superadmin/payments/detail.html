@@ -1,0 +1,142 @@
+{% extends "superadmin/base.html" %}
+{% load humanize %}
+
+{% block page_title %}Paiement {{ payment.reference|default:payment.pk }}{% endblock %}
+{% block page_subtitle %}Dossier transactionnel et preuves de paiement{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6" x-data="{showValidate:false, showNotify:false}">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <a href="{% url 'superadmin:payment_list' %}" class="text-slate-500 hover:text-slate-700"><i class="fas fa-arrow-left"></i></a>
+                <h2 class="text-2xl font-bold tracking-tight text-slate-900 mb-0">{{ payment.reference|default:"PAY" }}</h2>
+                <span class="badge-status badge-{% if payment.status == 'validated' %}success{% elif payment.status == 'pending' %}warning{% else %}danger{% endif %}">{{ payment.get_status_display }}</span>
+            </div>
+            <p class="text-sm text-slate-500 mb-0">{{ payment.inscription.candidature.full_name }} • {{ payment.inscription.public_token }} • {{ payment.paid_at|date:"d/m/Y H:i" }}</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" class="btn btn-secondary" @click="showValidate=true" {% if payment.status != 'pending' %}disabled{% endif %}><i class="fas fa-check-circle"></i>Valider le paiement</button>
+            {% if payment.status == 'validated' and payment.receipt_pdf %}
+                <a href="{% url 'superadmin:payment_receipt_pdf' payment.pk %}" class="btn btn-outline"><i class="fas fa-file-pdf"></i>Télécharger reçu PDF</a>
+            {% elif payment.status == 'validated' %}
+                <button type="button" class="btn btn-outline" disabled title="Reçu indisponible pour ce paiement validé"><i class="fas fa-file-pdf"></i>Reçu PDF indisponible</button>
+            {% else %}
+                <button type="button" class="btn btn-outline" disabled title="Le reçu devient disponible après validation"><i class="fas fa-file-pdf"></i>Reçu après validation</button>
+            {% endif %}
+            <button type="button" class="btn btn-primary" @click="showNotify=true" {% if payment.status != 'validated' %}disabled{% endif %}><i class="fas fa-paper-plane"></i>Notifier l'étudiant</button>
+            {% if payment.status == 'validated' %}
+                <button type="button" class="btn btn-outline" disabled title="Un paiement validé est verrouillé"><i class="fas fa-lock"></i>Verrouillé</button>
+            {% else %}
+                <a href="{% url 'superadmin:payment_edit' payment.pk %}" class="btn btn-outline"><i class="fas fa-pen"></i>Éditer</a>
+            {% endif %}
+            <form method="post" action="{% url 'superadmin:payment_delete' payment.pk %}" onsubmit="return confirm('Annuler ce paiement (suppression logique) ?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i>Supprimer</button>
+            </form>
+        </div>
+    </div>
+
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card p-4"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Montant</p><p class="text-2xl font-bold text-slate-900">{{ payment.amount|intcomma }}</p><p class="text-xs text-slate-500">FCFA</p></div>
+        <div class="card p-4"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Mode</p><p class="text-2xl font-bold text-cyan-700">{{ payment.get_method_display }}</p><p class="text-xs text-slate-500">{{ payment.method }}</p></div>
+        <div class="card p-4"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Reçu</p><p class="text-sm font-semibold text-slate-900">{{ payment.receipt_number|default:"Non généré" }}</p><p class="text-xs text-slate-500">{% if payment.receipt_pdf %}PDF disponible{% elif payment.status == 'validated' %}PDF indisponible{% else %}Disponible après validation{% endif %}</p></div>
+        <div class="card p-4"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Agent</p><p class="text-sm font-semibold text-slate-900">{{ payment.agent.user.get_full_name|default:"-" }}</p><p class="text-xs text-slate-500">{{ payment.agent.agent_code|default:"" }}</p></div>
+    </section>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-2 space-y-6">
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Preuves de paiement</h3></div>
+                <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div><span class="text-slate-500">Référence transaction</span><p class="font-medium text-slate-800 mb-0">{{ payment.reference|default:"-" }}</p></div>
+                    <div><span class="text-slate-500">N° reçu</span><p class="font-medium text-slate-800 mb-0">{{ payment.receipt_number|default:"-" }}</p></div>
+                    <div><span class="text-slate-500">Date de paiement</span><p class="font-medium text-slate-800 mb-0">{{ payment.paid_at|date:"d/m/Y H:i" }}</p></div>
+                    <div><span class="text-slate-500">Date de création</span><p class="font-medium text-slate-800 mb-0">{{ payment.created_at|date:"d/m/Y H:i" }}</p></div>
+                    <div class="md:col-span-2">
+                        <span class="text-slate-500">Pièce jointe / reçu PDF</span>
+                        <p class="font-medium text-slate-800 mb-0">
+                            {% if payment.receipt_pdf %}
+                                <a href="{{ payment.receipt_pdf.url }}" target="_blank" class="text-[var(--primary)] hover:underline">Ouvrir le reçu existant</a>
+                            {% else %}
+                                Aucune preuve PDF stockée pour l'instant.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {% if is_manual_method %}
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Codes d'accès (paiement manuel)</h3></div>
+                <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="text-slate-500">Code d'accès inscription</span>
+                        <p class="font-mono font-semibold text-slate-900 mb-0">{{ inscription_access_code|default:"-" }}</p>
+                    </div>
+                    <div>
+                        <span class="text-slate-500">Code cash (OTP)</span>
+                        <p class="font-mono font-semibold text-slate-900 mb-0">{{ cash_code|default:"-" }}</p>
+                        {% if cash_code_expires_at %}
+                            <p class="text-xs text-slate-500 mt-1">Expire le {{ cash_code_expires_at|date:"d/m/Y H:i" }}{% if cash_code_is_used %} - utilisé{% endif %}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Historique des modifications</h3></div>
+                <div class="card-body">
+                    <ol class="space-y-3">
+                        {% for item in history %}
+                        <li class="flex items-start gap-3">
+                            <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[var(--primary)]"><i class="fas fa-clock text-xs"></i></span>
+                            <div>
+                                <p class="text-sm font-medium text-slate-800 mb-0">{{ item.label }}</p>
+                                <p class="text-xs text-slate-500 mb-0">{{ item.date|date:"d/m/Y H:i" }}</p>
+                                <p class="text-xs text-slate-600 mt-1">{{ item.meta }}</p>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="card">
+                <div class="card-header"><h3 class="text-base font-bold text-slate-900">Navigation profonde</h3></div>
+                <div class="card-body space-y-2">
+                    <a href="{% url 'superadmin:inscription_detail' payment.inscription.pk %}" class="btn btn-outline w-full justify-start"><i class="fas fa-id-card"></i>Voir inscription liée</a>
+                    <a href="{% url 'superadmin:candidature_detail' payment.inscription.candidature.pk %}" class="btn btn-outline w-full justify-start"><i class="fas fa-file-alt"></i>Voir candidature</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showValidate" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40" style="display:none">
+        <div class="w-full max-w-md rounded-xl bg-white border border-slate-200 shadow-xl p-5">
+            <h4 class="text-lg font-bold text-slate-900 mb-2">Confirmer la validation</h4>
+            <p class="text-sm text-slate-500 mb-4">Cette action déclenche le workflow métier de validation (mise à jour inscription, génération reçu, etc.).</p>
+            <div class="flex justify-end gap-2">
+                <button type="button" class="btn btn-outline" @click="showValidate=false">Annuler</button>
+                <form method="post" action="{% url 'superadmin:payment_validate' payment.pk %}">{% csrf_token %}<button type="submit" class="btn btn-secondary">Valider</button></form>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showNotify" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40" style="display:none">
+        <div class="w-full max-w-md rounded-xl bg-white border border-slate-200 shadow-xl p-5">
+            <h4 class="text-lg font-bold text-slate-900 mb-2">Notifier l'étudiant</h4>
+            <p class="text-sm text-slate-500 mb-4">Un email de confirmation sera envoyé selon la logique existante du module paiements.</p>
+            <div class="flex justify-end gap-2">
+                <button type="button" class="btn btn-outline" @click="showNotify=false">Annuler</button>
+                <form method="post" action="{% url 'superadmin:payment_notify_student' payment.pk %}">{% csrf_token %}<button type="submit" class="btn btn-primary">Notifier</button></form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

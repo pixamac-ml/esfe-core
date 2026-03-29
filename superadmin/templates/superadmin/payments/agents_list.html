@@ -1,0 +1,77 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Agents de paiement{% endblock %}
+{% block page_subtitle %}Gestion des agents et affectation par annexe{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input type="text" name="search" value="{{ filters.search|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Nom, email, code agent...">
+            <select name="branch" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Toutes annexes</option>
+                {% for b in branches %}
+                <option value="{{ b.id }}" {% if filters.branch == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous statuts</option>
+                <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actif</option>
+                <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactif</option>
+            </select>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:payment_agent_list' %}" class="btn btn-outline">Réinitialiser</a>
+                <button type="submit" class="btn btn-outline">Filtrer</button>
+                <a href="{% url 'superadmin:payment_agent_create' %}" class="btn btn-primary">Nouvel agent</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Agent</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Code</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Annexe</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Statut</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Actions</th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                {% for agent in agents %}
+                <tr>
+                    <td class="px-4 py-3">
+                        <p class="font-medium text-slate-900 mb-0">{{ agent.user.get_full_name|default:agent.user.username }}</p>
+                        <p class="text-xs text-slate-500 mb-0">{{ agent.user.email|default:'-' }}</p>
+                    </td>
+                    <td class="px-4 py-3"><span class="font-mono">{{ agent.agent_code }}</span></td>
+                    <td class="px-4 py-3">{{ agent.branch.name }}</td>
+                    <td class="px-4 py-3">
+                        {% if agent.is_active %}
+                        <span class="badge-status badge-success">Actif</span>
+                        {% else %}
+                        <span class="badge-status badge-draft">Inactif</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="{% url 'superadmin:payment_agent_edit' agent.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                            <form method="post" action="{% url 'superadmin:payment_agent_toggle' agent.pk %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm">{% if agent.is_active %}Désactiver{% else %}Activer{% endif %}</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">Aucun agent trouvé.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

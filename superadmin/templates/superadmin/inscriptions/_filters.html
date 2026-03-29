@@ -1,0 +1,34 @@
+<form id="inscription-filter-form" method="get" class="grid grid-cols-1 md:grid-cols-5 gap-3" hx-get="{% url 'superadmin:inscription_list' %}" hx-target="#inscriptions-table-container" hx-swap="innerHTML" hx-trigger="change delay:250ms, submit">
+    <div class="md:col-span-2">
+        <input type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Recherche: token, candidat, email, matricule..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+    </div>
+    <div>
+        <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Tous statuts</option>
+            {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Tous programmes</option>
+            {% for programme in programmes %}
+            <option value="{{ programme.pk }}" {% if filters.programme == programme.pk|stringformat:'s' %}selected{% endif %}>{{ programme.title }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <select name="academic_year" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Toutes années</option>
+            {% for year in academic_years %}
+            <option value="{{ year }}" {% if filters.academic_year == year %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="md:col-span-5 flex justify-between items-center gap-2">
+        <div class="text-sm text-slate-500">Filtrage live HTMX sur le flux d'inscriptions</div>
+        <a href="{% url 'superadmin:inscription_list' %}" class="btn btn-outline">Réinitialiser</a>
+    </div>
+</form>
+

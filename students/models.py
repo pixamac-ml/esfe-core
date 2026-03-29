@@ -82,9 +82,9 @@ class Student(models.Model):
         if not self.user:
             raise ValidationError("Un utilisateur est requis.")
 
-        if self.inscription.status != "active":
+        if self.inscription.status not in {"partial_paid", "active"}:
             raise ValidationError(
-                "Impossible de créer un étudiant si l'inscription n'est pas active."
+                "Impossible de créer un étudiant si l'inscription n'a pas encore de paiement validé."
             )
 
     # =====================================================

@@ -3,12 +3,18 @@
 Fonctions d'envoi des notifications par email
 """
 
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from django.conf import settings
-from django.utils import timezone
+import logging
 
+from urllib.parse import urljoin
+
+from django.utils import timezone
+from django.conf import settings
+
+from core.emailing import send_templated_email
 from core.models import Notification
+
+
+logger = logging.getLogger(__name__)
 
 
 def send_notification_email(notification_id):
@@ -29,30 +35,19 @@ def send_notification_email(notification_id):
         "message": notification.message,
         "candidate_reference": notification.related_candidature.id if notification.related_candidature else None,
         "programme_name": notification.related_candidature.programme.title if notification.related_candidature else None,
-        "dashboard_url": getattr(settings, "BASE_URL", "https://www.esfe-mali.org"),
+        "dashboard_url": urljoin(getattr(settings, "BASE_URL", "https://www.esfe-mali.org").rstrip("/") + "/", "candidature/"),
+        "reference": notification.related_candidature.reference if notification.related_candidature else None,
     }
 
     template_name = "emails/notification_candidature.html"
 
-    try:
-        html_message = render_to_string(template_name, context)
-    except Exception:
-        html_message = f"""
-        <html>
-        <body>
-            <h2>Bonjour {notification.recipient_name},</h2>
-            <p>{notification.message}</p>
-        </body>
-        </html>
-        """
 
     try:
-        send_mail(
-            subject=f"[EPSFe] {notification.title}",
-            message=notification.message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[notification.recipient_email],
-            html_message=html_message,
+        send_templated_email(
+            subject=f"[ESFE] {notification.title}",
+            recipient=notification.recipient_email,
+            html_template=template_name,
+            context=context,
             fail_silently=False,
         )
 
@@ -62,8 +57,8 @@ def send_notification_email(notification_id):
 
         return True
 
-    except Exception as e:
-        print(f"Erreur envoi email: {e}")
+    except Exception:
+        logger.exception("Echec envoi notification candidature id=%s", notification_id)
         return False
 
 

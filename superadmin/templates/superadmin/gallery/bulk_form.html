@@ -1,0 +1,57 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Upload en lot{% endblock %}
+{% block page_subtitle %}Import rapide de médias (images et vidéos){% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" class="space-y-4">
+                {% csrf_token %}
+
+                <div>
+                    <label for="event" class="form-label">Événement cible *</label>
+                    <select id="event" name="event" required class="form-input">
+                        <option value="">Choisir...</option>
+                        {% for event in events %}
+                        <option value="{{ event.pk }}" {% if selected_event_id == event.pk|stringformat:'s' %}selected{% endif %}>
+                            {{ event.title }} ({{ event.event_date|date:'d/m/Y' }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="media_files" class="form-label">Fichiers média *</label>
+                    <input id="media_files" type="file" name="media_files" multiple required class="form-input" accept="image/*,video/*">
+                    <p class="text-xs text-slate-500 mt-2 mb-0">
+                        Sélection multiple autorisée. Limite: 50 fichiers par envoi.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" name="use_filename_caption" checked>
+                        Utiliser le nom du fichier comme légende
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" name="is_featured">
+                        Marquer tous les médias en avant
+                    </label>
+                </div>
+
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    Types supportés: JPG, PNG, WEBP, GIF, MP4, MOV, AVI, MKV, WEBM, M4V.
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary">Importer en lot</button>
+                    <a href="{% url 'superadmin:gallery_list' %}" class="btn btn-outline">Retour galerie</a>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

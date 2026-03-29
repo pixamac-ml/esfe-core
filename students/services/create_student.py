@@ -2,7 +2,6 @@ import secrets
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.core.exceptions import ValidationError
 
 from students.models import Student
 
@@ -15,8 +14,8 @@ def create_student_after_first_payment(inscription):
 
     RÈGLES MÉTIER :
 
-    - La candidature doit être ACCEPTÉE
-    - L'inscription doit être ACTIVE
+    - La candidature doit être ACCEPTÉE (ou ACCEPTÉE SOUS RÉSERVE)
+    - L'inscription doit avoir un statut de paiement éligible (partiel ou active)
     - Un étudiant ne peut exister qu'une seule fois par inscription
     - La fonction est idempotente (appel multiple sans duplication)
     """
@@ -27,13 +26,12 @@ def create_student_after_first_payment(inscription):
     # VALIDATIONS MÉTIER
     # ==================================================
 
-    if candidature.status != "accepted":
-        raise ValidationError(
-            "Impossible de créer un étudiant : candidature non acceptée."
-        )
+    if candidature.status not in {"accepted", "accepted_with_reserve"}:
+        # Ne pas casser le pipeline post-commit si la candidature n'est pas encore éligible.
+        return None
 
-    if inscription.status != "active":
-        # Sécurité supplémentaire
+    if inscription.status not in {"partial_paid", "active"}:
+        # Création du compte dès le premier paiement validé (généralement partial_paid).
         return None
 
     # ==================================================

@@ -1,58 +1,92 @@
 {% extends "superadmin/base.html" %}
-{% load static %}
+{% load humanize %}
 
 {% block page_title %}Gestion des Paiements{% endblock %}
-{% block page_subtitle %}Consulter et gérer les transactions de paiement{% endblock %}
+{% block page_subtitle %}Suivi financier des transactions et du recouvrement{% endblock %}
 
 {% block content_main %}
-<div class="fade-in space-y-6">
-
-    <!-- ========================================
-         BARRE D'ACTIONS & RECHERCHE (HTMX)
-    ======================================== -->
-    <div class="card p-4">
-        <div class="flex flex-col lg:flex-row gap-4 items-center justify-between">
-
-            <!-- Formulaire de recherche dynamique -->
-            <form hx-get="{% url 'superadmin:payment_list' %}"
-                  hx-target="#payments-table-container"
-                  hx-trigger="keyup changed delay:500ms, change"
-                  hx-indicator=".loader"
-                  class="flex-1 flex items-center w-full max-w-2xl">
-
-                <div class="search-box flex-1 relative">
-                    <i class="fas fa-search"></i>
-                    <input type="text" name="search"
-                           placeholder="Rechercher par étudiant, montant ou référence..."
-                           value="{{ filters.search|default:'' }}"
-                           class="w-full">
-
-                    <!-- Indicateur visuel pendant que HTMX travaille -->
-                    <div class="loader htmx-indicator absolute right-3 top-3">
-                        <i class="fas fa-spinner fa-spin text-secondary"></i>
-                    </div>
-                </div>
-            </form>
-
-            <!-- Boutons d'export / Actions -->
-            <div class="flex gap-2">
-                <a href="{% url 'superadmin:export_data' 'payments' %}" class="btn btn-outline">
-                    <i class="fas fa-file-export mr-2"></i>Exporter CSV
-                </a>
-                <!-- Si tu as une vue de création de paiement, ajoute le bouton ici -->
-            </div>
+<div class="space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total encaissé</p>
+            <p class="text-2xl font-bold text-emerald-700">{{ summary.total_validated|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500">FCFA validés</p>
         </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total en attente</p>
+            <p class="text-2xl font-bold text-amber-700">{{ summary.total_pending|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500">FCFA pending</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Taux de recouvrement</p>
+            <p class="text-2xl font-bold text-[var(--primary)]">{{ summary.recovery_rate|default:0 }}%</p>
+            <p class="text-xs text-slate-500">sur {{ summary.total_due|default:0|intcomma }} FCFA dus</p>
+        </div>
+        <div class="card p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Transactions</p>
+            <p class="text-2xl font-bold text-slate-900">{{ summary.total_count|default:0|intcomma }}</p>
+            <p class="text-xs text-slate-500">dans le périmètre filtré</p>
+        </div>
+    </section>
+
+    <div class="card p-4">
+        <form id="payment-filter-form"
+              method="get"
+              class="grid grid-cols-1 md:grid-cols-7 gap-3"
+              hx-get="{% url 'superadmin:payment_list' %}"
+              hx-target="#payments-table-container"
+              hx-swap="innerHTML"
+              hx-trigger="keyup changed delay:350ms, change, submit">
+            <div class="md:col-span-2">
+                <input type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Recherche: étudiant, référence, reçu..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+            <div>
+                <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous statuts</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="method" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Toutes méthodes</option>
+                    {% for value, label in method_choices %}
+                    <option value="{{ value }}" {% if filters.method == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous programmes</option>
+                    {% for p in programmes %}
+                    <option value="{{ p.id }}" {% if filters.programme_id == p.id %}selected{% endif %}>{{ p.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="academic_year" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Toutes années</option>
+                    {% for year in academic_years %}
+                    <option value="{{ year }}" {% if filters.academic_year == year %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:payment_list' %}" class="btn btn-outline">Réinitialiser</a>
+            </div>
+        </form>
     </div>
 
-    <!-- ========================================
-         ZONE DE LA TABLE (Injectée par HTMX)
-    ======================================== -->
-    <div class="card shadow-sm border-slate-100 overflow-hidden">
-        <div id="payments-table-container">
-            <!-- On inclut le partial que nous avons créé juste avant -->
+    <div class="card overflow-hidden">
+        <div id="payments-table-container"
+             hx-get="{% url 'superadmin:payment_list' %}"
+             hx-trigger="refreshPayments from:body"
+             hx-target="this"
+             hx-swap="innerHTML"
+             hx-include="#payment-filter-form">
             {% include "superadmin/payments/_payment_table.html" %}
         </div>
     </div>
-
 </div>
 {% endblock %}

@@ -1,0 +1,48 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ event.title }}{% endblock %}
+{% block page_subtitle %}Détail de l'événement et de ses médias{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-semibold text-slate-900 mb-0">{{ event.title }}</h2>
+                <p class="text-xs text-slate-500 mb-0">{{ event.event_type.name|default:'-' }} - {{ event.event_date|date:'d/m/Y' }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{% url 'superadmin:event_edit' event.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                <a href="{% url 'superadmin:gallery_create' %}?event={{ event.pk }}" class="btn btn-primary btn-sm">Ajouter média</a>
+                <a href="{% url 'superadmin:gallery_bulk_upload' %}?event={{ event.pk }}" class="btn btn-secondary btn-sm">Upload en lot</a>
+                <a href="{% url 'superadmin:event_list' %}" class="btn btn-outline btn-sm">Retour liste</a>
+            </div>
+        </div>
+        <div class="card-body space-y-3">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{{ event.description|default:'-' }}</div>
+            <p class="text-sm text-slate-600 mb-0">Statut: {% if event.is_published %}<span class="badge-status badge-success">Publié</span>{% else %}<span class="badge-status badge-draft">Brouillon</span>{% endif %}</p>
+        </div>
+    </section>
+
+    <section class="card rounded-xl border border-slate-100 shadow-sm p-4">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-800 mb-0">Médias liés</h3>
+            <a href="{% url 'superadmin:gallery_list' %}?event={{ event.pk }}" class="btn btn-outline btn-sm">Gérer la galerie</a>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for media in media_items %}
+            <article class="rounded-lg border border-slate-200 p-3 bg-white">
+                {% if media.thumbnail %}
+                <img src="{{ media.thumbnail.url }}" alt="thumb" class="w-full h-32 object-cover rounded-md mb-2">
+                {% endif %}
+                <p class="text-xs text-slate-500 mb-1">{{ media.get_media_type_display }}{% if media.is_featured %} - mis en avant{% endif %}</p>
+                <p class="text-sm text-slate-700 mb-0">{{ media.caption|default:'Sans légende' }}</p>
+            </article>
+            {% empty %}
+            <p class="text-sm text-slate-500">Aucun média pour cet événement.</p>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+

@@ -1,0 +1,98 @@
+{% load humanize %}
+
+<form id="inscription-bulk-form" method="post" action="{% url 'superadmin:inscription_bulk_action' %}" class="hidden">
+    {% csrf_token %}
+</form>
+
+<div class="overflow-x-auto">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="w-10"><input type="checkbox" aria-label="Tout sélectionner" onclick="document.querySelectorAll('input[form=inscription-bulk-form][name=selected]').forEach(cb => cb.checked = this.checked)"></th>
+                    <th>Inscription</th>
+                    <th>Candidat</th>
+                    <th>Programme</th>
+                    <th>Année</th>
+                    <th class="text-right">Montant dû</th>
+                    <th class="text-right">Payé</th>
+                    <th>Statut</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inscription in inscriptions %}
+                <tr>
+                    <td><input type="checkbox" form="inscription-bulk-form" name="selected" value="{{ inscription.pk }}" aria-label="Sélectionner inscription {{ inscription.pk }}"></td>
+                    <td>
+                        <div class="font-medium text-slate-800">{{ inscription.public_token }}</div>
+                        <div class="text-xs text-slate-500">{{ inscription.reference }}</div>
+                        {% if inscription.has_validated_payment and not inscription.student_pk %}
+                        <div class="mt-1 text-[11px] font-medium text-amber-700">⚠ Paiement validé sans compte étudiant</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="font-medium text-slate-800">{{ inscription.candidature.full_name }}</div>
+                        <div class="text-xs text-slate-500">{{ inscription.student_matricule|default:inscription.candidature.email }}</div>
+                    </td>
+                    <td>
+                        <div class="font-medium text-slate-800">{{ inscription.candidature.programme.title }}</div>
+                        <div class="text-xs text-slate-500">{{ inscription.candidature.branch.name|default:'-' }}</div>
+                    </td>
+                    <td>{{ inscription.candidature.academic_year }}</td>
+                    <td class="text-right font-semibold text-slate-800">{{ inscription.amount_due|intcomma }}</td>
+                    <td class="text-right font-semibold {% if inscription.amount_paid >= inscription.amount_due %}text-emerald-700{% elif inscription.amount_paid > 0 %}text-amber-700{% else %}text-slate-700{% endif %}">{{ inscription.amount_paid|intcomma }}</td>
+                    <td>
+                        <span class="badge-status badge-{% if inscription.status == 'active' %}success{% elif inscription.status == 'partial_paid' %}warning{% elif inscription.status == 'awaiting_payment' %}info{% elif inscription.status == 'cancelled' %}danger{% else %}draft{% endif %}">{{ inscription.get_status_display }}</span>
+                        {% if inscription.student_pk %}
+                        <div class="text-xs text-emerald-700 mt-1">Compte étudiant créé</div>
+                        {% elif inscription.has_validated_payment %}
+                        <div class="text-xs text-amber-700 mt-1">Compte étudiant manquant</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        <div class="inline-flex items-center gap-1">
+                            <a href="{% url 'superadmin:inscription_detail' inscription.pk %}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a>
+                            <a href="{% url 'superadmin:inscription_certificate' inscription.pk %}" target="_blank" class="btn btn-sm btn-outline"><i class="fas fa-file-pdf"></i></a>
+                            <form method="post" action="{% url 'superadmin:inscription_confirm_payment' inscription.pk %}" class="inline-block">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-check"></i></button>
+                            </form>
+                            <form method="post" action="{% url 'superadmin:inscription_relance' inscription.pk %}" class="inline-block">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-bell"></i></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="py-10 text-center text-slate-500">Aucune inscription trouvée pour ces critères.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+</div>
+
+{% if inscriptions.has_other_pages %}
+<div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100">
+    <p class="text-sm text-slate-500">Page {{ inscriptions.number }} / {{ inscriptions.paginator.num_pages }} ({{ inscriptions.paginator.count }} résultats)</p>
+    <div class="flex items-center gap-1">
+        {% if inscriptions.has_previous %}
+            <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&academic_year={{ filters.academic_year|urlencode }}&page={{ inscriptions.previous_page_number }}">&laquo;</a>
+        {% endif %}
+        {% for num in inscriptions.paginator.page_range %}
+            {% if num >= inscriptions.number|add:'-2' and num <= inscriptions.number|add:'2' %}
+                {% if num == inscriptions.number %}
+                    <span class="btn btn-sm btn-primary">{{ num }}</span>
+                {% else %}
+                    <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&academic_year={{ filters.academic_year|urlencode }}&page={{ num }}">{{ num }}</a>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% if inscriptions.has_next %}
+            <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&academic_year={{ filters.academic_year|urlencode }}&page={{ inscriptions.next_page_number }}">&raquo;</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+

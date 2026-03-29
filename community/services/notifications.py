@@ -2,16 +2,18 @@
 Services de notifications enrichis pour la communauté ESFE
 Gère les notifications multi-canal : DB + WebSocket + Email
 """
-import json
+import logging
+from urllib.parse import urljoin
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from django.core.mail import send_mail
 from django.conf import settings
-from django.db.models import Count
-
 from community.models import Notification
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_notification(
@@ -101,12 +103,12 @@ def create_notification(
                 message=_build_email_content(notification),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
-                fail_silently=True
+                fail_silently=False,
             )
             notification.email_sent = True
             notification.save(update_fields=["email_sent"])
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.exception("Echec envoi email notification communaute id=%s: %s", notification.id, exc)
 
     return notification
 
@@ -134,8 +136,6 @@ def notify_new_topic(topic, author):
     """
     Notifie tous les abonnés de la catégorie lors d'un nouveau sujet.
     """
-    from community.models import Category
-
     category = topic.category
 
     # Récupérer les abonnés (sauf l'auteur)
@@ -292,8 +292,8 @@ def _build_email_content(notification):
     message = build_message(notification)
     url = notification.get_target_url
 
-    base_url = getattr(settings, "BASE_URL", "https://esfe.fr")
-    full_url = f"{base_url}{url}"
+    base_url = getattr(settings, "BASE_URL", "https://www.esfe-mali.org")
+    full_url = urljoin(base_url.rstrip("/") + "/", str(url).lstrip("/"))
 
     return f"""
 Bonjour {notification.user.get_full_name() or notification.user.username},

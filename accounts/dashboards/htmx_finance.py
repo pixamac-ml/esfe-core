@@ -250,6 +250,16 @@ def create_cash_session_htmx(request):
         id=inscription_id
     )
 
+    if inscription.status not in {
+        Inscription.STATUS_CREATED,
+        Inscription.STATUS_AWAITING_PAYMENT,
+        Inscription.STATUS_PARTIAL,
+    }:
+        return HttpResponse(
+            "<div class='text-red-500 p-4'>Cette inscription n'est pas dans un etat payable.</div>",
+            status=400
+        )
+
     # Vérifier qu'il n'y a pas déjà une session active pour cette inscription
     existing_session = CashPaymentSession.objects.filter(
         inscription=inscription,

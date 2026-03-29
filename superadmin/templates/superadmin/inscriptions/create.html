@@ -1,85 +1,66 @@
 {% extends "superadmin/base.html" %}
-{% load static %}
+{% load humanize %}
 
 {% block page_title %}Créer une inscription{% endblock %}
-{% block page_subtitle %}À partir d'une candidature acceptée{% endblock %}
+{% block page_subtitle %}Initialiser une inscription depuis une candidature validée{% endblock %}
 
 {% block content_main %}
-<div class="fade-in">
-
-    <div style="max-width: 600px; margin: 0 auto;">
-        <div class="card" style="padding: 32px;">
-            <h2 style="font-size: 24px; font-weight: 700; color: #1f2937; margin-bottom: 24px; text-align: center;">
-                Créer une inscription
-            </h2>
-
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-xl font-bold tracking-tight text-slate-900 mb-1">Création d'inscription</h2>
+                <p class="text-sm text-slate-500 mb-0">Le dossier est rattaché à la candidature d'origine et reprend automatiquement le contexte académique.</p>
+            </div>
+        </div>
+        <div class="card-body">
             {% if candidature %}
-            <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-                <h3 style="font-size: 16px; font-weight: 600; color: #0c4a6e; margin-bottom: 12px;">
-                    Candidature sélectionnée
-                </h3>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <p style="color: #374151;">
-                        <strong>Candidat:</strong> {{ candidature.full_name }}
-                    </p>
-                    <p style="color: #374151;">
-                        <strong>Programme:</strong> {{ candidature.programme.title }}
-                    </p>
-                    <p style="color: #374151;">
-                        <strong>Statut:</strong>
-                        <span class="badge-status badge-{% if candidature.status == 'accepted' %}success{% elif candidature.status == 'accepted_with_reserve' %}warning{% else %}danger{% endif %}">
-                            {% if candidature.status == 'accepted' %}Acceptée
-                            {% elif candidature.status == 'accepted_with_reserve' %}Sous réserve
-                            {% else %}Non éligible
-                            {% endif %}
-                        </span>
-                    </p>
+            <div class="mb-6 rounded-xl border border-sky-200 bg-sky-50 p-4">
+                <p class="text-sm font-semibold text-sky-900 mb-2">Candidature source</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div><span class="text-sky-700">Candidat</span><p class="font-medium text-slate-800 mb-0">{{ candidature.full_name }}</p></div>
+                    <div><span class="text-sky-700">Programme</span><p class="font-medium text-slate-800 mb-0">{{ candidature.programme.title }}</p></div>
+                    <div><span class="text-sky-700">Campus</span><p class="font-medium text-slate-800 mb-0">{{ candidature.branch.name|default:'-' }}</p></div>
+                    <div><span class="text-sky-700">Statut candidature</span><p class="font-medium text-slate-800 mb-0">{{ candidature.get_status_display }}</p></div>
                 </div>
             </div>
 
-            <form method="POST" style="display: flex; flex-direction: column; gap: 24px;">
+            <form method="post" class="space-y-5">
                 {% csrf_token %}
                 <input type="hidden" name="candidature" value="{{ candidature.pk }}">
 
-                <div class="form-group">
-                    <label for="amount_due" class="form-label">Montant dû (F CFA)</label>
-                    <input type="number" id="amount_due" name="amount_due" class="form-input"
-                           value="{{ amount_due|default:500000 }}" min="0" step="1000" required>
-                    <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-                        Montant calculé automatiquement selon le programme et l'année d'entrée
-                    </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="amount_due" class="block text-sm font-medium text-slate-700 mb-1">Montant dû</label>
+                        <input id="amount_due" type="number" name="amount_due" class="w-full rounded-lg border border-slate-300 px-3 py-2" value="{{ amount_due|default:500000 }}" min="0" step="1000" required>
+                        <p class="mt-1 text-xs text-slate-500">Montant suggéré selon le programme et l'année d'entrée.</p>
+                    </div>
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-slate-700 mb-1">Statut initial</label>
+                        <select id="status" name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if value == 'created' %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="status" class="form-label">Statut initial</label>
-                    <select id="status" name="status" class="form-select" required>
-                        <option value="awaiting_payment">En attente de paiement</option>
-                        <option value="active">Active</option>
-                        <option value="suspended">Suspendue</option>
-                    </select>
-                </div>
-
-                <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                    <a href="{% url 'superadmin:candidature_detail' candidature.pk %}" class="btn btn-outline">
-                        Annuler
-                    </a>
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-user-plus mr-2"></i>Créer l'inscription
-                    </button>
+                <div class="flex justify-end gap-2">
+                    <a href="{% url 'superadmin:candidature_detail' candidature.pk %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i>Créer l'inscription</button>
                 </div>
             </form>
             {% else %}
-            <div style="text-align: center; padding: 40px; color: #9ca3af;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
-                <p style="font-size: 16px; font-weight: 500; color: #6b7280; margin-bottom: 4px;">Aucune candidature sélectionnée</p>
-                <p style="font-size: 14px;">Veuillez revenir à la liste des candidatures et utiliser le bouton "Créer inscription".</p>
-                <a href="{% url 'superadmin:candidature_list' %}" class="btn btn-primary" style="margin-top: 16px;">
-                    Retour aux candidatures
-                </a>
+            <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center">
+                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-200 text-slate-500">
+                    <i class="fas fa-circle-exclamation"></i>
+                </div>
+                <p class="text-base font-semibold text-slate-700 mb-1">Aucune candidature sélectionnée</p>
+                <p class="text-sm text-slate-500 mb-4">Utilise le bouton de création depuis la fiche d'une candidature acceptée.</p>
+                <a href="{% url 'superadmin:candidature_list' %}" class="btn btn-primary">Retour aux candidatures</a>
             </div>
             {% endif %}
         </div>
     </div>
-
 </div>
 {% endblock %}

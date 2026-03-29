@@ -1,78 +1,75 @@
-<div id="students-table-container" class="overflow-x-auto">
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Étudiant</th>
-                <th>Matricule</th>
-                <th>Email / Tel</th>
-                <th>Inscriptions</th>
-                <th class="text-right">Actions</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-            {% for student in students %}
-            <tr class="hover:bg-slate-50 transition-colors">
-                <td>
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold shadow-sm">
-                            {{ student.user.first_name|slice:":1" }}{{ student.user.last_name|slice:":1" }}
-                        </div>
-                        <div class="flex flex-col">
-                            <span class="font-bold text-slate-700">{{ student.user.get_full_name }}</span>
-                            <span class="text-xs text-slate-400">Inscrit le {{ student.created_at|date:"d M Y" }}</span>
-                        </div>
-                    </div>
-                </td>
-                <td>
-                    <code class="text-xs bg-slate-100 px-2 py-1 rounded font-mono text-primary">{{ student.matricule|default:"SANS-MAT" }}</code>
-                </td>
-                <td>
-                    <div class="flex flex-col text-sm">
-                        <span class="text-slate-600"><i class="fas fa-envelope mr-1 text-xs"></i> {{ student.user.email }}</span>
-                        <span class="text-slate-400 text-xs"><i class="fas fa-phone mr-1 text-xs"></i> {{ student.phone|default:"Non renseigné" }}</span>
-                    </div>
-                </td>
-                <td>
-                    <span class="badge-status {% if student.inscriptions.count > 0 %}badge-success{% else %}badge-draft{% endif %}">
-                        {{ student.inscriptions.count }} inscription{{ student.inscriptions.count|pluralize }}
-                    </span>
-                </td>
-                <td class="text-right">
-                    <div class="flex justify-end gap-2">
-                        <a href="{% url 'superadmin:student_detail' student.pk %}" class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-primary hover:border-primary">
-                            <i class="fas fa-user-graduate"></i>
-                        </a>
-                        <a href="{% url 'superadmin:student_edit' student.pk %}" class="btn-icon btn-outline border-slate-200 text-slate-400 hover:text-secondary hover:border-secondary">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5" class="py-12 text-center text-slate-400 italic">
-                    <i class="fas fa-user-slash mb-3 text-3xl block"></i>
-                    Aucun étudiant trouvé...
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+{% load humanize %}
 
-    <!-- Pagination -->
+<div class="p-4 md:p-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {% for student in students %}
+        <article class="rounded-xl border border-slate-100 bg-white shadow-sm p-4 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="h-11 w-11 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center font-semibold shrink-0">
+                        {{ student.user.first_name|slice:":1" }}{{ student.user.last_name|slice:":1" }}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-slate-900 truncate">{{ student.user.get_full_name|default:student.user.username }}</p>
+                        <p class="text-xs text-slate-500 truncate">{{ student.user.email|default:"-" }}</p>
+                    </div>
+                </div>
+                <span class="badge-status {% if student.is_active %}badge-success{% else %}badge-draft{% endif %}">{% if student.is_active %}Actif{% else %}Inactif{% endif %}</span>
+            </div>
+
+            <div class="mt-4 space-y-2 text-sm">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-slate-500">Matricule</span>
+                    <span class="font-mono text-xs rounded bg-slate-100 px-2 py-1 text-slate-700">{{ student.matricule }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-slate-500">Programme</span>
+                    <span class="font-medium text-slate-800 text-right">{{ student.inscription.candidature.programme.title|default:"-" }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-slate-500">Campus</span>
+                    <span class="font-medium text-slate-800 text-right">{{ student.inscription.candidature.branch.name|default:"-" }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-slate-500">Total validé</span>
+                    <span class="font-semibold text-emerald-700">{{ student.validated_amount|default:0|intcomma }} FCFA</span>
+                </div>
+            </div>
+
+            <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                <span class="text-xs text-slate-500">Créé le {{ student.created_at|date:"d/m/Y" }}</span>
+                <div class="inline-flex items-center gap-1">
+                    <a href="{% url 'superadmin:student_detail' student.pk %}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a>
+                    <a href="{% url 'superadmin:student_edit' student.pk %}" class="btn btn-sm btn-outline"><i class="fas fa-pen"></i></a>
+                </div>
+            </div>
+        </article>
+        {% empty %}
+        <div class="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center">
+            <i class="fas fa-user-slash text-3xl text-slate-300"></i>
+            <p class="mt-3 text-sm font-medium text-slate-600">Aucun étudiant trouvé pour ces filtres.</p>
+        </div>
+        {% endfor %}
+    </div>
+
     {% if students.has_other_pages %}
-    <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-        <span class="text-sm text-slate-500">Page {{ students.number }} / {{ students.paginator.num_pages }}</span>
-        <div class="flex gap-2">
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        <p class="text-sm text-slate-500">Page {{ students.number }} / {{ students.paginator.num_pages }} ({{ students.paginator.count }} résultats)</p>
+        <div class="flex items-center gap-1">
             {% if students.has_previous %}
-                <button hx-get="?page={{ students.previous_page_number }}&search={{ search }}" hx-target="#students-table-container" class="btn btn-outline btn-sm bg-white">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
+                <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&page={{ students.previous_page_number }}">&laquo;</a>
             {% endif %}
+            {% for num in students.paginator.page_range %}
+                {% if num >= students.number|add:'-2' and num <= students.number|add:'2' %}
+                    {% if num == students.number %}
+                        <span class="btn btn-sm btn-primary">{{ num }}</span>
+                    {% else %}
+                        <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&page={{ num }}">{{ num }}</a>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
             {% if students.has_next %}
-                <button hx-get="?page={{ students.next_page_number }}&search={{ search }}" hx-target="#students-table-container" class="btn btn-outline btn-sm bg-white">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
+                <a class="btn btn-sm btn-outline" href="?search={{ filters.search|urlencode }}&status={{ filters.status|urlencode }}&programme={{ filters.programme|urlencode }}&page={{ students.next_page_number }}">&raquo;</a>
             {% endif %}
         </div>
     </div>

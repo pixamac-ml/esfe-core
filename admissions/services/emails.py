@@ -1,6 +1,6 @@
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-from django.conf import settings
+from django.core.mail import send_mail
+
+from core.emailing import send_templated_email
 
 
 # ======================================================
@@ -12,17 +12,24 @@ def send_institutional_email(subject, template, context, recipient):
     Envoi d'un email institutionnel HTML + texte.
     """
 
-    html_content = render_to_string(template, context)
-
-    email = EmailMultiAlternatives(
-        subject=subject,
-        body="",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[recipient],
-    )
-
-    email.attach_alternative(html_content, "text/html")
-    email.send()
+    try:
+        return send_templated_email(
+            subject=subject,
+            recipient=recipient,
+            html_template=template,
+            context=context,
+            fail_silently=False,
+        )
+    except Exception:
+        # Fallback text si le template HTML a un souci.
+        send_mail(
+            subject=subject,
+            message=context.get("fallback_message", "Notification institutionnelle."),
+            from_email=None,
+            recipient_list=[recipient],
+            fail_silently=False,
+        )
+        return True
 
 
 # ======================================================
@@ -31,18 +38,72 @@ def send_institutional_email(subject, template, context, recipient):
 
 def send_application_accepted_email(candidature):
 
-    subject = "Admission confirmée - École de Santé Félix Houphouët-Boigny"
+    subject = "[ESFE] Admission confirmée"
 
     context = {
         "title": "Votre candidature a été acceptée",
         "first_name": candidature.first_name,
-        "programme": candidature.programme,
+        "programme": candidature.programme.title,
         "academic_year": candidature.academic_year,
+        "candidature_reference": candidature.reference,
+        "fallback_message": (
+            f"Votre candidature ({candidature.reference}) a ete acceptee. "
+            "Veuillez proceder a l'inscription."
+        ),
     }
 
     send_institutional_email(
         subject,
         "emails/admission_accepted.html",
+        context,
+        candidature.email,
+    )
+
+
+def send_application_under_review_email(candidature):
+
+    subject = "[ESFE] Candidature en cours d'analyse"
+
+    context = {
+        "title": "Votre candidature est en cours d'analyse",
+        "first_name": candidature.first_name,
+        "programme": candidature.programme.title,
+        "academic_year": candidature.academic_year,
+        "candidature_reference": candidature.reference,
+        "fallback_message": (
+            f"Votre candidature ({candidature.reference}) est en cours d'analyse. "
+            "Nous revenons vers vous rapidement."
+        ),
+    }
+
+    send_institutional_email(
+        subject,
+        "emails/admission_under_review.html",
+        context,
+        candidature.email,
+    )
+
+
+def send_application_accepted_with_reserve_email(candidature):
+
+    subject = "[ESFE] Admission sous réserve"
+
+    context = {
+        "title": "Votre candidature est acceptee sous reserve",
+        "first_name": candidature.first_name,
+        "programme": candidature.programme.title,
+        "academic_year": candidature.academic_year,
+        "candidature_reference": candidature.reference,
+        "comment": candidature.admin_comment or "Veuillez finaliser les conditions indiquees par l'administration.",
+        "fallback_message": (
+            f"Votre candidature ({candidature.reference}) est acceptee sous reserve. "
+            "Veuillez consulter les conditions a remplir."
+        ),
+    }
+
+    send_institutional_email(
+        subject,
+        "emails/admission_accepted_with_reserve.html",
         context,
         candidature.email,
     )
@@ -54,7 +115,7 @@ def send_application_accepted_email(candidature):
 
 def send_application_rejected_email(candidature):
 
-    subject = "Décision concernant votre candidature"
+    subject = "[ESFE] Décision concernant votre candidature"
 
     reason = candidature.admin_comment or "Votre dossier ne remplit pas les critères requis."
 
@@ -62,6 +123,11 @@ def send_application_rejected_email(candidature):
         "title": "Décision concernant votre candidature",
         "first_name": candidature.first_name,
         "reason": reason,
+        "candidature_reference": candidature.reference,
+        "fallback_message": (
+            f"Votre candidature ({candidature.reference}) n'a pas ete retenue. "
+            f"Motif: {reason}"
+        ),
     }
 
     send_institutional_email(
@@ -78,7 +144,7 @@ def send_application_rejected_email(candidature):
 
 def send_application_to_complete_email(candidature):
 
-    subject = "Votre dossier de candidature doit être complété"
+    subject = "[ESFE] Votre dossier de candidature doit être complété"
 
     comment = candidature.admin_comment or "Veuillez vérifier les documents demandés."
 
@@ -86,6 +152,11 @@ def send_application_to_complete_email(candidature):
         "title": "Votre dossier doit être complété",
         "first_name": candidature.first_name,
         "comment": comment,
+        "candidature_reference": candidature.reference,
+        "fallback_message": (
+            f"Votre candidature ({candidature.reference}) doit etre completee. "
+            f"Commentaire: {comment}"
+        ),
     }
 
     send_institutional_email(
@@ -94,3 +165,4 @@ def send_application_to_complete_email(candidature):
         context,
         candidature.email,
     )
+

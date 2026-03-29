@@ -1,0 +1,238 @@
+﻿<div class="space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-xs text-slate-500 mb-1">Candidatures en attente</p>
+            <p class="text-2xl font-bold text-slate-900 mb-0">{{ candidatures_pending }}</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-xs text-slate-500 mb-1">Inscriptions actives</p>
+            <p class="text-2xl font-bold text-slate-900 mb-0">{{ inscriptions_active }}</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-xs text-slate-500 mb-1">Messages non lus</p>
+            <p class="text-2xl font-bold text-slate-900 mb-0">{{ messages_unread }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <section class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <header class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+                <div>
+                    <p class="text-sm font-semibold text-slate-900 mb-0">Finance & Inscriptions</p>
+                    <p class="text-xs text-slate-500 mb-0">Paiements terrain et anomalies de workflow</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="{% url 'superadmin:payment_list' %}" class="text-[11px] font-semibold text-[var(--primary)] no-underline hover:opacity-80">Paiements</a>
+                    <a href="{% url 'superadmin:inscription_list' %}" class="text-[11px] font-semibold text-[var(--primary)] no-underline hover:opacity-80">Inscriptions</a>
+                </div>
+            </header>
+            <div class="p-4 space-y-3">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-semibold text-slate-700 mb-0">Codes cash actifs (poste dossier)</p>
+                        <span class="inline-flex items-center rounded-full bg-slate-200 text-slate-700 px-2 py-0.5 text-[11px] font-semibold">{{ recent_cash_sessions|length }}</span>
+                    </div>
+                    {% if recent_cash_sessions %}
+                        <div class="space-y-2">
+                            {% for session in recent_cash_sessions %}
+                                <div class="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs">
+                                    <p class="font-semibold text-slate-900 mb-0">{{ session.inscription.candidature.full_name }}</p>
+                                    <p class="text-slate-600 mb-0">{{ session.inscription.public_token }} - Agent <span class="font-mono">{{ session.agent.agent_code|default:"N/A" }}</span></p>
+                                    <p class="text-slate-700 mb-0">Code: <span class="font-mono font-semibold">{{ session.verification_code|default:"-" }}</span> - Expire {{ session.expires_at|date:"d/m H:i" }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-xs text-slate-500 mb-0">Aucun code cash actif.</p>
+                    {% endif %}
+                </div>
+
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-semibold text-amber-800 mb-0">Paiements validés sans compte étudiant</p>
+                        <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-semibold">{{ missing_student_inscriptions|length }}</span>
+                    </div>
+                    {% if missing_student_inscriptions %}
+                        <div class="space-y-2">
+                            {% for inscription in missing_student_inscriptions %}
+                                <a href="{% url 'superadmin:inscription_detail' inscription.pk %}" class="block rounded-md border border-amber-200 bg-white/90 px-3 py-2 text-xs no-underline hover:bg-amber-100/40">
+                                    <p class="font-semibold text-slate-900 mb-0">{{ inscription.candidature.full_name }}</p>
+                                    <p class="text-slate-600 mb-0">{{ inscription.candidature.programme.title }} - {{ inscription.public_token }}</p>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-xs text-amber-800/80 mb-0">Aucune anomalie détectée.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="rounded-xl border border-indigo-200 bg-indigo-50/60 shadow-sm overflow-hidden">
+            <header class="px-4 py-3 border-b border-indigo-100 flex items-center justify-between gap-2">
+                <div>
+                    <p class="text-sm font-semibold text-indigo-900 mb-0">Emails & Notifications</p>
+                    <p class="text-xs text-indigo-700 mb-0">Pilotage de la file d'envoi</p>
+                </div>
+                <span class="inline-flex items-center rounded-full {% if pending_notifications_count %}bg-indigo-100 text-indigo-800{% else %}bg-emerald-100 text-emerald-800{% endif %} text-xs font-semibold px-2.5 py-1">{{ pending_notifications_count }}</span>
+            </header>
+            <div class="p-4 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-[11px] text-indigo-700 mb-0">
+                        {% if pending_notifications_oldest_at %}Plus ancienne: {{ pending_notifications_oldest_at|date:"d/m/Y H:i" }}{% else %}Aucune notification en attente.{% endif %}
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="{% url 'admin:core_notification_changelist' %}?email_sent__exact=0" target="_blank" rel="noopener" class="rounded-md border border-indigo-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 no-underline">Rapport</a>
+                        <form method="post" action="{% url 'superadmin:dashboard_notifications_action' %}" class="inline">{% csrf_token %}<input type="hidden" name="action" value="mark_old_done"><button type="submit" class="rounded-md border border-indigo-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100" onclick="return confirm('Traiter les notifications de plus de 7 jours ?')">Traiter +7j</button></form>
+                        <form method="post" action="{% url 'superadmin:dashboard_notifications_action' %}" class="inline">{% csrf_token %}<input type="hidden" name="action" value="mark_all_done"><button type="submit" class="rounded-md border border-indigo-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100" onclick="return confirm('Traiter toute la file de notifications email ?')">Tout traiter</button></form>
+                    </div>
+                </div>
+
+                {% if pending_notification_types %}
+                    <div class="space-y-2">
+                        {% for row in pending_notification_types %}
+                            <div class="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-800 mb-0">{{ row.label }}</p>
+                                    <p class="text-[11px] text-slate-500 mb-0">Type: <span class="font-mono">{{ row.notification_type }}</span> - Depuis {{ row.oldest_at|date:"d/m/Y H:i" }}</p>
+                                </div>
+                                <div class="inline-flex items-center gap-2">
+                                    <span class="inline-flex items-center rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-semibold px-2 py-1">{{ row.total }}</span>
+                                    <form method="post" action="{% url 'superadmin:dashboard_notifications_action' %}" class="inline">{% csrf_token %}<input type="hidden" name="action" value="mark_type_done"><input type="hidden" name="notification_type" value="{{ row.notification_type }}"><button type="submit" class="rounded-md border border-indigo-300 bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100" onclick="return confirm('Traiter les notifications {{ row.label|escapejs }} ?')">Traiter</button></form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <section class="rounded-xl border border-sky-200 bg-sky-50/60 shadow-sm overflow-hidden">
+            <header class="px-4 py-3 border-b border-sky-100 flex items-center justify-between gap-2">
+                <div>
+                    <p class="text-sm font-semibold text-sky-900 mb-0">Content Hub</p>
+                    <p class="text-xs text-sky-700 mb-0">Blog, actualités et événements</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="{% url 'superadmin:article_list' %}?status=draft" class="text-[11px] font-semibold text-sky-700 no-underline hover:opacity-80">Brouillons</a>
+                    <a href="{% url 'superadmin:news_list' %}" class="text-[11px] font-semibold text-sky-700 no-underline hover:opacity-80">Ouvrir module</a>
+                </div>
+            </header>
+            <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="rounded-lg border border-sky-200 bg-white p-3 text-xs">
+                    <p class="font-semibold text-slate-800 mb-1">Blog</p>
+                    <p class="text-slate-600 mb-2">{{ blog_drafts_count }} brouillon(s)</p>
+                    {% if blog_next_draft %}
+                        <p class="text-[11px] text-slate-500 mb-2 truncate">{{ blog_next_draft.title }}</p>
+                        <form method="post" action="{% url 'superadmin:dashboard_content_quick_action' %}" class="inline">{% csrf_token %}<input type="hidden" name="model" value="article"><input type="hidden" name="pk" value="{{ blog_next_draft.pk }}"><button type="submit" class="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100" onclick="return confirm('Publier ce brouillon blog ?')">Publier</button></form>
+                    {% endif %}
+                </div>
+                <div class="rounded-lg border border-sky-200 bg-white p-3 text-xs">
+                    <p class="font-semibold text-slate-800 mb-1">Actualités</p>
+                    <p class="text-slate-600 mb-2">{{ news_drafts_count }} brouillon(s)</p>
+                    {% if news_next_draft %}
+                        <p class="text-[11px] text-slate-500 mb-2 truncate">{{ news_next_draft.titre }}</p>
+                        <form method="post" action="{% url 'superadmin:dashboard_content_quick_action' %}" class="inline">{% csrf_token %}<input type="hidden" name="model" value="news"><input type="hidden" name="pk" value="{{ news_next_draft.pk }}"><button type="submit" class="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100" onclick="return confirm('Publier cette actualité ?')">Publier</button></form>
+                    {% endif %}
+                </div>
+                <div class="rounded-lg border border-sky-200 bg-white p-3 text-xs">
+                    <p class="font-semibold text-slate-800 mb-1">Événements</p>
+                    <p class="text-slate-600 mb-2">{{ events_unpublished_count }} en attente</p>
+                    {% if event_next_unpublished %}
+                        <p class="text-[11px] text-slate-500 mb-2 truncate">{{ event_next_unpublished.title }}</p>
+                        <form method="post" action="{% url 'superadmin:dashboard_content_quick_action' %}" class="inline">{% csrf_token %}<input type="hidden" name="model" value="event"><input type="hidden" name="pk" value="{{ event_next_unpublished.pk }}"><button type="submit" class="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100" onclick="return confirm('Publier cet événement ?')">Publier</button></form>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="rounded-xl border border-rose-200 bg-rose-50/60 shadow-sm overflow-hidden">
+            <header class="px-4 py-3 border-b border-rose-100 flex items-center justify-between gap-2">
+                <div>
+                    <p class="text-sm font-semibold text-rose-900 mb-0">Community Control</p>
+                    <p class="text-xs text-rose-700 mb-0">Modération et activité membres</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="{% url 'superadmin:community_topic_list' %}" class="text-[11px] font-semibold text-rose-700 no-underline hover:opacity-80">Sujets</a>
+                    <a href="{% url 'superadmin:community_answer_list' %}" class="text-[11px] font-semibold text-rose-700 no-underline hover:opacity-80">Ouvrir module</a>
+                </div>
+            </header>
+            <div class="p-4 space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="rounded-lg border border-rose-200 bg-white p-2 text-xs"><p class="text-slate-500 mb-0">Nouveaux membres (7j)</p><p class="text-base font-semibold text-slate-800 mb-0">{{ community_new_members_7d }}</p></div>
+                    <div class="rounded-lg border border-rose-200 bg-white p-2 text-xs"><p class="text-slate-500 mb-0">Sujets à modérer</p><p class="text-base font-semibold text-slate-800 mb-0">{{ community_topics_to_moderate }}</p></div>
+                    <div class="rounded-lg border border-rose-200 bg-white p-2 text-xs"><p class="text-slate-500 mb-0">Réponses supprimées</p><p class="text-base font-semibold text-slate-800 mb-0">{{ community_answers_deleted_count }}</p></div>
+                    <div class="rounded-lg border border-rose-200 bg-white p-2 text-xs"><p class="text-slate-500 mb-0">Sujets non résolus</p><p class="text-base font-semibold text-slate-800 mb-0">{{ community_unresolved_topics_count }}</p></div>
+                </div>
+                {% if community_recent_topics %}
+                    <div class="space-y-2">
+                        {% for topic in community_recent_topics %}
+                            <div class="rounded-md border border-rose-200 bg-white px-3 py-2 text-xs flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-800 mb-0">{{ topic.title }}</p>
+                                    <p class="text-[11px] text-slate-500 mb-0">{{ topic.author.get_full_name|default:topic.author.username }} - {{ topic.created_at|date:"d/m H:i" }}</p>
+                                </div>
+                                <a href="{% url 'superadmin:community_topic_detail' topic.pk %}" class="rounded-md border border-rose-300 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100 no-underline">Gérer</a>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-1 gap-4">
+        <section class="rounded-xl border border-teal-200 bg-teal-50/60 shadow-sm overflow-hidden">
+            <header class="px-4 py-3 border-b border-teal-100 flex items-center justify-between gap-2">
+                <div>
+                    <p class="text-sm font-semibold text-teal-900 mb-0">Campus Control</p>
+                    <p class="text-xs text-teal-700 mb-0">Pilotage des annexes, activation et inscription en ligne</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="{% url 'superadmin:branch_create' %}" class="text-[11px] font-semibold text-teal-700 no-underline hover:opacity-80">Nouveau campus</a>
+                    <a href="{% url 'superadmin:branch_list' %}" class="text-[11px] font-semibold text-teal-700 no-underline hover:opacity-80">Ouvrir module</a>
+                </div>
+            </header>
+            <div class="p-4 space-y-3">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div class="rounded-lg border border-teal-200 bg-white p-2 text-xs">
+                        <p class="text-slate-500 mb-0">Total campus</p>
+                        <p class="text-base font-semibold text-slate-800 mb-0">{{ branches_total_count }}</p>
+                    </div>
+                    <div class="rounded-lg border border-teal-200 bg-white p-2 text-xs">
+                        <p class="text-slate-500 mb-0">Campus actifs</p>
+                        <p class="text-base font-semibold text-emerald-700 mb-0">{{ branches_active_count }}</p>
+                    </div>
+                    <div class="rounded-lg border border-teal-200 bg-white p-2 text-xs">
+                        <p class="text-slate-500 mb-0">Campus inactifs</p>
+                        <p class="text-base font-semibold text-amber-700 mb-0">{{ branches_inactive_count }}</p>
+                    </div>
+                    <div class="rounded-lg border border-teal-200 bg-white p-2 text-xs">
+                        <p class="text-slate-500 mb-0">Récents</p>
+                        <p class="text-base font-semibold text-slate-800 mb-0">{{ branches_recent|length }}</p>
+                    </div>
+                </div>
+
+                {% if branches_recent %}
+                    <div class="space-y-2">
+                        {% for branch in branches_recent %}
+                            <a href="{% url 'superadmin:branch_edit' branch.pk %}" class="block rounded-md border border-teal-200 bg-white px-3 py-2 text-xs no-underline hover:bg-teal-100/40">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <p class="font-semibold text-slate-800 mb-0">{{ branch.name }}</p>
+                                        <p class="text-[11px] text-slate-500 mb-0"><span class="font-mono">{{ branch.code }}</span> - {{ branch.city|default:"-" }}</p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold {% if branch.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-slate-100 text-slate-700{% endif %}">{% if branch.is_active %}Actif{% else %}Inactif{% endif %}</span>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-xs text-teal-700/80 mb-0">Aucun campus enregistré pour le moment.</p>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+</div>

@@ -1,38 +1,131 @@
-{% extends 'superadmin/base.html' %}
-{% block content %}
-<div class="container-fluid">
-    <h1 class="h3 mb-4">Liste des messages</h1>
-    <div class="card">
-        <div class="card-body">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Expéditeur</th>
-                        <th>Objet</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Messages{% endblock %}
+{% block page_subtitle %}Suivi des demandes de contact{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total</p><p class="text-2xl font-bold text-slate-900 mb-0">{{ messages_total_count }}</p></article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Nouveaux</p><p class="text-2xl font-bold text-sky-700 mb-0">{{ messages_new_count }}</p></article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">En cours</p><p class="text-2xl font-bold text-amber-700 mb-0">{{ messages_in_progress_count }}</p></article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Répondus</p><p class="text-2xl font-bold text-emerald-700 mb-0">{{ messages_answered_count }}</p></article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Clôturés</p><p class="text-2xl font-bold text-slate-700 mb-0">{{ messages_closed_count }}</p></article>
+    </section>
+
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="text" name="q" value="{{ filters.q|default:'' }}" placeholder="Rechercher nom, email, contenu..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous statuts</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="subject" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous sujets</option>
+                {% for value, label in subject_choices %}
+                <option value="{{ value }}" {% if filters.subject == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="priority" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Toutes priorités</option>
+                {% for value, label in priority_choices %}
+                <option value="{{ value }}" {% if filters.priority == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:message_list' %}" class="btn btn-outline">Réinitialiser</a>
+                <button type="submit" class="btn btn-outline">Filtrer</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <form id="messagesBulkForm" method="post" action="{% url 'superadmin:bulk_action' %}" class="flex items-center flex-wrap gap-2 w-full">
+                {% csrf_token %}
+                <input type="hidden" name="model_type" value="message">
+                <select name="action" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Action groupée...</option>
+                    <option value="mark_new">Marquer Nouveau</option>
+                    <option value="mark_in_progress">Marquer En cours</option>
+                    <option value="mark_answered">Marquer Répondu</option>
+                    <option value="mark_closed">Marquer Clôturé</option>
+                    <option value="delete">Supprimer</option>
+                </select>
+                <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Appliquer cette action aux messages sélectionnés ?')">Appliquer</button>
+            </form>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600 w-10"><input id="select-all-messages" type="checkbox"></th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Expéditeur</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Sujet</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Priorité</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Statut</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Date</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Actions</th>
+                </tr>
                 </thead>
-                <tbody>
-                    {% for message in messages %}
-                    <tr>
-                        <td>{{ message.sender }}</td>
-                        <td>{{ message.subject }}</td>
-                        <td>{{ message.sent_at|date:'d/m/Y H:i' }}</td>
-                        <td>{{ message.status }}</td>
-                        <td>
-                            <a href="{% url 'superadmin:message_detail' message.id %}" class="btn btn-sm btn-primary">Voir</a>
-                            <a href="{% url 'superadmin:message_reply' message.id %}" class="btn btn-sm btn-success">Répondre</a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="5">Aucun message trouvé.</td></tr>
-                    {% endfor %}
+                <tbody class="divide-y divide-slate-100 bg-white">
+                {% for message in contact_messages %}
+                <tr>
+                    <td class="px-4 py-3"><input type="checkbox" name="selected_ids" value="{{ message.pk }}" form="messagesBulkForm" class="message-row-checkbox"></td>
+                    <td class="px-4 py-3">
+                        <p class="font-medium text-slate-900 mb-0">{{ message.full_name }}</p>
+                        <p class="text-xs text-slate-500 mb-0">{{ message.email }}{% if message.phone %} · {{ message.phone }}{% endif %}</p>
+                    </td>
+                    <td class="px-4 py-3">{{ message.get_subject_display }}</td>
+                    <td class="px-4 py-3">{{ message.get_priority_display }}</td>
+                    <td class="px-4 py-3"><span class="badge-status badge-info">{{ message.get_status_display }}</span></td>
+                    <td class="px-4 py-3">{{ message.created_at|date:'d/m/Y H:i' }}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="{% url 'superadmin:message_detail' message.pk %}" class="btn btn-outline btn-sm">Voir</a>
+                            <form method="post" action="{% url 'superadmin:message_status' message.pk %}" class="inline">{% csrf_token %}<input type="hidden" name="status" value="answered"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-outline btn-sm">Répondu</button></form>
+                            <form method="post" action="{% url 'superadmin:message_delete' message.pk %}" class="inline" onsubmit="return confirm('Supprimer ce message ?')">{% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Supprimer</button></form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Aucun message trouvé.</td></tr>
+                {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
+        {% if contact_messages.has_other_pages %}
+        <div class="card-body flex items-center justify-between">
+            <p class="text-sm text-slate-500 mb-0">Page {{ contact_messages.number }} / {{ contact_messages.paginator.num_pages }}</p>
+            <div class="flex items-center gap-2">
+                {% if contact_messages.has_previous %}
+                <a href="?page={{ contact_messages.previous_page_number }}&q={{ filters.q }}&status={{ filters.status }}&subject={{ filters.subject }}&priority={{ filters.priority }}" class="btn btn-outline btn-sm">Précédent</a>
+                {% endif %}
+                {% if contact_messages.has_next %}
+                <a href="?page={{ contact_messages.next_page_number }}&q={{ filters.q }}&status={{ filters.status }}&subject={{ filters.subject }}&priority={{ filters.priority }}" class="btn btn-outline btn-sm">Suivant</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectAll = document.getElementById('select-all-messages');
+    const rowCheckboxes = Array.from(document.querySelectorAll('.message-row-checkbox'));
+    if (!selectAll || rowCheckboxes.length === 0) {
+        return;
+    }
+
+    selectAll.addEventListener('change', function () {
+        rowCheckboxes.forEach(function (box) {
+            box.checked = selectAll.checked;
+        });
+    });
+});
+</script>
 {% endblock %}
 

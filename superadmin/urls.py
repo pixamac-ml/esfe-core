@@ -51,10 +51,12 @@ urlpatterns = [
     # ============================================================================
     path('candidatures/', views.candidature_list, name='candidature_list'),
     path('admissions/', views.candidature_list, name='admission_list'),  # ALIAS
+    path('candidatures/create/', views.candidature_create, name='candidature_create'),
     path('candidatures/<int:pk>/', views.candidature_detail, name='candidature_detail'),
     path('candidatures/<int:pk>/status/', views.candidature_status, name='candidature_status'),
     path('candidatures/<int:pk>/edit/', views.candidature_edit, name='candidature_edit'),
     path('candidatures/<int:pk>/delete/', views.candidature_delete, name='candidature_delete'),
+    path('candidatures/bulk-action/', views.candidature_bulk_action, name='candidature_bulk_action'),
 
     # ============================================================================
     # INSCRIPTIONS
@@ -62,8 +64,15 @@ urlpatterns = [
     path('inscriptions/', views.inscription_list, name='inscription_list'),
     path('inscriptions/create/', views.inscription_create, name='inscription_create'),
     path('inscriptions/<int:pk>/', views.inscription_detail, name='inscription_detail'),
+    path('inscriptions/<int:pk>/status/', views.inscription_status, name='inscription_status'),
+    path('inscriptions/<int:pk>/certificate/', views.inscription_certificate, name='inscription_certificate'),
+    path('inscriptions/<int:pk>/confirm-payment/', views.inscription_confirm_payment, name='inscription_confirm_payment'),
+    path('inscriptions/<int:pk>/relance/', views.inscription_relance, name='inscription_relance'),
+    path('inscriptions/<int:pk>/regenerate-access-code/', views.inscription_regenerate_access_code, name='inscription_regenerate_access_code'),
+    path('inscriptions/<int:pk>/archive-toggle/', views.inscription_archive_toggle, name='inscription_archive_toggle'),
     path('inscriptions/<int:pk>/edit/', views.inscription_edit, name='inscription_edit'),
     path('inscriptions/<int:pk>/delete/', views.inscription_delete, name='inscription_delete'),
+    path('inscriptions/bulk-action/', views.inscription_bulk_action, name='inscription_bulk_action'),
 
     # ============================================================================
     # STUDENTS
@@ -78,8 +87,15 @@ urlpatterns = [
     # ============================================================================
     path('payments/', views.payment_list, name='payment_list'),
     path('payments/<int:pk>/', views.payment_detail, name='payment_detail'),
+    path('payments/<int:pk>/validate/', views.payment_validate, name='payment_validate'),
+    path('payments/<int:pk>/receipt/', views.payment_receipt_pdf, name='payment_receipt_pdf'),
+    path('payments/<int:pk>/notify/', views.payment_notify_student, name='payment_notify_student'),
     path('payments/<int:pk>/edit/', views.payment_edit, name='payment_edit'),
     path('payments/<int:pk>/delete/', views.payment_delete, name='payment_delete'),
+    path('payments/agents/', views.payment_agent_list, name='payment_agent_list'),
+    path('payments/agents/create/', views.payment_agent_create, name='payment_agent_create'),
+    path('payments/agents/<int:pk>/edit/', views.payment_agent_edit, name='payment_agent_edit'),
+    path('payments/agents/<int:pk>/toggle/', views.payment_agent_toggle, name='payment_agent_toggle'),
 
     # ============================================================================
     # FEES
@@ -127,6 +143,17 @@ urlpatterns = [
     path('events/<int:pk>/edit/', views.event_edit, name='event_edit'),
     path('events/<int:pk>/delete/', views.event_delete, name='event_delete'),
     path('events/<int:pk>/toggle/', views.toggle_event, name='toggle_event'),
+
+    # ============================================================================
+    # GALLERY (Galerie événements)
+    # ============================================================================
+    path('gallery/', views.gallery_list, name='gallery_list'),
+    path('gallery/bulk/', views.gallery_bulk_upload, name='gallery_bulk_upload'),
+    path('gallery/bulk-action/', views.gallery_bulk_action, name='gallery_bulk_action'),
+    path('gallery/create/', views.gallery_create, name='gallery_create'),
+    path('gallery/<int:pk>/edit/', views.gallery_edit, name='gallery_edit'),
+    path('gallery/<int:pk>/delete/', views.gallery_delete, name='gallery_delete'),
+    path('gallery/<int:pk>/featured/', views.gallery_toggle_featured, name='gallery_toggle_featured'),
 
     # ============================================================================
     # PAGES (Legal / Institutionnelles)
@@ -185,6 +212,10 @@ urlpatterns = [
     path('search/', views.search_global, name='search_global'),
     path('bulk-action/', views.bulk_action, name='bulk_action'),
     path('export/<str:model_type>/', views.export_data, name='export_data'),
+    path('cockpit/preferences/', views.cockpit_preferences_update, name='cockpit_preferences_update'),
+    path('dashboard/widgets/mini/', views.dashboard_widgets_fragment, name='dashboard_widgets_fragment'),
+    path('dashboard/widgets/notifications/action/', views.dashboard_notifications_action, name='dashboard_notifications_action'),
+    path('dashboard/widgets/content/action/', views.dashboard_content_quick_action, name='dashboard_content_quick_action'),
 
     # ============================================================================
     # PROGRAMME YEARS

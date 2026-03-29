@@ -1,0 +1,55 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{% if event %}Modifier événement{% else %}Nouvel événement{% endif %}{% endblock %}
+{% block page_subtitle %}Configurer les informations de l'événement{% endblock %}
+
+{% block content_main %}
+<section class="card max-w-4xl rounded-xl border border-slate-100 shadow-sm">
+    <form method="post" enctype="multipart/form-data" class="card-body space-y-4">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="form-label">Titre *</label>
+                <input type="text" name="title" required class="form-input" value="{{ event.title|default:'' }}">
+            </div>
+            <div>
+                <label class="form-label">Type *</label>
+                <select name="event_type" required class="form-input">
+                    <option value="">Choisir...</option>
+                    {% for t in event_types %}
+                    <option value="{{ t.pk }}" {% if event and event.event_type_id == t.pk %}selected{% endif %}>{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="form-label">Date *</label>
+                <input type="date" name="event_date" required class="form-input" value="{{ event.event_date|date:'Y-m-d'|default:'' }}">
+            </div>
+            <div>
+                <label class="form-label">Image de couverture</label>
+                <input type="file" name="cover_image" accept="image/*" class="form-input">
+            </div>
+        </div>
+
+        <div>
+            <label class="form-label">Description</label>
+            <textarea name="description" rows="6" class="form-input">{{ event.description|default:'' }}</textarea>
+        </div>
+
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="is_published" {% if not event or event.is_published %}checked{% endif %}>
+            Publier immédiatement
+        </label>
+
+        <div class="flex items-center gap-2 pt-2">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+            <a href="{% url 'superadmin:event_list' %}" class="btn btn-outline">Annuler</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
+

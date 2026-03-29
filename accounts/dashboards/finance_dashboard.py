@@ -131,7 +131,8 @@ def finance_dashboard(request):
         inscriptions
         .filter(
             Q(status="created") |
-            Q(status="awaiting_payment")
+            Q(status="awaiting_payment") |
+            Q(status="partial_paid")
         )
         .order_by("-created_at")[:20]
     )
@@ -157,7 +158,8 @@ def finance_dashboard(request):
             CashPaymentSession.objects
             .filter(
                 agent=agent,
-                is_used=False
+                is_used=False,
+                expires_at__gt=timezone.now(),
             )
             .order_by("-created_at")[:10]
         )

@@ -1,0 +1,52 @@
+<form id="candidature-filter-form" method="get" class="grid grid-cols-1 md:grid-cols-6 gap-3" hx-get="{% url 'superadmin:candidature_list' %}" hx-target="#candidatures-table-container" hx-swap="innerHTML" hx-trigger="change delay:300ms, submit">
+    <div class="md:col-span-2">
+        <input type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Recherche: nom, email, programme..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+    </div>
+
+    <div>
+        <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Tous statuts</option>
+            {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Tous programmes</option>
+            {% for programme in programmes %}
+            <option value="{{ programme.pk }}" {% if filters.programme == programme.pk|stringformat:'s' %}selected{% endif %}>{{ programme.title }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <select name="branch" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Tous campus</option>
+            {% for b in branches %}
+            <option value="{{ b.pk }}" {% if filters.branch == b.pk|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <select name="academic_year" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="">Toutes années</option>
+            {% for year in academic_years %}
+            <option value="{{ year }}" {% if filters.academic_year == year %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="md:col-span-6 flex items-center justify-between gap-3">
+        <div class="text-sm text-slate-500">Filtrage dynamique activé (HTMX)</div>
+        <div class="flex gap-2">
+            <a href="{% url 'superadmin:candidature_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i>Nouvelle candidature
+            </a>
+            <a href="{% url 'superadmin:candidature_list' %}" class="btn btn-outline">Réinitialiser</a>
+        </div>
+    </div>
+</form>
+

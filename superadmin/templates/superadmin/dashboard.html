@@ -1,193 +1,445 @@
 {% extends "superadmin/base.html" %}
-{% load static %}
 {% load humanize %}
 
-{% block page_title %}Tableau de bord{% endblock %}
-{% block page_subtitle %}Vue d'ensemble de votre plateforme{% endblock %}
+{% block page_title %}Tableau de bord ERP{% endblock %}
+{% block page_subtitle %}Centre de commande unifie de la plateforme{% endblock %}
 
 {% block content_main %}
-<div class="fade-in">
+<div id="dashboard-root" class="space-y-6" x-data="dashboardCockpit()" x-init="init()">
+    <section class="card">
+        <div class="card-body flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button"
+                        class="btn btn-sm {% if dashboard_period == '7d' %}btn-primary{% else %}btn-outline{% endif %}"
+                        @click="persistPeriod('7d')"
+                        hx-get="{% url 'superadmin:dashboard' %}?period=7d"
+                        hx-target="#dashboard-root"
+                        hx-select="#dashboard-root"
+                        hx-swap="outerHTML"
+                        hx-push-url="true">7 jours</button>
+                <button type="button"
+                        class="btn btn-sm {% if dashboard_period == '30d' %}btn-primary{% else %}btn-outline{% endif %}"
+                        @click="persistPeriod('30d')"
+                        hx-get="{% url 'superadmin:dashboard' %}?period=30d"
+                        hx-target="#dashboard-root"
+                        hx-select="#dashboard-root"
+                        hx-swap="outerHTML"
+                        hx-push-url="true">30 jours</button>
+                <button type="button"
+                        class="btn btn-sm {% if dashboard_period == 'quarter' %}btn-primary{% else %}btn-outline{% endif %}"
+                        @click="persistPeriod('quarter')"
+                        hx-get="{% url 'superadmin:dashboard' %}?period=quarter"
+                        hx-target="#dashboard-root"
+                        hx-select="#dashboard-root"
+                        hx-swap="outerHTML"
+                        hx-push-url="true">Trimestre</button>
+            </div>
 
-    <!-- STATISTIQUES PRINCIPALES -->
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-6 mb-8">
+            <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" {% if widget_autorefresh %}checked{% endif %} @change="toggleAutorefresh($event.target.checked)">
+                Auto-refresh widgets (30s)
+            </label>
+        </div>
+    </section>
 
-        <!-- Formations -->
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <div class="flex justify-between items-center">
+    <section id="mini-widgets"
+             hx-get="{% url 'superadmin:dashboard_widgets_fragment' %}"
+             hx-trigger="load{% if widget_autorefresh %}, every 30s{% endif %}"
+             hx-swap="innerHTML"
+             class="card p-4">
+        <div class="text-sm text-slate-500">Chargement des mini-widgets...</div>
+    </section>
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <article x-data="{ hovered: false }" @mouseenter="hovered = true" @mouseleave="hovered = false" :class="hovered ? 'ring-2 ring-amber-100' : ''" class="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div class="flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-slate-500 text-sm mb-1">Formations</p>
-                    <h3 class="text-2xl font-bold text-primary-500">{{ formations_count }}</h3>
-                    <p class="text-xs text-green-600 mt-1">
-                        <i class="fas fa-check-circle"></i> {{ formations_published }} publiées
+                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Candidatures en attente</p>
+                    <p class="text-2xl font-bold tracking-tight text-slate-900">{{ candidatures_pending|default:0 }}</p>
+                    <p class="text-xs text-amber-600 mt-1">sur {{ candidatures_count|default:0|intcomma }} total</p>
+                    <p class="text-xs mt-1 {% if trends.candidatures.up %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                        {% if trends.candidatures.up %}+{% endif %}{{ trends.candidatures.pct }}% vs 7j prec.
                     </p>
                 </div>
-                <div class="w-14 h-14 bg-primary-500/10 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-graduation-cap text-xl text-primary-500"></i>
-                </div>
+                <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                    <i data-lucide="clock-3" class="w-5 h-5"></i>
+                </span>
             </div>
-        </div>
+        </article>
 
-        <!-- Candidatures -->
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <div class="flex justify-between items-center">
+        <article x-data="{ hovered: false }" @mouseenter="hovered = true" @mouseleave="hovered = false" :class="hovered ? 'ring-2 ring-emerald-100' : ''" class="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div class="flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-slate-500 text-sm mb-1">Candidatures</p>
-                    <h3 class="text-2xl font-bold text-primary-500">{{ candidatures_count }}</h3>
-                    <p class="text-xs text-amber-600 mt-1">
-                        <i class="fas fa-clock"></i> {{ candidatures_pending }} en attente
+                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Inscriptions validees</p>
+                    <p class="text-2xl font-bold tracking-tight text-slate-900">{{ inscriptions_active|default:0|intcomma }}</p>
+                    <p class="text-xs text-emerald-600 mt-1">{{ inscriptions_count|default:0|intcomma }} enregistrees</p>
+                    <p class="text-xs mt-1 {% if trends.inscriptions.up %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                        {% if trends.inscriptions.up %}+{% endif %}{{ trends.inscriptions.pct }}% vs 7j prec.
                     </p>
                 </div>
-                <div class="w-14 h-14 bg-accent/10 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-user-plus text-xl text-accent"></i>
-                </div>
+                <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                    <i data-lucide="user-check" class="w-5 h-5"></i>
+                </span>
             </div>
-        </div>
+        </article>
 
-        <!-- Inscriptions -->
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <div class="flex justify-between items-center">
+        <article x-data="{ hovered: false }" @mouseenter="hovered = true" @mouseleave="hovered = false" :class="hovered ? 'ring-2 ring-cyan-100' : ''" class="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div class="flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-slate-500 text-sm mb-1">Inscriptions</p>
-                    <h3 class="text-2xl font-bold text-primary-500">{{ inscriptions_count }}</h3>
-                    <p class="text-xs text-green-600 mt-1">
-                        <i class="fas fa-user-check"></i> {{ inscriptions_active }} actives
+                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Revenus valides</p>
+                    <p class="text-2xl font-bold tracking-tight text-slate-900">{{ payments_total|default:0|intcomma }}</p>
+                    <p class="text-xs text-slate-500 mt-1">FCFA</p>
+                    <p class="text-xs mt-1 {% if trends.payments.up %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                        {% if trends.payments.up %}+{% endif %}{{ trends.payments.pct }}% vs 7j prec.
                     </p>
                 </div>
-                <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-user-graduate text-xl text-green-600"></i>
-                </div>
+                <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700">
+                    <i data-lucide="wallet" class="w-5 h-5"></i>
+                </span>
             </div>
-        </div>
+        </article>
 
-        <!-- Messages -->
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <div class="flex justify-between items-center">
+        <article class="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+            <div class="flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-slate-500 text-sm mb-1">Messages</p>
-                    <h3 class="text-2xl font-bold text-primary-500">{{ messages_unread }}</h3>
-                    <p class="text-xs text-slate-500 mt-1">non lus</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Messages non traites</p>
+                    <p class="text-2xl font-bold tracking-tight text-slate-900">{{ messages_unread|default:0|intcomma }}</p>
+                    <p class="text-xs text-slate-500 mt-1">boite de reception</p>
                 </div>
-                <div class="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-envelope text-xl text-purple-600"></i>
+                <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                    <i data-lucide="mail" class="w-5 h-5"></i>
+                </span>
+            </div>
+        </article>
+    </section>
+
+    <section class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <article class="xl:col-span-2 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <header class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                <div>
+                    <h2 class="text-base font-bold tracking-tight text-slate-900 mb-0">Navigation rapide</h2>
+                    <p class="text-sm text-slate-500 mb-0">Acces direct aux modules critiques</p>
                 </div>
+                <a href="{% url 'superadmin:search_global' %}" class="text-sm font-medium text-[var(--primary)] no-underline hover:opacity-80 transition-all duration-300">Recherche globale</a>
+            </header>
+
+            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <a href="{% url 'superadmin:candidature_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                            <i data-lucide="file-text" class="w-5 h-5"></i>
+                        </span>
+                        <span class="text-xs text-slate-500">{{ candidatures_count|default:0|intcomma }}</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Candidatures</h3>
+                    <p class="text-xs text-slate-500 mb-0">Suivi, validation et decisions</p>
+                </a>
+
+                <a href="{% url 'superadmin:inscription_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                            <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+                        </span>
+                        <span class="text-xs text-slate-500">{{ inscriptions_count|default:0|intcomma }}</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Inscriptions</h3>
+                    <p class="text-xs text-slate-500 mb-0">Finalisation administrative</p>
+                </a>
+
+                <a href="{% url 'superadmin:student_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700">
+                            <i data-lucide="users" class="w-5 h-5"></i>
+                        </span>
+                        <span class="text-xs text-slate-500">{{ students_count|default:0|intcomma }}</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Etudiants</h3>
+                    <p class="text-xs text-slate-500 mb-0">Parcours et dossiers complets</p>
+                </a>
+
+                <a href="{% url 'superadmin:formation_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
+                            <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+                        </span>
+                        <span class="text-xs text-slate-500">{{ formations_count|default:0|intcomma }}</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Programmes</h3>
+                    <p class="text-xs text-slate-500 mb-0">Catalogue, cycles et filieres</p>
+                </a>
+
+                <a href="{% url 'superadmin:payment_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                            <i data-lucide="credit-card" class="w-5 h-5"></i>
+                        </span>
+                        <span class="text-xs text-slate-500">{{ payments_total|default:0|intcomma }} FCFA</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Paiements</h3>
+                    <p class="text-xs text-slate-500 mb-0">Transactions et statuts</p>
+                </a>
+
+                <a href="{% url 'superadmin:settings' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-700">
+                            <i data-lucide="settings-2" class="w-5 h-5"></i>
+                        </span>
+                        <span class="text-xs text-slate-500">Configuration</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Parametres</h3>
+                    <p class="text-xs text-slate-500 mb-0">Reglages institutionnels</p>
+                </a>
+
+                <a href="{% url 'superadmin:article_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
+                            <i data-lucide="newspaper" class="w-5 h-5"></i>
+                        </span>
+                        <span class="text-xs text-slate-500">{{ articles_count|default:0|intcomma }}</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Contenu</h3>
+                    <p class="text-xs text-slate-500 mb-0">Articles et actualites</p>
+                </a>
+
+                <a href="{% url 'admin:index' %}" target="_blank" rel="noopener" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-200 text-slate-700">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        </span>
+                        <span class="text-xs text-slate-500">Avance</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Utilisateurs</h3>
+                    <p class="text-xs text-slate-500 mb-0">Gestion avancee Django Admin</p>
+                </a>
             </div>
-        </div>
+        </article>
 
-    </div>
+        <article class="rounded-xl border border-slate-200 bg-white shadow-sm p-5">
+            <header class="mb-4">
+                <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Activite recente</h2>
+                <p class="text-sm text-slate-500 mb-0">Dernieres operations detectees</p>
+            </header>
 
-    <!-- STATISTIQUES FINANCIÈRES -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <p class="text-slate-500 text-sm mb-2">Revenus totaux</p>
-            <h3 class="text-xl font-bold text-green-600">
-                {{ payments_total|intcomma }} <span class="text-sm font-normal text-slate-400">FCFA</span>
-            </h3>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <p class="text-slate-500 text-sm mb-2">Étudiants</p>
-            <h3 class="text-xl font-bold text-primary-500">{{ students_count }}</h3>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <p class="text-slate-500 text-sm mb-2">Articles</p>
-            <h3 class="text-xl font-bold text-primary-500">{{ articles_count }}</h3>
-        </div>
-
-    </div>
-
-    <!-- DEUXIÈME RANGÉE -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <!-- Actions rapides -->
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h3 class="text-lg font-bold text-primary-500 mb-4">
-                <i class="fas fa-bolt text-accent mr-2"></i>
-                Actions rapides
-            </h3>
-            <div class="flex flex-col gap-3">
-                <a href="{% url 'superadmin:formation_create' %}"
-                   class="flex items-center p-4 bg-primary-500/5 rounded-xl no-underline transition-all duration-200 hover:bg-primary-500/10">
-                    <div class="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center mr-3">
-                        <i class="fas fa-plus text-white"></i>
-                    </div>
-                    <div class="flex-1">
-                        <p class="font-semibold text-slate-800 m-0">Nouvelle formation</p>
-                        <p class="text-xs text-slate-500 m-0">Ajouter un programme</p>
-                    </div>
-                    <i class="fas fa-chevron-right text-slate-400"></i>
-                </a>
-
-                <a href="{% url 'superadmin:candidature_list' %}?status=submitted"
-                   class="flex items-center p-4 bg-accent/5 rounded-xl no-underline transition-all duration-200 hover:bg-accent/10">
-                    <div class="w-10 h-10 bg-accent rounded-xl flex items-center justify-center mr-3">
-                        <i class="fas fa-clipboard-list text-white"></i>
-                    </div>
-                    <div class="flex-1">
-                        <p class="font-semibold text-slate-800 m-0">Candidatures en attente</p>
-                        <p class="text-xs text-slate-500 m-0">{{ candidatures_pending }} à traiter</p>
-                    </div>
-                    <i class="fas fa-chevron-right text-slate-400"></i>
-                </a>
-
-                <a href="{% url 'superadmin:message_list' %}?status=pending"
-                   class="flex items-center p-4 bg-purple-500/5 rounded-xl no-underline transition-all duration-200 hover:bg-purple-500/10">
-                    <div class="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center mr-3">
-                        <i class="fas fa-envelope text-white"></i>
-                    </div>
-                    <div class="flex-1">
-                        <p class="font-semibold text-slate-800 m-0">Messages</p>
-                        <p class="text-xs text-slate-500 m-0">{{ messages_unread }} non répondus</p>
-                    </div>
-                    <i class="fas fa-chevron-right text-slate-400"></i>
-                </a>
-            </div>
-        </div>
-
-        <!-- Candidatures récentes -->
-        <div class="bg-white rounded-xl shadow-sm">
-            <div class="p-5 border-b border-slate-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-primary-500 m-0">
-                    <i class="fas fa-clock text-accent mr-2"></i>
-                    Candidatures récentes
-                </h3>
-                <a href="{% url 'superadmin:candidature_list' %}" class="text-sm text-primary-500 no-underline">
-                    Voir tout
-                </a>
-            </div>
-            <div>
-                {% if recent_candidatures %}
-                    {% for cand in recent_candidatures|slice:":5" %}
-                    <div class="p-4 border-b border-slate-50 flex justify-between items-center hover:bg-slate-50">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-user text-blue-600"></i>
-                            </div>
-                            <div>
-                                <p class="font-medium text-slate-800 m-0">
-                                    {{ cand.full_name }}
-                                </p>
-                                <p class="text-xs text-slate-500 m-0">
-                                    {{ cand.programme.title|default:"Formation non spécifiée" }}
-                                </p>
+            {% if recent_candidatures %}
+                <div class="space-y-3">
+                    {% for cand in recent_candidatures|slice:":6" %}
+                    <div class="flex items-start gap-3 p-3 rounded-lg border border-slate-100 bg-slate-50/70">
+                        <span class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[var(--primary)]">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-slate-800 mb-0 truncate">{{ cand.full_name|default:"Candidat" }}</p>
+                            <p class="text-xs text-slate-500 mb-1">{{ cand.programme.title|default:"Programme non renseigne" }}</p>
+                            <div class="flex items-center gap-2 text-xs text-slate-500">
+                                <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+                                <span>{{ cand.submitted_at|date:"d/m/Y H:i" }}</span>
                             </div>
                         </div>
-                        <span class="badge-status badge-{% if cand.status == 'submitted' %}warning{% elif cand.status == 'accepted' %}success{% else %}draft{% endif %}">
+                        <span class="badge-status badge-{% if cand.status == 'submitted' %}warning{% elif cand.status == 'accepted' %}success{% elif cand.status == 'rejected' %}danger{% else %}draft{% endif %}">
                             {{ cand.get_status_display|default:cand.status }}
                         </span>
                     </div>
                     {% endfor %}
-                {% else %}
-                    <div class="p-8 text-center text-slate-400">
-                        <i class="fas fa-inbox text-4xl mb-2"></i>
-                        <p class="m-0">Aucune candidature récente</p>
-                    </div>
-                {% endif %}
+                </div>
+            {% else %}
+                <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+                    <span class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-200 text-slate-500">
+                        <i data-lucide="inbox" class="w-6 h-6"></i>
+                    </span>
+                    <p class="text-sm font-medium text-slate-700 mb-1">Aucune activite recente</p>
+                    <p class="text-xs text-slate-500 mb-0">Les actions admin apparaitront ici en temps reel.</p>
+                </div>
+            {% endif %}
+        </article>
+    </section>
+
+    <section class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <article class="xl:col-span-2 rounded-xl border border-slate-200 bg-white shadow-sm p-5">
+            <header class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Vue analytique (placeholder)</h2>
+                    <p class="text-sm text-slate-500 mb-0">Zone prete pour Chart.js ou ApexCharts</p>
+                </div>
+                <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600">
+                    <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Donnees live
+                </span>
+            </header>
+
+            <div class="rounded-xl border border-slate-100 bg-slate-50 p-4" x-init="renderTrendChart()">
+                <canvas x-ref="trendChart" class="w-full h-52" aria-label="Graphique d'activite"></canvas>
             </div>
-        </div>
+        </article>
 
-    </div>
+        <article class="rounded-xl border border-slate-200 bg-white shadow-sm p-5">
+            <header class="mb-4">
+                <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Pipeline instantane</h2>
+                <p class="text-sm text-slate-500 mb-0">Etat des volumes cles</p>
+            </header>
 
+            <div class="space-y-4">
+                <div>
+                    <div class="mb-1 flex items-center justify-between text-xs text-slate-600">
+                        <span>Candidatures traitees</span>
+                        <span>{% widthratio candidatures_pending|default:0 candidatures_count|default:1 100 %}% restant</span>
+                    </div>
+                    <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div class="h-full bg-[var(--accent)]" style="width:{% widthratio candidatures_pending|default:0 candidatures_count|default:1 100 %}%"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="mb-1 flex items-center justify-between text-xs text-slate-600">
+                        <span>Inscriptions actives</span>
+                        <span>{% widthratio inscriptions_active|default:0 inscriptions_count|default:1 100 %}%</span>
+                    </div>
+                    <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div class="h-full bg-[var(--secondary)]" style="width:{% widthratio inscriptions_active|default:0 inscriptions_count|default:1 100 %}%"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="mb-1 flex items-center justify-between text-xs text-slate-600">
+                        <span>Formations publiees</span>
+                        <span>{% widthratio formations_published|default:0 formations_count|default:1 100 %}%</span>
+                    </div>
+                    <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div class="h-full bg-[var(--primary)]" style="width:{% widthratio formations_published|default:0 formations_count|default:1 100 %}%"></div>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </section>
 </div>
+
+{{ trend_labels|json_script:"trend-labels" }}
+{{ trend_candidatures_series|json_script:"trend-candidatures" }}
+{{ trend_inscriptions_series|json_script:"trend-inscriptions" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+function dashboardCockpit() {
+    return {
+        chart: null,
+        prefsUrl: "{% url 'superadmin:cockpit_preferences_update' %}",
+        init() {
+            this.$nextTick(() => this.renderTrendChart());
+        },
+        persistPeriod(period) {
+            this.persistPreference({ dashboard_period: period });
+        },
+        toggleAutorefresh(enabled) {
+            this.persistPreference({ widget_autorefresh: enabled ? '1' : '0' });
+        },
+        persistPreference(payload) {
+            var params = new URLSearchParams(payload).toString();
+            fetch(this.prefsUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': this.getCsrfToken(),
+                },
+                body: params,
+            }).catch(function () {});
+        },
+        getCsrfToken() {
+            var value = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var c = cookies[i].trim();
+                    if (c.substring(0, 10) === 'csrftoken=') {
+                        value = decodeURIComponent(c.substring(10));
+                        break;
+                    }
+                }
+            }
+            return value;
+        },
+        readJson(id) {
+            var node = document.getElementById(id);
+            if (!node) return [];
+            try { return JSON.parse(node.textContent || '[]'); } catch (e) { return []; }
+        },
+        renderTrendChart() {
+            if (!this.$refs.trendChart || typeof Chart === 'undefined') return;
+
+            var labels = this.readJson('trend-labels');
+            var candidatures = this.readJson('trend-candidatures');
+            var inscriptions = this.readJson('trend-inscriptions');
+
+            if (this.chart) {
+                this.chart.destroy();
+            }
+
+            var ctx = this.$refs.trendChart.getContext('2d');
+            var gradPrimary = ctx.createLinearGradient(0, 0, 0, 280);
+            gradPrimary.addColorStop(0, 'rgba(30,79,111,0.28)');
+            gradPrimary.addColorStop(1, 'rgba(30,79,111,0.03)');
+
+            var gradSecondary = ctx.createLinearGradient(0, 0, 0, 280);
+            gradSecondary.addColorStop(0, 'rgba(29,181,176,0.22)');
+            gradSecondary.addColorStop(1, 'rgba(29,181,176,0.02)');
+
+            this.chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Candidatures',
+                            data: candidatures,
+                            borderColor: '#1e4f6f',
+                            backgroundColor: gradPrimary,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2,
+                            pointHoverRadius: 5
+                        },
+                        {
+                            label: 'Inscriptions',
+                            data: inscriptions,
+                            borderColor: '#1db5b0',
+                            backgroundColor: gradSecondary,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                boxWidth: 12,
+                                boxHeight: 12,
+                                borderRadius: 4,
+                                color: '#475569',
+                                font: { family: 'Inter' }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#64748b' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148,163,184,.18)' },
+                            ticks: { color: '#64748b', precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
+</script>
 {% endblock %}

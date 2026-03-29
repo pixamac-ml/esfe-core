@@ -1,17 +1,10 @@
 from django.contrib import admin, messages
-from django.db import transaction
 from django.utils.html import format_html
 from django.utils import timezone
 
 from .models import Candidature, CandidatureDocument
 from inscriptions.services import create_inscription_from_candidature
-
-# EMAILS
-from admissions.services.emails import (
-    send_application_accepted_email,
-    send_application_rejected_email,
-    send_application_to_complete_email,
-)
+from django.db import transaction
 
 
 # ==================================================
@@ -197,13 +190,24 @@ class CandidatureAdmin(admin.ModelAdmin):
 
     @admin.action(description="📂 Passer en cours d’analyse")
     def mark_under_review(self, request, queryset):
+        updated = 0
+        skipped = 0
 
-        updated = queryset.exclude(status="accepted").update(
-            status="under_review",
-            reviewed_at=timezone.now()
-        )
+        for candidature in queryset:
+            if candidature.status == "accepted":
+                skipped += 1
+                continue
 
-        messages.success(request, f"{updated} dossier(s) mis en analyse.")
+            candidature.status = "under_review"
+            candidature.reviewed_at = timezone.now()
+            candidature.save(update_fields=["status", "reviewed_at", "updated_at"])
+
+            updated += 1
+
+        if updated:
+            messages.success(request, f"{updated} dossier(s) mis en analyse.")
+        if skipped:
+            messages.warning(request, f"{skipped} dossier(s) ignore(s).")
 
     # --------------------------------------------------
 
@@ -260,11 +264,6 @@ class CandidatureAdmin(admin.ModelAdmin):
                     amount_due=amount_due
                 )
 
-            # EMAIL ACCEPTATION
-            transaction.on_commit(
-                lambda c=candidature: send_application_accepted_email(c)
-            )
-
             accepted += 1
 
         if accepted:
@@ -283,15 +282,18 @@ class CandidatureAdmin(admin.ModelAdmin):
 
     @admin.action(description="⚠️ Accepter sous réserve")
     def mark_accepted_with_reserve(self, request, queryset):
+        updated = 0
 
-        updated = queryset.update(
-            status="accepted_with_reserve",
-            reviewed_at=timezone.now()
-        )
+        for candidature in queryset:
+            candidature.status = "accepted_with_reserve"
+            candidature.reviewed_at = timezone.now()
+            candidature.save(update_fields=["status", "reviewed_at", "updated_at"])
+
+            updated += 1
 
         messages.success(
             request,
-            f"{updated} dossier(s) acceptée(s) sous réserve."
+            f"{updated} dossier(s) acceptee(s) sous reserve."
         )
 
     # --------------------------------------------------
@@ -304,10 +306,6 @@ class CandidatureAdmin(admin.ModelAdmin):
             candidature.status = "to_complete"
             candidature.reviewed_at = timezone.now()
             candidature.save(update_fields=["status", "reviewed_at"])
-
-            transaction.on_commit(
-                lambda c=candidature: send_application_to_complete_email(c)
-            )
 
         messages.success(request, "Dossiers marqués à compléter.")
 
@@ -322,9 +320,6 @@ class CandidatureAdmin(admin.ModelAdmin):
             candidature.reviewed_at = timezone.now()
             candidature.save(update_fields=["status", "reviewed_at"])
 
-            transaction.on_commit(
-                lambda c=candidature: send_application_rejected_email(c)
-            )
 
         messages.success(request, "Dossiers refusés.")
 

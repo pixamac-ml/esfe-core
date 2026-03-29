@@ -13,7 +13,7 @@ class Navbar(component.Component):
 
     def get_context_data(self, **kwargs):
         # Récupérer request depuis le contexte (fourni par Django)
-        request = self.request
+        request = getattr(self, "request", None)
 
         # FORMATIONS - Cycles et programmes
         cycles = (
@@ -44,9 +44,10 @@ class Navbar(component.Component):
 
         # NOTIFICATIONS - COMPTEUR
         unread_notification_count = 0
-        if request.user.is_authenticated:
+        user = getattr(request, "user", None)
+        if getattr(user, "is_authenticated", False):
             unread_notification_count = Notification.objects.filter(
-                user=request.user,
+                user=user,
                 is_read=False
             ).count()
 

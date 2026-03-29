@@ -1,17 +1,18 @@
-{% extends 'superadmin/base.html' %}
-{% block content %}
-<div class="container-fluid">
-    <h1 class="h3 mb-4">{{ form_title|default:'Nouveau message' }}</h1>
-    <div class="card">
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit" class="btn btn-success">Envoyer</button>
-                <a href="{% url 'superadmin:messages' %}" class="btn btn-secondary">Annuler</a>
-            </form>
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ form_title|default:'Message' }}{% endblock %}
+{% block page_subtitle %}Saisie du message{% endblock %}
+
+{% block content_main %}
+<section class="card max-w-4xl rounded-xl border border-slate-100 shadow-sm">
+    <form method="post" class="card-body space-y-4">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="flex items-center gap-2 pt-2">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+            <a href="{% url 'superadmin:message_list' %}" class="btn btn-outline">Annuler</a>
         </div>
-    </div>
-</div>
+    </form>
+</section>
 {% endblock %}
 

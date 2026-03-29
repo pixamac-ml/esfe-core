@@ -1,0 +1,70 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Créer ou mettre à jour une actualité institutionnelle{% endblock %}
+
+{% block content_main %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <h2 class="text-base font-semibold text-slate-900 mb-0">Formulaire actualité</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% csrf_token %}
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Titre *</label>
+                    <input type="text" name="titre" required value="{{ news_item.titre|default:'' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Résumé</label>
+                    <textarea name="resume" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">{{ news_item.resume|default:'' }}</textarea>
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Catégorie *</label>
+                    <select name="categorie" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="">Sélectionner...</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.pk }}" {% if news_item.categorie_id == cat.pk %}selected{% endif %}>{{ cat.nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Statut</label>
+                    <select name="status" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if news_item.status|default:'draft' == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Contenu *</label>
+                    <textarea name="contenu" rows="10" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">{{ news_item.contenu|default:'' }}</textarea>
+                </div>
+
+                <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        <input type="checkbox" name="is_important" {% if news_item.is_important %}checked{% endif %}>
+                        Marquer comme important
+                    </label>
+                    <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        <input type="checkbox" name="is_urgent" {% if news_item.is_urgent %}checked{% endif %}>
+                        Marquer comme urgent
+                    </label>
+                </div>
+
+                <div class="md:col-span-2 flex items-center justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:news_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

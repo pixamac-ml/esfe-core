@@ -14,6 +14,7 @@ from django.db import transaction
 from .models import Inscription, StatusHistory
 from core.models import Notification
 from students.services import create_student_after_first_payment
+from admissions.emails import send_notification_email
 
 
 # ==========================================================
@@ -111,7 +112,7 @@ def create_inscription_notification(inscription, previous_status, new_status):
         f"Votre statut d'inscription est maintenant : {new_status}"
     )
 
-    return Notification.objects.create(
+    notification = Notification.objects.create(
         recipient_email=recipient_email,
         recipient_name=recipient_name,
         notification_type=notification_type,
@@ -120,6 +121,8 @@ def create_inscription_notification(inscription, previous_status, new_status):
         related_inscription=inscription,
         related_candidature=candidature,
     )
+    transaction.on_commit(lambda nid=notification.id: send_notification_email(nid))
+    return notification
 
 
 # ==========================================================

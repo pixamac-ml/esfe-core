@@ -9,6 +9,7 @@ from django.contrib.auth.models import Group
 from django.utils.functional import cached_property
 from django_ckeditor_5.fields import CKEditor5Field
 import uuid
+from datetime import timedelta
 
 
 # ==========================================================
@@ -719,7 +720,7 @@ class ContactMessage(models.Model):
 
     @cached_property
     def deadline(self):
-        return self.created_at + timezone.timedelta(hours=self.sla_hours)
+        return self.created_at + timedelta(hours=self.sla_hours)
 
     @property
     def is_overdue(self):
@@ -747,7 +748,12 @@ class Notification(models.Model):
         ("candidature_accepted_with_reserve", "Candidature acceptée sous réserve"),
         ("candidature_rejected", "Candidature refusée"),
         ("inscription_created", "Inscription créée"),
+        ("inscription_payment_pending", "Inscription en attente de paiement"),
+        ("inscription_partial_payment", "Inscription avec paiement partiel"),
         ("inscription_active", "Inscription active"),
+        ("inscription_suspended", "Inscription suspendue"),
+        ("inscription_expired", "Inscription expirée"),
+        ("inscription_completed", "Inscription terminée"),
         ("payment_received", "Paiement reçu"),
         ("payment_validated", "Paiement validé"),
         ("document_missing", "Document manquant"),

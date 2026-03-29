@@ -1,0 +1,130 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Événements{% endblock %}
+{% block page_subtitle %}Pilotage du calendrier événementiel{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total événements</p>
+            <p class="text-2xl font-bold text-slate-900 mb-0">{{ events_total_count }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Publiés</p>
+            <p class="text-2xl font-bold text-emerald-700 mb-0">{{ events_published_count }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Brouillons</p>
+            <p class="text-2xl font-bold text-amber-700 mb-0">{{ events_draft_count }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Médias liés</p>
+            <p class="text-2xl font-bold text-sky-700 mb-0">{{ events_media_count }}</p>
+        </article>
+    </section>
+
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input type="text" name="search" value="{{ filters.search|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Rechercher titre ou description">
+            <select name="type" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous les types</option>
+                {% for t in event_types %}
+                <option value="{{ t.pk }}" {% if filters.type == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="publication" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous statuts</option>
+                <option value="published" {% if filters.publication == 'published' %}selected{% endif %}>Publié</option>
+                <option value="draft" {% if filters.publication == 'draft' %}selected{% endif %}>Brouillon</option>
+            </select>
+            <div class="flex items-center gap-2 justify-end">
+                <a href="{% url 'superadmin:event_list' %}" class="btn btn-outline">Réinitialiser</a>
+                <button type="submit" class="btn btn-outline">Filtrer</button>
+                <a href="{% url 'superadmin:event_create' %}" class="btn btn-primary">Nouvel événement</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <form id="eventsBulkForm" method="post" action="{% url 'superadmin:bulk_action' %}" class="flex flex-wrap items-center gap-2 w-full">
+                {% csrf_token %}
+                <input type="hidden" name="model_type" value="event">
+                <select name="action" required class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Action groupée...</option>
+                    <option value="publish">Publier</option>
+                    <option value="unpublish">Dépublier</option>
+                    <option value="delete">Supprimer</option>
+                </select>
+                <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Appliquer cette action aux événements sélectionnés ?')">Appliquer</button>
+            </form>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600 w-10"><input id="select-all-events" type="checkbox"></th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Événement</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Type</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Date</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Médias</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Statut</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Actions</th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                {% for event in events %}
+                <tr>
+                    <td class="px-4 py-3"><input type="checkbox" name="selected_ids" value="{{ event.pk }}" form="eventsBulkForm" class="event-row-checkbox"></td>
+                    <td class="px-4 py-3">
+                        <p class="font-medium text-slate-900 mb-0">{{ event.title }}</p>
+                    </td>
+                    <td class="px-4 py-3">{{ event.event_type.name|default:'-' }}</td>
+                    <td class="px-4 py-3">{{ event.event_date|date:'d/m/Y' }}</td>
+                    <td class="px-4 py-3">{{ event.total_media }}</td>
+                    <td class="px-4 py-3">
+                        {% if event.is_published %}
+                        <span class="badge-status badge-success">Publié</span>
+                        {% else %}
+                        <span class="badge-status badge-draft">Brouillon</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="{% url 'superadmin:gallery_list' %}?event={{ event.pk }}" class="btn btn-outline btn-sm">Galerie</a>
+                            <a href="{% url 'superadmin:event_detail' event.pk %}" class="btn btn-outline btn-sm">Voir</a>
+                            <a href="{% url 'superadmin:event_edit' event.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                            <form method="post" action="{% url 'superadmin:toggle_event' event.pk %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm">{% if event.is_published %}Dépublier{% else %}Publier{% endif %}</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Aucun événement trouvé.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectAll = document.getElementById('select-all-events');
+    const rowCheckboxes = Array.from(document.querySelectorAll('.event-row-checkbox'));
+    if (!selectAll || rowCheckboxes.length === 0) {
+        return;
+    }
+
+    selectAll.addEventListener('change', function () {
+        rowCheckboxes.forEach(function (box) {
+            box.checked = selectAll.checked;
+        });
+    });
+});
+</script>
+{% endblock %}
+

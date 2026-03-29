@@ -1,0 +1,71 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Campus{% endblock %}
+{% block page_subtitle %}Gestion centralisee des annexes et points de service{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total campus</p>
+            <p class="text-2xl font-bold text-slate-900 mb-0">{{ branches_total }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Campus actifs</p>
+            <p class="text-2xl font-bold text-emerald-700 mb-0">{{ branches_active }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between gap-3">
+            <div>
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Actions</p>
+                <p class="text-sm text-slate-600 mb-0">Creer et piloter vos campus</p>
+            </div>
+            <a href="{% url 'superadmin:branch_create' %}" class="btn btn-primary">
+                Nouveau campus
+            </a>
+        </article>
+    </section>
+
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <form id="branch-filter-form"
+              method="get"
+              class="grid grid-cols-1 md:grid-cols-5 gap-3"
+              hx-get="{% url 'superadmin:branch_list' %}"
+              hx-target="#branch-table-container"
+              hx-swap="innerHTML"
+              hx-trigger="keyup changed delay:350ms, change, submit">
+            <div class="md:col-span-2">
+                <input type="text"
+                       name="search"
+                       value="{{ filters.search|default:'' }}"
+                       placeholder="Rechercher nom, code, email, telephone..."
+                       class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+            <div>
+                <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous statuts</option>
+                    <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actif</option>
+                    <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactif</option>
+                </select>
+            </div>
+            <div>
+                <select name="city" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Toutes les villes</option>
+                    {% for city_name in cities %}
+                    <option value="{{ city_name }}" {% if filters.city == city_name %}selected{% endif %}>{{ city_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:branch_list' %}" class="btn btn-outline">Reinitialiser</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div id="branch-table-container">
+            {% include "superadmin/branches/_list_table.html" %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+

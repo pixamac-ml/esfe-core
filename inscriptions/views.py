@@ -7,6 +7,19 @@ from inscriptions.models import Inscription
 from payments.forms import StudentPaymentForm
 
 
+def _can_initiate_payment(inscription, has_pending_payment):
+    payable_statuses = {
+        Inscription.STATUS_CREATED,
+        Inscription.STATUS_AWAITING_PAYMENT,
+        Inscription.STATUS_PARTIAL,
+    }
+    return (
+        inscription.status in payable_statuses
+        and inscription.balance > 0
+        and not has_pending_payment
+    )
+
+
 def inscription_public_detail(request, token):
     """
     Vue publique sécurisée du dossier d'inscription.
@@ -47,9 +60,9 @@ def inscription_public_detail(request, token):
     # Historique des paiements
     payments = inscription.payments.order_by("-paid_at")
     has_pending_payment = payments.filter(status="pending").exists()
-    can_pay = inscription.status == "created" and inscription.balance > 0 and not has_pending_payment
+    can_pay = _can_initiate_payment(inscription, has_pending_payment)
     payment_form = StudentPaymentForm(inscription=inscription) if can_pay else None
-    inscriptions = Inscription.objects.filter(status=inscription.created_at)
+
     context = {
         "inscription": inscription,
         "candidature": inscription.candidature,
@@ -59,7 +72,6 @@ def inscription_public_detail(request, token):
         "receipt_payment": payments.filter(status="validated", receipt_number__isnull=False).first(),
         "can_pay": can_pay,
         "has_pending_payment": has_pending_payment,
-        "inscriptions": inscriptions,
     }
 
     # Réponse HTMX

@@ -1,0 +1,82 @@
+<div class="overflow-x-auto">
+    <table class="data-table min-w-full">
+        <thead>
+            <tr>
+                <th>Campus</th>
+                <th>Code</th>
+                <th>Ville</th>
+                <th>Contact</th>
+                <th>Manager</th>
+                <th>Inscription en ligne</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for branch in branches %}
+            <tr>
+                <td>
+                    <p class="font-semibold text-slate-900 mb-0">{{ branch.name }}</p>
+                    <p class="text-xs text-slate-500 mb-0">{{ branch.slug }}</p>
+                </td>
+                <td><span class="font-mono text-xs">{{ branch.code }}</span></td>
+                <td>{{ branch.city|default:"-" }}</td>
+                <td>
+                    <p class="mb-0">{{ branch.phone|default:"-" }}</p>
+                    <p class="text-xs text-slate-500 mb-0">{{ branch.email|default:"-" }}</p>
+                </td>
+                <td>
+                    {% if branch.manager %}
+                        {{ branch.manager.get_full_name|default:branch.manager.username }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if branch.accepts_online_registration %}
+                        <span class="badge-status badge-success">Oui</span>
+                    {% else %}
+                        <span class="badge-status badge-draft">Non</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if branch.is_active %}
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">Actif</span>
+                    {% else %}
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700">Inactif</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="flex items-center gap-2">
+                        <a href="{% url 'superadmin:branch_edit' branch.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                        <a href="{% url 'superadmin:toggle_branch' branch.pk %}" class="btn btn-outline btn-sm">{% if branch.is_active %}Désactiver{% else %}Activer{% endif %}</a>
+                        <form method="post" action="{% url 'superadmin:branch_delete' branch.pk %}" class="inline" onsubmit="return confirm('Supprimer ce campus ?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center text-slate-500 py-8">Aucun campus trouvé.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if branches.paginator.num_pages > 1 %}
+<div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+    <p class="text-xs text-slate-500 mb-0">Page {{ branches.number }} / {{ branches.paginator.num_pages }}</p>
+    <div class="flex items-center gap-2">
+        {% if branches.has_previous %}
+            <a class="btn btn-outline btn-sm" href="?page={{ branches.previous_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&city={{ filters.city|default:'' }}">Précédent</a>
+        {% endif %}
+        {% if branches.has_next %}
+            <a class="btn btn-outline btn-sm" href="?page={{ branches.next_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&city={{ filters.city|default:'' }}">Suivant</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+

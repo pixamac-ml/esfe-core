@@ -523,7 +523,7 @@ def finance_dashboard(request):
 
     # Inscriptions en attente de paiement
     inscriptions_pending = inscriptions_qs.filter(
-        status='created'
+        status__in=['created', 'awaiting_payment', 'partial_paid']
     ).select_related(
         'candidature__programme',
         'candidature__branch'
@@ -554,14 +554,14 @@ def finance_dashboard(request):
     # Inscriptions disponibles pour session
     if is_global:
         available_inscriptions = Inscription.objects.filter(
-            status='created'
+            status__in=['created', 'awaiting_payment', 'partial_paid']
         ).select_related(
             'candidature__programme',
             'candidature__branch'
         ).order_by('-created_at')[:50]
     elif user_branch:
         available_inscriptions = Inscription.objects.filter(
-            status='created',
+            status__in=['created', 'awaiting_payment', 'partial_paid'],
             candidature__branch=user_branch
         ).select_related(
             'candidature__programme',
@@ -642,6 +642,7 @@ def finance_dashboard(request):
         # Sessions
         'payment_agent': payment_agent,
         'active_sessions': active_sessions,
+        'sessions': active_sessions,
         'today_sessions': today_sessions,
         'recent_sessions': recent_sessions,
 

@@ -1,55 +1,72 @@
 {% extends "superadmin/base.html" %}
-{% load static %}
+{% load humanize %}
 
 {% block page_title %}Gestion des Étudiants{% endblock %}
 {% block page_subtitle %}Consulter et gérer l'annuaire des étudiants{% endblock %}
 
 {% block content_main %}
-<div class="fade-in space-y-6">
-
-    <!-- ========================================
-         BARRE D'ACTIONS & RECHERCHE (HTMX)
-    ======================================== -->
-    <div class="card p-4">
-        <div class="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            
-            <!-- Formulaire de recherche dynamique -->
-            <form hx-get="{% url 'superadmin:student_list' %}" 
-                  hx-target="#students-table-container" 
-                  hx-trigger="keyup changed delay:500ms, change"
-                  hx-indicator=".loader"
-                  class="flex-1 flex items-center w-full max-w-2xl">
-                
-                <div class="search-box flex-1 relative">
-                    <i class="fas fa-search"></i>
-                    <input type="text" name="search" 
-                           placeholder="Rechercher par nom, email ou matricule..."
-                           value="{{ filters.search|default:'' }}"
-                           class="w-full">
-                    
-                    <!-- Indicateur visuel pendant que HTMX travaille -->
-                    <div class="loader htmx-indicator absolute right-3 top-3">
-                        <i class="fas fa-spinner fa-spin text-secondary"></i>
-                    </div>
-                </div>
-            </form>
-
-            <!-- Boutons d'export / Actions -->
-            <div class="flex gap-2">
-                <a href="{% url 'superadmin:export_data' 'students' %}" class="btn btn-outline">
-                    <i class="fas fa-file-export mr-2"></i>Exporter CSV
-                </a>
-                <!-- Si tu as une vue de création d'étudiant, ajoute le bouton ici -->
-            </div>
+<div class="space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="card p-4 rounded-xl shadow-sm border border-slate-100">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total étudiants</p>
+            <p class="text-2xl font-bold text-slate-900">{{ students.paginator.count|intcomma }}</p>
+            <p class="text-xs text-slate-500">périmètre filtré</p>
         </div>
+        <div class="card p-4 rounded-xl shadow-sm border border-slate-100">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Statut actif</p>
+            <p class="text-2xl font-bold text-emerald-700">{{ students.object_list|length|intcomma }}</p>
+            <p class="text-xs text-slate-500">sur la page courante</p>
+        </div>
+        <div class="card p-4 rounded-xl shadow-sm border border-slate-100">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Export</p>
+            <a href="{% url 'superadmin:export_data' 'students' %}" class="btn btn-outline mt-1">
+                <i class="fas fa-file-export mr-2"></i>Exporter CSV
+            </a>
+        </div>
+    </section>
+
+    <div class="card p-4 rounded-xl shadow-sm border border-slate-100">
+        <form id="student-filter-form"
+              method="get"
+              class="grid grid-cols-1 md:grid-cols-5 gap-3"
+              hx-get="{% url 'superadmin:student_list' %}"
+              hx-target="#students-table-container"
+              hx-swap="innerHTML"
+              hx-trigger="keyup changed delay:350ms, change, submit">
+            <div class="md:col-span-2">
+                <label for="student-search" class="sr-only">Recherche</label>
+                <input id="student-search" type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Rechercher par nom, email, matricule..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label for="student-status" class="sr-only">Statut</label>
+                <select id="student-status" name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous statuts</option>
+                    <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actif</option>
+                    <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactif</option>
+                </select>
+            </div>
+            <div>
+                <label for="student-programme" class="sr-only">Programme</label>
+                <select id="student-programme" name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous programmes</option>
+                    {% for p in programmes %}
+                    <option value="{{ p.id }}" {% if filters.programme_id == p.id %}selected{% endif %}>{{ p.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:student_list' %}" class="btn btn-outline">Réinitialiser</a>
+            </div>
+        </form>
     </div>
 
-    <!-- ========================================
-         ZONE DE LA TABLE (Injectée par HTMX)
-    ======================================== -->
-    <div class="card shadow-sm border-slate-100 overflow-hidden">
-        <div id="students-table-container">
-            <!-- On inclut le partial que nous avons créé juste avant -->
+    <div class="card overflow-hidden rounded-xl shadow-sm border border-slate-100">
+        <div id="students-table-container"
+             hx-get="{% url 'superadmin:student_list' %}"
+             hx-trigger="refreshStudents from:body"
+             hx-target="this"
+             hx-swap="innerHTML"
+             hx-include="#student-filter-form">
             {% include "superadmin/students/_student_table.html" %}
         </div>
     </div>

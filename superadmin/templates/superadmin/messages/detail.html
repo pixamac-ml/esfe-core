@@ -1,20 +1,64 @@
-{% extends 'superadmin/base.html' %}
-{% block content %}
-<div class="container-fluid">
-    <h1 class="h3 mb-4">Détail du message</h1>
-    <div class="card">
-        <div class="card-body">
-            <p><strong>Expéditeur :</strong> {{ message.sender }}</p>
-            <p><strong>Objet :</strong> {{ message.subject }}</p>
-            <p><strong>Date :</strong> {{ message.sent_at|date:'d/m/Y H:i' }}</p>
-            <p><strong>Status :</strong> {{ message.status }}</p>
-            <div class="mt-4">
-                {{ message.body|linebreaksbr }}
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Message de {{ message.full_name }}{% endblock %}
+{% block page_subtitle %}Détail et traitement du message{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-semibold text-slate-900 mb-0">{{ message.full_name }}</h2>
+                <p class="text-xs text-slate-500 mb-0">{{ message.email }}{% if message.phone %} · {{ message.phone }}{% endif %}</p>
             </div>
-            <a href="{% url 'superadmin:message_reply' message.id %}" class="btn btn-success mt-3">Répondre</a>
-            <a href="{% url 'superadmin:messages' %}" class="btn btn-secondary mt-3">Retour à la liste</a>
+            <div class="flex items-center gap-2">
+                <form method="post" action="{% url 'superadmin:message_status' message.pk %}" class="inline-flex items-center gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'superadmin:message_detail' message.pk %}">
+                    <select name="status" class="form-input text-sm">
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if message.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-outline btn-sm">Mettre à jour statut</button>
+                </form>
+                <form method="post" action="{% url 'superadmin:message_delete' message.pk %}" class="inline" onsubmit="return confirm('Supprimer ce message ?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                </form>
+                <a href="{% url 'superadmin:message_list' %}" class="btn btn-outline btn-sm">Retour liste</a>
+            </div>
         </div>
-    </div>
+        <div class="card-body space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><p class="text-xs text-slate-500 mb-1">Sujet</p><p class="font-semibold text-slate-900 mb-0">{{ message.get_subject_display }}</p></div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><p class="text-xs text-slate-500 mb-1">Priorité</p><p class="font-semibold text-slate-900 mb-0">{{ message.get_priority_display }}</p></div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><p class="text-xs text-slate-500 mb-1">Statut</p><p class="font-semibold text-slate-900 mb-0">{{ message.get_status_display }}</p></div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><p class="text-xs text-slate-500 mb-1">Créé le</p><p class="font-semibold text-slate-900 mb-0">{{ message.created_at|date:'d/m/Y H:i' }}</p></div>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Message</p>
+                <div class="text-sm text-slate-700">{{ message.message|linebreaks }}</div>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Réponse</p>
+                <div class="text-sm text-slate-700">{{ message.reply|default:'Aucune réponse enregistrée.'|linebreaks }}</div>
+            </div>
+
+            <form method="post" action="{% url 'superadmin:message_status' message.pk %}" class="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+                {% csrf_token %}
+                <input type="hidden" name="status" value="answered">
+                <input type="hidden" name="next" value="{% url 'superadmin:message_detail' message.pk %}">
+                <label class="form-label">Rédiger / mettre à jour la réponse</label>
+                <textarea name="reply" rows="5" class="form-input" placeholder="Tapez votre réponse...">{{ message.reply|default:'' }}</textarea>
+                <div class="flex items-center justify-end gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Enregistrer et marquer Répondu</button>
+                </div>
+            </form>
+        </div>
+    </section>
 </div>
 {% endblock %}
 

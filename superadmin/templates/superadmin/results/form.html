@@ -1,0 +1,74 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Saisie rapide d'un résultat PDF publiable immédiatement{% endblock %}
+
+{% block content_main %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <h2 class="text-base font-semibold text-slate-900 mb-0">Import résultat</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% csrf_token %}
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Titre *</label>
+                    <input type="text" name="titre" required value="{{ result_item.titre|default:'' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Type *</label>
+                    <select name="type" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        {% for value, label in result_type_choices %}
+                        <option value="{{ value }}" {% if result_item.type|default:'semestre' == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Année académique *</label>
+                    <input type="text" name="annee_academique" required value="{{ result_item.annee_academique|default:'' }}" placeholder="2025-2026" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Annexe *</label>
+                    <input type="text" name="annexe" required value="{{ result_item.annexe|default:'' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Filière *</label>
+                    <input type="text" name="filiere" required value="{{ result_item.filiere|default:'' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Classe *</label>
+                    <input type="text" name="classe" required value="{{ result_item.classe|default:'' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">PDF officiel {% if not result_item %}*{% endif %}</label>
+                    <input type="file" name="fichier_pdf" {% if not result_item %}required{% endif %} accept="application/pdf" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    {% if result_item and result_item.fichier_pdf %}
+                    <p class="mt-2 text-xs text-slate-500">Fichier actuel: <a href="{{ result_item.fichier_pdf.url }}" target="_blank">ouvrir le PDF</a></p>
+                    {% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        <input type="checkbox" name="is_published" {% if result_item.is_published or not result_item %}checked{% endif %}>
+                        Publier immédiatement
+                    </label>
+                </div>
+
+                <div class="md:col-span-2 flex items-center justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:result_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

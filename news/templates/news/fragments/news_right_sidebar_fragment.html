@@ -1,0 +1,55 @@
+<aside id="news-right-sidebar"
+       class="col-span-12 lg:col-span-3 space-y-8"
+       hx-get="{% url 'news:sidebar_fragment' %}?{{ active_querystring }}"
+       hx-trigger="news:refresh from:body"
+       hx-target="this"
+       hx-swap="outerHTML"
+       hx-indicator="#news-loading">
+
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-primary-50">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-2">
+                <i class="fa-solid fa-bolt text-secondary"></i>
+                A la une
+            </h3>
+            <span class="text-[11px] text-gray-400">Live</span>
+        </div>
+        <div class="space-y-4">
+            {% for item in featured_news %}
+                <a href="{{ item.get_absolute_url }}"
+                   class="block text-sm font-medium text-gray-700 hover:text-primary-600 transition">
+                    {{ item.titre }}
+                </a>
+            {% empty %}
+                <p class="text-sm text-gray-400">Aucune mise a jour.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-primary-50">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-2">
+                <i class="fa-regular fa-clock text-primary-500"></i>
+                Dernieres publications
+            </h3>
+            <span class="text-[11px] text-gray-400">{{ last_updated_at|date:"H:i" }}</span>
+        </div>
+        <div class="space-y-4">
+            {% for item in recent_news %}
+                <div>
+                    <div class="text-xs text-gray-400 mb-1">
+                        {{ item.published_at|date:"d M Y" }}
+                    </div>
+                    <a href="{{ item.get_absolute_url }}"
+                       class="block text-sm font-medium text-gray-700 hover:text-primary-600 transition">
+                        {{ item.titre }}
+                    </a>
+                </div>
+            {% empty %}
+                <p class="text-sm text-gray-400">Aucune publication pour le moment.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+</aside>
+

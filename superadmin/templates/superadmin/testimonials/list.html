@@ -1,0 +1,56 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Temoignages{% endblock %}
+{% block page_subtitle %}Gestion des avis publics{% endblock %}
+
+{% block content_main %}
+<div class="space-y-4">
+    <div class="flex justify-end">
+        <a href="{% url 'superadmin:testimonial_create' %}" class="btn btn-primary btn-sm">Nouveau temoignage</a>
+    </div>
+
+    <div class="card overflow-hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Auteur</th>
+                    <th>Role</th>
+                    <th>Extrait</th>
+                    <th>Statut</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in testimonials %}
+                <tr>
+                    <td class="font-medium">{{ t.author_name }}</td>
+                    <td>{{ t.author_role|default:"-" }}</td>
+                    <td class="text-slate-600">{{ t.quote|truncatechars:90 }}</td>
+                    <td>
+                        {% if t.is_active %}
+                        <span class="badge-status badge-success">Actif</span>
+                        {% else %}
+                        <span class="badge-status badge-draft">Inactif</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        <div class="inline-flex gap-2">
+                            <a href="{% url 'superadmin:testimonial_edit' t.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                            <a href="{% url 'superadmin:toggle_testimonial' t.pk %}" class="btn btn-outline btn-sm">Toggle</a>
+                            <form method="post" action="{% url 'superadmin:testimonial_delete' t.pk %}" onsubmit="return confirm('Supprimer ce temoignage ?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="py-10 text-center text-slate-500">Aucun temoignage.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

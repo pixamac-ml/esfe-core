@@ -1,4 +1,4 @@
-<div class="bg-white rounded-2xl border border-primary-100 shadow-sm overflow-hidden"
+<div x-data="{ replyOpen: false }" class="bg-white rounded-2xl border border-primary-100 shadow-sm overflow-hidden"
      id="answer-{{ answer.id }}">
 <!-- Bouton accepter réponse -->
 <div id="accept-btn-{{ answer.id }}">
@@ -15,6 +15,7 @@
                     hx-vals='{"value": "1"}'
                     hx-target="#answer-{{ answer.id }} .vote-count"
                     hx-swap="outerHTML"
+                    hx-indicator="#vote-indicator-{{ answer.id }}"
                     class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/>
@@ -34,6 +35,7 @@
                 {% if answer.score > 0 %}text-green-600{% elif answer.score < 0 %}text-red-600{% else %}text-gray-400{% endif %}">
                 {{ answer.score }}
             </div>
+            <span id="vote-indicator-{{ answer.id }}" class="htmx-indicator text-xs text-primary-500">...</span>
 
             {% if user.is_authenticated %}
                 <button
@@ -41,6 +43,7 @@
                     hx-vals='{"value": "-1"}'
                     hx-target="#answer-{{ answer.id }} .vote-count"
                     hx-swap="outerHTML"
+                    hx-indicator="#vote-indicator-{{ answer.id }}"
                     class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
@@ -102,7 +105,7 @@
                 <!-- Action Répondre -->
                 {% if user.is_authenticated and not topic.is_locked %}
                     <button
-                        onclick="document.getElementById('reply-form-{{ answer.id }}').classList.toggle('hidden')"
+                        @click="replyOpen = !replyOpen"
                         class="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-secondary font-medium transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
@@ -116,13 +119,15 @@
 
             <!-- ================= FORMULAIRE INLINE ================= -->
             {% if user.is_authenticated and not topic.is_locked %}
-            <div id="reply-form-{{ answer.id }}" class="hidden mt-5 pt-5 border-t border-dashed border-primary-100">
+            <div id="reply-form-{{ answer.id }}" x-show="replyOpen" x-transition class="mt-5 pt-5 border-t border-dashed border-primary-100" style="display: none;">
 
                 <form
                     hx-post="{% url 'community:add_answer' topic.slug %}"
                     hx-target="#answer-{{ answer.id }} .replies"
                     hx-swap="beforeend"
-                    hx-on="htmx:afterRequest: this.reset(); this.parentElement.classList.add('hidden')"
+                    hx-indicator="#reply-indicator-{{ answer.id }}"
+                    hx-on="htmx:afterRequest: this.reset()"
+                    @submit="replyOpen = false"
                     class="space-y-4"
                 >
                     {% csrf_token %}
@@ -144,11 +149,13 @@
                         </button>
                         <button
                             type="button"
-                            onclick="this.closest('form').reset(); document.getElementById('reply-form-{{ answer.id }}').classList.add('hidden')"
+                            @click="replyOpen = false"
                             class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium transition">
                             Annuler
                         </button>
                     </div>
+
+                    <div id="reply-indicator-{{ answer.id }}" class="htmx-indicator text-xs text-primary-500">Envoi...</div>
 
                 </form>
 

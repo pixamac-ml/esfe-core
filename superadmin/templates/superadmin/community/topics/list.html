@@ -1,0 +1,38 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Sujets Communaute{% endblock %}
+{% block page_subtitle %}Moderation et suivi des discussions{% endblock %}
+
+{% block content_main %}
+<div class="space-y-5">
+    <div class="card p-4">
+        <form id="community-topic-filter-form"
+              method="get"
+              class="grid grid-cols-1 md:grid-cols-4 gap-3"
+              hx-get="{% url 'superadmin:community_topic_list' %}"
+              hx-target="#community-topic-table-container"
+              hx-swap="innerHTML"
+              hx-trigger="keyup changed delay:350ms, change, submit">
+            <input type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Recherche titre/contenu" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <select name="category" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Toutes categories</option>
+                {% for c in categories %}
+                <option value="{{ c.pk }}" {% if filters.category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="status" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous statuts</option>
+                <option value="published" {% if filters.status == 'published' %}selected{% endif %}>Publie</option>
+                <option value="deleted" {% if filters.status == 'deleted' %}selected{% endif %}>Supprime</option>
+            </select>
+            <div class="flex justify-end">
+                <a href="{% url 'superadmin:community_topic_list' %}" class="btn btn-outline btn-sm">Reinitialiser</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card overflow-hidden" id="community-topic-table-container">
+        {% include "superadmin/community/topics/_topic_table.html" %}
+    </div>
+</div>
+{% endblock %}

@@ -42,8 +42,8 @@
             <!-- Statistiques -->
             <div class="flex items-center gap-4">
                 <div class="bg-white/10 backdrop-blur rounded-xl px-5 py-3 text-center">
-                    <div class="text-2xl font-bold">{{ users|length }}</div>
-                    <div class="text-xs text-primary-200 uppercase tracking-wide">Membre{{ users|length|pluralize }}</div>
+                    <div class="text-2xl font-bold">{{ users_total|default:users|length }}</div>
+                    <div class="text-xs text-primary-200 uppercase tracking-wide">Membre{{ users_total|default:users|length|pluralize }}</div>
                 </div>
             </div>
         </div>
@@ -66,8 +66,8 @@
                 <div class="flex items-center gap-4">
                     <!-- Avatar -->
                     <div class="relative">
-                        {% if user.profile.image %}
-                        <img src="{{ user.profile.image.url }}"
+                        {% if user.profile.avatar %}
+                        <img src="{{ user.profile.avatar.url }}"
                              alt="{{ user.username }}"
                              class="w-16 h-16 rounded-full object-cover border-2 border-primary-100
                                     group-hover:border-primary-300 group-hover:scale-105
@@ -95,9 +95,9 @@
                             {{ user.username }}
                         </div>
 
-                        {% if user.profile.domain %}
+                        {% if user.profile.main_domain %}
                         <div class="text-xs text-gray-500 truncate mt-0.5">
-                            {{ user.profile.domain }}
+                            {{ user.profile.main_domain }}
                         </div>
                         {% endif %}
 
@@ -127,7 +127,7 @@
                 </div>
 
                 <!-- Badges ou rôle (si disponible) -->
-                {% if user.profile.is_verified or user.is_staff %}
+                {% if user.is_staff %}
                 <div class="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
                     {% if user.is_staff %}
                     <span class="inline-flex items-center gap-1 bg-purple-100 text-purple-700 text-xs font-medium px-2.5 py-1 rounded-full">
@@ -137,20 +137,28 @@
                         Staff
                     </span>
                     {% endif %}
-                    {% if user.profile.is_verified %}
-                    <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        Vérifié
-                    </span>
-                    {% endif %}
                 </div>
                 {% endif %}
 
             </a>
             {% endfor %}
         </div>
+
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <div class="mt-8 flex items-center justify-between text-sm">
+            <span class="text-gray-500">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            <div class="flex items-center gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}"
+                   class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition">Prec</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}"
+                   class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition">Suiv</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
 
         {% else %}
         <!-- État vide -->

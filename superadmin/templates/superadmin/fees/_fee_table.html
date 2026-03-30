@@ -1,0 +1,50 @@
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Programme</th>
+            <th>Annee academique</th>
+            <th>Libelle</th>
+            <th>Montant</th>
+            <th>Echeance</th>
+            <th class="text-right">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for fee in fees %}
+        <tr>
+            <td>{{ fee.programme_year.programme.title }}</td>
+            <td>{{ fee.programme_year.academic_year }}</td>
+            <td>{{ fee.label }}</td>
+            <td class="font-semibold">{{ fee.amount }}</td>
+            <td>{{ fee.due_month|default:"-" }}</td>
+            <td class="text-right">
+                <div class="inline-flex gap-2">
+                    <a href="{% url 'superadmin:fee_edit' fee.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                    <form method="post" action="{% url 'superadmin:fee_delete' fee.pk %}" onsubmit="return confirm('Supprimer ce frais ?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="py-10 text-center text-slate-500">Aucun frais disponible.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if fees.paginator.num_pages > 1 %}
+<div class="p-4 border-t border-slate-100 flex items-center justify-between text-sm">
+    <span class="text-slate-500">Page {{ fees.number }} / {{ fees.paginator.num_pages }}</span>
+    <div class="flex gap-2">
+        {% if fees.has_previous %}
+        <a class="btn btn-outline btn-sm" href="?page={{ fees.previous_page_number }}{% if filters.programme %}&programme={{ filters.programme }}{% endif %}">Precedent</a>
+        {% endif %}
+        {% if fees.has_next %}
+        <a class="btn btn-outline btn-sm" href="?page={{ fees.next_page_number }}{% if filters.programme %}&programme={{ filters.programme }}{% endif %}">Suivant</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

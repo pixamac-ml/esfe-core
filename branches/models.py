@@ -33,6 +33,13 @@ class Branch(models.Model):
 
     email = models.EmailField(blank=True)
 
+    image = models.ImageField(
+        upload_to="branches/",
+        blank=True,
+        null=True,
+        verbose_name="Image de l'annexe"
+    )
+
     manager = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

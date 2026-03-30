@@ -107,3 +107,36 @@
     {% endfor %}
 
 </div>
+
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<div class="mt-6 flex items-center justify-between gap-4 text-sm">
+    <div class="text-gray-500">
+        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </div>
+    <div class="flex items-center gap-2">
+        {% if page_obj.has_previous %}
+        <button
+            hx-get="{{ request.path }}?sort={{ current_sort }}&q={{ query|urlencode }}&page={{ page_obj.previous_page_number }}"
+            hx-target="#topic-list-container"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition"
+        >
+            Prec
+        </button>
+        {% endif %}
+
+        {% if page_obj.has_next %}
+        <button
+            hx-get="{{ request.path }}?sort={{ current_sort }}&q={{ query|urlencode }}&page={{ page_obj.next_page_number }}"
+            hx-target="#topic-list-container"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition"
+        >
+            Suiv
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

@@ -1,0 +1,87 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Sessions cash{% endblock %}
+{% block page_subtitle %}Suivi des codes de vérification en espèces{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="text" name="search" value="{{ filters.search|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Token, candidat, code...">
+            <select name="branch" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Toutes annexes</option>
+                {% for b in branches %}
+                <option value="{{ b.id }}" {% if filters.branch == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="agent" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous agents</option>
+                {% for a in payment_agents %}
+                <option value="{{ a.id }}" {% if filters.agent == a.id|stringformat:'s' %}selected{% endif %}>{{ a.user.get_full_name|default:a.user.username }} ({{ a.agent_code }})</option>
+                {% endfor %}
+            </select>
+            <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous statuts</option>
+                <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actives</option>
+                <option value="used" {% if filters.status == 'used' %}selected{% endif %}>Utilisées</option>
+                <option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expirées</option>
+            </select>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:payment_cash_session_list' %}" class="btn btn-outline">Réinitialiser</a>
+                <button type="submit" class="btn btn-outline">Filtrer</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Inscription</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Agent</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Code</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Expiration</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Statut</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                {% for session in sessions %}
+                <tr>
+                    <td class="px-4 py-3">
+                        <p class="font-medium text-slate-900 mb-0">{{ session.inscription.public_token }}</p>
+                        <p class="text-xs text-slate-500 mb-0">{{ session.inscription.candidature.full_name }}</p>
+                    </td>
+                    <td class="px-4 py-3">
+                        <p class="font-medium text-slate-900 mb-0">{{ session.agent.user.get_full_name|default:session.agent.user.username }}</p>
+                        <p class="text-xs text-slate-500 mb-0">{{ session.agent.branch.name }}</p>
+                    </td>
+                    <td class="px-4 py-3"><span class="font-mono">{{ session.verification_code }}</span></td>
+                    <td class="px-4 py-3">{{ session.expires_at|date:'d/m/Y H:i' }}</td>
+                    <td class="px-4 py-3">
+                        {% if session.is_used %}
+                        <span class="badge-status badge-draft">Utilisée</span>
+                        {% elif session.expires_at <= now %}
+                        <span class="badge-status badge-danger">Expirée</span>
+                        {% else %}
+                        <span class="badge-status badge-success">Active</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <form method="post" action="{% url 'superadmin:payment_cash_session_mark_used' session.pk %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline btn-sm" {% if session.is_used %}disabled{% endif %}>Marquer utilisée</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">Aucune session cash trouvée.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

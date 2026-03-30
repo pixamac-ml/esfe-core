@@ -10,10 +10,14 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 from django.utils import timezone
+from django.db import connection
+from django.db.utils import OperationalError, ProgrammingError
+from django.shortcuts import redirect
 
 from .models import (
     Institution,
     InstitutionPresentation,
+    SiteConfiguration,
     Value,
     Infrastructure,
     Staff,
@@ -150,6 +154,93 @@ class InstitutionPresentationAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SiteConfiguration)
+class SiteConfigurationAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "updated_at")
+    readonly_fields = ("updated_at",)
+
+    fieldsets = (
+        ("Production - Images cles (Zero statique)", {
+            "fields": (
+                "home_hero_image",
+                "home_about_image",
+                "about_hero_image",
+                "about_main_image",
+            ),
+            "description": "Ces 4 images alimentent directement la Landing et la page A propos."
+        }),
+        ("Branding", {
+            "fields": ("site_logo",)
+        }),
+        ("Accueil - Hero", {
+            "fields": (
+                "home_hero_title",
+                "home_hero_subtitle",
+            )
+        }),
+        ("Accueil - Images sections", {
+            "fields": (
+                "home_why_image_1",
+                "home_why_image_2",
+                "home_why_image_3",
+                "home_why_image_4",
+                "home_annexe_image_1",
+                "home_annexe_image_2",
+                "home_annexe_image_3",
+                "home_annexe_image_4",
+                "home_stats_banner_image",
+            ),
+            "classes": ("collapse",)
+        }),
+        ("A propos", {
+            "fields": (
+                "about_stats_banner_image",
+                "about_vision_title",
+                "about_vision_text",
+                "about_values_title",
+                "about_values_subtitle",
+            )
+        }),
+        ("Smart Rocket", {
+            "fields": (
+                "smart_rocket_enabled",
+                "smart_rocket_title",
+                "smart_rocket_message",
+            )
+        }),
+        ("Metadonnees", {
+            "fields": ("updated_at",),
+            "classes": ("collapse",)
+        }),
+    )
+
+    def has_add_permission(self, request):
+        # Tant que la migration n'est pas appliquee, la table peut ne pas exister.
+        try:
+            return not SiteConfiguration.objects.exists()
+        except (ProgrammingError, OperationalError):
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def _site_config_table_exists(self):
+        try:
+            return SiteConfiguration._meta.db_table in connection.introspection.table_names()
+        except (ProgrammingError, OperationalError):
+            return False
+
+    def changelist_view(self, request, extra_context=None):
+        if not self._site_config_table_exists():
+            messages.warning(
+                request,
+                "La table de configuration du site n'est pas encore créée. "
+                "Exécutez d'abord les migrations (python manage.py migrate core).",
+            )
+            return redirect("admin:index")
+        return super().changelist_view(request, extra_context=extra_context)
 
 
 # ==========================================================

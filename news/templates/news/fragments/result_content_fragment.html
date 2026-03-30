@@ -1,0 +1,126 @@
+{% load component_tags %}
+<div id="results-loading"
+     class="hidden fixed inset-0 bg-white/40 backdrop-blur-sm z-40 flex items-center justify-center"
+     hx-indicator>
+    <div class="w-10 h-10 border-4 border-primary-300 border-t-primary-600 rounded-full animate-spin"></div>
+</div>
+
+<div id="result-content"
+     x-data="{
+        syncLatest(detail) {
+            if (!detail || !detail.latest) return
+            const input = document.getElementById('result-poll-since')
+            if (input) input.value = detail.latest
+        }
+     }"
+     @results:refresh.window="syncLatest($event.detail)"
+     class="max-w-7xl mx-auto px-6 grid grid-cols-12 gap-12">
+
+    <input type="hidden"
+           id="result-poll-since"
+           name="since"
+           value="{% if latest_results_timestamp %}{{ latest_results_timestamp|date:'c' }}{% endif %}">
+
+    <div id="result-poller"
+         hx-get="{% url 'news:result_poll' %}?{{ active_querystring }}"
+         hx-trigger="every 30s"
+         hx-include="#result-poll-since"
+         hx-swap="none"></div>
+
+    <aside class="col-span-12 lg:col-span-3 space-y-6">
+        <div class="bg-white rounded-2xl border border-primary-50 shadow-sm p-5">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap text-primary-500"></i>
+                Navigation rapide
+            </h3>
+            <div class="space-y-2 text-sm">
+                {% for annee, annexe_list in annexes_par_annee.items %}
+                    <div class="pt-2 {% if not forloop.first %}border-t border-gray-100{% endif %}">
+                        <a href="{% url 'news:result_list' %}?annee={{ annee }}"
+                           hx-get="{% url 'news:result_list' %}?annee={{ annee }}"
+                           hx-target="#result-content"
+                           hx-swap="outerHTML"
+                           hx-push-url="true"
+                           hx-indicator="#results-loading"
+                           class="font-medium {% if current_annee == annee %}text-primary-600{% else %}text-gray-700 hover:text-primary-600{% endif %}">
+                            {{ annee }}
+                        </a>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            {% for annexe in annexe_list %}
+                                <a href="{% url 'news:result_list' %}?annee={{ annee }}&annexe={{ annexe|urlencode }}"
+                                   hx-get="{% url 'news:result_list' %}?annee={{ annee }}&annexe={{ annexe|urlencode }}"
+                                   hx-target="#result-content"
+                                   hx-swap="outerHTML"
+                                   hx-push-url="true"
+                                   hx-indicator="#results-loading"
+                                   class="text-xs px-2.5 py-1 rounded-full border transition {% if current_annexe == annexe %}bg-primary-50 border-primary-200 text-primary-600{% else %}border-gray-200 text-gray-600 hover:border-primary-200 hover:text-primary-600{% endif %}">
+                                    {{ annexe }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-sm text-gray-500">Aucune donnée disponible.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </aside>
+
+    <div class="col-span-12 lg:col-span-9 space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-primary-50 shadow-sm">
+            <div class="flex items-center justify-between gap-4 mb-4">
+                <h2 class="text-lg font-semibold text-primary-700">Classement des publications</h2>
+                <span class="inline-flex items-center gap-2 text-xs text-gray-500 bg-primary-50 px-3 py-2 rounded-lg">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    Mise a jour auto 30s
+                </span>
+            </div>
+
+            <form method="get"
+                  class="grid md:grid-cols-4 gap-3"
+                  hx-get="{% url 'news:result_list' %}"
+                  hx-target="#result-content"
+                  hx-swap="outerHTML"
+                  hx-push-url="true"
+                  hx-indicator="#results-loading"
+                  hx-trigger="submit, change from:select, keyup changed delay:500ms from:#result-search">
+                <label for="result-year" class="sr-only">Filtrer par année</label>
+                <select id="result-year" name="annee" class="form-select text-sm">
+                    <option value="">Toutes les annees</option>
+                    {% for annee in annees %}
+                        <option value="{{ annee }}" {% if current_annee == annee %}selected{% endif %}>{{ annee }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="result-annexe" class="sr-only">Filtrer par annexe</label>
+                <select id="result-annexe" name="annexe" class="form-select text-sm">
+                    <option value="">Toutes les annexes</option>
+                    {% for annexe in annexes %}
+                        <option value="{{ annexe }}" {% if current_annexe == annexe %}selected{% endif %}>{{ annexe }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="result-type" class="sr-only">Filtrer par type</label>
+                <select id="result-type" name="type" class="form-select text-sm">
+                    <option value="">Tous les types</option>
+                    <option value="semestre" {% if current_type == "semestre" %}selected{% endif %}>Resultats semestriels</option>
+                    <option value="examen" {% if current_type == "examen" %}selected{% endif %}>Examens nationaux</option>
+                </select>
+
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <label for="result-search" class="sr-only">Rechercher un résultat</label>
+                    <input id="result-search"
+                           name="q"
+                           value="{{ current_search }}"
+                           type="search"
+                           placeholder="Rechercher un resultat"
+                           class="w-full pl-9 pr-3 py-2.5 rounded-lg border border-primary-100 focus:ring-2 focus:ring-primary-200 focus:outline-none text-sm">
+                </div>
+            </form>
+        </div>
+
+        {% include "news/fragments/result_list_fragment.html" %}
+    </div>
+</div>
+

@@ -1,0 +1,36 @@
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Nom</th>
+            <th>Description</th>
+            <th>Obligatoire</th>
+            <th class="text-right">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for document in documents %}
+        <tr>
+            <td class="font-medium">{{ document.name }}</td>
+            <td class="text-slate-600">{{ document.description|default:'-'|truncatechars:110 }}</td>
+            <td>
+                {% if document.is_mandatory %}
+                <span class="badge-status badge-success">Oui</span>
+                {% else %}
+                <span class="badge-status badge-draft">Non</span>
+                {% endif %}
+            </td>
+            <td class="text-right">
+                <div class="inline-flex gap-2">
+                    <a href="{% url 'superadmin:required_document_edit' document.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                    <form method="post" action="{% url 'superadmin:required_document_delete' document.pk %}" onsubmit="return confirm('Supprimer ce document ?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="py-10 text-center text-slate-500">Aucun document requis.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>

@@ -28,17 +28,47 @@
     </div>
 
     <div class="text-sm text-gray-500 mt-2">
-        Réponse publiée {{ answer.created_at|timesince }} ago
+        Reponse publiee il y a {{ answer.created_at|timesince }}
     </div>
 
 </a>
 
 {% empty %}
 
-<p class="text-gray-400">
-Aucune réponse publiée.
-</p>
+<div class="bg-white border rounded-xl p-6 text-center text-gray-400">
+    Aucune reponse publiee.
+</div>
 
 {% endfor %}
+
+{% if answers_page and answers_page.paginator.num_pages > 1 %}
+<div class="pt-2 flex items-center justify-between text-sm">
+    <span class="text-gray-500">Page {{ answers_page.number }} / {{ answers_page.paginator.num_pages }}</span>
+    <div class="flex items-center gap-2">
+        {% if answers_page.has_previous %}
+        <button
+            hx-get="{% url 'community:profile_answers' profile_user.username %}?answers_page={{ answers_page.previous_page_number }}"
+            hx-target="#profile-content"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition"
+        >
+            Prec
+        </button>
+        {% endif %}
+        {% if answers_page.has_next %}
+        <button
+            hx-get="{% url 'community:profile_answers' profile_user.username %}?answers_page={{ answers_page.next_page_number }}"
+            hx-target="#profile-content"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition"
+        >
+            Suiv
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 
 </div>

@@ -167,6 +167,103 @@ class InstitutionPresentation(models.Model):
 
 
 # ==========================================================
+# SITE CONFIGURATION (SINGLETON)
+# ==========================================================
+
+class SiteConfiguration(models.Model):
+    """Configuration visuelle centralisée du site public (singleton)."""
+
+    # Identité visuelle globale
+    site_logo = models.ImageField(
+        upload_to="site/branding/",
+        blank=True,
+        null=True,
+        verbose_name="Logo principal"
+    )
+
+    # Home - Hero
+    home_hero_image = models.ImageField(
+        upload_to="site/home/hero/",
+        blank=True,
+        null=True,
+        verbose_name="Image Hero Accueil"
+    )
+    home_hero_title = models.CharField(
+        max_length=255,
+        default="ESFE",
+        verbose_name="Titre Hero Accueil"
+    )
+    home_hero_subtitle = models.CharField(
+        max_length=500,
+        default="Former les cadres de la santé",
+        verbose_name="Sous-titre Hero Accueil"
+    )
+
+    # Home - Sections imagees
+    home_about_image = models.ImageField(
+        upload_to="site/home/about/",
+        blank=True,
+        null=True,
+        verbose_name="Image section Qui sommes-nous (Accueil)"
+    )
+    home_why_image_1 = models.ImageField(upload_to="site/home/why/", blank=True, null=True)
+    home_why_image_2 = models.ImageField(upload_to="site/home/why/", blank=True, null=True)
+    home_why_image_3 = models.ImageField(upload_to="site/home/why/", blank=True, null=True)
+    home_why_image_4 = models.ImageField(upload_to="site/home/why/", blank=True, null=True)
+    home_annexe_image_1 = models.ImageField(upload_to="site/home/annexes/", blank=True, null=True)
+    home_annexe_image_2 = models.ImageField(upload_to="site/home/annexes/", blank=True, null=True)
+    home_annexe_image_3 = models.ImageField(upload_to="site/home/annexes/", blank=True, null=True)
+    home_annexe_image_4 = models.ImageField(upload_to="site/home/annexes/", blank=True, null=True)
+    home_stats_banner_image = models.ImageField(
+        upload_to="site/home/banners/",
+        blank=True,
+        null=True,
+        verbose_name="Banniere statistiques Accueil"
+    )
+
+    # About
+    about_hero_image = models.ImageField(
+        upload_to="site/about/hero/",
+        blank=True,
+        null=True,
+        verbose_name="Image Hero (A propos)"
+    )
+    about_main_image = models.ImageField(
+        upload_to="site/about/main/",
+        blank=True,
+        null=True,
+        verbose_name="Image principale de presentation (A propos)"
+    )
+    about_stats_banner_image = models.ImageField(upload_to="site/about/banners/", blank=True, null=True)
+    about_vision_title = models.CharField(max_length=255, default="Notre Vision")
+    about_vision_text = models.TextField(blank=True)
+    about_values_title = models.CharField(max_length=255, default="Nos Valeurs")
+    about_values_subtitle = models.CharField(max_length=500, blank=True)
+
+    # Smart Rocket
+    smart_rocket_enabled = models.BooleanField(default=True)
+    smart_rocket_title = models.CharField(max_length=120, default="Assistant ESFE")
+    smart_rocket_message = models.CharField(max_length=255, default="Accedez rapidement aux actions clés.")
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if SiteConfiguration.objects.exclude(pk=self.pk).exists():
+            raise ValidationError("Une seule configuration du site est autorisée.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Configuration du site"
+
+    class Meta:
+        verbose_name = "Configuration du site"
+        verbose_name_plural = "Configuration du site"
+
+
+# ==========================================================
 # VALEURS (3-4 MAX)
 # ==========================================================
 

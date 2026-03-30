@@ -1,0 +1,59 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Categories Communaute{% endblock %}
+{% block page_subtitle %}Pilotage des domaines de discussion{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <p class="text-sm text-slate-500 mb-0">Gestion des espaces thematiques visibles par les membres.</p>
+        <a href="{% url 'superadmin:community_category_create' %}" class="btn btn-primary">Nouvelle categorie</a>
+    </div>
+
+    <div class="card overflow-hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Description</th>
+                    <th>Sujets</th>
+                    <th>Abonnes</th>
+                    <th>Statut</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category in categories %}
+                <tr>
+                    <td class="font-medium">{{ category.name }}</td>
+                    <td class="text-slate-600">{{ category.description|default:"-"|truncatechars:70 }}</td>
+                    <td>{{ category.topics_count|default:0 }}</td>
+                    <td>{{ category.subscribers_count|default:0 }}</td>
+                    <td>
+                        {% if category.is_active %}
+                            <span class="badge-status badge-success">Active</span>
+                        {% else %}
+                            <span class="badge-status badge-draft">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        <div class="inline-flex gap-2">
+                            <a href="{% url 'superadmin:community_category_edit' category.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                            <a href="{% url 'superadmin:toggle_community_category' category.pk %}" class="btn btn-outline btn-sm">Toggle</a>
+                            <form method="post" action="{% url 'superadmin:community_category_delete' category.pk %}" onsubmit="return confirm('Supprimer cette categorie ?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-slate-500 py-10">Aucune categorie disponible.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -9,6 +9,7 @@ class Hero(component.Component):
         title="ESFE",
         subtitle="",
         image_url="",
+        logo_url="",
         next_id="",
         cities="[]",
     ):
@@ -16,6 +17,7 @@ class Hero(component.Component):
             "title": title,
             "subtitle": subtitle,
             "image_url": image_url,
+            "logo_url": logo_url,
             "next_id": next_id,
             "cities": cities,
         }

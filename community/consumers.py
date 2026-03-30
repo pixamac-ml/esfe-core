@@ -35,10 +35,13 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
 
-    async def receive(self, text_data):
+    async def receive(self, text_data=None, bytes_data=None):
         """
         Si un message arrive du navigateur
         """
+        if not text_data:
+            return
+
         data = json.loads(text_data)
 
         # Pour l'instant on ne gère rien
@@ -54,5 +57,8 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 "type": "notification",
                 "message": event["message"],
                 "url": event["url"],
+                "notification_type": event.get("notification_type"),
+                "vote_count": event.get("vote_count", 1),
+                "unread_count": event.get("unread_count"),
             })
         )

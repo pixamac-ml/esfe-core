@@ -22,7 +22,10 @@
 {# SECTION 1 : HERO                                              #}
 {# ============================================================ #}
 {% comment %} ================================ HERO ================================ {% endcomment %}
-{% if presentation and presentation.hero_image %}
+{% if site_configuration and site_configuration.about_hero_image %}
+    {% component "about_hero" title=presentation.hero_title|default:"Former les professionnels de demain" subtitle=presentation.hero_subtitle|default:"Une institution d'excellence" label="À propos de nous" image=site_configuration.about_hero_image.url cta_text="Candidater maintenant" cta_url="/candidature/" %}
+    {% endcomponent %}
+{% elif presentation and presentation.hero_image %}
     {% component "about_hero" title=presentation.hero_title subtitle=presentation.hero_subtitle label="À propos de nous" image=presentation.hero_image.url cta_text="Candidater maintenant" cta_url="/candidature/" %}
     {% endcomponent %}
 {% else %}
@@ -45,12 +48,25 @@
     {% component "about_presentation"
         about_title=presentation.about_title
         about_text=presentation.about_text
-        about_image=presentation.about_image
+        about_image=site_configuration.about_main_image|default:presentation.about_image
         vision_title=presentation.vision_title
         vision_text=presentation.vision_text
         mission_title=presentation.mission_title
         mission_text=presentation.mission_text
     %}{% endcomponent %}
+{% endif %}
+
+{% if presentation or site_configuration.about_vision_text %}
+<section class="py-14 bg-white">
+    <div class="max-w-5xl mx-auto px-6 text-center" data-aos="fade-up">
+        <h3 class="text-2xl md:text-3xl font-bold text-primary-700 mb-4">
+            {{ site_configuration.about_vision_title|default:presentation.vision_title|default:"Notre Vision" }}
+        </h3>
+        <p class="text-gray-600 leading-relaxed max-w-3xl mx-auto">
+            {{ site_configuration.about_vision_text|default:presentation.vision_text }}
+        </p>
+    </div>
+</section>
 {% endif %}
 
 
@@ -60,8 +76,8 @@
 {% if values %}
     {% component "about_values"
         values=values
-        title="Nos Valeurs"
-        subtitle="Les piliers qui guident notre engagement envers l'excellence"
+        title=site_configuration.about_values_title|default:"Nos Valeurs"
+        subtitle=site_configuration.about_values_subtitle|default:"Les piliers qui guident notre engagement envers l'excellence"
     %}{% endcomponent %}
 {% endif %}
 

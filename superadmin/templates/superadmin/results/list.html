@@ -1,0 +1,76 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Résultats académiques{% endblock %}
+{% block page_subtitle %}Import rapide, publication et pilotage des sessions{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <div id="results-table-loading" class="hidden fixed inset-0 z-40 bg-white/40 backdrop-blur-sm" hx-indicator></div>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total sessions</p>
+            <p class="text-2xl font-bold text-slate-900 mb-0">{{ results_total_count }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Publiées</p>
+            <p class="text-2xl font-bold text-emerald-700 mb-0">{{ results_published_count }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Brouillons</p>
+            <p class="text-2xl font-bold text-amber-700 mb-0">{{ results_draft_count }}</p>
+        </article>
+    </section>
+
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <div class="flex flex-col lg:flex-row items-center justify-between gap-3">
+            <form id="result-filter-form"
+                  method="get"
+                  class="grid grid-cols-1 md:grid-cols-4 gap-3 w-full"
+                  hx-get="{% url 'superadmin:result_list' %}"
+                  hx-target="#results-table-container"
+                  hx-swap="innerHTML"
+                  hx-push-url="true"
+                  hx-indicator="#results-table-loading"
+                  hx-trigger="keyup changed delay:350ms, change, submit">
+                <label for="result-search-admin" class="sr-only">Recherche</label>
+                <input id="result-search-admin" type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Rechercher titre, filiere, classe..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2">
+                <label for="result-type-admin" class="sr-only">Type</label>
+                <select id="result-type-admin" name="type" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous les types</option>
+                    {% for value, label in result_type_choices %}
+                    <option value="{{ value }}" {% if filters.type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <label for="result-year-admin" class="sr-only">Année</label>
+                <select id="result-year-admin" name="annee" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Toutes les années</option>
+                    {% for year in years %}
+                    <option value="{{ year }}" {% if filters.annee == year %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+                <label for="result-published-admin" class="sr-only">Statut</label>
+                <select id="result-published-admin" name="published" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Visibilité: toutes</option>
+                    <option value="1" {% if filters.published == '1' %}selected{% endif %}>Publiées</option>
+                    <option value="0" {% if filters.published == '0' %}selected{% endif %}>Brouillons</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Filtrer</button>
+            </form>
+
+            <div class="flex items-center gap-2 w-full lg:w-auto justify-end">
+                <a href="{% url 'superadmin:news_list' %}" class="btn btn-outline">Gérer les actualités</a>
+                <a href="{% url 'superadmin:result_list' %}" class="btn btn-outline">Réinitialiser</a>
+                <a href="{% url 'superadmin:result_create' %}" class="btn btn-primary">Importer un résultat</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div id="results-table-container" aria-live="polite" aria-busy="false">
+            {% include "superadmin/results/_list_table.html" %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+

@@ -1,5 +1,8 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
@@ -14,6 +17,20 @@ from .models import Topic, Category, Answer, Vote, TopicView, Tag, Notification,
 from community.services.notifications import create_notification
 from community.services.gamification import GamificationService
 from community.models_gamification import GamificationProfile, UserBadge
+
+
+logger = logging.getLogger(__name__)
+
+
+def paginate_items(request, items, per_page=12, page_param="page"):
+    paginator = Paginator(items, per_page)
+    page_number = request.GET.get(page_param, 1)
+    try:
+        return paginator.page(page_number)
+    except PageNotAnInteger:
+        return paginator.page(1)
+    except EmptyPage:
+        return paginator.page(paginator.num_pages)
 
 
 # =====================================================
@@ -81,6 +98,7 @@ def build_sidebar_context(request=None):
     top_users = (
         User.objects
         .select_related("profile")
+        .filter(profile__isnull=False)
         .annotate(
             answer_count=Count(
                 "community_answers",
@@ -121,10 +139,13 @@ def topic_list(request):
     sort = request.GET.get("sort", "active")
     query = request.GET.get("q", "").strip()
 
-    topics = build_topic_queryset(sort=sort, query=query)
+    topics_qs = build_topic_queryset(sort=sort, query=query)
+    page_obj = paginate_items(request, topics_qs, per_page=12)
 
     context = {
-        "topics": topics,
+        "topics": page_obj.object_list,
+        "topics_total": topics_qs.count(),
+        "page_obj": page_obj,
         "current_sort": sort,
         "query": query,
         **build_sidebar_context(request),
@@ -150,10 +171,13 @@ def topic_by_tag(request, slug):
 
     tag = get_object_or_404(Tag, slug=slug)
 
-    topics = build_topic_queryset(sort=sort, query=query).filter(tags=tag)
+    topics_qs = build_topic_queryset(sort=sort, query=query).filter(tags=tag)
+    page_obj = paginate_items(request, topics_qs, per_page=12)
 
     context = {
-        "topics": topics,
+        "topics": page_obj.object_list,
+        "topics_total": topics_qs.count(),
+        "page_obj": page_obj,
         "tag": tag,
         "current_sort": sort,
         "query": query,
@@ -180,10 +204,13 @@ def topic_by_category(request, slug):
 
     category = get_object_or_404(Category, slug=slug, is_active=True)
 
-    topics = build_topic_queryset(sort=sort, query=query).filter(category=category)
+    topics_qs = build_topic_queryset(sort=sort, query=query).filter(category=category)
+    page_obj = paginate_items(request, topics_qs, per_page=12)
 
     context = {
-        "topics": topics,
+        "topics": page_obj.object_list,
+        "topics_total": topics_qs.count(),
+        "page_obj": page_obj,
         "category": category,
         "current_sort": sort,
         "query": query,
@@ -257,6 +284,15 @@ def topic_detail(request, slug):
             key=lambda a: a.id != accepted.id
         )
 
+    answers_total = len(root_answers)
+
+    answers_page = paginate_items(
+        request,
+        root_answers,
+        per_page=10,
+        page_param="answers_page"
+    )
+
     # Sujets similaires
     similar_topics = (
         Topic.objects
@@ -282,7 +318,9 @@ def topic_detail(request, slug):
 
     return render(request, "community/topic_detail.html", {
         "topic": topic,
-        "answers": root_answers,
+        "answers": answers_page.object_list,
+        "answers_total": answers_total,
+        "answers_page": answers_page,
         "similar_topics": similar_topics,
         "user_subscriptions": user_subscriptions,
     })
@@ -342,8 +380,8 @@ def add_answer(request, slug):
                 notification_type="new_answer",
                 send_email=False
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.exception("Echec notification nouvelle reponse auteur topic=%s: %s", topic.id, exc)
 
     try:
         previous_responders = (
@@ -374,10 +412,15 @@ def add_answer(request, slug):
                         notification_type="new_answer",
                         send_email=False
                     )
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as exc:
+                    logger.warning(
+                        "Echec notification responder_id=%s topic=%s: %s",
+                        responder_id,
+                        topic.id,
+                        exc,
+                    )
+    except Exception as exc:
+        logger.exception("Echec boucle notifications reponse topic=%s: %s", topic.id, exc)
 
     # Préchargement auteur pour template
     answer = (
@@ -464,8 +507,8 @@ def create_topic(request):
             if form.cleaned_data.get("subscribe"):
                 try:
                     category.subscribers.add(request.user)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Impossible d'abonner user=%s categorie=%s: %s", request.user.id, category.id, exc)
 
             # NOTIFICATIONS DES ABONNÉS
             subscribers = (
@@ -484,8 +527,8 @@ def create_topic(request):
                         notification_type="new_topic",
                         send_email=True
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Echec notif nouveau topic pour user=%s topic=%s: %s", user.id, topic.id, exc)
 
             if request.headers.get("HX-Request"):
                 response = HttpResponse()
@@ -620,8 +663,10 @@ def my_subscriptions(request):
 def members_list(request):
     User = get_user_model()
 
-    users = (
+    users_qs = (
         User.objects
+        .select_related("profile")
+        .filter(profile__isnull=False)
         .annotate(
             topic_count=Count(
                 "community_topics",
@@ -636,8 +681,12 @@ def members_list(request):
         .order_by("-answer_count", "-topic_count")
     )
 
+    page_obj = paginate_items(request, users_qs, per_page=12)
+
     return render(request, "community/members_list.html", {
-        "users": users
+        "users": page_obj.object_list,
+        "users_total": users_qs.count(),
+        "page_obj": page_obj,
     })
 
 
@@ -755,17 +804,23 @@ def profile_answers(request, username):
     User = get_user_model()
     user = get_object_or_404(User.objects.select_related("profile"), username=username)
 
-    answers = (
+    answers_qs = (
         user.community_answers
         .filter(is_deleted=False)
         .select_related("topic", "topic__category")
         .order_by("-created_at")
     )
 
+    page_obj = paginate_items(request, answers_qs, per_page=10, page_param="answers_page")
+
     return render(
         request,
         "community/partials/profile/answers.html",
-        {"profile_user": user, "answers": answers},
+        {
+            "profile_user": user,
+            "answers": page_obj.object_list,
+            "answers_page": page_obj,
+        },
     )
 
 
@@ -776,7 +831,7 @@ def profile_topics(request, username):
     User = get_user_model()
     user = get_object_or_404(User.objects.select_related("profile"), username=username)
 
-    topics = (
+    topics_qs = (
         user.community_topics
         .filter(is_deleted=False)
         .select_related("category")
@@ -784,10 +839,16 @@ def profile_topics(request, username):
         .order_by("-created_at")
     )
 
+    page_obj = paginate_items(request, topics_qs, per_page=10, page_param="topics_page")
+
     return render(
         request,
         "community/partials/profile/topics.html",
-        {"profile_user": user, "topics": topics},
+        {
+            "profile_user": user,
+            "topics": page_obj.object_list,
+            "topics_page": page_obj,
+        },
     )
 
 
@@ -818,7 +879,7 @@ def profile_badges(request, username):
 # =====================================================
 def leaderboard(request):
     """Affiche le classement des contributeurs"""
-    category = request.GET.get("cat", "xp")
+    category = request.GET.get("category") or request.GET.get("cat", "xp")
 
     # Classement principal
     top_users = GamificationService.get_leaderboard(category=category, limit=20)
@@ -857,7 +918,6 @@ def leaderboard(request):
 # =====================================================
 @login_required
 def notifications(request):
-    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
     notification_type = request.GET.get("type", "")
     is_read = request.GET.get("is_read", "")
@@ -889,12 +949,6 @@ def notifications(request):
     unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
     total_count = Notification.objects.filter(user=request.user).count()
 
-    if request.GET.get("mark_all_read") == "true":
-        Notification.objects.filter(user=request.user, is_read=False).update(
-            is_read=True,
-            read_at=timezone.now()
-        )
-        unread_count = 0
 
     if request.headers.get("HX-Request"):
         return render(
@@ -1023,8 +1077,8 @@ def accept_answer(request, answer_id):
             try:
                 from community.services.notifications import notify_accepted_answer
                 notify_accepted_answer(topic, answer)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.exception("Echec notification accepted_answer topic=%s answer=%s: %s", topic.id, answer.id, exc)
 
     if request.headers.get("HX-Request"):
         html = render_to_string(

@@ -1,0 +1,33 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Reponses Communaute{% endblock %}
+{% block page_subtitle %}Moderation des interventions membres{% endblock %}
+
+{% block content_main %}
+<div class="space-y-5">
+    <div class="card p-4">
+        <form id="community-answer-filter-form"
+              method="get"
+              class="grid grid-cols-1 md:grid-cols-3 gap-3"
+              hx-get="{% url 'superadmin:community_answer_list' %}"
+              hx-target="#community-answer-table-container"
+              hx-swap="innerHTML"
+              hx-trigger="keyup changed delay:350ms, change, submit">
+            <input type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Recherche contenu" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <select name="topic" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous sujets</option>
+                {% for t in topics %}
+                <option value="{{ t.pk }}" {% if filters.topic == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.title|truncatechars:50 }}</option>
+                {% endfor %}
+            </select>
+            <div class="flex justify-end">
+                <a href="{% url 'superadmin:community_answer_list' %}" class="btn btn-outline btn-sm">Reinitialiser</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card overflow-hidden" id="community-answer-table-container">
+        {% include "superadmin/community/answers/_answer_table.html" %}
+    </div>
+</div>
+{% endblock %}

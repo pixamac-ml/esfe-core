@@ -1,0 +1,55 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Configuration d'un onglet programme{% endblock %}
+
+{% block content_main %}
+<div class="max-w-3xl">
+    <div class="card">
+        <div class="card-body">
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Programme</span>
+                    <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        <option value="">Selectionner</option>
+                        {% for p in programmes %}
+                        <option value="{{ p.pk }}" {% if tab.programme_id == p.pk %}selected{% endif %}>{{ p.title }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Type d'onglet</span>
+                        <select name="tab_type" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                            {% for value, label in tab_type_choices %}
+                            <option value="{{ value }}" {% if tab.tab_type == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Ordre</span>
+                        <input type="number" name="order" value="{{ tab.order|default:'0' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                    </label>
+                </div>
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Titre</span>
+                    <input type="text" name="title" value="{{ tab.title|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </label>
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Slug</span>
+                    <input type="text" name="slug" value="{{ tab.slug|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="auto si vide">
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" name="is_active" {% if tab.is_active or not tab %}checked{% endif %}>
+                    <span>Onglet actif</span>
+                </label>
+                <div class="flex justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:programme_tab_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

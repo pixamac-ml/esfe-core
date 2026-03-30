@@ -67,7 +67,7 @@ INSTALLED_APPS = [
     # Contenu
     "blog.apps.BlogConfig",
     "news",
-    "community",
+    "community.apps.CommunityConfig",
     "accounts.apps.AccountsConfig",
 ]
 

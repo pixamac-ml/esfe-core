@@ -1,0 +1,52 @@
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Reponse</th>
+            <th>Auteur</th>
+            <th>Sujet</th>
+            <th>Score</th>
+            <th>Date</th>
+            <th class="text-right">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for answer in answers %}
+        <tr>
+            <td class="text-slate-700">{{ answer.content|truncatechars:120 }}</td>
+            <td>{{ answer.author.get_full_name|default:answer.author.username }}</td>
+            <td class="text-slate-700">{{ answer.topic.title|truncatechars:50 }}</td>
+            <td>{{ answer.score }}</td>
+            <td class="text-sm text-slate-500">{{ answer.created_at|date:"d/m/Y H:i" }}</td>
+            <td class="text-right">
+                <div class="inline-flex gap-2">
+                    <a class="btn btn-outline btn-sm" href="{% url 'superadmin:community_answer_detail' answer.pk %}">Voir</a>
+                    <a class="btn btn-outline btn-sm" href="{% url 'superadmin:community_answer_edit' answer.pk %}">Modifier</a>
+                    <a class="btn btn-outline btn-sm" href="{% url 'superadmin:toggle_community_answer' answer.pk %}?action=accept">Accepter</a>
+                    <form method="post" action="{% url 'superadmin:community_answer_delete' answer.pk %}" onsubmit="return confirm('Supprimer cette reponse ?');">
+                        {% csrf_token %}
+                        <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center text-slate-500 py-10">Aucune reponse trouvee.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if answers.paginator.num_pages > 1 %}
+<div class="p-4 border-t border-slate-100 flex items-center justify-between text-sm">
+    <span class="text-slate-500">Page {{ answers.number }} / {{ answers.paginator.num_pages }}</span>
+    <div class="flex gap-2">
+        {% if answers.has_previous %}
+        <a class="btn btn-outline btn-sm" hx-get="{% url 'superadmin:community_answer_list' %}?page={{ answers.previous_page_number }}&search={{ filters.search }}&topic={{ filters.topic }}" hx-target="#community-answer-table-container" hx-swap="innerHTML">Precedent</a>
+        {% endif %}
+        {% if answers.has_next %}
+        <a class="btn btn-outline btn-sm" hx-get="{% url 'superadmin:community_answer_list' %}?page={{ answers.next_page_number }}&search={{ filters.search }}&topic={{ filters.topic }}" hx-target="#community-answer-table-container" hx-swap="innerHTML">Suivant</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

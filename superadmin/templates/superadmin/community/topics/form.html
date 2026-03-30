@@ -1,0 +1,50 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Edition des metadonnees du sujet{% endblock %}
+
+{% block content_main %}
+<div class="max-w-4xl">
+    <div class="card">
+        <div class="card-body">
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Titre</span>
+                    <input type="text" name="title" value="{{ topic.title|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </label>
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Categorie</span>
+                    <select name="category" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                        {% for c in categories %}
+                        <option value="{{ c.pk }}" {% if topic.category_id == c.pk %}selected{% endif %}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="is_published" {% if topic.is_published %}checked{% endif %}>
+                        <span>Publie</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="is_locked" {% if topic.is_locked %}checked{% endif %}>
+                        <span>Verrouille</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="is_pinned" {% if topic.is_pinned %}checked{% endif %}>
+                        <span>Epingler</span>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:community_topic_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

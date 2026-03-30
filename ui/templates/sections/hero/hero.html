@@ -1,13 +1,15 @@
-{% load static %}
-
 <section id="hero-section" class="relative h-screen min-h-[600px] max-h-[1200px] w-full overflow-hidden isolate">
 
   <!-- ================= BACKGROUND AVEC ZOOM ================= -->
   <div class="absolute inset-0 hero-zoom z-0">
-    <img src="{% static 'images/hero-bg.jpg' %}"
-         class="w-full h-full object-cover object-center"
+    {% if image_url %}
+    <img src="{{ image_url }}"
+         class="w-full h-full object-cover object-center hero-ken-burns"
          alt="Campus ESFE"
          loading="eager">
+    {% else %}
+    <div class="w-full h-full bg-gradient-to-br from-primary-700 via-primary-600 to-secondary"></div>
+    {% endif %}
     <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-black/50 to-black/80
                 sm:from-black/40 sm:via-black/55 sm:to-black/75"></div>
   </div>
@@ -20,9 +22,11 @@
 
   <!-- ================= LOGO ================= -->
   <div class="absolute top-4 left-4 sm:top-6 sm:left-6 z-30 hero-fade-in">
-    <img src="{% static 'images/logo-esfe.png' %}"
+    {% if logo_url %}
+    <img src="{{ logo_url }}"
          class="h-10 sm:h-14 md:h-16 lg:h-20 opacity-95 drop-shadow-lg"
          alt="Logo ESFE">
+    {% endif %}
   </div>
 
   <!-- ================= BADGE EXCELLENCE ================= -->
@@ -142,6 +146,16 @@
   transform: scale(1);
   transition: transform 20s ease-out;
   will-change: transform;
+}
+
+@keyframes kenBurns {
+  0% { transform: scale(1.02); }
+  100% { transform: scale(1.12); }
+}
+
+.hero-ken-burns {
+  animation: kenBurns 18s ease-out forwards;
+  transform-origin: center center;
 }
 
 /* ============================= */

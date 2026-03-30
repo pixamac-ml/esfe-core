@@ -5,6 +5,8 @@
 
 {% block content_main %}
 <div class="space-y-6">
+    <div id="news-table-loading" class="hidden fixed inset-0 z-40 bg-white/40 backdrop-blur-sm" hx-indicator></div>
+
     <section class="grid grid-cols-1 md:grid-cols-5 gap-4">
         <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
             <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total actualités</p>
@@ -36,27 +38,34 @@
                   hx-get="{% url 'superadmin:news_list' %}"
                   hx-target="#news-table-container"
                   hx-swap="innerHTML"
+                  hx-push-url="true"
+                  hx-indicator="#news-table-loading"
                   hx-trigger="keyup changed delay:350ms, change, submit">
-                <input type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Rechercher titre, résumé, contenu..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2">
-                <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <label for="news-search" class="sr-only">Recherche actualites</label>
+                <input id="news-search" type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Rechercher titre, résumé, contenu..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2">
+                <label for="news-status" class="sr-only">Statut</label>
+                <select id="news-status" name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     <option value="">Tous statuts</option>
                     {% for value, label in status_choices %}
                     <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
-                <select name="category" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <label for="news-category" class="sr-only">Categorie</label>
+                <select id="news-category" name="category" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     <option value="">Toutes catégories</option>
                     {% for cat in categories %}
                     <option value="{{ cat.pk }}" {% if filters.category == cat.pk|stringformat:'s' %}selected{% endif %}>{{ cat.nom }}</option>
                     {% endfor %}
                 </select>
-                <select name="urgent" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <label for="news-urgent" class="sr-only">Urgence</label>
+                <select id="news-urgent" name="urgent" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     <option value="">Urgence: toutes</option>
                     <option value="1" {% if filters.urgent == '1' %}selected{% endif %}>Urgentes seulement</option>
                 </select>
             </form>
 
             <div class="flex items-center gap-2 w-full lg:w-auto justify-end">
+                <a href="{% url 'superadmin:result_list' %}" class="btn btn-outline">Gérer les résultats</a>
                 <a href="{% url 'superadmin:news_list' %}" class="btn btn-outline">Réinitialiser</a>
                 <a href="{% url 'superadmin:news_create' %}" class="btn btn-primary">Nouvelle actualité</a>
             </div>
@@ -64,7 +73,7 @@
     </section>
 
     <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
-        <div id="news-table-container">
+        <div id="news-table-container" aria-live="polite" aria-busy="false">
             {% include "superadmin/news/_list_table.html" %}
         </div>
     </section>

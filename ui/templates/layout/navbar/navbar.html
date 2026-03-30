@@ -185,11 +185,10 @@
 
           <i data-lucide="bell" class="w-5 h-5"></i>
 
-          {% if unread_notification_count > 0 %}
-          <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-            {% if unread_notification_count > 9 %}9+{% else %}{{ unread_notification_count }}{% endif %}
+          <span id="unread-notification-count"
+                class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 items-center justify-center animate-pulse {% if unread_notification_count > 0 %}flex{% else %}hidden{% endif %}">
+            {% if unread_notification_count > 9 %}9+{% elif unread_notification_count > 0 %}{{ unread_notification_count }}{% endif %}
           </span>
-          {% endif %}
 
         </button>
 
@@ -212,9 +211,9 @@
             </a>
           </div>
 
-          <div class="max-h-80 overflow-y-auto"
+          <div id="navbar-notifications-panel" class="max-h-80 overflow-y-auto"
                hx-get="{% url 'community:notifications_partial' %}"
-               hx-trigger="load"
+               hx-trigger="load, community:notification from:body"
                hx-swap="innerHTML">
             <div class="p-4 text-center text-gray-400 text-sm">
               <i class="fa-solid fa-circle-notch fa-spin"></i>

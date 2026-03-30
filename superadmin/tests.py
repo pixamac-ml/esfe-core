@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from PIL import Image
 
-from news.models import Event, EventType, MediaItem
+from news.models import Event, EventType, MediaItem, ResultSession
 from core.models import ContactMessage
 from branches.models import Branch
 from payments.models import PaymentAgent
@@ -281,5 +281,69 @@ class PaymentAgentModuleTests(TestCase):
         agent.refresh_from_db()
         self.assertEqual(agent.user_id, self.staff_b.pk)
         self.assertEqual(agent.branch_id, self.branch_b.pk)
+
+
+class ResultModuleTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='admin_results',
+            email='admin_results@example.com',
+            password='pass1234',
+        )
+        self.client.force_login(self.user)
+
+    def test_create_result_from_superadmin(self):
+        pdf_file = SimpleUploadedFile('res.pdf', b'%PDF-1.4\nfake\n', content_type='application/pdf')
+
+        response = self.client.post(
+            reverse('superadmin:result_create'),
+            {
+                'titre': 'Resultat test',
+                'type': 'semestre',
+                'annee_academique': '2025-2026',
+                'annexe': 'Douala',
+                'filiere': 'Informatique',
+                'classe': 'L3',
+                'is_published': 'on',
+                'fichier_pdf': pdf_file,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(ResultSession.objects.filter(titre='Resultat test', is_published=True).exists())
+
+    def test_toggle_result_publication(self):
+        result = ResultSession.objects.create(
+            type='semestre',
+            titre='Session test',
+            annee_academique='2025-2026',
+            annexe='Yaounde',
+            filiere='Gestion',
+            classe='L2',
+            fichier_pdf=SimpleUploadedFile('toggle.pdf', b'%PDF-1.4\nfake\n', content_type='application/pdf'),
+            is_published=False,
+        )
+
+        response = self.client.post(reverse('superadmin:toggle_result', args=[result.pk]))
+        self.assertEqual(response.status_code, 302)
+        result.refresh_from_db()
+        self.assertTrue(result.is_published)
+
+    def test_result_list_hx_returns_partial_table(self):
+        ResultSession.objects.create(
+            type='semestre',
+            titre='Session HX',
+            annee_academique='2025-2026',
+            annexe='Douala',
+            filiere='Info',
+            classe='L1',
+            fichier_pdf=SimpleUploadedFile('hx.pdf', b'%PDF-1.4\nhx\n', content_type='application/pdf'),
+            is_published=True,
+        )
+
+        response = self.client.get(reverse('superadmin:result_list'), HTTP_HX_REQUEST='true')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-table')
+        self.assertContains(response, 'Session HX')
 
 

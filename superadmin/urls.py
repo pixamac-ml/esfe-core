@@ -96,6 +96,8 @@ urlpatterns = [
     path('payments/agents/create/', views.payment_agent_create, name='payment_agent_create'),
     path('payments/agents/<int:pk>/edit/', views.payment_agent_edit, name='payment_agent_edit'),
     path('payments/agents/<int:pk>/toggle/', views.payment_agent_toggle, name='payment_agent_toggle'),
+    path('payments/cash-sessions/', views.payment_cash_session_list, name='payment_cash_session_list'),
+    path('payments/cash-sessions/<int:pk>/mark-used/', views.payment_cash_session_mark_used, name='payment_cash_session_mark_used'),
 
     # ============================================================================
     # FEES
@@ -133,6 +135,15 @@ urlpatterns = [
     path('news/<int:pk>/edit/', views.news_edit, name='news_edit'),
     path('news/<int:pk>/delete/', views.news_delete, name='news_delete'),
     path('news/<int:pk>/toggle/', views.toggle_news, name='toggle_news'),
+
+    # ============================================================================
+    # RESULTS (Résultats académiques)
+    # ============================================================================
+    path('results/', views.result_list, name='result_list'),
+    path('results/create/', views.result_create, name='result_create'),
+    path('results/<int:pk>/edit/', views.result_edit, name='result_edit'),
+    path('results/<int:pk>/delete/', views.result_delete, name='result_delete'),
+    path('results/<int:pk>/toggle/', views.toggle_result, name='toggle_result'),
 
     # ============================================================================
     # EVENTS (Événements)

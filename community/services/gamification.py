@@ -183,5 +183,6 @@ class GamificationService:
         return (
             GamificationProfile.objects
             .select_related("user", "user__profile")
+            .filter(user__profile__isnull=False)
             .order_by(order)[:limit]
         )

@@ -32,7 +32,7 @@
     <div class="card p-4">
         <form id="payment-filter-form"
               method="get"
-              class="grid grid-cols-1 md:grid-cols-7 gap-3"
+              class="grid grid-cols-1 md:grid-cols-9 gap-3"
               hx-get="{% url 'superadmin:payment_list' %}"
               hx-target="#payments-table-container"
               hx-swap="innerHTML"
@@ -72,8 +72,42 @@
                     {% endfor %}
                 </select>
             </div>
+            <div>
+                <select name="branch" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Toutes annexes</option>
+                    {% for b in branches %}
+                    <option value="{{ b.id }}" {% if filters.branch_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="agent" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous agents</option>
+                    {% for a in payment_agents %}
+                    <option value="{{ a.id }}" {% if filters.agent_id == a.id %}selected{% endif %}>{{ a.user.get_full_name|default:a.user.username }} ({{ a.agent_code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="flex items-center justify-end gap-2">
                 <a href="{% url 'superadmin:payment_list' %}" class="btn btn-outline">Réinitialiser</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card p-4">
+        <form id="payments-bulk-form" method="post" action="{% url 'superadmin:bulk_action' %}" class="flex flex-wrap items-center gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="model_type" value="payment">
+            <select name="action" class="rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                <option value="">Action groupée...</option>
+                <option value="validate">Valider</option>
+                <option value="cancel">Annuler</option>
+                <option value="notify">Notifier</option>
+            </select>
+            <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Appliquer cette action aux paiements sélectionnés ?')">Appliquer</button>
+            <div class="ml-auto flex items-center gap-2">
+                <a href="{% url 'superadmin:payment_agent_list' %}" class="btn btn-outline btn-sm">Agents paiement</a>
+                <a href="{% url 'superadmin:payment_cash_session_list' %}" class="btn btn-outline btn-sm">Sessions cash</a>
             </div>
         </form>
     </div>
@@ -89,4 +123,27 @@
         </div>
     </div>
 </div>
+
+<script>
+function bindPaymentsBulkSelection() {
+    const selectAll = document.getElementById('select-all-payments');
+    const rowCheckboxes = Array.from(document.querySelectorAll('.payment-row-checkbox'));
+    if (!selectAll || rowCheckboxes.length === 0) {
+        return;
+    }
+
+    selectAll.addEventListener('change', function () {
+        rowCheckboxes.forEach(function (box) {
+            box.checked = selectAll.checked;
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', bindPaymentsBulkSelection);
+document.body.addEventListener('htmx:afterSwap', function (evt) {
+    if (evt.target && evt.target.id === 'payments-table-container') {
+        bindPaymentsBulkSelection();
+    }
+});
+</script>
 {% endblock %}

@@ -1,0 +1,51 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Configuration d'un quick fact{% endblock %}
+
+{% block content_main %}
+<div class="max-w-3xl">
+    <div class="card">
+        <div class="card-body">
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Programme</span>
+                    <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        <option value="">Selectionner</option>
+                        {% for p in programmes %}
+                        <option value="{{ p.pk }}" {% if quick_fact.programme_id == p.pk %}selected{% endif %}>{{ p.title }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Icone</span>
+                        <select name="icon" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                            {% for value, label in icon_choices %}
+                            <option value="{{ value }}" {% if quick_fact.icon == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Ordre</span>
+                        <input type="number" name="order" value="{{ quick_fact.order|default:'0' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                    </label>
+                </div>
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Label</span>
+                    <input type="text" name="label" value="{{ quick_fact.label|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </label>
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Valeur</span>
+                    <input type="text" name="value" value="{{ quick_fact.value|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </label>
+                <div class="flex justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:quick_fact_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

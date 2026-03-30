@@ -118,6 +118,7 @@ def _send_websocket_notification(user, notification):
     try:
         channel_layer = get_channel_layer()
         if channel_layer:
+            unread_count = Notification.objects.filter(user=user, is_read=False).count()
             async_to_sync(channel_layer.group_send)(
                 f"user_{user.id}",
                 {
@@ -126,10 +127,11 @@ def _send_websocket_notification(user, notification):
                     "url": notification.get_target_url,
                     "notification_type": notification.notification_type,
                     "vote_count": notification.vote_count,
+                    "unread_count": unread_count,
                 }
             )
     except Exception:
-        pass  # Ne jamais bloquer la requête
+        logger.exception("Echec websocket notification user=%s notif=%s", user.id, getattr(notification, "id", None))
 
 
 def notify_new_topic(topic, author):

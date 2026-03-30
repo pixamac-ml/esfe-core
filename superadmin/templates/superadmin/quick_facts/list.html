@@ -1,0 +1,33 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Quick facts{% endblock %}
+{% block page_subtitle %}Elements rapides des fiches programme{% endblock %}
+
+{% block content_main %}
+<div class="space-y-5">
+    <div class="card p-4">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-3"
+              hx-get="{% url 'superadmin:quick_fact_list' %}" hx-target="#quick-fact-table-container" hx-swap="innerHTML" hx-trigger="change, submit">
+            <div class="md:col-span-2">
+                <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous les programmes</option>
+                    {% for p in programmes %}
+                    <option value="{{ p.pk }}" {% if filters.programme == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-outline btn-sm">Filtrer</button>
+                <a href="{% url 'superadmin:quick_fact_list' %}" class="btn btn-outline btn-sm">Reset</a>
+            </div>
+            <div class="md:justify-self-end">
+                <a href="{% url 'superadmin:quick_fact_create' %}" class="btn btn-primary btn-sm">Nouveau quick fact</a>
+            </div>
+        </form>
+    </div>
+
+    <div id="quick-fact-table-container" class="card overflow-hidden">
+        {% include "superadmin/quick_facts/_quick_fact_table.html" %}
+    </div>
+</div>
+{% endblock %}

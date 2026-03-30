@@ -2,7 +2,7 @@
 
 <section
     class="relative py-20 lg:py-28 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 overflow-hidden"
-    x-data="gallerySpotlight({{ images_json }})"
+    x-data="gallerySpotlight({{ images_json }}, {{ modal_images_json }})"
     x-init="init()"
 >
     {# Fond décoratif #}
@@ -164,24 +164,57 @@
             class="text-center opacity-0 translate-y-8"
             x-intersect:enter="$el.classList.add('animate-fade-in-up-delayed-2')"
         >
-            <a
-                href="{{ gallery_url }}"
+            <button
+                type="button"
+                @click="openModal()"
                 class="group inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-secondary to-secondary/80 hover:from-secondary/90 hover:to-secondary text-white font-semibold rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-secondary/30 hover:-translate-y-1"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
-                <span>Explorer toute la galerie</span>
+                <span>Voir plus</span>
                 <span class="flex items-center justify-center w-8 h-8 bg-white/20 rounded-full text-sm font-bold group-hover:bg-white/30 transition-colors">
                     {{ total_count }}
                 </span>
                 <svg class="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
                 </svg>
-            </a>
+            </button>
             <p class="mt-4 text-gray-500 text-sm">
                 +{{ total_count }} photos d'événements, cérémonies et vie étudiante
             </p>
+        </div>
+
+        <div x-show="isModalOpen"
+             x-cloak
+             x-transition.opacity
+             class="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center px-4 py-8"
+             @click.self="closeModal()"
+             @keydown.escape.window="closeModal()">
+            <div class="w-full max-w-6xl bg-white rounded-2xl overflow-hidden shadow-2xl">
+                <div class="px-5 py-4 border-b flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-primary-700">Galerie complete</h3>
+                    <button type="button" @click="closeModal()" class="text-slate-500 hover:text-slate-800">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div class="p-5 max-h-[75vh] overflow-y-auto">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <template x-for="image in modalImages" :key="`modal-${image.id}`">
+                            <a :href="image.full_src || image.src" target="_blank"
+                               class="group block rounded-xl overflow-hidden border border-slate-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                                <img :src="image.src"
+                                     :alt="image.title"
+                                     class="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500">
+                                <div class="p-3 bg-white">
+                                    <p class="text-sm font-semibold text-slate-800 truncate" x-text="image.title"></p>
+                                    <p class="text-xs text-slate-500" x-text="image.date"></p>
+                                </div>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -229,12 +262,14 @@
 
 {# Script Alpine.js #}
 <script>
-    function gallerySpotlight(initialImages) {
+    function gallerySpotlight(initialImages, modalImages) {
         return {
             currentIndex: 0,
             isPlaying: true,
+            isModalOpen: false,
             interval: null,
             images: initialImages || [],
+            modalImages: modalImages || [],
 
             init() {
                 this.startAutoplay();
@@ -276,6 +311,18 @@
                     this.startAutoplay();
                 } else {
                     this.stopAutoplay();
+                }
+            },
+
+            openModal() {
+                this.isModalOpen = true;
+                this.stopAutoplay();
+            },
+
+            closeModal() {
+                this.isModalOpen = false;
+                if (this.isPlaying) {
+                    this.startAutoplay();
                 }
             },
 

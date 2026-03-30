@@ -113,6 +113,11 @@
     background-color: rgba(0,0,0,0.2);
     border-radius: 3px;
 }
+
+.rocket-launch {
+    transform: translateY(-10px) scale(1.08);
+    box-shadow: 0 10px 30px rgba(29, 181, 176, 0.35);
+}
 </style>
 
 <body class="min-h-screen flex flex-col bg-gray-50 text-gray-800 font-roboto antialiased overflow-x-hidden"
@@ -273,6 +278,20 @@
   }
   </script>
 
+  <script>
+  function smartRocketWidget() {
+    return {
+      open: false,
+      launched: false,
+      launchToTop() {
+        this.launched = true;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(() => { this.launched = false; }, 700);
+      }
+    }
+  }
+  </script>
+
   <!-- ================= GLOBAL LOADER ================= -->
   <div id="global-loader"
        class="hidden fixed bottom-6 right-6 z-50">
@@ -298,11 +317,53 @@
     {% block content %}{% endblock %}
   </main>
 
+  {% if site_configuration and site_configuration.smart_rocket_enabled %}
+      <div x-data="smartRocketWidget()" class="fixed top-24 right-4 sm:right-6 z-[70] flex flex-col items-end gap-3">
+    <div x-show="open" x-transition @click.outside="open = false"
+         class="w-80 rounded-2xl shadow-2xl border border-slate-200 bg-white overflow-hidden">
+      <div class="px-4 py-3 bg-primary-700 text-white flex items-center justify-between">
+        <div class="text-sm font-semibold">{{ site_configuration.smart_rocket_title }}</div>
+        <button @click="open = false" class="text-white/80 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3">
+        <p class="text-sm text-slate-600">{{ site_configuration.smart_rocket_message }}</p>
+        <a href="/candidature/" class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm">
+          <i class="fa-solid fa-file-signature text-secondary"></i>
+          Postuler
+        </a>
+        <a href="/community/" class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm">
+          <i class="fa-regular fa-circle-question text-secondary"></i>
+          Questions frequentes
+        </a>
+        <a href="/contact/" class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm">
+          <i class="fa-regular fa-envelope text-secondary"></i>
+          Contact
+        </a>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button @click="open = !open"
+              class="h-12 w-12 rounded-full bg-white border border-slate-200 shadow-lg hover:shadow-xl transition">
+        <i class="fa-regular fa-comments text-primary-700"></i>
+      </button>
+      <button @click="launchToTop()"
+              :class="launched ? 'rocket-launch' : ''"
+              class="h-12 w-12 rounded-full bg-secondary text-white shadow-lg hover:shadow-xl transition duration-300">
+        <i class="fa-solid fa-rocket"></i>
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ================= FOOTER ================= -->
   {% component "footer"
      site_name="ESFE"
      site_slogan="Excellence • Innovation • Engagement"
      site_description="Établissement supérieur de formation en sciences de la santé, orienté vers l'excellence académique, l'innovation pédagogique et l'employabilité."
+     logo_url=site_logo_url
      footer_contact={
          'address': 'Djélibougou, Bamako, Mali',
          'phone': '+223 XX XX XX XX',
@@ -404,13 +465,32 @@
   <script>
     (function() {
       try {
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
         const socket = new WebSocket(
-          "ws://" + window.location.host + "/ws/notifications/"
+          protocol + "://" + window.location.host + "/ws/notifications/"
         );
 
         socket.onmessage = function(e) {
           const data = JSON.parse(e.data);
-          console.log("Notification reçue :", data);
+          if (typeof data.unread_count === "number") {
+            const badge = document.getElementById("unread-notification-count");
+            if (badge) {
+              if (data.unread_count > 0) {
+                badge.classList.remove("hidden");
+                badge.classList.add("flex");
+                badge.textContent = data.unread_count > 9 ? "9+" : String(data.unread_count);
+              } else {
+                badge.classList.remove("flex");
+                badge.classList.add("hidden");
+                badge.textContent = "";
+              }
+            }
+          }
+
+          // Refresh dropdown content via HTMX listeners in navbar.
+          document.body.dispatchEvent(
+            new CustomEvent("community:notification", { detail: data })
+          );
         };
 
         socket.onerror = function(e) {

@@ -1,5 +1,6 @@
 {% load component_tags %}
 <div
+    id="news-list-region"
     x-data
     x-init="$nextTick(() => {
         $el.querySelectorAll('.news-card').forEach((el, index) => {
@@ -13,6 +14,11 @@
         })
     })"
     class="space-y-12"
+    hx-get="{% url 'news:list_fragment' %}?{{ active_querystring }}"
+    hx-trigger="news:refresh from:body"
+    hx-target="#news-list-region"
+    hx-swap="outerHTML"
+    hx-indicator="#news-loading"
 >
 
 {% for item in news %}
@@ -28,13 +34,15 @@
 <div class="flex justify-center mt-12 gap-4">
     {% if page_obj.has_previous %}
         <a
-           hx-get="{% url 'news:list' %}?page={{ page_obj.previous_page_number }}"
+           href="{% url 'news:list' %}?{{ active_query_prefix }}page={{ page_obj.previous_page_number }}"
+           hx-get="{% url 'news:list' %}?{{ active_query_prefix }}page={{ page_obj.previous_page_number }}"
            hx-target="#news-content"
            hx-swap="outerHTML"
            hx-push-url="true"
            hx-indicator="#news-loading"
-           class="px-5 py-2 bg-white border border-primary-50 rounded-xl hover:bg-primary-50 transition">
-            ← Précédent
+           class="px-5 py-2 bg-white border border-primary-50 rounded-xl hover:bg-primary-50 transition inline-flex items-center gap-2">
+            <i class="fa-solid fa-arrow-left"></i>
+            Precedent
         </a>
     {% endif %}
 
@@ -44,13 +52,15 @@
 
     {% if page_obj.has_next %}
         <a
-           hx-get="{% url 'news:list' %}?page={{ page_obj.next_page_number }}"
+           href="{% url 'news:list' %}?{{ active_query_prefix }}page={{ page_obj.next_page_number }}"
+           hx-get="{% url 'news:list' %}?{{ active_query_prefix }}page={{ page_obj.next_page_number }}"
            hx-target="#news-content"
            hx-swap="outerHTML"
            hx-push-url="true"
            hx-indicator="#news-loading"
-           class="px-5 py-2 bg-white border border-primary-50 rounded-xl hover:bg-primary-50 transition">
-            Suivant →
+           class="px-5 py-2 bg-white border border-primary-50 rounded-xl hover:bg-primary-50 transition inline-flex items-center gap-2">
+            Suivant
+            <i class="fa-solid fa-arrow-right"></i>
         </a>
     {% endif %}
 </div>

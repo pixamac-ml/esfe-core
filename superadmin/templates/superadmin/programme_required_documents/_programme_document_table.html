@@ -1,0 +1,25 @@
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Programme</th>
+            <th>Document</th>
+            <th class="text-right">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for pd in programme_documents %}
+        <tr>
+            <td>{{ pd.programme.title }}</td>
+            <td>{{ pd.document.name }}</td>
+            <td class="text-right">
+                <form method="post" action="{% url 'superadmin:programme_required_document_delete' pd.pk %}" onsubmit="return confirm('Supprimer cette association ?');" class="inline-flex">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="py-10 text-center text-slate-500">Aucune association document-programme.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>

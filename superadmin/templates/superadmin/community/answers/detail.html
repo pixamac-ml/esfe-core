@@ -1,0 +1,45 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Detail d'une reponse membre{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6 max-w-5xl">
+    <div class="card p-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
+            <div class="rounded-xl border border-slate-200 p-3">
+                <p class="text-slate-500 mb-1">Auteur</p>
+                <p class="font-semibold mb-0">{{ answer.author.get_full_name|default:answer.author.username }}</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-3">
+                <p class="text-slate-500 mb-1">Score</p>
+                <p class="font-semibold mb-0">{{ answer.score }} ({{ answer.upvotes }} / {{ answer.downvotes }})</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-3">
+                <p class="text-slate-500 mb-1">Date</p>
+                <p class="font-semibold mb-0">{{ answer.created_at|date:"d/m/Y H:i" }}</p>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Sujet</p>
+            <p class="text-sm font-semibold text-slate-900 mb-0">{{ answer.topic.title }}</p>
+        </div>
+
+        <div class="mt-4">
+            <h3 class="text-sm font-semibold text-slate-900 mb-2">Contenu</h3>
+            <p class="text-sm text-slate-700 whitespace-pre-line mb-0">{{ answer.content }}</p>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-2">
+            <a class="btn btn-outline btn-sm" href="{% url 'superadmin:community_topic_detail' answer.topic.pk %}">Voir sujet</a>
+            <a class="btn btn-outline btn-sm" href="{% url 'superadmin:community_answer_edit' answer.pk %}">Modifier</a>
+            <a class="btn btn-outline btn-sm" href="{% url 'superadmin:toggle_community_answer' answer.pk %}?action=accept">Marquer acceptee</a>
+            <form method="post" action="{% url 'superadmin:community_answer_delete' answer.pk %}" onsubmit="return confirm('Supprimer cette reponse ?');">
+                {% csrf_token %}
+                <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

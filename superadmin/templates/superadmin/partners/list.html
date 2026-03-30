@@ -1,0 +1,58 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Partenaires{% endblock %}
+{% block page_subtitle %}Reseau institutionnel et visibilite{% endblock %}
+
+{% block content_main %}
+<div class="space-y-4">
+    <div class="flex justify-end">
+        <a href="{% url 'superadmin:partner_create' %}" class="btn btn-primary btn-sm">Nouveau partenaire</a>
+    </div>
+
+    <div class="card overflow-hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Site web</th>
+                    <th>Statut</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for partner in partners %}
+                <tr>
+                    <td class="font-medium">{{ partner.name }}</td>
+                    <td>
+                        {% if partner.website %}
+                        <a href="{{ partner.website }}" target="_blank" rel="noopener" class="text-[var(--primary)] no-underline">{{ partner.website }}</a>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if partner.is_active %}
+                        <span class="badge-status badge-success">Actif</span>
+                        {% else %}
+                        <span class="badge-status badge-draft">Inactif</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">
+                        <div class="inline-flex gap-2">
+                            <a href="{% url 'superadmin:partner_edit' partner.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                            <a href="{% url 'superadmin:toggle_partner' partner.pk %}" class="btn btn-outline btn-sm">Toggle</a>
+                            <form method="post" action="{% url 'superadmin:partner_delete' partner.pk %}" onsubmit="return confirm('Supprimer ce partenaire ?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="py-10 text-center text-slate-500">Aucun partenaire.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

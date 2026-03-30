@@ -1,20 +1,19 @@
 # core/views.py
 
 import logging
+from datetime import timedelta
 
 from django.shortcuts import render, get_object_or_404
 from django.http import Http404, HttpResponse
 from django.utils.html import strip_tags
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
-from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import (
-    Sum, Count, F, Avg,
-    ExpressionWrapper, DurationField, Prefetch
-)
+from django.db.models import Q
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db.utils import OperationalError, ProgrammingError
 
 # PDF
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
@@ -23,15 +22,14 @@ from reportlab.lib.pagesizes import A4
 
 # Apps
 from formations.models import Programme
-from news.models import News
+from news.models import News, ResultSession
 from blog.models import Article
-from admissions.models import Candidature
-from inscriptions.models import Inscription
-from payments.models import Payment
+from branches.models import Branch
 
 from .models import (
     Institution,
     InstitutionPresentation,
+    SiteConfiguration,
     InstitutionStat,
     Value,
     Infrastructure,
@@ -39,12 +37,20 @@ from .models import (
     Partner,
     Testimonial,
     LegalPage,
-    ContactMessage,
 )
 
 from .forms import ContactForm
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
+
+
+def get_site_configuration_safe():
+    """Retourne la configuration site ou None si la migration n'est pas encore appliquee."""
+    try:
+        return SiteConfiguration.objects.first()
+    except (ProgrammingError, OperationalError):
+        return None
 
 
 # ==========================================================
@@ -53,10 +59,14 @@ logger = logging.getLogger(__name__)
 
 def get_institution_context():
     institution = Institution.objects.filter(is_active=True).first()
+    site_configuration = get_site_configuration_safe()
+    site_logo_url = site_configuration.site_logo.url if site_configuration and site_configuration.site_logo else ""
 
     if not institution:
         return {
             "institution": None,
+            "site_configuration": site_configuration,
+            "site_logo_url": site_logo_url,
             "institution_name": "Institution non configurée",
             "contact": {},
             "navigation": [],
@@ -65,6 +75,8 @@ def get_institution_context():
 
     return {
         "institution": institution,
+        "site_configuration": site_configuration,
+        "site_logo_url": site_logo_url,
         "institution_name": institution.name,
         "contact": {
             "address": f"{institution.address}, {institution.city}, {institution.country}",
@@ -102,31 +114,10 @@ def sitemap(request):
 # ABOUT
 # ==========================================================
 
-# core/views.py
-
-from django.shortcuts import render
-from django.views.decorators.cache import cache_page
-
-from core.models import (
-    Institution,
-    InstitutionPresentation,
-    InstitutionStat,
-    Value,
-    Infrastructure,
-    Staff,
-    Partner,
-)
-from formations.models import Programme
-from branches.models import Branch
-
-
-# ==========================================================
-# ABOUT
-# ==========================================================
-
 def about(request):
     institution = Institution.objects.filter(is_active=True).first()
     presentation = InstitutionPresentation.objects.first()
+    site_configuration = get_site_configuration_safe()
 
     stats = InstitutionStat.objects.filter(
         is_active=True
@@ -162,7 +153,6 @@ def about(request):
         is_active=True
     ).select_related('cycle').order_by('-is_featured', 'title')[:6]
 
-    # ✅ AJOUTER CETTE LIGNE - BRANCHES / ANNEXES
     branches = Branch.objects.filter(is_active=True).order_by("name")
 
     # Hero data
@@ -171,6 +161,7 @@ def about(request):
 
     context = {
         "institution": institution,
+        "site_configuration": site_configuration,
         "presentation": presentation,
         "stats": stats,
         "values": values,
@@ -180,7 +171,7 @@ def about(request):
         "partners": partners,
         "testimonials": testimonials,
         "formations": formations,
-        "branches": branches,  # ✅ AJOUTER CETTE LIGNE
+        "branches": branches,
         "hero_title": hero_title,
         "hero_subtitle": hero_subtitle,
         **get_institution_context(),
@@ -196,6 +187,9 @@ def about(request):
 def home(request):
     institution = Institution.objects.filter(is_active=True).first()
     presentation = InstitutionPresentation.objects.first()
+    site_configuration = get_site_configuration_safe()
+    home_hero_image_url = site_configuration.home_hero_image.url if site_configuration and site_configuration.home_hero_image else ""
+    site_logo_url = site_configuration.site_logo.url if site_configuration and site_configuration.site_logo else ""
 
     pillars = [
         {"title": "Sciences de la santé", "description": "Formations spécialisées adaptées aux exigences professionnelles."},
@@ -234,17 +228,56 @@ def home(request):
         is_featured=True
     ).order_by("order")[:3]
 
+    branches = Branch.objects.filter(is_active=True).select_related("manager").order_by("name")[:8]
+
+    why_blocks = [
+        {
+            "title": "Formation professionnalisante",
+            "desc": "Programmes alignes sur les besoins du terrain.",
+            "image_url": site_configuration.home_why_image_1.url if site_configuration and site_configuration.home_why_image_1 else "",
+        },
+        {
+            "title": "Encadrement de proximite",
+            "desc": "Accompagnement pedagogique et suivi individualise.",
+            "image_url": site_configuration.home_why_image_2.url if site_configuration and site_configuration.home_why_image_2 else "",
+        },
+        {
+            "title": "Equipements modernes",
+            "desc": "Plateaux techniques adaptes aux pratiques de sante.",
+            "image_url": site_configuration.home_why_image_3.url if site_configuration and site_configuration.home_why_image_3 else "",
+        },
+        {
+            "title": "Insertion rapide",
+            "desc": "Competences operationnelles et employabilite renforcee.",
+            "image_url": site_configuration.home_why_image_4.url if site_configuration and site_configuration.home_why_image_4 else "",
+        },
+    ]
+
+    latest_results = ResultSession.objects.filter(is_published=True).order_by("-annee_academique", "-created_at")[:3]
+
+    active_members_30d = User.objects.filter(
+        Q(community_topics__created_at__gte=timezone.now() - timedelta(days=30))
+        | Q(community_answers__created_at__gte=timezone.now() - timedelta(days=30))
+    ).distinct().count()
+
     context = {
         "institution": institution,
         "presentation": presentation,
+        "site_configuration": site_configuration,
+        "home_hero_image_url": home_hero_image_url,
+        "site_logo_url": site_logo_url,
         "pillars": pillars,
         "formations_home": formations_home,
         "stats": stats,
         "values": values,
         "latest_news": latest_news,
         "latest_articles": latest_articles,
+        "latest_results": latest_results,
+        "active_members_30d": active_members_30d,
         "partners": partners,
         "testimonials": testimonials,
+        "why_blocks": why_blocks,
+        "annexes": branches,
         **get_institution_context(),
     }
 

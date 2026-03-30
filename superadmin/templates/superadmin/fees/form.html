@@ -1,0 +1,48 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Configuration d'un frais de scolarite{% endblock %}
+
+{% block content_main %}
+<div class="max-w-3xl">
+    <div class="card">
+        <div class="card-body">
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Programme / Annee</span>
+                    <select name="programme_year" class="w-full rounded-lg border border-slate-300 px-3 py-2" {% if fee %}disabled{% endif %} required>
+                        <option value="">Selectionner</option>
+                        {% for py in programme_years %}
+                        <option value="{{ py.pk }}" {% if fee and fee.programme_year_id == py.pk %}selected{% endif %}>{{ py.programme.title }} - {{ py.academic_year }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if fee %}<input type="hidden" name="programme_year" value="{{ fee.programme_year_id }}">{% endif %}
+                </label>
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Libelle</span>
+                    <input type="text" name="label" value="{{ fee.label|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Montant</span>
+                        <input type="number" name="amount" value="{{ fee.amount|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                    </label>
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Mois d'echeance</span>
+                        <input type="number" min="1" max="12" name="due_month" value="{{ fee.due_month|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                    </label>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:fee_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

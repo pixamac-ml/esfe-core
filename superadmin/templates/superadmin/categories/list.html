@@ -1,0 +1,47 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Categories Blog{% endblock %}
+{% block page_subtitle %}Organisation editoriale des articles{% endblock %}
+
+{% block content_main %}
+<div class="space-y-4">
+    <div class="flex justify-end">
+        <a href="{% url 'superadmin:category_create' %}" class="btn btn-primary btn-sm">Nouvelle categorie</a>
+    </div>
+
+    <div class="card overflow-hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Slug</th>
+                    <th>Articles</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category in categories %}
+                <tr>
+                    <td class="font-medium">{{ category.name }}</td>
+                    <td class="text-slate-500">{{ category.slug }}</td>
+                    <td>{{ category.articles_count|default:0 }}</td>
+                    <td class="text-right">
+                        <div class="inline-flex gap-2">
+                            <a href="{% url 'superadmin:category_edit' category.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                            <form method="post" action="{% url 'superadmin:category_delete' category.pk %}" onsubmit="return confirm('Supprimer cette categorie ?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="py-10 text-center text-slate-500">Aucune categorie blog.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

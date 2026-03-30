@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import UniqueConstraint, Index, Q
 from django.utils.text import slugify
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 
 # ==========================
@@ -270,6 +271,9 @@ class Topic(models.Model):
     # ======================
 
     def save(self, *args, **kwargs):
+        if self.accepted_answer_id and self.accepted_answer and self.accepted_answer.topic_id != self.id:
+            raise ValidationError("La réponse acceptée doit appartenir au même sujet.")
+
         if not self.slug:
             base_slug = slugify(self.title)
             slug = base_slug
@@ -352,6 +356,14 @@ class Answer(models.Model):
     @property
     def score(self):
         return self.upvotes - self.downvotes
+
+    def clean(self):
+        if self.parent_id and self.parent and self.parent.topic_id != self.topic_id:
+            raise ValidationError("Une réponse parent doit appartenir au même sujet.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Réponse #{self.id} par {self.author}"

@@ -1,0 +1,64 @@
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Titre</th>
+            <th>Auteur</th>
+            <th>Categorie</th>
+            <th>Activite</th>
+            <th>Etat</th>
+            <th class="text-right">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for topic in topics %}
+        <tr>
+            <td>
+                <p class="font-medium mb-0">{{ topic.title }}</p>
+                <p class="text-xs text-slate-500 mb-0">{{ topic.answers.count }} reponses</p>
+            </td>
+            <td class="text-slate-600">{{ topic.author.get_full_name|default:topic.author.username }}</td>
+            <td>{{ topic.category.name }}</td>
+            <td class="text-slate-600 text-sm">{{ topic.last_activity_at|date:"d/m/Y H:i" }}</td>
+            <td>
+                {% if topic.is_deleted %}
+                    <span class="badge-status badge-danger">Supprime</span>
+                {% elif topic.is_published %}
+                    <span class="badge-status badge-success">Publie</span>
+                {% else %}
+                    <span class="badge-status badge-draft">Brouillon</span>
+                {% endif %}
+            </td>
+            <td class="text-right">
+                <div class="inline-flex gap-2">
+                    <a class="btn btn-outline btn-sm" href="{% url 'superadmin:community_topic_detail' topic.pk %}">Voir</a>
+                    <a class="btn btn-outline btn-sm" href="{% url 'superadmin:community_topic_edit' topic.pk %}">Modifier</a>
+                    <a class="btn btn-outline btn-sm" href="{% url 'superadmin:toggle_community_topic' topic.pk %}?action=publish">Publier</a>
+                    <a class="btn btn-outline btn-sm" href="{% url 'superadmin:toggle_community_topic' topic.pk %}?action=lock">Lock</a>
+                    <form method="post" action="{% url 'superadmin:community_topic_delete' topic.pk %}" onsubmit="return confirm('Supprimer ce sujet ?');">
+                        {% csrf_token %}
+                        <button class="btn btn-danger btn-sm" type="submit">Supprimer</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center text-slate-500 py-10">Aucun sujet trouve.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if topics.paginator.num_pages > 1 %}
+<div class="p-4 border-t border-slate-100 flex items-center justify-between text-sm">
+    <span class="text-slate-500">Page {{ topics.number }} / {{ topics.paginator.num_pages }}</span>
+    <div class="flex gap-2">
+        {% if topics.has_previous %}
+        <a class="btn btn-outline btn-sm" hx-get="{% url 'superadmin:community_topic_list' %}?page={{ topics.previous_page_number }}&search={{ filters.search }}&category={{ filters.category }}&status={{ filters.status }}" hx-target="#community-topic-table-container" hx-swap="innerHTML">Precedent</a>
+        {% endif %}
+        {% if topics.has_next %}
+        <a class="btn btn-outline btn-sm" hx-get="{% url 'superadmin:community_topic_list' %}?page={{ topics.next_page_number }}&search={{ filters.search }}&category={{ filters.category }}&status={{ filters.status }}" hx-target="#community-topic-table-container" hx-swap="innerHTML">Suivant</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

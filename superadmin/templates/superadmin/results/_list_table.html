@@ -1,0 +1,81 @@
+<div class="overflow-x-auto">
+    <table class="data-table min-w-full">
+        <thead>
+            <tr>
+                <th>Titre</th>
+                <th>Type</th>
+                <th>Année</th>
+                <th>Annexe</th>
+                <th>Classe</th>
+                <th>Statut</th>
+                <th>Fichier</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in results_list %}
+            <tr>
+                <td class="font-semibold text-slate-900">{{ item.titre }}</td>
+                <td>{{ item.get_type_display }}</td>
+                <td>{{ item.annee_academique }}</td>
+                <td>{{ item.annexe }}</td>
+                <td>{{ item.classe }}</td>
+                <td>
+                    {% if item.is_published %}
+                        <span class="badge-status badge-success">Publié</span>
+                    {% else %}
+                        <span class="badge-status badge-draft">Brouillon</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ item.fichier_pdf.url }}" target="_blank" class="btn btn-outline btn-sm">PDF</a>
+                </td>
+                <td>
+                    <div class="flex items-center gap-2">
+                        <a href="{% url 'superadmin:result_edit' item.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                        <form method="post" action="{% url 'superadmin:toggle_result' item.pk %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline btn-sm">{% if item.is_published %}Dépublier{% else %}Publier{% endif %}</button>
+                        </form>
+                        <form method="post" action="{% url 'superadmin:result_delete' item.pk %}" class="inline" onsubmit="return confirm('Supprimer ce résultat ?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center text-slate-500 py-8">Aucun résultat trouvé.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if results_list.paginator.num_pages > 1 %}
+<div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+    <p class="text-xs text-slate-500 mb-0">Page {{ results_list.number }} / {{ results_list.paginator.num_pages }}</p>
+    <div class="flex items-center gap-2">
+        {% if results_list.has_previous %}
+            <a class="btn btn-outline btn-sm"
+               href="?page={{ results_list.previous_page_number }}&search={{ filters.search|default:'' }}&type={{ filters.type|default:'' }}&annee={{ filters.annee|default:'' }}&published={{ filters.published|default:'' }}"
+               hx-get="{% url 'superadmin:result_list' %}?page={{ results_list.previous_page_number }}&search={{ filters.search|default:'' }}&type={{ filters.type|default:'' }}&annee={{ filters.annee|default:'' }}&published={{ filters.published|default:'' }}"
+               hx-target="#results-table-container"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-indicator="#results-table-loading">Précédent</a>
+        {% endif %}
+        {% if results_list.has_next %}
+            <a class="btn btn-outline btn-sm"
+               href="?page={{ results_list.next_page_number }}&search={{ filters.search|default:'' }}&type={{ filters.type|default:'' }}&annee={{ filters.annee|default:'' }}&published={{ filters.published|default:'' }}"
+               hx-get="{% url 'superadmin:result_list' %}?page={{ results_list.next_page_number }}&search={{ filters.search|default:'' }}&type={{ filters.type|default:'' }}&annee={{ filters.annee|default:'' }}&published={{ filters.published|default:'' }}"
+               hx-target="#results-table-container"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-indicator="#results-table-loading">Suivant</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+

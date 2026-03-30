@@ -1,0 +1,46 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Edition d'un item de competences{% endblock %}
+
+{% block content_main %}
+<div class="max-w-3xl">
+    <div class="card">
+        <div class="card-body">
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Bloc de competences</span>
+                    <select name="block" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        <option value="">Selectionner</option>
+                        {% for b in blocks %}
+                        <option value="{{ b.pk }}" {% if item.block_id == b.pk %}selected{% endif %}>{{ b.programme.title }} - {{ b.title }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Titre</span>
+                    <input type="text" name="title" value="{{ item.title|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </label>
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Description</span>
+                    <textarea name="description" rows="6" class="w-full rounded-lg border border-slate-300 px-3 py-2">{{ item.description|default:'' }}</textarea>
+                </label>
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Ordre</span>
+                    <input type="number" name="order" value="{{ item.order|default:'0' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </label>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:competence_item_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

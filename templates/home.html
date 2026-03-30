@@ -11,8 +11,10 @@
    SECTION 1 : HERO
    ══════════════════════════════════════════════════════════════════════════════ #}
 {% component "hero"
-   title="ESFE"
-   subtitle="Former les cadres de la santé"
+   title=site_configuration.home_hero_title|default:"ESFE"
+   subtitle=site_configuration.home_hero_subtitle|default:"Former les cadres de la santé"
+   image_url=home_hero_image_url
+   logo_url=site_logo_url
    cities="['Abidjan','Kati','Koulikoro','San','Gao','Bobo']"
 %}{% endcomponent %}
 
@@ -48,10 +50,14 @@
       <div :class="show ? 'opacity-100 scale-100' : 'opacity-0 scale-95'"
            class="transition-all duration-1000 delay-200">
         <div class="relative">
-          <img src="{% static 'images/institution/students-academic.jpg' %}"
-               class="w-full rounded-3xl shadow-2xl object-cover"
+          {% if site_configuration and site_configuration.home_about_image %}
+          <img src="{{ site_configuration.home_about_image.url }}"
+               class="w-full h-full min-h-[320px] rounded-3xl shadow-2xl object-cover"
                alt="Étudiants ESFE"
                loading="lazy">
+          {% else %}
+          <div class="w-full h-80 rounded-3xl shadow-2xl bg-gradient-to-br from-primary-100 to-secondary/20"></div>
+          {% endif %}
           {# Badge flottant #}
           <div class="absolute -bottom-6 -right-6 bg-white rounded-2xl shadow-xl p-6 hidden lg:block">
             <div class="text-3xl font-bold text-secondary">15+</div>
@@ -136,7 +142,9 @@
 {# ══════════════════════════════════════════════════════════════════════════════
    SECTION 3 : STATISTIQUES (Compacte, intégrée)
    ══════════════════════════════════════════════════════════════════════════════ #}
-<section id="stats" class="py-16 bg-primary-700 text-white">
+<section id="stats"
+  class="py-16 text-white bg-primary-700 bg-cover bg-center"
+  {% if site_configuration and site_configuration.home_stats_banner_image %}style="background-image:linear-gradient(rgba(16,39,55,.72),rgba(16,39,55,.78)),url('{{ site_configuration.home_stats_banner_image.url }}');"{% endif %}>
   <div class="max-w-7xl mx-auto px-6"
        x-data="{ show: false }"
        x-intersect:enter.threshold.50.once="show = true">
@@ -278,10 +286,14 @@
            style="transition-delay: {{ forloop.counter0 }}00ms"
            class="group relative rounded-2xl overflow-hidden shadow-xl transition-all duration-500 hover:-translate-y-3">
 
-        <img src="{% static 'images/esfe/' %}{{ item.img }}"
+        {% if item.image_url %}
+        <img src="{{ item.image_url }}"
              class="w-full h-56 object-cover transition duration-700 group-hover:scale-110"
              alt="{{ item.title }}"
              loading="lazy">
+        {% else %}
+        <div class="w-full h-56 bg-gradient-to-br from-primary-200 to-secondary/30"></div>
+        {% endif %}
 
         {# Overlay #}
         <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
@@ -337,8 +349,7 @@
 {% component "gallery_spotlight"
    title="Instants Capturés"
    subtitle="Revivez les moments forts de notre communauté"
-   gallery_url="/galerie/"
-   total_count=48
+   gallery_url="{% url 'news:event_list' %}"
 %}{% endcomponent %}
 
 
@@ -347,7 +358,20 @@
    ══════════════════════════════════════════════════════════════════════════════ #}
 <section id="annexes" class="py-24 lg:py-32 bg-white">
   <div class="max-w-7xl mx-auto px-6"
-       x-data="{ show: false }"
+       x-data="{
+         show: false,
+         detailOpen: false,
+         selectedBranch: null,
+         openDetail(payload) {
+           this.selectedBranch = payload;
+           this.detailOpen = true;
+           document.body.classList.add('overflow-hidden');
+         },
+         closeDetail() {
+           this.detailOpen = false;
+           document.body.classList.remove('overflow-hidden');
+         }
+       }"
        x-intersect:enter.threshold.20.once="show = true">
 
     {# Header #}
@@ -366,106 +390,78 @@
 
     {# Grid Annexes #}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-
-      {# Annexe Card - Répéter pour chaque annexe #}
-      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-           class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
+      {% for branch in annexes %}
+      <article :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
+               style="transition-delay: {{ forloop.counter0 }}00ms"
+               class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
         <div class="relative h-48 overflow-hidden">
-          <img src="{% static 'images/annexes/dielibougou.jpg' %}"
+          {% if branch.image %}
+          <img src="{{ branch.image.url }}"
                class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
-               alt="ESFE Djélibougou"
+               alt="{{ branch.name }}"
                loading="lazy">
+          {% else %}
+          <div class="w-full h-full bg-gradient-to-br from-primary-200 to-secondary/30"></div>
+          {% endif %}
           <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
           <div class="absolute bottom-4 left-4 text-white">
-            <h4 class="font-semibold text-lg">ESFE Djélibougou</h4>
-            <p class="text-white/80 text-sm">Siège principal</p>
+            <h4 class="font-semibold text-lg">{{ branch.name }}</h4>
+            <p class="text-white/80 text-sm">{{ branch.city|default:"Annexe" }}</p>
           </div>
         </div>
-        <div class="p-4">
-          <a href="tel:+22370000000" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
+        <div class="p-4 flex items-center justify-between gap-3">
+          <a href="tel:{{ branch.phone }}" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
             <i data-lucide="phone" class="w-4 h-4"></i>
-            +223 70 00 00 00
+            {{ branch.phone|default:"Contact indisponible" }}
           </a>
+          <button type="button"
+                  @click='openDetail({
+                    name: "{{ branch.name|escapejs }}",
+                    code: "{{ branch.code|escapejs }}",
+                    city: "{{ branch.city|default:''|escapejs }}",
+                    phone: "{{ branch.phone|default:''|escapejs }}",
+                    email: "{{ branch.email|default:''|escapejs }}",
+                    address: "{{ branch.address|default:''|escapejs }}",
+                    image: "{% if branch.image %}{{ branch.image.url }}{% endif %}",
+                    manager: "{% if branch.manager %}{{ branch.manager.get_full_name|default:branch.manager.username|escapejs }}{% endif %}",
+                    online: "{% if branch.accepts_online_registration %}Oui{% else %}Non{% endif %}"
+                  })'
+                  class="text-xs px-3 py-1.5 rounded-full border border-secondary/30 text-secondary hover:bg-secondary hover:text-white transition">
+            Détails de l'annexe
+          </button>
         </div>
-      </div>
-
-      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-           style="transition-delay: 100ms"
-           class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
-        <div class="relative h-48 overflow-hidden">
-          <img src="{% static 'images/annexes/segou.jpg' %}"
-               class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
-               alt="ESFE Ségou"
-               loading="lazy">
-          <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
-          <div class="absolute bottom-4 left-4 text-white">
-            <h4 class="font-semibold text-lg">ESFE Ségou</h4>
-            <p class="text-white/80 text-sm">Annexe régionale</p>
-          </div>
-        </div>
-        <div class="p-4">
-          <a href="tel:+22371000000" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
-            <i data-lucide="phone" class="w-4 h-4"></i>
-            +223 71 00 00 00
-          </a>
-        </div>
-      </div>
-
-      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-           style="transition-delay: 200ms"
-           class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
-        <div class="relative h-48 overflow-hidden">
-          <img src="{% static 'images/annexes/sikasso.jpg' %}"
-               class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
-               alt="ESFE Sikasso"
-               loading="lazy">
-          <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
-          <div class="absolute bottom-4 left-4 text-white">
-            <h4 class="font-semibold text-lg">ESFE Sikasso</h4>
-            <p class="text-white/80 text-sm">Annexe régionale</p>
-          </div>
-        </div>
-        <div class="p-4">
-          <a href="tel:+22374000000" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
-            <i data-lucide="phone" class="w-4 h-4"></i>
-            +223 74 00 00 00
-          </a>
-        </div>
-      </div>
-
-      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-           style="transition-delay: 300ms"
-           class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
-        <div class="relative h-48 overflow-hidden">
-          <img src="{% static 'images/annexes/kayes.jpg' %}"
-               class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
-               alt="ESFE Kayes"
-               loading="lazy">
-          <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
-          <div class="absolute bottom-4 left-4 text-white">
-            <h4 class="font-semibold text-lg">ESFE Kayes</h4>
-            <p class="text-white/80 text-sm">Annexe régionale</p>
-          </div>
-        </div>
-        <div class="p-4">
-          <a href="tel:+22375000000" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
-            <i data-lucide="phone" class="w-4 h-4"></i>
-            +223 75 00 00 00
-          </a>
-        </div>
-      </div>
-
+      </article>
+      {% empty %}
+      <div class="col-span-full text-center text-gray-500 py-10">Aucune annexe active pour le moment.</div>
+      {% endfor %}
     </div>
 
-    {# Voir plus #}
-    <div class="text-center mt-12">
-      <a href="#"
-         class="inline-flex items-center gap-2 text-primary-700 font-semibold hover:text-secondary transition-colors">
-        Voir toutes nos implantations
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
-        </svg>
-      </a>
+    <div x-show="detailOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center p-4"
+         @click.self="closeDetail()" @keydown.escape.window="closeDetail()">
+      <div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div class="px-5 py-4 border-b flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-primary-700" x-text="selectedBranch?.name"></h3>
+          <button type="button" @click="closeDetail()" class="text-slate-500 hover:text-slate-900">
+            <i class="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+        <div class="grid md:grid-cols-2 gap-0">
+          <div class="h-64 md:h-full bg-slate-100">
+            <template x-if="selectedBranch?.image">
+              <img :src="selectedBranch.image" class="w-full h-full object-cover" alt="Annexe">
+            </template>
+          </div>
+          <div class="p-6 space-y-3 text-sm text-slate-600">
+            <p><strong class="text-slate-800">Code:</strong> <span x-text="selectedBranch?.code"></span></p>
+            <p><strong class="text-slate-800">Ville:</strong> <span x-text="selectedBranch?.city || '-' "></span></p>
+            <p><strong class="text-slate-800">Téléphone:</strong> <span x-text="selectedBranch?.phone || '-' "></span></p>
+            <p><strong class="text-slate-800">Email:</strong> <span x-text="selectedBranch?.email || '-' "></span></p>
+            <p><strong class="text-slate-800">Manager:</strong> <span x-text="selectedBranch?.manager || '-' "></span></p>
+            <p><strong class="text-slate-800">Inscription en ligne:</strong> <span x-text="selectedBranch?.online"></span></p>
+            <p><strong class="text-slate-800">Adresse:</strong> <span x-text="selectedBranch?.address || '-' "></span></p>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>

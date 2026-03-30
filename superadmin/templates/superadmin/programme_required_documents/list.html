@@ -1,0 +1,33 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Documents par programme{% endblock %}
+{% block page_subtitle %}Associations des exigences documentaires{% endblock %}
+
+{% block content_main %}
+<div class="space-y-5">
+    <div class="card p-4">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-3"
+              hx-get="{% url 'superadmin:programme_required_document_list' %}" hx-target="#programme-document-table-container" hx-swap="innerHTML" hx-trigger="change, submit">
+            <div class="md:col-span-2">
+                <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous les programmes</option>
+                    {% for p in programmes %}
+                    <option value="{{ p.pk }}" {% if filters.programme == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-outline btn-sm">Filtrer</button>
+                <a href="{% url 'superadmin:programme_required_document_list' %}" class="btn btn-outline btn-sm">Reset</a>
+            </div>
+            <div class="md:justify-self-end">
+                <a href="{% url 'superadmin:programme_required_document_create' %}" class="btn btn-primary btn-sm">Nouvelle association</a>
+            </div>
+        </form>
+    </div>
+
+    <div id="programme-document-table-container" class="card overflow-hidden">
+        {% include "superadmin/programme_required_documents/_programme_document_table.html" %}
+    </div>
+</div>
+{% endblock %}

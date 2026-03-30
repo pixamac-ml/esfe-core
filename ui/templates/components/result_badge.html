@@ -1,7 +1,23 @@
-<div class="bg-white border rounded-xl shadow-sm p-4
-            hover:shadow-md transition flex flex-col justify-between text-xs">
+<div x-data="{ hover: false }"
+     @mouseenter="hover = true"
+     @mouseleave="hover = false"
+     class="bg-white border border-primary-50 rounded-2xl shadow-sm p-5 hover:shadow-md transition flex flex-col justify-between text-xs">
 
     <div class="space-y-2">
+
+        <div class="flex items-center justify-between mb-1">
+            <span class="inline-flex items-center gap-2 text-[11px] text-gray-500">
+                <i class="fa-solid fa-ranking-star text-secondary"></i>
+                Rang #{{ rank }}
+            </span>
+            <span class="text-[10px] text-gray-400">{{ result.created_at|date:"d/m/Y" }}</span>
+        </div>
+
+        <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full rounded-full bg-gradient-to-r from-primary-500 to-secondary"
+                 :class="hover ? 'opacity-100' : 'opacity-80'"
+                 style="width: {{ progress }}%;"></div>
+        </div>
 
         <div class="flex justify-between items-center">
 
@@ -30,13 +46,18 @@
 
     </div>
 
-    <div class="mt-4">
+    <div class="mt-4 flex items-center justify-between gap-3">
+        <span class="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-primary-50 text-primary-600">
+            <i class="fa-regular fa-file-lines"></i>
+            {{ result.filiere }}
+        </span>
         <a href="{{ result.fichier_pdf.url }}"
            target="_blank"
            class="inline-flex items-center justify-center
                   bg-primary-700 text-white
                   text-[11px] px-3 py-1 rounded-md
                   hover:bg-primary-800 transition">
+            <i class="fa-solid fa-download mr-1"></i>
             PDF
         </a>
     </div>

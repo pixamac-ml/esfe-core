@@ -1,0 +1,36 @@
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Programme</th>
+            <th>Titre</th>
+            <th>Type</th>
+            <th>Slug</th>
+            <th>Ordre</th>
+            <th>Actif</th>
+            <th class="text-right">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tab in tabs %}
+        <tr>
+            <td>{{ tab.programme.title }}</td>
+            <td>{{ tab.title }}</td>
+            <td>{{ tab.get_tab_type_display }}</td>
+            <td>{{ tab.slug }}</td>
+            <td>{{ tab.order }}</td>
+            <td>{% if tab.is_active %}<span class="badge-status badge-success">Oui</span>{% else %}<span class="badge-status badge-draft">Non</span>{% endif %}</td>
+            <td class="text-right">
+                <div class="inline-flex gap-2">
+                    <a href="{% url 'superadmin:programme_tab_edit' tab.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                    <form method="post" action="{% url 'superadmin:programme_tab_delete' tab.pk %}" onsubmit="return confirm('Supprimer cet onglet ?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="py-10 text-center text-slate-500">Aucun onglet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>

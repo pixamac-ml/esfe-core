@@ -50,6 +50,7 @@
             <div class="relative -mt-14 mb-4">
                 {% if profile_user.profile.avatar %}
                 <img src="{{ profile_user.profile.avatar.url }}"
+                     alt="Avatar de {{ profile_user.username }}"
                      class="w-28 h-28 rounded-2xl border-4 border-white shadow-xl object-cover">
                 {% else %}
                 <div class="w-28 h-28 rounded-2xl border-4 border-white shadow-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
@@ -121,8 +122,8 @@
             <!-- ========== FIN WIDGET NIVEAU ========== -->
 
             <!-- Title/Role -->
-            {% if profile_user.profile.title %}
-            <p class="text-sm font-medium text-primary-600 mt-3">{{ profile_user.profile.title }}</p>
+            {% if profile_user.profile.main_domain %}
+            <p class="text-sm font-medium text-primary-600 mt-3">{{ profile_user.profile.main_domain }}</p>
             {% endif %}
 
             <!-- Bio -->
@@ -156,20 +157,13 @@
             </div>
 
             <!-- Social Links -->
-            {% if profile_user.profile.website or profile_user.profile.linkedin or profile_user.profile.twitter %}
+            {% if profile_user.profile.website %}
             <div class="mt-4 pt-4 border-t border-gray-100">
                 <div class="flex gap-3">
                     {% if profile_user.profile.website %}
                     <a href="{{ profile_user.profile.website }}" target="_blank" class="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
                         <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
-                        </svg>
-                    </a>
-                    {% endif %}
-                    {% if profile_user.profile.linkedin %}
-                    <a href="{{ profile_user.profile.linkedin }}" target="_blank" class="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
-                        <svg class="w-5 h-5 text-blue-700" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                         </svg>
                     </a>
                     {% endif %}
@@ -455,6 +449,15 @@
             </div>
             {% endif %}
             {% endfor %}
+        </div>
+    </div>
+
+    <!-- ONGLET DETAILLE HTMX -->
+    <div class="bg-white rounded-2xl shadow-lg border border-primary-100 p-6">
+        <h2 class="font-bold text-gray-900 mb-4">Exploration detaillee</h2>
+        {% include "community/partials/profile/tabs.html" %}
+        <div id="profile-content" class="mt-4">
+            {% include "community/partials/profile/activity.html" with answers=answers|slice:":10" topics=topics|slice:":5" profile_user=profile_user %}
         </div>
     </div>
 

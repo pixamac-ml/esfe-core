@@ -175,7 +175,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-6">
                         <h2 class="text-xl font-bold text-primary-700">
-                            {{ answers|length }} Réponse{{ answers|length|pluralize }}
+                            {{ answers_total|default:answers|length }} Reponse{{ answers_total|default:answers|length|pluralize }}
                         </h2>
                     </div>
 
@@ -197,6 +197,26 @@
                             </div>
                         {% endfor %}
                     </div>
+
+                    {% if answers_page and answers_page.paginator.num_pages > 1 %}
+                    <div class="mt-6 flex items-center justify-between text-sm">
+                        <span class="text-gray-500">Page {{ answers_page.number }} / {{ answers_page.paginator.num_pages }}</span>
+                        <div class="flex items-center gap-2">
+                            {% if answers_page.has_previous %}
+                            <a href="?answers_page={{ answers_page.previous_page_number }}"
+                               class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition">
+                                Prec
+                            </a>
+                            {% endif %}
+                            {% if answers_page.has_next %}
+                            <a href="?answers_page={{ answers_page.next_page_number }}"
+                               class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition">
+                                Suiv
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
 

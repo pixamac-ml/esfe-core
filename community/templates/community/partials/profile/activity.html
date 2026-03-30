@@ -29,7 +29,7 @@ Réponse publiée
 
 <span class="flex items-center gap-1">
 <i data-lucide="clock" class="w-3 h-3"></i>
-{{ answer.created_at|timesince }} ago
+il y a {{ answer.created_at|timesince }}
 </span>
 
 <span class="flex items-center gap-1 text-blue-600">
@@ -56,14 +56,66 @@ Réponse publiée
 
 </a>
 
-{% empty %}
+{% endfor %}
 
-<div class="bg-white border rounded-xl p-6 text-center text-gray-400">
-<i data-lucide="inbox" class="mx-auto mb-2"></i>
-Aucune activité récente.
+{% for topic in topics %}
+
+<a href="{{ topic.get_absolute_url }}"
+   class="block bg-white border border-primary-100 rounded-xl p-4 hover:bg-primary-50 transition shadow-sm hover:shadow-md">
+
+<div class="flex items-start justify-between gap-4">
+
+<div class="flex-1">
+
+<div class="text-primary-700 font-medium">
+{{ topic.title }}
 </div>
 
+<div class="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+
+<span class="flex items-center gap-1">
+<i data-lucide="message-square" class="w-3 h-3"></i>
+Sujet publie
+</span>
+
+<span class="flex items-center gap-1">
+<i data-lucide="clock" class="w-3 h-3"></i>
+il y a {{ topic.created_at|timesince }}
+</span>
+
+<span class="flex items-center gap-1 text-blue-600">
+<i data-lucide="eye" class="w-3 h-3"></i>
+{{ topic.view_count }}
+</span>
+
+</div>
+
+</div>
+
+<div class="flex flex-col items-center text-xs text-gray-500">
+
+<div class="flex items-center gap-1">
+<i data-lucide="reply" class="w-4 h-4"></i>
+{{ topic.answers.count }}
+</div>
+
+<div>reponses</div>
+
+</div>
+
+</div>
+
+</a>
+
+{% empty %}
 {% endfor %}
+
+{% if not answers and not topics %}
+<div class="bg-white border rounded-xl p-6 text-center text-gray-400">
+<i data-lucide="inbox" class="mx-auto mb-2"></i>
+Aucune activite recente.
+</div>
+{% endif %}
 
 </div>
 

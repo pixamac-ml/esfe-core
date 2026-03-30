@@ -41,6 +41,7 @@
                 <td>{{ news_item.views_count }}</td>
                 <td>
                     <div class="flex items-center gap-2">
+                        <a href="{% url 'superadmin:news_detail' news_item.pk %}" class="btn btn-outline btn-sm">Voir</a>
                         <a href="{% url 'superadmin:news_edit' news_item.pk %}" class="btn btn-outline btn-sm">Modifier</a>
                         <form method="post" action="{% url 'superadmin:toggle_news' news_item.pk %}" class="inline">
                             {% csrf_token %}
@@ -67,10 +68,22 @@
     <p class="text-xs text-slate-500 mb-0">Page {{ news_list.number }} / {{ news_list.paginator.num_pages }}</p>
     <div class="flex items-center gap-2">
         {% if news_list.has_previous %}
-            <a class="btn btn-outline btn-sm" href="?page={{ news_list.previous_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&category={{ filters.category|default:'' }}&urgent={{ filters.urgent|default:'' }}">Précédent</a>
+            <a class="btn btn-outline btn-sm"
+               href="?page={{ news_list.previous_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&category={{ filters.category|default:'' }}&urgent={{ filters.urgent|default:'' }}"
+               hx-get="{% url 'superadmin:news_list' %}?page={{ news_list.previous_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&category={{ filters.category|default:'' }}&urgent={{ filters.urgent|default:'' }}"
+               hx-target="#news-table-container"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-indicator="#news-table-loading">Précédent</a>
         {% endif %}
         {% if news_list.has_next %}
-            <a class="btn btn-outline btn-sm" href="?page={{ news_list.next_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&category={{ filters.category|default:'' }}&urgent={{ filters.urgent|default:'' }}">Suivant</a>
+            <a class="btn btn-outline btn-sm"
+               href="?page={{ news_list.next_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&category={{ filters.category|default:'' }}&urgent={{ filters.urgent|default:'' }}"
+               hx-get="{% url 'superadmin:news_list' %}?page={{ news_list.next_page_number }}&search={{ filters.search|default:'' }}&status={{ filters.status|default:'' }}&category={{ filters.category|default:'' }}&urgent={{ filters.urgent|default:'' }}"
+               hx-target="#news-table-container"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-indicator="#news-table-loading">Suivant</a>
         {% endif %}
     </div>
 </div>

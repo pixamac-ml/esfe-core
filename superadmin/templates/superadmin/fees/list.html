@@ -1,0 +1,39 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Frais de scolarite{% endblock %}
+{% block page_subtitle %}Gestion des frais par programme et annee{% endblock %}
+
+{% block content_main %}
+<div class="space-y-5">
+    <div class="card p-4">
+        <form method="get"
+              id="fee-filter-form"
+              class="grid grid-cols-1 md:grid-cols-4 gap-3"
+              hx-get="{% url 'superadmin:fee_list' %}"
+              hx-target="#fees-table-container"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit">
+            <div class="md:col-span-2">
+                <label class="sr-only" for="fee-programme">Programme</label>
+                <select id="fee-programme" name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous programmes</option>
+                    {% for p in programmes %}
+                    <option value="{{ p.pk }}" {% if filters.programme == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="submit" class="btn btn-outline btn-sm">Filtrer</button>
+                <a href="{% url 'superadmin:fee_list' %}" class="btn btn-outline btn-sm">Reset</a>
+            </div>
+            <div class="md:justify-self-end">
+                <a href="{% url 'superadmin:fee_create' %}" class="btn btn-primary btn-sm">Nouveau frais</a>
+            </div>
+        </form>
+    </div>
+
+    <div id="fees-table-container" class="card overflow-hidden">
+        {% include "superadmin/fees/_fee_table.html" %}
+    </div>
+</div>
+{% endblock %}

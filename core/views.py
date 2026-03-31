@@ -14,6 +14,7 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.utils import OperationalError, ProgrammingError
+from django.urls import NoReverseMatch, reverse
 
 # PDF
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
@@ -102,12 +103,105 @@ def get_institution_context():
 # PLAN DU SITE
 # ==========================================================
 
+def _safe_reverse(url_name):
+    try:
+        return reverse(url_name)
+    except NoReverseMatch:
+        return None
+
+
+def _sitemap_link(label, url_name, description=""):
+    url = _safe_reverse(url_name)
+    if not url:
+        return None
+    return {
+        "label": label,
+        "url": url,
+        "description": description,
+    }
+
+
+def _clean_links(raw_links):
+    return [item for item in raw_links if item]
+
+
 def sitemap(request):
+    sitemap_sections = [
+        {
+            "title": "Decouvrir ESFE",
+            "icon": "fa-solid fa-compass",
+            "links": _clean_links([
+                _sitemap_link("Accueil", "core:home", "Vue d'ensemble et actualites principales."),
+                _sitemap_link("A propos", "core:about", "Presentation de l'institution et des valeurs."),
+                _sitemap_link("Contact", "core:contact", "Coordonnees et formulaire de contact."),
+                _sitemap_link("Plan du site", "core:sitemap", "Structure complete des pages publiques."),
+            ]),
+        },
+        {
+            "title": "Admissions et formations",
+            "icon": "fa-solid fa-graduation-cap",
+            "links": _clean_links([
+                _sitemap_link("Catalogue des formations", "formations:list", "Programmes disponibles par cycle."),
+                _sitemap_link("Actualites", "news:list", "Informations officielles et annonces."),
+                _sitemap_link("Galeries evenements", "news:event_list", "Evenements et vie de campus."),
+                _sitemap_link("Portail resultats", "news:result_list", "Publication des resultats academiques."),
+            ]),
+        },
+        {
+            "title": "Vie academique",
+            "icon": "fa-solid fa-users",
+            "links": _clean_links([
+                _sitemap_link("Blog", "blog:article_list", "Articles, conseils et contenus pedagogiques."),
+                _sitemap_link("Communaute", "community:topic_list", "Questions, echanges et entraide."),
+            ]),
+        },
+        {
+            "title": "Informations legales",
+            "icon": "fa-solid fa-scale-balanced",
+            "links": _clean_links([
+                _sitemap_link("Mentions legales", "core:legal_notice", "Cadre juridique du site."),
+                _sitemap_link("Politique de confidentialite", "core:privacy_policy", "Protection des donnees personnelles."),
+                _sitemap_link("Conditions d'utilisation", "core:terms_of_service", "Regles d'utilisation de la plateforme."),
+            ]),
+        },
+    ]
+
+    sitemap_stats = [
+        {"label": "Formations actives", "value": Programme.objects.filter(is_active=True).count()},
+        {"label": "Annexes actives", "value": Branch.objects.filter(is_active=True).count()},
+        {"label": "Actualites publiees", "value": News.objects.filter(status="published").count()},
+        {"label": "Sessions de resultats", "value": ResultSession.objects.filter(is_published=True).count()},
+    ]
+
     context = {
         "page_title": "Plan du site",
+        "meta_description": "Plan du site ESFE: accedez rapidement aux formations, actualites, blog, pages legales et contacts.",
+        "og_type": "website",
+        "hero_title": "Plan du site ESFE",
+        "hero_subtitle": "Retrouvez rapidement toutes les pages essentielles de la plateforme ESFE.",
+        "sitemap_sections": [section for section in sitemap_sections if section["links"]],
+        "sitemap_stats": sitemap_stats,
+        "updated_on": timezone.localdate(),
         **get_institution_context(),
     }
     return render(request, "sitemap.html", context)
+
+
+def robots_txt(request):
+    lines = ["User-agent: *"]
+    if settings.DEBUG:
+        lines.append("Disallow: /")
+    else:
+        lines.extend([
+            "Disallow: /admin/",
+            "Disallow: /superadmin/",
+            "Disallow: /accounts/",
+            "Disallow: /__reload__/",
+            "Allow: /",
+        ])
+
+    lines.append(f"Sitemap: {settings.BASE_URL}/sitemap.xml")
+    return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
 
 
 # ==========================================================
@@ -485,3 +579,23 @@ def custom_400(request, exception):
     }
 
     return render(request, "core/errors/400.html", context, status=400)
+
+
+def fallback_404(request, unmatched_path=""):
+    """Fallback explicite pour les URLs non resolues (utile aussi en mode debug)."""
+    logger.warning(f"404 fallback | Path=/{unmatched_path}")
+    return custom_404(request, exception=None)
+
+
+def preview_error_page(request, error_code):
+    """Apercu rapide des pages d'erreur pour validation visuelle."""
+    if error_code == 400:
+        return custom_400(request, exception=None)
+    if error_code == 403:
+        return custom_403(request, exception=None)
+    if error_code == 404:
+        return custom_404(request, exception=None)
+    if error_code == 500:
+        return custom_500(request)
+    raise Http404("Code d'erreur non supporte")
+

@@ -4,6 +4,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.contrib.auth.decorators import user_passes_test
 from django.http import HttpResponse, JsonResponse, FileResponse
 from django.contrib import messages
@@ -31,16 +32,30 @@ from blog.models import Article, Comment, Category as BlogCategory
 from blog.forms import ArticleForm
 from news.models import News, Event, EventType, MediaItem, ResultSession, Category as NewsCategory
 from news.services import create_event_media_batch
-from core.models import Institution, LegalPage, Partner, ContactMessage, Testimonial, Notification
+from core.models import Institution, LegalPage, LegalSection, LegalSidebarBlock, Partner, ContactMessage, Testimonial, Notification
 from inscriptions.models import Inscription, StatusHistory
 from payments.models import Payment, PaymentAgent, CashPaymentSession
 from students.models import Student
 from branches.models import Branch
+from accounts.models import Profile
 from community.models import Category as CommunityCategory, Topic, Answer
 from .models import SuperadminCockpitPreference
 from students.services.email import send_payment_confirmation_email
 
 User = get_user_model()
+
+MANAGED_STAFF_GROUPS = (
+    'admissions_managers',
+    'finance_agents',
+    'executive_director',
+    'gestionnaire',
+)
+
+
+def _managed_groups_queryset():
+    for group_name in MANAGED_STAFF_GROUPS:
+        Group.objects.get_or_create(name=group_name)
+    return Group.objects.filter(name__in=MANAGED_STAFF_GROUPS).order_by('name')
 
 
 # ============================================
@@ -48,7 +63,52 @@ User = get_user_model()
 # ============================================
 
 def superuser_required(user):
-    return user.is_authenticated and user.is_superuser
+    return bool(user.is_authenticated and user.is_superuser)
+
+
+def _missing_superadmin_view(name):
+    @user_passes_test(superuser_required, login_url='/accounts/login/')
+    def _view(request, *args, **kwargs):
+        if request.headers.get('HX-Request'):
+            return HttpResponse(status=204)
+        messages.warning(
+            request,
+            f"La fonctionnalite '{name}' est temporairement indisponible.",
+        )
+        return redirect('superadmin:dashboard')
+
+    _view.__name__ = name
+    return _view
+
+
+# Keep URL imports stable even if some optional modules/views are not yet restored.
+_MISSING_SUPERADMIN_VIEWS = [
+    'branch_create', 'branch_delete', 'branch_edit', 'branch_list',
+    'bulk_action',
+    'community_answer_delete', 'community_answer_detail', 'community_answer_edit', 'community_answer_list',
+    'community_category_create', 'community_category_delete', 'community_category_edit', 'community_category_list',
+    'community_topic_delete', 'community_topic_detail', 'community_topic_edit', 'community_topic_list',
+    'competence_block_create', 'competence_block_delete', 'competence_block_edit', 'competence_block_list',
+    'competence_item_create', 'competence_item_delete', 'competence_item_edit', 'competence_item_list',
+    'export_data',
+    'message_delete', 'message_detail', 'message_list',
+    'partner_create', 'partner_delete', 'partner_edit', 'partner_list',
+    'programme_required_document_create', 'programme_required_document_delete', 'programme_required_document_list',
+    'programme_section_create', 'programme_section_delete', 'programme_section_edit', 'programme_section_list',
+    'programme_tab_create', 'programme_tab_delete', 'programme_tab_edit', 'programme_tab_list',
+    'programme_year_create', 'programme_year_delete', 'programme_year_edit', 'programme_year_list',
+    'quick_fact_create', 'quick_fact_delete', 'quick_fact_edit', 'quick_fact_list',
+    'required_document_create', 'required_document_delete', 'required_document_edit', 'required_document_list',
+    'search_global', 'settings',
+    'testimonial_create', 'testimonial_delete', 'testimonial_edit', 'testimonial_list',
+    'toggle_branch', 'toggle_community_answer', 'toggle_community_category', 'toggle_community_topic',
+    'toggle_partner', 'toggle_testimonial',
+    'update_message_status',
+]
+
+for _missing_name in _MISSING_SUPERADMIN_VIEWS:
+    if _missing_name not in globals():
+        globals()[_missing_name] = _missing_superadmin_view(_missing_name)
 
 
 def _get_cockpit_pref(user):
@@ -2142,7 +2202,7 @@ def payment_agent_list(request):
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def payment_agent_create(request):
-    staff_users = User.objects.filter(is_staff=True, is_active=True, payment_agent_profile__isnull=True).order_by('first_name', 'last_name')
+    staff_users = User.objects.filter(is_staff=True, is_active=True, payment_agent_profile__isnull=True).order_by('first_name', 'last_name', 'username')
     branches = Branch.objects.filter(is_active=True).order_by('name')
 
     if request.method == 'POST':
@@ -2176,7 +2236,7 @@ def payment_agent_edit(request, pk):
     agent = get_object_or_404(PaymentAgent, pk=pk)
     staff_users = User.objects.filter(
         Q(is_staff=True, is_active=True, payment_agent_profile__isnull=True) | Q(pk=agent.user_id)
-    ).order_by('first_name', 'last_name').distinct()
+    ).order_by('first_name', 'last_name', 'username').distinct()
     branches = Branch.objects.filter(is_active=True).order_by('name')
 
     if request.method == 'POST':
@@ -2214,6 +2274,177 @@ def payment_agent_toggle(request, pk):
     agent.save(update_fields=['is_active'])
     messages.success(request, 'Statut agent mis à jour.')
     return redirect('superadmin:payment_agent_list')
+
+
+# ============================================
+# USER MANAGEMENT
+# ============================================
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def user_list(request):
+    search = request.GET.get('search', '').strip()
+    role = request.GET.get('role', '').strip()
+    group = request.GET.get('group', '').strip()
+    status = request.GET.get('status', '').strip()
+
+    users_qs = (
+        User.objects
+        .select_related('profile', 'profile__branch')
+        .prefetch_related('groups')
+        .order_by('-date_joined')
+    )
+
+    if search:
+        users_qs = users_qs.filter(
+            Q(username__icontains=search)
+            | Q(first_name__icontains=search)
+            | Q(last_name__icontains=search)
+            | Q(email__icontains=search)
+        )
+
+    if role:
+        users_qs = users_qs.filter(profile__role=role)
+
+    if group:
+        users_qs = users_qs.filter(groups__id=group)
+
+    if status == 'active':
+        users_qs = users_qs.filter(is_active=True)
+    elif status == 'inactive':
+        users_qs = users_qs.filter(is_active=False)
+
+    users_qs = users_qs.distinct()
+    paginator = Paginator(users_qs, 20)
+    users_page = paginator.get_page(request.GET.get('page', 1))
+
+    return render(request, 'superadmin/users/list.html', {
+        'page_title': 'Utilisateurs staff',
+        'active_menu': 'users',
+        'users': users_page,
+        'groups': _managed_groups_queryset(),
+        'role_choices': Profile.ROLE_CHOICES,
+        'filters': {
+            'search': search,
+            'role': role,
+            'group': group,
+            'status': status,
+        },
+    })
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def user_create(request):
+    groups = _managed_groups_queryset()
+    branches = Branch.objects.filter(is_active=True).order_by('name')
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        password = request.POST.get('password', '').strip()
+        role = request.POST.get('role', '').strip()
+        branch_id = request.POST.get('branch', '').strip()
+        selected_groups = request.POST.getlist('groups')
+
+        if not username or not password:
+            messages.error(request, 'Nom utilisateur et mot de passe sont obligatoires.')
+        elif User.objects.filter(username=username).exists():
+            messages.error(request, 'Ce nom utilisateur existe deja.')
+        else:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                is_staff=request.POST.get('is_staff') == 'on',
+                is_active=request.POST.get('is_active') == 'on',
+            )
+
+            profile, _ = Profile.objects.get_or_create(user=user)
+            profile.role = role
+            profile.branch_id = branch_id or None
+            profile.save(update_fields=['role', 'branch'])
+
+            user.groups.set(groups.filter(id__in=selected_groups))
+            messages.success(request, 'Utilisateur cree avec succes.')
+            return redirect('superadmin:user_list')
+
+    return render(request, 'superadmin/users/form.html', {
+        'page_title': 'Nouvel utilisateur',
+        'active_menu': 'users',
+        'target_user': None,
+        'groups': groups,
+        'role_choices': Profile.ROLE_CHOICES,
+        'branches': branches,
+    })
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def user_edit(request, pk):
+    target_user = get_object_or_404(
+        User.objects.select_related('profile', 'profile__branch').prefetch_related('groups'),
+        pk=pk,
+    )
+    groups = _managed_groups_queryset()
+    branches = Branch.objects.filter(is_active=True).order_by('name')
+    profile, _ = Profile.objects.get_or_create(user=target_user)
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        if not username:
+            messages.error(request, 'Le nom utilisateur est obligatoire.')
+        elif User.objects.filter(username=username).exclude(pk=target_user.pk).exists():
+            messages.error(request, 'Ce nom utilisateur existe deja.')
+        else:
+            target_user.username = username
+            target_user.email = request.POST.get('email', '').strip()
+            target_user.first_name = request.POST.get('first_name', '').strip()
+            target_user.last_name = request.POST.get('last_name', '').strip()
+            target_user.is_staff = request.POST.get('is_staff') == 'on'
+            target_user.is_active = request.POST.get('is_active') == 'on'
+
+            new_password = request.POST.get('password', '').strip()
+            if new_password:
+                target_user.set_password(new_password)
+
+            target_user.save()
+
+            profile.role = request.POST.get('role', '').strip()
+            profile.branch_id = request.POST.get('branch', '').strip() or None
+            profile.save(update_fields=['role', 'branch'])
+
+            selected_groups = request.POST.getlist('groups')
+            target_user.groups.set(groups.filter(id__in=selected_groups))
+
+            messages.success(request, 'Utilisateur mis a jour avec succes.')
+            return redirect('superadmin:user_list')
+
+    return render(request, 'superadmin/users/form.html', {
+        'page_title': f"Modifier utilisateur {target_user.username}",
+        'active_menu': 'users',
+        'target_user': target_user,
+        'groups': groups,
+        'role_choices': Profile.ROLE_CHOICES,
+        'branches': branches,
+    })
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def user_toggle_active(request, pk):
+    if request.method != 'POST':
+        return redirect('superadmin:user_list')
+
+    target_user = get_object_or_404(User, pk=pk)
+    if target_user.pk == request.user.pk and target_user.is_superuser and target_user.is_active:
+        messages.error(request, 'Vous ne pouvez pas desactiver votre propre compte superadmin.')
+        return redirect('superadmin:user_list')
+
+    target_user.is_active = not target_user.is_active
+    target_user.save(update_fields=['is_active'])
+    messages.success(request, 'Statut utilisateur mis a jour.')
+    return redirect('superadmin:user_list')
 
 
 # ============================================
@@ -2460,7 +2691,7 @@ def category_list(request):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def category_create(request):
     if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
+        name = request.POST.get('name')
         if name:
             BlogCategory.objects.create(name=name, slug=slugify(name), description=request.POST.get('description', ''))
             messages.success(request, 'Catégorie créée!')
@@ -2597,7 +2828,7 @@ def news_edit(request, pk):
     categories = NewsCategory.objects.filter(is_active=True).order_by('ordre', 'nom')
 
     if request.method == 'POST':
-        news_item.titre = request.POST.get('titre', news_item.titre).strip() or news_item.titre
+        news_item.titre = request.POST.get('titre', '').strip() or news_item.titre
         news_item.resume = request.POST.get('resume', '').strip()
         news_item.contenu = request.POST.get('contenu', '').strip()
         news_item.categorie_id = request.POST.get('categorie') or news_item.categorie_id
@@ -2731,8 +2962,7 @@ def result_create(request):
                 fichier_pdf=fichier_pdf,
                 is_published=request.POST.get('is_published') == 'on',
             )
-            state = 'publié' if result.is_published else 'brouillon'
-            messages.success(request, f"Résultat '{result.titre}' importé ({state}).")
+            messages.success(request, f"Résultat '{result.titre}' importé.")
             return redirect('superadmin:result_list')
 
     return render(request, 'superadmin/results/form.html', {
@@ -2916,10 +3146,6 @@ def event_delete(request, pk):
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def toggle_event(request, pk):
-    if request.method != 'POST':
-        messages.error(request, 'Action invalide: utilisez le bouton de publication.')
-        return redirect('superadmin:event_list')
-
     event = get_object_or_404(Event, pk=pk)
     event.is_published = not event.is_published
     event.save(update_fields=['is_published', 'updated_at'])
@@ -3170,40 +3396,174 @@ def gallery_toggle_featured(request, pk):
 # PAGES
 # ============================================
 
+def _legal_public_url(page_type):
+    mapping = {
+        "legal": "/mentions-legales/",
+        "privacy": "/confidentialite/",
+        "terms": "/conditions-utilisation/",
+    }
+    return mapping.get(page_type, "#")
+
+
+def _sync_legal_page_blocks(page, request):
+    section_ids = request.POST.getlist("section_id[]")
+    section_titles = request.POST.getlist("section_title[]")
+    section_contents = request.POST.getlist("section_content[]")
+    section_orders = request.POST.getlist("section_order[]")
+    section_active = set(request.POST.getlist("section_is_active[]"))
+
+    keep_section_ids = []
+    for idx, title in enumerate(section_titles):
+        title = (title or "").strip()
+        content = section_contents[idx] if idx < len(section_contents) else ""
+        if not title and not (content or "").strip():
+            continue
+
+        raw_id = section_ids[idx] if idx < len(section_ids) else ""
+        order = int(section_orders[idx]) if idx < len(section_orders) and str(section_orders[idx]).isdigit() else (idx + 1)
+        is_active = str(idx) in section_active
+
+        if raw_id:
+            section = page.sections.filter(pk=raw_id).first()
+            if section:
+                section.title = title or f"Section {idx + 1}"
+                section.content = content
+                section.order = order
+                section.is_active = is_active
+                section.save()
+                keep_section_ids.append(section.pk)
+                continue
+
+        created = LegalSection.objects.create(
+            page=page,
+            title=title or f"Section {idx + 1}",
+            content=content,
+            order=order,
+            is_active=is_active,
+        )
+        keep_section_ids.append(created.pk)
+
+    page.sections.exclude(pk__in=keep_section_ids).delete()
+
+    sidebar_ids = request.POST.getlist("sidebar_id[]")
+    sidebar_titles = request.POST.getlist("sidebar_title[]")
+    sidebar_contents = request.POST.getlist("sidebar_content[]")
+    sidebar_orders = request.POST.getlist("sidebar_order[]")
+    sidebar_active = set(request.POST.getlist("sidebar_is_active[]"))
+
+    keep_sidebar_ids = []
+    for idx, title in enumerate(sidebar_titles):
+        title = (title or "").strip()
+        content = sidebar_contents[idx] if idx < len(sidebar_contents) else ""
+        if not title and not (content or "").strip():
+            continue
+
+        raw_id = sidebar_ids[idx] if idx < len(sidebar_ids) else ""
+        order = int(sidebar_orders[idx]) if idx < len(sidebar_orders) and str(sidebar_orders[idx]).isdigit() else (idx + 1)
+        is_active = str(idx) in sidebar_active
+
+        if raw_id:
+            block = page.sidebar_blocks.filter(pk=raw_id).first()
+            if block:
+                block.title = title or f"Bloc {idx + 1}"
+                block.content = content
+                block.order = order
+                block.is_active = is_active
+                block.save()
+                keep_sidebar_ids.append(block.pk)
+                continue
+
+        created = LegalSidebarBlock.objects.create(
+            page=page,
+            title=title or f"Bloc {idx + 1}",
+            content=content,
+            order=order,
+            is_active=is_active,
+        )
+        keep_sidebar_ids.append(created.pk)
+
+    page.sidebar_blocks.exclude(pk__in=keep_sidebar_ids).delete()
+
+
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def page_list(request):
-    pages = LegalPage.objects.order_by('title')
-    return render(request, 'superadmin/pages/list.html', {'page_title': 'Pages légales', 'pages': pages})
+    pages = LegalPage.objects.order_by('page_type')
+    existing_types = set(pages.values_list('page_type', flat=True))
+    missing_page_types = [pt for pt in LegalPage.PAGE_TYPES if pt[0] not in existing_types]
+    return render(request, 'superadmin/pages/list.html', {
+        'page_title': 'Pages légales',
+        'active_menu': 'pages',
+        'pages': pages,
+        'missing_page_types': missing_page_types,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def page_create(request):
+    initial_page_type = request.GET.get('page_type', '').strip()
+
     if request.method == 'POST':
-        title = request.POST.get('title')
-        if title:
-            LegalPage.objects.create(title=title, content=request.POST.get('content', ''), is_published=request.POST.get('is_published') == 'on')
-            messages.success(request, f"Page '{title}' créée!")
-            return redirect('superadmin:page_list')
-    return render(request, 'superadmin/pages/form.html', {'page_title': 'Nouvelle Page'})
+        page_type = request.POST.get('page_type', '').strip()
+        title = request.POST.get('title', '').strip()
+        if not page_type or not title:
+            messages.error(request, 'Le type et le titre sont obligatoires.')
+        elif LegalPage.objects.filter(page_type=page_type).exists():
+            messages.error(request, 'Une page existe deja pour ce type.')
+        else:
+            page = LegalPage.objects.create(
+                page_type=page_type,
+                title=title,
+                introduction=request.POST.get('introduction', ''),
+                version=request.POST.get('version', '1.0') or '1.0',
+                status=request.POST.get('status', 'draft') or 'draft',
+            )
+            _sync_legal_page_blocks(page, request)
+            messages.success(request, f"Page '{title}' creee.")
+            return redirect('superadmin:page_edit', pk=page.pk)
+
+    return render(request, 'superadmin/pages/form.html', {
+        'page_title': 'Nouvelle page legale',
+        'active_menu': 'pages',
+        'page_types': LegalPage.PAGE_TYPES,
+        'status_choices': LegalPage.STATUS_CHOICES,
+        'initial_page_type': initial_page_type,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def page_detail(request, pk):
     page = get_object_or_404(LegalPage, pk=pk)
-    return render(request, 'superadmin/pages/detail.html', {'page_title': page.title, 'page': page})
+    return render(request, 'superadmin/pages/detail.html', {
+        'page_title': page.title,
+        'active_menu': 'pages',
+        'page': page,
+        'sections': page.sections.all(),
+        'sidebar_blocks': page.sidebar_blocks.all(),
+        'public_url': _legal_public_url(page.page_type),
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def page_edit(request, pk):
     page = get_object_or_404(LegalPage, pk=pk)
     if request.method == 'POST':
-        page.title = request.POST.get('title', page.title)
-        page.content = request.POST.get('content', '')
-        page.is_published = request.POST.get('is_published') == 'on'
+        page.title = request.POST.get('title', page.title).strip() or page.title
+        page.introduction = request.POST.get('introduction', '')
+        page.version = request.POST.get('version', page.version).strip() or page.version
+        page.status = request.POST.get('status', page.status) or page.status
         page.save()
-        messages.success(request, f"Page '{page.title}' mise à jour!")
+        _sync_legal_page_blocks(page, request)
+        messages.success(request, f"Page '{page.title}' mise a jour.")
         return redirect('superadmin:page_list')
-    return render(request, 'superadmin/pages/form.html', {'page_title': f'Modifier: {page.title}', 'page_obj': page})
+    return render(request, 'superadmin/pages/form.html', {
+        'page_title': f"Modifier: {page.title}",
+        'active_menu': 'pages',
+        'page_obj': page,
+        'sections': page.sections.all(),
+        'sidebar_blocks': page.sidebar_blocks.all(),
+        'page_types': LegalPage.PAGE_TYPES,
+        'status_choices': LegalPage.STATUS_CHOICES,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -3211,54 +3571,306 @@ def page_delete(request, pk):
     if request.method == 'POST':
         page = get_object_or_404(LegalPage, pk=pk)
         page.delete()
-        messages.success(request, "Page supprimée!")
+        messages.success(request, "Page supprimee.")
         if request.headers.get('HX-Request'):
             return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/pages/'})
     return redirect('superadmin:page_list')
 
 
 # ============================================
-# PARTNERS
+# RESTORED SUPERADMIN VIEWS (PREVIOUSLY FALLBACK)
 # ============================================
+
+def _redirect_back(request, default='superadmin:dashboard'):
+    return redirect(request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER') or default)
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def message_list(request):
+    qs = ContactMessage.objects.order_by('-created_at')
+
+    q = request.GET.get('q', '').strip()
+    status = request.GET.get('status', '').strip()
+    subject = request.GET.get('subject', '').strip()
+    priority = request.GET.get('priority', '').strip()
+
+    if q:
+        qs = qs.filter(
+            Q(full_name__icontains=q)
+            | Q(email__icontains=q)
+            | Q(phone__icontains=q)
+            | Q(message__icontains=q)
+        )
+    if status:
+        qs = qs.filter(status=status)
+    if subject:
+        qs = qs.filter(subject=subject)
+    if priority:
+        qs = qs.filter(priority=priority)
+
+    contact_messages = Paginator(qs, 20).get_page(request.GET.get('page', 1))
+
+    context = {
+        'page_title': 'Messages',
+        'active_menu': 'messages',
+        'contact_messages': contact_messages,
+        'status_choices': ContactMessage.STATUS_CHOICES,
+        'subject_choices': ContactMessage.SUBJECT_CHOICES,
+        'priority_choices': ContactMessage.PRIORITY_CHOICES,
+        'filters': {'q': q, 'status': status, 'subject': subject, 'priority': priority},
+        'messages_total_count': ContactMessage.objects.count(),
+        'messages_new_count': ContactMessage.objects.filter(status='new').count(),
+        'messages_in_progress_count': ContactMessage.objects.filter(status='in_progress').count(),
+        'messages_answered_count': ContactMessage.objects.filter(status='answered').count(),
+        'messages_closed_count': ContactMessage.objects.filter(status='closed').count(),
+    }
+    return render(request, 'superadmin/messages/list.html', context)
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def message_detail(request, pk):
+    message_obj = get_object_or_404(ContactMessage, pk=pk)
+    return render(request, 'superadmin/messages/detail.html', {
+        'page_title': f"Message de {message_obj.full_name}",
+        'active_menu': 'messages',
+        'message': message_obj,
+        'status_choices': ContactMessage.STATUS_CHOICES,
+    })
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def update_message_status(request, pk):
+    if request.method != 'POST':
+        return redirect('superadmin:message_list')
+
+    message_obj = get_object_or_404(ContactMessage, pk=pk)
+    new_status = (request.POST.get('status') or '').strip()
+    reply = request.POST.get('reply')
+
+    if new_status in dict(ContactMessage.STATUS_CHOICES):
+        message_obj.status = new_status
+
+    if reply is not None:
+        message_obj.reply = reply
+
+    if message_obj.status == 'answered':
+        message_obj.answered_at = timezone.now()
+
+    message_obj.save()
+    messages.success(request, 'Statut du message mis a jour.')
+
+    if request.headers.get('HX-Request'):
+        return HttpResponse(status=200, headers={'HX-Refresh': 'true'})
+    return _redirect_back(request, default='superadmin:message_list')
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def message_delete(request, pk):
+    if request.method == 'POST':
+        message_obj = get_object_or_404(ContactMessage, pk=pk)
+        message_obj.delete()
+        messages.success(request, 'Message supprime.')
+        if request.headers.get('HX-Request'):
+            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/messages/'})
+    return redirect('superadmin:message_list')
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def settings(request):
+    institution = Institution.objects.first()
+
+    if request.method == 'POST':
+        if not institution:
+            institution = Institution()
+
+        institution.name = request.POST.get('name', institution.name or '').strip() or 'Institution'
+        institution.short_name = request.POST.get('short_name', institution.short_name or '').strip()
+        institution.email = request.POST.get('email', institution.email or '').strip() or 'contact@example.com'
+        institution.phone = request.POST.get('phone', institution.phone or '').strip() or '+000000000'
+        institution.address = request.POST.get('address', institution.address or '').strip() or '-'
+        institution.city = request.POST.get('city', institution.city or '').strip() or 'Bamako'
+        institution.country = request.POST.get('country', institution.country or '').strip() or 'Mali'
+        institution.legal_status = request.POST.get('legal_status', institution.legal_status or '').strip()
+        institution.approval_number = request.POST.get('approval_number', institution.approval_number or '').strip()
+        institution.director_title = request.POST.get('director_title', institution.director_title or '').strip() or 'Direction Generale'
+        institution.save()
+        messages.success(request, 'Parametres institutionnels enregistres.')
+        return redirect('superadmin:settings')
+
+    return render(request, 'superadmin/settings/index.html', {
+        'page_title': 'Parametres institutionnels',
+        'active_menu': 'settings',
+        'institution': institution,
+    })
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def search_global(request):
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:
+        return HttpResponse('<div class="p-3 text-sm text-slate-500">Tapez au moins 2 caracteres...</div>')
+
+    results = []
+    for p in Programme.objects.filter(Q(title__icontains=query) | Q(description__icontains=query)).order_by('title')[:5]:
+        results.append(('Formation', p.title, f'/superadmin/formations/{p.pk}/edit/'))
+    for a in Article.objects.filter(Q(title__icontains=query) | Q(content__icontains=query)).order_by('-created_at')[:5]:
+        results.append(('Article', a.title, f'/superadmin/articles/{a.pk}/edit/'))
+    for s in Student.objects.select_related('user').filter(
+        Q(user__first_name__icontains=query) | Q(user__last_name__icontains=query) | Q(matricule__icontains=query)
+    )[:5]:
+        results.append(('Etudiant', s.user.get_full_name() or s.user.username, f'/superadmin/students/{s.pk}/'))
+
+    if not results:
+        return HttpResponse(f'<div class="p-3 text-sm text-slate-500">Aucun resultat pour "{query}"</div>')
+
+    html = ['<div class="divide-y divide-slate-100">']
+    for kind, title, url in results:
+        html.append(
+            f'<a href="{url}" class="block px-3 py-2 hover:bg-slate-50">'
+            f'<span class="text-xs text-slate-500">{kind}</span><br>'
+            f'<span class="text-sm text-slate-800">{title}</span></a>'
+        )
+    html.append('</div>')
+    return HttpResponse(''.join(html))
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def bulk_action(request):
+    if request.method != 'POST':
+        return redirect('superadmin:dashboard')
+
+    action = request.POST.get('action', '').strip()
+    model_type = request.POST.get('model_type', '').strip()
+    selected_ids = request.POST.getlist('selected_ids')
+
+    if not selected_ids:
+        messages.warning(request, 'Aucun element selectionne.')
+        return _redirect_back(request)
+
+    if model_type == 'message':
+        qs = ContactMessage.objects.filter(pk__in=selected_ids)
+        map_status = {
+            'mark_new': 'new',
+            'mark_in_progress': 'in_progress',
+            'mark_answered': 'answered',
+            'mark_closed': 'closed',
+        }
+        if action in map_status:
+            updated = qs.update(status=map_status[action])
+            messages.success(request, f'{updated} message(s) mis a jour.')
+        elif action == 'delete':
+            deleted = qs.count()
+            qs.delete()
+            messages.success(request, f'{deleted} message(s) supprime(s).')
+        else:
+            messages.warning(request, 'Action non supportee pour les messages.')
+        return _redirect_back(request, default='superadmin:message_list')
+
+    messages.warning(request, 'Action groupee non configuree pour ce module.')
+    return _redirect_back(request)
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def export_data(request, model_type):
+    import csv
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{model_type}_export.csv"'
+    response.write('\ufeff'.encode('utf-8'))
+
+    writer = csv.writer(response, delimiter=';')
+    if model_type == 'formations':
+        writer.writerow(['ID', 'Titre', 'Cycle', 'Actif'])
+        for p in Programme.objects.select_related('cycle').all():
+            writer.writerow([p.pk, p.title, p.cycle.name if p.cycle else '-', 'Oui' if p.is_active else 'Non'])
+    elif model_type == 'students':
+        writer.writerow(['ID', 'Matricule', 'Nom', 'Email'])
+        for s in Student.objects.select_related('user').all():
+            writer.writerow([s.pk, s.matricule, s.user.get_full_name(), s.user.email])
+    elif model_type == 'messages':
+        writer.writerow(['ID', 'Nom', 'Email', 'Sujet', 'Statut', 'Date'])
+        for m in ContactMessage.objects.all():
+            writer.writerow([m.pk, m.full_name, m.email, m.get_subject_display(), m.get_status_display(), m.created_at.strftime('%d/%m/%Y %H:%M')])
+    else:
+        writer.writerow(['Info'])
+        writer.writerow(['Type export non supporte'])
+    return response
+
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def partner_list(request):
-    partners = Partner.objects.order_by('name')
-    return render(request, 'superadmin/partners/list.html', {'page_title': 'Partenaires', 'partners': partners, 'active_menu': 'partners'})
+    partners = Partner.objects.order_by('order', 'name')
+    return render(request, 'superadmin/partners/list.html', {
+        'page_title': 'Partenaires',
+        'active_menu': 'partners',
+        'partners': partners,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def partner_create(request):
     if request.method == 'POST':
-        name = request.POST.get('name')
-        if name:
-            Partner.objects.create(name=name, website=request.POST.get('website', ''), is_active=request.POST.get('is_active') == 'on')
-            messages.success(request, f"Partenaire '{name}' créé!")
+        name = request.POST.get('name', '').strip()
+        logo = request.FILES.get('logo')
+        if not name or not logo:
+            messages.error(request, 'Le nom et le logo sont obligatoires.')
+        else:
+            Partner.objects.create(
+                name=name,
+                logo=logo,
+                website=request.POST.get('website', '').strip(),
+                description=request.POST.get('description', '').strip(),
+                partner_type=request.POST.get('partner_type', 'autre') or 'autre',
+                is_active=request.POST.get('is_active') == 'on',
+                order=int(request.POST.get('order', '0') or 0),
+            )
+            messages.success(request, f"Partenaire '{name}' cree.")
             return redirect('superadmin:partner_list')
-    return render(request, 'superadmin/partners/form.html', {'page_title': 'Nouveau Partenaire', 'active_menu': 'partners'})
+
+    return render(request, 'superadmin/partners/form.html', {
+        'page_title': 'Nouveau partenaire',
+        'active_menu': 'partners',
+        'partner_types': Partner.PARTNER_TYPES,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def partner_edit(request, pk):
     partner = get_object_or_404(Partner, pk=pk)
     if request.method == 'POST':
-        partner.name = request.POST.get('name', partner.name)
-        partner.website = request.POST.get('website', '')
+        partner.name = request.POST.get('name', partner.name).strip() or partner.name
+        partner.website = request.POST.get('website', '').strip()
+        partner.description = request.POST.get('description', '').strip()
+        partner.partner_type = request.POST.get('partner_type', partner.partner_type) or partner.partner_type
         partner.is_active = request.POST.get('is_active') == 'on'
+        partner.order = int(request.POST.get('order', str(partner.order)) or partner.order)
+        if request.FILES.get('logo'):
+            partner.logo = request.FILES['logo']
         partner.save()
-        messages.success(request, f"Partenaire '{partner.name}' mis à jour!")
+        messages.success(request, f"Partenaire '{partner.name}' mis a jour.")
         return redirect('superadmin:partner_list')
-    return render(request, 'superadmin/partners/form.html', {'page_title': f'Modifier: {partner.name}', 'partner': partner, 'active_menu': 'partners'})
+
+    return render(request, 'superadmin/partners/form.html', {
+        'page_title': f'Modifier: {partner.name}',
+        'active_menu': 'partners',
+        'partner': partner,
+        'partner_types': Partner.PARTNER_TYPES,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def partner_delete(request, pk):
     if request.method == 'POST':
         partner = get_object_or_404(Partner, pk=pk)
-        partner.delete()
-        messages.success(request, "Partenaire supprimé!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/partners/'})
+        response = _safe_delete(
+            request,
+            partner,
+            success_message='Partenaire supprime.',
+            protected_message='Suppression impossible: partenaire utilise ailleurs.',
+            hx_redirect='/superadmin/partners/',
+        )
+        if response:
+            return response
     return redirect('superadmin:partner_list')
 
 
@@ -3266,48 +3878,65 @@ def partner_delete(request, pk):
 def toggle_partner(request, pk):
     partner = get_object_or_404(Partner, pk=pk)
     partner.is_active = not partner.is_active
-    partner.save()
-    status = "activé" if partner.is_active else "désactivé"
-    if request.headers.get('HX-Request'):
-        return HttpResponse(f'<span class="badge">{"Actif" if partner.is_active else "Inactif"}</span>', headers={'HX-Trigger': '{"showToast": "Statut mis à jour"}'})
-    messages.success(request, f"Partenaire {status}!")
+    partner.save(update_fields=['is_active'])
+    messages.success(request, 'Statut partenaire mis a jour.')
     return redirect('superadmin:partner_list')
 
 
-# ============================================
-# TESTIMONIALS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def testimonial_list(request):
-    testimonials = Testimonial.objects.order_by('-is_featured', 'order', '-pk')
-    return render(request, 'superadmin/testimonials/list.html', {'page_title': 'Témoignages', 'testimonials': testimonials, 'active_menu': 'testimonials'})
+    testimonials = Testimonial.objects.select_related('programme').order_by('-is_featured', 'order', '-pk')
+    return render(request, 'superadmin/testimonials/list.html', {
+        'page_title': 'Temoignages',
+        'active_menu': 'testimonials',
+        'testimonials': testimonials,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def testimonial_create(request):
     if request.method == 'POST':
-        author_name = request.POST.get('author_name')
-        quote = request.POST.get('quote', '')
-        if author_name and quote:
-            Testimonial.objects.create(author_name=author_name, quote=quote, author_role=request.POST.get('author_role', ''), is_active=request.POST.get('is_active') == 'on')
-            messages.success(request, "Témoignage créé!")
+        author_name = request.POST.get('author_name', '').strip()
+        quote = request.POST.get('quote', '').strip()
+        if not author_name or not quote:
+            messages.error(request, 'Le nom auteur et le temoignage sont obligatoires.')
+        else:
+            Testimonial.objects.create(
+                author_name=author_name,
+                quote=quote,
+                author_role=request.POST.get('author_role', '').strip(),
+                is_active=request.POST.get('is_active') == 'on',
+                is_featured=request.POST.get('is_featured') == 'on',
+                order=int(request.POST.get('order', '0') or 0),
+            )
+            messages.success(request, 'Temoignage cree.')
             return redirect('superadmin:testimonial_list')
-    return render(request, 'superadmin/testimonials/form.html', {'page_title': 'Nouveau Témoignage', 'active_menu': 'testimonials'})
+
+    return render(request, 'superadmin/testimonials/form.html', {
+        'page_title': 'Nouveau temoignage',
+        'active_menu': 'testimonials',
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def testimonial_edit(request, pk):
     testimonial = get_object_or_404(Testimonial, pk=pk)
     if request.method == 'POST':
-        testimonial.author_name = request.POST.get('author_name', testimonial.author_name)
-        testimonial.quote = request.POST.get('quote', testimonial.quote)
-        testimonial.author_role = request.POST.get('author_role', '')
+        testimonial.author_name = request.POST.get('author_name', testimonial.author_name).strip() or testimonial.author_name
+        testimonial.author_role = request.POST.get('author_role', '').strip()
+        testimonial.quote = request.POST.get('quote', testimonial.quote).strip() or testimonial.quote
         testimonial.is_active = request.POST.get('is_active') == 'on'
+        testimonial.is_featured = request.POST.get('is_featured') == 'on'
+        testimonial.order = int(request.POST.get('order', str(testimonial.order)) or testimonial.order)
         testimonial.save()
-        messages.success(request, "Témoignage mis à jour!")
+        messages.success(request, 'Temoignage mis a jour.')
         return redirect('superadmin:testimonial_list')
-    return render(request, 'superadmin/testimonials/form.html', {'page_title': 'Modifier Témoignage', 'testimonial': testimonial, 'active_menu': 'testimonials'})
+
+    return render(request, 'superadmin/testimonials/form.html', {
+        'page_title': 'Modifier temoignage',
+        'active_menu': 'testimonials',
+        'testimonial': testimonial,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -3315,9 +3944,7 @@ def testimonial_delete(request, pk):
     if request.method == 'POST':
         testimonial = get_object_or_404(Testimonial, pk=pk)
         testimonial.delete()
-        messages.success(request, "Témoignage supprimé!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/testimonials/'})
+        messages.success(request, 'Temoignage supprime.')
     return redirect('superadmin:testimonial_list')
 
 
@@ -3325,118 +3952,76 @@ def testimonial_delete(request, pk):
 def toggle_testimonial(request, pk):
     testimonial = get_object_or_404(Testimonial, pk=pk)
     testimonial.is_active = not testimonial.is_active
-    testimonial.save()
-    if request.headers.get('HX-Request'):
-        return HttpResponse(f'<span class="badge">{"Actif" if testimonial.is_active else "Inactif"}</span>', headers={'HX-Trigger': '{"showToast": "Statut mis à jour"}'})
+    testimonial.save(update_fields=['is_active'])
+    messages.success(request, 'Statut temoignage mis a jour.')
     return redirect('superadmin:testimonial_list')
 
 
-# ============================================
-# BRANCHES
-# ============================================
-
-def _generate_branch_code(name):
-    base = ''.join(ch for ch in slugify(name).upper() if ch.isalnum())[:4] or 'CAMP'
-    candidate = base
-    index = 1
-    while Branch.objects.filter(code=candidate).exists():
-        suffix = str(index)
-        candidate = f"{base[:max(1, 4 - len(suffix))]}{suffix}"
-        index += 1
-    return candidate
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def branch_list(request):
-    branches_qs = Branch.objects.select_related('manager').order_by('name')
-
+    qs = Branch.objects.select_related('manager').order_by('name')
     search = request.GET.get('search', '').strip()
     status = request.GET.get('status', '').strip()
     city = request.GET.get('city', '').strip()
 
     if search:
-        branches_qs = branches_qs.filter(
+        qs = qs.filter(
             Q(name__icontains=search)
             | Q(code__icontains=search)
             | Q(email__icontains=search)
             | Q(phone__icontains=search)
         )
-
     if status == 'active':
-        branches_qs = branches_qs.filter(is_active=True)
+        qs = qs.filter(is_active=True)
     elif status == 'inactive':
-        branches_qs = branches_qs.filter(is_active=False)
-
+        qs = qs.filter(is_active=False)
     if city:
-        branches_qs = branches_qs.filter(city__iexact=city)
+        qs = qs.filter(city=city)
 
-    paginator = Paginator(branches_qs, 20)
-    branches = paginator.get_page(request.GET.get('page', 1))
+    branches = Paginator(qs, 20).get_page(request.GET.get('page', 1))
 
     context = {
         'page_title': 'Campus',
         'active_menu': 'branches',
         'branches': branches,
-        'branches_total': branches_qs.count(),
-        'branches_active': branches_qs.filter(is_active=True).count(),
-        'cities': Branch.objects.exclude(city='').values_list('city', flat=True).distinct().order_by('city'),
+        'branches_total': Branch.objects.count(),
+        'branches_active': Branch.objects.filter(is_active=True).count(),
+        'cities': Branch.objects.order_by('city').values_list('city', flat=True).distinct(),
         'filters': {'search': search, 'status': status, 'city': city},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/branches/_list_table.html', context)
-
     return render(request, 'superadmin/branches/list.html', context)
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def branch_create(request):
     managers = User.objects.filter(is_active=True).order_by('first_name', 'last_name', 'username')
-
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
-        code = request.POST.get('code', '').strip().upper()
-        city = request.POST.get('city', '').strip() or 'Bamako'
-
-        if name:
-            if not code:
-                code = _generate_branch_code(name)
-
-            slug = slugify(request.POST.get('slug', '').strip() or name)
-            if Branch.objects.filter(code=code).exists():
-                messages.error(request, f"Le code campus '{code}' existe deja.")
-                return render(request, 'superadmin/branches/form.html', {
-                    'page_title': 'Nouveau Campus',
-                    'active_menu': 'branches',
-                    'managers': managers,
-                })
-            if Branch.objects.filter(slug=slug).exists():
-                messages.error(request, f"Le slug '{slug}' existe deja.")
-                return render(request, 'superadmin/branches/form.html', {
-                    'page_title': 'Nouveau Campus',
-                    'active_menu': 'branches',
-                    'managers': managers,
-                })
-
-            branch = Branch.objects.create(
+        code = request.POST.get('code', '').strip().upper() or slugify(name)[:8].upper()
+        slug = request.POST.get('slug', '').strip() or slugify(name)
+        if not name:
+            messages.error(request, 'Le nom du campus est obligatoire.')
+        else:
+            Branch.objects.create(
                 name=name,
                 code=code,
                 slug=slug,
                 address=request.POST.get('address', '').strip(),
-                city=city,
+                city=request.POST.get('city', 'Bamako').strip() or 'Bamako',
                 phone=request.POST.get('phone', '').strip(),
                 email=request.POST.get('email', '').strip(),
-                image=request.FILES.get('image'),
                 manager_id=request.POST.get('manager') or None,
                 is_active=request.POST.get('is_active') == 'on',
                 accepts_online_registration=request.POST.get('accepts_online_registration') == 'on',
+                image=request.FILES.get('image'),
             )
-            messages.success(request, f"Campus '{name}' créé!")
+            messages.success(request, f"Campus '{name}' cree.")
             return redirect('superadmin:branch_list')
 
-        messages.error(request, "Le nom du campus est obligatoire.")
-
     return render(request, 'superadmin/branches/form.html', {
-        'page_title': 'Nouveau Campus',
+        'page_title': 'Nouveau campus',
         'active_menu': 'branches',
         'managers': managers,
     })
@@ -3446,43 +4031,23 @@ def branch_create(request):
 def branch_edit(request, pk):
     branch = get_object_or_404(Branch, pk=pk)
     managers = User.objects.filter(is_active=True).order_by('first_name', 'last_name', 'username')
-
     if request.method == 'POST':
         branch.name = request.POST.get('name', branch.name).strip() or branch.name
-        new_code = request.POST.get('code', branch.code).strip().upper() or branch.code
-        new_slug = slugify(request.POST.get('slug', branch.slug).strip() or branch.name)
-
-        if Branch.objects.exclude(pk=branch.pk).filter(code=new_code).exists():
-            messages.error(request, f"Le code campus '{new_code}' existe deja.")
-            return render(request, 'superadmin/branches/form.html', {
-                'page_title': f'Modifier: {branch.name}',
-                'active_menu': 'branches',
-                'branch': branch,
-                'managers': managers,
-            })
-        if Branch.objects.exclude(pk=branch.pk).filter(slug=new_slug).exists():
-            messages.error(request, f"Le slug '{new_slug}' existe deja.")
-            return render(request, 'superadmin/branches/form.html', {
-                'page_title': f'Modifier: {branch.name}',
-                'active_menu': 'branches',
-                'branch': branch,
-                'managers': managers,
-            })
-
-        branch.code = new_code
-        branch.slug = new_slug
+        branch.code = request.POST.get('code', branch.code).strip().upper() or branch.code
+        branch.slug = request.POST.get('slug', branch.slug).strip() or branch.slug
         branch.address = request.POST.get('address', '').strip()
-        branch.city = request.POST.get('city', branch.city).strip() or 'Bamako'
+        branch.city = request.POST.get('city', branch.city).strip() or branch.city
         branch.phone = request.POST.get('phone', '').strip()
         branch.email = request.POST.get('email', '').strip()
-        if request.FILES.get('image'):
-            branch.image = request.FILES.get('image')
         branch.manager_id = request.POST.get('manager') or None
         branch.is_active = request.POST.get('is_active') == 'on'
         branch.accepts_online_registration = request.POST.get('accepts_online_registration') == 'on'
+        if request.FILES.get('image'):
+            branch.image = request.FILES['image']
         branch.save()
-        messages.success(request, f"Campus '{branch.name}' mis à jour!")
+        messages.success(request, f"Campus '{branch.name}' mis a jour.")
         return redirect('superadmin:branch_list')
+
     return render(request, 'superadmin/branches/form.html', {
         'page_title': f'Modifier: {branch.name}',
         'active_menu': 'branches',
@@ -3498,8 +4063,8 @@ def branch_delete(request, pk):
         response = _safe_delete(
             request,
             branch,
-            success_message="Campus supprimé!",
-            protected_message="Suppression impossible: ce campus est reference par des candidatures ou inscriptions.",
+            success_message='Campus supprime.',
+            protected_message='Suppression impossible: campus lie a des donnees.',
             hx_redirect='/superadmin/branches/',
         )
         if response:
@@ -3510,355 +4075,31 @@ def branch_delete(request, pk):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def toggle_branch(request, pk):
     branch = get_object_or_404(Branch, pk=pk)
-    if hasattr(branch, 'is_active'):
-        branch.is_active = not branch.is_active
-        branch.save(update_fields=['is_active'])
-
-    if request.headers.get('HX-Request'):
-        badge = 'Actif' if branch.is_active else 'Inactif'
-        tone = 'bg-emerald-100 text-emerald-700' if branch.is_active else 'bg-slate-100 text-slate-700'
-        return HttpResponse(
-            f'<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold {tone}">{badge}</span>'
-        )
-
-    messages.success(request, 'Campus mis à jour!')
+    branch.is_active = not branch.is_active
+    branch.save(update_fields=['is_active'])
+    messages.success(request, 'Statut campus mis a jour.')
     return redirect('superadmin:branch_list')
 
 
-# ============================================
-# MESSAGES
-# ============================================
+def _programme_filter(qs, programme_id):
+    if programme_id:
+        return qs.filter(programme_id=programme_id)
+    return qs
 
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def message_list(request):
-    contact_messages = ContactMessage.objects.select_related('assigned_to').order_by('-created_at')
-    search = request.GET.get('q', '').strip()
-    filter_status = request.GET.get('status', '').strip()
-    filter_subject = request.GET.get('subject', '').strip()
-    filter_priority = request.GET.get('priority', '').strip()
-
-    valid_statuses = {value for value, _ in ContactMessage.STATUS_CHOICES}
-    valid_subjects = {value for value, _ in ContactMessage.SUBJECT_CHOICES}
-    valid_priorities = {value for value, _ in ContactMessage.PRIORITY_CHOICES}
-
-    if search:
-        contact_messages = contact_messages.filter(
-            Q(full_name__icontains=search)
-            | Q(email__icontains=search)
-            | Q(phone__icontains=search)
-            | Q(message__icontains=search)
-        )
-    if filter_status in valid_statuses:
-        contact_messages = contact_messages.filter(status=filter_status)
-    if filter_subject in valid_subjects:
-        contact_messages = contact_messages.filter(subject=filter_subject)
-    if filter_priority in valid_priorities:
-        contact_messages = contact_messages.filter(priority=filter_priority)
-
-    paginator = Paginator(contact_messages, 20)
-    contact_messages = paginator.get_page(request.GET.get('page', 1))
-
-    return render(request, 'superadmin/messages/list.html', {
-        'page_title': 'Messages de contact',
-        'active_menu': 'messages',
-        'contact_messages': contact_messages,
-        'filters': {
-            'q': search,
-            'status': filter_status,
-            'subject': filter_subject,
-            'priority': filter_priority,
-        },
-        'status_choices': ContactMessage.STATUS_CHOICES,
-        'subject_choices': ContactMessage.SUBJECT_CHOICES,
-        'priority_choices': ContactMessage.PRIORITY_CHOICES,
-        'messages_total_count': ContactMessage.objects.count(),
-        'messages_new_count': ContactMessage.objects.filter(status='new').count(),
-        'messages_in_progress_count': ContactMessage.objects.filter(status='in_progress').count(),
-        'messages_answered_count': ContactMessage.objects.filter(status='answered').count(),
-        'messages_closed_count': ContactMessage.objects.filter(status='closed').count(),
-    })
-
-
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def message_detail(request, pk):
-    message = get_object_or_404(ContactMessage, pk=pk)
-    if message.status == 'new':
-        message.status = 'in_progress'
-        message.save(update_fields=['status'])
-
-    return render(request, 'superadmin/messages/detail.html', {
-        'page_title': f'Message de {message.full_name}',
-        'active_menu': 'messages',
-        'message': message,
-        'status_choices': ContactMessage.STATUS_CHOICES,
-    })
-
-
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def update_message_status(request, pk):
-    if request.method == 'POST':
-        message = get_object_or_404(ContactMessage, pk=pk)
-        new_status = request.POST.get('status', 'new').strip()
-        reply_text = request.POST.get('reply', '').strip()
-        valid_statuses = {value for value, _ in ContactMessage.STATUS_CHOICES}
-        if new_status in valid_statuses:
-            message.status = new_status
-            message.answered_at = timezone.now() if new_status == 'answered' else None
-            update_fields = ['status', 'answered_at']
-            if reply_text:
-                message.reply = reply_text
-                update_fields.append('reply')
-
-            message.save(update_fields=update_fields)
-            messages.success(request, f'Statut mis à jour: {message.get_status_display()}')
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Refresh': 'true'})
-        next_url = request.POST.get('next', '').strip()
-        if next_url:
-            return redirect(next_url)
-        return redirect('superadmin:message_list')
-    return redirect('superadmin:message_list')
-
-
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def message_delete(request, pk):
-    if request.method == 'POST':
-        message = get_object_or_404(ContactMessage, pk=pk)
-        response = _safe_delete(
-            request,
-            message,
-            success_message='Message supprimé.',
-            protected_message='Suppression impossible: ce message est encore lie a des donnees de suivi.',
-            hx_redirect='/superadmin/messages/',
-        )
-        if response:
-            return response
-        return redirect('superadmin:message_list')
-    return redirect('superadmin:message_list')
-
-
-# ============================================
-# SETTINGS
-# ============================================
-
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def settings(request):
-    institution = Institution.objects.first()
-    if request.method == 'POST':
-        if institution:
-            institution.name = request.POST.get('name', institution.name)
-            institution.short_name = request.POST.get('short_name', institution.short_name)
-            institution.email = request.POST.get('email', institution.email)
-            institution.phone = request.POST.get('phone', institution.phone)
-            institution.address = request.POST.get('address', institution.address)
-            institution.city = request.POST.get('city', institution.city)
-            institution.country = request.POST.get('country', institution.country)
-            institution.legal_status = request.POST.get('legal_status', institution.legal_status)
-            institution.approval_number = request.POST.get('approval_number', institution.approval_number)
-            institution.director_title = request.POST.get('director_title', institution.director_title)
-            institution.save()
-            messages.success(request, 'Paramètres mis à jour!')
-        return redirect('superadmin:settings')
-    return render(request, 'superadmin/settings/index.html', {'page_title': 'Paramètres', 'institution': institution, 'active_menu': 'settings'})
-
-
-# ============================================
-# SEARCH
-# ============================================
-
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def search_global(request):
-    query = request.GET.get('q', '').strip()
-    if len(query) < 2:
-        return HttpResponse('<div class="search-results empty">Tapez au moins 2 caractères...</div>')
-
-    results = []
-    for f in Programme.objects.filter(Q(title__icontains=query) | Q(description__icontains=query))[:5]:
-        results.append({'type': 'Formation', 'title': f.title, 'url': f'/superadmin/formations/{f.pk}/edit/', 'icon': 'fa-graduation-cap'})
-    for a in Article.objects.filter(Q(title__icontains=query) | Q(content__icontains=query))[:5]:
-        results.append({'type': 'Article', 'title': a.title, 'url': f'/superadmin/articles/{a.pk}/edit/', 'icon': 'fa-newspaper'})
-    for s in Student.objects.filter(Q(user__first_name__icontains=query) | Q(user__last_name__icontains=query) | Q(matricule__icontains=query))[:5]:
-        results.append({'type': 'Étudiant', 'title': s.user.get_full_name() or s.user.email, 'url': f'/superadmin/students/{s.pk}/', 'icon': 'fa-user-graduate'})
-
-    if not results:
-        return HttpResponse(f'<div class="search-results empty">Aucun résultat pour "{query}"</div>')
-
-    html = '<div class="search-results">'
-    for r in results:
-        html += f'<a href="{r["url"]}" class="search-result-item"><i class="fas {r["icon"]}"></i><span class="result-type">{r["type"]}</span><span class="result-title">{r["title"]}</span></a>'
-    html += '</div>'
-    return HttpResponse(html)
-
-
-# ============================================
-# BULK ACTION
-# ============================================
-
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def bulk_action(request):
-    if request.method != 'POST':
-        return redirect('superadmin:dashboard')
-
-    action = request.POST.get('action', '')
-    model_type = request.POST.get('model_type', '')
-    selected_ids = request.POST.getlist('selected_ids')
-
-    if not selected_ids:
-        messages.warning(request, 'Aucun élément sélectionné.')
-        return redirect(request.META.get('HTTP_REFERER', 'superadmin:dashboard'))
-
-    count = 0
-    if model_type == 'formation':
-        queryset = Programme.objects.filter(pk__in=selected_ids)
-        if action == 'delete':
-            try:
-                count = queryset.count(); queryset.delete()
-            except ProtectedError:
-                messages.error(request, 'Suppression impossible: au moins une formation est encore utilisee.')
-                return redirect('superadmin:formation_list')
-        elif action == 'activate':
-            count = queryset.update(is_active=True)
-        elif action == 'deactivate':
-            count = queryset.update(is_active=False)
-    elif model_type == 'article':
-        queryset = Article.objects.filter(pk__in=selected_ids)
-        if action == 'delete':
-            try:
-                count = queryset.count(); queryset.delete()
-            except ProtectedError:
-                messages.error(request, 'Suppression impossible: certains articles sont encore references.')
-                return redirect('superadmin:article_list')
-        elif action == 'publish':
-            count = queryset.update(status='published')
-    elif model_type == 'message':
-        queryset = ContactMessage.objects.filter(pk__in=selected_ids)
-        if action == 'delete':
-            try:
-                count = queryset.count(); queryset.delete()
-            except ProtectedError:
-                messages.error(request, 'Suppression impossible: certains messages ne peuvent pas etre supprimes.')
-                return redirect('superadmin:message_list')
-        elif action == 'mark_new':
-            count = queryset.update(status='new', answered_at=None)
-        elif action == 'mark_in_progress':
-            count = queryset.update(status='in_progress', answered_at=None)
-        elif action == 'mark_answered':
-            count = queryset.update(status='answered', answered_at=timezone.now())
-        elif action == 'mark_closed':
-            count = queryset.update(status='closed', answered_at=None)
-    elif model_type == 'event':
-        queryset = Event.objects.filter(pk__in=selected_ids)
-        if action == 'delete':
-            try:
-                count = queryset.count(); queryset.delete()
-            except ProtectedError:
-                messages.error(request, 'Suppression impossible: au moins un evenement est encore reference.')
-                return redirect('superadmin:event_list')
-        elif action == 'publish':
-            count = queryset.update(is_published=True)
-        elif action == 'unpublish':
-            count = queryset.update(is_published=False)
-    elif model_type == 'payment':
-        queryset = Payment.objects.select_related('inscription', 'inscription__candidature').filter(pk__in=selected_ids)
-
-        if action == 'cancel':
-            count = queryset.filter(status=Payment.STATUS_PENDING).update(status=Payment.STATUS_CANCELLED)
-        elif action == 'validate':
-            skipped = 0
-            for payment in queryset:
-                if payment.status != Payment.STATUS_PENDING:
-                    continue
-                if _is_manual_payment_method(payment.method):
-                    if not payment.agent_id:
-                        payment.agent = _get_or_create_superadmin_agent(request.user, payment.inscription)
-                    inscription_branch = getattr(payment.inscription.candidature, 'branch', None)
-                    if not payment.agent_id or (inscription_branch and payment.agent.branch_id != inscription_branch.id):
-                        skipped += 1
-                        continue
-
-                payment.status = Payment.STATUS_VALIDATED
-                update_fields = ['status']
-                if payment.agent_id:
-                    update_fields.append('agent')
-
-                try:
-                    payment.save(update_fields=update_fields)
-                    count += 1
-                except (ValueError, ValidationError):
-                    continue
-            if skipped:
-                messages.warning(request, f'{skipped} paiement(s) manuel(s) ignoré(s): agent absent/incohérent avec l\'annexe.')
-        elif action == 'notify':
-            for payment in queryset:
-                if payment.status != Payment.STATUS_VALIDATED:
-                    continue
-                try:
-                    send_payment_confirmation_email(payment=payment)
-                    count += 1
-                except Exception:
-                    continue
-
-    messages.success(request, f'{count} élément(s) traité(s).')
-    redirect_map = {'formation': 'formation_list', 'article': 'article_list', 'message': 'message_list', 'event': 'event_list', 'payment': 'payment_list'}
-    return redirect(f'superadmin:{redirect_map.get(model_type, "dashboard")}')
-
-
-# ============================================
-# EXPORT
-# ============================================
-
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def export_data(request, model_type):
-    import csv
-    from django.http import HttpResponse as DjangoHttpResponse
-
-    response = DjangoHttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{model_type}_export.csv"'
-    response.write('\ufeff'.encode('utf-8'))
-    writer = csv.writer(response, delimiter=';')
-
-    if model_type == 'students':
-        writer.writerow(['ID', 'Matricule', 'Nom', 'Email'])
-        for s in Student.objects.select_related('user'):
-            writer.writerow([s.pk, s.matricule, s.user.get_full_name(), s.user.email])
-    elif model_type == 'candidatures':
-        writer.writerow(['ID', 'Candidat', 'Formation', 'Statut', 'Date'])
-        for c in Candidature.objects.select_related('programme'):
-            writer.writerow([c.pk, c.full_name, c.programme.title, c.status, c.submitted_at.strftime('%d/%m/%Y')])
-    elif model_type == 'payments':
-        writer.writerow(['ID', 'Étudiant', 'Montant', 'Statut', 'Date'])
-        for p in Payment.objects.select_related('inscription__student__user'):
-            writer.writerow([p.pk, p.inscription.student.user.get_full_name() if p.inscription else 'N/A', p.amount, p.status, p.created_at.strftime('%d/%m/%Y')])
-    else:
-        return DjangoHttpResponse("Type d'export non supporté", status=400)
-
-    return response
-
-
-# ============================================
-# PROGRAMME YEARS
-# ============================================
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_year_list(request):
-    programme_years = ProgrammeYear.objects.select_related('programme').order_by('programme__title', 'year_number')
-    programme = request.GET.get('programme', '')
-
+    programme = request.GET.get('programme', '').strip()
+    qs = ProgrammeYear.objects.select_related('programme').order_by('programme__title', 'year_number')
     if programme:
-        programme_years = programme_years.filter(programme_id=programme)
-
-    paginator = Paginator(programme_years, 20)
-    page = request.GET.get('page', 1)
-    programme_years = paginator.get_page(page)
-
+        qs = qs.filter(programme_id=programme)
     context = {
-        'page_title': 'Années de Programme',
-        'active_menu': 'programme_years',
-        'programme_years': programme_years,
-        'programmes': Programme.objects.all(),
+        'page_title': 'Annees de programme',
+        'active_menu': 'formations',
+        'programme_years': qs,
+        'programmes': Programme.objects.order_by('title'),
         'filters': {'programme': programme},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/programme_years/_programme_year_table.html', context)
     return render(request, 'superadmin/programme_years/list.html', context)
@@ -3867,83 +4108,66 @@ def programme_year_list(request):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_year_create(request):
     if request.method == 'POST':
-        programme_id = request.POST.get('programme')
-        year_number = request.POST.get('year_number')
-        if not programme_id or not year_number:
-            messages.error(request, "Programme et numéro d'année obligatoires.")
-            return redirect('superadmin:programme_year_create')
+        try:
+            ProgrammeYear.objects.create(
+                programme_id=request.POST.get('programme') or None,
+                year_number=int(request.POST.get('year_number') or 0),
+            )
+            messages.success(request, 'Annee de programme creee.')
+            return redirect('superadmin:programme_year_list')
+        except Exception as exc:
+            messages.error(request, f'Creation impossible: {exc}')
 
-        ProgrammeYear.objects.create(
-            programme_id=programme_id,
-            year_number=year_number,
-        )
-        messages.success(request, "Année de programme créée!")
-        return redirect('superadmin:programme_year_list')
-
-    context = {
-        'page_title': 'Nouvelle Année de Programme',
-        'active_menu': 'programme_years',
-        'programmes': Programme.objects.all(),
-    }
-    return render(request, 'superadmin/programme_years/form.html', context)
+    return render(request, 'superadmin/programme_years/form.html', {
+        'page_title': 'Nouvelle annee',
+        'active_menu': 'formations',
+        'programmes': Programme.objects.order_by('title'),
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_year_edit(request, pk):
     programme_year = get_object_or_404(ProgrammeYear, pk=pk)
-
     if request.method == 'POST':
-        programme_year.programme_id = request.POST.get('programme', programme_year.programme_id)
-        programme_year.year_number = request.POST.get('year_number', programme_year.year_number)
-        programme_year.save()
-        messages.success(request, f"Année de programme '{programme_year}' mise à jour!")
-        return redirect('superadmin:programme_year_list')
+        try:
+            programme_year.programme_id = request.POST.get('programme') or programme_year.programme_id
+            programme_year.year_number = int(request.POST.get('year_number') or programme_year.year_number)
+            programme_year.save()
+            messages.success(request, 'Annee de programme mise a jour.')
+            return redirect('superadmin:programme_year_list')
+        except Exception as exc:
+            messages.error(request, f'Mise a jour impossible: {exc}')
 
-    context = {
-        'page_title': f'Modifier: {programme_year}',
-        'active_menu': 'programme_years',
+    return render(request, 'superadmin/programme_years/form.html', {
+        'page_title': 'Modifier annee de programme',
+        'active_menu': 'formations',
         'programme_year': programme_year,
-        'programmes': Programme.objects.all(),
-    }
-    return render(request, 'superadmin/programme_years/form.html', context)
+        'programmes': Programme.objects.order_by('title'),
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_year_delete(request, pk):
     if request.method == 'POST':
         programme_year = get_object_or_404(ProgrammeYear, pk=pk)
-        name = str(programme_year)
         programme_year.delete()
-        messages.success(request, f"Année de programme '{name}' supprimée!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/programme-years/'})
+        messages.success(request, 'Annee de programme supprimee.')
     return redirect('superadmin:programme_year_list')
 
 
-# ============================================
-# PROGRAMME QUICK FACTS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def quick_fact_list(request):
-    quick_facts = ProgrammeQuickFact.objects.select_related('programme').order_by('programme__title', 'order')
-    programme = request.GET.get('programme', '')
-
+    programme = request.GET.get('programme', '').strip()
+    qs = ProgrammeQuickFact.objects.select_related('programme').order_by('programme__title', 'order', 'id')
     if programme:
-        quick_facts = quick_facts.filter(programme_id=programme)
-
-    paginator = Paginator(quick_facts, 20)
-    page = request.GET.get('page', 1)
-    quick_facts = paginator.get_page(page)
-
+        qs = qs.filter(programme_id=programme)
     context = {
-        'page_title': 'Faits Rapides',
-        'active_menu': 'quick_facts',
-        'quick_facts': quick_facts,
-        'programmes': Programme.objects.all(),
+        'page_title': 'Quick facts',
+        'active_menu': 'formations',
+        'quick_facts': qs,
+        'programmes': Programme.objects.order_by('title'),
         'filters': {'programme': programme},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/quick_facts/_quick_fact_table.html', context)
     return render(request, 'superadmin/quick_facts/list.html', context)
@@ -3952,92 +4176,72 @@ def quick_fact_list(request):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def quick_fact_create(request):
     if request.method == 'POST':
-        programme_id = request.POST.get('programme')
-        label = request.POST.get('label')
-        value = request.POST.get('value')
-        if not programme_id or not label or not value:
-            messages.error(request, "Programme, label et valeur obligatoires.")
-            return redirect('superadmin:quick_fact_create')
-
-        ProgrammeQuickFact.objects.create(
-            programme_id=programme_id,
-            icon=request.POST.get('icon', 'academic_cap'),
-            label=label,
-            value=value,
-            order=request.POST.get('order', 0),
-        )
-        messages.success(request, "Fait rapide créé!")
-        return redirect('superadmin:quick_fact_list')
-
-    context = {
-        'page_title': 'Nouveau Fait Rapide',
-        'active_menu': 'quick_facts',
-        'programmes': Programme.objects.all(),
+        try:
+            ProgrammeQuickFact.objects.create(
+                programme_id=request.POST.get('programme') or None,
+                icon=request.POST.get('icon', 'academic_cap') or 'academic_cap',
+                label=request.POST.get('label', '').strip(),
+                value=request.POST.get('value', '').strip(),
+                order=int(request.POST.get('order') or 0),
+            )
+            messages.success(request, 'Quick fact cree.')
+            return redirect('superadmin:quick_fact_list')
+        except Exception as exc:
+            messages.error(request, f'Creation impossible: {exc}')
+    return render(request, 'superadmin/quick_facts/form.html', {
+        'page_title': 'Nouveau quick fact',
+        'active_menu': 'formations',
+        'programmes': Programme.objects.order_by('title'),
         'icon_choices': ProgrammeQuickFact.ICON_CHOICES,
-    }
-    return render(request, 'superadmin/quick_facts/form.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def quick_fact_edit(request, pk):
     quick_fact = get_object_or_404(ProgrammeQuickFact, pk=pk)
-
     if request.method == 'POST':
-        quick_fact.programme_id = request.POST.get('programme', quick_fact.programme_id)
-        quick_fact.icon = request.POST.get('icon', quick_fact.icon)
-        quick_fact.label = request.POST.get('label', quick_fact.label)
-        quick_fact.value = request.POST.get('value', quick_fact.value)
-        quick_fact.order = request.POST.get('order', quick_fact.order)
-        quick_fact.save()
-        messages.success(request, f"Fait rapide '{quick_fact.label}' mis à jour!")
-        return redirect('superadmin:quick_fact_list')
-
-    context = {
-        'page_title': f'Modifier: {quick_fact.label}',
-        'active_menu': 'quick_facts',
+        try:
+            quick_fact.programme_id = request.POST.get('programme') or quick_fact.programme_id
+            quick_fact.icon = request.POST.get('icon', quick_fact.icon) or quick_fact.icon
+            quick_fact.label = request.POST.get('label', quick_fact.label).strip() or quick_fact.label
+            quick_fact.value = request.POST.get('value', quick_fact.value).strip() or quick_fact.value
+            quick_fact.order = int(request.POST.get('order') or quick_fact.order)
+            quick_fact.save()
+            messages.success(request, 'Quick fact mis a jour.')
+            return redirect('superadmin:quick_fact_list')
+        except Exception as exc:
+            messages.error(request, f'Mise a jour impossible: {exc}')
+    return render(request, 'superadmin/quick_facts/form.html', {
+        'page_title': 'Modifier quick fact',
+        'active_menu': 'formations',
         'quick_fact': quick_fact,
-        'programmes': Programme.objects.all(),
+        'programmes': Programme.objects.order_by('title'),
         'icon_choices': ProgrammeQuickFact.ICON_CHOICES,
-    }
-    return render(request, 'superadmin/quick_facts/form.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def quick_fact_delete(request, pk):
     if request.method == 'POST':
         quick_fact = get_object_or_404(ProgrammeQuickFact, pk=pk)
-        label = quick_fact.label
         quick_fact.delete()
-        messages.success(request, f"Fait rapide '{label}' supprimé!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/quick-facts/'})
+        messages.success(request, 'Quick fact supprime.')
     return redirect('superadmin:quick_fact_list')
 
 
-# ============================================
-# PROGRAMME TABS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_tab_list(request):
-    tabs = ProgrammeTab.objects.select_related('programme').order_by('programme__title', 'order')
-    programme = request.GET.get('programme', '')
-
+    programme = request.GET.get('programme', '').strip()
+    qs = ProgrammeTab.objects.select_related('programme').order_by('programme__title', 'order', 'id')
     if programme:
-        tabs = tabs.filter(programme_id=programme)
-
-    paginator = Paginator(tabs, 20)
-    page = request.GET.get('page', 1)
-    tabs = paginator.get_page(page)
-
+        qs = qs.filter(programme_id=programme)
     context = {
-        'page_title': 'Onglets de Programme',
-        'active_menu': 'programme_tabs',
-        'tabs': tabs,
-        'programmes': Programme.objects.all(),
+        'page_title': 'Onglets programme',
+        'active_menu': 'formations',
+        'tabs': qs,
+        'programmes': Programme.objects.order_by('title'),
         'filters': {'programme': programme},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/programme_tabs/_tab_table.html', context)
     return render(request, 'superadmin/programme_tabs/list.html', context)
@@ -4046,93 +4250,74 @@ def programme_tab_list(request):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_tab_create(request):
     if request.method == 'POST':
-        programme_id = request.POST.get('programme')
-        title = request.POST.get('title')
-        if not programme_id or not title:
-            messages.error(request, "Programme et titre obligatoires.")
-            return redirect('superadmin:programme_tab_create')
-
-        ProgrammeTab.objects.create(
-            programme_id=programme_id,
-            tab_type=request.POST.get('tab_type', 'custom'),
-            title=title,
-            slug=request.POST.get('slug', ''),
-            order=request.POST.get('order', 0),
-            is_active=request.POST.get('is_active') == 'on',
-        )
-        messages.success(request, "Onglet créé!")
-        return redirect('superadmin:programme_tab_list')
-
-    context = {
-        'page_title': 'Nouvel Onglet',
-        'active_menu': 'programme_tabs',
-        'programmes': Programme.objects.all(),
+        try:
+            ProgrammeTab.objects.create(
+                programme_id=request.POST.get('programme') or None,
+                tab_type=request.POST.get('tab_type', 'custom') or 'custom',
+                title=request.POST.get('title', '').strip(),
+                slug=request.POST.get('slug', '').strip(),
+                order=int(request.POST.get('order') or 0),
+                is_active=request.POST.get('is_active') == 'on',
+            )
+            messages.success(request, 'Onglet cree.')
+            return redirect('superadmin:programme_tab_list')
+        except Exception as exc:
+            messages.error(request, f'Creation impossible: {exc}')
+    return render(request, 'superadmin/programme_tabs/form.html', {
+        'page_title': 'Nouvel onglet',
+        'active_menu': 'formations',
+        'programmes': Programme.objects.order_by('title'),
         'tab_type_choices': ProgrammeTab.TAB_TYPE_CHOICES,
-    }
-    return render(request, 'superadmin/programme_tabs/form.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_tab_edit(request, pk):
     tab = get_object_or_404(ProgrammeTab, pk=pk)
-
     if request.method == 'POST':
-        tab.programme_id = request.POST.get('programme', tab.programme_id)
-        tab.tab_type = request.POST.get('tab_type', tab.tab_type)
-        tab.title = request.POST.get('title', tab.title)
-        tab.slug = request.POST.get('slug', tab.slug)
-        tab.order = request.POST.get('order', tab.order)
-        tab.is_active = request.POST.get('is_active') == 'on'
-        tab.save()
-        messages.success(request, f"Onglet '{tab.title}' mis à jour!")
-        return redirect('superadmin:programme_tab_list')
-
-    context = {
-        'page_title': f'Modifier: {tab.title}',
-        'active_menu': 'programme_tabs',
+        try:
+            tab.programme_id = request.POST.get('programme') or tab.programme_id
+            tab.tab_type = request.POST.get('tab_type', tab.tab_type) or tab.tab_type
+            tab.title = request.POST.get('title', tab.title).strip() or tab.title
+            tab.slug = request.POST.get('slug', tab.slug).strip() or tab.slug
+            tab.order = int(request.POST.get('order') or tab.order)
+            tab.is_active = request.POST.get('is_active') == 'on'
+            tab.save()
+            messages.success(request, 'Onglet mis a jour.')
+            return redirect('superadmin:programme_tab_list')
+        except Exception as exc:
+            messages.error(request, f'Mise a jour impossible: {exc}')
+    return render(request, 'superadmin/programme_tabs/form.html', {
+        'page_title': 'Modifier onglet',
+        'active_menu': 'formations',
         'tab': tab,
-        'programmes': Programme.objects.all(),
+        'programmes': Programme.objects.order_by('title'),
         'tab_type_choices': ProgrammeTab.TAB_TYPE_CHOICES,
-    }
-    return render(request, 'superadmin/programme_tabs/form.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_tab_delete(request, pk):
     if request.method == 'POST':
         tab = get_object_or_404(ProgrammeTab, pk=pk)
-        title = tab.title
         tab.delete()
-        messages.success(request, f"Onglet '{title}' supprimé!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/programme-tabs/'})
+        messages.success(request, 'Onglet supprime.')
     return redirect('superadmin:programme_tab_list')
 
 
-# ============================================
-# PROGRAMME SECTIONS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_section_list(request):
-    sections = ProgrammeSection.objects.select_related('tab__programme').order_by('tab__programme__title', 'order')
-    programme = request.GET.get('programme', '')
-
+    programme = request.GET.get('programme', '').strip()
+    qs = ProgrammeSection.objects.select_related('tab', 'tab__programme').order_by('tab__programme__title', 'tab__order', 'order', 'id')
     if programme:
-        sections = sections.filter(tab__programme_id=programme)
-
-    paginator = Paginator(sections, 20)
-    page = request.GET.get('page', 1)
-    sections = paginator.get_page(page)
-
+        qs = qs.filter(tab__programme_id=programme)
     context = {
-        'page_title': 'Sections de Programme',
-        'active_menu': 'programme_sections',
-        'sections': sections,
-        'programmes': Programme.objects.all(),
+        'page_title': 'Sections programme',
+        'active_menu': 'formations',
+        'sections': qs,
+        'programmes': Programme.objects.order_by('title'),
         'filters': {'programme': programme},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/programme_sections/_section_table.html', context)
     return render(request, 'superadmin/programme_sections/list.html', context)
@@ -4140,92 +4325,75 @@ def programme_section_list(request):
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_section_create(request):
+    tabs = ProgrammeTab.objects.select_related('programme').order_by('programme__title', 'order')
     if request.method == 'POST':
-        tab_id = request.POST.get('tab')
-        section_type = request.POST.get('section_type')
-        if not tab_id or not section_type:
-            messages.error(request, "Onglet et type de section obligatoires.")
-            return redirect('superadmin:programme_section_create')
-
-        ProgrammeSection.objects.create(
-            tab_id=tab_id,
-            section_type=section_type,
-            title=request.POST.get('title', ''),
-            content=request.POST.get('content', ''),
-            order=request.POST.get('order', 0),
-        )
-        messages.success(request, "Section créée!")
-        return redirect('superadmin:programme_section_list')
-
-    context = {
-        'page_title': 'Nouvelle Section',
-        'active_menu': 'programme_sections',
-        'tabs': ProgrammeTab.objects.select_related('programme').all(),
+        try:
+            ProgrammeSection.objects.create(
+                tab_id=request.POST.get('tab') or None,
+                section_type=request.POST.get('section_type', 'text') or 'text',
+                title=request.POST.get('title', '').strip(),
+                content=request.POST.get('content', ''),
+                order=int(request.POST.get('order') or 0),
+            )
+            messages.success(request, 'Section creee.')
+            return redirect('superadmin:programme_section_list')
+        except Exception as exc:
+            messages.error(request, f'Creation impossible: {exc}')
+    return render(request, 'superadmin/programme_sections/form.html', {
+        'page_title': 'Nouvelle section',
+        'active_menu': 'formations',
+        'tabs': tabs,
         'section_type_choices': ProgrammeSection.SECTION_TYPE_CHOICES,
-    }
-    return render(request, 'superadmin/programme_sections/form.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_section_edit(request, pk):
     section = get_object_or_404(ProgrammeSection, pk=pk)
-
+    tabs = ProgrammeTab.objects.select_related('programme').order_by('programme__title', 'order')
     if request.method == 'POST':
-        section.tab_id = request.POST.get('tab', section.tab_id)
-        section.section_type = request.POST.get('section_type', section.section_type)
-        section.title = request.POST.get('title', section.title)
-        section.content = request.POST.get('content', section.content)
-        section.order = request.POST.get('order', section.order)
-        section.save()
-        messages.success(request, f"Section '{section.title or 'Sans titre'}' mise à jour!")
-        return redirect('superadmin:programme_section_list')
-
-    context = {
-        'page_title': f'Modifier: {section.title or "Section"}',
-        'active_menu': 'programme_sections',
+        try:
+            section.tab_id = request.POST.get('tab') or section.tab_id
+            section.section_type = request.POST.get('section_type', section.section_type) or section.section_type
+            section.title = request.POST.get('title', '').strip()
+            section.content = request.POST.get('content', '')
+            section.order = int(request.POST.get('order') or section.order)
+            section.save()
+            messages.success(request, 'Section mise a jour.')
+            return redirect('superadmin:programme_section_list')
+        except Exception as exc:
+            messages.error(request, f'Mise a jour impossible: {exc}')
+    return render(request, 'superadmin/programme_sections/form.html', {
+        'page_title': 'Modifier section',
+        'active_menu': 'formations',
         'section': section,
-        'tabs': ProgrammeTab.objects.select_related('programme').all(),
+        'tabs': tabs,
         'section_type_choices': ProgrammeSection.SECTION_TYPE_CHOICES,
-    }
-    return render(request, 'superadmin/programme_sections/form.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_section_delete(request, pk):
     if request.method == 'POST':
         section = get_object_or_404(ProgrammeSection, pk=pk)
-        title = section.title or 'Section'
         section.delete()
-        messages.success(request, f"Section '{title}' supprimée!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/programme-sections/'})
+        messages.success(request, 'Section supprimee.')
     return redirect('superadmin:programme_section_list')
 
 
-# ============================================
-# COMPETENCE BLOCKS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def competence_block_list(request):
-    blocks = CompetenceBlock.objects.select_related('programme').order_by('programme__title', 'order')
-    programme = request.GET.get('programme', '')
-
+    programme = request.GET.get('programme', '').strip()
+    qs = CompetenceBlock.objects.select_related('programme').order_by('programme__title', 'order', 'id')
     if programme:
-        blocks = blocks.filter(programme_id=programme)
-
-    paginator = Paginator(blocks, 20)
-    page = request.GET.get('page', 1)
-    blocks = paginator.get_page(page)
-
+        qs = qs.filter(programme_id=programme)
     context = {
-        'page_title': 'Blocs de Compétences',
-        'active_menu': 'competence_blocks',
-        'blocks': blocks,
-        'programmes': Programme.objects.all(),
+        'page_title': 'Blocs de competences',
+        'active_menu': 'formations',
+        'blocks': qs,
+        'programmes': Programme.objects.order_by('title'),
         'filters': {'programme': programme},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/competence_blocks/_block_table.html', context)
     return render(request, 'superadmin/competence_blocks/list.html', context)
@@ -4234,87 +4402,68 @@ def competence_block_list(request):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def competence_block_create(request):
     if request.method == 'POST':
-        programme_id = request.POST.get('programme')
-        title = request.POST.get('title')
-        if not programme_id or not title:
-            messages.error(request, "Programme et titre obligatoires.")
-            return redirect('superadmin:competence_block_create')
-
-        CompetenceBlock.objects.create(
-            programme_id=programme_id,
-            title=title,
-            description=request.POST.get('description', ''),
-            order=request.POST.get('order', 0),
-        )
-        messages.success(request, "Bloc de compétences créé!")
-        return redirect('superadmin:competence_block_list')
-
-    context = {
-        'page_title': 'Nouveau Bloc de Compétences',
-        'active_menu': 'competence_blocks',
-        'programmes': Programme.objects.all(),
-    }
-    return render(request, 'superadmin/competence_blocks/form.html', context)
+        try:
+            CompetenceBlock.objects.create(
+                programme_id=request.POST.get('programme') or None,
+                title=request.POST.get('title', '').strip(),
+                description=request.POST.get('description', '').strip(),
+                order=int(request.POST.get('order') or 0),
+            )
+            messages.success(request, 'Bloc de competences cree.')
+            return redirect('superadmin:competence_block_list')
+        except Exception as exc:
+            messages.error(request, f'Creation impossible: {exc}')
+    return render(request, 'superadmin/competence_blocks/form.html', {
+        'page_title': 'Nouveau bloc',
+        'active_menu': 'formations',
+        'programmes': Programme.objects.order_by('title'),
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def competence_block_edit(request, pk):
     block = get_object_or_404(CompetenceBlock, pk=pk)
-
     if request.method == 'POST':
-        block.programme_id = request.POST.get('programme', block.programme_id)
-        block.title = request.POST.get('title', block.title)
-        block.description = request.POST.get('description', block.description)
-        block.order = request.POST.get('order', block.order)
-        block.save()
-        messages.success(request, f"Bloc '{block.title}' mis à jour!")
-        return redirect('superadmin:competence_block_list')
-
-    context = {
-        'page_title': f'Modifier: {block.title}',
-        'active_menu': 'competence_blocks',
+        try:
+            block.programme_id = request.POST.get('programme') or block.programme_id
+            block.title = request.POST.get('title', block.title).strip() or block.title
+            block.description = request.POST.get('description', '').strip()
+            block.order = int(request.POST.get('order') or block.order)
+            block.save()
+            messages.success(request, 'Bloc mis a jour.')
+            return redirect('superadmin:competence_block_list')
+        except Exception as exc:
+            messages.error(request, f'Mise a jour impossible: {exc}')
+    return render(request, 'superadmin/competence_blocks/form.html', {
+        'page_title': 'Modifier bloc',
+        'active_menu': 'formations',
         'block': block,
-        'programmes': Programme.objects.all(),
-    }
-    return render(request, 'superadmin/competence_blocks/form.html', context)
+        'programmes': Programme.objects.order_by('title'),
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def competence_block_delete(request, pk):
     if request.method == 'POST':
         block = get_object_or_404(CompetenceBlock, pk=pk)
-        title = block.title
         block.delete()
-        messages.success(request, f"Bloc '{title}' supprimé!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/competence-blocks/'})
+        messages.success(request, 'Bloc supprime.')
     return redirect('superadmin:competence_block_list')
 
 
-# ============================================
-# COMPETENCE ITEMS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def competence_item_list(request):
-    items = CompetenceItem.objects.select_related('block__programme').order_by('block__programme__title', 'order')
-    programme = request.GET.get('programme', '')
-
+    programme = request.GET.get('programme', '').strip()
+    qs = CompetenceItem.objects.select_related('block', 'block__programme').order_by('block__programme__title', 'block__order', 'order', 'id')
     if programme:
-        items = items.filter(block__programme_id=programme)
-
-    paginator = Paginator(items, 20)
-    page = request.GET.get('page', 1)
-    items = paginator.get_page(page)
-
+        qs = qs.filter(block__programme_id=programme)
     context = {
-        'page_title': 'Items de Compétences',
-        'active_menu': 'competence_items',
-        'items': items,
-        'programmes': Programme.objects.all(),
+        'page_title': 'Items de competences',
+        'active_menu': 'formations',
+        'items': qs,
+        'programmes': Programme.objects.order_by('title'),
         'filters': {'programme': programme},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/competence_items/_item_table.html', context)
     return render(request, 'superadmin/competence_items/list.html', context)
@@ -4322,165 +4471,129 @@ def competence_item_list(request):
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def competence_item_create(request):
+    blocks = CompetenceBlock.objects.select_related('programme').order_by('programme__title', 'order')
     if request.method == 'POST':
-        block_id = request.POST.get('block')
-        title = request.POST.get('title')
-        if not block_id or not title:
-            messages.error(request, "Bloc et titre obligatoires.")
-            return redirect('superadmin:competence_item_create')
-
-        CompetenceItem.objects.create(
-            block_id=block_id,
-            title=title,
-            description=request.POST.get('description', ''),
-            order=request.POST.get('order', 0),
-        )
-        messages.success(request, "Item de compétence créé!")
-        return redirect('superadmin:competence_item_list')
-
-    context = {
-        'page_title': 'Nouvel Item de Compétence',
-        'active_menu': 'competence_items',
-        'blocks': CompetenceBlock.objects.select_related('programme').all(),
-    }
-    return render(request, 'superadmin/competence_items/form.html', context)
+        try:
+            CompetenceItem.objects.create(
+                block_id=request.POST.get('block') or None,
+                title=request.POST.get('title', '').strip(),
+                description=request.POST.get('description', '').strip(),
+                order=int(request.POST.get('order') or 0),
+            )
+            messages.success(request, 'Item de competences cree.')
+            return redirect('superadmin:competence_item_list')
+        except Exception as exc:
+            messages.error(request, f'Creation impossible: {exc}')
+    return render(request, 'superadmin/competence_items/form.html', {
+        'page_title': 'Nouvel item',
+        'active_menu': 'formations',
+        'blocks': blocks,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def competence_item_edit(request, pk):
     item = get_object_or_404(CompetenceItem, pk=pk)
-
+    blocks = CompetenceBlock.objects.select_related('programme').order_by('programme__title', 'order')
     if request.method == 'POST':
-        item.block_id = request.POST.get('block', item.block_id)
-        item.title = request.POST.get('title', item.title)
-        item.description = request.POST.get('description', item.description)
-        item.order = request.POST.get('order', item.order)
-        item.save()
-        messages.success(request, f"Item '{item.title}' mis à jour!")
-        return redirect('superadmin:competence_item_list')
-
-    context = {
-        'page_title': f'Modifier: {item.title}',
-        'active_menu': 'competence_items',
+        try:
+            item.block_id = request.POST.get('block') or item.block_id
+            item.title = request.POST.get('title', item.title).strip() or item.title
+            item.description = request.POST.get('description', '').strip()
+            item.order = int(request.POST.get('order') or item.order)
+            item.save()
+            messages.success(request, 'Item mis a jour.')
+            return redirect('superadmin:competence_item_list')
+        except Exception as exc:
+            messages.error(request, f'Mise a jour impossible: {exc}')
+    return render(request, 'superadmin/competence_items/form.html', {
+        'page_title': 'Modifier item',
+        'active_menu': 'formations',
         'item': item,
-        'blocks': CompetenceBlock.objects.select_related('programme').all(),
-    }
-    return render(request, 'superadmin/competence_items/form.html', context)
+        'blocks': blocks,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def competence_item_delete(request, pk):
     if request.method == 'POST':
         item = get_object_or_404(CompetenceItem, pk=pk)
-        title = item.title
         item.delete()
-        messages.success(request, f"Item '{title}' supprimé!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/competence-items/'})
+        messages.success(request, 'Item supprime.')
     return redirect('superadmin:competence_item_list')
 
 
-# ============================================
-# REQUIRED DOCUMENTS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def required_document_list(request):
-    documents = RequiredDocument.objects.all().order_by('name')
-    paginator = Paginator(documents, 20)
-    page = request.GET.get('page', 1)
-    documents = paginator.get_page(page)
-
-    context = {
-        'page_title': 'Documents Requis',
-        'active_menu': 'required_documents',
+    documents = RequiredDocument.objects.order_by('name')
+    return render(request, 'superadmin/required_documents/list.html', {
+        'page_title': 'Documents requis',
+        'active_menu': 'formations',
         'documents': documents,
-    }
-
-    if request.headers.get('HX-Request'):
-        return render(request, 'superadmin/required_documents/_document_table.html', context)
-    return render(request, 'superadmin/required_documents/list.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def required_document_create(request):
     if request.method == 'POST':
-        name = request.POST.get('name')
-        if not name:
-            messages.error(request, "Nom obligatoire.")
-            return redirect('superadmin:required_document_create')
-
-        RequiredDocument.objects.create(
-            name=name,
-            description=request.POST.get('description', ''),
-            is_mandatory=request.POST.get('is_mandatory') == 'on',
-        )
-        messages.success(request, "Document requis créé!")
-        return redirect('superadmin:required_document_list')
-
-    context = {
-        'page_title': 'Nouveau Document Requis',
-        'active_menu': 'required_documents',
-    }
-    return render(request, 'superadmin/required_documents/form.html', context)
+        try:
+            RequiredDocument.objects.create(
+                name=request.POST.get('name', '').strip(),
+                description=request.POST.get('description', '').strip(),
+                is_mandatory=request.POST.get('is_mandatory') == 'on',
+            )
+            messages.success(request, 'Document requis cree.')
+            return redirect('superadmin:required_document_list')
+        except Exception as exc:
+            messages.error(request, f'Creation impossible: {exc}')
+    return render(request, 'superadmin/required_documents/form.html', {
+        'page_title': 'Nouveau document requis',
+        'active_menu': 'formations',
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def required_document_edit(request, pk):
     document = get_object_or_404(RequiredDocument, pk=pk)
-
     if request.method == 'POST':
-        document.name = request.POST.get('name', document.name)
-        document.description = request.POST.get('description', document.description)
-        document.is_mandatory = request.POST.get('is_mandatory') == 'on'
-        document.save()
-        messages.success(request, f"Document '{document.name}' mis à jour!")
-        return redirect('superadmin:required_document_list')
-
-    context = {
-        'page_title': f'Modifier: {document.name}',
-        'active_menu': 'required_documents',
+        try:
+            document.name = request.POST.get('name', document.name).strip() or document.name
+            document.description = request.POST.get('description', '').strip()
+            document.is_mandatory = request.POST.get('is_mandatory') == 'on'
+            document.save()
+            messages.success(request, 'Document requis mis a jour.')
+            return redirect('superadmin:required_document_list')
+        except Exception as exc:
+            messages.error(request, f'Mise a jour impossible: {exc}')
+    return render(request, 'superadmin/required_documents/form.html', {
+        'page_title': 'Modifier document requis',
+        'active_menu': 'formations',
         'document': document,
-    }
-    return render(request, 'superadmin/required_documents/form.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def required_document_delete(request, pk):
     if request.method == 'POST':
         document = get_object_or_404(RequiredDocument, pk=pk)
-        name = document.name
         document.delete()
-        messages.success(request, f"Document '{name}' supprimé!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/required-documents/'})
+        messages.success(request, 'Document requis supprime.')
     return redirect('superadmin:required_document_list')
 
 
-# ============================================
-# PROGRAMME REQUIRED DOCUMENTS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_required_document_list(request):
-    programme_documents = ProgrammeRequiredDocument.objects.select_related('programme', 'document').order_by('programme__title', 'document__name')
-    programme = request.GET.get('programme', '')
-
+    programme = request.GET.get('programme', '').strip()
+    qs = ProgrammeRequiredDocument.objects.select_related('programme', 'document').order_by('programme__title', 'document__name')
     if programme:
-        programme_documents = programme_documents.filter(programme_id=programme)
-
-    paginator = Paginator(programme_documents, 20)
-    page = request.GET.get('page', 1)
-    programme_documents = paginator.get_page(page)
-
+        qs = qs.filter(programme_id=programme)
     context = {
-        'page_title': 'Documents Requis par Programme',
-        'active_menu': 'programme_required_documents',
-        'programme_documents': programme_documents,
-        'programmes': Programme.objects.all(),
+        'page_title': 'Documents par programme',
+        'active_menu': 'formations',
+        'programme_documents': qs,
+        'programmes': Programme.objects.order_by('title'),
         'filters': {'programme': programme},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/programme_required_documents/_programme_document_table.html', context)
     return render(request, 'superadmin/programme_required_documents/list.html', context)
@@ -4489,90 +4602,95 @@ def programme_required_document_list(request):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_required_document_create(request):
     if request.method == 'POST':
-        programme_id = request.POST.get('programme')
-        document_id = request.POST.get('document')
-        if not programme_id or not document_id:
-            messages.error(request, "Programme et document obligatoires.")
-            return redirect('superadmin:programme_required_document_create')
-
-        ProgrammeRequiredDocument.objects.create(
-            programme_id=programme_id,
-            document_id=document_id,
-        )
-        messages.success(request, "Association créée!")
-        return redirect('superadmin:programme_required_document_list')
-
-    context = {
-        'page_title': 'Nouvelle Association Document-Programme',
-        'active_menu': 'programme_required_documents',
-        'programmes': Programme.objects.all(),
-        'documents': RequiredDocument.objects.all(),
-    }
-    return render(request, 'superadmin/programme_required_documents/form.html', context)
+        try:
+            ProgrammeRequiredDocument.objects.create(
+                programme_id=request.POST.get('programme') or None,
+                document_id=request.POST.get('document') or None,
+            )
+            messages.success(request, 'Association creee.')
+            return redirect('superadmin:programme_required_document_list')
+        except Exception as exc:
+            messages.error(request, f'Creation impossible: {exc}')
+    return render(request, 'superadmin/programme_required_documents/form.html', {
+        'page_title': 'Nouvelle association',
+        'active_menu': 'formations',
+        'programmes': Programme.objects.order_by('title'),
+        'documents': RequiredDocument.objects.order_by('name'),
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def programme_required_document_delete(request, pk):
     if request.method == 'POST':
-        programme_document = get_object_or_404(ProgrammeRequiredDocument, pk=pk)
-        name = f"{programme_document.programme.title} - {programme_document.document.name}"
-        programme_document.delete()
-        messages.success(request, f"Association '{name}' supprimée!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/programme-required-documents/'})
+        obj = get_object_or_404(ProgrammeRequiredDocument, pk=pk)
+        obj.delete()
+        messages.success(request, 'Association supprimee.')
     return redirect('superadmin:programme_required_document_list')
 
-
-# ============================================
-# COMMUNITY CATEGORIES
-# ============================================
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_category_list(request):
     categories = CommunityCategory.objects.annotate(
-        topics_count=Count('topics', filter=Q(topics__is_deleted=False, topics__is_published=True)),
-        subscribers_count=Count('subscribers')
-    ).order_by('name')
-    return render(request, 'superadmin/community/categories/list.html', {'page_title': 'Catégories Communauté', 'categories': categories, 'active_menu': 'community'})
+        topics_count=Count('topics', distinct=True),
+        subscribers_count=Count('subscribers', distinct=True),
+    ).order_by('order', 'name')
+    return render(request, 'superadmin/community/categories/list.html', {
+        'page_title': 'Categories Communaute',
+        'active_menu': 'community',
+        'categories': categories,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_category_create(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
-        if name:
+        if not name:
+            messages.error(request, 'Le nom est obligatoire.')
+        else:
             CommunityCategory.objects.create(
                 name=name,
-                description=request.POST.get('description', ''),
-                is_active=request.POST.get('is_active') == 'on'
+                description=request.POST.get('description', '').strip(),
+                is_active=request.POST.get('is_active') == 'on',
             )
-            messages.success(request, f"Catégorie '{name}' créée!")
+            messages.success(request, 'Categorie creee.')
             return redirect('superadmin:community_category_list')
-        messages.error(request, "Le nom est obligatoire.")
-    return render(request, 'superadmin/community/categories/form.html', {'page_title': 'Nouvelle Catégorie', 'active_menu': 'community'})
+    return render(request, 'superadmin/community/categories/form.html', {
+        'page_title': 'Nouvelle categorie communaute',
+        'active_menu': 'community',
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_category_edit(request, pk):
     category = get_object_or_404(CommunityCategory, pk=pk)
     if request.method == 'POST':
-        category.name = request.POST.get('name', category.name).strip()
-        category.description = request.POST.get('description', '')
+        category.name = request.POST.get('name', category.name).strip() or category.name
+        category.description = request.POST.get('description', '').strip()
         category.is_active = request.POST.get('is_active') == 'on'
         category.save()
-        messages.success(request, f"Catégorie '{category.name}' mise à jour!")
+        messages.success(request, 'Categorie mise a jour.')
         return redirect('superadmin:community_category_list')
-    return render(request, 'superadmin/community/categories/form.html', {'page_title': f'Modifier: {category.name}', 'category': category, 'active_menu': 'community'})
+    return render(request, 'superadmin/community/categories/form.html', {
+        'page_title': 'Modifier categorie communaute',
+        'active_menu': 'community',
+        'category': category,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_category_delete(request, pk):
     if request.method == 'POST':
         category = get_object_or_404(CommunityCategory, pk=pk)
-        category.delete()
-        messages.success(request, "Catégorie supprimée!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/community/categories/'})
+        response = _safe_delete(
+            request,
+            category,
+            success_message='Categorie supprimee.',
+            protected_message='Suppression impossible: categorie encore utilisee.',
+            hx_redirect='/superadmin/community/categories/',
+        )
+        if response:
+            return response
     return redirect('superadmin:community_category_list')
 
 
@@ -4580,46 +4698,35 @@ def community_category_delete(request, pk):
 def toggle_community_category(request, pk):
     category = get_object_or_404(CommunityCategory, pk=pk)
     category.is_active = not category.is_active
-    category.save()
-    status = "activée" if category.is_active else "désactivée"
-    if request.headers.get('HX-Request'):
-        return HttpResponse(f'<span class="badge">{"Actif" if category.is_active else "Inactif"}</span>', headers={'HX-Trigger': '{"showToast": "Statut mis à jour"}'})
-    messages.success(request, f"Catégorie {status}!")
+    category.save(update_fields=['is_active'])
+    messages.success(request, 'Statut categorie mis a jour.')
     return redirect('superadmin:community_category_list')
 
 
-# ============================================
-# COMMUNITY TOPICS
-# ============================================
-
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_topic_list(request):
-    topics = Topic.objects.select_related('author', 'category').prefetch_related('answers').order_by('-last_activity_at')
-    search = request.GET.get('search', '')
-    category = request.GET.get('category', '')
-    status = request.GET.get('status', '')
+    search = request.GET.get('search', '').strip()
+    category = request.GET.get('category', '').strip()
+    status = request.GET.get('status', '').strip()
 
+    qs = Topic.objects.select_related('author', 'category', 'accepted_answer').order_by('-last_activity_at')
     if search:
-        topics = topics.filter(Q(title__icontains=search) | Q(content__icontains=search))
+        qs = qs.filter(Q(title__icontains=search) | Q(content__icontains=search))
     if category:
-        topics = topics.filter(category_id=category)
+        qs = qs.filter(category_id=category)
     if status == 'published':
-        topics = topics.filter(is_published=True, is_deleted=False)
+        qs = qs.filter(is_published=True, is_deleted=False)
     elif status == 'deleted':
-        topics = topics.filter(is_deleted=True)
+        qs = qs.filter(is_deleted=True)
 
-    paginator = Paginator(topics, 20)
-    page = request.GET.get('page', 1)
-    topics = paginator.get_page(page)
-
+    topics = Paginator(qs, 20).get_page(request.GET.get('page', 1))
     context = {
-        'page_title': 'Sujets Communauté',
-        'topics': topics,
-        'categories': CommunityCategory.objects.all(),
-        'filters': {'search': search, 'category': category, 'status': status},
+        'page_title': 'Sujets Communaute',
         'active_menu': 'community',
+        'topics': topics,
+        'categories': CommunityCategory.objects.order_by('name'),
+        'filters': {'search': search, 'category': category, 'status': status},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/community/topics/_topic_table.html', context)
     return render(request, 'superadmin/community/topics/list.html', context)
@@ -4628,33 +4735,32 @@ def community_topic_list(request):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_topic_detail(request, pk):
     topic = get_object_or_404(Topic.objects.select_related('author', 'category', 'accepted_answer'), pk=pk)
-    answers = Answer.objects.filter(topic=topic, is_deleted=False).select_related('author').order_by('created_at')
-    context = {
+    answers = topic.answers.select_related('author').order_by('-upvotes', 'created_at')[:8]
+    return render(request, 'superadmin/community/topics/detail.html', {
         'page_title': topic.title,
+        'active_menu': 'community',
         'topic': topic,
         'answers': answers,
-        'active_menu': 'community',
-    }
-    return render(request, 'superadmin/community/topics/detail.html', context)
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_topic_edit(request, pk):
     topic = get_object_or_404(Topic, pk=pk)
     if request.method == 'POST':
-        topic.title = request.POST.get('title', topic.title)
-        topic.category_id = request.POST.get('category', topic.category_id)
+        topic.title = request.POST.get('title', topic.title).strip() or topic.title
+        topic.category_id = request.POST.get('category') or topic.category_id
         topic.is_published = request.POST.get('is_published') == 'on'
         topic.is_locked = request.POST.get('is_locked') == 'on'
         topic.is_pinned = request.POST.get('is_pinned') == 'on'
         topic.save()
-        messages.success(request, f"Sujet '{topic.title}' mis à jour!")
-        return redirect('superadmin:community_topic_list')
+        messages.success(request, 'Sujet mis a jour.')
+        return redirect('superadmin:community_topic_detail', pk=topic.pk)
     return render(request, 'superadmin/community/topics/form.html', {
-        'page_title': f'Modifier: {topic.title}',
-        'topic': topic,
-        'categories': CommunityCategory.objects.all(),
+        'page_title': 'Modifier sujet',
         'active_menu': 'community',
+        'topic': topic,
+        'categories': CommunityCategory.objects.order_by('name'),
     })
 
 
@@ -4662,72 +4768,53 @@ def community_topic_edit(request, pk):
 def community_topic_delete(request, pk):
     if request.method == 'POST':
         topic = get_object_or_404(Topic, pk=pk)
-        title = topic.title
-        topic.soft_delete()
-        messages.success(request, f"Sujet '{title}' supprimé!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/community/topics/'})
+        topic.is_deleted = True
+        topic.is_published = False
+        topic.save(update_fields=['is_deleted', 'is_published'])
+        messages.success(request, 'Sujet masque (suppression logique).')
     return redirect('superadmin:community_topic_list')
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def toggle_community_topic(request, pk):
     topic = get_object_or_404(Topic, pk=pk)
-    action = request.GET.get('action', 'publish')
-    status = None
+    action = request.GET.get('action', '').strip()
     if action == 'publish':
         topic.is_published = not topic.is_published
-        topic.save(update_fields=['is_published'])
-        status = "publié" if topic.is_published else "dépublié"
-    elif action == 'delete':
-        topic.is_deleted = not topic.is_deleted
-        if topic.is_deleted:
-            topic.is_published = False
-            topic.save(update_fields=['is_deleted', 'is_published'])
-        else:
-            topic.save(update_fields=['is_deleted'])
-        status = "supprimée" if topic.is_deleted else "restaurée"
+        if topic.is_published:
+            topic.is_deleted = False
+        topic.save(update_fields=['is_published', 'is_deleted'])
+        messages.success(request, 'Etat de publication mis a jour.')
     elif action == 'lock':
         topic.is_locked = not topic.is_locked
         topic.save(update_fields=['is_locked'])
-        status = "verrouillée" if topic.is_locked else "déverrouillée"
+        messages.success(request, 'Verrouillage du sujet mis a jour.')
     else:
-        messages.error(request, "Action communauté invalide.")
-        return redirect('superadmin:community_topic_list')
+        topic.is_pinned = not topic.is_pinned
+        topic.save(update_fields=['is_pinned'])
+        messages.success(request, 'Epinglage du sujet mis a jour.')
+    return _redirect_back(request, default='superadmin:community_topic_list')
 
-    if request.headers.get('HX-Request'):
-        return HttpResponse(f'<span class="badge">{status}</span>', headers={'HX-Trigger': f'{{"showToast": "Sujet {status}"}}'})
-    messages.success(request, f"Sujet {status}!")
-    return redirect('superadmin:community_topic_list')
-
-
-# ============================================
-# COMMUNITY ANSWERS
-# ============================================
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_answer_list(request):
-    answers = Answer.objects.select_related('author', 'topic').order_by('-created_at')
-    search = request.GET.get('search', '')
-    topic = request.GET.get('topic', '')
+    search = request.GET.get('search', '').strip()
+    topic_id = request.GET.get('topic', '').strip()
 
+    qs = Answer.objects.select_related('author', 'topic', 'topic__accepted_answer').order_by('-created_at')
     if search:
-        answers = answers.filter(content__icontains=search)
-    if topic:
-        answers = answers.filter(topic_id=topic)
+        qs = qs.filter(content__icontains=search)
+    if topic_id:
+        qs = qs.filter(topic_id=topic_id)
 
-    paginator = Paginator(answers, 20)
-    page = request.GET.get('page', 1)
-    answers = paginator.get_page(page)
-
+    answers = Paginator(qs, 20).get_page(request.GET.get('page', 1))
     context = {
-        'page_title': 'Réponses Communauté',
-        'answers': answers,
-        'topics': Topic.objects.all(),
-        'filters': {'search': search, 'topic': topic},
+        'page_title': 'Reponses Communaute',
         'active_menu': 'community',
+        'answers': answers,
+        'topics': Topic.objects.order_by('-last_activity_at')[:200],
+        'filters': {'search': search, 'topic': topic_id},
     }
-
     if request.headers.get('HX-Request'):
         return render(request, 'superadmin/community/answers/_answer_table.html', context)
     return render(request, 'superadmin/community/answers/list.html', context)
@@ -4735,8 +4822,12 @@ def community_answer_list(request):
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def community_answer_detail(request, pk):
-    answer = get_object_or_404(Answer.objects.select_related('author', 'topic'), pk=pk)
-    return render(request, 'superadmin/community/answers/detail.html', {'page_title': f'Réponse #{answer.pk}', 'answer': answer, 'active_menu': 'community'})
+    answer = get_object_or_404(Answer.objects.select_related('author', 'topic', 'topic__category'), pk=pk)
+    return render(request, 'superadmin/community/answers/detail.html', {
+        'page_title': f'Reponse #{answer.pk}',
+        'active_menu': 'community',
+        'answer': answer,
+    })
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -4744,13 +4835,13 @@ def community_answer_edit(request, pk):
     answer = get_object_or_404(Answer, pk=pk)
     if request.method == 'POST':
         answer.content = request.POST.get('content', answer.content)
-        answer.save()
-        messages.success(request, f"Réponse #{answer.pk} mise à jour!")
-        return redirect('superadmin:community_answer_list')
+        answer.save(update_fields=['content'])
+        messages.success(request, 'Reponse mise a jour.')
+        return redirect('superadmin:community_answer_detail', pk=answer.pk)
     return render(request, 'superadmin/community/answers/form.html', {
-        'page_title': f'Modifier Réponse #{answer.pk}',
-        'answer': answer,
+        'page_title': 'Modifier reponse',
         'active_menu': 'community',
+        'answer': answer,
     })
 
 
@@ -4758,34 +4849,25 @@ def community_answer_edit(request, pk):
 def community_answer_delete(request, pk):
     if request.method == 'POST':
         answer = get_object_or_404(Answer, pk=pk)
-        answer_id = answer.pk
         answer.is_deleted = True
-        answer.save()
-        messages.success(request, f"Réponse #{answer_id} supprimée!")
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=200, headers={'HX-Redirect': '/superadmin/community/answers/'})
-    return redirect('superadmin:community_answer_list')
+        answer.save(update_fields=['is_deleted'])
+        messages.success(request, 'Reponse masquee.')
+    return _redirect_back(request, default='superadmin:community_answer_list')
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def toggle_community_answer(request, pk):
-    answer = get_object_or_404(Answer, pk=pk)
-    action = request.GET.get('action', 'accept')
-    status = None
+    answer = get_object_or_404(Answer.objects.select_related('topic'), pk=pk)
+    action = request.GET.get('action', '').strip()
     if action == 'accept':
-        answer.topic.accepted_answer = answer
-        answer.topic.save()
-        status = "acceptée"
-    elif action == 'delete':
-        answer.is_deleted = not answer.is_deleted
-        status = "supprimée" if answer.is_deleted else "restaurée"
-        answer.save()
+        topic = answer.topic
+        topic.accepted_answer = answer if topic.accepted_answer_id != answer.pk else None
+        topic.save(update_fields=['accepted_answer'])
+        messages.success(request, 'Reponse acceptee mise a jour.')
     else:
-        messages.error(request, "Action communauté invalide.")
-        return redirect('superadmin:community_answer_list')
+        answer.is_deleted = not answer.is_deleted
+        answer.save(update_fields=['is_deleted'])
+        messages.success(request, 'Statut de reponse mis a jour.')
+    return _redirect_back(request, default='superadmin:community_answer_list')
 
-    if request.headers.get('HX-Request'):
-        return HttpResponse(f'<span class="badge">{status}</span>', headers={'HX-Trigger': f'{{"showToast": "Réponse {status}"}}'})
-    messages.success(request, f"Réponse {status}!")
-    return redirect('superadmin:community_answer_list')
 

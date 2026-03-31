@@ -1,121 +1,69 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- ================= HERO ================= -->
-<section class="relative pt-24 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
-    <div class="max-w-4xl mx-auto px-4">
+<section class="pt-24 pb-10 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6">
+    <a href="{% url 'community:topic_list' %}" class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition mb-6">
+      <i class="fa-solid fa-arrow-left"></i>
+      Retour a la communaute
+    </a>
 
-        <!-- Bouton retour -->
-        <a href="{% url 'community:topic_list' %}"
-           class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition group mb-8">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Retour à la communauté
-        </a>
-
-        <h1 class="text-3xl font-bold">Créer un compte</h1>
-        <p class="text-primary-100 mt-2 text-sm">
-            Rejoignez l'espace communautaire et participez aux échanges académiques.
-        </p>
-
+    <div class="rounded-2xl border border-white/20 bg-white/10 backdrop-blur p-6 md:p-8">
+      <p class="text-xs uppercase tracking-widest text-primary-200">Onboarding ESFE</p>
+      <h1 class="text-3xl font-bold mt-2">Creer un compte</h1>
+      <p class="text-primary-100 mt-2 text-sm max-w-2xl">Rejoignez l'espace communautaire et commencez a contribuer aux echanges academiques.</p>
     </div>
+  </div>
 </section>
 
+<section class="bg-soft pb-16">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 -mt-4">
+    <div class="grid lg:grid-cols-5 gap-6">
+      <aside class="lg:col-span-2 bg-white rounded-2xl border border-primary-100 shadow-sm p-6">
+        <h2 class="font-semibold text-primary-700 mb-3">Pourquoi creer un compte ?</h2>
+        <ul class="space-y-2 text-sm text-gray-600">
+          <li><i class="fa-solid fa-check text-secondary mr-2"></i>Suivre vos discussions et notifications</li>
+          <li><i class="fa-solid fa-check text-secondary mr-2"></i>Publier des sujets et repondre</li>
+          <li><i class="fa-solid fa-check text-secondary mr-2"></i>Construire votre reputation academique</li>
+        </ul>
+      </aside>
 
-<!-- ================= FORMULAIRE ================= -->
-<section class="bg-gray-50 py-16">
-    <div class="max-w-md mx-auto px-4">
+      <div class="lg:col-span-3 bg-white rounded-2xl border border-primary-100 shadow-xl p-6 md:p-8">
+        <form method="post" class="space-y-5">
+          {% csrf_token %}
 
-        <div class="bg-white shadow-xl rounded-2xl p-10 border border-gray-100">
+          {% if form.non_field_errors %}
+          <div class="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-sm">{{ form.non_field_errors }}</div>
+          {% endif %}
 
-            <!-- Logo institution (optionnel) -->
-            <div class="flex justify-center mb-8">
-                <div class="w-16 h-16 bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl flex items-center justify-center shadow-lg">
-                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
-                    </svg>
-                </div>
-            </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Nom d'utilisateur</label>
+            {{ form.username }}
+            {% if form.username.errors %}<p class="text-red-500 text-sm mt-1">{{ form.username.errors.0 }}</p>{% endif %}
+          </div>
 
-            <form method="post" class="space-y-6">
-                {% csrf_token %}
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
+            {{ form.password1 }}
+            {% if form.password1.errors %}<p class="text-red-500 text-sm mt-1">{{ form.password1.errors.0 }}</p>{% endif %}
+          </div>
 
-                {% if form.non_field_errors %}
-                <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-sm flex items-center gap-2">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                    </svg>
-                    {{ form.non_field_errors }}
-                </div>
-                {% endif %}
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Confirmation du mot de passe</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}<p class="text-red-500 text-sm mt-1">{{ form.password2.errors.0 }}</p>{% endif %}
+          </div>
 
-                <!-- Username -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Nom d'utilisateur
-                    </label>
-                    {{ form.username }}
-                    {% if form.username.errors %}
-                    <p class="text-red-500 text-sm mt-1">{{ form.username.errors.0 }}</p>
-                    {% endif %}
-                </div>
+          <button type="submit" class="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3 rounded-xl font-semibold hover:opacity-95 transition shadow-lg">Creer mon compte</button>
+        </form>
 
-                <!-- Password -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Mot de passe
-                    </label>
-                    {{ form.password1 }}
-                    {% if form.password1.errors %}
-                    <p class="text-red-500 text-sm mt-1">{{ form.password1.errors.0 }}</p>
-                    {% endif %}
-                </div>
-
-                <!-- Confirmation -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Confirmation du mot de passe
-                    </label>
-                    {{ form.password2 }}
-                    {% if form.password2.errors %}
-                    <p class="text-red-500 text-sm mt-1">{{ form.password2.errors.0 }}</p>
-                    {% endif %}
-                </div>
-
-                <!-- Submit -->
-                <button type="submit"
-                        class="w-full bg-gradient-to-r from-accent to-accent-dark text-white py-3.5 rounded-xl font-semibold transition shadow-lg hover:shadow-xl hover:scale-[1.02] transform">
-                    Créer mon compte
-                </button>
-
-            </form>
-
-            <!-- Divider -->
-            <div class="relative my-8">
-                <div class="absolute inset-0 flex items-center">
-                    <div class="w-full border-t border-gray-200"></div>
-                </div>
-                <div class="relative flex justify-center text-sm">
-                    <span class="px-4 bg-white text-gray-500">ou</span>
-                </div>
-            </div>
-
-            <!-- Lien connexion - URL CORRIGÉE -->
-            <div class="text-center">
-                <p class="text-sm text-gray-500">
-                    Déjà un compte ?
-                    <a href="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}"
-                       class="text-primary-600 hover:text-primary-700 font-semibold">
-                        Se connecter
-                    </a>
-                </p>
-            </div>
-
+        <div class="mt-6 pt-5 border-t border-gray-100 text-center text-sm text-gray-500">
+          Deja un compte ?
+          <a href="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}" class="text-primary-700 font-semibold hover:underline">Se connecter</a>
         </div>
-
+      </div>
     </div>
+  </div>
 </section>
 
 {% endblock %}

@@ -1,294 +1,89 @@
 {% extends "base.html" %}
-{% load static %}
-{% load custom_filters %}
 
 {% block content %}
+<section class="pt-24 pb-10 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6">
+    <a href="{% url 'community:topic_list' %}" class="inline-flex items-center gap-2 text-primary-100 hover:text-white text-sm mb-6 transition">
+      <i class="fa-solid fa-arrow-left"></i>
+      Retour a la communaute
+    </a>
 
-<!-- ================= HERO SECTION ================= -->
-<section class="relative pt-28 pb-20 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
-    <div class="relative max-w-6xl mx-auto px-6">
+    <div class="rounded-2xl border border-white/20 bg-white/10 backdrop-blur p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">
+      <div class="relative">
+        {% if user_obj.profile.avatar %}
+          <img src="{{ user_obj.profile.avatar.url }}" alt="Avatar" class="w-28 h-28 rounded-2xl object-cover border-4 border-white/80 shadow-xl">
+        {% else %}
+          <div class="w-28 h-28 rounded-2xl bg-white text-primary-700 flex items-center justify-center text-3xl font-bold border-4 border-white/80 shadow-xl">
+            {{ user_obj.username|first|upper }}
+          </div>
+        {% endif %}
+        <a href="{% url 'accounts:edit_profile' %}" class="absolute -bottom-2 -right-2 w-9 h-9 rounded-full bg-white text-primary-700 flex items-center justify-center shadow hover:bg-primary-50 transition" title="Modifier l'avatar">
+          <i class="fa-solid fa-camera"></i>
+        </a>
+      </div>
 
-        <!-- Bouton retour -->
-        <div class="mb-8">
-            <a href="{% url 'community:topic_list' %}"
-               class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
-                <i class="fa-solid fa-arrow-left"></i>
-                Retour à la communauté
-            </a>
+      <div class="flex-1">
+        <h1 class="text-2xl md:text-3xl font-bold">{{ user_obj.get_full_name|default:user_obj.username }}</h1>
+        <p class="text-primary-100 text-sm mt-1">@{{ user_obj.username }}</p>
+        {% if user_obj.profile.bio %}
+          <p class="mt-3 text-primary-100 leading-relaxed max-w-3xl">{{ user_obj.profile.bio }}</p>
+        {% endif %}
+        <div class="mt-4 flex flex-wrap gap-3 text-xs">
+          <span class="px-3 py-1 rounded-full bg-white/15 border border-white/20">Membre depuis {{ user_obj.date_joined|date:"d M Y" }}</span>
+          {% if user_obj.profile.location %}<span class="px-3 py-1 rounded-full bg-white/15 border border-white/20">{{ user_obj.profile.location }}</span>{% endif %}
+          {% if user_obj.profile.main_domain %}<span class="px-3 py-1 rounded-full bg-white/15 border border-white/20">{{ user_obj.profile.main_domain }}</span>{% endif %}
         </div>
+      </div>
 
-        <!-- Profil header -->
-        <div class="flex flex-col md:flex-row items-center md:items-start gap-8">
-
-            <!-- Avatar -->
-            <div class="relative">
-                {% if user_obj.profile.avatar %}
-                <img src="{{ user_obj.profile.avatar.url }}"
-                     class="w-32 h-32 rounded-full object-cover border-4 border-white shadow-xl">
-                {% else %}
-                <div class="w-32 h-32 rounded-full bg-white text-primary-700 flex items-center justify-center text-4xl font-bold border-4 border-white shadow-xl">
-                    {{ user_obj.username|first|upper }}
-                </div>
-                {% endif %}
-
-                <!-- Bouton changer avatar -->
-                <a href="{% url 'accounts:edit_profile' %}"
-                   class="absolute bottom-0 right-0 bg-white text-primary-600 p-2 rounded-full shadow-lg hover:bg-primary-50 transition"
-                   title="Changer l'avatar">
-                    <i class="fa-solid fa-camera"></i>
-                </a>
-            </div>
-
-            <!-- Infos utilisateur -->
-            <div class="flex-1 text-center md:text-left">
-                <h1 class="text-3xl font-bold mb-2">
-                    {{ user_obj.get_full_name|default:user_obj.username }}
-                </h1>
-
-                <p class="text-primary-100 text-sm mb-2">
-                    @{{ user_obj.username }}
-                </p>
-
-                {% if user_obj.profile.bio %}
-                    <p class="max-w-2xl text-primary-100 leading-relaxed mb-4">
-                        {{ user_obj.profile.bio }}
-                    </p>
-                {% endif %}
-
-                <!-- Méta infos -->
-                <div class="flex flex-wrap justify-center md:justify-start gap-4 text-sm text-primary-200">
-                    <span class="flex items-center gap-2">
-                        <i class="fa-solid fa-calendar"></i>
-                        Membre depuis {{ user_obj.date_joined|date:"d M Y" }}
-                    </span>
-
-                    {% if user_obj.profile.location %}
-                    <span class="flex items-center gap-2">
-                        <i class="fa-solid fa-location-dot"></i>
-                        {{ user_obj.profile.location }}
-                    </span>
-                    {% endif %}
-
-                    {% if user_obj.profile.main_domain %}
-                    <span class="flex items-center gap-2">
-                        <i class="fa-solid fa-stethoscope"></i>
-                        {{ user_obj.profile.main_domain }}
-                    </span>
-                    {% endif %}
-
-                    {% if user_obj.profile.website %}
-                    <span class="flex items-center gap-2">
-                        <i class="fa-solid fa-globe"></i>
-                        <a href="{{ user_obj.profile.website }}" target="_blank" class="hover:text-white">
-                            Site web
-                        </a>
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Réputation -->
-            <div class="text-center">
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
-                    <div class="text-4xl font-bold text-white">
-                        {{ profile.reputation|default:0 }}
-                    </div>
-                    <div class="text-primary-200 text-sm mt-1">
-                        <i class="fa-solid fa-star mr-1"></i>
-                        Réputation
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
+      <div class="text-center rounded-xl bg-white/10 border border-white/20 px-5 py-4 min-w-[150px]">
+        <p class="text-3xl font-extrabold">{{ profile.reputation|default:0 }}</p>
+        <p class="text-primary-100 text-xs uppercase tracking-wide">Reputation</p>
+      </div>
     </div>
+  </div>
 </section>
 
-
-<!-- ================= STATS CARDS ================= -->
-<section class="bg-soft -mt-8 relative z-10">
-    <div class="max-w-6xl mx-auto px-6">
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-
-            <!-- Sujets -->
-            <div class="bg-white rounded-xl shadow-sm border border-primary-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-2xl font-bold text-primary-700">
-                    {{ profile.total_topics|default:0 }}
-                </div>
-                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">
-                    <i class="fa-solid fa-file-lines mr-1"></i>
-                    Sujets
-                </div>
-            </div>
-
-            <!-- Réponses -->
-            <div class="bg-white rounded-xl shadow-sm border border-primary-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-2xl font-bold text-primary-700">
-                    {{ profile.total_answers|default:0 }}
-                </div>
-                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">
-                    <i class="fa-solid fa-comment-dots mr-1"></i>
-                    Réponses
-                </div>
-            </div>
-
-            <!-- Solutions -->
-            <div class="bg-white rounded-xl shadow-sm border border-primary-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-2xl font-bold text-green-600">
-                    {{ profile.total_accepted_answers|default:0 }}
-                </div>
-                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">
-                    <i class="fa-solid fa-check-circle mr-1"></i>
-                    Solutions
-                </div>
-            </div>
-
-            <!-- Upvotes -->
-            <div class="bg-white rounded-xl shadow-sm border border-primary-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-2xl font-bold text-blue-600">
-                    {{ profile.total_upvotes_received|default:0 }}
-                </div>
-                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">
-                    <i class="fa-solid fa-thumbs-up mr-1"></i>
-                    Upvotes
-                </div>
-            </div>
-
-            <!-- Vues -->
-            <div class="bg-white rounded-xl shadow-sm border border-primary-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-2xl font-bold text-purple-600">
-                    {{ profile.total_views_generated|default:0 }}
-                </div>
-                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">
-                    <i class="fa-solid fa-eye mr-1"></i>
-                    Vues
-                </div>
-            </div>
-
-        </div>
+<section class="bg-soft pb-8">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 -mt-6">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="bg-white rounded-xl border border-primary-100 p-4 text-center"><p class="text-2xl font-bold text-primary-700">{{ profile.total_topics|default:0 }}</p><p class="text-xs text-gray-500 uppercase">Sujets</p></div>
+      <div class="bg-white rounded-xl border border-primary-100 p-4 text-center"><p class="text-2xl font-bold text-primary-700">{{ profile.total_answers|default:0 }}</p><p class="text-xs text-gray-500 uppercase">Reponses</p></div>
+      <div class="bg-white rounded-xl border border-primary-100 p-4 text-center"><p class="text-2xl font-bold text-green-600">{{ profile.total_accepted_answers|default:0 }}</p><p class="text-xs text-gray-500 uppercase">Solutions</p></div>
+      <div class="bg-white rounded-xl border border-primary-100 p-4 text-center"><p class="text-2xl font-bold text-blue-600">{{ profile.total_upvotes_received|default:0 }}</p><p class="text-xs text-gray-500 uppercase">Upvotes</p></div>
+      <div class="bg-white rounded-xl border border-primary-100 p-4 text-center"><p class="text-2xl font-bold text-purple-600">{{ profile.total_views_generated|default:0 }}</p><p class="text-xs text-gray-500 uppercase">Vues</p></div>
     </div>
+
+    <div class="flex items-center justify-center gap-8 mt-5 text-sm">
+      <span class="font-semibold text-yellow-600"><i class="fa-solid fa-medal mr-1"></i>{{ profile.badge_gold|default:0 }}</span>
+      <span class="font-semibold text-gray-600"><i class="fa-solid fa-medal mr-1"></i>{{ profile.badge_silver|default:0 }}</span>
+      <span class="font-semibold text-amber-700"><i class="fa-solid fa-medal mr-1"></i>{{ profile.badge_bronze|default:0 }}</span>
+    </div>
+  </div>
 </section>
 
-
-<!-- ================= BADGES ================= -->
-<section class="bg-soft py-6">
-    <div class="max-w-6xl mx-auto px-6">
-        <div class="flex items-center justify-center gap-8">
-
-            <!-- Badge Or -->
-            <div class="flex items-center gap-2">
-                <span class="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center shadow">
-                    <i class="fa-solid fa-medal text-white"></i>
-                </span>
-                <span class="font-bold text-yellow-600">{{ profile.badge_gold|default:0 }}</span>
-            </div>
-
-            <!-- Badge Argent -->
-            <div class="flex items-center gap-2">
-                <span class="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shadow">
-                    <i class="fa-solid fa-medal text-white"></i>
-                </span>
-                <span class="font-bold text-gray-600">{{ profile.badge_silver|default:0 }}</span>
-            </div>
-
-            <!-- Badge Bronze -->
-            <div class="flex items-center gap-2">
-                <span class="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center shadow">
-                    <i class="fa-solid fa-medal text-white"></i>
-                </span>
-                <span class="font-bold text-amber-700">{{ profile.badge_bronze|default:0 }}</span>
-            </div>
-
+<section class="bg-soft pb-16" x-data="{ activeTab: 'activity' }">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6">
+    <div class="bg-white border border-primary-100 rounded-2xl shadow-sm overflow-hidden">
+      <div class="border-b border-primary-100 px-2 md:px-4 overflow-x-auto">
+        <div class="flex gap-1 min-w-max">
+          <button @click="activeTab='activity'" hx-get="{% url 'accounts:profile_activity' %}" hx-target="#profile-content" hx-swap="innerHTML" :class="activeTab==='activity' ? 'text-primary-700 border-primary-500 bg-primary-50' : 'text-gray-500 border-transparent'" class="px-4 py-3 text-sm font-medium border-b-2 transition">Activite</button>
+          <button @click="activeTab='topics'" hx-get="{% url 'accounts:profile_topics' %}" hx-target="#profile-content" hx-swap="innerHTML" :class="activeTab==='topics' ? 'text-primary-700 border-primary-500 bg-primary-50' : 'text-gray-500 border-transparent'" class="px-4 py-3 text-sm font-medium border-b-2 transition">Mes sujets</button>
+          <button @click="activeTab='answers'" hx-get="{% url 'accounts:profile_answers' %}" hx-target="#profile-content" hx-swap="innerHTML" :class="activeTab==='answers' ? 'text-primary-700 border-primary-500 bg-primary-50' : 'text-gray-500 border-transparent'" class="px-4 py-3 text-sm font-medium border-b-2 transition">Mes reponses</button>
+          <button @click="activeTab='badges'" hx-get="{% url 'accounts:profile_badges' %}" hx-target="#profile-content" hx-swap="innerHTML" :class="activeTab==='badges' ? 'text-primary-700 border-primary-500 bg-primary-50' : 'text-gray-500 border-transparent'" class="px-4 py-3 text-sm font-medium border-b-2 transition">Badges</button>
+          <button @click="activeTab='settings'" hx-get="{% url 'accounts:profile_settings' %}" hx-target="#profile-content" hx-swap="innerHTML" :class="activeTab==='settings' ? 'text-primary-700 border-primary-500 bg-primary-50' : 'text-gray-500 border-transparent'" class="px-4 py-3 text-sm font-medium border-b-2 transition">Parametres</button>
         </div>
-    </div>
-</section>
+      </div>
 
-
-<!-- ================= TABS NAVIGATION ================= -->
-<section class="bg-white border-b border-primary-100 sticky top-16 z-20">
-    <div class="max-w-6xl mx-auto px-6">
-        <div class="flex overflow-x-auto gap-1" x-data="{ activeTab: 'activity' }">
-
-            <!-- Activité -->
-            <button
-                @click="activeTab = 'activity'; document.getElementById('profile-content').setAttribute('hx-get', '{% url 'accounts:profile_activity' %}'); document.getElementById('profile-content').dispatchEvent(new Event('load'))"
-                :class="activeTab === 'activity' ? 'border-primary-500 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                class="profile-tab flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent hover:text-primary-600 transition whitespace-nowrap">
-                <i class="fa-solid fa-clock"></i>
-                Activité
-            </button>
-
-            <!-- Sujets -->
-            <button
-                @click="activeTab = 'topics'; document.getElementById('profile-content').setAttribute('hx-get', '{% url 'accounts:profile_topics' %}'); document.getElementById('profile-content').dispatchEvent(new Event('load'))"
-                :class="activeTab === 'topics' ? 'border-primary-500 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                class="profile-tab flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent hover:text-primary-600 transition whitespace-nowrap">
-                <i class="fa-solid fa-file-lines"></i>
-                Mes sujets
-            </button>
-
-            <!-- Réponses -->
-            <button
-                @click="activeTab = 'answers'; document.getElementById('profile-content').setAttribute('hx-get', '{% url 'accounts:profile_answers' %}'); document.getElementById('profile-content').dispatchEvent(new Event('load'))"
-                :class="activeTab === 'answers' ? 'border-primary-500 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                class="profile-tab flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent hover:text-primary-600 transition whitespace-nowrap">
-                <i class="fa-solid fa-comment-dots"></i>
-                Mes réponses
-            </button>
-
-            <!-- Badges -->
-            <button
-                @click="activeTab = 'badges'; document.getElementById('profile-content').setAttribute('hx-get', '{% url 'accounts:profile_badges' %}'); document.getElementById('profile-content').dispatchEvent(new Event('load'))"
-                :class="activeTab === 'badges' ? 'border-primary-500 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                class="profile-tab flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent hover:text-primary-600 transition whitespace-nowrap">
-                <i class="fa-solid fa-award"></i>
-                Badges
-            </button>
-
-            <!-- Paramètres -->
-            <button
-                @click="activeTab = 'settings'; document.getElementById('profile-content').setAttribute('hx-get', '{% url 'accounts:profile_settings' %}'); document.getElementById('profile-content').dispatchEvent(new Event('load'))"
-                :class="activeTab === 'settings' ? 'border-primary-500 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                class="profile-tab flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent hover:text-primary-600 transition whitespace-nowrap">
-                <i class="fa-solid fa-gear"></i>
-                Paramètres
-            </button>
-
+      <div id="profile-content" class="p-5 md:p-6 min-h-[320px]" hx-get="{% url 'accounts:profile_activity' %}" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+        <div class="flex items-center justify-center h-56">
+          <div class="text-center">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mx-auto mb-3"></div>
+            <p class="text-gray-500 text-sm">Chargement...</p>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 </section>
-
-
-<!-- ================= CONTENT AREA ================= -->
-<section class="bg-soft min-h-screen py-8">
-    <div class="max-w-6xl mx-auto px-6">
-
-        <div class="bg-white rounded-2xl shadow-sm border border-primary-100 p-6 min-h-[400px]">
-
-            <div
-                id="profile-content"
-                hx-get="{% url 'accounts:profile_activity' %}"
-                hx-trigger="load"
-                hx-target="this"
-                hx-swap="innerHTML"
-                class="min-h-[300px]"
-            >
-                <!-- Loading state -->
-                <div class="flex items-center justify-center h-64">
-                    <div class="text-center">
-                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-                        <p class="text-gray-500">Chargement...</p>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-    </div>
-</section>
-
-<!-- Bottom spacing -->
-<div class="pb-16"></div>
 
 {% endblock %}

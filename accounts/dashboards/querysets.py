@@ -47,6 +47,7 @@ def get_base_queryset(user, model_type):
 
         qs = (
             Candidature.objects
+            .filter(is_deleted=False)
             .select_related(
                 "programme",
                 "branch"
@@ -71,6 +72,10 @@ def get_base_queryset(user, model_type):
 
         qs = (
             Inscription.objects
+            .filter(
+                is_archived=False,
+                candidature__is_deleted=False,
+            )
             .select_related(
                 "candidature",
                 "candidature__programme",
@@ -98,6 +103,10 @@ def get_base_queryset(user, model_type):
 
         qs = (
             Payment.objects
+            .filter(
+                inscription__is_archived=False,
+                inscription__candidature__is_deleted=False,
+            )
             .select_related(
                 "inscription",
                 "inscription__candidature",

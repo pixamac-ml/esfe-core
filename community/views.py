@@ -755,6 +755,9 @@ def public_profile(request, username):
     }
 
     context = {
+        "page_title": f"Profil de {user.get_full_name() or user.username}",
+        "meta_description": f"Consultez le profil public de {user.get_full_name() or user.username} sur la communaute ESFE.",
+        "og_type": "profile",
         "profile_user": user,
         "profile": profile,
         "gamification": gamification,

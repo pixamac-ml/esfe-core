@@ -2,553 +2,175 @@
 {% load component_tags %}
 {% load humanize %}
 
-{% block title %}{{ programme.title }} – ESFE{% endblock %}
+{% block title %}{{ programme.title }} - ESFE{% endblock %}
 
 {% block content %}
-
-
-<!-- ========================================================= -->
-<!-- HERO -->
-<!-- ========================================================= -->
-
 {% component "formation_hero" programme=programme %}
 {% endcomponent %}
 
-
-
-<!-- ========================================================= -->
-<!-- PRESENTATION + INFOS CLES -->
-<!-- ========================================================= -->
-
-<section id="presentation" class="py-20 bg-soft">
-
-<div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-3 gap-10 items-start">
-
-
-<!-- PRESENTATION (2/3) -->
-
-<div class="lg:col-span-2">
-
-<div class="bg-white rounded-3xl border border-gray-100 p-10 shadow-sm">
-
-<h2 class="text-3xl font-bold text-primary-800 mb-2">
-Présentation
-</h2>
-
-<p class="text-gray-400 text-sm mb-6">
-{{ programme.title }}
-</p>
-
-<div class="prose prose-lg max-w-none text-gray-600 leading-relaxed">
-{{ programme.description|linebreaks }}
-</div>
-
-<!-- DATE MISE A JOUR -->
-<p class="text-xs text-gray-400 mt-8 pt-6 border-t border-gray-100">
-Dernière mise à jour : {{ programme.created_at|date:"d F Y" }}
-</p>
-
-</div>
-
-</div>
-
-
-
-<!-- INFOS CLES (1/3) -->
-
-<div>
-
-<div class="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm sticky top-6">
-
-<h3 class="text-lg font-bold text-primary-800 mb-6">
-Infos clés
-</h3>
-
-<ul class="space-y-5">
-
-<!-- RENTREE -->
-<li class="flex items-center justify-between">
-
-<span class="flex items-center gap-3 text-gray-600">
-<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
-<svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-</svg>
-</div>
-Rentrée
-</span>
-
-<span class="font-semibold text-primary-800">Septembre</span>
-
-</li>
-
-
-<!-- DUREE -->
-<li class="flex items-center justify-between">
-
-<span class="flex items-center gap-3 text-gray-600">
-<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
-<svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-</svg>
-</div>
-Durée
-</span>
-
-<span class="font-semibold text-primary-800">{{ programme.duration_years }} ans</span>
-
-</li>
-
-
-<!-- LANGUE -->
-<li class="flex items-center justify-between">
-
-<span class="flex items-center gap-3 text-gray-600">
-<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
-<svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
-</svg>
-</div>
-Langue
-</span>
-
-<span class="font-semibold text-primary-800">Français</span>
-
-</li>
-
-
-<!-- CAMPUS -->
-<li class="flex items-center justify-between">
-
-<span class="flex items-center gap-3 text-gray-600">
-<div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
-<svg class="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-</svg>
-</div>
-Campus
-</span>
-
-<span class="font-semibold text-primary-800">Dakar</span>
-
-</li>
-
-</ul>
-
-</div>
-
-</div>
-
-
-</div>
-
+<section x-data="{ show: false }" x-intersect:enter.threshold.1.once="show = true" class="py-14 bg-white border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-4">
+    <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'" class="rounded-xl border border-slate-200 p-4 transition-all duration-500 hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 uppercase tracking-wide">Cycle</p><p class="text-lg font-bold text-slate-900 mt-1">{{ programme.cycle.name }}</p></div>
+    <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'" class="rounded-xl border border-slate-200 p-4 transition-all duration-500 delay-75 hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 uppercase tracking-wide">Duree</p><p class="text-lg font-bold text-slate-900 mt-1">{{ programme.duration_years }} ans</p></div>
+    <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'" class="rounded-xl border border-slate-200 p-4 transition-all duration-500 delay-100 hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 uppercase tracking-wide">Diplome</p><p class="text-lg font-bold text-slate-900 mt-1">{{ programme.diploma_awarded.name }}</p></div>
+    <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'" class="rounded-xl border border-slate-200 p-4 transition-all duration-500 delay-150 hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 uppercase tracking-wide">Campus principal</p><p class="text-lg font-bold text-slate-900 mt-1">{% if main_branch %}{{ main_branch.name }}{% else %}A confirmer{% endif %}</p></div>
+  </div>
 </section>
 
+<section id="presentation" x-data="{ show: false }" x-intersect:enter.threshold.15.once="show = true" class="py-16 bg-soft">
+  <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-3 gap-8 items-start">
+    <div class="lg:col-span-2 space-y-6 transition-all duration-700" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'">
+      <article class="bg-white rounded-2xl border border-slate-200 p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+        <h2 class="text-2xl font-bold text-slate-900 mb-3">Pourquoi choisir cette formation ?</h2>
+        <div class="prose max-w-none text-slate-600">{{ programme.description|linebreaks }}</div>
+      </article>
 
+      {% if learning_objectives %}
+      <article class="bg-white rounded-2xl border border-slate-200 p-8 transition-all duration-300 hover:shadow-lg">
+        <h3 class="text-xl font-bold text-slate-900 mb-4">Competences que vous allez developper</h3>
+        <div class="grid md:grid-cols-2 gap-4">
+          {% for obj in learning_objectives %}
+          <div class="rounded-xl border border-slate-200 p-4 bg-slate-50 transition-all duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-md">
+            <p class="font-semibold text-slate-900 mb-1">{{ obj.title|default:"Competence" }}</p>
+            <p class="text-sm text-slate-600">{{ obj.desc }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </article>
+      {% endif %}
 
-<!-- OBJECTIFS DE LA FORMATION -->
-{% if learning_objectives %}
-<section id="objectifs" class="py-20 bg-white">
-<div class="max-w-7xl mx-auto px-6">
+      {% if structure_points %}
+      <article class="bg-white rounded-2xl border border-slate-200 p-8 transition-all duration-300 hover:shadow-lg">
+        <h3 class="text-xl font-bold text-slate-900 mb-4">Organisation pedagogique</h3>
+        <ul class="space-y-3 text-slate-700">
+          {% for point in structure_points %}
+          <li class="flex gap-3"><span class="mt-2 w-2 h-2 rounded-full bg-secondary"></span><span>{{ point }}</span></li>
+          {% endfor %}
+        </ul>
+      </article>
+      {% endif %}
+    </div>
 
-<div class="mb-12">
-<h2 class="text-3xl font-bold text-primary-800">Objectifs de la formation</h2>
-<p class="text-gray-500 mt-3">Les compétences clés développées tout au long de ce programme</p>
-</div>
+    <aside class="space-y-5 lg:sticky lg:top-24 transition-all duration-700 delay-100" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'">
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 transition-all duration-300 hover:shadow-lg">
+        <h3 class="font-bold text-slate-900 mb-4">Decider rapidement</h3>
+        <ul class="space-y-3 text-sm text-slate-600">
+          <li>Cout total: <span class="font-semibold text-slate-900">{% if total_programme_cost %}{{ total_programme_cost|intcomma }} FCFA{% else %}A confirmer{% endif %}</span></li>
+          <li>Cout annuel moyen: <span class="font-semibold text-slate-900">{% if average_year_cost %}{{ average_year_cost|intcomma }} FCFA{% else %}A confirmer{% endif %}</span></li>
+          <li>Rentree: <span class="font-semibold text-slate-900">Septembre</span></li>
+          <li>Langue: <span class="font-semibold text-slate-900">Francais</span></li>
+        </ul>
+        {% if can_apply %}
+        <a href="{% url 'admissions:apply' programme.slug %}" class="mt-5 w-full inline-flex justify-center items-center bg-secondary text-white px-5 py-3 rounded-xl font-semibold hover:bg-secondary-dark hover:scale-[1.02] transition-all duration-300">Candidater maintenant</a>
+        {% endif %}
+      </div>
 
-<div class="grid md:grid-cols-2 gap-6">
-{% for obj in learning_objectives %}
-<div class="bg-soft rounded-2xl p-8 flex items-start gap-5 hover:shadow-md transition">
-
-<div class="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0
-    {% if obj.color == 'secondary' %}bg-secondary/20{% elif obj.color == 'accent' %}bg-accent/20{% else %}bg-primary-100{% endif %}">
-<svg class="w-7 h-7 {% if obj.color == 'secondary' %}text-secondary{% elif obj.color == 'accent' %}text-accent{% else %}text-primary-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-{% if obj.icon == 'chart' %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-{% elif obj.icon == 'users' %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-{% elif obj.icon == 'trending' %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-{% elif obj.icon == 'lightbulb' %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-{% endif %}
-</svg>
-</div>
-
-<div>
-<h3 class="font-bold text-primary-800 mb-2">{{ obj.title }}</h3>
-<p class="text-gray-600 text-sm leading-relaxed">{{ obj.desc }}</p>
-</div>
-
-</div>
-{% endfor %}
-</div>
-
-</div>
+      {% if has_documents %}
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 transition-all duration-300 hover:shadow-lg">
+        <h3 class="font-bold text-slate-900 mb-3">Documents requis</h3>
+        <ul class="space-y-2 text-sm text-slate-600">
+          {% for document in required_documents|slice:":5" %}
+          <li class="flex gap-2"><span class="text-secondary">-</span><span>{{ document.name }}</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </aside>
+  </div>
 </section>
-
-
-{% endif %}
-
-<!-- ========================================================= -->
-<!-- ORGANISATION DE LA FORMATION -->
-<!-- ========================================================= -->
 
 {% if has_fees %}
+<section id="organisation" x-data="{ show: false }" x-intersect:enter.threshold.15.once="show = true" class="py-16 bg-white">
+  <div class="max-w-7xl mx-auto px-6">
+    <h2 class="text-2xl font-bold text-slate-900 mb-3 transition-all duration-500" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'">Frais par annee</h2>
+    <p class="text-slate-500 mb-8 transition-all duration-500 delay-75" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'">Transparence totale des couts pour vous projeter sereinement.</p>
+    <div class="grid md:grid-cols-2 gap-6">
+      {% for item in years_with_totals %}
+      <article class="rounded-2xl border border-slate-200 overflow-hidden bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'">
+        <div class="px-5 py-4 bg-slate-50 flex justify-between items-center">
+          <h3 class="font-semibold text-slate-900">Annee {{ item.year.year_number }}</h3>
+          <span class="font-bold text-secondary">{{ item.year_total|intcomma }} FCFA</span>
+        </div>
+        <div class="divide-y divide-slate-100">
+          {% for fee in item.fees %}
+          <div class="px-5 py-3 flex justify-between text-sm">
+            <span class="text-slate-600">{{ fee.label }}</span>
+            <span class="font-medium text-slate-900">{{ fee.amount|intcomma }} FCFA</span>
+          </div>
+          {% endfor %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
-<section id="organisation" class="py-20 bg-soft">
-
-<div class="max-w-7xl mx-auto px-6">
-
-<!-- TITRE + DROPDOWN -->
-<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-10 gap-6">
-
-<div>
-<h2 class="text-3xl font-bold text-primary-800">
-Organisation de la formation
-</h2>
-<p class="text-gray-500 mt-2">
-Détail des frais par année d'études
-</p>
-</div>
-
-<!-- DROPDOWN FILTRER (optionnel) -->
-<div class="relative" x-data="{ open: false }">
-<button @click="open = !open"
-        class="flex items-center gap-2 bg-white border border-gray-200 px-5 py-3 rounded-xl text-primary-800 font-medium hover:border-primary-300 transition">
-    Tous alles
-    <svg class="w-4 h-4" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-    </svg>
-</button>
-</div>
-
-</div>
-
-
-<!-- GRILLE 2 COLONNES CÔTE À CÔTE -->
-<div class="grid md:grid-cols-2 gap-6">
-
-{% for item in years_with_totals %}
-
-<div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-
-<!-- HEADER ANNÉE -->
-<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-
-<span class="inline-flex items-center gap-2 bg-primary-800 text-white px-5 py-2 rounded-full text-sm font-semibold">
-    {% if item.year.year_number == 1 %}
-    Année 1
-    {% else %}
-    {{ item.year.year_number }}<sup>ème</sup> année
+<section id="admissions" x-data="{ show: false }" x-intersect:enter.threshold.15.once="show = true" class="py-16 bg-soft">
+  <div class="max-w-5xl mx-auto px-6">
+    <h2 class="text-2xl font-bold text-slate-900 mb-3 text-center transition-all duration-500" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'">Processus d'admission</h2>
+    <p class="text-slate-500 mb-8 text-center transition-all duration-500 delay-75" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'">Un parcours clair, digitalise et accompagne.</p>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="rounded-xl bg-white border border-slate-200 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"><p class="font-semibold text-slate-900">1. Depot du dossier</p><p class="text-sm text-slate-600 mt-1">Remplissez le formulaire et joignez vos pieces.</p></div>
+      <div class="rounded-xl bg-white border border-slate-200 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"><p class="font-semibold text-slate-900">2. Etude pedagogique</p><p class="text-sm text-slate-600 mt-1">Votre profil est analyse par l'equipe academique.</p></div>
+      <div class="rounded-xl bg-white border border-slate-200 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"><p class="font-semibold text-slate-900">3. Entretien</p><p class="text-sm text-slate-600 mt-1">Echange de motivation et validation finale.</p></div>
+      <div class="rounded-xl bg-white border border-slate-200 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"><p class="font-semibold text-slate-900">4. Confirmation</p><p class="text-sm text-slate-600 mt-1">Notification + activation de l'inscription.</p></div>
+    </div>
+    {% if can_apply %}
+    <div class="text-center mt-8">
+      <a href="{% url 'admissions:apply' programme.slug %}" class="inline-flex items-center bg-secondary text-white px-8 py-4 rounded-xl font-semibold hover:bg-secondary-dark hover:scale-[1.02] transition-all duration-300">Je lance ma candidature</a>
+    </div>
     {% endif %}
-</span>
-
-<!-- HEURES (si disponible) -->
-{% if item.year.hours %}
-<span class="flex items-center gap-2 text-gray-500 text-sm">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-    </svg>
-    {{ item.year.hours }} heures
-</span>
-{% endif %}
-
-</div>
-
-<!-- LIGNES DE FRAIS -->
-<div class="divide-y divide-gray-100">
-
-{% for fee in item.fees %}
-<div class="px-6 py-4 flex justify-between items-center">
-    <span class="flex items-center gap-3 text-gray-600">
-        <span class="w-2 h-2 rounded-full bg-gray-300"></span>
-        {{ fee.label }}
-    </span>
-    <span class="font-semibold text-primary-800">{{ fee.amount|intcomma }} FCFA</span>
-</div>
-{% endfor %}
-
-</div>
-
-<!-- TOTAL ANNUEL -->
-<div class="px-6 py-4 bg-soft flex justify-between items-center border-t border-gray-100">
-    <span class="font-semibold text-primary-800">Total annuel atteint</span>
-    <span class="font-bold text-secondary text-lg">{{ item.year_total|intcomma }} FCFA</span>
-</div>
-
-</div>
-
-{% endfor %}
-
-</div>
-
-</div>
-
+  </div>
 </section>
 
-{% endif %}
-
-
-
-<!-- ========================================================= -->
-<!-- FINANCEMENT -->
-<!-- ========================================================= -->
-
-<section id="financement" class="py-20 bg-white">
-
-<div class="max-w-7xl mx-auto px-6">
-
-<h2 class="text-3xl font-bold text-primary-800 mb-10">
-Financement
-</h2>
-
-<div class="grid md:grid-cols-3 gap-6">
-
-<!-- CARTE 1 : COÛT DE LA FORMATION -->
-<div class="bg-soft rounded-2xl p-8 border border-gray-100">
-
-<div class="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center mb-5">
-<svg class="w-6 h-6 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-</svg>
-</div>
-
-<h3 class="font-bold text-primary-800 text-lg mb-3">
-Coût de la formation
-</h3>
-
-<p class="text-2xl font-bold text-secondary mb-2">
-{% if total_programme_cost %}
-{{ total_programme_cost|intcomma }} FCFA
-{% else %}
-—
-{% endif %}
-</p>
-
-<p class="text-gray-500 text-sm">
-sur {{ programme.duration_years }} ans
-</p>
-
-</div>
-
-
-<!-- CARTE 2 : MODALITÉS DE PAIEMENT -->
-<div class="bg-soft rounded-2xl p-8 border border-gray-100">
-
-<div class="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center mb-5">
-<svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-</svg>
-</div>
-
-<h3 class="font-bold text-primary-800 text-lg mb-4">
-Modalités de paiement
-</h3>
-
-<ul class="space-y-3">
-<li class="flex items-start gap-2 text-gray-600 text-sm">
-    <span class="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0"></span>
-    Échelonnement acquis en fois
-</li>
-<li class="flex items-start gap-2 text-gray-600 text-sm">
-    <span class="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0"></span>
-    Prélèvements automatique en différé
-</li>
-<li class="flex items-start gap-2 text-gray-600 text-sm">
-    <span class="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0"></span>
-    Financement par un tiers
-</li>
-</ul>
-
-</div>
-
-
-<!-- CARTE 3 : AIDES & BOURSES -->
-<div class="bg-soft rounded-2xl p-8 border border-gray-100">
-
-<div class="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mb-5">
-<svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-</svg>
-</div>
-
-<h3 class="font-bold text-primary-800 text-lg mb-4">
-Aides & bourses
-</h3>
-
-<ul class="space-y-3">
-<li class="flex items-start gap-2 text-gray-600 text-sm">
-    <span class="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 flex-shrink-0"></span>
-    Bourses d'excellence
-</li>
-<li class="flex items-start gap-2 text-gray-600 text-sm">
-    <span class="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 flex-shrink-0"></span>
-    Bourses sociales
-</li>
-<li class="flex items-start gap-2 text-gray-600 text-sm">
-    <span class="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 flex-shrink-0"></span>
-    Accès à un prêt étudiant
-</li>
-</ul>
-
-</div>
-
-</div>
-
-</div>
-
+{% if career_points %}
+<section x-data="{ show: false }" x-intersect:enter.threshold.15.once="show = true" class="py-16 bg-white">
+  <div class="max-w-7xl mx-auto px-6">
+    <h2 class="text-2xl font-bold text-slate-900 mb-6 transition-all duration-500" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'">Debouches professionnels</h2>
+    <div class="grid md:grid-cols-2 gap-4">
+      {% for item in career_points %}
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700 transition-all duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-md" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'">{{ item }}</div>
+      {% endfor %}
+    </div>
+  </div>
 </section>
-
-
-<!-- ========================================================= -->
-<!-- ADMISSIONS -->
-<!-- ========================================================= -->
-
-<section id="admissions" class="py-20 bg-soft">
-
-<div class="max-w-4xl mx-auto px-6">
-
-<div class="text-center mb-12">
-<h2 class="text-3xl font-bold text-primary-800 mb-3">
-Procédure d'admission
-</h2>
-<p class="text-gray-500">
-La procédure d'admission se fait entièrement en ligne
-</p>
-</div>
-
-
-<!-- ETAPES -->
-<div class="space-y-4">
-
-<!-- ETAPE 1 -->
-<div class="bg-white rounded-2xl p-6 flex items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition">
-
-<div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
-1
-</div>
-
-<div class="flex-1">
-<h3 class="font-semibold text-primary-800">Dépôt de la candidature en ligne</h3>
-<p class="text-gray-500 text-sm">Remplissez le formulaire et soumettez vos documents</p>
-</div>
-
-<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-</svg>
-
-</div>
-
-
-<!-- ETAPE 2 -->
-<div class="bg-white rounded-2xl p-6 flex items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition">
-
-<div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
-2
-</div>
-
-<div class="flex-1">
-<h3 class="font-semibold text-primary-800">Étude du dossier</h3>
-<p class="text-gray-500 text-sm">Notre équipe pédagogique examine votre candidature</p>
-</div>
-
-<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-</svg>
-
-</div>
-
-
-<!-- ETAPE 3 -->
-<div class="bg-white rounded-2xl p-6 flex items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition">
-
-<div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
-3
-</div>
-
-<div class="flex-1">
-<h3 class="font-semibold text-primary-800">Entretien de motivation</h3>
-<p class="text-gray-500 text-sm">Échange avec un membre du jury d'admission</p>
-</div>
-
-<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-</svg>
-
-</div>
-
-
-<!-- ETAPE 4 -->
-<div class="bg-white rounded-2xl p-6 flex items-center gap-6 shadow-sm border border-gray-100 hover:shadow-md transition">
-
-<div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
-4
-</div>
-
-<div class="flex-1">
-<h3 class="font-semibold text-primary-800">Résultat et inscription</h3>
-<p class="text-gray-500 text-sm">Notification de la décision et finalisation de l'inscription</p>
-</div>
-
-<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-</svg>
-
-</div>
-
-</div>
-
-
-<!-- CTA -->
-{% if can_apply %}
-<div class="text-center mt-10">
-
-<a href="{% url 'admissions:apply' programme.slug %}"
-   class="inline-flex items-center gap-2 bg-secondary text-white px-10 py-4 rounded-xl font-semibold text-lg hover:bg-secondary-dark transition shadow-lg">
-
-Candidater maintenant
-
-<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
-</svg>
-
-</a>
-
-</div>
 {% endif %}
 
-</div>
-
+{% if testimonials %}
+<section x-data="{ show: false }" x-intersect:enter.threshold.15.once="show = true" class="py-16 bg-soft">
+  <div class="max-w-7xl mx-auto px-6">
+    <h2 class="text-2xl font-bold text-slate-900 mb-6 transition-all duration-500" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'">Ils temoignent</h2>
+    <div class="grid md:grid-cols-3 gap-4">
+      {% for t in testimonials %}
+      <article class="rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'">
+        <p class="text-slate-700 text-sm leading-relaxed">"{{ t.quote|truncatechars:220 }}"</p>
+        <p class="mt-4 font-semibold text-slate-900">{{ t.author_name }}</p>
+        <p class="text-xs text-slate-500">{{ t.author_role|default:"Ancien etudiant" }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
 </section>
-
-
-
-<!-- ========================================================= -->
-<!-- DOCUMENTS REQUIS -->
-<!-- ========================================================= -->
-
-{% if has_documents %}
-
-<section class="py-20 bg-white">
-
-<div class="max-w-4xl mx-auto px-6">
-
-{% component "formation_documents"
-required_documents=required_documents
-%}
-{% endcomponent %}
-
-</div>
-
-</section>
-
 {% endif %}
 
+{% if related_programmes %}
+<section x-data="{ show: false }" x-intersect:enter.threshold.15.once="show = true" class="py-16 bg-white border-t border-slate-200">
+  <div class="max-w-7xl mx-auto px-6">
+    <h2 class="text-2xl font-bold text-slate-900 mb-6 transition-all duration-500" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'">Formations similaires</h2>
+    <div class="grid md:grid-cols-3 gap-4">
+      {% for rp in related_programmes %}
+      <a href="{{ rp.get_absolute_url }}" class="block rounded-2xl border border-slate-200 p-5 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 bg-white" :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'">
+        <p class="text-xs uppercase tracking-wide text-slate-500">{{ rp.cycle.name }}</p>
+        <h3 class="mt-2 font-bold text-slate-900">{{ rp.title }}</h3>
+        <p class="mt-2 text-sm text-slate-600">{{ rp.short_description|truncatechars:120 }}</p>
+        <p class="mt-4 text-sm text-secondary font-semibold">Decouvrir ce programme</p>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {% endblock %}
+

@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from datetime import timedelta
 
-from admissions.models import Candidature, CandidatureDocument
+from admissions.models import CandidatureDocument
 from formations.models import Programme
 from branches.models import Branch
 
@@ -56,6 +56,9 @@ def admissions_dashboard(request):
     entry_year = request.GET.get("entry_year")
     date_from = request.GET.get("date_from")
     date_to = request.GET.get("date_to")
+
+    if status == "pending":
+        status = "submitted"
 
     if status:
         candidatures = candidatures.filter(status=status)
@@ -150,8 +153,11 @@ def admissions_dashboard(request):
 
     accepted_candidatures_qs = (
         base_candidatures
-        .filter(status="accepted")
-        .select_related("programme", "branch", "inscription")
+        .filter(
+            status__in=["accepted", "accepted_with_reserve"],
+            inscription__isnull=True,
+        )
+        .select_related("programme", "branch")
         .order_by("-reviewed_at")
     )
 

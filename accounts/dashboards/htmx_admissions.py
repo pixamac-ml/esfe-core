@@ -8,10 +8,10 @@ sans rechargement de page.
 """
 
 import json
+from functools import wraps
 
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_GET
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -36,6 +36,7 @@ def htmx_admissions_required(view_func):
     Décorateur combiné : login + accès admissions + requête HTMX.
     """
 
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
 
         if not request.user.is_authenticated:
@@ -93,7 +94,7 @@ def approve_candidature_htmx(request, candidature_id):
 
         html = render_to_string(
             "accounts/dashboard/partials/candidature_row.html",
-            {"candidature": candidature},
+            {"cand": candidature},
             request=request
         )
 
@@ -145,7 +146,7 @@ def reject_candidature_htmx(request, candidature_id):
 
         html = render_to_string(
             "accounts/dashboard/partials/candidature_row.html",
-            {"candidature": candidature},
+            {"cand": candidature},
             request=request
         )
 
@@ -199,7 +200,7 @@ def set_candidature_under_review_htmx(request, candidature_id):
 
         html = render_to_string(
             "accounts/dashboard/partials/candidature_row.html",
-            {"candidature": candidature},
+            {"cand": candidature},
             request=request
         )
 
@@ -250,7 +251,7 @@ def set_candidature_to_complete_htmx(request, candidature_id):
 
         html = render_to_string(
             "accounts/dashboard/partials/candidature_row.html",
-            {"candidature": candidature},
+            {"cand": candidature},
             request=request
         )
 
@@ -342,10 +343,11 @@ def validate_document_htmx(request, document_id):
 
 
 @require_POST
+@htmx_admissions_required
 def create_inscription_htmx(request, candidature_id):
 
     candidature = get_object_or_404(
-        Candidature,
+        get_base_queryset(request.user, "candidature"),
         id=candidature_id,
         status="accepted"
     )
@@ -566,6 +568,10 @@ def candidatures_list_htmx(request):
     programme_id = request.GET.get("programme")
     search = request.GET.get("q")
 
+    # Backward compatibility: pending == submitted for candidatures.
+    if status == "pending":
+        status = "submitted"
+
     if status:
         candidatures = candidatures.filter(status=status)
 
@@ -573,22 +579,33 @@ def candidatures_list_htmx(request):
         candidatures = candidatures.filter(programme_id=programme_id)
 
     if search:
-        candidatures = candidatures.filter(
-            Q(reference__icontains=search) |
-            Q(first_name__icontains=search) |
-            Q(last_name__icontains=search) |
-            Q(email__icontains=search)
+        search_filter = (
+            Q(first_name__icontains=search)
+            | Q(last_name__icontains=search)
+            | Q(email__icontains=search)
+            | Q(phone__icontains=search)
+            | Q(programme__title__icontains=search)
+            | Q(branch__name__icontains=search)
+            | Q(academic_year__icontains=search)
         )
+
+        # Optional support for canonical references like CAND-2026-00012.
+        if search.upper().startswith("CAND-"):
+            ref_parts = search.upper().split("-")
+            if len(ref_parts) >= 3 and ref_parts[-1].isdigit():
+                search_filter = search_filter | Q(id=int(ref_parts[-1]))
+
+        candidatures = candidatures.filter(search_filter)
 
     # Tri
     order = request.GET.get("order", "recent")
 
     if order == "oldest":
-        candidatures = candidatures.order_by("created_at")
+        candidatures = candidatures.order_by("submitted_at")
     elif order == "name":
         candidatures = candidatures.order_by("last_name", "first_name")
     else:
-        candidatures = candidatures.order_by("-created_at")
+        candidatures = candidatures.order_by("-submitted_at")
 
     # Pagination
     from django.core.paginator import Paginator
@@ -703,7 +720,7 @@ def refresh_admissions_stats_htmx(request):
 
     # Stats du jour
     today = timezone.now().date()
-    stats["today"] = candidatures.filter(created_at__date=today).count()
+    stats["today"] = candidatures.filter(submitted_at__date=today).count()
 
     html = render_to_string(
         "accounts/dashboard/partials/admissions_stats.html",

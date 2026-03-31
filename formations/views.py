@@ -2,6 +2,8 @@ from django.shortcuts import render, get_object_or_404
 from django.db.models import Prefetch, Count, Q
 from django.core.paginator import Paginator
 from django_htmx.middleware import HtmxDetails
+from branches.models import Branch
+from core.models import Testimonial
 
 from .models import (
     Programme,
@@ -60,6 +62,8 @@ def formation_list(request):
         "cycles": Cycle.objects.filter(is_active=True).order_by("min_duration_years"),
         "current_cycle": cycle_slug,
         "search_query": search_query,
+        "featured_count": programmes.filter(is_featured=True).count(),
+        "cycle_count": Cycle.objects.filter(is_active=True).count(),
     }
 
     # ==================================================
@@ -131,6 +135,7 @@ def formation_detail(request, slug):
 
     has_documents = bool(required_documents)
     has_fees = total_programme_cost > 0
+    average_year_cost = int(total_programme_cost / programme.duration_years) if programme.duration_years else 0
 
     # Déterminer le type de cycle pour affichage conditionnel
     cycle_name = programme.cycle.name.lower()
@@ -144,6 +149,40 @@ def formation_detail(request, slug):
     except (json.JSONDecodeError, TypeError):
         learning_objectives = []
 
+    # Fallback si learning_outcomes n'est pas en JSON
+    if not learning_objectives and programme.learning_outcomes:
+        learning_objectives = [
+            {
+                "title": "Objectif",
+                "desc": line.strip(),
+                "icon": "lightbulb",
+                "color": "primary",
+            }
+            for line in programme.learning_outcomes.splitlines()
+            if line.strip()
+        ]
+
+    career_points = [line.strip(" -\u2022") for line in (programme.career_opportunities or "").splitlines() if line.strip()]
+    structure_points = [line.strip(" -\u2022") for line in (programme.program_structure or "").splitlines() if line.strip()]
+
+    testimonials = (
+        Testimonial.objects
+        .filter(is_active=True)
+        .filter(Q(programme=programme) | Q(programme__isnull=True))
+        .order_by("-is_featured", "order")[:3]
+    )
+
+    related_programmes = (
+        Programme.objects
+        .filter(is_active=True)
+        .exclude(pk=programme.pk)
+        .filter(cycle=programme.cycle)
+        .select_related("cycle", "diploma_awarded")
+        .order_by("-is_featured", "title")[:3]
+    )
+
+    main_branch = Branch.objects.filter(is_active=True).order_by("name").first()
+
     context = {
         "programme": programme,
         "programme_years": programme_years,
@@ -155,7 +194,13 @@ def formation_detail(request, slug):
         "cycle_type": cycle_type,
         "total_cost": total_programme_cost,
         "total_programme_cost": total_programme_cost,
-        "learning_objectives": learning_objectives,  # ← NOUVEAU
+        "average_year_cost": average_year_cost,
+        "learning_objectives": learning_objectives,
+        "career_points": career_points,
+        "structure_points": structure_points,
+        "testimonials": testimonials,
+        "related_programmes": related_programmes,
+        "main_branch": main_branch,
     }
     return render(
         request,

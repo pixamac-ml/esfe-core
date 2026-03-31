@@ -7,7 +7,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="htmx-config" content='{"historyCacheSize": 0}'>
 
-  <title>{% block title %}ESFE{% endblock %}</title>
+  <title>{% block title %}{% firstof page_title seo_site_name "ESFE" %}{% endblock %}</title>
+  <meta name="description" content="{% firstof meta_description seo_default_description "ESFE" %}">
+  <meta name="robots" content="{{ meta_robots }}">
+  <meta name="author" content="{{ seo_site_name }}">
+  {% if canonical_url %}
+  <link rel="canonical" href="{{ canonical_url }}">
+  {% endif %}
+
+  <meta property="og:type" content="{{ og_type|default:'website' }}">
+  <meta property="og:title" content="{% firstof meta_og_title page_title seo_site_name "ESFE" %}">
+  <meta property="og:description" content="{% firstof meta_og_description meta_description seo_default_description "ESFE" %}">
+  <meta property="og:url" content="{{ canonical_url }}">
+  {% if og_image_url or seo_default_image %}
+  <meta property="og:image" content="{{ og_image_url|default:seo_default_image }}">
+  {% endif %}
+  <meta property="og:locale" content="fr_ML">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{% firstof meta_twitter_title meta_og_title page_title seo_site_name "ESFE" %}">
+  <meta name="twitter:description" content="{% firstof meta_twitter_description meta_description seo_default_description "ESFE" %}">
+  {% if og_image_url or seo_default_image %}
+  <meta name="twitter:image" content="{{ og_image_url|default:seo_default_image }}">
+  {% endif %}
+
+  {% if organization_schema_json %}
+  <script type="application/ld+json">{{ organization_schema_json|safe }}</script>
+  {% endif %}
+  {% if website_schema_json %}
+  <script type="application/ld+json">{{ website_schema_json|safe }}</script>
+  {% endif %}
 
   <!-- STYLES -->
   <link rel="stylesheet" href="{% static 'public/css/main.css' %}">
@@ -318,7 +347,7 @@
   </main>
 
   {% if site_configuration and site_configuration.smart_rocket_enabled %}
-      <div x-data="smartRocketWidget()" class="fixed top-24 right-4 sm:right-6 z-[70] flex flex-col items-end gap-3">
+      <div x-data="smartRocketWidget()" class="fixed bottom-6 right-4 sm:right-6 z-[70] flex flex-col items-end gap-3">
     <div x-show="open" x-transition @click.outside="open = false"
          class="w-80 rounded-2xl shadow-2xl border border-slate-200 bg-white overflow-hidden">
       <div class="px-4 py-3 bg-primary-700 text-white flex items-center justify-between">
@@ -359,23 +388,81 @@
   {% endif %}
 
   <!-- ================= FOOTER ================= -->
+  {% url 'core:legal_notice' as legal_notice_url %}
+  {% url 'core:privacy_policy' as privacy_policy_url %}
+  {% url 'core:terms_of_service' as terms_url %}
+  {% url 'core:sitemap' as sitemap_url %}
+  {% url 'formations:list' as formations_url %}
+  {% url 'core:home' as home_url %}
+  {% url 'core:about' as about_url %}
+  {% url 'core:contact' as contact_url %}
+  {% url 'news:list' as news_url %}
+  {% url 'news:result_list' as result_url %}
+  {% url 'news:event_list' as event_gallery_url %}
+  {% url 'blog:article_list' as blog_url %}
+  {% url 'community:topic_list' as community_url %}
+  {% with formations_licence_url=formations_url|add:'?cycle=licence' formations_master_url=formations_url|add:'?cycle=master' formations_bts_url=formations_url|add:'?cycle=bts' %}
   {% component "footer"
      site_name="ESFE"
      site_slogan="Excellence • Innovation • Engagement"
      site_description="Établissement supérieur de formation en sciences de la santé, orienté vers l'excellence académique, l'innovation pédagogique et l'employabilité."
      logo_url=site_logo_url
-     footer_contact={
-         'address': 'Djélibougou, Bamako, Mali',
-         'phone': '+223 XX XX XX XX',
-         'email': 'contact@esfe.ml'
-     }
+     footer_contact=contact
      opening_hours="Lun-Ven : 8h00 - 17h00"
+     cta={
+         'title': 'Votre avenir dans la sante commence ici',
+         'description': 'Discutez avec notre equipe et identifiez la formation la plus adaptee a votre profil.',
+         'button_label': 'Voir les formations',
+         'button_url': formations_url
+     }
+     footer_navigation=[
+         {'title': 'Explorer', 'links': [
+             {'label': 'Accueil', 'url': home_url},
+             {'label': 'A propos', 'url': about_url},
+             {'label': 'Contact', 'url': contact_url},
+             {'label': 'Plan du site', 'url': sitemap_url}
+         ]},
+         {'title': 'Formations', 'links': [
+             {'label': 'Tous les programmes', 'url': formations_url},
+             {'label': 'Licence', 'url': formations_licence_url},
+             {'label': 'Master', 'url': formations_master_url},
+             {'label': 'BTS / DTS', 'url': formations_bts_url}
+         ]},
+         {'title': 'Ressources', 'links': [
+             {'label': 'Actualites', 'url': news_url},
+             {'label': 'Resultats', 'url': result_url},
+             {'label': 'Blog', 'url': blog_url},
+             {'label': 'Communaute', 'url': community_url}
+         ]},
+         {'title': 'Admission', 'links': [
+             {'label': 'Demarrer ma candidature', 'url': formations_url},
+             {'label': 'Calendrier des rentrees', 'url': event_gallery_url},
+             {'label': 'FAQ et entraide', 'url': community_url},
+             {'label': 'Parler a un conseiller', 'url': contact_url}
+         ]}
+     ]
+     social_links=[
+         {'label': 'Facebook', 'url': '#', 'icon': 'facebook'},
+         {'label': 'Instagram', 'url': '#', 'icon': 'instagram'},
+         {'label': 'LinkedIn', 'url': '#', 'icon': 'linkedin'},
+         {'label': 'YouTube', 'url': '#', 'icon': 'youtube'},
+         {'label': 'WhatsApp', 'url': 'https://wa.me/22370000000', 'icon': 'whatsapp'}
+     ]
+     stats=[
+         {'label': 'Programmes', 'value': '20+'},
+         {'label': 'Etudiants', 'value': '1800+'},
+         {'label': 'Partenaires', 'value': '40+'},
+         {'label': 'Insertion', 'value': '94%'}
+     ]
      footer_legal_links=[
-         {'label': 'Mentions légales', 'url': '/mentions-legales/'},
-         {'label': 'Confidentialité', 'url': '/confidentialite/'}
+         {'label': 'Mentions legales', 'url': legal_notice_url},
+         {'label': 'Confidentialite', 'url': privacy_policy_url},
+         {'label': 'Conditions d\'utilisation', 'url': terms_url},
+         {'label': 'Plan du site', 'url': sitemap_url}
      ]
   %}
   {% endcomponent %}
+  {% endwith %}
 
   <!-- ================= SCRIPTS ================= -->
 
@@ -513,3 +600,4 @@
     </script>
 </body>
 </html>
+

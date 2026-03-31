@@ -287,6 +287,7 @@ def profile_activity(request):
         Topic.objects
         .filter(author=request.user, is_deleted=False)
         .select_related("category")
+        .annotate(answer_count=Count("answers"))
         .order_by("-created_at")[:5]
     )
 

@@ -1,103 +1,45 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- ================= HERO ================= -->
-<section class="relative pt-24 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+<section class="pt-24 pb-10 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6">
+    <a href="{% url 'accounts:profile' %}" class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition mb-6">
+      <i class="fa-solid fa-arrow-left"></i>
+      Retour au profil
+    </a>
 
-    <div class="max-w-4xl mx-auto px-4">
-
-        <!-- Retour -->
-        <div class="mb-8">
-            <a href="{% url 'accounts:profile' %}"
-               class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition">
-
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     class="w-4 h-4"
-                     fill="none"
-                     viewBox="0 0 24 24"
-                     stroke="currentColor"
-                     stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M15 19l-7-7 7-7" />
-                </svg>
-
-                Retour au profil
-            </a>
-        </div>
-
-        <h1 class="text-3xl font-bold">
-            Modifier mon adresse email
-        </h1>
-
-        <p class="text-primary-100 mt-2 text-sm max-w-2xl">
-            Utilisez une adresse valide et sécurisée.
-            Cette adresse pourra être utilisée pour les notifications importantes.
-        </p>
-
+    <div class="rounded-2xl border border-white/20 bg-white/10 backdrop-blur p-6 md:p-7">
+      <p class="text-xs uppercase tracking-widest text-primary-200">Securite du compte</p>
+      <h1 class="text-3xl font-bold mt-2">Modifier mon adresse email</h1>
+      <p class="text-primary-100 mt-2 text-sm max-w-2xl">Utilisez une adresse valide et securisee pour recevoir les notifications importantes.</p>
     </div>
+  </div>
 </section>
 
+<section class="bg-soft pb-16">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 -mt-4">
+    <div class="bg-white rounded-2xl border border-primary-100 shadow-xl p-6 md:p-8">
+      {% if form.non_field_errors %}
+      <div class="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-sm mb-6">{{ form.non_field_errors }}</div>
+      {% endif %}
 
-<!-- ================= FORMULAIRE ================= -->
-<section class="bg-soft py-20">
-    <div class="max-w-2xl mx-auto px-4">
+      <form method="post" class="space-y-6">
+        {% csrf_token %}
 
-        <div class="bg-white shadow-lg rounded-2xl p-12 border border-primary-100">
-
-            {% if form.non_field_errors %}
-                <div class="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm mb-8">
-                    {{ form.non_field_errors }}
-                </div>
-            {% endif %}
-
-            <form method="post" class="space-y-10">
-                {% csrf_token %}
-
-                <!-- Email -->
-                <div class="space-y-4">
-                    <h2 class="text-lg font-semibold text-primary-700">
-                        Adresse email
-                    </h2>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-600 mb-3">
-                            Nouvelle adresse
-                        </label>
-
-                        {{ form.email }}
-
-                        {% if form.email.errors %}
-                            <p class="text-red-500 text-sm mt-2">
-                                {{ form.email.errors.0 }}
-                            </p>
-                        {% endif %}
-
-                        <p class="text-xs text-gray-400 mt-2">
-                            Exemple : nom.prenom@domaine.com
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Actions -->
-                <div class="flex flex-wrap gap-4 pt-6 border-t border-primary-100">
-
-                    <button type="submit"
-                            class="bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 rounded-xl font-semibold transition shadow-md">
-                        Mettre à jour l’email
-                    </button>
-
-                    <a href="{% url 'accounts:profile' %}"
-                       class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition">
-                        Annuler
-                    </a>
-
-                </div>
-
-            </form>
-
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Nouvelle adresse email</label>
+          {{ form.email }}
+          {% if form.email.errors %}<p class="text-red-500 text-sm mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+          <p class="text-xs text-gray-400 mt-2">Exemple: nom.prenom@domaine.com</p>
         </div>
 
+        <div class="pt-4 border-t border-primary-100 flex flex-wrap gap-3">
+          <button type="submit" class="px-6 py-3 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700 transition shadow-md">Mettre a jour l'email</button>
+          <a href="{% url 'accounts:profile' %}" class="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition">Annuler</a>
+        </div>
+      </form>
     </div>
+  </div>
 </section>
 
 {% endblock %}

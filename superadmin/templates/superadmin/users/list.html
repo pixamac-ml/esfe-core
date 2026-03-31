@@ -1,0 +1,95 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Utilisateurs staff{% endblock %}
+{% block page_subtitle %}Creer des comptes, attribuer roles et groupes{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="text" name="search" value="{{ filters.search|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Nom, username, email...">
+            <select name="role" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous roles</option>
+                {% for role_key, role_label in role_choices %}
+                <option value="{{ role_key }}" {% if filters.role == role_key %}selected{% endif %}>{{ role_label }}</option>
+                {% endfor %}
+            </select>
+            <select name="group" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous groupes</option>
+                {% for g in groups %}
+                <option value="{{ g.id }}" {% if filters.group == g.id|stringformat:'s' %}selected{% endif %}>{{ g.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="">Tous statuts</option>
+                <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actif</option>
+                <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactif</option>
+            </select>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:user_list' %}" class="btn btn-outline">Reinitialiser</a>
+                <button type="submit" class="btn btn-outline">Filtrer</button>
+                <a href="{% url 'superadmin:user_create' %}" class="btn btn-primary">Nouvel utilisateur</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Utilisateur</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Role</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Groupes</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Statut</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Actions</th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">
+                {% for u in users %}
+                <tr>
+                    <td class="px-4 py-3">
+                        <p class="font-medium text-slate-900 mb-0">{{ u.get_full_name|default:u.username }}</p>
+                        <p class="text-xs text-slate-500 mb-0">@{{ u.username }}{% if u.email %} - {{ u.email }}{% endif %}</p>
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if u.profile and u.profile.role %}
+                        {{ u.profile.get_role_display }}
+                        {% else %}
+                        <span class="text-slate-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% for g in u.groups.all %}
+                            <span class="badge-status badge-draft">{{ g.name }}</span>
+                        {% empty %}
+                            <span class="text-slate-400">Aucun</span>
+                        {% endfor %}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if u.is_active %}
+                        <span class="badge-status badge-success">Actif</span>
+                        {% else %}
+                        <span class="badge-status badge-draft">Inactif</span>
+                        {% endif %}
+                        {% if u.is_superuser %}<span class="badge-status badge-info">Superadmin</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="{% url 'superadmin:user_edit' u.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                            <form method="post" action="{% url 'superadmin:user_toggle_active' u.pk %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm">{% if u.is_active %}Desactiver{% else %}Activer{% endif %}</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">Aucun utilisateur trouve.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

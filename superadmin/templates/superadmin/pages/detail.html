@@ -1,19 +1,67 @@
-{% extends 'superadmin/base.html' %}
-{% block content %}
-<div class="container-fluid">
-    <h1 class="h3 mb-4">Détail de la page</h1>
-    <div class="card">
-        <div class="card-body">
-            <h2>{{ page.title }}</h2>
-            <p><strong>Slug :</strong> {{ page.slug }}</p>
-            <p><strong>Status :</strong> {{ page.status }}</p>
-            <div class="mt-4">
-                {{ page.content|safe }}
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page.title }}{% endblock %}
+{% block page_subtitle %}Apercu de la page legale{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6 max-w-6xl">
+    <section class="card rounded-xl border border-slate-100 shadow-sm p-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-slate-500 mb-1">Type</p><p class="font-semibold mb-0">{{ page.get_page_type_display }}</p></div>
+            <div><p class="text-slate-500 mb-1">Version</p><p class="font-semibold mb-0">{{ page.version }}</p></div>
+            <div>
+                <p class="text-slate-500 mb-1">Statut</p>
+                <p class="font-semibold mb-0">{{ page.get_status_display }}</p>
             </div>
-            <a href="{% url 'superadmin:page_edit' page.id %}" class="btn btn-warning mt-3">Modifier</a>
-            <a href="{% url 'superadmin:pages' %}" class="btn btn-secondary mt-3">Retour à la liste</a>
         </div>
-    </div>
+
+        <div class="mt-4 flex items-center gap-2 flex-wrap">
+            <a href="{% url 'superadmin:page_edit' page.pk %}" class="btn btn-primary btn-sm">Modifier</a>
+            <a href="{% url 'superadmin:page_list' %}" class="btn btn-outline btn-sm">Retour</a>
+            {% if public_url %}
+            <a href="{{ public_url }}" target="_blank" class="btn btn-outline btn-sm">Voir page publique</a>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="card rounded-xl border border-slate-100 shadow-sm p-5">
+        <h3 class="text-base font-semibold text-slate-900 mb-3">Introduction</h3>
+        <div class="prose max-w-none text-sm text-slate-700">{{ page.introduction|default:'-'|safe }}</div>
+    </section>
+
+    <section class="card rounded-xl border border-slate-100 shadow-sm p-5">
+        <h3 class="text-base font-semibold text-slate-900 mb-3">Sections</h3>
+        <div class="space-y-3">
+            {% for section in sections %}
+            <article class="rounded-lg border border-slate-200 p-3">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <h4 class="text-sm font-semibold mb-0">{{ section.title }}</h4>
+                    <span class="text-xs text-slate-500">Ordre {{ section.order }} - {% if section.is_active %}Actif{% else %}Inactif{% endif %}</span>
+                </div>
+                <div class="prose max-w-none text-sm text-slate-700">{{ section.content|safe }}</div>
+            </article>
+            {% empty %}
+            <p class="text-sm text-slate-500 mb-0">Aucune section.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="card rounded-xl border border-slate-100 shadow-sm p-5">
+        <h3 class="text-base font-semibold text-slate-900 mb-3">Blocs sidebar</h3>
+        <div class="space-y-3">
+            {% for block in sidebar_blocks %}
+            <article class="rounded-lg border border-slate-200 p-3">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <h4 class="text-sm font-semibold mb-0">{{ block.title }}</h4>
+                    <span class="text-xs text-slate-500">Ordre {{ block.order }} - {% if block.is_active %}Actif{% else %}Inactif{% endif %}</span>
+                </div>
+                <div class="prose max-w-none text-sm text-slate-700">{{ block.content|safe }}</div>
+            </article>
+            {% empty %}
+            <p class="text-sm text-slate-500 mb-0">Aucun bloc sidebar.</p>
+            {% endfor %}
+        </div>
+    </section>
 </div>
 {% endblock %}
 

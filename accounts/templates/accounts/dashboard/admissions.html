@@ -56,6 +56,21 @@
 
 {% block dashboard_content %}
 
+<!-- ================= OPERATION HERO ================= -->
+<div class="rounded-2xl p-5 sm:p-6 mb-6 text-white border border-white/10" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 50%, #1db5b0 100%);">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-widest text-white/80">Poste de travail admissions</p>
+            <h2 class="text-xl sm:text-2xl font-bold mt-1">Traitement des candidatures et validation documentaire</h2>
+            <p class="text-sm text-white/85 mt-2">Flux quotidien optimise pour les agents: lecture, decision, suivi et creation d'inscription.</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">Actions HTMX instantanees</span>
+            <span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">Mode production</span>
+        </div>
+    </div>
+</div>
+
 <!-- ================= ALERTES SYSTÈME ================= -->
 {% if alerts %}
 <div class="space-y-3 mb-6">
@@ -99,45 +114,37 @@
 
 <!-- ================= INDICATEUR ANNEXE ================= -->
 {% if not is_global %}
-<div class="bg-gradient-to-r from-[#1e4f6f] to-[#2d6a8f] rounded-2xl p-4 sm:p-5 mb-6 text-white">
+<div class="bg-gradient-to-r from-primary-700 to-primary-600 rounded-2xl p-5 mb-6 text-white border border-white/10 shadow-sm">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div class="flex items-center gap-4">
-            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-building text-lg sm:text-xl"></i>
+            <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
+                <i class="fas fa-building text-lg"></i>
             </div>
             <div>
-                <p class="text-xs sm:text-sm text-white/70">Annexe actuelle</p>
-                <p class="font-bold text-base sm:text-lg">{{ branch.name|default:"Non assignée" }}</p>
+                <p class="text-xs uppercase tracking-wide text-primary-100">Perimetre actif</p>
+                <p class="font-bold text-lg">{{ branch.name|default:"Non assignee" }}</p>
             </div>
         </div>
-        <div class="flex items-center gap-4">
-            <div class="text-left sm:text-right">
-                <p class="text-xs sm:text-sm text-white/70">Vous gérez uniquement</p>
-                <p class="font-semibold text-sm sm:text-base">les candidatures de cette annexe</p>
-            </div>
-        </div>
+        <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/15 border border-white/20 w-fit">
+            Gestion locale des candidatures
+        </span>
     </div>
 </div>
 {% else %}
-<div class="bg-gradient-to-r from-[#1db5b0] to-[#49c7c3] rounded-2xl p-4 sm:p-5 mb-6 text-white">
+<div class="bg-gradient-to-r from-secondary to-[#49c7c3] rounded-2xl p-5 mb-6 text-white border border-white/10 shadow-sm">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div class="flex items-center gap-4">
-            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-globe text-lg sm:text-xl"></i>
+            <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
+                <i class="fas fa-globe text-lg"></i>
             </div>
             <div>
-                <p class="text-xs sm:text-sm text-white/70">Mode Direction</p>
-                <p class="font-bold text-base sm:text-lg">Vue Globale - Toutes les annexes</p>
+                <p class="text-xs uppercase tracking-wide text-white/80">Mode direction</p>
+                <p class="font-bold text-lg">Vue globale des annexes</p>
             </div>
         </div>
-        <div class="flex items-center gap-3">
-            <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/20">
-                <i class="fas fa-eye mr-1"></i> Accès complet
-            </span>
-            <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/20">
-                <i class="fas fa-code-branch mr-1"></i> {{ branches_count|default:0 }} annexe{{ branches_count|pluralize }}
-            </span>
-        </div>
+        <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/15 border border-white/20 w-fit">
+            {{ branches_count|default:0 }} annexe{{ branches_count|pluralize }}
+        </span>
     </div>
 </div>
 {% endif %}
@@ -446,7 +453,7 @@
                 <span class="px-3 py-1 rounded-full text-xs font-semibold" style="background-color: rgba(243, 156, 18, 0.1); color: #f39c12;">
                     {{ pending_candidatures|length }}
                 </span>
-                <button hx-get="{% url 'accounts:candidatures_list_htmx' %}?status=pending"
+                <button hx-get="{% url 'accounts:candidatures_list_htmx' %}?status=submitted"
                         hx-target="#pending-list"
                         hx-swap="innerHTML"
                         class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Actualiser">
@@ -674,7 +681,7 @@
     <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2" style="background-color: #f4fbfb;">
         <h2 class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">
             <i class="fas fa-user-check mr-2" style="color: #1db5b0;"></i>
-            <span class="hidden sm:inline">Candidatures acceptées - Prêtes pour inscription</span>
+            <span class="hidden sm:inline">Candidatures acceptees - A inscrire</span>
             <span class="sm:hidden">Acceptées</span>
         </h2>
         <div class="flex items-center gap-2">
@@ -700,15 +707,9 @@
                             <p class="text-xs text-slate-500">{{ cand.email }}</p>
                         </div>
                     </div>
-                    {% if cand.inscription %}
-                    <span class="px-2 py-1 text-xs font-medium rounded-lg bg-green-100 text-green-700">
-                        <i class="fas fa-check-circle mr-1"></i>Inscrit
-                    </span>
-                    {% else %}
                     <span class="px-2 py-1 text-xs font-medium rounded-lg" style="background-color: rgba(243, 156, 18, 0.1); color: #f39c12;">
                         <i class="fas fa-clock mr-1"></i>En attente
                     </span>
-                    {% endif %}
                 </div>
                 <div class="grid grid-cols-2 gap-2 text-sm mb-3">
                     <div>
@@ -721,13 +722,6 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    {% if cand.inscription %}
-                    <button onclick="showInscriptionModal('{{ cand.full_name|escapejs }}', '{{ cand.inscription.access_code }}', '{{ cand.inscription.get_public_url }}')"
-                            class="flex-1 px-4 py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2"
-                            style="background-color: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
-                        <i class="fas fa-link"></i>Voir lien
-                    </button>
-                    {% else %}
                     <button hx-post="{% url 'accounts:create_inscription_htmx' cand.id %}"
                             hx-target="#accepted-card-{{ cand.id }}" hx-swap="outerHTML"
                             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
@@ -735,7 +729,6 @@
                             style="background-color: rgba(29, 181, 176, 0.1); color: #1db5b0;">
                         <i class="fas fa-plus"></i>Créer inscription
                     </button>
-                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -780,25 +773,12 @@
                         <td class="py-4 text-slate-600">{{ cand.entry_year }}ère/ème année</td>
                         <td class="py-4 text-slate-600">{{ cand.reviewed_at|date:"d/m/Y" }}</td>
                         <td class="py-4">
-                            {% if cand.inscription %}
-                            <span class="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700">
-                                <i class="fas fa-check-circle mr-1"></i>Inscrit
-                            </span>
-                            {% else %}
                             <span class="px-3 py-1.5 text-xs font-medium rounded-lg" style="background-color: rgba(243, 156, 18, 0.1); color: #f39c12;">
                                 <i class="fas fa-clock mr-1"></i>En attente
                             </span>
-                            {% endif %}
                         </td>
                         <td class="py-4">
                             <div class="flex items-center gap-2">
-                                {% if cand.inscription %}
-                                <button onclick="showInscriptionModal('{{ cand.full_name|escapejs }}', '{{ cand.inscription.access_code }}', '{{ cand.inscription.get_public_url }}')"
-                                        class="px-3 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
-                                        style="background-color: rgba(30, 79, 111, 0.1); color: #1e4f6f;">
-                                    <i class="fas fa-link"></i>Lien
-                                </button>
-                                {% else %}
                                 <button hx-post="{% url 'accounts:create_inscription_htmx' cand.id %}"
                                         hx-target="#accepted-row-{{ cand.id }}" hx-swap="outerHTML"
                                         hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
@@ -806,7 +786,6 @@
                                         style="background-color: rgba(29, 181, 176, 0.1); color: #1db5b0;">
                                     <i class="fas fa-plus"></i>Créer inscription
                                 </button>
-                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -841,8 +820,8 @@
             <div class="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full flex items-center justify-center" style="background-color: rgba(30, 79, 111, 0.1);">
                 <i class="fas fa-user-plus text-2xl sm:text-3xl" style="color: #1e4f6f;"></i>
             </div>
-            <p class="font-semibold text-slate-600">Aucune candidature acceptée</p>
-            <p class="text-sm text-slate-400 mt-1">Les candidatures acceptées apparaîtront ici</p>
+            <p class="font-semibold text-slate-600">Aucune candidature a inscrire</p>
+            <p class="text-sm text-slate-400 mt-1">Toutes les candidatures acceptees ont deja ete traitees.</p>
         </div>
         {% endif %}
     </div>

@@ -1,17 +1,175 @@
-{% extends 'superadmin/base.html' %}
-{% block content %}
-<div class="container-fluid">
-    <h1 class="h3 mb-4">{{ form_title|default:'Nouvelle page' }}</h1>
-    <div class="card">
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Edition des contenus et blocs legaux{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6 max-w-6xl">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
         <div class="card-body">
-            <form method="post">
+            <form method="post" class="space-y-6" id="legal-page-form">
                 {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit" class="btn btn-success">Enregistrer</button>
-                <a href="{% url 'superadmin:pages' %}" class="btn btn-secondary">Annuler</a>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label class="text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Type de page</span>
+                        <select name="page_type" class="w-full rounded-lg border border-slate-300 px-3 py-2" {% if page_obj %}disabled{% endif %} required>
+                            <option value="">Selectionner</option>
+                            {% for value, label in page_types %}
+                            <option value="{{ value }}" {% if page_obj.page_type == value or initial_page_type == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if page_obj %}
+                        <input type="hidden" name="page_type" value="{{ page_obj.page_type }}">
+                        {% endif %}
+                    </label>
+
+                    <label class="text-sm text-slate-700 md:col-span-2">
+                        <span class="block mb-1 font-medium">Titre</span>
+                        <input type="text" name="title" value="{{ page_obj.title|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                    </label>
+
+                    <label class="text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Version</span>
+                        <input type="text" name="version" value="{{ page_obj.version|default:'1.0' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                    </label>
+
+                    <label class="text-sm text-slate-700 md:col-span-2">
+                        <span class="block mb-1 font-medium">Statut</span>
+                        <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if page_obj.status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+
+                <label class="text-sm text-slate-700 block">
+                    <span class="block mb-1 font-medium">Introduction</span>
+                    <textarea name="introduction" rows="6" class="w-full rounded-lg border border-slate-300 px-3 py-2">{{ page_obj.introduction|default:'' }}</textarea>
+                </label>
+
+                <div class="border-t pt-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-base font-semibold text-slate-900 mb-0">Sections principales</h3>
+                        <button type="button" id="add-section-row" class="btn btn-outline btn-sm">Ajouter section</button>
+                    </div>
+
+                    <div id="sections-container" class="space-y-3">
+                        {% for section in sections %}
+                        <div class="rounded-lg border border-slate-200 p-3 section-row">
+                            <input type="hidden" name="section_id[]" value="{{ section.pk }}">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <input type="text" name="section_title[]" value="{{ section.title }}" placeholder="Titre section" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2">
+                                <input type="number" name="section_order[]" value="{{ section.order }}" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Ordre">
+                            </div>
+                            <textarea name="section_content[]" rows="4" class="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Contenu">{{ section.content }}</textarea>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="section_is_active[]" value="{{ forloop.counter0 }}" {% if section.is_active %}checked{% endif %}> Active
+                            </label>
+                        </div>
+                        {% empty %}
+                        <div class="rounded-lg border border-slate-200 p-3 section-row">
+                            <input type="hidden" name="section_id[]" value="">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <input type="text" name="section_title[]" placeholder="Titre section" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2">
+                                <input type="number" name="section_order[]" value="1" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Ordre">
+                            </div>
+                            <textarea name="section_content[]" rows="4" class="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Contenu"></textarea>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="section_is_active[]" value="0" checked> Active
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="border-t pt-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-base font-semibold text-slate-900 mb-0">Blocs sidebar</h3>
+                        <button type="button" id="add-sidebar-row" class="btn btn-outline btn-sm">Ajouter bloc</button>
+                    </div>
+
+                    <div id="sidebar-container" class="space-y-3">
+                        {% for block in sidebar_blocks %}
+                        <div class="rounded-lg border border-slate-200 p-3 sidebar-row">
+                            <input type="hidden" name="sidebar_id[]" value="{{ block.pk }}">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <input type="text" name="sidebar_title[]" value="{{ block.title }}" placeholder="Titre bloc" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2">
+                                <input type="number" name="sidebar_order[]" value="{{ block.order }}" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Ordre">
+                            </div>
+                            <textarea name="sidebar_content[]" rows="3" class="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Contenu">{{ block.content }}</textarea>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="sidebar_is_active[]" value="{{ forloop.counter0 }}" {% if block.is_active %}checked{% endif %}> Active
+                            </label>
+                        </div>
+                        {% empty %}
+                        <div class="rounded-lg border border-slate-200 p-3 sidebar-row">
+                            <input type="hidden" name="sidebar_id[]" value="">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <input type="text" name="sidebar_title[]" placeholder="Titre bloc" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2">
+                                <input type="number" name="sidebar_order[]" value="1" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Ordre">
+                            </div>
+                            <textarea name="sidebar_content[]" rows="3" class="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Contenu"></textarea>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="sidebar_is_active[]" value="0" checked> Active
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:page_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
             </form>
         </div>
-    </div>
+    </section>
 </div>
+
+<script>
+(function () {
+    const sectionBtn = document.getElementById('add-section-row');
+    const sidebarBtn = document.getElementById('add-sidebar-row');
+    const sectionsContainer = document.getElementById('sections-container');
+    const sidebarContainer = document.getElementById('sidebar-container');
+
+    function nextOrder(container, selector) {
+        const rows = Array.from(container.querySelectorAll(selector));
+        return rows.length + 1;
+    }
+
+    sectionBtn && sectionBtn.addEventListener('click', function () {
+        const idx = sectionsContainer.querySelectorAll('.section-row').length;
+        const order = nextOrder(sectionsContainer, '.section-row');
+        const html = '<div class="rounded-lg border border-slate-200 p-3 section-row">'
+            + '<input type="hidden" name="section_id[]" value="">'
+            + '<div class="grid grid-cols-1 md:grid-cols-3 gap-3">'
+            + '<input type="text" name="section_title[]" placeholder="Titre section" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2">'
+            + '<input type="number" name="section_order[]" value="' + order + '" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Ordre">'
+            + '</div>'
+            + '<textarea name="section_content[]" rows="4" class="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Contenu"></textarea>'
+            + '<label class="mt-2 inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" name="section_is_active[]" value="' + idx + '" checked> Active</label>'
+            + '</div>';
+        sectionsContainer.insertAdjacentHTML('beforeend', html);
+    });
+
+    sidebarBtn && sidebarBtn.addEventListener('click', function () {
+        const idx = sidebarContainer.querySelectorAll('.sidebar-row').length;
+        const order = nextOrder(sidebarContainer, '.sidebar-row');
+        const html = '<div class="rounded-lg border border-slate-200 p-3 sidebar-row">'
+            + '<input type="hidden" name="sidebar_id[]" value="">'
+            + '<div class="grid grid-cols-1 md:grid-cols-3 gap-3">'
+            + '<input type="text" name="sidebar_title[]" placeholder="Titre bloc" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2">'
+            + '<input type="number" name="sidebar_order[]" value="' + order + '" class="rounded-lg border border-slate-300 px-3 py-2" placeholder="Ordre">'
+            + '</div>'
+            + '<textarea name="sidebar_content[]" rows="3" class="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Contenu"></textarea>'
+            + '<label class="mt-2 inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" name="sidebar_is_active[]" value="' + idx + '" checked> Active</label>'
+            + '</div>';
+        sidebarContainer.insertAdjacentHTML('beforeend', html);
+    });
+})();
+</script>
 {% endblock %}
 

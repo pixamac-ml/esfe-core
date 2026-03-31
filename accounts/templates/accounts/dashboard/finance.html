@@ -7,47 +7,83 @@
     {% if is_global %}Vue globale - Toutes les annexes{% else %}Votre tableau de bord{% endif %}
 {% endblock %}
 
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .fin-soft-header { background-color: #f4fbfb; }
+    .fin-chip-primary { background-color: rgba(30, 79, 111, 0.1); color: #1e4f6f; }
+    .fin-chip-secondary { background-color: rgba(29, 181, 176, 0.1); color: #1db5b0; }
+    .fin-chip-blue { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+    .fin-clickable { cursor: pointer; }
+    .fin-clickable:hover { transform: translateY(-1px); }
+    .fin-workbench-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+    .fin-workbench-card:hover {
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.09);
+    }
+    .fin-kpi-card {
+        border-radius: 1rem;
+        border: 1px solid #e2e8f0;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+    .fin-hero {
+        background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 55%, #1db5b0 100%);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+</style>
+{% endblock %}
+
 {% block dashboard_content %}
 
-<!-- ================= BRANCH INFO BANNER ================= -->
-{% if not is_global %}
-<div class="bg-gradient-to-r from-[#1e4f6f] to-[#2d6a8f] rounded-2xl p-4 sm:p-5 mb-6 text-white">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div class="flex items-center gap-3 sm:gap-4">
-            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-user-tie text-lg sm:text-xl"></i>
-            </div>
-            <div>
-                <p class="font-semibold text-sm sm:text-base">{{ request.user.get_full_name|default:request.user.username }}</p>
-                <p class="text-xs sm:text-sm text-white/70">Agent de paiement</p>
-            </div>
+<!-- ================= OPERATION HERO ================= -->
+<div class="fin-hero rounded-2xl p-5 sm:p-6 mb-6 text-white">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-widest text-white/80">Poste de travail finance</p>
+            <h2 class="text-xl sm:text-2xl font-bold mt-1">Encaissements, sessions cash et validation des paiements</h2>
+            <p class="text-sm text-white/85 mt-2">Un seul ecran pour traiter rapidement les operations quotidiennes des agents.</p>
         </div>
-        <div class="flex items-center gap-4 sm:gap-6">
-            <div class="text-left sm:text-center px-0 sm:px-4 sm:border-r border-white/20">
-                <p class="text-xs sm:text-sm text-white/70">Annexe</p>
-                <p class="font-bold text-sm sm:text-base">{{ branch.name|default:"Non assignée" }}</p>
-            </div>
-            <div class="text-left sm:text-right">
-                <p class="text-xs sm:text-sm text-white/70">Périmètre</p>
-                <p class="font-semibold text-xs sm:text-sm">Cette annexe uniquement</p>
-            </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">Traitement HTMX en temps reel</span>
+            <span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">Mode production</span>
         </div>
     </div>
 </div>
-{% else %}
-<div class="bg-gradient-to-r from-[#1db5b0] to-[#49c7c3] rounded-2xl p-4 sm:p-5 mb-6 text-white">
+
+<!-- ================= BRANCH INFO BANNER ================= -->
+{% if not is_global %}
+<div class="bg-gradient-to-r from-primary-700 to-primary-600 rounded-2xl p-5 mb-6 text-white border border-white/10 shadow-sm">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div class="flex items-center gap-3 sm:gap-4">
-            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-globe text-lg sm:text-xl"></i>
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
+                <i class="fas fa-user-tie text-lg"></i>
             </div>
             <div>
-                <p class="text-xs sm:text-sm text-white/70">Mode Direction</p>
-                <p class="font-bold text-base sm:text-lg">Vue Globale - Toutes les annexes</p>
+                <p class="text-xs uppercase tracking-wide text-primary-100">Agent de paiement</p>
+                <p class="font-bold text-lg">{{ branch.name|default:"Non assignee" }}</p>
             </div>
         </div>
-        <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/20 w-fit">
-            <i class="fas fa-eye mr-1"></i> Tous les paiements
+        <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/15 border border-white/20 w-fit">Perimetre local</span>
+    </div>
+</div>
+{% else %}
+<div class="bg-gradient-to-r from-secondary to-[#49c7c3] rounded-2xl p-5 mb-6 text-white border border-white/10 shadow-sm">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
+                <i class="fas fa-globe text-lg"></i>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-wide text-white/80">Mode direction</p>
+                <p class="font-bold text-lg">Vue globale des paiements</p>
+            </div>
+        </div>
+        <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/15 border border-white/20 w-fit">
+            Acces complet
         </span>
     </div>
 </div>
@@ -120,7 +156,7 @@
      hx-swap="innerHTML">
 
     <!-- Paiements du jour -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5">
+    <div class="stat-card fin-kpi-card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(29, 181, 176, 0.1);">
                 <i class="fas fa-receipt text-lg sm:text-xl" style="color: #1db5b0;"></i>
@@ -131,7 +167,7 @@
     </div>
 
     <!-- Collecte du jour -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5">
+    <div class="stat-card fin-kpi-card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(34, 197, 94, 0.1);">
                 <i class="fas fa-money-bill-wave text-lg sm:text-xl" style="color: #22c55e;"></i>
@@ -142,7 +178,7 @@
     </div>
 
     <!-- En attente -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5">
+    <div class="stat-card fin-kpi-card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(243, 156, 18, 0.1);">
                 <i class="fas fa-hourglass-half text-lg sm:text-xl" style="color: #f39c12;"></i>
@@ -153,7 +189,7 @@
     </div>
 
     <!-- Collecte semaine -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5">
+    <div class="stat-card fin-kpi-card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(59, 130, 246, 0.1);">
                 <i class="fas fa-calendar-week text-lg sm:text-xl" style="color: #3b82f6;"></i>
@@ -164,7 +200,7 @@
     </div>
 
     <!-- Total global -->
-    <div class="stat-card bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 col-span-2 sm:col-span-1">
+    <div class="stat-card fin-kpi-card p-4 sm:p-5 col-span-2 sm:col-span-1">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(139, 92, 246, 0.1);">
                 <i class="fas fa-chart-line text-lg sm:text-xl" style="color: #8b5cf6;"></i>
@@ -179,14 +215,14 @@
 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
 
     <!-- Paiements en attente de validation -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" id="pending-payments-section">
-        <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
-            <h2 class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">
-                <i class="fas fa-clock mr-2" style="color: #f39c12;"></i>
+    <div class="fin-workbench-card overflow-hidden" id="pending-payments-section">
+        <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between fin-soft-header">
+            <h2 class="font-bold text-base sm:text-lg text-primary-700">
+                <i class="fas fa-clock mr-2 text-accent"></i>
                 <span class="hidden sm:inline">Paiements en attente</span>
                 <span class="sm:hidden">En attente</span>
             </h2>
-            <span class="px-3 py-1 rounded-full text-xs font-semibold" style="background-color: rgba(243, 156, 18, 0.1); color: #f39c12;">
+            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-accent/10 text-accent">
                 {{ pending_payments|length }}
             </span>
         </div>
@@ -257,14 +293,14 @@
     </div>
 
     <!-- Inscriptions en attente de paiement -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
-            <h2 class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">
-                <i class="fas fa-user-plus mr-2" style="color: #3b82f6;"></i>
+    <div class="fin-workbench-card overflow-hidden">
+        <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between fin-soft-header">
+            <h2 class="font-bold text-base sm:text-lg text-primary-700">
+                <i class="fas fa-user-plus mr-2 text-blue-500"></i>
                 <span class="hidden sm:inline">Inscriptions en attente</span>
                 <span class="sm:hidden">Inscriptions</span>
             </h2>
-            <span class="px-3 py-1 rounded-full text-xs font-semibold" style="background-color: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+            <span class="px-3 py-1 rounded-full text-xs font-semibold fin-chip-blue">
                 {{ inscriptions_pending|length }}
             </span>
         </div>
@@ -272,13 +308,14 @@
             {% if inscriptions_pending %}
             <div class="space-y-3">
                 {% for ins in inscriptions_pending %}
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors gap-3"
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all gap-3 fin-clickable"
                      hx-get="{% url 'accounts:inscription_finance_detail_htmx' ins.id %}"
                      hx-target="#modal-container"
                      hx-trigger="click"
-                     style="cursor: pointer;">
+                     role="button"
+                     aria-label="Voir le detail de l'inscription">
                     <div class="flex items-center gap-3 sm:gap-4 min-w-0">
-                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style="background: linear-gradient(135deg, #1e4f6f 0%, #2d6a8f 100%);">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-white text-sm flex-shrink-0 bg-gradient-to-br from-primary-700 to-primary-600">
                             {{ ins.candidature.first_name.0|upper }}{{ ins.candidature.last_name.0|upper }}
                         </div>
                         <div class="flex-1 min-w-0">
@@ -298,7 +335,7 @@
                         </div>
                     </div>
                     <div class="text-right flex-shrink-0">
-                        <p class="text-lg sm:text-xl font-bold" style="color: #f39c12;">{{ ins.balance|intcomma }} F</p>
+                        <p class="text-lg sm:text-xl font-bold text-accent">{{ ins.balance|intcomma }} F</p>
                         <p class="text-xs text-slate-500">solde restant</p>
                     </div>
                 </div>
@@ -318,7 +355,7 @@
 </div>
 
 <!-- ================= CASH PAYMENT SESSIONS ================= -->
-<div class="bg-white rounded-2xl shadow-sm border border-slate-100 mb-6" id="cash-sessions-section">
+<div class="fin-workbench-card mb-6" id="cash-sessions-section">
     <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style="background-color: #f4fbfb;">
         <h2 class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">
             <i class="fas fa-money-bill-alt mr-2" style="color: #8b5cf6;"></i>
@@ -449,13 +486,13 @@
 </div>
 
 <!-- ================= ALL PAYMENTS TABLE ================= -->
-<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" id="payments-table-section">
-    <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between" style="background-color: #f4fbfb;">
-        <h2 class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">
-            <i class="fas fa-list-alt mr-2" style="color: #1db5b0;"></i>
+<div class="fin-workbench-card overflow-hidden" id="payments-table-section">
+    <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between fin-soft-header">
+        <h2 class="font-bold text-base sm:text-lg text-primary-700">
+            <i class="fas fa-list-alt mr-2 text-secondary"></i>
             Historique des paiements
         </h2>
-        <span class="px-3 py-1 rounded-full text-xs font-semibold" style="background-color: rgba(29, 181, 176, 0.1); color: #1db5b0;">
+        <span class="px-3 py-1 rounded-full text-xs font-semibold fin-chip-secondary">
             {{ payments.paginator.count }} total
         </span>
     </div>
@@ -595,9 +632,9 @@
         {% endif %}
 
         {% else %}
-        <div class="text-center py-12">
-            <div class="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full flex items-center justify-center" style="background-color: rgba(30, 79, 111, 0.1);">
-                <i class="fas fa-receipt text-2xl sm:text-3xl" style="color: #1e4f6f;"></i>
+        <div class="text-center py-12 rounded-xl border border-dashed border-slate-200 bg-slate-50/60">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full flex items-center justify-center bg-primary-50">
+                <i class="fas fa-receipt text-2xl sm:text-3xl text-primary-600"></i>
             </div>
             <p class="font-semibold text-slate-600">Aucun paiement trouvé</p>
             <p class="text-sm text-slate-400 mt-1">

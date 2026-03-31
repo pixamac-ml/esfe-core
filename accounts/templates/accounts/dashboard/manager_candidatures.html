@@ -113,7 +113,7 @@
                                     </svg>
                                 </button>
                                 
-                                {% if candidature.status in 'submitted,under_review' %}
+                                {% if candidature.status == 'submitted' or candidature.status == 'under_review' %}
                                 <button hx-post="{% url 'accounts:htmx_candidature_accept' candidature.pk %}"
                                         hx-target="#candidature-{{ candidature.pk }}"
                                         hx-swap="outerHTML"
@@ -137,7 +137,8 @@
                                 </button>
                                 {% endif %}
                                 
-                                {% if candidature.status in 'accepted,accepted_with_reserve' and not candidature.inscription %}
+                                {% if candidature.status == 'accepted' or candidature.status == 'accepted_with_reserve' %}
+                                {% if not candidature.inscription %}
                                 <button hx-post="{% url 'accounts:htmx_inscription_create' candidature.pk %}"
                                         hx-target="#candidature-{{ candidature.pk }}"
                                         hx-swap="afterend"
@@ -145,6 +146,7 @@
                                         class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors">
                                     Créer inscription
                                 </button>
+                                {% endif %}
                                 {% endif %}
                             </div>
                         </td>

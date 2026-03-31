@@ -9,7 +9,7 @@ Fonctions d'export CSV pour les dashboards.
 """
 
 import csv
-from datetime import timedelta
+from datetime import datetime
 
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
@@ -52,12 +52,15 @@ def export_candidatures_csv(request):
         get_base_queryset(user, "candidature")
         .filter(is_deleted=False)
         .select_related("programme", "branch")
-        .order_by("-created_at")
+        .order_by("-submitted_at")
     )
 
     # Filtres depuis GET
     status = request.GET.get("status")
     programme_id = request.GET.get("programme")
+
+    if status == "pending":
+        status = "submitted"
 
     if status:
         candidatures = candidatures.filter(status=status)
@@ -96,6 +99,7 @@ def export_candidatures_csv(request):
         "under_review": "En révision",
         "to_complete": "À compléter",
         "accepted": "Acceptée",
+        "accepted_with_reserve": "Acceptée sous réserve",
         "rejected": "Rejetée",
     }
 
@@ -109,7 +113,7 @@ def export_candidatures_csv(request):
             c.programme.title if c.programme else "",
             c.branch.name if c.branch else "",
             status_labels.get(c.status, c.status),
-            c.created_at.strftime("%d/%m/%Y %H:%M") if c.created_at else "",
+            c.submitted_at.strftime("%d/%m/%Y %H:%M") if c.submitted_at else "",
             c.reviewed_at.strftime("%d/%m/%Y %H:%M") if c.reviewed_at else "",
             c.reviewed_by.get_full_name() if c.reviewed_by else "",
         ])
@@ -142,9 +146,8 @@ def export_payments_csv(request):
             "inscription__candidature__programme",
             "inscription__candidature__branch",
             "agent",
-            "validated_by",
         )
-        .order_by("-created_at")
+        .order_by("-paid_at")
     )
 
     # Filtres depuis GET
@@ -217,7 +220,7 @@ def export_payments_csv(request):
             candidature.branch.name if candidature and candidature.branch else "",
             p.agent.user.get_full_name() if p.agent else "",
             p.paid_at.strftime("%d/%m/%Y %H:%M") if p.paid_at else "",
-            p.validated_by.get_full_name() if p.validated_by else "",
+            "",
         ])
 
     return response
@@ -252,7 +255,7 @@ def export_executive_csv(request):
     today = timezone.now().date()
     month_start = today.replace(day=1)
     month_start_dt = timezone.make_aware(
-        timezone.datetime.combine(month_start, timezone.datetime.min.time())
+        datetime.combine(month_start, datetime.min.time())
     )
 
     # ========================================

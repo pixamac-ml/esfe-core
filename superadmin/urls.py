@@ -212,6 +212,14 @@ urlpatterns = [
     path('messages/<int:pk>/delete/', views.message_delete, name='message_delete'),
 
     # ============================================================================
+    # USERS (Gestion des comptes staff)
+    # ============================================================================
+    path('users/', views.user_list, name='user_list'),
+    path('users/create/', views.user_create, name='user_create'),
+    path('users/<int:pk>/edit/', views.user_edit, name='user_edit'),
+    path('users/<int:pk>/toggle-active/', views.user_toggle_active, name='user_toggle_active'),
+
+    # ============================================================================
     # SETTINGS (Paramètres Institution)
     # ============================================================================
     path('settings/', views.settings, name='settings'),

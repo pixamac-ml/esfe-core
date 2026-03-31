@@ -16,6 +16,7 @@ urlpatterns = [
     path("apropos/", views.about, name="about"),
     path("contact/", views.contact_view, name="contact"),
     path("plan-du-site/", views.sitemap, name="sitemap"),
+    path("robots.txt", views.robots_txt, name="robots_txt"),
 
 
     # =====================================================
@@ -31,6 +32,9 @@ urlpatterns = [
         views.legal_page_pdf,
         name="legal_pdf"
     ),
+
+    # Apercu des pages d'erreur (dev/preprod)
+    path("erreurs/<int:error_code>/", views.preview_error_page, name="error_page_preview"),
 
 
     # =====================================================

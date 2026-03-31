@@ -7,12 +7,122 @@ from django.urls import reverse
 from PIL import Image
 
 from news.models import Event, EventType, MediaItem, ResultSession
-from core.models import ContactMessage
+from core.models import ContactMessage, LegalPage
 from branches.models import Branch
 from payments.models import PaymentAgent
 
 
 User = get_user_model()
+
+
+class SuperadminAccessPolicyTests(TestCase):
+    def test_superuser_can_access_superadmin_dashboard(self):
+        admin_user = User.objects.create_superuser(
+            username='admin_root',
+            email='admin_root@example.com',
+            password='pass1234',
+        )
+        self.client.force_login(admin_user)
+
+        response = self.client.get(reverse('superadmin:dashboard'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_staff_user_is_denied_superadmin_dashboard(self):
+        staff_user = User.objects.create_user(
+            username='staff_ops',
+            email='staff_ops@example.com',
+            password='pass1234',
+            is_staff=True,
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.get(reverse('superadmin:dashboard'))
+        self.assertEqual(response.status_code, 302)
+
+
+class SuperadminUserManagementTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='admin_users',
+            email='admin_users@example.com',
+            password='pass1234',
+        )
+        self.client.force_login(self.user)
+        self.branch = Branch.objects.create(name='Annexe Test', code='ATS', slug='annexe-test')
+
+    def test_create_user_with_role_and_group(self):
+        list_response = self.client.get(reverse('superadmin:user_list'))
+        self.assertEqual(list_response.status_code, 200)
+        group_id = str(list_response.context['groups'].first().id)
+
+        response = self.client.post(
+            reverse('superadmin:user_create'),
+            {
+                'username': 'agent_adm',
+                'email': 'agent_adm@example.com',
+                'first_name': 'Agent',
+                'last_name': 'Admission',
+                'password': 'pass1234',
+                'role': 'admissions',
+                'branch': str(self.branch.pk),
+                'groups': [group_id],
+                'is_staff': 'on',
+                'is_active': 'on',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        created = User.objects.get(username='agent_adm')
+        self.assertTrue(created.is_staff)
+        self.assertTrue(created.is_active)
+        self.assertEqual(created.profile.role, 'admissions')
+        self.assertEqual(created.profile.branch_id, self.branch.pk)
+        self.assertTrue(created.groups.exists())
+
+    def test_edit_user_updates_role_groups(self):
+        target = User.objects.create_user(
+            username='agent_finance',
+            email='agent_finance@example.com',
+            password='pass1234',
+            is_staff=True,
+        )
+
+        list_response = self.client.get(reverse('superadmin:user_list'))
+        self.assertEqual(list_response.status_code, 200)
+        group_id = str(list_response.context['groups'].first().id)
+
+        response = self.client.post(
+            reverse('superadmin:user_edit', args=[target.pk]),
+            {
+                'username': 'agent_finance',
+                'email': 'agent_finance@example.com',
+                'first_name': 'Agent',
+                'last_name': 'Finance',
+                'role': 'finance',
+                'branch': str(self.branch.pk),
+                'groups': [group_id],
+                'is_staff': 'on',
+                'is_active': 'on',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        target.refresh_from_db()
+        self.assertEqual(target.profile.role, 'finance')
+        self.assertEqual(target.profile.branch_id, self.branch.pk)
+        self.assertEqual(target.groups.count(), 1)
+
+    def test_non_staff_user_is_denied_superadmin_dashboard(self):
+        basic_user = User.objects.create_user(
+            username='basic_user',
+            email='basic_user@example.com',
+            password='pass1234',
+            is_staff=False,
+        )
+        self.client.force_login(basic_user)
+
+        response = self.client.get(reverse('superadmin:dashboard'))
+        self.assertEqual(response.status_code, 302)
 
 
 class GalleryBulkUploadTests(TestCase):
@@ -345,5 +455,50 @@ class ResultModuleTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-table')
         self.assertContains(response, 'Session HX')
+
+
+class LegalPagesSuperadminTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='admin_legal',
+            email='admin_legal@example.com',
+            password='pass1234',
+        )
+        self.client.force_login(self.user)
+
+    def test_page_list_is_accessible(self):
+        response = self.client.get(reverse('superadmin:page_list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_create_legal_page_from_superadmin(self):
+        response = self.client.post(
+            reverse('superadmin:page_create'),
+            {
+                'page_type': 'legal',
+                'title': 'Mentions legales',
+                'introduction': 'Introduction test',
+                'version': '1.0',
+                'status': 'published',
+                'section_id[]': [''],
+                'section_title[]': ['Identification'],
+                'section_content[]': ['Contenu section'],
+                'section_order[]': ['1'],
+                'section_is_active[]': ['0'],
+                'sidebar_id[]': [''],
+                'sidebar_title[]': ['Contact'],
+                'sidebar_content[]': ['contact@example.com'],
+                'sidebar_order[]': ['1'],
+                'sidebar_is_active[]': ['0'],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        page = LegalPage.objects.get(page_type='legal')
+        self.assertEqual(page.status, 'published')
+        self.assertEqual(page.sections.count(), 1)
+        self.assertEqual(page.sidebar_blocks.count(), 1)
+
+        public_response = self.client.get(reverse('core:legal_notice'))
+        self.assertEqual(public_response.status_code, 200)
 
 

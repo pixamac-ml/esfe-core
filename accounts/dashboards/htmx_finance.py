@@ -775,7 +775,7 @@ def payments_list_htmx(request):
     # Filtres
     method = request.GET.get("method")
     status = request.GET.get("status")
-    search = request.GET.get("q")
+    search = (request.GET.get("q") or request.GET.get("search") or "").strip()
 
     if method:
         payments = payments.filter(method=method)
@@ -784,12 +784,19 @@ def payments_list_htmx(request):
         payments = payments.filter(status=status)
 
     if search:
-        payments = payments.filter(
+        search_filter = (
             Q(reference__icontains=search) |
             Q(inscription__public_token__icontains=search) |
             Q(inscription__candidature__last_name__icontains=search) |
-            Q(inscription__candidature__first_name__icontains=search)
+            Q(inscription__candidature__first_name__icontains=search) |
+            Q(inscription__candidature__email__icontains=search)
         )
+
+        # Exact id support for references like PAY-AB12CD34.
+        if search.upper().startswith("PAY-"):
+            search_filter = search_filter | Q(reference__iexact=search)
+
+        payments = payments.filter(search_filter)
 
     # Tri
     order = request.GET.get("order", "recent")
@@ -806,11 +813,16 @@ def payments_list_htmx(request):
     page = request.GET.get("page", 1)
     payments_page = paginator.get_page(page)
 
+    query_data = request.GET.copy()
+    query_data.pop("page", None)
+    pagination_query = query_data.urlencode()
+
     html = render_to_string(
         "accounts/dashboard/partials/payments_table.html",
         {
             "payments": payments_page,
-            "paginator": paginator
+            "paginator": paginator,
+            "pagination_query": pagination_query,
         },
         request=request
     )

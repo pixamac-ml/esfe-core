@@ -1,62 +1,78 @@
 {% extends "accounts/dashboard/base_dashboard.html" %}
 
-{% block title %}Paiements | Gestionnaire{% endblock %}
+{% block dashboard_title %}Paiements{% endblock %}
+{% block dashboard_subtitle %}Controle et validation des paiements - {{ branch.name }}{% endblock %}
 
-{% block content %}
+{% block dashboard_content %}
 <div class="space-y-6">
 
-    <!-- En-tête -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Paiements</h1>
-            <p class="text-gray-600">Gérez et validez les paiements des étudiants</p>
-        </div>
-        
-        <!-- Stats rapides -->
-        <div class="flex items-center space-x-4">
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
-                <p class="text-xs text-yellow-600 font-medium">En attente</p>
-                <p class="text-xl font-bold text-yellow-700">{{ pending_count|default:0 }}</p>
+    <div class="rounded-2xl bg-gradient-to-r from-primary-700 to-primary-600 text-white p-5 border border-white/10 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
+                    <i class="fas fa-wallet"></i>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-primary-100">Poste gestionnaire</p>
+                    <p class="font-bold text-lg">Encaissement et validation des operations</p>
+                </div>
             </div>
-            <div class="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-                <p class="text-xs text-green-600 font-medium">Validés ce mois</p>
-                <p class="text-xl font-bold text-green-700">{{ validated_this_month|default:0 }}</p>
-            </div>
+            <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/15 border border-white/20 w-fit">
+                {{ stats.total|default:0 }} paiement(s)
+            </span>
         </div>
     </div>
 
-    <!-- Filtres -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <a href="?status=" class="bg-white rounded-xl p-4 border {% if not status_filter %}border-primary-500 ring-2 ring-primary-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-slate-900">{{ stats.total|default:0 }}</p>
+            <p class="text-sm text-slate-500">Total</p>
+        </a>
+        <a href="?status=pending" class="bg-white rounded-xl p-4 border {% if status_filter == 'pending' %}border-amber-500 ring-2 ring-amber-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-amber-600">{{ stats.pending|default:0 }}</p>
+            <p class="text-sm text-slate-500">En attente</p>
+        </a>
+        <a href="?status=validated" class="bg-white rounded-xl p-4 border {% if status_filter == 'validated' %}border-green-500 ring-2 ring-green-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-green-600">{{ stats.validated|default:0 }}</p>
+            <p class="text-sm text-slate-500">Valides</p>
+        </a>
+        <a href="?status=cancelled" class="bg-white rounded-xl p-4 border {% if status_filter == 'cancelled' %}border-red-500 ring-2 ring-red-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-red-600">{{ stats.cancelled|default:0 }}</p>
+            <p class="text-sm text-slate-500">Annules</p>
+        </a>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
         <form method="get" class="flex flex-wrap gap-4">
             <div class="flex-1 min-w-[200px]">
-                <input type="text" name="q" value="{{ request.GET.q }}" 
+                <input type="text" name="q" value="{{ search }}"
                        placeholder="Rechercher par référence ou étudiant..."
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                       class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
             </div>
             <div>
-                <select name="status" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <select name="status" class="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
                     <option value="">Tous les statuts</option>
-                    <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>En attente</option>
-                    <option value="validated" {% if request.GET.status == 'validated' %}selected{% endif %}>Validé</option>
-                    <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>Annulé</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>En attente</option>
+                    <option value="validated" {% if status_filter == 'validated' %}selected{% endif %}>Valide</option>
+                    <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Annule</option>
                 </select>
             </div>
             <div>
-                <select name="method" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                    <option value="">Tous les modes</option>
-                    <option value="cash" {% if request.GET.method == 'cash' %}selected{% endif %}>Espèces</option>
-                    <option value="orange_money" {% if request.GET.method == 'orange_money' %}selected{% endif %}>Orange Money</option>
-                    <option value="bank_transfer" {% if request.GET.method == 'bank_transfer' %}selected{% endif %}>Virement</option>
+                <select name="date" class="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                    <option value="" {% if not date_filter %}selected{% endif %}>Toutes periodes</option>
+                    <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Aujourd'hui</option>
+                    <option value="week" {% if date_filter == 'week' %}selected{% endif %}>Cette semaine</option>
+                    <option value="month" {% if date_filter == 'month' %}selected{% endif %}>Ce mois</option>
                 </select>
             </div>
-            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-700 transition">
                 Filtrer
             </button>
         </form>
     </div>
 
     <!-- Tableau des paiements -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -72,9 +88,9 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for payment in payments %}
-                    <tr class="hover:bg-gray-50 transition" id="payment-row-{{ payment.id }}">
+                    <tr class="hover:bg-slate-50 transition" id="payment-row-{{ payment.id }}">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="font-mono text-sm text-blue-600">{{ payment.reference }}</span>
+                            <span class="font-mono text-sm text-primary-700">{{ payment.reference }}</span>
                             {% if payment.receipt_number %}
                             <p class="text-xs text-gray-400">Reçu: {{ payment.receipt_number }}</p>
                             {% endif %}
@@ -86,7 +102,7 @@
                                 </div>
                                 <div class="ml-3">
                                     <p class="font-medium text-gray-900">{{ payment.inscription.candidature.last_name }} {{ payment.inscription.candidature.first_name }}</p>
-                                    <p class="text-sm text-gray-500">{{ payment.inscription.reference }}</p>
+                                    <p class="text-sm text-gray-500">{{ payment.inscription.public_token }}</p>
                                 </div>
                             </div>
                         </td>
@@ -123,7 +139,7 @@
                         <td class="px-6 py-4 whitespace-nowrap text-right">
                             <div class="flex items-center justify-end space-x-2">
                                 <!-- Voir détails -->
-                                <button hx-get="{% url 'accounts:htmx_payment_detail' payment.id %}"
+                                <button hx-get="{% url 'accounts:payment_detail_htmx' payment.id %}"
                                         hx-target="#modal-container"
                                         hx-swap="innerHTML"
                                         @click="modalOpen = true"
@@ -136,7 +152,7 @@
                                 
                                 {% if payment.status == 'pending' %}
                                 <!-- Valider -->
-                                <button hx-post="{% url 'accounts:htmx_payment_validate' payment.id %}"
+                                <button hx-post="{% url 'accounts:validate_payment_htmx' payment.id %}"
                                         hx-target="#payment-row-{{ payment.id }}"
                                         hx-swap="outerHTML"
                                         hx-confirm="Valider ce paiement de {{ payment.amount|floatformat:0 }} FCFA ?"
@@ -147,7 +163,7 @@
                                 </button>
                                 
                                 <!-- Annuler -->
-                                <button hx-post="{% url 'accounts:htmx_payment_cancel' payment.id %}"
+                                <button hx-post="{% url 'accounts:reject_payment_htmx' payment.id %}"
                                         hx-target="#payment-row-{{ payment.id }}"
                                         hx-swap="outerHTML"
                                         hx-confirm="Annuler ce paiement ?"
@@ -176,8 +192,8 @@
                             <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
                             </svg>
-                            <p class="text-lg font-medium">Aucun paiement trouvé</p>
-                            <p class="text-sm">Modifiez vos filtres ou attendez de nouveaux paiements</p>
+                            <p class="text-lg font-medium">Aucun paiement trouve</p>
+                            <p class="text-sm">Ajustez vos filtres ou attendez de nouveaux paiements.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -187,17 +203,17 @@
 
         <!-- Pagination -->
         {% if payments.has_other_pages %}
-        <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+        <div class="bg-slate-50 px-6 py-4 border-t border-slate-200">
             <div class="flex items-center justify-between">
                 <p class="text-sm text-gray-700">
                     Affichage de {{ payments.start_index }} à {{ payments.end_index }} sur {{ payments.paginator.count }} paiements
                 </p>
                 <div class="flex space-x-2">
                     {% if payments.has_previous %}
-                    <a href="?page={{ payments.previous_page_number }}" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition">Précédent</a>
+                    <a href="?page={{ payments.previous_page_number }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-100 transition">Precedent</a>
                     {% endif %}
                     {% if payments.has_next %}
-                    <a href="?page={{ payments.next_page_number }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Suivant</a>
+                    <a href="?page={{ payments.next_page_number }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-700 transition">Suivant</a>
                     {% endif %}
                 </div>
             </div>

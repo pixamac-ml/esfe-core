@@ -36,10 +36,24 @@ def manager_dashboard(request):
     start_of_week = today - timedelta(days=today.weekday())
     start_of_month = today.replace(day=1)
 
+    base_inscriptions = Inscription.objects.filter(
+        candidature__branch=branch,
+        candidature__is_deleted=False,
+        is_archived=False,
+    )
+    base_candidatures = Candidature.objects.filter(
+        branch=branch,
+        is_deleted=False,
+    )
+    base_payments = Payment.objects.filter(
+        inscription__candidature__branch=branch,
+        inscription__candidature__is_deleted=False,
+        inscription__is_archived=False,
+    )
+
     # Inscriptions
     inscriptions = (
-        Inscription.objects
-        .filter(candidature__branch=branch)
+        base_inscriptions
         .select_related(
             "candidature",
             "candidature__programme",
@@ -48,38 +62,27 @@ def manager_dashboard(request):
         .order_by("-created_at")[:10]
     )
 
-    total_inscriptions = Inscription.objects.filter(candidature__branch=branch).count()
-    inscriptions_this_month = Inscription.objects.filter(
-        candidature__branch=branch,
+    total_inscriptions = base_inscriptions.count()
+    inscriptions_this_month = base_inscriptions.filter(
         created_at__date__gte=start_of_month
     ).count()
-    inscriptions_active = Inscription.objects.filter(
-        candidature__branch=branch,
+    inscriptions_active = base_inscriptions.filter(
         status=Inscription.STATUS_ACTIVE
     ).count()
 
     # Candidatures
-    candidatures_pending = Candidature.objects.filter(
-        branch=branch,
+    candidatures_pending = base_candidatures.filter(
         status__in=["submitted", "under_review"],
-        is_deleted=False
     ).count()
 
-    candidatures_to_complete = Candidature.objects.filter(
-        branch=branch,
-        status="to_complete",
-        is_deleted=False
-    ).count()
+    candidatures_to_complete = base_candidatures.filter(status="to_complete").count()
 
-    candidatures_accepted = Candidature.objects.filter(
-        branch=branch,
+    candidatures_accepted = base_candidatures.filter(
         status__in=["accepted", "accepted_with_reserve"],
-        is_deleted=False
     ).count()
 
     recent_candidatures = (
-        Candidature.objects
-        .filter(branch=branch, is_deleted=False)
+        base_candidatures
         .select_related("programme", "programme__cycle")
         .order_by("-submitted_at")[:5]
     )
@@ -87,70 +90,61 @@ def manager_dashboard(request):
     # Étudiants
     total_students = Student.objects.filter(
         inscription__candidature__branch=branch,
+        inscription__candidature__is_deleted=False,
+        inscription__is_archived=False,
         is_active=True
     ).count()
 
     # Paiements
     payments_today = (
-        Payment.objects
-        .filter(
-            inscription__candidature__branch=branch,
-            created_at__date=today
-        )
+        base_payments
+        .filter(paid_at__date=today)
         .select_related(
             "inscription__candidature",
             "inscription__candidature__programme",
         )
-        .order_by("-created_at")
+        .order_by("-paid_at")
     )
 
     recent_payments = (
-        Payment.objects
-        .filter(inscription__candidature__branch=branch)
+        base_payments
         .select_related(
             "inscription__candidature",
             "inscription__candidature__programme",
         )
-        .order_by("-created_at")[:5]
+        .order_by("-paid_at")[:5]
     )
 
     # Stats financières
-    total_today = Payment.objects.filter(
-        inscription__candidature__branch=branch,
+    total_today = base_payments.filter(
         status=Payment.STATUS_VALIDATED,
-        created_at__date=today
+        paid_at__date=today
     ).aggregate(total=Sum("amount"))["total"] or 0
 
-    validated_today_count = Payment.objects.filter(
-        inscription__candidature__branch=branch,
+    validated_today_count = base_payments.filter(
         status=Payment.STATUS_VALIDATED,
-        created_at__date=today
+        paid_at__date=today
     ).count()
 
-    total_week = Payment.objects.filter(
-        inscription__candidature__branch=branch,
+    total_week = base_payments.filter(
         status=Payment.STATUS_VALIDATED,
-        created_at__date__gte=start_of_week
+        paid_at__date__gte=start_of_week
     ).aggregate(total=Sum("amount"))["total"] or 0
 
-    total_month = Payment.objects.filter(
-        inscription__candidature__branch=branch,
+    total_month = base_payments.filter(
         status=Payment.STATUS_VALIDATED,
-        created_at__date__gte=start_of_month
+        paid_at__date__gte=start_of_month
     ).aggregate(total=Sum("amount"))["total"] or 0
 
-    pending_payments = Payment.objects.filter(
-        inscription__candidature__branch=branch,
+    pending_payments = base_payments.filter(
         status=Payment.STATUS_PENDING
     ).count()
 
-    pending_payments_amount = Payment.objects.filter(
-        inscription__candidature__branch=branch,
+    pending_payments_amount = base_payments.filter(
         status=Payment.STATUS_PENDING
     ).aggregate(total=Sum("amount"))["total"] or 0
 
-    inscriptions_with_balance = Inscription.objects.filter(
-        candidature__branch=branch,
+    inscriptions_with_balance = base_inscriptions.filter(
         status__in=[Inscription.STATUS_PARTIAL, Inscription.STATUS_AWAITING_PAYMENT]
     ).count()
 
@@ -198,7 +192,10 @@ def manager_candidatures(request):
     )
 
     if status_filter:
-        candidatures = candidatures.filter(status=status_filter)
+        if status_filter == "accepted":
+            candidatures = candidatures.filter(status__in=["accepted", "accepted_with_reserve"])
+        else:
+            candidatures = candidatures.filter(status=status_filter)
 
     if search:
         candidatures = candidatures.filter(
@@ -246,7 +243,11 @@ def manager_inscriptions(request):
 
     inscriptions = (
         Inscription.objects
-        .filter(candidature__branch=branch)
+        .filter(
+            candidature__branch=branch,
+            candidature__is_deleted=False,
+            is_archived=False,
+        )
         .select_related(
             "candidature",
             "candidature__programme",
@@ -273,12 +274,35 @@ def manager_inscriptions(request):
 
     # Stats
     stats = {
-        "total": Inscription.objects.filter(candidature__branch=branch).count(),
-        "active": Inscription.objects.filter(candidature__branch=branch, status=Inscription.STATUS_ACTIVE).count(),
-        "partial": Inscription.objects.filter(candidature__branch=branch, status=Inscription.STATUS_PARTIAL).count(),
-        "awaiting": Inscription.objects.filter(candidature__branch=branch,
-                                               status=Inscription.STATUS_AWAITING_PAYMENT).count(),
-        "created": Inscription.objects.filter(candidature__branch=branch, status=Inscription.STATUS_CREATED).count(),
+        "total": Inscription.objects.filter(
+            candidature__branch=branch,
+            candidature__is_deleted=False,
+            is_archived=False,
+        ).count(),
+        "active": Inscription.objects.filter(
+            candidature__branch=branch,
+            candidature__is_deleted=False,
+            is_archived=False,
+            status=Inscription.STATUS_ACTIVE,
+        ).count(),
+        "partial": Inscription.objects.filter(
+            candidature__branch=branch,
+            candidature__is_deleted=False,
+            is_archived=False,
+            status=Inscription.STATUS_PARTIAL,
+        ).count(),
+        "awaiting": Inscription.objects.filter(
+            candidature__branch=branch,
+            candidature__is_deleted=False,
+            is_archived=False,
+            status=Inscription.STATUS_AWAITING_PAYMENT,
+        ).count(),
+        "created": Inscription.objects.filter(
+            candidature__branch=branch,
+            candidature__is_deleted=False,
+            is_archived=False,
+            status=Inscription.STATUS_CREATED,
+        ).count(),
     }
 
     context = {
@@ -306,26 +330,30 @@ def manager_paiements(request):
 
     payments = (
         Payment.objects
-        .filter(inscription__candidature__branch=branch)
+        .filter(
+            inscription__candidature__branch=branch,
+            inscription__candidature__is_deleted=False,
+            inscription__is_archived=False,
+        )
         .select_related(
             "inscription__candidature",
             "inscription__candidature__programme",
             "agent__user",
         )
-        .order_by("-created_at")
+        .order_by("-paid_at")
     )
 
     if status_filter:
         payments = payments.filter(status=status_filter)
 
     if date_filter == "today":
-        payments = payments.filter(created_at__date=today)
+        payments = payments.filter(paid_at__date=today)
     elif date_filter == "week":
         start_of_week = today - timedelta(days=today.weekday())
-        payments = payments.filter(created_at__date__gte=start_of_week)
+        payments = payments.filter(paid_at__date__gte=start_of_week)
     elif date_filter == "month":
         start_of_month = today.replace(day=1)
-        payments = payments.filter(created_at__date__gte=start_of_month)
+        payments = payments.filter(paid_at__date__gte=start_of_month)
 
     if search:
         payments = payments.filter(
@@ -341,15 +369,33 @@ def manager_paiements(request):
 
     # Stats
     stats = {
-        "total": Payment.objects.filter(inscription__candidature__branch=branch).count(),
-        "validated": Payment.objects.filter(inscription__candidature__branch=branch,
-                                            status=Payment.STATUS_VALIDATED).count(),
-        "pending": Payment.objects.filter(inscription__candidature__branch=branch,
-                                          status=Payment.STATUS_PENDING).count(),
-        "cancelled": Payment.objects.filter(inscription__candidature__branch=branch,
-                                            status=Payment.STATUS_CANCELLED).count(),
+        "total": Payment.objects.filter(
+            inscription__candidature__branch=branch,
+            inscription__candidature__is_deleted=False,
+            inscription__is_archived=False,
+        ).count(),
+        "validated": Payment.objects.filter(
+            inscription__candidature__branch=branch,
+            inscription__candidature__is_deleted=False,
+            inscription__is_archived=False,
+            status=Payment.STATUS_VALIDATED,
+        ).count(),
+        "pending": Payment.objects.filter(
+            inscription__candidature__branch=branch,
+            inscription__candidature__is_deleted=False,
+            inscription__is_archived=False,
+            status=Payment.STATUS_PENDING,
+        ).count(),
+        "cancelled": Payment.objects.filter(
+            inscription__candidature__branch=branch,
+            inscription__candidature__is_deleted=False,
+            inscription__is_archived=False,
+            status=Payment.STATUS_CANCELLED,
+        ).count(),
         "total_amount": Payment.objects.filter(
             inscription__candidature__branch=branch,
+            inscription__candidature__is_deleted=False,
+            inscription__is_archived=False,
             status=Payment.STATUS_VALIDATED
         ).aggregate(total=Sum("amount"))["total"] or 0,
     }

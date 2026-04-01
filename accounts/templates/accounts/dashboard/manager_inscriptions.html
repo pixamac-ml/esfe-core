@@ -1,53 +1,77 @@
 {% extends "accounts/dashboard/base_dashboard.html" %}
 
-{% block title %}Inscriptions | Gestionnaire{% endblock %}
+{% block dashboard_title %}Inscriptions{% endblock %}
+{% block dashboard_subtitle %}Suivi operationnel des inscriptions - {{ branch.name }}{% endblock %}
 
-{% block content %}
+{% block dashboard_content %}
 <div class="space-y-6">
 
-    <!-- En-tête -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Inscriptions</h1>
-            <p class="text-gray-600">Gérez les inscriptions des étudiants</p>
+    <div class="rounded-2xl bg-gradient-to-r from-primary-700 to-primary-600 text-white p-5 border border-white/10 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
+                    <i class="fas fa-id-card"></i>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-primary-100">Poste gestionnaire</p>
+                    <p class="font-bold text-lg">Pilotage des inscriptions par annexe</p>
+                </div>
+            </div>
+            <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/15 border border-white/20 w-fit">
+                {{ stats.total|default:0 }} dossier(s)
+            </span>
         </div>
     </div>
 
-    <!-- Filtres -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <a href="?status=" class="bg-white rounded-xl p-4 border {% if not status_filter %}border-primary-500 ring-2 ring-primary-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-slate-900">{{ stats.total|default:0 }}</p>
+            <p class="text-sm text-slate-500">Total</p>
+        </a>
+        <a href="?status=created" class="bg-white rounded-xl p-4 border {% if status_filter == 'created' %}border-blue-500 ring-2 ring-blue-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-blue-600">{{ stats.created|default:0 }}</p>
+            <p class="text-sm text-slate-500">Creees</p>
+        </a>
+        <a href="?status=awaiting_payment" class="bg-white rounded-xl p-4 border {% if status_filter == 'awaiting_payment' %}border-amber-500 ring-2 ring-amber-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-amber-600">{{ stats.awaiting|default:0 }}</p>
+            <p class="text-sm text-slate-500">En attente paiement</p>
+        </a>
+        <a href="?status=partial_paid" class="bg-white rounded-xl p-4 border {% if status_filter == 'partial_paid' %}border-orange-500 ring-2 ring-orange-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-orange-600">{{ stats.partial|default:0 }}</p>
+            <p class="text-sm text-slate-500">Paiement partiel</p>
+        </a>
+        <a href="?status=active" class="bg-white rounded-xl p-4 border {% if status_filter == 'active' %}border-green-500 ring-2 ring-green-100{% else %}border-slate-100{% endif %} hover:shadow-md transition-all">
+            <p class="text-2xl font-bold text-green-600">{{ stats.active|default:0 }}</p>
+            <p class="text-sm text-slate-500">Actives</p>
+        </a>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
         <form method="get" class="flex flex-wrap gap-4">
             <div class="flex-1 min-w-[200px]">
-                <input type="text" name="q" value="{{ request.GET.q }}" 
+                <input type="text" name="q" value="{{ search }}"
                        placeholder="Rechercher par nom ou référence..."
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                       class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
             </div>
             <div>
-                <select name="status" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <select name="status" class="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500">
                     <option value="">Tous les statuts</option>
-                    <option value="initiated" {% if request.GET.status == 'initiated' %}selected{% endif %}>Initiée</option>
-                    <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Complétée</option>
-                    <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>Annulée</option>
+                    <option value="created" {% if status_filter == 'created' %}selected{% endif %}>Creee</option>
+                    <option value="awaiting_payment" {% if status_filter == 'awaiting_payment' %}selected{% endif %}>En attente paiement</option>
+                    <option value="partial_paid" {% if status_filter == 'partial_paid' %}selected{% endif %}>Paiement partiel</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                    <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Terminee</option>
+                    <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Annulee</option>
                 </select>
             </div>
-            <div>
-                <select name="programme" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                    <option value="">Tous les programmes</option>
-                    {% for prog in programmes %}
-                    <option value="{{ prog.id }}" {% if request.GET.programme == prog.id|stringformat:"i" %}selected{% endif %}>
-                        {{ prog.title }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-700 transition">
                 Filtrer
             </button>
         </form>
     </div>
 
     <!-- Tableau des inscriptions -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -63,9 +87,9 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for inscription in inscriptions %}
-                    <tr class="hover:bg-gray-50 transition" id="inscription-row-{{ inscription.id }}">
+                    <tr class="hover:bg-slate-50 transition" id="inscription-row-{{ inscription.id }}">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="font-mono text-sm text-blue-600">{{ inscription.reference }}</span>
+                            <span class="font-mono text-sm text-primary-700">{{ inscription.public_token }}</span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
@@ -85,8 +109,8 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if inscription.status == 'active' %}
                                 <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>
-                            {% elif inscription.status == 'initiated' %}
-                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Initiée</span>
+                            {% elif inscription.status == 'created' %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Creee</span>
                             {% elif inscription.status == 'completed' %}
                                 <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Complétée</span>
                             {% else %}
@@ -129,8 +153,8 @@
                             <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
-                            <p class="text-lg font-medium">Aucune inscription trouvée</p>
-                            <p class="text-sm">Modifiez vos filtres ou attendez de nouvelles inscriptions</p>
+                            <p class="text-lg font-medium">Aucune inscription trouvee</p>
+                            <p class="text-sm">Ajustez vos filtres ou attendez de nouvelles inscriptions.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -140,17 +164,17 @@
 
         <!-- Pagination -->
         {% if inscriptions.has_other_pages %}
-        <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+        <div class="bg-slate-50 px-6 py-4 border-t border-slate-200">
             <div class="flex items-center justify-between">
                 <p class="text-sm text-gray-700">
                     Affichage de {{ inscriptions.start_index }} à {{ inscriptions.end_index }} sur {{ inscriptions.paginator.count }} inscriptions
                 </p>
                 <div class="flex space-x-2">
                     {% if inscriptions.has_previous %}
-                    <a href="?page={{ inscriptions.previous_page_number }}" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition">Précédent</a>
+                    <a href="?page={{ inscriptions.previous_page_number }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-100 transition">Precedent</a>
                     {% endif %}
                     {% if inscriptions.has_next %}
-                    <a href="?page={{ inscriptions.next_page_number }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Suivant</a>
+                    <a href="?page={{ inscriptions.next_page_number }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-700 transition">Suivant</a>
                     {% endif %}
                 </div>
             </div>

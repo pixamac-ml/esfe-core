@@ -173,8 +173,8 @@ def admissions_dashboard(request):
         CandidatureDocument.objects
         .filter(
             candidature__in=base_candidatures,
-            is_valid=False
         )
+        .filter(Q(is_valid=False) | Q(is_validated=False))
         .select_related(
             "candidature",
             "document_type"

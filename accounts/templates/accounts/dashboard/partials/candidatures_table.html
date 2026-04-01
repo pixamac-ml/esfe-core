@@ -22,3 +22,29 @@
 {% endfor %}
 
 </div>
+
+{% if candidatures.has_other_pages %}
+<div class="mt-4 flex items-center justify-center gap-2">
+    {% if candidatures.has_previous %}
+    <button hx-get="{% url 'accounts:candidatures_list_htmx' %}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ candidatures.previous_page_number }}"
+            hx-target="#pending-list"
+            hx-swap="innerHTML"
+            class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    {% endif %}
+
+    <span class="px-3 py-1.5 text-sm text-slate-600">
+        Page {{ candidatures.number }} / {{ paginator.num_pages }}
+    </span>
+
+    {% if candidatures.has_next %}
+    <button hx-get="{% url 'accounts:candidatures_list_htmx' %}?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ candidatures.next_page_number }}"
+            hx-target="#pending-list"
+            hx-swap="innerHTML"
+            class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+        <i class="fas fa-chevron-right"></i>
+    </button>
+    {% endif %}
+</div>
+{% endif %}

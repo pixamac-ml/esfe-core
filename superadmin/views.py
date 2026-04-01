@@ -2336,6 +2336,17 @@ def user_list(request):
 def user_create(request):
     groups = _managed_groups_queryset()
     branches = Branch.objects.filter(is_active=True).order_by('name')
+    form_data = {
+        'username': '',
+        'email': '',
+        'first_name': '',
+        'last_name': '',
+        'role': '',
+        'branch': '',
+        'is_staff': True,
+        'is_active': True,
+    }
+    selected_group_ids = []
 
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
@@ -2346,6 +2357,20 @@ def user_create(request):
         role = request.POST.get('role', '').strip()
         branch_id = request.POST.get('branch', '').strip()
         selected_groups = request.POST.getlist('groups')
+        is_staff = request.POST.get('is_staff') == 'on'
+        is_active = request.POST.get('is_active') == 'on'
+
+        form_data = {
+            'username': username,
+            'email': email,
+            'first_name': first_name,
+            'last_name': last_name,
+            'role': role,
+            'branch': branch_id,
+            'is_staff': is_staff,
+            'is_active': is_active,
+        }
+        selected_group_ids = [str(group_id) for group_id in selected_groups]
 
         if not username or not password:
             messages.error(request, 'Nom utilisateur et mot de passe sont obligatoires.')
@@ -2358,8 +2383,8 @@ def user_create(request):
                 password=password,
                 first_name=first_name,
                 last_name=last_name,
-                is_staff=request.POST.get('is_staff') == 'on',
-                is_active=request.POST.get('is_active') == 'on',
+                is_staff=is_staff,
+                is_active=is_active,
             )
 
             profile, _ = Profile.objects.get_or_create(user=user)
@@ -2378,6 +2403,8 @@ def user_create(request):
         'groups': groups,
         'role_choices': Profile.ROLE_CHOICES,
         'branches': branches,
+        'form_data': form_data,
+        'selected_group_ids': selected_group_ids,
     })
 
 
@@ -2390,20 +2417,52 @@ def user_edit(request, pk):
     groups = _managed_groups_queryset()
     branches = Branch.objects.filter(is_active=True).order_by('name')
     profile, _ = Profile.objects.get_or_create(user=target_user)
+    form_data = {
+        'username': target_user.username,
+        'email': target_user.email,
+        'first_name': target_user.first_name,
+        'last_name': target_user.last_name,
+        'role': profile.role or '',
+        'branch': str(profile.branch_id) if profile.branch_id else '',
+        'is_staff': target_user.is_staff,
+        'is_active': target_user.is_active,
+    }
+    selected_group_ids = [str(group.id) for group in target_user.groups.all()]
 
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        role = request.POST.get('role', '').strip()
+        branch_id = request.POST.get('branch', '').strip()
+        selected_groups = request.POST.getlist('groups')
+        is_staff = request.POST.get('is_staff') == 'on'
+        is_active = request.POST.get('is_active') == 'on'
+
+        form_data = {
+            'username': username,
+            'email': email,
+            'first_name': first_name,
+            'last_name': last_name,
+            'role': role,
+            'branch': branch_id,
+            'is_staff': is_staff,
+            'is_active': is_active,
+        }
+        selected_group_ids = [str(group_id) for group_id in selected_groups]
+
         if not username:
             messages.error(request, 'Le nom utilisateur est obligatoire.')
         elif User.objects.filter(username=username).exclude(pk=target_user.pk).exists():
             messages.error(request, 'Ce nom utilisateur existe deja.')
         else:
             target_user.username = username
-            target_user.email = request.POST.get('email', '').strip()
-            target_user.first_name = request.POST.get('first_name', '').strip()
-            target_user.last_name = request.POST.get('last_name', '').strip()
-            target_user.is_staff = request.POST.get('is_staff') == 'on'
-            target_user.is_active = request.POST.get('is_active') == 'on'
+            target_user.email = email
+            target_user.first_name = first_name
+            target_user.last_name = last_name
+            target_user.is_staff = is_staff
+            target_user.is_active = is_active
 
             new_password = request.POST.get('password', '').strip()
             if new_password:
@@ -2411,11 +2470,10 @@ def user_edit(request, pk):
 
             target_user.save()
 
-            profile.role = request.POST.get('role', '').strip()
-            profile.branch_id = request.POST.get('branch', '').strip() or None
+            profile.role = role
+            profile.branch_id = branch_id or None
             profile.save(update_fields=['role', 'branch'])
 
-            selected_groups = request.POST.getlist('groups')
             target_user.groups.set(groups.filter(id__in=selected_groups))
 
             messages.success(request, 'Utilisateur mis a jour avec succes.')
@@ -2428,6 +2486,8 @@ def user_edit(request, pk):
         'groups': groups,
         'role_choices': Profile.ROLE_CHOICES,
         'branches': branches,
+        'form_data': form_data,
+        'selected_group_ids': selected_group_ids,
     })
 
 

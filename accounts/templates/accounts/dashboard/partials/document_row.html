@@ -1,73 +1,36 @@
-<tr class="hover:bg-gray-50 transition" id="candidature-row-{{ candidature.id }}">
-    <td class="px-6 py-4 whitespace-nowrap">
-        <div class="flex items-center">
-            <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold">
-                {{ candidature.first_name|slice:":1" }}{{ candidature.last_name|slice:":1" }}
-            </div>
-            <div class="ml-3">
-                <p class="font-medium text-gray-900">{{ candidature.last_name }} {{ candidature.first_name }}</p>
-                <p class="text-sm text-gray-500">{{ candidature.email }}</p>
+<div id="doc-row-{{ doc.id }}" class="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-xl bg-slate-50 hover:bg-slate-100 gap-3 transition-colors">
+    <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-file-alt"></i>
+        </div>
+        <div class="min-w-0">
+            <p class="font-semibold text-slate-800 truncate">{{ doc.document_type.name|default:"Document" }}</p>
+            <p class="text-sm text-slate-500 truncate">{{ doc.candidature.full_name }} - {{ doc.candidature.programme.title }}</p>
+            <div class="flex flex-wrap items-center gap-2 mt-1">
+                <span class="text-xs text-slate-400">{{ doc.uploaded_at|date:"d/m/Y H:i" }}</span>
+                {% if doc.candidature.branch %}
+                <span class="text-xs px-2 py-0.5 bg-slate-200 text-slate-600 rounded">{{ doc.candidature.branch.name }}</span>
+                {% endif %}
             </div>
         </div>
-    </td>
-    <td class="px-6 py-4 whitespace-nowrap">
-        <p class="text-sm text-gray-900">{{ candidature.programme.title }}</p>
-        <p class="text-xs text-gray-500">{{ candidature.programme.cycle.name }}</p>
-    </td>
-    <td class="px-6 py-4 whitespace-nowrap">
-        {% if candidature.status == 'submitted' %}
-            <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Soumise</span>
-        {% elif candidature.status == 'under_review' %}
-            <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">En analyse</span>
-        {% elif candidature.status == 'accepted' %}
-            <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Acceptée</span>
-        {% elif candidature.status == 'accepted_with_reserve' %}
-            <span class="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">Sous réserve</span>
-        {% elif candidature.status == 'to_complete' %}
-            <span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">À compléter</span>
+    </div>
+    <div class="flex items-center gap-2 justify-end sm:justify-start flex-shrink-0">
+        <a href="{{ doc.file.url }}" target="_blank" rel="noopener"
+           class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
+            <i class="fas fa-eye mr-1"></i>Voir
+        </a>
+        {% if not doc.is_validated or not doc.is_valid %}
+        <button hx-post="{% url 'accounts:validate_document_htmx' doc.id %}"
+                hx-target="#doc-row-{{ doc.id }}"
+                hx-swap="outerHTML"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                class="px-3 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors">
+            <i class="fas fa-check mr-1"></i>Valider
+        </button>
         {% else %}
-            <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Refusée</span>
+        <span class="px-3 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-700">
+            <i class="fas fa-check-circle mr-1"></i>Valide
+        </span>
         {% endif %}
-    </td>
-    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {{ candidature.submitted_at|date:"d/m/Y" }}
-    </td>
-    <td class="px-6 py-4 whitespace-nowrap text-right">
-        <div class="flex items-center justify-end space-x-2">
-            <!-- Voir détails -->
-            <button hx-get="{% url 'accounts:htmx_candidature_detail' candidature.id %}"
-                    hx-target="#modal-container"
-                    hx-swap="innerHTML"
-                    @click="modalOpen = true"
-                    class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                </svg>
-            </button>
-
-            {% if candidature.status == 'submitted' or candidature.status == 'under_review' %}
-            <!-- Accepter -->
-            <button hx-post="{% url 'accounts:htmx_candidature_accept' candidature.id %}"
-                    hx-target="#candidature-row-{{ candidature.id }}"
-                    hx-swap="outerHTML"
-                    hx-confirm="Accepter cette candidature ?"
-                    class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-            </button>
-            <!-- Refuser -->
-            <button hx-post="{% url 'accounts:htmx_candidature_reject' candidature.id %}"
-                    hx-target="#candidature-row-{{ candidature.id }}"
-                    hx-swap="outerHTML"
-                    hx-confirm="Refuser cette candidature ?"
-                    class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-            {% endif %}
-        </div>
-    </td>
-</tr>
+    </div>
+</div>

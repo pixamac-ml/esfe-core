@@ -1,0 +1,125 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{% if target_user %}Modifier utilisateur{% else %}Nouvel utilisateur{% endif %}{% endblock %}
+{% block page_subtitle %}Creation de compte, role, groupe et annexe{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+	<section class="card rounded-xl border border-slate-100 shadow-sm">
+		<div class="card-body">
+			<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+				<div>
+					<h2 class="text-base font-semibold text-slate-900 mb-1">Configuration du compte</h2>
+					<p class="text-sm text-slate-500 mb-0">Renseigner les informations de base, les droits et l'affectation.</p>
+				</div>
+				<div class="flex items-center gap-2 text-xs">
+					{% if target_user and target_user.is_superuser %}
+					<span class="badge-status badge-info">Superadmin</span>
+					{% endif %}
+					{% if target_user and target_user.is_active %}
+					<span class="badge-status badge-success">Actif</span>
+					{% elif target_user %}
+					<span class="badge-status badge-draft">Inactif</span>
+					{% endif %}
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="card max-w-5xl rounded-xl border border-slate-100 shadow-sm">
+		<form method="post" class="card-body space-y-6">
+			{% csrf_token %}
+
+			<div class="space-y-3">
+				<h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-0">Identite du compte</h3>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div>
+						<label for="id_username" class="form-label">Nom utilisateur *</label>
+						<input id="id_username" type="text" name="username" required class="form-input" value="{{ form_data.username|default:'' }}">
+						<p class="text-xs text-slate-500 mt-1 mb-0">Utilise pour la connexion (unique).</p>
+					</div>
+					<div>
+						<label for="id_email" class="form-label">Email</label>
+						<input id="id_email" type="email" name="email" class="form-input" value="{{ form_data.email|default:'' }}">
+					</div>
+					<div>
+						<label for="id_first_name" class="form-label">Prenom</label>
+						<input id="id_first_name" type="text" name="first_name" class="form-input" value="{{ form_data.first_name|default:'' }}">
+					</div>
+					<div>
+						<label for="id_last_name" class="form-label">Nom</label>
+						<input id="id_last_name" type="text" name="last_name" class="form-input" value="{{ form_data.last_name|default:'' }}">
+					</div>
+				</div>
+			</div>
+
+			<div class="space-y-3">
+				<h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-0">Securite</h3>
+				<div>
+					<label for="id_password" class="form-label">Mot de passe {% if not target_user %}*{% else %}(laisser vide pour ne pas changer){% endif %}</label>
+					<input id="id_password" type="password" name="password" {% if not target_user %}required{% endif %} class="form-input md:max-w-md">
+				</div>
+			</div>
+
+			<div class="space-y-3">
+				<h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-0">Role et affectation</h3>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div>
+						<label for="id_role" class="form-label">Role applicatif</label>
+						<select id="id_role" name="role" class="form-input">
+							<option value="">Aucun role</option>
+							{% for role_key, role_label in role_choices %}
+							<option value="{{ role_key }}" {% if form_data.role == role_key %}selected{% endif %}>{{ role_label }}</option>
+							{% endfor %}
+						</select>
+					</div>
+					<div>
+						<label for="id_branch" class="form-label">Annexe</label>
+						<select id="id_branch" name="branch" class="form-input">
+							<option value="">Aucune annexe</option>
+							{% for b in branches %}
+							<option value="{{ b.id }}" {% if form_data.branch == b.id|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+							{% endfor %}
+						</select>
+					</div>
+				</div>
+				<p class="text-xs text-slate-500 mb-0">Conseil: admissions/finance doivent en general etre rattaches a une annexe.</p>
+			</div>
+
+			<div class="space-y-3">
+				<h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-0">Groupes staff</h3>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3 bg-slate-50">
+					{% for g in groups %}
+					<label class="inline-flex items-center gap-2 text-sm text-slate-700">
+						<input type="checkbox" name="groups" value="{{ g.id }}" {% if g.id|stringformat:"s" in selected_group_ids %}checked{% endif %}>
+						<span>{{ g.name }}</span>
+					</label>
+					{% empty %}
+					<p class="text-sm text-slate-500 mb-0">Aucun groupe disponible.</p>
+					{% endfor %}
+				</div>
+			</div>
+
+			<div class="space-y-2">
+				<h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-0">Statut du compte</h3>
+				<div class="flex flex-wrap items-center gap-6">
+					<label class="inline-flex items-center gap-2 text-sm text-slate-700">
+						<input type="checkbox" name="is_staff" {% if form_data.is_staff %}checked{% endif %}>
+						Compte staff
+					</label>
+					<label class="inline-flex items-center gap-2 text-sm text-slate-700">
+						<input type="checkbox" name="is_active" {% if form_data.is_active %}checked{% endif %}>
+						Compte actif
+					</label>
+				</div>
+			</div>
+
+			<div class="flex items-center gap-2 pt-2">
+				<button type="submit" class="btn btn-primary">Enregistrer</button>
+				<a href="{% url 'superadmin:user_list' %}" class="btn btn-outline">Annuler</a>
+			</div>
+		</form>
+	</section>
+</div>
+{% endblock %}
+

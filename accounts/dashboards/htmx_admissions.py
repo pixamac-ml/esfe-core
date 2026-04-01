@@ -305,14 +305,16 @@ def validate_document_htmx(request, document_id):
     try:
         with transaction.atomic():
 
+            # Keep both fields in sync for legacy screens still reading is_valid.
+            document.is_valid = True
             document.is_validated = True
             document.validated_at = timezone.now()
             # Sauvegarde uniquement les champs qui existent
-            document.save(update_fields=["is_validated", "validated_at"])
+            document.save(update_fields=["is_valid", "is_validated", "validated_at"])
 
         html = render_to_string(
             "accounts/dashboard/partials/document_row.html",
-            {"document": document},
+            {"doc": document},
             request=request
         )
 
@@ -349,7 +351,7 @@ def create_inscription_htmx(request, candidature_id):
     candidature = get_object_or_404(
         get_base_queryset(request.user, "candidature"),
         id=candidature_id,
-        status="accepted"
+        status__in=["accepted", "accepted_with_reserve"],
     )
 
     if hasattr(candidature, "inscription"):
@@ -377,7 +379,18 @@ def create_inscription_htmx(request, candidature_id):
             request=request
         )
 
-        return HttpResponse(html)
+        response = HttpResponse(html)
+        response["HX-Trigger"] = json.dumps({
+            "inscriptionCreated": {
+                "candidature_id": candidature.id,
+                "inscription_id": inscription.id,
+            },
+            "showToast": {
+                "message": "Inscription creee avec succes.",
+                "type": "success",
+            }
+        })
+        return response
 
     except Exception as e:
 
@@ -566,7 +579,7 @@ def candidatures_list_htmx(request):
     # Filtres
     status = request.GET.get("status")
     programme_id = request.GET.get("programme")
-    search = request.GET.get("q")
+    search = (request.GET.get("q") or request.GET.get("search") or "").strip()
 
     # Backward compatibility: pending == submitted for candidatures.
     if status == "pending":
@@ -614,11 +627,16 @@ def candidatures_list_htmx(request):
     page = request.GET.get("page", 1)
     candidatures_page = paginator.get_page(page)
 
+    query_data = request.GET.copy()
+    query_data.pop("page", None)
+    pagination_query = query_data.urlencode()
+
     html = render_to_string(
         "accounts/dashboard/partials/candidatures_table.html",
         {
             "candidatures": candidatures_page,
-            "paginator": paginator
+            "paginator": paginator,
+            "pagination_query": pagination_query,
         },
         request=request
     )
@@ -643,12 +661,14 @@ def documents_list_htmx(request):
         .values_list("id", flat=True)
     )
 
+    unvalidated_filter = Q(is_valid=False) | Q(is_validated=False)
+
     documents = (
         CandidatureDocument.objects
         .filter(
             candidature_id__in=candidature_ids,
-            is_validated=False
         )
+        .filter(unvalidated_filter)
         .select_related(
             "candidature",
             "candidature__programme"
@@ -668,11 +688,16 @@ def documents_list_htmx(request):
     page = request.GET.get("page", 1)
     documents_page = paginator.get_page(page)
 
+    query_data = request.GET.copy()
+    query_data.pop("page", None)
+    pagination_query = query_data.urlencode()
+
     html = render_to_string(
         "accounts/dashboard/partials/documents_table.html",
         {
             "documents": documents_page,
-            "paginator": paginator
+            "paginator": paginator,
+            "pagination_query": pagination_query,
         },
         request=request
     )
@@ -711,8 +736,8 @@ def refresh_admissions_stats_htmx(request):
         CandidatureDocument.objects
         .filter(
             candidature_id__in=candidature_ids,
-            is_validated=False
         )
+        .filter(Q(is_valid=False) | Q(is_validated=False))
         .count()
     )
 

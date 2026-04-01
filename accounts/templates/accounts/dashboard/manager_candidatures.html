@@ -7,29 +7,47 @@
 {% block dashboard_content %}
 <div class="space-y-6">
 
+    <div class="rounded-2xl bg-gradient-to-r from-primary-700 to-primary-600 text-white p-5 border border-white/10 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-primary-100">Poste gestionnaire</p>
+                    <p class="font-bold text-lg">Traitement des candidatures et decisions operationnelles</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">Annexe: {{ branch.name }}</span>
+                <a href="{% url 'accounts:manager_inscriptions' %}" class="px-3 py-1.5 rounded-full bg-white text-primary-700 text-xs font-semibold hover:bg-slate-100 transition-colors">Voir inscriptions</a>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <a href="?status=" class="bg-white rounded-xl p-4 border {% if not status_filter %}border-blue-500 ring-2 ring-blue-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+        <a href="?status={% if search %}&q={{ search|urlencode }}{% endif %}" class="bg-white rounded-xl p-4 border {% if not status_filter %}border-blue-500 ring-2 ring-blue-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
             <p class="text-2xl font-bold text-gray-900">{{ stats.total }}</p>
             <p class="text-sm text-gray-500">Total</p>
         </a>
-        <a href="?status=submitted" class="bg-white rounded-xl p-4 border {% if status_filter == 'submitted' %}border-blue-500 ring-2 ring-blue-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+        <a href="?status=submitted{% if search %}&q={{ search|urlencode }}{% endif %}" class="bg-white rounded-xl p-4 border {% if status_filter == 'submitted' %}border-blue-500 ring-2 ring-blue-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
             <p class="text-2xl font-bold text-blue-600">{{ stats.submitted }}</p>
             <p class="text-sm text-gray-500">Soumises</p>
         </a>
-        <a href="?status=under_review" class="bg-white rounded-xl p-4 border {% if status_filter == 'under_review' %}border-purple-500 ring-2 ring-purple-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+        <a href="?status=under_review{% if search %}&q={{ search|urlencode }}{% endif %}" class="bg-white rounded-xl p-4 border {% if status_filter == 'under_review' %}border-purple-500 ring-2 ring-purple-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
             <p class="text-2xl font-bold text-purple-600">{{ stats.under_review }}</p>
             <p class="text-sm text-gray-500">En analyse</p>
         </a>
-        <a href="?status=to_complete" class="bg-white rounded-xl p-4 border {% if status_filter == 'to_complete' %}border-orange-500 ring-2 ring-orange-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+        <a href="?status=to_complete{% if search %}&q={{ search|urlencode }}{% endif %}" class="bg-white rounded-xl p-4 border {% if status_filter == 'to_complete' %}border-orange-500 ring-2 ring-orange-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
             <p class="text-2xl font-bold text-orange-600">{{ stats.to_complete }}</p>
             <p class="text-sm text-gray-500">À compléter</p>
         </a>
-        <a href="?status=accepted" class="bg-white rounded-xl p-4 border {% if status_filter == 'accepted' %}border-green-500 ring-2 ring-green-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+        <a href="?status=accepted{% if search %}&q={{ search|urlencode }}{% endif %}" class="bg-white rounded-xl p-4 border {% if status_filter == 'accepted' %}border-green-500 ring-2 ring-green-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
             <p class="text-2xl font-bold text-green-600">{{ stats.accepted }}</p>
             <p class="text-sm text-gray-500">Acceptées</p>
         </a>
-        <a href="?status=rejected" class="bg-white rounded-xl p-4 border {% if status_filter == 'rejected' %}border-red-500 ring-2 ring-red-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
+        <a href="?status=rejected{% if search %}&q={{ search|urlencode }}{% endif %}" class="bg-white rounded-xl p-4 border {% if status_filter == 'rejected' %}border-red-500 ring-2 ring-red-100{% else %}border-gray-100{% endif %} hover:shadow-md transition-all">
             <p class="text-2xl font-bold text-red-600">{{ stats.rejected }}</p>
             <p class="text-sm text-gray-500">Refusées</p>
         </a>
@@ -40,7 +58,9 @@
         <form method="get" class="flex items-center space-x-4">
             <input type="hidden" name="status" value="{{ status_filter }}">
             <div class="flex-1 relative">
-                <input type="text" name="q" value="{{ search }}" 
+                <label for="manager-candidatures-search" class="sr-only">Rechercher une candidature</label>
+                <input type="text" name="q" value="{{ search }}"
+                       id="manager-candidatures-search"
                        placeholder="Rechercher par nom, prénom ou email..."
                        class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,6 +137,7 @@
                                 <button hx-post="{% url 'accounts:htmx_candidature_accept' candidature.pk %}"
                                         hx-target="#candidature-{{ candidature.pk }}"
                                         hx-swap="outerHTML"
+                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                         hx-confirm="Accepter cette candidature ?"
                                         class="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                                         title="Accepter">
@@ -128,6 +149,7 @@
                                 <button hx-post="{% url 'accounts:htmx_candidature_reject' candidature.pk %}"
                                         hx-target="#candidature-{{ candidature.pk }}"
                                         hx-swap="outerHTML"
+                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                         hx-confirm="Refuser cette candidature ?"
                                         class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                         title="Refuser">
@@ -142,6 +164,7 @@
                                 <button hx-post="{% url 'accounts:htmx_inscription_create' candidature.pk %}"
                                         hx-target="#candidature-{{ candidature.pk }}"
                                         hx-swap="afterend"
+                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                         hx-confirm="Créer l'inscription pour ce candidat ?"
                                         class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors">
                                     Créer inscription
@@ -173,11 +196,11 @@
             </p>
             <div class="flex items-center space-x-2">
                 {% if candidatures.has_previous %}
-                <a href="?page={{ candidatures.previous_page_number }}&status={{ status_filter }}&q={{ search }}" 
+                <a href="?page={{ candidatures.previous_page_number }}&status={{ status_filter }}{% if search %}&q={{ search|urlencode }}{% endif %}"
                    class="px-3 py-1 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Précédent</a>
                 {% endif %}
                 {% if candidatures.has_next %}
-                <a href="?page={{ candidatures.next_page_number }}&status={{ status_filter }}&q={{ search }}" 
+                <a href="?page={{ candidatures.next_page_number }}&status={{ status_filter }}{% if search %}&q={{ search|urlencode }}{% endif %}"
                    class="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Suivant</a>
                 {% endif %}
             </div>

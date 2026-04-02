@@ -4,7 +4,10 @@ Configuration DEV stable ESFE
 """
 
 import os
+import importlib.util
 from pathlib import Path
+
+import dj_database_url
 from dotenv import load_dotenv
 
 # ==================================================
@@ -14,20 +17,29 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
+# URL absolue du site, utilisee par SEO, emails et securite CSRF.
+BASE_URL = os.getenv("BASE_URL", "https://www.esfe-mali.org").rstrip("/")
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: str = "") -> list[str]:
+    return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
+
 # ==================================================
 # SECURITY
 # ==================================================
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
-DEBUG = os.getenv("DEBUG", "True").strip().lower() in {"1", "true", "yes", "on"}
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.getenv(
-        "ALLOWED_HOSTS",
-        "127.0.0.1,localhost,192.168.93.68,192.168.2.5",
-    ).split(",")
-    if host.strip()
-]
+DEBUG = env_bool("DEBUG", True)
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost,192.168.93.68,192.168.2.5")
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", BASE_URL)
+
+ENABLE_BROWSER_RELOAD = DEBUG and env_bool("ENABLE_BROWSER_RELOAD", True)
+ENABLE_WEBSOCKETS = env_bool("ENABLE_WEBSOCKETS", True)
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1").strip()
 
 # ==================================================
 # APPLICATIONS
@@ -47,9 +59,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-
-    # Dev tools
-    "django_browser_reload",
 
     # UI / Core
     "ui.apps.UiConfig",
@@ -72,6 +81,9 @@ INSTALLED_APPS = [
     "accounts.apps.AccountsConfig",
 ]
 
+if ENABLE_BROWSER_RELOAD and importlib.util.find_spec("django_browser_reload"):
+    INSTALLED_APPS.append("django_browser_reload")
+
 # ==================================================
 # DJANGO-COMPONENTS CONFIG
 # ==================================================
@@ -86,17 +98,18 @@ COMPONENTS = {
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-
-    # Dev
-    "django_browser_reload.middleware.BrowserReloadMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
 ]
+
+if ENABLE_BROWSER_RELOAD and importlib.util.find_spec("django_browser_reload"):
+    MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
 
 # ==================================================
 # URLS / WSGI / ASGI
@@ -135,30 +148,49 @@ TEMPLATES = [
 # DATABASE
 # ==================================================
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "esfe_db"),
-        "USER": os.getenv("DB_USER", "esfe_user"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=int(os.getenv("DB_CONN_MAX_AGE", "60")),
+            ssl_require=env_bool("DB_SSL_REQUIRE", not DEBUG),
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME", "esfe_db"),
+            "USER": os.getenv("DB_USER", "esfe_user"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),
+        }
+    }
 
 
 # ==================================================
 # DJANGO CHANNELS (WebSockets)
 # ==================================================
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
-    },
-}
+if ENABLE_WEBSOCKETS and REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 # ==================================================
 # PASSWORD VALIDATION
@@ -187,6 +219,8 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_MAX_AGE = int(os.getenv("WHITENOISE_MAX_AGE", "31536000" if not DEBUG else "0"))
 
 # ==================================================
 # MEDIA FILES
@@ -205,8 +239,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # URLS ABSOLUES (EMAILS / LIENS EXTERNES)
 # ==================================================
 
-BASE_URL = os.getenv("BASE_URL", "https://www.esfe-mali.org").rstrip("/")
 EMAIL_LOGO_PATH = os.getenv("EMAIL_LOGO_PATH", "static/images/logo-esfe.png")
+
+if BASE_URL and BASE_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(BASE_URL)
 
 # ==================================================
 # EMAIL (DEV)
@@ -253,3 +289,24 @@ CKEDITOR_5_CONFIGS = {
 
 STUDENT_LOGIN_URL = os.getenv("STUDENT_LOGIN_URL", f"{BASE_URL}/student/login/")
 FFMPEG_PATH = os.getenv("FFMPEG_PATH", "ffmpeg")
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", not DEBUG)
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", not DEBUG)
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", not DEBUG)
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000" if not DEBUG else "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", not DEBUG)
+SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", not DEBUG)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
+X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "DENY")
+
+if DEBUG:
+    SECURE_SSL_REDIRECT = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+

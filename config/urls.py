@@ -44,10 +44,11 @@ urlpatterns = [
     # Core (home + pages publiques)
     path("", include("core.urls")),
     path("community/", include("community.urls")),
-    # Dev only
-    path("__reload__/", include("django_browser_reload.urls")),
     path("ckeditor5/", include("django_ckeditor_5.urls")),
 ]
+
+if settings.DEBUG and "django_browser_reload" in settings.INSTALLED_APPS:
+    urlpatterns.append(path("__reload__/", include("django_browser_reload.urls")))
 
 
 # ==========================================================

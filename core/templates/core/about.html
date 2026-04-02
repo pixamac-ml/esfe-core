@@ -14,6 +14,10 @@
 {% block extra_head %}
 <!-- AOS Animations CSS -->
 <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+<style>
+  html { scroll-behavior: smooth; }
+  .about-anchor { scroll-margin-top: 6.5rem; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -22,6 +26,7 @@
 {# SECTION 1 : HERO                                              #}
 {# ============================================================ #}
 {% comment %} ================================ HERO ================================ {% endcomment %}
+<section id="ecole" class="about-anchor">
 {% if site_configuration and site_configuration.about_hero_image %}
     {% component "about_hero" title=presentation.hero_title|default:"Former les professionnels de demain" subtitle=presentation.hero_subtitle|default:"Une institution d'excellence" label="À propos de nous" image=site_configuration.about_hero_image.url cta_text="Candidater maintenant" cta_url="/candidature/" %}
     {% endcomponent %}
@@ -32,19 +37,56 @@
     {% component "about_hero" title=presentation.hero_title|default:"Former les professionnels de demain" subtitle=presentation.hero_subtitle|default:"Une institution d'excellence" label="À propos de nous" image="" cta_text="Candidater maintenant" cta_url="/candidature/" %}
     {% endcomponent %}
 {% endif %}
+</section>
 
 {# ============================================================ #}
 {# SECTION 2 : STATISTIQUES                                      #}
 {# ============================================================ #}
 {% if stats %}
+<section id="chiffres" class="about-anchor">
     {% component "about_stats" stats=stats %}{% endcomponent %}
+</section>
 {% endif %}
+
+<span id="notre-histoire" class="about-anchor"></span>
+<section id="histoire" class="about-anchor py-14 bg-slate-50">
+    <div class="max-w-5xl mx-auto px-6" data-aos="fade-up">
+        <div class="text-center mb-8">
+            <h3 class="text-2xl md:text-3xl font-bold text-primary-700 mb-3">Notre histoire</h3>
+            <p class="text-gray-600 max-w-3xl mx-auto">
+                {% if institution %}
+                    {{ institution.name }} s'inscrit dans une dynamique de formation d'excellence orientee vers l'employabilite, la rigueur academique et le service a la communaute.
+                {% else %}
+                    Une institution engagee pour former des professionnels de sante competents et responsables.
+                {% endif %}
+            </p>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4">
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Identite</p>
+                <p class="font-semibold text-slate-800">{{ institution.short_name|default:"ESFE" }}</p>
+                <p class="text-sm text-slate-600 mt-1">{{ institution.legal_status|default:"Etablissement prive de formation" }}</p>
+            </div>
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Ancrage</p>
+                <p class="font-semibold text-slate-800">{{ institution.city|default:"Bamako" }}, {{ institution.country|default:"Mali" }}</p>
+                <p class="text-sm text-slate-600 mt-1">Formation de proximite, impact national.</p>
+            </div>
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Reference</p>
+                <p class="font-semibold text-slate-800">{{ institution.approval_number|default:"Reference institutionnelle" }}</p>
+                <p class="text-sm text-slate-600 mt-1">Conformite administrative et pedagogique.</p>
+            </div>
+        </div>
+    </div>
+</section>
 
 
 {# ============================================================ #}
 {# SECTION 3 : PRÉSENTATION + VISION/MISSION                     #}
 {# ============================================================ #}
 {% if presentation %}
+<section id="presentation" class="about-anchor">
     {% component "about_presentation"
         about_title=presentation.about_title
         about_text=presentation.about_text
@@ -54,6 +96,7 @@
         mission_title=presentation.mission_title
         mission_text=presentation.mission_text
     %}{% endcomponent %}
+</section>
 {% endif %}
 
 {% if presentation or site_configuration.about_vision_text %}
@@ -74,11 +117,13 @@
 {# SECTION 4 : VALEURS                                           #}
 {# ============================================================ #}
 {% if values %}
+<section id="valeurs" class="about-anchor">
     {% component "about_values"
         values=values
         title=site_configuration.about_values_title|default:"Nos Valeurs"
         subtitle=site_configuration.about_values_subtitle|default:"Les piliers qui guident notre engagement envers l'excellence"
     %}{% endcomponent %}
+</section>
 {% endif %}
 
 
@@ -86,6 +131,7 @@
 {# SECTION 5 : FORMATIONS (Aperçu)                               #}
 {# ============================================================ #}
 {% if formations %}
+<section id="formations" class="about-anchor">
     {% component "about_formations"
         programmes=formations
         title="Nos Formations"
@@ -93,6 +139,7 @@
         cta_text="Découvrir toutes nos formations"
         cta_url="/formations/"
     %}{% endcomponent %}
+</section>
 {% endif %}
 
 
@@ -100,29 +147,43 @@
 {# SECTION 6 : INFRASTRUCTURES                                   #}
 {# ============================================================ #}
 {% if infrastructures %}
+<section id="infrastructures" class="about-anchor">
     {% component "about_infrastructure"
         infrastructures=infrastructures
         title="Nos Infrastructures"
         subtitle="Des installations modernes pour une formation pratique de qualité"
     %}{% endcomponent %}
+</section>
 {% endif %}
 
 
 {# ============================================================ #}
 {# SECTION 7 : ANNEXES / BRANCHES                                #}
 {# ============================================================ #}
+<span id="nos-annexes" class="about-anchor"></span>
+<section id="annexes" class="about-anchor">
 {% if branches %}
     {% component "about_branches"
         branches=branches
         title="Nos Implantations"
-        subtitle="Une présence régionale pour une formation de proximité"
+        subtitle="Une presence regionale pour une formation de proximite"
     %}{% endcomponent %}
+{% else %}
+    <div class="py-14 bg-white">
+        <div class="max-w-5xl mx-auto px-6 text-center">
+            <h3 class="text-2xl font-bold text-primary-700 mb-3">Nos annexes</h3>
+            <p class="text-gray-600">Les implantations seront publiees ici. Contactez l'administration pour connaitre l'annexe de rattachement.</p>
+        </div>
+    </div>
 {% endif %}
+</section>
 
 
 {# ============================================================ #}
 {# SECTION 8 : PERSONNEL / STAFF                                 #}
 {# ============================================================ #}
+<span id="equipe-pedagogique" class="about-anchor"></span>
+<section id="equipe" class="about-anchor">
 {% if staff_direction or staff_teachers %}
     {% component "about_staff"
         direction=staff_direction
@@ -130,25 +191,44 @@
         title="Notre Équipe"
         subtitle="Des professionnels dévoués à votre réussite"
     %}{% endcomponent %}
+{% else %}
+    <div class="py-14 bg-white">
+        <div class="max-w-5xl mx-auto px-6 text-center">
+            <h3 class="text-2xl font-bold text-primary-700 mb-3">Notre equipe pedagogique</h3>
+            <p class="text-gray-600">La presentation des equipes sera publiee ici tres prochainement.</p>
+        </div>
+    </div>
 {% endif %}
+</section>
 
 
 {# ============================================================ #}
 {# SECTION 9 : PARTENAIRES                                       #}
 {# ============================================================ #}
+<span id="nos-partenaires" class="about-anchor"></span>
+<section id="partenaires" class="about-anchor">
 {% if partners %}
     {% component "about_partners"
         partners=partners
         title="Nos Partenaires"
         subtitle="Des collaborations stratégiques pour votre insertion professionnelle"
     %}{% endcomponent %}
+{% else %}
+    <div class="py-14 bg-slate-50">
+        <div class="max-w-5xl mx-auto px-6 text-center">
+            <h3 class="text-2xl font-bold text-primary-700 mb-3">Nos partenaires</h3>
+            <p class="text-gray-600">Les partenaires institutionnels et professionnels seront affiches ici.</p>
+        </div>
+    </div>
 {% endif %}
+</section>
 
 
 {# ============================================================ #}
 {# SECTION 10 : CTA FINAL                                        #}
 {# ============================================================ #}
 {% if presentation %}
+<section id="contact" class="about-anchor">
     {% component "about_cta"
         title=presentation.cta_title
         subtitle=presentation.cta_subtitle
@@ -157,7 +237,9 @@
         secondary_text="Nous contacter"
         secondary_url="/contact/"
     %}{% endcomponent %}
+</section>
 {% else %}
+<section id="contact" class="about-anchor">
     {% component "about_cta"
         title="Rejoignez une institution d'excellence"
         subtitle="Commencez votre parcours vers une carrière réussie."
@@ -166,6 +248,7 @@
         secondary_text="Nous contacter"
         secondary_url="/contact/"
     %}{% endcomponent %}
+</section>
 {% endif %}
 
 {% endblock %}

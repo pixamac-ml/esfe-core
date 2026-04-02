@@ -53,7 +53,7 @@
 .superadmin-search input { border: 0; outline: 0; width: 100%; background: transparent; font-size: .9rem; }
 .header-icon-btn { width: 2.5rem; height: 2.5rem; border: 1px solid var(--border); border-radius: .75rem; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #334155; transition: all .25s ease; }
 .header-icon-btn:hover { color: var(--primary); border-color: #cbd5e1; transform: translateY(-1px); }
-.superadmin-content { padding: 1.2rem; background: var(--soft); }
+.superadmin-content { padding: 1.5rem; background: var(--soft); }
 #htmx-progress { position: fixed; top: 0; left: 0; width: 0; height: 3px; background: linear-gradient(90deg, var(--secondary), var(--accent)); z-index: 90; opacity: 0; transition: width .25s ease, opacity .25s ease; }
 #htmx-progress.active { width: 90%; opacity: 1; }
 #htmx-progress.done { width: 100%; opacity: 0; transition: width .15s ease, opacity .3s ease; }
@@ -81,9 +81,148 @@
 .badge-danger { background: #fee2e2; color: #b91c1c; }
 .badge-draft { background: #f1f5f9; color: #475569; }
 .badge-info { background: #dbeafe; color: #1d4ed8; }
+
+/* ================= FORM DESIGN SYSTEM (GLOBAL) ================= */
+.sa-form {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    padding: 1.35rem;
+    max-width: 1040px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.sa-form-shell {
+    max-width: 1180px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.superadmin-content > .sa-form-shell,
+.superadmin-content > .card.sa-form-shell {
+    width: 100%;
+}
+
+.sa-form-shell .card-header {
+    padding: 1.15rem 1.35rem;
+}
+
+.sa-form-shell .card-body {
+    padding: 1.5rem;
+}
+
+/* Si le formulaire est deja dans une card/card-body, on evite l'effet double couche. */
+.card > form.sa-form,
+.card-body.sa-form,
+.card-body > form.sa-form {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    max-width: 100%;
+    margin: 0;
+}
+
+.form-group { margin-bottom: 1.2rem; }
+
+.sa-form > .form-group:last-child,
+.sa-form > div:last-child {
+    margin-bottom: 0;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: .5rem;
+    font-size: .82rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.form-help {
+    margin-top: .45rem;
+    margin-bottom: 0;
+    font-size: .74rem;
+    color: #64748b;
+}
+
+.form-input,
+.form-select,
+.form-textarea,
+.sa-form input:not([type='checkbox']):not([type='radio']):not([type='hidden']):not([type='submit']):not([type='button']),
+.sa-form select,
+.sa-form textarea {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #0f172a;
+    border-radius: .75rem;
+    padding: .74rem .9rem;
+    font-size: .88rem;
+    line-height: 1.45;
+    transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus,
+.sa-form input:not([type='checkbox']):not([type='radio']):not([type='hidden']):not([type='submit']):not([type='button']):focus,
+.sa-form select:focus,
+.sa-form textarea:focus {
+    outline: none;
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 3px rgba(29,181,176,.15);
+}
+
+.sa-form input[type='file'] {
+    border-style: dashed;
+    background: #f8fafc;
+}
+
+.sa-form input[disabled],
+.sa-form select[disabled],
+.sa-form textarea[disabled] {
+    background: #f8fafc;
+    color: #64748b;
+}
+
+.sa-form input[type='checkbox'],
+.sa-form input[type='radio'] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--secondary);
+}
+
+.sa-form .form-actions,
+.sa-form .flex.justify-end.gap-2 {
+    margin-top: .9rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.sa-form .grid {
+    gap: 1.1rem;
+}
+
+.sa-form textarea {
+    min-height: 110px;
+}
+
+.sa-form .inline-flex.items-center.gap-2,
+.sa-form .flex.items-center.gap-2 {
+    row-gap: .6rem;
+}
+
+.sa-form .errorlist,
+.sa-form .text-red-600 {
+    font-size: .75rem;
+}
 @media (max-width: 1023px) {
     .superadmin-sidebar { width: 16rem; }
     .superadmin-content { padding: 1rem; }
+    .sa-form { padding: 1rem; }
+    .sa-form-shell .card-header,
+    .sa-form-shell .card-body { padding: 1rem; }
 }
 </style>
 {% endblock %}
@@ -477,10 +616,72 @@ function superadminLayout() {
         }
     });
 
+    function enhanceSuperadminForms(root) {
+        var scope = root || document;
+        var forms = scope.querySelectorAll('.superadmin-content form');
+
+        forms.forEach(function (form) {
+            var isCompactForm = form.classList.contains('inline')
+                || form.classList.contains('inline-flex')
+                || form.closest('.card-header') !== null;
+
+            if (isCompactForm) {
+                return;
+            }
+
+            if (!form.classList.contains('sa-form')) {
+                form.classList.add('sa-form');
+            }
+
+            var card = form.closest('.card');
+            if (card && !card.classList.contains('sa-form-shell')) {
+                card.classList.add('sa-form-shell');
+            }
+
+            form.querySelectorAll('p').forEach(function (p) {
+                if (!p.classList.contains('form-group') && p.querySelector('input,select,textarea')) {
+                    p.classList.add('form-group');
+                }
+            });
+
+            form.querySelectorAll('label').forEach(function (label) {
+                if (!label.classList.contains('form-label')) {
+                    label.classList.add('form-label');
+                }
+            });
+
+            form.querySelectorAll('input, select, textarea').forEach(function (field) {
+                var tag = field.tagName.toLowerCase();
+                var type = (field.getAttribute('type') || '').toLowerCase();
+
+                if (tag === 'textarea') {
+                    field.classList.add('form-textarea');
+                    return;
+                }
+
+                if (tag === 'select') {
+                    field.classList.add('form-select');
+                    return;
+                }
+
+                if (type === 'checkbox' || type === 'radio' || type === 'hidden' || type === 'submit' || type === 'button') {
+                    return;
+                }
+
+                field.classList.add('form-input');
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         if (window.lucide) {
             lucide.createIcons();
         }
+        enhanceSuperadminForms(document);
+    });
+
+    document.body.addEventListener('htmx:afterSwap', function (event) {
+        enhanceSuperadminForms(event.target || document);
     });
 })();
 </script>

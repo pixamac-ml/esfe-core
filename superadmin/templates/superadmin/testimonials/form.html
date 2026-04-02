@@ -7,7 +7,7 @@
 <div class="max-w-3xl">
     <div class="card">
         <div class="card-body">
-            <form method="post" class="space-y-4">
+            <form method="post" enctype="multipart/form-data" class="space-y-4">
                 {% csrf_token %}
 
                 <label class="block text-sm text-slate-700">
@@ -20,15 +20,53 @@
                     <input type="text" name="author_role" value="{{ testimonial.author_role|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
                 </label>
 
+                <div class="grid md:grid-cols-2 gap-4">
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Promotion</span>
+                        <input type="text" name="promotion" value="{{ testimonial.promotion|default:'' }}" placeholder="Ex: Promo 2024" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                    </label>
+
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Programme lie (optionnel)</span>
+                        <select name="programme" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                            <option value="">Temoignage global</option>
+                            {% for p in programmes %}
+                            <option value="{{ p.id }}" {% if testimonial.programme_id == p.id %}selected{% endif %}>{{ p.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+
+                <label class="block text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Photo de profil (optionnel)</span>
+                    <input type="file" name="author_photo" accept="image/*" class="w-full rounded-lg border border-slate-300 px-3 py-2 bg-white">
+                    {% if testimonial.author_photo %}
+                    <img src="{{ testimonial.author_photo.url }}" alt="Photo actuelle" class="mt-3 h-16 w-16 rounded-full object-cover border border-slate-200">
+                    {% endif %}
+                </label>
+
                 <label class="block text-sm text-slate-700">
                     <span class="block mb-1 font-medium">Temoignage</span>
                     <textarea name="quote" rows="6" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>{{ testimonial.quote|default:'' }}</textarea>
                 </label>
 
-                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" name="is_active" {% if testimonial.is_active or not testimonial %}checked{% endif %}>
-                    <span>Publier ce temoignage</span>
-                </label>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <label class="block text-sm text-slate-700">
+                        <span class="block mb-1 font-medium">Ordre d'affichage</span>
+                        <input type="number" min="0" name="order" value="{{ testimonial.order|default:0 }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                    </label>
+
+                    <div class="space-y-2 pt-6">
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input type="checkbox" name="is_featured" {% if testimonial.is_featured %}checked{% endif %}>
+                            <span>Mettre en avant</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input type="checkbox" name="is_active" {% if testimonial.is_active or not testimonial %}checked{% endif %}>
+                            <span>Publier ce temoignage</span>
+                        </label>
+                    </div>
+                </div>
 
                 <div class="flex justify-end gap-2 pt-2">
                     <a href="{% url 'superadmin:testimonial_list' %}" class="btn btn-outline">Annuler</a>

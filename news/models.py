@@ -285,7 +285,15 @@ from django.conf import settings
 # CONFIGURATION FFMPEG
 # ==========================================================
 
-FFMPEG_PATH = os.path.join(settings.BASE_DIR, "ffmpeg", "bin", "ffmpeg.exe")
+# En production, on peut fournir FFMPEG_PATH (ex: /usr/bin/ffmpeg)
+FFMPEG_PATH = getattr(settings, "FFMPEG_PATH", "ffmpeg")
+
+# Profils qualite image (galerie events)
+EVENT_IMAGE_MAX_SIZE = (2400, 2400)
+EVENT_COVER_THUMB_SIZE = (960, 720)
+EVENT_MEDIA_THUMB_SIZE = (960, 960)
+EVENT_FULL_QUALITY = 92
+EVENT_THUMB_QUALITY = 86
 
 
 # ==========================================================
@@ -350,13 +358,23 @@ class Event(models.Model):
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
 
+        # On duplique avant redimensionnement pour garder une base propre.
+        original = img.copy()
+
         base_name = os.path.basename(self.cover_image.name)
         file_root = os.path.splitext(base_name)[0]
 
-        # HD
+        # Full quality (hero/detail)
         buffer_hd = BytesIO()
-        img.thumbnail((1600, 1200), Image.LANCZOS)
-        img.save(buffer_hd, format="WEBP", quality=85)
+        full = original.copy()
+        full.thumbnail(EVENT_IMAGE_MAX_SIZE, Image.LANCZOS)
+        full.save(
+            buffer_hd,
+            format="WEBP",
+            quality=EVENT_FULL_QUALITY,
+            method=6,
+            optimize=True,
+        )
 
         self.cover_image.save(
             f"{file_root}.webp",
@@ -364,12 +382,18 @@ class Event(models.Model):
             save=False
         )
 
-        # Thumbnail
-        thumb = img.copy()
-        thumb.thumbnail((500, 350), Image.LANCZOS)
+        # Thumbnail premium (listes/cartes)
+        thumb = original.copy()
+        thumb.thumbnail(EVENT_COVER_THUMB_SIZE, Image.LANCZOS)
 
         buffer_thumb = BytesIO()
-        thumb.save(buffer_thumb, format="WEBP", quality=75)
+        thumb.save(
+            buffer_thumb,
+            format="WEBP",
+            quality=EVENT_THUMB_QUALITY,
+            method=6,
+            optimize=True,
+        )
 
         self.cover_thumbnail.save(
             f"{file_root}_thumb.webp",
@@ -437,7 +461,8 @@ class MediaItem(models.Model):
         if self.media_type == self.IMAGE and self.image and not self.thumbnail:
             self._process_image()
 
-        if self.media_type == self.VIDEO and self.video_file:
+        # Evite une recompression video a chaque edition.
+        if self.media_type == self.VIDEO and self.video_file and not self.thumbnail:
             self._process_video()
 
     # =========================
@@ -451,13 +476,22 @@ class MediaItem(models.Model):
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
 
+        original = img.copy()
+
         base_name = os.path.basename(self.image.name)
         file_root = os.path.splitext(base_name)[0]
 
-        # HD
+        # Full quality (lightbox/detail)
         buffer_hd = BytesIO()
-        img.thumbnail((1600, 1200), Image.LANCZOS)
-        img.save(buffer_hd, format="WEBP", quality=85)
+        full = original.copy()
+        full.thumbnail(EVENT_IMAGE_MAX_SIZE, Image.LANCZOS)
+        full.save(
+            buffer_hd,
+            format="WEBP",
+            quality=EVENT_FULL_QUALITY,
+            method=6,
+            optimize=True,
+        )
 
         self.image.save(
             f"{file_root}.webp",
@@ -465,12 +499,18 @@ class MediaItem(models.Model):
             save=False
         )
 
-        # Thumbnail
-        thumb = img.copy()
-        thumb.thumbnail((400, 300), Image.LANCZOS)
+        # Thumbnail premium (grilles galerie)
+        thumb = original.copy()
+        thumb.thumbnail(EVENT_MEDIA_THUMB_SIZE, Image.LANCZOS)
 
         buffer_thumb = BytesIO()
-        thumb.save(buffer_thumb, format="WEBP", quality=70)
+        thumb.save(
+            buffer_thumb,
+            format="WEBP",
+            quality=EVENT_THUMB_QUALITY,
+            method=6,
+            optimize=True,
+        )
 
         self.thumbnail.save(
             f"{file_root}_thumb.webp",
@@ -486,8 +526,8 @@ class MediaItem(models.Model):
 
     def _process_video(self):
 
-        if not os.path.exists(FFMPEG_PATH):
-            return  # sécurité si ffmpeg absent
+        # Accepte un binaire present dans le PATH systeme (prod Linux/Windows).
+        ffmpeg_bin = FFMPEG_PATH
 
         input_path = self.video_file.path
         base = os.path.splitext(input_path)[0]
@@ -495,25 +535,28 @@ class MediaItem(models.Model):
         compressed_path = f"{base}_compressed.mp4"
         thumbnail_path = f"{base}_thumb.jpg"
 
-        # Compression vidéo
-        subprocess.run([
-            FFMPEG_PATH,
-            "-i", input_path,
-            "-vcodec", "libx264",
-            "-crf", "28",
-            "-preset", "medium",
-            "-acodec", "aac",
-            compressed_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            # Compression vidéo
+            subprocess.run([
+                ffmpeg_bin,
+                "-i", input_path,
+                "-vcodec", "libx264",
+                "-crf", "23",
+                "-preset", "medium",
+                "-acodec", "aac",
+                compressed_path
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # Génération thumbnail
-        subprocess.run([
-            FFMPEG_PATH,
-            "-i", input_path,
-            "-ss", "00:00:01",
-            "-vframes", "1",
-            thumbnail_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Génération thumbnail
+            subprocess.run([
+                ffmpeg_bin,
+                "-i", input_path,
+                "-ss", "00:00:01",
+                "-vframes", "1",
+                thumbnail_path
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            return
 
         if os.path.exists(compressed_path):
             os.remove(input_path)

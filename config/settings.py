@@ -252,3 +252,4 @@ CKEDITOR_5_CONFIGS = {
 # ==================================================
 
 STUDENT_LOGIN_URL = os.getenv("STUDENT_LOGIN_URL", f"{BASE_URL}/student/login/")
+FFMPEG_PATH = os.getenv("FFMPEG_PATH", "ffmpeg")

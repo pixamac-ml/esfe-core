@@ -17,6 +17,7 @@ urlpatterns = [
     path("contact/", views.contact_view, name="contact"),
     path("plan-du-site/", views.sitemap, name="sitemap"),
     path("robots.txt", views.robots_txt, name="robots_txt"),
+    path("cookies/consent/", views.set_cookie_preferences, name="cookie_consent"),
 
 
     # =====================================================

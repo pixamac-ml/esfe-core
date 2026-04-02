@@ -5,7 +5,19 @@
 {% block page_subtitle %}{% if programme %}Modifier les informations du programme{% else %}Créer un nouveau programme de formation{% endif %}{% endblock %}
 
 {% block content_main %}
-<div class="fade-in max-w-5xl mx-auto">
+<div class="fade-in max-w-6xl mx-auto">
+
+    <div class="card mb-6" style="border: 1px solid #e2e8f0; background: #f8fafc;">
+        <div class="card-body" style="padding: 16px 20px;">
+            <div class="flex items-start gap-3" style="display: flex; align-items: flex-start; gap: 12px;">
+                <i class="fas fa-circle-info" style="color: #2563eb; margin-top: 2px;"></i>
+                <div>
+                    <p class="text-sm font-semibold text-gray-900" style="margin: 0;">Formulaire de gestion du programme</p>
+                    <p class="text-sm text-gray-600" style="margin: 4px 0 0 0;">Les champs marqués d'un <span style="color: #ef4444;">*</span> sont obligatoires. Vérifiez les informations académiques avant enregistrement.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- ========================================
          FORMULAIRE DE PROGRAMME
@@ -21,55 +33,59 @@
             </a>
         </div>
 
-        <form method="POST" class="card-body" enctype="multipart/form-data">
+        <form method="POST" class="card-body space-y-10" enctype="multipart/form-data">
             {% csrf_token %}
 
             <!-- Informations de base -->
-            <div style="margin-bottom: 24px;">
-                <h4 style="font-size: 14px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            <div class="mb-8">
+                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
                     <i class="fas fa-info-circle"></i> Informations de base
                 </h4>
 
-                <div class="form-group">
-                    <label for="title" class="form-label">
-                        Titre du programme <span style="color: #ef4444;">*</span>
-                    </label>
-                    <input type="text" id="title" name="title" required
-                           value="{{ programme.title|default:'' }}"
-                           class="form-input"
-                           placeholder="Ex: Licence en Sciences Informatiques">
-                    <p class="form-help">Le titre complet du programme tel qu'il apparaîtra sur le site</p>
-                </div>
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div class="form-group">
+                        <label for="title" class="form-label">
+                            Titre du programme <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input type="text" id="title" name="title" required
+                               value="{{ request.POST.title|default:programme.title|default:'' }}"
+                               class="form-input"
+                               placeholder="Ex: Licence en Sciences Informatiques">
+                        <p class="form-help">Le titre complet du programme tel qu'il apparaîtra sur le site.</p>
+                    </div>
 
-                <div class="form-group">
-                    <label for="short_description" class="form-label">
-                        Description courte <span style="color: #ef4444;">*</span>
-                    </label>
-                    <input type="text" id="short_description" name="short_description" required
-                           value="{{ programme.short_description|default:'' }}"
-                           class="form-input"
-                           maxlength="300"
-                           placeholder="Ex: Formation complète en développement logiciel et algorithms">
-                    <p class="form-help">Résumé bref (max 300 caractères) pour les listes et aperçus</p>
+                    <div class="form-group">
+                        <label for="short_description" class="form-label">
+                            Description courte <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input type="text" id="short_description" name="short_description" required
+                               value="{{ request.POST.short_description|default:programme.short_description|default:'' }}"
+                               class="form-input"
+                               maxlength="300"
+                               placeholder="Ex: Formation complète en développement logiciel et algorithmes">
+                        <p class="form-help" id="short-description-help">Resume bref (max 300 caracteres) pour les listes et apercus.</p>
+                    </div>
                 </div>
             </div>
 
             <!-- Classification -->
-            <div style="margin-bottom: 24px;">
-                <h4 style="font-size: 14px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            <div class="mb-8">
+                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
                     <i class="fas fa-layer-group"></i> Classification
                 </h4>
 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                     <div class="form-group">
                         <label for="cycle" class="form-label">Cycle <span style="color: #ef4444;">*</span></label>
                         <select id="cycle" name="cycle" required class="form-select">
                             <option value="">Sélectionner un cycle</option>
+                            {% with selected_cycle=request.POST.cycle|default:programme.cycle_id %}
                             {% for cycle in cycles %}
-                            <option value="{{ cycle.pk }}" {% if programme.cycle_id == cycle.pk %}selected{% endif %}>
+                            <option value="{{ cycle.pk }}" {% if selected_cycle|stringformat:"s" == cycle.pk|stringformat:"s" %}selected{% endif %}>
                                 {{ cycle.name }}
                             </option>
                             {% endfor %}
+                            {% endwith %}
                         </select>
                     </div>
 
@@ -77,11 +93,13 @@
                         <label for="filiere" class="form-label">Filière <span style="color: #ef4444;">*</span></label>
                         <select id="filiere" name="filiere" required class="form-select">
                             <option value="">Sélectionner une filière</option>
+                            {% with selected_filiere=request.POST.filiere|default:programme.filiere_id %}
                             {% for filiere in filieres %}
-                            <option value="{{ filiere.pk }}" {% if programme.filiere_id == filiere.pk %}selected{% endif %}>
+                            <option value="{{ filiere.pk }}" {% if selected_filiere|stringformat:"s" == filiere.pk|stringformat:"s" %}selected{% endif %}>
                                 {{ filiere.name }}
                             </option>
                             {% endfor %}
+                            {% endwith %}
                         </select>
                     </div>
 
@@ -89,11 +107,13 @@
                         <label for="diploma_awarded" class="form-label">Diplôme délivré <span style="color: #ef4444;">*</span></label>
                         <select id="diploma_awarded" name="diploma_awarded" required class="form-select">
                             <option value="">Sélectionner un diplôme</option>
+                            {% with selected_diploma=request.POST.diploma_awarded|default:programme.diploma_awarded_id %}
                             {% for diploma in diplomas %}
-                            <option value="{{ diploma.pk }}" {% if programme.diploma_awarded_id == diploma.pk %}selected{% endif %}>
+                            <option value="{{ diploma.pk }}" {% if selected_diploma|stringformat:"s" == diploma.pk|stringformat:"s" %}selected{% endif %}>
                                 {{ diploma.name }}
                             </option>
                             {% endfor %}
+                            {% endwith %}
                         </select>
                     </div>
 
@@ -102,7 +122,7 @@
                             Durée (années) <span style="color: #ef4444;">*</span>
                         </label>
                         <input type="number" id="duration_years" name="duration_years" required
-                               value="{{ programme.duration_years|default:'3' }}"
+                               value="{{ request.POST.duration_years|default:programme.duration_years|default:'3' }}"
                                class="form-input"
                                min="1" max="10"
                                placeholder="Ex: 3">
@@ -112,8 +132,8 @@
             </div>
 
             <!-- Description complète -->
-            <div style="margin-bottom: 24px;">
-                <h4 style="font-size: 14px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            <div class="mb-8">
+                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
                     <i class="fas fa-file-alt"></i> Description complète
                 </h4>
 
@@ -121,16 +141,16 @@
                     <label for="description" class="form-label">Description <span style="color: #ef4444;">*</span></label>
                     <textarea id="description" name="description" rows="6" required
                               class="form-textarea"
-                              placeholder="Décrivez en détail le programme, les objectifs pédagogiques, les compétences acquises...">{{ programme.description|default:'' }}</textarea>
+                              placeholder="Décrivez en détail le programme, les objectifs pédagogiques, les compétences acquises...">{{ request.POST.description|default:programme.description|default:'' }}</textarea>
                     <p class="form-help">Description détaillée du programme (objectifs, méthode pédagogique, etc.)</p>
                 </div>
 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
                     <div class="form-group">
                         <label for="learning_outcomes" class="form-label">Compétences acquises</label>
                         <textarea id="learning_outcomes" name="learning_outcomes" rows="4"
                                   class="form-textarea"
-                                  placeholder="- Maîtrise des algorithmes et structures de données&#10;- Programmation orientée objet&#10;- Gestion de bases de données">{{ programme.learning_outcomes|default:'' }}</textarea>
+                                  placeholder="- Maitrise des algorithmes et structures de donnees&#10;- Programmation orientee objet&#10;- Gestion de bases de donnees">{{ request.POST.learning_outcomes|default:programme.learning_outcomes|default:'' }}</textarea>
                         <p class="form-help">Liste des compétences et savoir-faire développés</p>
                     </div>
 
@@ -138,7 +158,7 @@
                         <label for="career_opportunities" class="form-label">Débouchés professionnels</label>
                         <textarea id="career_opportunities" name="career_opportunities" rows="4"
                                   class="form-textarea"
-                                  placeholder="- Développeur logiciel&#10;- Ingénieur système&#10;- Analyste de données">{{ programme.career_opportunities|default:'' }}</textarea>
+                                  placeholder="- Developpeur logiciel&#10;- Ingenieur systeme&#10;- Analyste de donnees">{{ request.POST.career_opportunities|default:programme.career_opportunities|default:'' }}</textarea>
                         <p class="form-help">Métiers et secteurs accessibles après la formation</p>
                     </div>
                 </div>
@@ -147,23 +167,25 @@
                     <label for="program_structure" class="form-label">Structure pédagogique</label>
                     <textarea id="program_structure" name="program_structure" rows="4"
                               class="form-textarea"
-                              placeholder="Cours théoriques: 60%&#10;Travaux pratiques: 30%&#10;Stages: 10%">{{ programme.program_structure|default:'' }}</textarea>
+                              placeholder="Cours theoriques: 60%&#10;Travaux pratiques: 30%&#10;Stages: 10%">{{ request.POST.program_structure|default:programme.program_structure|default:'' }}</textarea>
                     <p class="form-help">Organisation pédagogique (cours, stages, TP, etc.)</p>
                 </div>
             </div>
 
             <!-- Options avancées -->
-            <div style="margin-bottom: 24px;">
-                <h4 style="font-size: 14px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            <div class="mb-8">
+                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
                     <i class="fas fa-cog"></i> Options
                 </h4>
 
-                <div style="display: flex; flex-wrap: wrap; gap: 24px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 32px;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="flex items-center cursor-pointer">
                             <div class="relative">
                                 <input type="checkbox" name="is_active" id="is_active"
-                                       {% if programme.is_active %}checked{% endif %}
+                                       {% if request.POST %}
+                                           {% if request.POST.is_active %}checked{% endif %}
+                                       {% elif programme.is_active %}checked{% endif %}
                                        class="sr-only">
                                 <div class="toggle-slider"></div>
                             </div>
@@ -176,7 +198,9 @@
                         <label class="flex items-center cursor-pointer">
                             <div class="relative">
                                 <input type="checkbox" name="is_featured" id="is_featured"
-                                       {% if programme.is_featured %}checked{% endif %}
+                                       {% if request.POST %}
+                                           {% if request.POST.is_featured %}checked{% endif %}
+                                       {% elif programme.is_featured %}checked{% endif %}
                                        class="sr-only">
                                 <div class="toggle-slider"></div>
                             </div>
@@ -188,8 +212,8 @@
             </div>
 
             <!-- Illustration -->
-            <div style="margin-bottom: 24px;">
-                <h4 style="font-size: 14px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            <div class="mb-8">
+                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
                     <i class="fas fa-image"></i> Illustration
                 </h4>
 
@@ -209,7 +233,7 @@
             </div>
 
             <!-- Boutons -->
-            <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+            <div class="form-actions flex items-center justify-between" style="padding-top: 28px; margin-top: 8px; border-top: 1px solid #e5e7eb;">
                 <a href="{% url 'superadmin:formation_list' %}" class="btn btn-outline">
                     <i class="fas fa-times mr-2"></i>Annuler
                 </a>
@@ -223,4 +247,22 @@
     </div>
 
 </div>
+
+<script>
+    (function () {
+        var input = document.getElementById("short_description");
+        var help = document.getElementById("short-description-help");
+        if (!input || !help) {
+            return;
+        }
+        var max = Number(input.getAttribute("maxlength") || 300);
+        function updateCounter() {
+            var remaining = max - (input.value || "").length;
+            help.textContent = "Resume bref (max " + max + " caracteres). Restants: " + remaining + ".";
+            help.style.color = remaining < 25 ? "#b45309" : "#6b7280";
+        }
+        input.addEventListener("input", updateCounter);
+        updateCounter();
+    })();
+</script>
 {% endblock %}

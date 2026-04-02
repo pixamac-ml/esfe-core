@@ -402,7 +402,8 @@ class StaffAdmin(admin.ModelAdmin):
                 obj.photo.url
             )
         return format_html(
-            '<div style="width:45px;height:45px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:1.2rem;">?</div>'
+            '<div style="width:45px;height:45px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:1.2rem;">{}</div>',
+            '?',
         )
     photo_preview.short_description = ""
 
@@ -718,7 +719,8 @@ class ContactMessageAdmin(admin.ModelAdmin):
                 name
             )
         return format_html(
-            '<span style="color:#dc2626;font-weight:600;">Non assigné</span>'
+            '<span style="color:#dc2626;font-weight:600;">{}</span>',
+            'Non assigne',
         )
     assigned_display.short_description = "Responsable"
 
@@ -755,11 +757,13 @@ class ContactMessageAdmin(admin.ModelAdmin):
     def sla_indicator(self, obj):
         if obj.status in ["answered", "closed"]:
             return format_html(
-                '<span style="color:#16a34a;font-weight:600;">✓ Traité</span>'
+                '<span style="color:#16a34a;font-weight:600;">{}</span>',
+                '✓ Traite',
             )
         if obj.is_overdue:
             return format_html(
-                '<span style="color:white;background:#dc2626;padding:5px 10px;border-radius:20px;font-weight:600;">⚠ En retard</span>'
+                '<span style="color:white;background:#dc2626;padding:5px 10px;border-radius:20px;font-weight:600;">{}</span>',
+                '⚠ En retard',
             )
         # Calcul des heures restantes
         remaining = obj.deadline - timezone.now()
@@ -858,10 +862,12 @@ class NotificationAdmin(admin.ModelAdmin):
     def email_status_badge(self, obj):
         if obj.email_sent:
             return format_html(
-                '<span style="color:white;background:#16a34a;padding:4px 8px;border-radius:4px;font-weight:600;">✓ Envoyé</span>'
+                '<span style="color:white;background:#16a34a;padding:4px 8px;border-radius:4px;font-weight:600;">{}</span>',
+                '✓ Envoye',
             )
         return format_html(
-            '<span style="color:white;background:#f59e0b;padding:4px 8px;border-radius:4px;font-weight:600;">En attente</span>'
+            '<span style="color:white;background:#f59e0b;padding:4px 8px;border-radius:4px;font-weight:600;">{}</span>',
+            'En attente',
         )
     email_status_badge.short_description = "Email"
 

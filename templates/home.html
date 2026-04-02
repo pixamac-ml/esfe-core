@@ -7,6 +7,42 @@
 
 {% block content %}
 
+<script>
+  function advancedCounter(target, prefix = "", suffix = "") {
+    return {
+      target: Number(target) || 0,
+      prefix: prefix || "",
+      suffix: suffix || "",
+      display: `${prefix || ""}0${suffix || ""}`,
+      started: false,
+      start() {
+        if (this.started) return;
+        this.started = true;
+
+        if (this.target <= 0) {
+          this.display = `${this.prefix}${this.target}${this.suffix}`;
+          return;
+        }
+
+        const duration = 1300;
+        const stepMs = 24;
+        const steps = Math.max(1, Math.floor(duration / stepMs));
+        let current = 0;
+        const increment = Math.max(1, Math.ceil(this.target / steps));
+
+        const timer = setInterval(() => {
+          current += increment;
+          if (current >= this.target) {
+            current = this.target;
+            clearInterval(timer);
+          }
+          this.display = `${this.prefix}${current.toLocaleString("fr-FR")}${this.suffix}`;
+        }, stepMs);
+      }
+    }
+  }
+</script>
+
 {# ══════════════════════════════════════════════════════════════════════════════
    SECTION 1 : HERO
    ══════════════════════════════════════════════════════════════════════════════ #}
@@ -152,15 +188,15 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12">
 
       {% for stat in stats %}
-      <div class="text-center"
-           x-data="advancedCounter({{ stat.value }}, '{{ stat.suffix }}')"
+      <div
+           x-data="advancedCounter({{ stat.value|default:0 }}, '{{ stat.prefix|default:''|escapejs }}', '{{ stat.suffix|default:''|escapejs }}')"
            x-intersect.once="start()"
            :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
            style="transition-delay: {{ forloop.counter0 }}50ms"
-           class="transition-all duration-700">
+           class="text-center transition-all duration-700">
 
         <div class="text-4xl lg:text-5xl font-bold text-white mb-2">
-          <span x-text="display"></span>{{ stat.suffix }}
+          <span x-text="display">{{ stat.prefix }}{{ stat.value|intcomma }}{{ stat.suffix }}</span>
         </div>
         <div class="text-sm text-white/70 uppercase tracking-wider">
           {{ stat.label }}

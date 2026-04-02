@@ -1,0 +1,134 @@
+{% url 'core:cookie_consent' as cookie_consent_url %}
+{% url 'core:legal_notice' as legal_notice_url %}
+{% url 'core:privacy_policy' as privacy_policy_url %}
+{% url 'core:terms_of_service' as terms_url %}
+
+<div id="cookie-consent-root"
+     data-endpoint="{{ cookie_consent_url }}"
+     data-csrf-token="{{ csrf_token }}"
+     class="fixed inset-x-0 bottom-0 z-[95] pointer-events-none">
+
+  <div id="cookie-banner" class="hidden pointer-events-auto mx-auto max-w-6xl p-4 sm:p-6">
+    <div class="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl ring-1 ring-slate-900/5">
+      <div class="bg-gradient-to-r from-primary-700 via-primary-600 to-secondary px-5 py-3 text-white text-xs sm:text-sm font-medium tracking-wide">
+        Centre de preferences cookies · ESFE
+      </div>
+      <div class="p-5 sm:p-6 lg:p-7">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div class="max-w-3xl">
+            <div class="flex items-center gap-3">
+              <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+                <i class="fa-solid fa-shield-halved"></i>
+              </span>
+              <div>
+                <h3 class="text-base sm:text-lg font-semibold text-slate-900">Respect de votre vie privee</h3>
+                <p class="text-xs sm:text-sm text-slate-500">Vous gardez le controle sur les cookies non essentiels.</p>
+              </div>
+            </div>
+            <p class="mt-4 text-sm sm:text-[15px] leading-7 text-slate-600">
+              ESFE utilise des cookies strictement necessaires au fonctionnement du site.
+              Avec votre accord, nous pouvons egalement activer des cookies d'analyse
+              afin d'ameliorer les performances, la navigation et la qualite globale du service.
+            </p>
+            <div class="mt-4 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-slate-500">
+              <a href="{{ privacy_policy_url }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 hover:border-primary-200 hover:text-primary-700 transition">
+                <i class="fa-solid fa-lock"></i>
+                Politique de confidentialite
+              </a>
+              <a href="{{ legal_notice_url }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 hover:border-primary-200 hover:text-primary-700 transition">
+                <i class="fa-solid fa-scale-balanced"></i>
+                Mentions legales
+              </a>
+              <a href="{{ terms_url }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 hover:border-primary-200 hover:text-primary-700 transition">
+                <i class="fa-solid fa-file-lines"></i>
+                Conditions d'utilisation
+              </a>
+            </div>
+          </div>
+
+          <div class="grid gap-2 sm:grid-cols-3 lg:min-w-[360px]">
+            <button id="cookie-reject-all" type="button" class="btn btn-outline btn-sm justify-center">Refuser</button>
+            <button id="cookie-open-customize" type="button" class="btn btn-outline btn-sm justify-center">Personnaliser</button>
+            <button id="cookie-accept-all" type="button" class="btn btn-primary btn-sm justify-center">Tout accepter</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button id="cookie-manage-button"
+        type="button"
+        class="hidden fixed bottom-4 left-4 z-[94] rounded-full border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-lg hover:-translate-y-0.5 hover:shadow-xl transition">
+  Gerer les cookies
+</button>
+
+<div id="cookie-modal" class="hidden fixed inset-0 z-[96] bg-slate-950/55 px-4 py-6 sm:py-10" aria-hidden="true">
+  <div class="mx-auto max-w-3xl rounded-[28px] bg-white shadow-2xl border border-slate-200 overflow-hidden">
+    <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
+      <div>
+        <p class="text-xs uppercase tracking-[0.22em] text-slate-400">Parametrage</p>
+        <h3 class="text-base sm:text-lg font-semibold text-slate-900">Preferences cookies</h3>
+      </div>
+      <button id="cookie-close-modal" type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition" aria-label="Fermer la fenetre des cookies">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="space-y-4 px-5 py-5 sm:px-6 sm:py-6">
+      <div class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm text-emerald-900">
+        <div class="flex items-start gap-3">
+          <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+            <i class="fa-solid fa-circle-check"></i>
+          </span>
+          <div>
+            <p class="font-semibold">Cookies necessaires</p>
+            <p class="mt-1 leading-6 text-emerald-800/90">
+              Ils assurent la securite, la session utilisateur, la soumission des formulaires
+              et le bon fonctionnement general du site. Ils sont toujours actifs.
+            </p>
+          </div>
+          <span class="inline-flex items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700 border border-emerald-200">Toujours actif</span>
+        </div>
+      </div>
+
+      <label class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4 sm:p-5 cursor-pointer hover:border-primary-200 hover:bg-primary-50/40 transition">
+        <div>
+          <p class="font-semibold text-slate-900">Cookies d'analyse</p>
+          <p class="text-sm text-slate-600 mt-1 leading-6">
+            Mesurent la frequentation, les parcours de navigation et les performances des pages
+            pour nous aider a ameliorer le site.
+          </p>
+        </div>
+        <input id="cookie-analytics" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500">
+      </label>
+
+      <label class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4 sm:p-5 cursor-pointer hover:border-primary-200 hover:bg-primary-50/40 transition">
+        <div>
+          <p class="font-semibold text-slate-900">Cookies marketing</p>
+          <p class="text-sm text-slate-600 mt-1 leading-6">
+            Servent a personnaliser certaines campagnes d'information ou integrations externes
+            si celles-ci sont activees ulterieurement.
+          </p>
+        </div>
+        <input id="cookie-marketing" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500">
+      </label>
+
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 leading-6">
+        Vous pouvez modifier vos choix a tout moment via le bouton <strong>Gerer les cookies</strong>
+        affiche en bas du site, ou depuis nos pages legales.
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
+      <div class="text-xs sm:text-sm text-slate-500">
+        En poursuivant sans accepter, seuls les cookies necessaires restent actifs.
+      </div>
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <a href="{{ privacy_policy_url }}" class="btn btn-outline btn-sm">En savoir plus</a>
+        <button id="cookie-save-selection" type="button" class="btn btn-primary btn-sm">Enregistrer mes choix</button>
+      </div>
+    </div>
+  </div>
+</div>
+

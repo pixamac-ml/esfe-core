@@ -1,10 +1,11 @@
 # core/views.py
 
 import logging
+import json
 from datetime import timedelta
 
 from django.shortcuts import render, get_object_or_404
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.utils.html import strip_tags
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -44,6 +45,10 @@ from .forms import ContactForm
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+COOKIE_CONSENT_NAME = "esfe_cookie_consent"
+COOKIE_CONSENT_MAX_AGE = 60 * 60 * 24 * 180  # 180 jours
 
 
 def get_site_configuration_safe():
@@ -204,6 +209,40 @@ def robots_txt(request):
     return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
 
 
+@require_http_methods(["POST"])
+def set_cookie_preferences(request):
+    """Enregistre les préférences cookies depuis la bannière de consentement."""
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "invalid_payload"}, status=400)
+
+    analytics = bool(payload.get("analytics", False))
+    marketing = bool(payload.get("marketing", False))
+    status = payload.get("status") or "customized"
+    if status not in {"accepted", "rejected", "customized"}:
+        status = "customized"
+
+    consent_payload = {
+        "version": 1,
+        "necessary": True,
+        "analytics": analytics,
+        "marketing": marketing,
+        "status": status,
+        "timestamp": timezone.now().isoformat(),
+    }
+
+    response = JsonResponse({"ok": True, "consent": consent_payload})
+    response.set_cookie(
+        COOKIE_CONSENT_NAME,
+        json.dumps(consent_payload, separators=(",", ":")),
+        max_age=COOKIE_CONSENT_MAX_AGE,
+        samesite="Lax",
+        secure=not settings.DEBUG,
+    )
+    return response
+
+
 # ==========================================================
 # ABOUT
 # ==========================================================
@@ -299,7 +338,7 @@ def home(request):
         .order_by("cycle__min_duration_years")[:3]
     )
 
-    stats = InstitutionStat.objects.filter(is_active=True).order_by("order")
+    stats = list(InstitutionStat.objects.filter(is_active=True).order_by("order"))
 
     values = Value.objects.filter(is_active=True).order_by("order")[:4]
 
@@ -353,6 +392,35 @@ def home(request):
         Q(community_topics__created_at__gte=timezone.now() - timedelta(days=30))
         | Q(community_answers__created_at__gte=timezone.now() - timedelta(days=30))
     ).distinct().count()
+
+    # Fallback: evite une section vide si aucune statistique n'a ete configuree.
+    if not stats:
+        stats = [
+            {
+                "label": "Programmes actifs",
+                "value": Programme.objects.filter(is_active=True).count(),
+                "prefix": "",
+                "suffix": "+",
+            },
+            {
+                "label": "Annexes",
+                "value": Branch.objects.filter(is_active=True).count(),
+                "prefix": "",
+                "suffix": "+",
+            },
+            {
+                "label": "Partenaires",
+                "value": Partner.objects.filter(is_active=True).count(),
+                "prefix": "",
+                "suffix": "+",
+            },
+            {
+                "label": "Membres actifs (30j)",
+                "value": active_members_30d,
+                "prefix": "",
+                "suffix": "+",
+            },
+        ]
 
     context = {
         "institution": institution,

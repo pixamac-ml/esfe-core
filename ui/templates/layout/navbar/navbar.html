@@ -1,4 +1,5 @@
 {% load static %}
+{% url 'core:about' as about_url %}
 
 <nav class="bg-primary-500 text-white sticky top-0 z-50 shadow-md">
 
@@ -26,33 +27,33 @@
 
       <!-- ================= L'ÉCOLE ================= -->
       <li class="relative group">
-        <button class="flex items-center gap-1 px-3 xl:px-4 py-2 rounded-lg hover:bg-white/10 transition">
+        <a href="{{ about_url }}#ecole" class="flex items-center gap-1 px-3 xl:px-4 py-2 rounded-lg hover:bg-white/10 transition">
           L'École
           <svg class="w-4 h-4 group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M6 9l6 6 6-6"/>
           </svg>
-        </button>
+        </a>
 
         <!-- Dropdown L'École -->
         <div class="absolute left-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform group-hover:translate-y-0 translate-y-2 z-50">
           <div class="py-2">
-            <a href="{% url 'core:about' %}" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
+            <a href="{{ about_url }}#ecole" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
               <i data-lucide="info" class="w-4 h-4 text-primary-500"></i>
               À propos
             </a>
-            <a href="{% url 'core:about' %}" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
+            <a href="{{ about_url }}#histoire" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
               <i data-lucide="history" class="w-4 h-4 text-primary-500"></i>
               Notre histoire
             </a>
-            <a href="{% url 'core:about' %}" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
+            <a href="{{ about_url }}#equipe" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
               <i data-lucide="users" class="w-4 h-4 text-primary-500"></i>
               Équipe pédagogique
             </a>
-            <a href="{% url 'core:about' %}" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
+            <a href="{{ about_url }}#annexes" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
               <i data-lucide="map-pin" class="w-4 h-4 text-primary-500"></i>
               Nos annexes
             </a>
-            <a href="{% url 'core:about' %}" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
+            <a href="{{ about_url }}#partenaires" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition">
               <i data-lucide="handshake" class="w-4 h-4 text-primary-500"></i>
               Partenaires
             </a>
@@ -321,11 +322,14 @@
             <div class="border-t border-gray-100 my-1"></div>
 
             <!-- Déconnexion -->
-            <a href="/login"
-               class="flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition">
-              <i data-lucide="log-out" class="w-4 h-4"></i>
-              Déconnexion
-            </a>
+            <form action="{% url 'accounts:logout' %}" method="post" class="m-0">
+              {% csrf_token %}
+              <button type="submit"
+                      class="w-full text-left flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                Déconnexion
+              </button>
+            </form>
 
           </div>
 
@@ -400,10 +404,11 @@
             </svg>
           </button>
           <ul x-show="activeSubmenu === 'ecole'" x-collapse class="pl-4 space-y-1 mt-1">
-            <li><a href="{% url 'core:about' %}" class="block px-4 py-2 text-white/80 hover:text-white transition">À propos</a></li>
-            <li><a href="{% url 'core:about' %}" class="block px-4 py-2 text-white/80 hover:text-white transition">Notre histoire</a></li>
-            <li><a href="{% url 'core:about' %}" class="block px-4 py-2 text-white/80 hover:text-white transition">Équipe pédagogique</a></li>
-            <li><a href="{% url 'core:about' %}" class="block px-4 py-2 text-white/80 hover:text-white transition">Nos annexes</a></li>
+            <li><a href="{{ about_url }}#ecole" class="block px-4 py-2 text-white/80 hover:text-white transition">À propos</a></li>
+            <li><a href="{{ about_url }}#histoire" class="block px-4 py-2 text-white/80 hover:text-white transition">Notre histoire</a></li>
+            <li><a href="{{ about_url }}#equipe" class="block px-4 py-2 text-white/80 hover:text-white transition">Équipe pédagogique</a></li>
+            <li><a href="{{ about_url }}#annexes" class="block px-4 py-2 text-white/80 hover:text-white transition">Nos annexes</a></li>
+            <li><a href="{{ about_url }}#partenaires" class="block px-4 py-2 text-white/80 hover:text-white transition">Partenaires</a></li>
           </ul>
         </li>
 
@@ -450,6 +455,19 @@
 
         <!-- Divider -->
         <li class="border-t border-white/10 my-3"></li>
+
+        {% if user.is_authenticated %}
+        <li>
+          <form action="{% url 'accounts:logout' %}" method="post" class="mx-4">
+            {% csrf_token %}
+            <button type="submit"
+                    class="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-300/40 text-red-100 hover:bg-red-500/20 transition">
+              <i data-lucide="log-out" class="w-5 h-5"></i>
+              Deconnexion
+            </button>
+          </form>
+        </li>
+        {% endif %}
 
         <!-- CTA Candidater -->
         <li>

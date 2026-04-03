@@ -34,9 +34,9 @@ def env_list(name: str, default: str = "") -> list[str]:
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
 DEBUG = env_bool("DEBUG", True)
-ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost,192.168.93.68,192.168.2.5")
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", BASE_URL)
-
+#ALLOWED_HOSTS =['127'192.168.2.3'.0.0.1',,'localhost']
+ALLOWED_HOSTS =['127.0.0.1','192.168.2.3','localhost']
 ENABLE_BROWSER_RELOAD = DEBUG and env_bool("ENABLE_BROWSER_RELOAD", True)
 ENABLE_WEBSOCKETS = env_bool("ENABLE_WEBSOCKETS", True)
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1").strip()
@@ -215,11 +215,14 @@ USE_TZ = True
 # ==================================================
 # STATIC FILES
 # ==================================================
+if DEBUG:
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+else:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_MAX_AGE = int(os.getenv("WHITENOISE_MAX_AGE", "31536000" if not DEBUG else "0"))
 
 # ==================================================

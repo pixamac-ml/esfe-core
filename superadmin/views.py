@@ -18,6 +18,7 @@ from django.utils import timezone
 from datetime import timedelta
 from io import BytesIO
 import secrets
+import logging
 from urllib.parse import urlencode
 
 from reportlab.lib import colors
@@ -41,8 +42,10 @@ from accounts.models import Profile
 from community.models import Category as CommunityCategory, Topic, Answer
 from .models import SuperadminCockpitPreference
 from students.services.email import send_payment_confirmation_email
+from admissions.emails import send_notification_email
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 MANAGED_STAFF_GROUPS = (
     'admissions_managers',
@@ -174,7 +177,46 @@ def _change_inscription_status(inscription, new_status, comment=''):
     previous_status = inscription.status
     inscription.status = new_status
     inscription.save(update_fields=['status'])
-    _log_inscription_history(inscription, previous_status, new_status, comment)
+    # Le signal inscriptions.signals journalise deja les transitions de statut.
+    if previous_status == new_status and comment:
+        _log_inscription_history(inscription, previous_status, new_status, comment)
+
+
+def _send_inscription_relance(inscription, *, source='superadmin'):
+    """Relance métier: crée une notification et tente l'envoi immédiat."""
+    candidature = getattr(inscription, 'candidature', None)
+    if not candidature or not candidature.email:
+        return False
+
+    if inscription.balance > 0:
+        message = (
+            f"Relance dossier: il reste {inscription.balance} FCFA a regler pour finaliser votre inscription. "
+            "Merci de vous connecter a votre espace candidat."
+        )
+    else:
+        message = (
+            "Votre dossier d'inscription est en attente d'une action de votre part. "
+            "Merci de verifier votre espace candidat pour finaliser le processus."
+        )
+
+    notification = Notification.objects.create(
+        recipient_email=candidature.email,
+        recipient_name=f"{candidature.last_name} {candidature.first_name}",
+        notification_type='inscription_payment_pending',
+        title="Relance dossier d'inscription",
+        message=message,
+        related_candidature=candidature,
+        related_inscription=inscription,
+    )
+    sent = send_notification_email(notification.id)
+
+    _log_inscription_history(
+        inscription,
+        inscription.status,
+        inscription.status,
+        f"Relance admin ({source}) - {'email envoye' if sent else 'email non envoye'}",
+    )
+    return sent
 
 
 def _safe_delete(request, instance, *, success_message, protected_message, hx_redirect=None):
@@ -1436,10 +1478,12 @@ def inscription_bulk_action(request):
             updated += 1
         messages.success(request, f'{updated} inscription(s) mises à jour.')
     elif action == 'relance':
+        sent_count = 0
         for inscription in inscriptions:
-            _log_inscription_history(inscription, inscription.status, inscription.status, 'Relance administrative envoyée')
+            if _send_inscription_relance(inscription, source='bulk'):
+                sent_count += 1
             updated += 1
-        messages.success(request, f'{updated} relance(s) enregistrée(s).')
+        messages.success(request, f'{updated} relance(s) traitee(s), {sent_count} email(s) envoye(s).')
     elif action == 'archive':
         updated = Inscription.objects.filter(pk__in=selected_ids).update(is_archived=True, archived_at=timezone.now())
         messages.success(request, f'{updated} inscription(s) archivée(s).')
@@ -1494,8 +1538,11 @@ def inscription_relance(request, pk):
         return redirect('superadmin:inscription_detail', pk=pk)
 
     inscription = get_object_or_404(Inscription, pk=pk)
-    _log_inscription_history(inscription, inscription.status, inscription.status, 'Relance envoyée au candidat/étudiant')
-    messages.success(request, 'Relance enregistrée.')
+    sent = _send_inscription_relance(inscription, source='detail')
+    if sent:
+        messages.success(request, 'Relance envoyee au candidat/etudiant.')
+    else:
+        messages.warning(request, 'Relance enregistree, mais email non envoye. Verifiez le SMTP.')
     return redirect('superadmin:inscription_detail', pk=pk)
 
 
@@ -2052,6 +2099,14 @@ def payment_validate(request, pk):
         payment.save(update_fields=update_fields)
     except (ValueError, ValidationError) as exc:
         messages.error(request, str(exc))
+        return redirect('superadmin:payment_detail', pk=pk)
+    except Exception as exc:
+        logger.exception('Erreur post-validation paiement id=%s', payment.pk)
+        payment.refresh_from_db(fields=['status'])
+        if payment.status == Payment.STATUS_VALIDATED:
+            messages.warning(request, 'Paiement valide, mais notification en echec. Verifiez le SMTP.')
+            return redirect('superadmin:payment_detail', pk=pk)
+        messages.error(request, f'Validation interrompue: {exc}')
         return redirect('superadmin:payment_detail', pk=pk)
 
     if _is_manual_payment_method(payment.method):
@@ -3825,6 +3880,73 @@ def bulk_action(request):
         else:
             messages.warning(request, 'Action non supportee pour les messages.')
         return _redirect_back(request, default='superadmin:message_list')
+
+    if model_type == 'payment':
+        qs = Payment.objects.select_related('inscription__candidature', 'agent').filter(pk__in=selected_ids)
+        done = 0
+        skipped = 0
+        failed = 0
+
+        if action == 'validate':
+            for payment in qs:
+                if payment.status != Payment.STATUS_PENDING:
+                    skipped += 1
+                    continue
+
+                if _is_manual_payment_method(payment.method):
+                    if not payment.agent_id:
+                        payment.agent = _get_or_create_superadmin_agent(request.user, payment.inscription)
+                    inscription_branch = getattr(payment.inscription.candidature, 'branch', None)
+                    if not payment.agent_id or (inscription_branch and payment.agent.branch_id != inscription_branch.id):
+                        failed += 1
+                        continue
+
+                payment.status = Payment.STATUS_VALIDATED
+                update_fields = ['status']
+                if payment.agent_id:
+                    update_fields.append('agent')
+                try:
+                    payment.save(update_fields=update_fields)
+                    done += 1
+                except Exception:
+                    logger.exception('Echec validation bulk paiement id=%s', payment.pk)
+                    failed += 1
+
+        elif action == 'cancel':
+            for payment in qs:
+                if payment.status in {Payment.STATUS_VALIDATED, Payment.STATUS_CANCELLED}:
+                    skipped += 1
+                    continue
+                payment.status = Payment.STATUS_CANCELLED
+                try:
+                    payment.save(update_fields=['status'])
+                    done += 1
+                except Exception:
+                    logger.exception('Echec annulation bulk paiement id=%s', payment.pk)
+                    failed += 1
+
+        elif action == 'notify':
+            for payment in qs:
+                if payment.status != Payment.STATUS_VALIDATED:
+                    skipped += 1
+                    continue
+                try:
+                    send_payment_confirmation_email(payment=payment)
+                    done += 1
+                except Exception:
+                    logger.exception('Echec notification bulk paiement id=%s', payment.pk)
+                    failed += 1
+        else:
+            messages.warning(request, 'Action non supportee pour les paiements.')
+            return _redirect_back(request, default='superadmin:payment_list')
+
+        if done:
+            messages.success(request, f'{done} paiement(s) traite(s).')
+        if skipped:
+            messages.info(request, f'{skipped} paiement(s) ignores (statut non eligible).')
+        if failed:
+            messages.error(request, f'{failed} paiement(s) en echec. Verifiez les logs/SMTP.')
+        return _redirect_back(request, default='superadmin:payment_list')
 
     messages.warning(request, 'Action groupee non configuree pour ce module.')
     return _redirect_back(request)

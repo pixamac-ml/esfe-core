@@ -1,19 +1,42 @@
 {% extends "superadmin/base.html" %}
 {% load static %}
 
-{% block page_title %}{% if programme %}Modifier le Programme{% else %}Nouveau Programme{% endif %}{% endblock %}
-{% block page_subtitle %}{% if programme %}Modifier les informations du programme{% else %}Créer un nouveau programme de formation{% endif %}{% endblock %}
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .programme-form-wrap { max-width: 1240px; margin: 0 auto; }
+    .programme-head-note { border: 1px solid #dbeafe; background: linear-gradient(180deg, #f8fbff 0%, #f1f7ff 100%); }
+    .programme-section-title { font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #1e4f6f; margin-bottom: 1rem; display: flex; align-items: center; gap: .45rem; }
+    .programme-card { border: 1px solid #e2e8f0; border-radius: .95rem; background: #fff; box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03); }
+    .programme-card .card-header { padding: 1rem 1.2rem; }
+    .programme-card .card-body { padding: 1.2rem; }
+    .programme-help { font-size: .78rem; color: #64748b; margin-top: .45rem; }
+    .programme-form-wrap .form-input,
+    .programme-form-wrap .form-select,
+    .programme-form-wrap .form-textarea { font-size: .93rem; line-height: 1.45; }
+    .programme-form-wrap .form-input,
+    .programme-form-wrap .form-select { min-height: 42px; }
+    .programme-form-wrap .form-textarea { min-height: 120px; }
+    .programme-form-wrap .form-label { margin-bottom: .35rem; font-weight: 600; color: #334155; }
+    .programme-form-wrap .form-help { font-size: .76rem; color: #64748b; margin-top: .35rem; }
+    .programme-form-wrap .form-group { margin-bottom: .25rem; }
+    .programme-form-actions { border-top: 1px solid #e5e7eb; padding-top: 1rem; margin-top: .35rem; }
+</style>
+{% endblock %}
+
+{% block page_title %}{% if programme.pk %}Modifier le Programme{% else %}Nouveau Programme{% endif %}{% endblock %}
+{% block page_subtitle %}{% if programme.pk %}Modifier les informations du programme{% else %}Créer un nouveau programme de formation{% endif %}{% endblock %}
 
 {% block content_main %}
-<div class="fade-in max-w-6xl mx-auto">
+<div class="fade-in programme-form-wrap">
 
-    <div class="card mb-6" style="border: 1px solid #e2e8f0; background: #f8fafc;">
-        <div class="card-body" style="padding: 16px 20px;">
-            <div class="flex items-start gap-3" style="display: flex; align-items: flex-start; gap: 12px;">
+    <div class="card mb-4 programme-head-note">
+        <div class="card-body">
+            <div class="flex items-start gap-3">
                 <i class="fas fa-circle-info" style="color: #2563eb; margin-top: 2px;"></i>
                 <div>
-                    <p class="text-sm font-semibold text-gray-900" style="margin: 0;">Formulaire de gestion du programme</p>
-                    <p class="text-sm text-gray-600" style="margin: 4px 0 0 0;">Les champs marqués d'un <span style="color: #ef4444;">*</span> sont obligatoires. Vérifiez les informations académiques avant enregistrement.</p>
+                    <p class="text-sm font-semibold text-gray-900 mb-0">Formulaire de gestion du programme</p>
+                    <p class="text-sm text-gray-600 mt-1 mb-0">Les champs marqués d'un <span style="color: #ef4444;">*</span> sont obligatoires. Vérifiez les informations académiques avant enregistrement.</p>
                 </div>
             </div>
         </div>
@@ -22,11 +45,11 @@
     <!-- ========================================
          FORMULAIRE DE PROGRAMME
     ======================================== -->
-    <div class="card">
+    <div class="card programme-card">
         <div class="card-header">
             <h3 class="text-lg font-bold text-gray-900" style="display: flex; align-items: center; gap: 10px;">
                 <i class="fas fa-graduation-cap" style="color: var(--primary);"></i>
-                {% if programme %}Modifier le programme{% else %}Nouveau programme de formation{% endif %}
+                {% if programme.pk %}Modifier le programme{% else %}Nouveau programme de formation{% endif %}
             </h3>
             <a href="{% url 'superadmin:formation_list' %}" class="btn btn-outline btn-sm">
                 <i class="fas fa-arrow-left mr-2"></i>Retour
@@ -38,7 +61,7 @@
 
             <!-- Informations de base -->
             <div class="mb-8">
-                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
+                <h4 class="programme-section-title">
                     <i class="fas fa-info-circle"></i> Informations de base
                 </h4>
 
@@ -70,7 +93,7 @@
 
             <!-- Classification -->
             <div class="mb-8">
-                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
+                <h4 class="programme-section-title">
                     <i class="fas fa-layer-group"></i> Classification
                 </h4>
 
@@ -133,7 +156,7 @@
 
             <!-- Description complète -->
             <div class="mb-8">
-                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
+                <h4 class="programme-section-title">
                     <i class="fas fa-file-alt"></i> Description complète
                 </h4>
 
@@ -174,11 +197,11 @@
 
             <!-- Options avancées -->
             <div class="mb-8">
-                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
+                <h4 class="programme-section-title">
                     <i class="fas fa-cog"></i> Options
                 </h4>
 
-                <div style="display: flex; flex-wrap: wrap; gap: 32px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 24px;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="flex items-center cursor-pointer">
                             <div class="relative">
@@ -213,16 +236,15 @@
 
             <!-- Illustration -->
             <div class="mb-8">
-                <h4 class="text-sm font-semibold text-primary uppercase tracking-wide mb-4 flex items-center gap-2">
+                <h4 class="programme-section-title">
                     <i class="fas fa-image"></i> Illustration
                 </h4>
 
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="illustration" class="form-label">Image du programme</label>
-                    <input type="file" id="illustration" name="illustration" accept="image/*"
-                           class="form-input" style="padding: 8px;">
-                    <p class="form-help">Image de présentation (recommandé: 800x600px)</p>
-                    {% if programme.illustration %}
+                    <input type="file" id="illustration" name="illustration" accept="image/*" class="form-input">
+                    <p class="programme-help">Image de présentation (recommandé: 800x600px)</p>
+                    {% if programme.pk and programme.illustration %}
                     <div style="margin-top: 12px;">
                         <img src="{{ programme.illustration.url }}" alt="Illustration"
                              style="max-width: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
@@ -233,13 +255,13 @@
             </div>
 
             <!-- Boutons -->
-            <div class="form-actions flex items-center justify-between" style="padding-top: 28px; margin-top: 8px; border-top: 1px solid #e5e7eb;">
+            <div class="form-actions programme-form-actions flex items-center justify-between">
                 <a href="{% url 'superadmin:formation_list' %}" class="btn btn-outline">
                     <i class="fas fa-times mr-2"></i>Annuler
                 </a>
-                <button type="submit" class="btn btn-primary" style="padding: 12px 32px;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 24px;">
                     <i class="fas fa-save mr-2"></i>
-                    {% if programme %}Enregistrer les modifications{% else %}Créer le programme{% endif %}
+                    {% if programme.pk %}Enregistrer les modifications{% else %}Créer le programme{% endif %}
                 </button>
             </div>
 

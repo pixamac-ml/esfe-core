@@ -4,37 +4,37 @@
 {% block page_subtitle %}Pilotage éditorial, publication et priorisation des news{% endblock %}
 
 {% block content_main %}
-<div class="space-y-6">
+<div class="space-y-4">
     <div id="news-table-loading" class="hidden fixed inset-0 z-40 bg-white/40 backdrop-blur-sm" hx-indicator></div>
 
-    <section class="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+    <section class="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <article class="card p-3 rounded-xl border border-slate-100 shadow-sm">
             <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total actualités</p>
-            <p class="text-2xl font-bold text-slate-900 mb-0">{{ news_total_count }}</p>
+            <p class="text-xl font-bold text-slate-900 mb-0 leading-none">{{ news_total_count }}</p>
         </article>
-        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <article class="card p-3 rounded-xl border border-slate-100 shadow-sm">
             <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Publiées</p>
-            <p class="text-2xl font-bold text-emerald-700 mb-0">{{ news_published_count }}</p>
+            <p class="text-xl font-bold text-emerald-700 mb-0 leading-none">{{ news_published_count }}</p>
         </article>
-        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <article class="card p-3 rounded-xl border border-slate-100 shadow-sm">
             <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Brouillons</p>
-            <p class="text-2xl font-bold text-amber-700 mb-0">{{ news_draft_count }}</p>
+            <p class="text-xl font-bold text-amber-700 mb-0 leading-none">{{ news_draft_count }}</p>
         </article>
-        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <article class="card p-3 rounded-xl border border-slate-100 shadow-sm">
             <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Archivées</p>
-            <p class="text-2xl font-bold text-slate-700 mb-0">{{ news_archived_count }}</p>
+            <p class="text-xl font-bold text-slate-700 mb-0 leading-none">{{ news_archived_count }}</p>
         </article>
-        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <article class="card p-3 rounded-xl border border-slate-100 shadow-sm">
             <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Urgentes publiées</p>
-            <p class="text-2xl font-bold text-rose-700 mb-0">{{ news_urgent_count }}</p>
+            <p class="text-xl font-bold text-rose-700 mb-0 leading-none">{{ news_urgent_count }}</p>
         </article>
     </section>
 
-    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
-        <div class="flex flex-col lg:flex-row items-center justify-between gap-3">
+    <section class="card p-3 rounded-xl border border-slate-100 shadow-sm">
+        <div class="flex flex-col lg:flex-row items-center justify-between gap-2">
             <form id="news-filter-form"
                   method="get"
-                  class="grid grid-cols-1 md:grid-cols-5 gap-3 w-full"
+                  class="grid grid-cols-1 md:grid-cols-5 gap-2 w-full"
                   hx-get="{% url 'superadmin:news_list' %}"
                   hx-target="#news-table-container"
                   hx-swap="innerHTML"
@@ -42,29 +42,29 @@
                   hx-indicator="#news-table-loading"
                   hx-trigger="keyup changed delay:350ms, change, submit">
                 <label for="news-search" class="sr-only">Recherche actualites</label>
-                <input id="news-search" type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Rechercher titre, résumé, contenu..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2">
+                <input id="news-search" type="text" name="search" value="{{ filters.search|default:'' }}" placeholder="Rechercher titre, résumé, contenu..." class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm md:col-span-2">
                 <label for="news-status" class="sr-only">Statut</label>
-                <select id="news-status" name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <select id="news-status" name="status" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
                     <option value="">Tous statuts</option>
                     {% for value, label in status_choices %}
                     <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
                 <label for="news-category" class="sr-only">Categorie</label>
-                <select id="news-category" name="category" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <select id="news-category" name="category" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
                     <option value="">Toutes catégories</option>
                     {% for cat in categories %}
                     <option value="{{ cat.pk }}" {% if filters.category == cat.pk|stringformat:'s' %}selected{% endif %}>{{ cat.nom }}</option>
                     {% endfor %}
                 </select>
                 <label for="news-urgent" class="sr-only">Urgence</label>
-                <select id="news-urgent" name="urgent" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <select id="news-urgent" name="urgent" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
                     <option value="">Urgence: toutes</option>
                     <option value="1" {% if filters.urgent == '1' %}selected{% endif %}>Urgentes seulement</option>
                 </select>
             </form>
 
-            <div class="flex items-center gap-2 w-full lg:w-auto justify-end">
+            <div class="flex items-center gap-1.5 w-full lg:w-auto justify-end">
                 <a href="{% url 'superadmin:result_list' %}" class="btn btn-outline">Gérer les résultats</a>
                 <a href="{% url 'superadmin:news_list' %}" class="btn btn-outline">Réinitialiser</a>
                 <a href="{% url 'superadmin:news_create' %}" class="btn btn-primary">Nouvelle actualité</a>

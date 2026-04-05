@@ -1,0 +1,136 @@
+<div class="tunnel-step-shell" x-data="{ subStep: 'school', lastDocsSlug: '' }" x-effect="if (step === 3 && subStep !== step3Phase) subStep = step3Phase; if (step === 3 && subStep === 'documents' && formData.formation_slug && lastDocsSlug !== formData.formation_slug) { lastDocsSlug = formData.formation_slug; document.body.dispatchEvent(new CustomEvent('admission-step-3-documents')); }" x-on:formation-selected.window="formData.formation = $event.detail.title; formData.formation_slug = $event.detail.slug; errors.documents=''; subStep='documents'; step3Phase='documents'; document.body.dispatchEvent(new CustomEvent('admission-step-3-documents'))">
+  <div class="relative overflow-hidden h-full min-h-0">
+    <div x-show="subStep === 'school'"
+         x-cloak
+         x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition duration-500 ease-in-out"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-4"
+         class="h-full min-h-0 flex flex-col">
+      <div class="tunnel-scroll pr-1 space-y-5 md:space-y-4">
+      <div class="space-y-3">
+        <p class="text-xs uppercase tracking-[0.25em] text-[#1db5b0] font-semibold" data-aos="fade-up" data-aos-delay="200">Destination</p>
+        <h2 class="text-2xl md:text-3xl lg:text-4xl font-extrabold text-[#1e4f6f] leading-tight" data-aos="fade-up" data-aos-delay="100">Une institution, plusieurs horizons.</h2>
+        <p class="text-sm text-slate-600" data-aos="fade-up" data-aos-delay="200">Quel campus ESFE deviendra votre prochain foyer ?</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3" data-aos="fade-up" data-aos-delay="300">
+        {% for branch in branches %}
+        <button type="button"
+                class="rounded-2xl border px-4 py-3 text-left transition"
+                :class="String(formData.branch_id) === '{{ branch.id }}' ? 'border-[#1db5b0] bg-[#1db5b0]/10 ring-1 ring-[#1db5b0]/35' : 'border-slate-200 hover:border-[#1db5b0]/60'"
+                @click="formData.branch_id='{{ branch.id }}'; formData.branch_name='{{ branch.name|escapejs }}'; formData.branch_city='{{ branch.city|default:''|escapejs }}'; formData.campus_image='{% if branch.image %}{{ branch.image.url }}{% endif %}'; formData.formation=''; formData.formation_slug=''; activeCycle = formData.current_level || activeCycle || 'all'; errors.documents=''; subStep = 'program'; step3Phase = 'program';"
+                hx-get="{% url 'admissions:admission_step3_formations' %}"
+                hx-vals='{"branch_id": "{{ branch.id }}"}'
+                hx-include="[name='current_level']"
+                hx-target="#step3-formations-list"
+                hx-indicator="#step3-formations-loading"
+                hx-swap="innerHTML">
+          <p class="font-semibold text-[#1e4f6f]">{{ branch.name }}</p>
+          <p class="mt-1 text-xs text-slate-500 inline-flex items-center gap-1">
+            <i class="fa-solid fa-location-dot text-[#1db5b0]"></i>
+            {{ branch.city|default:"Campus ESFE" }}
+          </p>
+        </button>
+        {% empty %}
+        <div class="md:col-span-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+          Aucune annexe disponible pour l'inscription en ligne.
+        </div>
+        {% endfor %}
+      </div>
+      </div>
+
+      <div class="tunnel-nav" data-aos="fade-up" data-aos-delay="300">
+        <button type="button" class="tunnel-btn-prev" @click="goTo(2)">Retour</button>
+        <button type="button" class="group tunnel-btn-next" :disabled="!formData.branch_id" :class="!formData.branch_id ? 'opacity-40 cursor-not-allowed' : ''" @click="subStep='program'; step3Phase='program'; document.body.dispatchEvent(new CustomEvent('admission-step-3'))">
+          Continuer
+          <i class="fa-solid fa-chevron-right text-xs transition-transform group-hover:translate-x-1"></i>
+        </button>
+      </div>
+    </div>
+
+    <div x-show="subStep === 'program'"
+         x-cloak
+         x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition duration-500 ease-in-out"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-4"
+         class="h-full min-h-0 flex flex-col">
+      <div class="tunnel-scroll pr-1 space-y-5 md:space-y-4">
+      <div class="space-y-3">
+        <p class="text-xs uppercase tracking-[0.25em] text-[#1db5b0] font-semibold" data-aos="fade-up" data-aos-delay="200">Catalogue</p>
+        <h2 class="text-2xl md:text-3xl lg:text-4xl font-extrabold text-[#1e4f6f] leading-tight" data-aos="fade-up" data-aos-delay="100">Felicitations pour votre choix.</h2>
+        <p class="text-sm text-slate-600" data-aos="fade-up" data-aos-delay="200">Maintenant, decouvrez le catalogue de formations d'excellence concu pour votre avenir.</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2" data-aos="fade-up" data-aos-delay="300">
+        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'all' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='all'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "all"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Tous les programmes</button>
+        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'licence' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='licence'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "licence"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Licence</button>
+        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'master' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='master'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "master"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Master</button>
+      </div>
+
+      <div class="relative" data-aos="fade-up" data-aos-delay="300">
+        <span id="step3-formations-loading" class="htmx-indicator htmx-loading-indicator" aria-hidden="true"></span>
+        <div id="step3-formations-list" class="htmx-fade-zone tunnel-scroll-y custom-scrollbar max-h-[50vh] rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-include="[name='branch_id'],[name='current_level']" hx-trigger="admission-step-3 from:body" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">
+          Selectionnez un campus pour afficher ses formations.
+        </div>
+      </div>
+      <p x-show="errors.formation_slug" x-cloak class="mt-2 text-xs text-red-600" x-text="errors.formation_slug"></p>
+      </div>
+
+      <div class="tunnel-nav" data-aos="fade-up" data-aos-delay="300">
+        <button type="button" class="tunnel-btn-prev" @click="subStep='school'; step3Phase='school'">Changer de campus</button>
+        <button type="button" class="group tunnel-btn-next" :disabled="!formData.formation_slug" :class="!formData.formation_slug ? 'opacity-60 cursor-not-allowed' : ''" @click="if (!formData.formation_slug) { errors.formation_slug = 'Veuillez choisir une formation.'; return; } subStep='documents'; step3Phase='documents'; errors.documents=''; document.body.dispatchEvent(new CustomEvent('admission-step-3-documents'))" hx-get="{% url 'admissions:admission_step3_documents' %}" hx-include="[name='formation_slug']" hx-target="#step3-documents-list" hx-indicator="#step3-documents-loading" hx-swap="innerHTML">
+          Continuer
+          <i class="fa-solid fa-chevron-right text-xs transition-transform group-hover:translate-x-1"></i>
+        </button>
+      </div>
+    </div>
+
+    <div x-show="subStep === 'documents'"
+         x-cloak
+         x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition duration-500 ease-in-out"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-4"
+         class="h-full min-h-0 flex flex-col">
+      <div class="tunnel-scroll pr-1 space-y-5 md:space-y-4">
+      <div class="space-y-3">
+        <p class="text-xs uppercase tracking-[0.25em] text-[#1db5b0] font-semibold" data-aos="fade-up" data-aos-delay="200">Documents</p>
+        <h2 class="text-2xl md:text-3xl lg:text-4xl font-extrabold text-[#1e4f6f] leading-tight" data-aos="fade-up" data-aos-delay="100">Televersez vos pieces justificatives.</h2>
+        <p class="text-sm text-slate-600" data-aos="fade-up" data-aos-delay="200">Ajoutez tous les documents obligatoires pour la formation selectionnee avant de finaliser votre candidature.</p>
+      </div>
+
+      <div class="relative" data-aos="fade-up" data-aos-delay="300">
+        <span id="step3-documents-loading" class="htmx-indicator htmx-loading-indicator" aria-hidden="true"></span>
+        <div id="step3-documents-list"
+             class="htmx-fade-zone tunnel-scroll-y custom-scrollbar max-h-[50vh] rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-5 text-sm text-slate-600"
+             hx-get="{% url 'admissions:admission_step3_documents' %}"
+             hx-include="[name='formation_slug']"
+             hx-trigger="load, admission-step-3-documents from:body, change from:[name='formation_slug']"
+             hx-indicator="#step3-documents-loading"
+             hx-swap="innerHTML">
+          Selectionnez une formation pour afficher la liste des documents requis.
+        </div>
+      </div>
+
+      <p x-show="errors.documents" x-cloak class="mt-2 text-xs text-red-600" x-text="errors.documents"></p>
+      </div>
+
+      <div class="tunnel-nav" data-aos="fade-up" data-aos-delay="300">
+        <button type="button" class="tunnel-btn-prev" @click="subStep='program'; step3Phase='program'">Retour aux formations</button>
+        <button type="button" class="group tunnel-btn-next" @click="if (!validateStep(3)) return; goTo(4)">
+          Suivant
+          <i class="fa-solid fa-chevron-right text-xs transition-transform group-hover:translate-x-1"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+

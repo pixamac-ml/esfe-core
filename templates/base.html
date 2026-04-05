@@ -61,6 +61,11 @@
 </head>
 
 <style>
+/* Cache les composants Alpine avant initialisation pour eviter le flicker. */
+[x-cloak] {
+    display: none !important;
+}
+
 /* ================= ANIMATIONS ================= */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(6px); }
@@ -328,27 +333,33 @@
   </div>
 
   <!-- ================= NAVBAR ================= -->
-  <div x-data="navbarObserver()" x-init="init()" class="fixed top-0 left-0 w-full z-50">
+  {% block public_navbar %}
+  <div x-data="navbarObserver()" x-init="init()" class="left-0 w-full z-50 transition-all duration-300"
+       :class="scrolled ? 'fixed top-0 backdrop-blur-md bg-primary-500/85 shadow-md' : 'absolute top-0 bg-transparent'">
     <div x-show="visible"
+         x-cloak
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0 -translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100 translate-y-0"
          x-transition:leave-end="opacity-0 -translate-y-4"
-         class="w-full backdrop-blur-md bg-white/80 shadow-md">
+         class="w-full">
 {% component "navbar" %}{% endcomponent %}
     </div>
   </div>
+  {% endblock %}
 
   <!-- ================= CONTENT ================= -->
   <main class="flex-grow">
     {% block content %}{% endblock %}
   </main>
 
+  {% block public_floating_widget %}
   {% if site_configuration and site_configuration.smart_rocket_enabled %}
       <div x-data="smartRocketWidget()" class="fixed bottom-6 right-4 sm:right-6 z-[70] flex flex-col items-end gap-3">
     <div x-show="open" x-transition @click.outside="open = false"
+         x-cloak
          class="w-80 rounded-2xl shadow-2xl border border-slate-200 bg-white overflow-hidden">
       <div class="px-4 py-3 bg-primary-700 text-white flex items-center justify-between">
         <div class="text-sm font-semibold">{{ site_configuration.smart_rocket_title }}</div>
@@ -358,7 +369,7 @@
       </div>
       <div class="p-4 space-y-3">
         <p class="text-sm text-slate-600">{{ site_configuration.smart_rocket_message }}</p>
-        <a href="/candidature/" class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm">
+        <a href="{% url 'admissions:admission_tunnel' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm">
           <i class="fa-solid fa-file-signature text-secondary"></i>
           Postuler
         </a>
@@ -386,8 +397,10 @@
     </div>
   </div>
   {% endif %}
+  {% endblock %}
 
   <!-- ================= FOOTER ================= -->
+  {% block public_footer %}
   {% url 'core:legal_notice' as legal_notice_url %}
   {% url 'core:privacy_policy' as privacy_policy_url %}
   {% url 'core:terms_of_service' as terms_url %}
@@ -463,9 +476,12 @@
   %}
   {% endcomponent %}
   {% endwith %}
+  {% endblock %}
 
   <!-- ================= COOKIE CONSENT ================= -->
+  {% block public_cookie_consent %}
   {% include "includes/cookie_consent.html" %}
+  {% endblock %}
 
   <!-- ================= SCRIPTS ================= -->
 
@@ -485,10 +501,27 @@
     function navbarObserver() {
       return {
         visible: false,
+        scrolled: false,
         init() {
           const hero = document.getElementById("hero-section");
+
+          const computeState = () => {
+            if (!hero) {
+              this.visible = true;
+              this.scrolled = true;
+              return;
+            }
+
+            const heroBottom = hero.getBoundingClientRect().bottom;
+            this.scrolled = window.scrollY > 16;
+            this.visible = heroBottom <= window.innerHeight * 0.62;
+          };
+
+          computeState();
+          window.addEventListener("scroll", computeState, { passive: true });
+          window.addEventListener("resize", computeState);
+
           if (!hero) {
-            this.visible = true;
             return;
           }
 
@@ -597,10 +630,10 @@
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
         AOS.init({
-            duration: 800,
+            duration: 650,
             easing: 'ease-out-cubic',
             once: true,
-            offset: 50,
+            offset: 40,
         });
     </script>
 

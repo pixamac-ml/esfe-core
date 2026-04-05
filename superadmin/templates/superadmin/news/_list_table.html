@@ -16,8 +16,8 @@
             {% for news_item in news_list %}
             <tr>
                 <td>
-                    <a href="{% url 'superadmin:news_detail' news_item.pk %}" class="font-semibold text-slate-900 no-underline hover:underline">{{ news_item.titre }}</a>
-                    <p class="text-xs text-slate-500 mb-0">{{ news_item.resume|truncatechars:90 }}</p>
+                    <a href="{% url 'superadmin:news_detail' news_item.pk %}" class="font-semibold text-slate-900 no-underline hover:underline leading-tight">{{ news_item.titre }}</a>
+                    <p class="text-xs text-slate-500 mb-0 leading-tight">{{ news_item.resume|truncatechars:90 }}</p>
                 </td>
                 <td>{{ news_item.categorie.nom|default:"-" }}</td>
                 <td>{{ news_item.auteur.get_full_name|default:news_item.auteur.username|default:'-' }}</td>
@@ -31,7 +31,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-1 flex-wrap">
                         {% if news_item.is_urgent %}<span class="badge-status badge-danger">Urgent</span>{% endif %}
                         {% if news_item.is_important %}<span class="badge-status badge-info">Important</span>{% endif %}
                         {% if not news_item.is_urgent and not news_item.is_important %}<span class="text-slate-400">-</span>{% endif %}
@@ -40,7 +40,7 @@
                 <td>{{ news_item.published_at|date:'d/m/Y H:i'|default:'-' }}</td>
                 <td>{{ news_item.views_count }}</td>
                 <td>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1.5 flex-wrap">
                         <a href="{% url 'superadmin:news_detail' news_item.pk %}" class="btn btn-outline btn-sm">Voir</a>
                         <a href="{% url 'superadmin:news_edit' news_item.pk %}" class="btn btn-outline btn-sm">Modifier</a>
                         <form method="post" action="{% url 'superadmin:toggle_news' news_item.pk %}" class="inline">
@@ -64,7 +64,7 @@
 </div>
 
 {% if news_list.paginator.num_pages > 1 %}
-<div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+<div class="flex items-center justify-between px-3 py-2 border-t border-slate-100">
     <p class="text-xs text-slate-500 mb-0">Page {{ news_list.number }} / {{ news_list.paginator.num_pages }}</p>
     <div class="flex items-center gap-2">
         {% if news_list.has_previous %}

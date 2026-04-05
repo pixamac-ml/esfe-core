@@ -1,0 +1,46 @@
+{% if selected_branch %}
+<label class="block text-sm font-medium text-slate-700 mb-2">
+  Formations disponibles pour {{ selected_branch.name }}
+</label>
+{% else %}
+<label class="block text-sm font-medium text-slate-700 mb-2">Choix de la formation</label>
+{% endif %}
+
+{% if not selected_branch %}
+<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+  Selectionnez un campus pour charger ses formations.
+</div>
+{% else %}
+<div class="space-y-2.5 max-h-[360px] md:max-h-[420px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-[#1db5b0]/60 scrollbar-track-slate-100" data-aos="fade-up" data-aos-delay="160">
+  {% for formation in formation_cards %}
+  <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
+    <div class="min-w-0">
+      <p class="font-semibold text-[#1e4f6f] truncate">{{ formation.title }}</p>
+      <p class="text-[11px] text-slate-500 mt-1">
+        Duree: {{ formation.duration_years }} an{% if formation.duration_years > 1 %}s{% endif %}
+        - Cout: {% if formation.first_year_cost %}{{ formation.first_year_cost }} FCFA{% else %}Sur devis{% endif %}
+      </p>
+    </div>
+    <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center shrink-0">
+      <button type="button"
+              class="w-full sm:w-auto rounded-xl bg-[#1db5b0] px-3 py-2 text-xs font-semibold text-white hover:bg-[#159a96]"
+              x-on:click="formData.formation = '{{ formation.title|escapejs }}'; formData.formation_slug = '{{ formation.slug|escapejs }}'; errors.documents=''; subStep='documents'; step3Phase='documents'; document.body.dispatchEvent(new CustomEvent('admission-step-3-documents'))"
+              onclick="(function(){ var title='{{ formation.title|escapejs }}'; var slug='{{ formation.slug|escapejs }}'; var formationInput=document.querySelector('[name=formation]'); var slugInput=document.querySelector('[name=formation_slug]'); if (formationInput) formationInput.value=title; if (slugInput) { slugInput.value=slug; slugInput.dispatchEvent(new Event('change', { bubbles: true })); } window.dispatchEvent(new CustomEvent('formation-selected', { detail: { title: title, slug: slug } })); })()"
+              hx-get="{% url 'admissions:admission_step3_documents' %}"
+              hx-vals='{"formation_slug": "{{ formation.slug }}"}'
+              hx-target="#step3-documents-list"
+              hx-swap="innerHTML">
+        Choisir
+      </button>
+      <a href="{{ formation.details_url }}" target="_blank" rel="noopener" class="w-full sm:w-auto text-center rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-[#1db5b0] hover:text-[#1e4f6f]">
+        Details
+      </a>
+    </div>
+  </div>
+  {% empty %}
+  <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+    Aucune formation disponible pour ce campus et ce cycle.
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

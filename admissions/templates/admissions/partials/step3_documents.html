@@ -1,0 +1,53 @@
+{% if not selected_programme %}
+<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+  Selectionnez une formation pour charger ses documents requis.
+</div>
+{% else %}
+<div data-documents-ready="1" class="space-y-3">
+  <p class="text-sm font-medium text-slate-700">
+    Documents requis pour <span class="font-semibold text-[#1e4f6f]">{{ selected_programme.title }}</span>
+  </p>
+
+  {% if required_documents %}
+  <div class="space-y-2.5 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-[#1db5b0]/60 scrollbar-track-slate-100">
+    {% for programme_document in required_documents %}
+    <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-[#1e4f6f]">{{ programme_document.document.name }}</p>
+          {% if programme_document.document.description %}
+          <p class="mt-1 text-xs text-slate-500">{{ programme_document.document.description }}</p>
+          {% endif %}
+        </div>
+        <span class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide {% if programme_document.document.is_mandatory %}bg-red-50 text-red-700{% else %}bg-slate-100 text-slate-600{% endif %}">
+          {% if programme_document.document.is_mandatory %}Obligatoire{% else %}Optionnel{% endif %}
+        </span>
+      </div>
+
+      <div class="mt-3">
+        {% if programme_document.document.is_mandatory %}
+        <input type="file"
+               name="document_{{ programme_document.document.id }}"
+               class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-[#1db5b0] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-[#159a96]"
+               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+               data-required="1"
+               required>
+        {% else %}
+        <input type="file"
+               name="document_{{ programme_document.document.id }}"
+               class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-[#1db5b0] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-[#159a96]"
+               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+               data-required="0">
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+    Aucun document n'est requis pour cette formation.
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+

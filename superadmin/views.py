@@ -19,6 +19,7 @@ from datetime import timedelta
 from io import BytesIO
 import secrets
 import logging
+import re
 from urllib.parse import urlencode
 
 from reportlab.lib import colors
@@ -643,6 +644,23 @@ def dashboard_notifications_action(request):
 # FORMATIONS - CRUD COMPLET
 # ============================================
 
+def _multiline_text_to_items(raw_value):
+    """Transforme un texte multi-lignes en liste d'items nettoyés pour l'affichage."""
+    if not raw_value:
+        return []
+
+    items = []
+    for line in str(raw_value).splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+
+        # Retire les puces courantes en début de ligne (-, *, •, 1., 1), etc.)
+        cleaned = re.sub(r'^(?:[-*•]+|\d+[.)])\s*', '', cleaned)
+        if cleaned:
+            items.append(cleaned)
+    return items
+
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def formation_list(request):
     formations = Programme.objects.select_related('cycle', 'filiere').all().order_by('-created_at')
@@ -703,6 +721,7 @@ def formation_create(request):
 
     context = {
         'page_title': 'Nouvelle Formation',
+        'programme': Programme(),
         'cycles': Cycle.objects.all(),
         'filieres': Filiere.objects.all(),
         'diplomas': Diploma.objects.all(),
@@ -713,7 +732,12 @@ def formation_create(request):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def formation_detail(request, pk):
     formation = get_object_or_404(Programme, pk=pk)
-    context = {'page_title': formation.title, 'programme': formation}
+    context = {
+        'page_title': formation.title,
+        'programme': formation,
+        'learning_outcomes_items': _multiline_text_to_items(formation.learning_outcomes),
+        'career_opportunities_items': _multiline_text_to_items(formation.career_opportunities),
+    }
     return render(request, 'superadmin/formations/detail.html', context)
 
 

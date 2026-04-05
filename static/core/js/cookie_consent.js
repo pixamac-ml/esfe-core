@@ -2,6 +2,10 @@
   "use strict";
 
   var COOKIE_NAME = "esfe_cookie_consent";
+  var CONSENT_KEY = "cookie_consent";
+  var ACCEPTED_COOKIE_NAME = "cookie_consent_accepted";
+  var ACCEPTED_STORAGE_KEY = "cookie_consent_accepted";
+  var INTERACTED_STORAGE_KEY = "cookie_interacted";
 
   function getCookie(name) {
     var prefix = name + "=";
@@ -37,6 +41,45 @@
     } catch (e) {
       return null;
     }
+  }
+
+  function hasAcceptedFlag() {
+    var storageValue = null;
+    try {
+      var explicitConsent = window.localStorage.getItem(CONSENT_KEY);
+      if (explicitConsent === "true") {
+        return true;
+      }
+      storageValue = window.localStorage.getItem(ACCEPTED_STORAGE_KEY);
+    } catch (e) {
+      storageValue = null;
+    }
+
+    var cookieValue = getCookie(ACCEPTED_COOKIE_NAME);
+    return storageValue === "true" || cookieValue === "true";
+  }
+
+  function hasInteractedFlag() {
+    try {
+      return window.localStorage.getItem(INTERACTED_STORAGE_KEY) === "true";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function setAcceptedFlag(value) {
+    var normalized = value ? "true" : "false";
+    try {
+      if (value) {
+        window.localStorage.setItem(CONSENT_KEY, "true");
+      } else {
+        window.localStorage.removeItem(CONSENT_KEY);
+      }
+      window.localStorage.setItem(ACCEPTED_STORAGE_KEY, normalized);
+    } catch (e) {
+      // Ignore localStorage failures.
+    }
+    setCookie(ACCEPTED_COOKIE_NAME, normalized, 180);
   }
 
   function activateDeferredScripts(consent) {
@@ -156,6 +199,12 @@
     function persistConsent(consent) {
       var safeConsent = normalizeConsent(consent);
       setCookie(COOKIE_NAME, JSON.stringify(safeConsent), 180);
+      setAcceptedFlag(safeConsent.status === "accepted");
+      try {
+        window.localStorage.setItem(INTERACTED_STORAGE_KEY, "true");
+      } catch (e) {
+        // Ignore localStorage failures.
+      }
       updateUIFromConsent(safeConsent);
       hideBanner();
       closeModal();
@@ -246,6 +295,13 @@
     if (currentConsent) {
       hideBanner();
       updateUIFromConsent(normalizeConsent(currentConsent));
+    } else if (hasAcceptedFlag()) {
+      hideBanner();
+      updateUIFromConsent(
+        normalizeConsent({ analytics: true, marketing: true, status: "accepted" })
+      );
+    } else if (hasInteractedFlag()) {
+      hideBanner();
     } else {
       showBanner();
       if (manageButton) {

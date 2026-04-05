@@ -6,6 +6,9 @@
 <div id="cookie-consent-root"
      data-endpoint="{{ cookie_consent_url }}"
      data-csrf-token="{{ csrf_token }}"
+     x-data="{ interacted: (function () { try { return localStorage.getItem('cookie_interacted') === 'true'; } catch (e) { return false; } })() }"
+     x-show="!interacted"
+     x-cloak
      class="fixed inset-x-0 bottom-0 z-[95] pointer-events-none">
 
   <div id="cookie-banner" class="hidden pointer-events-auto mx-auto max-w-6xl p-4 sm:p-6">
@@ -59,11 +62,12 @@
 
 <button id="cookie-manage-button"
         type="button"
+        x-cloak
         class="hidden fixed bottom-4 left-4 z-[94] rounded-full border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-lg hover:-translate-y-0.5 hover:shadow-xl transition">
   Gerer les cookies
 </button>
 
-<div id="cookie-modal" class="hidden fixed inset-0 z-[96] bg-slate-950/55 px-4 py-6 sm:py-10" aria-hidden="true">
+<div id="cookie-modal" x-cloak class="hidden fixed inset-0 z-[96] bg-slate-950/55 px-4 py-6 sm:py-10" aria-hidden="true">
   <div class="mx-auto max-w-3xl rounded-[28px] bg-white shadow-2xl border border-slate-200 overflow-hidden">
     <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
       <div>

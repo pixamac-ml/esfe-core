@@ -1,27 +1,36 @@
 {% extends "superadmin/base.html" %}
 {% load static %}
 
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .programme-list-wrap { max-width: 1240px; margin: 0 auto; }
+    .programme-filter-card { border: 1px solid #e2e8f0; border-radius: .95rem; background: #fff; }
+    .programme-filter-card .search-box input { font-size: .86rem; }
+</style>
+{% endblock %}
+
 {% block page_title %}Programmes de Formation{% endblock %}
 {% block page_subtitle %}Gérer le catalogue académique{% endblock %}
 
 {% block content_main %}
-<div class="fade-in space-y-6">
+<div class="fade-in space-y-4 programme-list-wrap">
 
     <!-- ========================================
          BARRE D'ACTIONS & FILTRES (HTMX)
     ======================================== -->
-    <div class="card p-4">
-        <div class="flex flex-col lg:flex-row gap-4 items-center justify-between">
+    <div class="card p-3 programme-filter-card">
+        <div class="flex flex-col lg:flex-row gap-3 items-center justify-between">
 
             <!-- Formulaire de filtrage dynamique -->
             <form hx-get="{% url 'superadmin:formation_list' %}"
                   hx-target="#formations-table-container"
                   hx-trigger="change, keyup delay:500ms"
                   hx-indicator=".loader"
-                  class="flex-1 flex flex-wrap gap-3 items-center w-full">
+                  class="flex-1 flex flex-wrap gap-2 items-center w-full">
 
                 <!-- Recherche avec indicateur de chargement -->
-                <div class="search-box flex-1 min-w-[300px] relative">
+                <div class="search-box flex-1 min-w-[260px] relative">
                     <i class="fas fa-search"></i>
                     <input type="text" name="search"
                            placeholder="Rechercher par titre ou description..."
@@ -34,13 +43,13 @@
 
                 <!-- Filtres Select -->
                 <div class="flex flex-wrap gap-2">
-                    <select name="status" class="form-select text-sm border-slate-200 focus:border-secondary">
+                    <select name="status" class="form-select text-sm border-slate-200 focus:border-secondary" style="min-width: 150px;">
                         <option value="">Tous les statuts</option>
                         <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actifs</option>
                         <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactifs</option>
                     </select>
 
-                    <select name="cycle" class="form-select text-sm border-slate-200 focus:border-secondary">
+                    <select name="cycle" class="form-select text-sm border-slate-200 focus:border-secondary" style="min-width: 150px;">
                         <option value="">Tous les cycles</option>
                         {% for cycle in cycles %}
                         <option value="{{ cycle.pk }}" {% if filters.cycle == cycle.pk|stringformat:"s" %}selected{% endif %}>
@@ -49,7 +58,7 @@
                         {% endfor %}
                     </select>
 
-                    <select name="filiere" class="form-select text-sm border-slate-200 focus:border-secondary">
+                    <select name="filiere" class="form-select text-sm border-slate-200 focus:border-secondary" style="min-width: 170px;">
                         <option value="">Toutes les filières</option>
                         {% for filiere in filieres %}
                         <option value="{{ filiere.pk }}" {% if filters.filiere == filiere.pk|stringformat:"s" %}selected{% endif %}>
@@ -62,7 +71,7 @@
 
             <!-- Bouton de création -->
             <div class="shrink-0">
-                <a href="{% url 'superadmin:formation_create' %}" class="btn btn-primary shadow-lg shadow-primary/20">
+                <a href="{% url 'superadmin:formation_create' %}" class="btn btn-primary">
                     <i class="fas fa-plus-circle mr-2"></i>Nouveau programme
                 </a>
             </div>
@@ -80,7 +89,7 @@
     </div>
 
     <!-- Actions groupées (Optionnel, pour la présentation) -->
-    <div class="flex items-center justify-between px-2 text-slate-500 text-sm">
+    <div class="flex items-center justify-between px-1 text-slate-500 text-xs">
         <div class="flex items-center gap-4">
             <span id="selected-count">0 élément sélectionné</span>
             <select name="bulk_action" class="form-select text-xs py-1" hx-include="[name='selected']" hx-post="{% url 'superadmin:bulk_action' %}">

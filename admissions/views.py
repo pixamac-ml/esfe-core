@@ -1,13 +1,264 @@
 # admissions/views.py
 
+import json
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.templatetags.static import static
 
+from branches.models import Branch
 from formations.models import Programme
 from .forms import CandidatureForm
 from .models import CandidatureDocument, Candidature
+
+
+def _build_formation_cards(cycle_slug="all", branch_id=None):
+    formations_qs = (
+        Programme.objects.filter(is_active=True)
+        .select_related("cycle")
+        .prefetch_related("years__fees")
+        .order_by("title")
+    )
+    if cycle_slug in {"licence", "master"}:
+        formations_qs = formations_qs.filter(cycle__slug__iexact=cycle_slug)
+
+    selected_branch = None
+    if branch_id:
+        selected_branch = (
+            Branch.objects.filter(id=branch_id, is_active=True, accepts_online_registration=True)
+            .only("id")
+            .first()
+        )
+        if not selected_branch:
+            return []
+
+    cards = []
+    for formation in formations_qs:
+        first_year = next(iter(formation.years.all()), None)
+        first_year_cost = 0
+        if first_year:
+            first_year_cost = sum(fee.amount for fee in first_year.fees.all())
+
+        cards.append(
+            {
+                "title": formation.title,
+                "slug": formation.slug,
+                "duration_years": formation.duration_years,
+                "first_year_cost": first_year_cost,
+                "details_url": formation.get_absolute_url(),
+            }
+        )
+
+    return cards
+
+
+def _default_form_data():
+    return {
+        "last_name": "",
+        "first_name": "",
+        "city": "",
+        "email": "",
+        "phone": "",
+        "birth_date": "",
+        "birth_place": "",
+        "gender": "",
+        "current_level": "",
+        "formation": "",
+        "formation_slug": "",
+        "branch_id": "",
+        "branch_name": "",
+        "branch_city": "",
+        "campus_image": "",
+    }
+
+
+def admission_tunnel(request):
+    cycle_filter = request.GET.get("cycle", "all").lower()
+    branches = Branch.objects.filter(is_active=True, accepts_online_registration=True).order_by("name")
+    form_data = _default_form_data()
+    backend_error = ""
+    initial_step = 1
+    initial_step3_phase = "school"
+
+    if request.method == "POST":
+        form_data = {
+            "last_name": request.POST.get("last_name", "").strip(),
+            "first_name": request.POST.get("first_name", "").strip(),
+            "city": request.POST.get("city", "").strip(),
+            "email": request.POST.get("email", "").strip(),
+            "phone": request.POST.get("phone", "").strip(),
+            "birth_date": request.POST.get("birth_date", "").strip(),
+            "birth_place": request.POST.get("birth_place", "").strip(),
+            "gender": request.POST.get("gender", "").strip(),
+            "current_level": request.POST.get("current_level", "").strip(),
+            "formation": request.POST.get("formation", "").strip(),
+            "formation_slug": request.POST.get("formation_slug", "").strip(),
+            "branch_id": request.POST.get("branch_id", "").strip(),
+            "branch_name": request.POST.get("branch_name", "").strip(),
+            "branch_city": request.POST.get("branch_city", "").strip(),
+            "campus_image": request.POST.get("campus_image", "").strip(),
+        }
+        initial_step = 4
+        if form_data.get("formation_slug"):
+            initial_step3_phase = "documents"
+        elif form_data.get("branch_id"):
+            initial_step3_phase = "program"
+
+        required_fields = [
+            "last_name",
+            "first_name",
+            "city",
+            "email",
+            "phone",
+            "birth_date",
+            "gender",
+            "current_level",
+            "formation_slug",
+            "branch_id",
+        ]
+        missing_fields = [field for field in required_fields if not form_data.get(field)]
+        if missing_fields:
+            backend_error = "Des informations obligatoires manquent. Merci de verifier les etapes precedentes."
+        else:
+            programme = Programme.objects.filter(is_active=True, slug=form_data["formation_slug"]).first()
+            branch = Branch.objects.filter(
+                id=form_data["branch_id"],
+                is_active=True,
+                accepts_online_registration=True,
+            ).first()
+            if not programme or not branch:
+                backend_error = "Impossible de finaliser la candidature. Formation ou annexe indisponible."
+                initial_step = 3
+                initial_step3_phase = "program"
+            else:
+                academic_year_start = timezone.now().year
+                entry_year = 4 if form_data["current_level"].lower() == "master" else 1
+                programme_documents = programme.required_documents.select_related("document")
+                uploaded_documents = []
+                missing_documents = []
+
+                for programme_document in programme_documents:
+                    file_key = f"document_{programme_document.document.id}"
+                    uploaded_file = request.FILES.get(file_key)
+                    if programme_document.document.is_mandatory and not uploaded_file:
+                        missing_documents.append(programme_document.document.name)
+                    if uploaded_file:
+                        uploaded_documents.append((programme_document.document, uploaded_file))
+
+                if missing_documents:
+                    backend_error = "Tous les documents obligatoires doivent etre televerses pour valider votre candidature."
+                    initial_step = 3
+                    initial_step3_phase = "documents"
+                else:
+                    try:
+                        with transaction.atomic():
+                            candidature = Candidature.objects.create(
+                                programme=programme,
+                                branch=branch,
+                                academic_year=f"{academic_year_start}-{academic_year_start + 1}",
+                                entry_year=entry_year,
+                                first_name=form_data["first_name"],
+                                last_name=form_data["last_name"],
+                                birth_date=form_data["birth_date"],
+                                birth_place=form_data["birth_place"] or form_data["city"],
+                                gender=form_data["gender"] if form_data["gender"] in {"male", "female"} else "male",
+                                phone=form_data["phone"],
+                                email=form_data["email"],
+                                city=form_data["city"],
+                                country="Mali",
+                            )
+
+                            for document_type, uploaded_file in uploaded_documents:
+                                CandidatureDocument.objects.create(
+                                    candidature=candidature,
+                                    document_type=document_type,
+                                    file=uploaded_file,
+                                )
+
+                        messages.success(request, "Votre candidature a ete enregistree avec succes.")
+                        return redirect("admissions:done", candidature_id=candidature.id)
+                    except IntegrityError:
+                        backend_error = "Une candidature existe deja avec cet email pour cette formation et cette annee."
+                    except Exception:
+                        backend_error = "Une erreur technique est survenue. Reessayez dans un instant."
+                        initial_step = 3
+                        initial_step3_phase = "documents"
+
+    formation_cards = []
+    return render(
+        request,
+        "admissions/tunnel.html",
+        {
+            "formation_cards": formation_cards,
+            "selected_cycle": cycle_filter,
+            "branches": branches,
+            "initial_form_json": json.dumps(form_data),
+            "initial_step": initial_step,
+            "initial_step3_phase": initial_step3_phase,
+            "backend_error": backend_error,
+        },
+    )
+
+
+def admission_step3_formations(request):
+    cycle_filter = request.GET.get("cycle", "").strip().lower()
+    if not cycle_filter:
+        cycle_filter = request.GET.get("current_level", "all").strip().lower()
+    if cycle_filter not in {"all", "licence", "master"}:
+        cycle_filter = "all"
+    branch_id_raw = request.GET.get("branch_id", "").strip() or request.GET.get("annexe_id", "").strip()
+    branch_id = None
+    if branch_id_raw.isdigit():
+        branch_id = int(branch_id_raw)
+
+    selected_branch = None
+    if branch_id:
+        selected_branch = Branch.objects.filter(
+            id=branch_id,
+            is_active=True,
+            accepts_online_registration=True,
+        ).first()
+
+    formation_cards = _build_formation_cards(cycle_filter, branch_id=branch_id)
+    return render(
+        request,
+        "admissions/partials/formation_options.html",
+        {
+            "formation_cards": formation_cards,
+            "selected_cycle": cycle_filter,
+            "selected_branch": selected_branch,
+        },
+    )
+
+
+def admission_step3_documents(request):
+    formation_slug = request.GET.get("formation_slug", "").strip()
+    selected_programme = None
+    required_documents = []
+
+    if formation_slug:
+        selected_programme = Programme.objects.filter(
+            slug=formation_slug,
+            is_active=True,
+        ).first()
+        if selected_programme:
+            required_documents = selected_programme.required_documents.select_related("document")
+
+    return render(
+        request,
+        "admissions/partials/step3_documents.html",
+        {
+            "selected_programme": selected_programme,
+            "required_documents": required_documents,
+        },
+    )
+
+
+def admission_done(request, candidature_id):
+    candidature = get_object_or_404(Candidature.objects.select_related("programme"), id=candidature_id)
+    return render(request, "admissions/done.html", {"candidature": candidature})
 
 
 def apply_to_programme(request, slug):

@@ -1,16 +1,31 @@
 {% extends "superadmin/base.html" %}
 {% load static %}
 
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .programme-detail-wrap { max-width: 1240px; margin: 0 auto; }
+    .programme-detail-top { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+    @media (min-width: 768px) {
+        .programme-detail-top { flex-direction: row; align-items: center; justify-content: space-between; }
+    }
+    .programme-detail-block { margin-bottom: 18px; }
+    .programme-list-clean { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .programme-list-item { display: flex; align-items: flex-start; gap: 10px; color: #4b5563; }
+    .programme-list-item span { line-height: 1.55; }
+</style>
+{% endblock %}
+
 {% block page_title %}{{ programme.title }}{% endblock %}
 {% block page_subtitle %}Détails du programme de formation{% endblock %}
 
 {% block content_main %}
-<div class="fade-in">
+<div class="fade-in programme-detail-wrap">
 
     <!-- ========================================
          EN-TÊTE ET ACTIONS
     ======================================== -->
-    <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;" class="md:flex-row md:items-center justify-between">
+    <div class="programme-detail-top">
         <div>
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
                 <a href="{% url 'superadmin:formation_list' %}" style="color: #6b7280; transition: color 0.2s;" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#6b7280'">
@@ -33,7 +48,7 @@
                 {% endif %}
             </p>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <a href="{% url 'superadmin:formation_edit' programme.pk %}" class="btn btn-primary">
                 <i class="fas fa-edit mr-2"></i>Modifier
             </a>
@@ -47,7 +62,7 @@
     <!-- ========================================
          INFORMATIONS PRINCIPALES
     ======================================== -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+    <div class="programme-detail-block" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px;">
 
         <!-- Fiche d'identité -->
         <div class="card" style="padding: 24px;">
@@ -129,7 +144,7 @@
     <!-- ========================================
          DESCRIPTION ET DÉTAILS
     ======================================== -->
-    <div class="card" style="margin-bottom: 24px;">
+    <div class="card programme-detail-block">
         <div class="card-header">
             <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
                 <i class="fas fa-align-left" style="color: #8b5cf6;"></i>
@@ -156,7 +171,7 @@
     <!-- ========================================
          COMPÉTENCES ET DÉBOUCHÉS
     ======================================== -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+    <div class="programme-detail-block" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px;">
 
         <!-- Compétences acquises -->
         <div class="card">
@@ -167,15 +182,13 @@
                 </h3>
             </div>
             <div class="card-body">
-                {% if programme.learning_outcomes %}
-                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
-                    {% for line in programme.learning_outcomes|linebreaks %}
-                    {% if line.strip %}
-                    <li style="display: flex; align-items: flex-start; gap: 10px; color: #4b5563;">
+                {% if learning_outcomes_items %}
+                <ul class="programme-list-clean">
+                    {% for item in learning_outcomes_items %}
+                    <li class="programme-list-item">
                         <i class="fas fa-check" style="color: #10b981; margin-top: 4px; flex-shrink: 0;"></i>
-                        <span>{{ line }}</span>
+                        <span>{{ item }}</span>
                     </li>
-                    {% endif %}
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -193,15 +206,13 @@
                 </h3>
             </div>
             <div class="card-body">
-                {% if programme.career_opportunities %}
-                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
-                    {% for line in programme.career_opportunities|linebreaks %}
-                    {% if line.strip %}
-                    <li style="display: flex; align-items: flex-start; gap: 10px; color: #4b5563;">
+                {% if career_opportunities_items %}
+                <ul class="programme-list-clean">
+                    {% for item in career_opportunities_items %}
+                    <li class="programme-list-item">
                         <i class="fas fa-arrow-right" style="color: #3b82f6; margin-top: 4px; flex-shrink: 0;"></i>
-                        <span>{{ line }}</span>
+                        <span>{{ item }}</span>
                     </li>
-                    {% endif %}
                     {% endfor %}
                 </ul>
                 {% else %}
@@ -215,7 +226,7 @@
          STRUCTURE PÉDAGOGIQUE
     ======================================== -->
     {% if programme.program_structure %}
-    <div class="card" style="margin-bottom: 24px;">
+    <div class="card programme-detail-block">
         <div class="card-header">
             <h3 style="font-size: 16px; font-weight: 700; color: #1f2937; display: flex; align-items: center; gap: 10px;">
                 <i class="fas fa-book-reader" style="color: #ec4899;"></i>

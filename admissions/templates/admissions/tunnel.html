@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Admission | ESFE{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --tunnel-vh-offset: 100px;
+  }
+  .admission-shell { font-family: 'Inter', sans-serif; }
+  .tunnel-hero-compact section {
+    padding-top: 2.75rem;
+    padding-bottom: 2.75rem;
+  }
+  .tunnel-hero-compact h1 {
+    font-size: 1.85rem;
+    line-height: 1.15;
+  }
+  .ken-burns {
+    animation: kenBurnsZoom 28s ease-in-out infinite alternate;
+    transform-origin: center center;
+  }
+  @keyframes kenBurnsZoom {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.03); }
+  }
+  .mesh-bg {
+    background: radial-gradient(circle at 20% 25%, rgba(29,181,176,0.35), transparent 42%),
+                radial-gradient(circle at 80% 20%, rgba(30,79,111,0.55), transparent 45%),
+                radial-gradient(circle at 50% 80%, rgba(29,181,176,0.28), transparent 42%),
+                linear-gradient(140deg, #163a52 0%, #1e4f6f 45%, #1a6d86 100%);
+    background-size: 140% 140%;
+    animation: meshShift 24s ease-in-out infinite alternate;
+  }
+  @keyframes meshShift {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 100% 100%; }
+  }
+  .float-word {
+    animation: floatWord 9s ease-in-out infinite;
+  }
+  @keyframes floatWord {
+    0%, 100% { transform: translateY(0px); opacity: 0.35; }
+    50% { transform: translateY(-10px); opacity: 0.75; }
+  }
+  .tunnel-split {
+    height: auto;
+    min-height: 0;
+  }
+  .tunnel-media-pane,
+  .tunnel-form-pane {
+    min-width: 0;
+    min-height: 0;
+  }
+  .tunnel-step-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  .tunnel-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(30,79,111,0.35) rgba(148,163,184,0.18);
+  }
+  .tunnel-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .tunnel-scroll::-webkit-scrollbar-track {
+    border-radius: 9999px;
+    background: rgba(148,163,184,0.16);
+  }
+  .tunnel-scroll::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: rgba(30,79,111,0.45);
+  }
+  .tunnel-scroll-y {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(30,79,111,0.35) rgba(148,163,184,0.18);
+  }
+  .tunnel-scroll-y::-webkit-scrollbar {
+    width: 8px;
+  }
+  .tunnel-scroll-y::-webkit-scrollbar-track {
+    border-radius: 9999px;
+    background: rgba(148,163,184,0.16);
+  }
+  .tunnel-scroll-y::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: rgba(30,79,111,0.45);
+  }
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(30,79,111,0.35) rgba(148,163,184,0.18);
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    border-radius: 9999px;
+    background: rgba(148,163,184,0.16);
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: rgba(30,79,111,0.45);
+  }
+  @media (min-width: 768px) {
+    .tunnel-hero-compact section {
+      padding-top: 2.25rem;
+      padding-bottom: 2.25rem;
+    }
+    .tunnel-hero-compact h1 {
+      font-size: 2rem;
+    }
+    .tunnel-split {
+      height: calc(100vh - var(--tunnel-vh-offset));
+      min-height: 620px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .tunnel-split {
+      min-height: 680px;
+    }
+  }
+  .tunnel-nav {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    padding-top: 0.8rem;
+    background: linear-gradient(to top, rgba(248,250,252,0.96), rgba(248,250,252,0.88) 65%, rgba(248,250,252,0));
+    backdrop-filter: blur(4px);
+  }
+  .tunnel-btn-prev {
+    border-radius: 1rem;
+    border: 1px solid rgb(226 232 240);
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: rgb(51 65 85);
+    transition: all 0.2s ease;
+  }
+  .tunnel-btn-prev:hover {
+    border-color: rgba(29,181,176,0.8);
+    color: #1e4f6f;
+  }
+  .tunnel-btn-next {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 1rem;
+    background: #1e4f6f;
+    padding: 0.875rem 1.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(30,79,111,0.2);
+    transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+  }
+  .tunnel-btn-next:hover {
+    transform: translateY(-2px);
+    background: #163a52;
+  }
+  @media (max-width: 767px) {
+    :root {
+      --tunnel-vh-offset: 0px;
+    }
+    .tunnel-hero-compact section {
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+    }
+    .tunnel-hero-compact h1 {
+      font-size: 1.55rem;
+      line-height: 1.2;
+    }
+    .tunnel-split {
+      min-height: auto;
+      height: auto;
+    }
+    .tunnel-nav {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      margin-top: 0;
+      padding: 0.75rem 1rem calc(env(safe-area-inset-bottom) + 0.85rem);
+      background: linear-gradient(to top, rgba(248,250,252,0.98), rgba(248,250,252,0.92));
+      backdrop-filter: blur(8px);
+      box-shadow: 0 -6px 24px rgba(15,23,42,0.08);
+    }
+    .tunnel-scroll {
+      padding-bottom: 6.2rem;
+    }
+    .tunnel-btn-prev,
+    .tunnel-btn-next {
+      padding-top: 0.7rem;
+      padding-bottom: 0.7rem;
+    }
+  }
+  .htmx-fade-zone {
+    position: relative;
+    transition: opacity 0.25s ease;
+  }
+  .htmx-fade-zone.htmx-request {
+    opacity: 0.55;
+  }
+  .htmx-added {
+    animation: htmxFadeIn 0.45s ease both;
+  }
+  .htmx-loading-indicator {
+    display: none;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.75rem;
+    height: 1.25rem;
+    width: 1.25rem;
+    border-radius: 9999px;
+    border: 2px solid rgba(30,79,111,0.2);
+    border-top-color: #1e4f6f;
+    animation: spin 0.8s linear infinite;
+  }
+  .htmx-indicator.htmx-request {
+    display: inline-block;
+  }
+  @keyframes htmxFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tunnel-hero-compact">
+  {% include "admissions/partials/hero_admission.html" %}
+</div>
+
+<section class="admission-shell w-full overflow-hidden isolate min-h-screen" aria-label="Tunnel admission">
+  <form method="post"
+        action="{% url 'admissions:admission_tunnel' %}"
+        enctype="multipart/form-data"
+        class="w-full max-w-7xl mx-auto"
+        x-data="admissionTunnelData()">
+    {% csrf_token %}
+
+    <input type="hidden" name="last_name" x-model="formData.last_name">
+    <input type="hidden" name="first_name" x-model="formData.first_name">
+    <input type="hidden" name="city" x-model="formData.city">
+    <input type="hidden" name="email" x-model="formData.email">
+    <input type="hidden" name="phone" x-model="formData.phone">
+    <input type="hidden" name="birth_date" x-model="formData.birth_date">
+    <input type="hidden" name="birth_place" x-model="formData.birth_place">
+    <input type="hidden" name="gender" x-model="formData.gender">
+    <input type="hidden" name="current_level" x-model="formData.current_level">
+    <input type="hidden" name="formation" x-model="formData.formation">
+    <input type="hidden" name="formation_slug" x-model="formData.formation_slug">
+    <input type="hidden" name="branch_id" x-model="formData.branch_id">
+    <input type="hidden" name="branch_name" x-model="formData.branch_name">
+    <input type="hidden" name="branch_city" x-model="formData.branch_city">
+    <input type="hidden" name="campus_image" x-model="formData.campus_image">
+
+    <div class="tunnel-split relative flex w-full flex-col md:flex-row overflow-hidden">
+      <div class="absolute top-0 left-0 h-[2px] w-full bg-[#1db5b0]/20 z-20">
+        <div class="h-full bg-[#1db5b0] transition-all duration-700 ease-out" :style="`width: ${progressWidth()}%`"></div>
+      </div>
+
+      <div class="tunnel-media-pane w-full relative overflow-hidden md:h-full"
+           :class="[step === 4 ? 'md:basis-[40%] md:max-w-[40%] xl:basis-[30%] xl:max-w-[30%] md:order-1' : 'md:basis-[40%] md:max-w-[40%] xl:basis-1/2 xl:max-w-1/2 md:order-1', step === 2 ? 'block' : 'hidden md:block']">
+        <div x-show="step !== 2 && step !== 3"
+             x-cloak
+             x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition duration-500 ease-in-out"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 -translate-y-4"
+             class="absolute inset-0 bg-[#0f2f43] overflow-hidden">
+          <img src="{% static 'images/lab_students.png' %}"
+               alt="ESFE immersion"
+               class="absolute inset-0 h-full w-full object-cover ken-burns [object-position:center_20%]">
+          <div class="absolute inset-0 bg-gradient-to-r from-[#1e4f6f]/55 to-transparent"></div>
+          <div class="absolute left-8 bottom-8 text-white/90" data-aos="fade-up" data-aos-delay="180">
+            <p class="inline-flex items-center gap-2 text-sm font-medium tracking-wide">
+              <i class="fa-solid fa-shield-halved text-[#1db5b0]"></i>
+              L'excellence se construit ici.
+            </p>
+          </div>
+          <div x-show="step === 3 && formData.branch_name"
+               x-cloak
+               class="absolute top-8 left-8 rounded-xl bg-black/30 px-4 py-2 text-white backdrop-blur-sm">
+            <p class="text-xs uppercase tracking-[0.16em] text-white/70">Campus selectionne</p>
+            <p class="font-semibold" x-text="formData.branch_name"></p>
+            <p class="text-sm text-white/80" x-text="formData.branch_city"></p>
+          </div>
+        </div>
+
+        <div x-show="step === 3"
+             x-cloak
+             x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition duration-500 ease-in-out"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 -translate-y-4"
+             class="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0 bg-[#0f2f43]">
+          {% for branch in branches|slice:":4" %}
+          <button type="button"
+                  class="group relative overflow-hidden"
+                  @click="formData.branch_id='{{ branch.id }}'; formData.branch_name='{{ branch.name|escapejs }}'; formData.branch_city='{{ branch.city|default:''|escapejs }}'; formData.campus_image='{% if branch.image %}{{ branch.image.url }}{% endif %}'"
+                  :class="String(formData.branch_id) === '{{ branch.id }}' ? 'ring-2 ring-[#1db5b0] z-10' : ''">
+            {% if branch.image %}
+            <img src="{{ branch.image.url }}" alt="{{ branch.name }}" class="h-full w-full object-cover transition duration-700 group-hover:scale-105">
+            {% else %}
+            <div class="h-full w-full bg-gradient-to-br from-[#1e4f6f] to-[#1db5b0]"></div>
+            {% endif %}
+            <div class="absolute inset-0 bg-black/45 transition group-hover:bg-black/25"></div>
+            <div class="absolute left-3 bottom-3 text-left text-white">
+              <p class="text-sm font-semibold leading-tight">{{ branch.name }}</p>
+              <p class="text-[11px] inline-flex items-center gap-1 text-white/85">
+                <i class="fa-solid fa-location-dot text-[#1db5b0]"></i>{{ branch.city|default:'Campus ESFE' }}
+              </p>
+            </div>
+          </button>
+          {% endfor %}
+        </div>
+
+        <div x-show="step === 2"
+             x-cloak
+             x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition duration-500 ease-in-out"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 -translate-y-4"
+             class="absolute inset-0 bg-[rgba(29,181,176,0.05)] backdrop-blur-sm text-slate-900 flex items-stretch justify-center overflow-hidden p-4 sm:p-5 md:p-6 lg:p-7 xl:p-8">
+          <div class="w-full">
+            <div x-show="backendError" x-cloak class="mb-6 text-sm text-red-600" x-text="backendError"></div>
+            {% include "admissions/partials/step2.html" %}
+          </div>
+        </div>
+      </div>
+
+      <div class="tunnel-form-pane w-full relative overflow-hidden flex-1"
+           :class="[step === 4 ? 'md:basis-[60%] md:max-w-[60%] xl:basis-[70%] xl:max-w-[70%] md:order-2' : 'md:basis-[60%] md:max-w-[60%] xl:basis-1/2 xl:max-w-1/2 md:order-2', step === 2 ? 'hidden md:block' : 'block']">
+        <div x-show="step !== 2"
+             x-cloak
+             x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition duration-500 ease-in-out"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 -translate-y-4"
+             class="absolute inset-0 bg-[rgba(29,181,176,0.05)] backdrop-blur-sm text-slate-900 flex items-stretch justify-center overflow-hidden p-4 sm:p-5 md:p-6 lg:p-7 xl:p-8">
+          <div class="w-full">
+            <div x-show="backendError" x-cloak class="mb-6 text-sm text-red-600" x-text="backendError"></div>
+
+            <div x-show="step === 1"
+                 x-cloak
+                 x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                 x-transition:enter-start="opacity-0 translate-y-4"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition duration-500 ease-in-out"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 -translate-y-4">
+              {% include "admissions/partials/step1.html" %}
+            </div>
+
+            <div x-show="step === 3"
+                 x-cloak
+                 x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                 x-transition:enter-start="opacity-0 translate-y-4"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition duration-500 ease-in-out"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 -translate-y-4">
+              {% include "admissions/partials/step3.html" %}
+            </div>
+
+            <div x-show="step === 4"
+                 x-cloak
+                 x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                 x-transition:enter-start="opacity-0 translate-y-4"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition duration-500 ease-in-out"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 -translate-y-4">
+              {% include "admissions/partials/step4.html" %}
+            </div>
+          </div>
+        </div>
+
+        <div x-show="step === 2"
+             x-cloak
+             x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition duration-500 ease-in-out"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 -translate-y-4"
+             class="absolute inset-0 mesh-bg">
+          <div class="absolute inset-0 bg-gradient-to-tr from-[#1e4f6f]/45 via-transparent to-[#1db5b0]/20"></div>
+          <div class="absolute inset-0 text-white/70 font-semibold tracking-wide">
+            <span class="float-word absolute top-[18%] left-[12%] text-xl" data-aos="fade-up" data-aos-delay="120">Excellence</span>
+            <span class="float-word absolute top-[38%] right-[18%] text-lg" data-aos="fade-up" data-aos-delay="260">Sante</span>
+            <span class="float-word absolute bottom-[30%] left-[24%] text-xl" data-aos="fade-up" data-aos-delay="380">Avenir</span>
+            <span class="float-word absolute bottom-[14%] right-[16%] text-2xl" data-aos="fade-up" data-aos-delay="520">ESFE</span>
+          </div>
+          <div class="absolute bottom-8 left-8 text-white/85" data-aos="fade-up" data-aos-delay="640">
+            <p class="inline-flex items-center gap-2 text-sm font-medium">
+              <i class="fa-solid fa-graduation-cap text-[#1db5b0]"></i>
+              Vision institutionnelle en mouvement.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</section>
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+  window.admissionTunnelData = function () {
+    return {
+      step: {{ initial_step|default:1 }},
+      step3Phase: '{{ initial_step3_phase|default:"school"|escapejs }}',
+      errors: {},
+      backendError: '{{ backend_error|default:""|escapejs }}',
+      activeCycle: '{{ selected_cycle|default:"all"|escapejs }}',
+      formData: Object.assign({
+        last_name: '',
+        first_name: '',
+        city: '',
+        email: '',
+        phone: '',
+        birth_date: '',
+        birth_place: '',
+        gender: '',
+        current_level: '',
+        formation: '',
+        formation_slug: '',
+        branch_id: '',
+        branch_name: '',
+        branch_city: '',
+        campus_image: ''
+      }, JSON.parse('{{ initial_form_json|default:"{}"|escapejs }}')),
+      isStepComplete(stepNo) {
+        if (stepNo === 1) return this.formData.last_name && this.formData.first_name && this.formData.city;
+        if (stepNo === 2) return this.formData.email && this.formData.phone && this.formData.birth_date && this.formData.current_level;
+        if (stepNo === 3) {
+          if (!(this.formData.branch_id && this.formData.formation_slug)) return false;
+          const readyMarker = document.querySelector('#step3-documents-list [data-documents-ready="1"]');
+          if (!readyMarker) return false;
+          const requiredFiles = document.querySelectorAll('#step3-documents-list input[type=file][data-required="1"]');
+          return Array.from(requiredFiles).every((input) => input.files && input.files.length > 0);
+        }
+        return true;
+      },
+      validateStep(stepNo) {
+        this.errors = {};
+        if (stepNo === 1) {
+          if (!this.formData.last_name) this.errors.last_name = 'Le nom est obligatoire.';
+          if (!this.formData.first_name) this.errors.first_name = 'Le prenom est obligatoire.';
+          if (!this.formData.city) this.errors.city = 'La ville d\'origine est obligatoire.';
+        }
+        if (stepNo === 2) {
+          if (!this.formData.email) this.errors.email = 'L\'email est obligatoire.';
+          if (!this.formData.phone) this.errors.phone = 'Le telephone est obligatoire.';
+          if (!this.formData.birth_date) this.errors.birth_date = 'La date de naissance est obligatoire.';
+          if (!this.formData.current_level) this.errors.current_level = 'Le niveau actuel est obligatoire.';
+        }
+        if (stepNo === 3 && !this.formData.branch_id) {
+          this.errors.formation_slug = 'Veuillez d\'abord choisir un campus puis une formation.';
+        } else if (stepNo === 3 && !this.formData.formation_slug) {
+          this.errors.formation_slug = 'Veuillez choisir une formation.';
+        } else if (stepNo === 3) {
+          const readyMarker = document.querySelector('#step3-documents-list [data-documents-ready="1"]');
+          if (!readyMarker) {
+            this.errors.documents = 'Chargez les documents requis de la formation selectionnee.';
+          } else {
+            const requiredFiles = document.querySelectorAll('#step3-documents-list input[type=file][data-required="1"]');
+            const missingRequired = Array.from(requiredFiles).some((input) => !input.files || input.files.length === 0);
+            if (missingRequired) {
+              this.errors.documents = 'Veuillez televerser tous les documents obligatoires.';
+            }
+          }
+        }
+        return Object.keys(this.errors).length === 0;
+      },
+      goTo(target) {
+        if (target < 1 || target > 4) return;
+        if (target > this.step && !this.validateStep(this.step)) return;
+        this.step = target;
+        this.$nextTick(() => {
+          if (window.AOS && typeof window.AOS.refresh === 'function') {
+            window.AOS.refresh();
+          }
+        });
+        if (target === 3) {
+          if (this.formData.formation_slug) {
+            this.step3Phase = 'documents';
+            document.body.dispatchEvent(new CustomEvent('admission-step-3-documents'));
+          } else if (this.formData.branch_id) {
+            this.step3Phase = 'program';
+            document.body.dispatchEvent(new CustomEvent('admission-step-3'));
+          } else {
+            this.step3Phase = 'school';
+          }
+          this.activeCycle = this.formData.current_level || 'all';
+        }
+      },
+      progressWidth() {
+        return (this.step / 4) * 100;
+      },
+      requiredDocumentInputs() {
+        return Array.from(document.querySelectorAll('#step3-documents-list input[type=file][data-required="1"]'));
+      },
+      requiredDocumentsTotal() {
+        return this.requiredDocumentInputs().length;
+      },
+      requiredDocumentsUploaded() {
+        return this.requiredDocumentInputs().filter((input) => input.files && input.files.length > 0).length;
+      },
+      documentUploadPercent() {
+        const total = this.requiredDocumentsTotal();
+        if (!total) return 100;
+        return Math.round((this.requiredDocumentsUploaded() / total) * 100);
+      },
+      prettyValue(value, fallback = 'Non renseigne') {
+        return value ? value : fallback;
+      }
+    };
+  };
+</script>
+{% endblock %}
+{% endblock %}

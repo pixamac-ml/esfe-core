@@ -1,0 +1,114 @@
+{% load static %}
+<main class="receipt-wrapper">
+  <section class="receipt-header">
+	<img class="receipt-logo" src="{% static 'institution/logo.png' %}" alt="Logo ESFe">
+	<div>
+	  <h1 class="receipt-title">RECU OFFICIEL DE PAIEMENT</h1>
+	  <p class="receipt-subtitle">Ecole de Sante Felix Houphouet-Boigny (ESFe)</p>
+	  <p class="receipt-subtitle">Excellence - Discipline - Humanite</p>
+	</div>
+  </section>
+
+  <section class="receipt-meta">
+	<div class="meta-card">
+	  <p><strong>Numero de recu :</strong> {{ payment.receipt_number|default:"-" }}</p>
+	  <p><strong>Ref :</strong> {% firstof payment.reference payment.receipt_number "-" %}</p>
+	  <p><strong>Date :</strong>{% if payment.paid_at %} {{ payment.paid_at|date:"d/m/Y H:i" }}{% else %} -{% endif %}</p>
+	</div>
+  </section>
+
+  <section class="section-card">
+	<h2 class="section-label">Infos Structure</h2>
+	<div class="info-grid">
+	  <p><strong>Nom de l'ecole :</strong> Ecole de Sante Felix Houphouet-Boigny (ESFe)</p>
+	  <p><strong>Annexe / Campus :</strong> Campus principal</p>
+	  <p><strong>Ville :</strong> Bamako</p>
+	  <p><strong>Coordonnees :</strong> Non renseignees</p>
+	</div>
+  </section>
+
+  <section class="section-card">
+	<h2 class="section-label">Infos Client</h2>
+	<div class="info-grid">
+	  <p>
+		<strong>Nom complet :</strong>
+		{% if candidature %}
+		  {{ candidature.last_name|default:"" }} {{ candidature.first_name|default:"" }}
+		{% else %}
+		  {{ payment.inscription.candidature.last_name|default:"" }} {{ payment.inscription.candidature.first_name|default:"" }}
+		{% endif %}
+	  </p>
+	  <p><strong>Email :</strong> {% firstof candidature.email payment.inscription.candidature.email "Non renseigne" %}</p>
+	  <p><strong>Telephone :</strong> {% firstof candidature.phone payment.inscription.candidature.phone "Non renseigne" %}</p>
+	</div>
+	<p class="agent-line">
+	  <strong>Genere par :</strong>
+	  {% if payment.agent and payment.agent.user %}
+		{% firstof payment.agent.user.get_full_name payment.agent.agent_code "Systeme ESFe" %}
+	  {% elif payment.agent %}
+		{{ payment.agent.agent_code|default:"Systeme ESFe" }}
+	  {% else %}
+		Systeme ESFe
+	  {% endif %}
+	</p>
+  </section>
+
+  <section class="section-card">
+	<h2 class="section-label">Tableau Principal</h2>
+	<div class="table-wrap">
+	  <table>
+		<thead>
+		  <tr>
+			<th>Designation</th>
+			<th>Detail</th>
+			<th style="text-align: right;">Montant</th>
+		  </tr>
+		</thead>
+		<tbody>
+		  <tr>
+			<td>Paiement valide</td>
+			<td>{% firstof programme.title payment.inscription.candidature.programme.title "Inscription" %}</td>
+			<td class="amount">{{ payment.amount|default:0 }} FCFA</td>
+		  </tr>
+		  <tr>
+			<td>Mode de paiement</td>
+			<td>{{ payment.get_method_display|default:"-" }}</td>
+			<td class="amount">-</td>
+		  </tr>
+		  <tr>
+			<td>Statut</td>
+			<td>{{ payment.get_status_display|default:"-" }}</td>
+			<td class="amount">-</td>
+		  </tr>
+		  <tr>
+			<td>Reference de paiement</td>
+			<td>{% firstof payment.reference payment.receipt_number "Aucune reference" %}</td>
+			<td class="amount">-</td>
+		  </tr>
+		</tbody>
+	  </table>
+	</div>
+
+	<div class="total-block">
+	  <p>Total paye</p>
+	  <p class="total-value">{{ payment.amount|default:0 }} FCFA</p>
+	</div>
+  </section>
+
+  <section class="qr-zone">
+	<div class="qr-card">
+	  {% if qr_code_url %}
+		<img src="{{ qr_code_url }}" alt="QR code de verification">
+	  {% else %}
+		<div class="qr-placeholder">QR indisponible</div>
+	  {% endif %}
+	  <p>Verification du dossier</p>
+	</div>
+  </section>
+
+  <footer class="receipt-footer">
+	<p>Merci pour votre confiance</p>
+	<p>Document genere automatiquement - Copyright ESFe</p>
+  </footer>
+</main>
+

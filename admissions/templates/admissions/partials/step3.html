@@ -16,7 +16,7 @@
         <p class="text-sm text-slate-600" data-aos="fade-up" data-aos-delay="200">Quel campus ESFE deviendra votre prochain foyer ?</p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3" data-aos="fade-up" data-aos-delay="300">
+      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2" data-aos="fade-up" data-aos-delay="300">
         {% for branch in branches %}
         <button type="button"
                 class="rounded-2xl border px-4 py-3 text-left transition"
@@ -67,7 +67,7 @@
         <p class="text-sm text-slate-600" data-aos="fade-up" data-aos-delay="200">Maintenant, decouvrez le catalogue de formations d'excellence concu pour votre avenir.</p>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2" data-aos="fade-up" data-aos-delay="300">
+      <div class="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 pr-1 custom-scrollbar" data-aos="fade-up" data-aos-delay="300">
         <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'all' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='all'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "all"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Tous les programmes</button>
         <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'licence' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='licence'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "licence"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Licence</button>
         <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'master' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='master'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "master"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Master</button>
@@ -75,7 +75,7 @@
 
       <div class="relative" data-aos="fade-up" data-aos-delay="300">
         <span id="step3-formations-loading" class="htmx-indicator htmx-loading-indicator" aria-hidden="true"></span>
-        <div id="step3-formations-list" class="htmx-fade-zone tunnel-scroll-y custom-scrollbar max-h-[50vh] rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-include="[name='branch_id'],[name='current_level']" hx-trigger="admission-step-3 from:body" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">
+        <div id="step3-formations-list" class="htmx-fade-zone rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-include="[name='branch_id'],[name='current_level']" hx-trigger="admission-step-3 from:body" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">
           Selectionnez un campus pour afficher ses formations.
         </div>
       </div>
@@ -110,7 +110,7 @@
       <div class="relative" data-aos="fade-up" data-aos-delay="300">
         <span id="step3-documents-loading" class="htmx-indicator htmx-loading-indicator" aria-hidden="true"></span>
         <div id="step3-documents-list"
-             class="htmx-fade-zone tunnel-scroll-y custom-scrollbar max-h-[50vh] rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-5 text-sm text-slate-600"
+             class="htmx-fade-zone rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-5 text-sm text-slate-600"
              hx-get="{% url 'admissions:admission_step3_documents' %}"
              hx-include="[name='formation_slug']"
              hx-trigger="load, admission-step-3-documents from:body, change from:[name='formation_slug']"
@@ -121,6 +121,18 @@
       </div>
 
       <p x-show="errors.documents" x-cloak class="mt-2 text-xs text-red-600" x-text="errors.documents"></p>
+      <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
+        <button type="button"
+                class="font-semibold text-[#1e4f6f] transition hover:text-[#1db5b0]"
+                @click="documentsDeferred = true; errors.documents = ''">
+          Je n'ai pas les documents pour le moment
+        </button>
+        <p class="mt-2 text-xs text-slate-500"
+           x-show="documentsDeferred"
+           x-cloak>
+          Pas de souci, vous pourrez les envoyer plus tard apres votre inscription.
+        </p>
+      </div>
       </div>
 
       <div class="tunnel-nav" data-aos="fade-up" data-aos-delay="300">

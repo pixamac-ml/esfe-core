@@ -137,54 +137,46 @@ def admission_tunnel(request):
                 entry_year = 4 if form_data["current_level"].lower() == "master" else 1
                 programme_documents = programme.required_documents.select_related("document")
                 uploaded_documents = []
-                missing_documents = []
 
                 for programme_document in programme_documents:
                     file_key = f"document_{programme_document.document.id}"
                     uploaded_file = request.FILES.get(file_key)
-                    if programme_document.document.is_mandatory and not uploaded_file:
-                        missing_documents.append(programme_document.document.name)
                     if uploaded_file:
                         uploaded_documents.append((programme_document.document, uploaded_file))
 
-                if missing_documents:
-                    backend_error = "Tous les documents obligatoires doivent etre televerses pour valider votre candidature."
-                    initial_step = 3
-                    initial_step3_phase = "documents"
-                else:
-                    try:
-                        with transaction.atomic():
-                            candidature = Candidature.objects.create(
-                                programme=programme,
-                                branch=branch,
-                                academic_year=f"{academic_year_start}-{academic_year_start + 1}",
-                                entry_year=entry_year,
-                                first_name=form_data["first_name"],
-                                last_name=form_data["last_name"],
-                                birth_date=form_data["birth_date"],
-                                birth_place=form_data["birth_place"] or form_data["city"],
-                                gender=form_data["gender"] if form_data["gender"] in {"male", "female"} else "male",
-                                phone=form_data["phone"],
-                                email=form_data["email"],
-                                city=form_data["city"],
-                                country="Mali",
+                try:
+                    with transaction.atomic():
+                        candidature = Candidature.objects.create(
+                            programme=programme,
+                            branch=branch,
+                            academic_year=f"{academic_year_start}-{academic_year_start + 1}",
+                            entry_year=entry_year,
+                            first_name=form_data["first_name"],
+                            last_name=form_data["last_name"],
+                            birth_date=form_data["birth_date"],
+                            birth_place=form_data["birth_place"] or form_data["city"],
+                            gender=form_data["gender"] if form_data["gender"] in {"male", "female"} else "male",
+                            phone=form_data["phone"],
+                            email=form_data["email"],
+                            city=form_data["city"],
+                            country="Mali",
+                        )
+
+                        for document_type, uploaded_file in uploaded_documents:
+                            CandidatureDocument.objects.create(
+                                candidature=candidature,
+                                document_type=document_type,
+                                file=uploaded_file,
                             )
 
-                            for document_type, uploaded_file in uploaded_documents:
-                                CandidatureDocument.objects.create(
-                                    candidature=candidature,
-                                    document_type=document_type,
-                                    file=uploaded_file,
-                                )
-
-                        messages.success(request, "Votre candidature a ete enregistree avec succes.")
-                        return redirect("admissions:done", candidature_id=candidature.id)
-                    except IntegrityError:
-                        backend_error = "Une candidature existe deja avec cet email pour cette formation et cette annee."
-                    except Exception:
-                        backend_error = "Une erreur technique est survenue. Reessayez dans un instant."
-                        initial_step = 3
-                        initial_step3_phase = "documents"
+                    messages.success(request, "Votre candidature a ete enregistree avec succes.")
+                    return redirect("admissions:done", candidature_id=candidature.id)
+                except IntegrityError:
+                    backend_error = "Une candidature existe deja avec cet email pour cette formation et cette annee."
+                except Exception:
+                    backend_error = "Une erreur technique est survenue. Reessayez dans un instant."
+                    initial_step = 3
+                    initial_step3_phase = "documents"
 
     formation_cards = []
     return render(

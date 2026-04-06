@@ -691,6 +691,7 @@
       step3Phase: '{{ initial_step3_phase|default:"school"|escapejs }}',
       errors: {},
       backendError: '{{ backend_error|default:""|escapejs }}',
+      documentsDeferred: false,
       activeCycle: '{{ selected_cycle|default:"all"|escapejs }}',
       formData: Object.assign({
         last_name: '',
@@ -712,13 +713,7 @@
       isStepComplete(stepNo) {
         if (stepNo === 1) return this.formData.last_name && this.formData.first_name && this.formData.city;
         if (stepNo === 2) return this.formData.email && this.formData.phone && this.formData.birth_date && this.formData.current_level;
-        if (stepNo === 3) {
-          if (!(this.formData.branch_id && this.formData.formation_slug)) return false;
-          const readyMarker = document.querySelector('#step3-documents-list [data-documents-ready="1"]');
-          if (!readyMarker) return false;
-          const requiredFiles = document.querySelectorAll('#step3-documents-list input[type=file][data-required="1"]');
-          return Array.from(requiredFiles).every((input) => input.files && input.files.length > 0);
-        }
+        if (stepNo === 3) return this.formData.branch_id && this.formData.formation_slug;
         return true;
       },
       validateStep(stepNo) {
@@ -738,17 +733,6 @@
           this.errors.formation_slug = 'Veuillez d\'abord choisir un campus puis une formation.';
         } else if (stepNo === 3 && !this.formData.formation_slug) {
           this.errors.formation_slug = 'Veuillez choisir une formation.';
-        } else if (stepNo === 3) {
-          const readyMarker = document.querySelector('#step3-documents-list [data-documents-ready="1"]');
-          if (!readyMarker) {
-            this.errors.documents = 'Chargez les documents requis de la formation selectionnee.';
-          } else {
-            const requiredFiles = document.querySelectorAll('#step3-documents-list input[type=file][data-required="1"]');
-            const missingRequired = Array.from(requiredFiles).some((input) => !input.files || input.files.length === 0);
-            if (missingRequired) {
-              this.errors.documents = 'Veuillez televerser tous les documents obligatoires.';
-            }
-          }
         }
         return Object.keys(this.errors).length === 0;
       },
@@ -780,8 +764,22 @@
       progressWidth() {
         return (this.step / 4) * 100;
       },
+      hasValue(value) {
+        return String(value ?? '').trim().length > 0;
+      },
+      fieldLabelClasses(value) {
+        return this.hasValue(value)
+          ? '-top-2 text-xs text-[#1e4f6f]'
+          : 'top-4 text-sm text-slate-500 peer-focus:-top-2 peer-focus:text-xs peer-focus:text-[#1e4f6f]';
+      },
+      allDocumentInputs() {
+        return Array.from(document.querySelectorAll('#step3-documents-list input[type=file]'));
+      },
       requiredDocumentInputs() {
         return Array.from(document.querySelectorAll('#step3-documents-list input[type=file][data-required="1"]'));
+      },
+      uploadedDocumentsCount() {
+        return this.allDocumentInputs().filter((input) => input.files && input.files.length > 0).length;
       },
       requiredDocumentsTotal() {
         return this.requiredDocumentInputs().length;
@@ -793,6 +791,28 @@
         const total = this.requiredDocumentsTotal();
         if (!total) return 100;
         return Math.round((this.requiredDocumentsUploaded() / total) * 100);
+      },
+      documentSubmissionStatus() {
+        const uploadedCount = this.uploadedDocumentsCount();
+        const requiredTotal = this.requiredDocumentsTotal();
+        const requiredUploaded = this.requiredDocumentsUploaded();
+
+        if (!uploadedCount) return 'Aucun document fourni';
+        if (!requiredTotal) return 'Documents complets';
+        if (requiredUploaded >= requiredTotal) return 'Documents complets';
+        return 'Documents partiels';
+      },
+      documentSubmissionNote() {
+        if (this.documentsDeferred && !this.uploadedDocumentsCount()) {
+          return 'Pas de souci, vous pourrez les envoyer plus tard apres votre inscription.';
+        }
+        if (this.documentSubmissionStatus() === 'Documents partiels') {
+          return 'Vous avez deja transmis une partie des documents. Vous pourrez completer votre dossier plus tard.';
+        }
+        if (this.documentSubmissionStatus() === 'Documents complets') {
+          return 'Vos documents actuellement fournis accompagnent deja votre candidature.';
+        }
+        return 'Vous pouvez finaliser votre candidature maintenant et envoyer les documents plus tard si besoin.';
       },
       prettyValue(value, fallback = 'Non renseigne') {
         return value ? value : fallback;

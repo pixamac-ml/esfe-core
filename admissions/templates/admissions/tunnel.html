@@ -10,9 +10,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --tunnel-vh-offset: 100px;
+    --tunnel-vh-offset: 2rem;
+    --tunnel-mobile-nav-height: 96px;
   }
-  .admission-shell { font-family: 'Inter', sans-serif; }
+  .admission-shell {
+    font-family: 'Inter', sans-serif;
+    padding: 0;
+    margin: 0;
+  }
+  .tunnel-hero-compact {
+    margin: 0;
+  }
+  .tunnel-hero-compact + .admission-shell {
+    margin-top: 0;
+  }
   .tunnel-hero-compact section {
     padding-top: 2.75rem;
     padding-bottom: 2.75rem;
@@ -20,6 +31,28 @@
   .tunnel-hero-compact h1 {
     font-size: 1.85rem;
     line-height: 1.15;
+  }
+  .mobile-only {
+    display: none;
+  }
+  .desktop-only {
+    display: block;
+  }
+  .fade-in {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .fade-in.active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .mobile-cta {
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    padding: 12px;
+    background: #fff;
   }
   .ken-burns {
     animation: kenBurnsZoom 28s ease-in-out infinite alternate;
@@ -49,13 +82,31 @@
     50% { transform: translateY(-10px); opacity: 0.75; }
   }
   .tunnel-split {
+    position: relative;
+    isolation: isolate;
     height: auto;
-    min-height: 0;
+    min-height: 100vh;
+    overflow: visible;
   }
   .tunnel-media-pane,
   .tunnel-form-pane {
+    position: relative;
+    width: 100%;
+    height: auto;
     min-width: 0;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+  .tunnel-pane-layer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: visible;
   }
   .tunnel-step-shell {
     display: flex;
@@ -64,9 +115,13 @@
     min-height: 0;
   }
   .tunnel-scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
+    flex: 0 1 auto;
+    min-height: auto;
+    height: auto;
+    overflow: visible;
+    padding-right: 0.25rem;
+    padding-bottom: 0.5rem;
+    overscroll-behavior: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(30,79,111,0.35) rgba(148,163,184,0.18);
   }
@@ -82,7 +137,9 @@
     background: rgba(30,79,111,0.45);
   }
   .tunnel-scroll-y {
-    overflow-y: auto;
+    overflow-y: visible;
+    overflow-x: visible;
+    max-height: none;
     scrollbar-width: thin;
     scrollbar-color: rgba(30,79,111,0.35) rgba(148,163,184,0.18);
   }
@@ -112,7 +169,10 @@
     border-radius: 9999px;
     background: rgba(30,79,111,0.45);
   }
-  @media (min-width: 768px) {
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .admission-shell {
+      padding: 0;
+    }
     .tunnel-hero-compact section {
       padding-top: 2.25rem;
       padding-bottom: 2.25rem;
@@ -121,13 +181,50 @@
       font-size: 2rem;
     }
     .tunnel-split {
-      height: calc(100vh - var(--tunnel-vh-offset));
-      min-height: 620px;
+      display: flex;
+      flex-direction: row;
+      height: auto;
+      min-height: 100vh;
+      overflow: visible;
+    }
+    .tunnel-media-pane {
+      width: 40%;
+      flex: 0 0 40%;
+    }
+    .tunnel-form-pane {
+      width: 60%;
+      flex: 0 0 60%;
     }
   }
-  @media (min-width: 1280px) {
+  @media (min-width: 1025px) {
     .tunnel-split {
-      min-height: 680px;
+      height: calc(100vh - var(--tunnel-vh-offset));
+      min-height: calc(100vh - var(--tunnel-vh-offset));
+      overflow: hidden;
+    }
+    .tunnel-media-pane,
+    .tunnel-form-pane {
+      height: 100%;
+      overflow: hidden;
+    }
+    .tunnel-pane-layer {
+      height: 100%;
+      flex: 1 1 auto;
+      overflow: hidden;
+    }
+    .tunnel-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      height: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-bottom: 1rem;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tunnel-scroll-y {
+      overflow-y: auto;
+      overflow-x: hidden;
     }
   }
   .tunnel-nav {
@@ -136,12 +233,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    position: sticky;
-    bottom: 0;
+    position: static;
     z-index: 20;
-    padding-top: 0.8rem;
-    background: linear-gradient(to top, rgba(248,250,252,0.96), rgba(248,250,252,0.88) 65%, rgba(248,250,252,0));
-    backdrop-filter: blur(4px);
+    padding-top: 0;
+    padding-bottom: 0;
+    background: transparent;
+    backdrop-filter: none;
   }
   .tunnel-btn-prev {
     border-radius: 1rem;
@@ -159,6 +256,7 @@
   .tunnel-btn-next {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
     border-radius: 1rem;
     background: #1e4f6f;
@@ -173,9 +271,23 @@
     transform: translateY(-2px);
     background: #163a52;
   }
-  @media (max-width: 767px) {
+  @media (max-width: 768px) {
+    html,
+    body {
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
     :root {
-      --tunnel-vh-offset: 0px;
+      --tunnel-vh-offset: 1rem;
+    }
+    .mobile-only {
+      display: block;
+    }
+    .desktop-only {
+      display: none;
+    }
+    .admission-shell {
+      padding: 0;
     }
     .tunnel-hero-compact section {
       padding-top: 2rem;
@@ -186,27 +298,145 @@
       line-height: 1.2;
     }
     .tunnel-split {
-      min-height: auto;
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      min-height: 0;
+      overflow: visible;
+    }
+    .tunnel-media-pane,
+    .tunnel-form-pane {
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+    .tunnel-media-pane .tunnel-pane-layer {
+      min-height: 220px;
       height: auto;
     }
+    .tunnel-media-pane [x-show="step === 3"] > .absolute {
+      display: none;
+    }
+    .tunnel-media-pane img {
+      height: 100%;
+      width: 100%;
+      object-fit: cover;
+    }
+    .ken-burns,
+    .mesh-bg,
+    .float-word {
+      animation: none !important;
+    }
+    .tunnel-pane-layer,
+    .tunnel-step-shell,
+    .tunnel-btn-prev,
+    .tunnel-btn-next {
+      transition-duration: 0.3s !important;
+    }
     .tunnel-nav {
-      position: fixed;
-      left: 0;
-      right: 0;
+      position: sticky;
       bottom: 0;
-      margin-top: 0;
-      padding: 0.75rem 1rem calc(env(safe-area-inset-bottom) + 0.85rem);
-      background: linear-gradient(to top, rgba(248,250,252,0.98), rgba(248,250,252,0.92));
-      backdrop-filter: blur(8px);
-      box-shadow: 0 -6px 24px rgba(15,23,42,0.08);
+      margin-top: 0.75rem;
+      gap: 0.65rem;
+      width: 100%;
+      padding: 8px 0 0;
+      background: transparent;
+      backdrop-filter: none;
+      box-shadow: none;
+      z-index: 30;
+    }
+    .mobile-cta,
+    .tunnel-nav {
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+    .tunnel-nav > * {
+      flex: 1 1 0;
     }
     .tunnel-scroll {
-      padding-bottom: 6.2rem;
+      padding-bottom: 0.5rem;
+      padding-right: 0;
+      overflow: visible;
+      height: auto;
+      min-height: auto;
+    }
+    .tunnel-step-shell [class*='duration-700'],
+    .tunnel-step-shell [class*='duration-500'] {
+      transition-duration: 0.3s !important;
+    }
+    .tunnel-media-pane [x-show="step === 3"] {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      background: transparent;
+      padding: 0.25rem 0;
+    }
+    .tunnel-media-pane .school-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-height: 64px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 0.9rem;
+      background: #fff;
+      padding: 0.55rem 0.7rem;
+    }
+    .tunnel-media-pane .school-item > img {
+      width: 50px;
+      height: 50px;
+      border-radius: 0.6rem;
+      flex: 0 0 50px;
+      object-fit: cover;
+    }
+    .tunnel-media-pane .school-item > .absolute.inset-0 {
+      display: none;
+    }
+    .tunnel-media-pane .school-item > .absolute.left-3.bottom-3 {
+      position: static;
+      color: #1e4f6f;
+      margin: 0;
+    }
+    .tunnel-media-pane .school-item > .absolute.left-3.bottom-3 p:last-child {
+      color: #64748b;
+      margin-top: 0.2rem;
+    }
+    .tunnel-scroll > .space-y-3,
+    .tunnel-scroll > .space-y-5,
+    .tunnel-scroll > .space-y-6 {
+      gap: 0.75rem;
+    }
+    .tunnel-scroll .flex.flex-nowrap.items-center.gap-2 {
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tunnel-scroll .flex.flex-nowrap.items-center.gap-2 > button:first-child {
+      display: none;
+    }
+    #step3-formations-list,
+    #step3-documents-list {
+      border-radius: 1rem;
+      padding: 0.75rem;
+    }
+    #step3-formations-list [class*='grid-cols-'] {
+      grid-template-columns: 1fr !important;
     }
     .tunnel-btn-prev,
     .tunnel-btn-next {
+      width: 100%;
       padding-top: 0.7rem;
       padding-bottom: 0.7rem;
+    }
+  }
+  @media (min-width: 1600px) {
+    .tunnel-form-pane > .tunnel-pane-layer > .w-full {
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  }
+  @media (max-width: 768px) {
+    .school-item:nth-child(n+5) {
+      display: none;
     }
   }
   .htmx-fade-zone {
@@ -249,11 +479,11 @@
   {% include "admissions/partials/hero_admission.html" %}
 </div>
 
-<section class="admission-shell w-full overflow-hidden isolate min-h-screen" aria-label="Tunnel admission">
+<section class="admission-shell w-full isolate" aria-label="Tunnel admission">
   <form method="post"
         action="{% url 'admissions:admission_tunnel' %}"
         enctype="multipart/form-data"
-        class="w-full max-w-7xl mx-auto"
+        class="w-full"
         x-data="admissionTunnelData()">
     {% csrf_token %}
 
@@ -273,13 +503,17 @@
     <input type="hidden" name="branch_city" x-model="formData.branch_city">
     <input type="hidden" name="campus_image" x-model="formData.campus_image">
 
-    <div class="tunnel-split relative flex w-full flex-col md:flex-row overflow-hidden">
+    <div class="tunnel-split relative w-full flex flex-col md:grid md:gap-0 transition-all duration-500 ease-in-out"
+         :class="{
+           'md:grid-cols-2': step !== 4,
+           'md:grid-cols-[30%_70%]': step === 4
+         }">
       <div class="absolute top-0 left-0 h-[2px] w-full bg-[#1db5b0]/20 z-20">
         <div class="h-full bg-[#1db5b0] transition-all duration-700 ease-out" :style="`width: ${progressWidth()}%`"></div>
       </div>
 
-      <div class="tunnel-media-pane w-full relative overflow-hidden md:h-full"
-           :class="[step === 4 ? 'md:basis-[40%] md:max-w-[40%] xl:basis-[30%] xl:max-w-[30%] md:order-1' : 'md:basis-[40%] md:max-w-[40%] xl:basis-1/2 xl:max-w-1/2 md:order-1', step === 2 ? 'block' : 'hidden md:block']">
+      <div class="tunnel-media-pane w-full relative overflow-hidden"
+           :class="step === 2 ? 'md:order-2' : 'md:order-1'">
         <div x-show="step !== 2 && step !== 3"
              x-cloak
              x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
@@ -288,7 +522,7 @@
              x-transition:leave="transition duration-500 ease-in-out"
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 -translate-y-4"
-             class="absolute inset-0 bg-[#0f2f43] overflow-hidden">
+             class="tunnel-pane-layer bg-[#0f2f43] overflow-hidden">
           <img src="{% static 'images/lab_students.png' %}"
                alt="ESFE immersion"
                class="absolute inset-0 h-full w-full object-cover ken-burns [object-position:center_20%]">
@@ -316,10 +550,10 @@
              x-transition:leave="transition duration-500 ease-in-out"
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 -translate-y-4"
-             class="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0 bg-[#0f2f43]">
+             class="tunnel-pane-layer grid grid-cols-1 sm:grid-cols-2 auto-rows-fr gap-px bg-[#0f2f43]">
           {% for branch in branches|slice:":4" %}
           <button type="button"
-                  class="group relative overflow-hidden"
+                  class="school-item group relative overflow-hidden"
                   @click="formData.branch_id='{{ branch.id }}'; formData.branch_name='{{ branch.name|escapejs }}'; formData.branch_city='{{ branch.city|default:''|escapejs }}'; formData.campus_image='{% if branch.image %}{{ branch.image.url }}{% endif %}'"
                   :class="String(formData.branch_id) === '{{ branch.id }}' ? 'ring-2 ring-[#1db5b0] z-10' : ''">
             {% if branch.image %}
@@ -346,7 +580,7 @@
              x-transition:leave="transition duration-500 ease-in-out"
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 -translate-y-4"
-             class="absolute inset-0 bg-[rgba(29,181,176,0.05)] backdrop-blur-sm text-slate-900 flex items-stretch justify-center overflow-hidden p-4 sm:p-5 md:p-6 lg:p-7 xl:p-8">
+             class="tunnel-pane-layer bg-[rgba(29,181,176,0.05)] backdrop-blur-sm text-slate-900 flex items-stretch justify-center overflow-hidden p-4 sm:p-5 md:p-6 lg:p-7 xl:p-8">
           <div class="w-full">
             <div x-show="backendError" x-cloak class="mb-6 text-sm text-red-600" x-text="backendError"></div>
             {% include "admissions/partials/step2.html" %}
@@ -354,8 +588,8 @@
         </div>
       </div>
 
-      <div class="tunnel-form-pane w-full relative overflow-hidden flex-1"
-           :class="[step === 4 ? 'md:basis-[60%] md:max-w-[60%] xl:basis-[70%] xl:max-w-[70%] md:order-2' : 'md:basis-[60%] md:max-w-[60%] xl:basis-1/2 xl:max-w-1/2 md:order-2', step === 2 ? 'hidden md:block' : 'block']">
+      <div class="tunnel-form-pane w-full relative overflow-hidden"
+           :class="step === 2 ? 'md:order-1' : 'md:order-2'">
         <div x-show="step !== 2"
              x-cloak
              x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
@@ -364,7 +598,7 @@
              x-transition:leave="transition duration-500 ease-in-out"
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 -translate-y-4"
-             class="absolute inset-0 bg-[rgba(29,181,176,0.05)] backdrop-blur-sm text-slate-900 flex items-stretch justify-center overflow-hidden p-4 sm:p-5 md:p-6 lg:p-7 xl:p-8">
+             class="tunnel-pane-layer bg-[rgba(29,181,176,0.05)] backdrop-blur-sm text-slate-900 flex items-stretch justify-center overflow-hidden p-4 sm:p-5 md:p-6 lg:p-7 xl:p-8">
           <div class="w-full">
             <div x-show="backendError" x-cloak class="mb-6 text-sm text-red-600" x-text="backendError"></div>
 
@@ -411,7 +645,7 @@
              x-transition:leave="transition duration-500 ease-in-out"
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 -translate-y-4"
-             class="absolute inset-0 mesh-bg">
+             class="desktop-only tunnel-pane-layer mesh-bg">
           <div class="absolute inset-0 bg-gradient-to-tr from-[#1e4f6f]/45 via-transparent to-[#1db5b0]/20"></div>
           <div class="absolute inset-0 text-white/70 font-semibold tracking-wide">
             <span class="float-word absolute top-[18%] left-[12%] text-xl" data-aos="fade-up" data-aos-delay="120">Excellence</span>
@@ -434,6 +668,17 @@
 {% block extra_scripts %}
 {{ block.super }}
 <script>
+  window.syncAdmissionTunnelLayout = function () {
+    const root = document.documentElement;
+    const navbar = document.querySelector('[x-data^="navbarObserver"]');
+    const navbarHeight = navbar ? Math.ceil(navbar.getBoundingClientRect().height || 0) : 0;
+    const visibleNavs = Array.from(document.querySelectorAll('.tunnel-nav')).filter((node) => node.offsetParent !== null);
+    const mobileNavHeight = visibleNavs.reduce((max, node) => Math.max(max, Math.ceil(node.getBoundingClientRect().height || 0)), 0);
+
+    root.style.setProperty('--tunnel-vh-offset', `${Math.max(navbarHeight + 24, 32)}px`);
+    root.style.setProperty('--tunnel-mobile-nav-height', `${Math.max(mobileNavHeight, 96)}px`);
+  };
+
   window.admissionTunnelData = function () {
     return {
       step: {{ initial_step|default:1 }},
@@ -506,6 +751,9 @@
         if (target > this.step && !this.validateStep(this.step)) return;
         this.step = target;
         this.$nextTick(() => {
+          if (typeof window.syncAdmissionTunnelLayout === 'function') {
+            window.syncAdmissionTunnelLayout();
+          }
           if (window.AOS && typeof window.AOS.refresh === 'function') {
             window.AOS.refresh();
           }
@@ -545,6 +793,32 @@
       }
     };
   };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.syncAdmissionTunnelLayout === 'function') {
+      window.syncAdmissionTunnelLayout();
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if (typeof window.syncAdmissionTunnelLayout === 'function') {
+      window.syncAdmissionTunnelLayout();
+    }
+  });
+
+  document.body.addEventListener('htmx:afterSwap', (event) => {
+    if (!event.target || !['step3-formations-list', 'step3-documents-list'].includes(event.target.id)) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      if (typeof window.syncAdmissionTunnelLayout === 'function') {
+        window.syncAdmissionTunnelLayout();
+      }
+      if (window.AOS && typeof window.AOS.refresh === 'function') {
+        window.AOS.refresh();
+      }
+    });
+  });
 </script>
 {% endblock %}
 {% endblock %}

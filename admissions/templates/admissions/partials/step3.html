@@ -16,11 +16,11 @@
         <p class="text-sm text-slate-600" data-aos="fade-up" data-aos-delay="200">Quel campus ESFE deviendra votre prochain foyer ?</p>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2" data-aos="fade-up" data-aos-delay="300">
+      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2" data-aos="fade-up" data-aos-delay="300" data-field="branch_id">
         {% for branch in branches %}
         <button type="button"
                 class="rounded-2xl border px-4 py-3 text-left transition"
-                :class="String(formData.branch_id) === '{{ branch.id }}' ? 'border-[#1db5b0] bg-[#1db5b0]/10 ring-1 ring-[#1db5b0]/35' : 'border-slate-200 hover:border-[#1db5b0]/60'"
+                :class="String(formData.branch_id) === '{{ branch.id }}' ? 'border-[#1db5b0] bg-[#1db5b0]/10 ring-1 ring-[#1db5b0]/35' : (errors.branch_id ? 'border-red-400 ring-1 ring-red-300/60' : 'border-slate-200 hover:border-[#1db5b0]/60')"
                 @click="formData.branch_id='{{ branch.id }}'; formData.branch_name='{{ branch.name|escapejs }}'; formData.branch_city='{{ branch.city|default:''|escapejs }}'; formData.campus_image='{% if branch.image %}{{ branch.image.url }}{% endif %}'; formData.formation=''; formData.formation_slug=''; activeCycle = formData.current_level || activeCycle || 'all'; errors.documents=''; subStep = 'program'; step3Phase = 'program';"
                 hx-get="{% url 'admissions:admission_step3_formations' %}"
                 hx-vals='{"branch_id": "{{ branch.id }}"}'
@@ -75,11 +75,11 @@
 
       <div class="relative" data-aos="fade-up" data-aos-delay="300">
         <span id="step3-formations-loading" class="htmx-indicator htmx-loading-indicator" aria-hidden="true"></span>
-        <div id="step3-formations-list" class="htmx-fade-zone rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-include="[name='branch_id'],[name='current_level']" hx-trigger="admission-step-3 from:body" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">
+        <div id="step3-formations-list" data-field="formation_slug" class="htmx-fade-zone rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-include="[name='branch_id'],[name='current_level']" hx-trigger="admission-step-3 from:body" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">
           Selectionnez un campus pour afficher ses formations.
         </div>
       </div>
-      <p x-show="errors.formation_slug" x-cloak class="mt-2 text-xs text-red-600" x-text="errors.formation_slug"></p>
+      <p x-show="errors.branch_id || errors.formation_slug" x-cloak class="mt-2 text-xs text-red-600" x-text="errors.branch_id || errors.formation_slug"></p>
       </div>
 
       <div class="tunnel-nav" data-aos="fade-up" data-aos-delay="300">
@@ -104,7 +104,7 @@
       <div class="space-y-3">
         <p class="text-xs uppercase tracking-[0.25em] text-[#1db5b0] font-semibold" data-aos="fade-up" data-aos-delay="200">Documents</p>
         <h2 class="text-2xl md:text-3xl lg:text-4xl font-extrabold text-[#1e4f6f] leading-tight" data-aos="fade-up" data-aos-delay="100">Televersez vos pieces justificatives.</h2>
-        <p class="text-sm text-slate-600" data-aos="fade-up" data-aos-delay="200">Ajoutez tous les documents obligatoires pour la formation selectionnee avant de finaliser votre candidature.</p>
+        <p class="text-sm text-slate-600" data-aos="fade-up" data-aos-delay="200">Ajoutez vos documents maintenant si vous les avez. Vous pourrez completer le dossier apres votre inscription.</p>
       </div>
 
       <div class="relative" data-aos="fade-up" data-aos-delay="300">
@@ -120,7 +120,7 @@
         </div>
       </div>
 
-      <p x-show="errors.documents" x-cloak class="mt-2 text-xs text-red-600" x-text="errors.documents"></p>
+      <p x-show="errors.documents" x-cloak data-field="documents" class="mt-2 text-xs text-red-600" x-text="errors.documents"></p>
       <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
         <button type="button"
                 class="font-semibold text-[#1e4f6f] transition hover:text-[#1db5b0]"

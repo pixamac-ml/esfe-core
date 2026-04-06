@@ -79,6 +79,9 @@ def admission_tunnel(request):
     branches = Branch.objects.filter(is_active=True, accepts_online_registration=True).order_by("name")
     form_data = _default_form_data()
     backend_error = ""
+    backend_errors = {}
+    backend_error_step = 1
+    backend_error_field = ""
     initial_step = 1
     initial_step3_phase = "school"
 
@@ -107,20 +110,29 @@ def admission_tunnel(request):
             initial_step3_phase = "program"
 
         required_fields = [
-            "last_name",
-            "first_name",
-            "city",
-            "email",
-            "phone",
-            "birth_date",
-            "gender",
-            "current_level",
-            "formation_slug",
-            "branch_id",
+            ("last_name", "Le champ nom est obligatoire.", 1),
+            ("first_name", "Le champ prenom est obligatoire.", 1),
+            ("city", "Veuillez renseigner votre ville d'origine.", 1),
+            ("email", "Le champ email est obligatoire.", 2),
+            ("phone", "Veuillez renseigner votre numero de telephone.", 2),
+            ("birth_date", "Veuillez renseigner votre date de naissance.", 2),
+            ("current_level", "Veuillez selectionner votre niveau d'etudes.", 2),
+            ("branch_id", "Veuillez selectionner un campus.", 3),
+            ("formation_slug", "Veuillez selectionner une formation.", 3),
         ]
-        missing_fields = [field for field in required_fields if not form_data.get(field)]
-        if missing_fields:
-            backend_error = "Des informations obligatoires manquent. Merci de verifier les etapes precedentes."
+
+        for field_name, field_message, step_no in required_fields:
+            if not form_data.get(field_name):
+                backend_errors[field_name] = field_message
+                if not backend_error:
+                    backend_error = f"Etape {step_no} : {field_message}"
+                    backend_error_step = step_no
+                    backend_error_field = field_name
+
+        if backend_errors:
+            initial_step = backend_error_step
+            if backend_error_step == 3:
+                initial_step3_phase = "school" if backend_error_field == "branch_id" else "program"
         else:
             programme = Programme.objects.filter(is_active=True, slug=form_data["formation_slug"]).first()
             branch = Branch.objects.filter(
@@ -129,12 +141,53 @@ def admission_tunnel(request):
                 accepts_online_registration=True,
             ).first()
             if not programme or not branch:
-                backend_error = "Impossible de finaliser la candidature. Formation ou annexe indisponible."
+                if not branch:
+                    backend_errors["branch_id"] = "Le campus selectionne n'est plus disponible."
+                    backend_error = f"Etape 3 : {backend_errors['branch_id']}"
+                    backend_error_step = 3
+                    backend_error_field = "branch_id"
+                    initial_step3_phase = "school"
+                if not programme:
+                    backend_errors["formation_slug"] = "La formation selectionnee n'est plus disponible."
+                    if not backend_error:
+                        backend_error = f"Etape 3 : {backend_errors['formation_slug']}"
+                        backend_error_step = 3
+                        backend_error_field = "formation_slug"
+                    initial_step3_phase = "program"
                 initial_step = 3
-                initial_step3_phase = "program"
             else:
                 academic_year_start = timezone.now().year
                 entry_year = 4 if form_data["current_level"].lower() == "master" else 1
+                email_in_use = Candidature.objects.filter(
+                    email__iexact=form_data["email"],
+                    programme=programme,
+                    academic_year=f"{academic_year_start}-{academic_year_start + 1}",
+                ).exists()
+                if email_in_use:
+                    backend_errors["email"] = "Cette adresse email est deja utilisee pour cette formation cette annee."
+                    backend_error = f"Etape 2 : {backend_errors['email']}"
+                    backend_error_step = 2
+                    backend_error_field = "email"
+                    initial_step = 2
+                    initial_step3_phase = "program"
+                    formation_cards = []
+                    return render(
+                        request,
+                        "admissions/tunnel.html",
+                        {
+                            "formation_cards": formation_cards,
+                            "selected_cycle": cycle_filter,
+                            "branches": branches,
+                            "initial_form_json": json.dumps(form_data),
+                            "initial_step": initial_step,
+                            "initial_step3_phase": initial_step3_phase,
+                            "backend_error": backend_error,
+                            "backend_errors_json": json.dumps(backend_errors),
+                            "backend_error_step": backend_error_step,
+                            "backend_error_field": backend_error_field,
+                        },
+                    )
+
                 programme_documents = programme.required_documents.select_related("document")
                 uploaded_documents = []
 
@@ -172,7 +225,12 @@ def admission_tunnel(request):
                     messages.success(request, "Votre candidature a ete enregistree avec succes.")
                     return redirect("admissions:done", candidature_id=candidature.id)
                 except IntegrityError:
-                    backend_error = "Une candidature existe deja avec cet email pour cette formation et cette annee."
+                    backend_errors["email"] = "Cette adresse email est deja utilisee pour cette formation cette annee."
+                    backend_error = f"Etape 2 : {backend_errors['email']}"
+                    backend_error_step = 2
+                    backend_error_field = "email"
+                    initial_step = 2
+                    initial_step3_phase = "program"
                 except Exception:
                     backend_error = "Une erreur technique est survenue. Reessayez dans un instant."
                     initial_step = 3
@@ -190,6 +248,9 @@ def admission_tunnel(request):
             "initial_step": initial_step,
             "initial_step3_phase": initial_step3_phase,
             "backend_error": backend_error,
+            "backend_errors_json": json.dumps(backend_errors),
+            "backend_error_step": backend_error_step,
+            "backend_error_field": backend_error_field,
         },
     )
 

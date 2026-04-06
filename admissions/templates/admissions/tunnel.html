@@ -490,7 +490,9 @@
         action="{% url 'admissions:admission_tunnel' %}"
         enctype="multipart/form-data"
         class="w-full"
-        x-data="admissionTunnelData()">
+        x-data="admissionTunnelData()"
+        x-init="init()"
+        @submit.prevent="submitForm($event)">
     {% csrf_token %}
 
     <input type="hidden" name="last_name" x-model="formData.last_name">
@@ -690,8 +692,12 @@
       step: {{ initial_step|default:1 }},
       step3Phase: '{{ initial_step3_phase|default:"school"|escapejs }}',
       errors: {},
+      backendErrors: JSON.parse('{{ backend_errors_json|default:"{}"|escapejs }}'),
       backendError: '{{ backend_error|default:""|escapejs }}',
+      backendErrorStep: {{ backend_error_step|default:1 }},
+      backendErrorField: '{{ backend_error_field|default:""|escapejs }}',
       documentsDeferred: false,
+      documentsRefreshTick: 0,
       activeCycle: '{{ selected_cycle|default:"all"|escapejs }}',
       formData: Object.assign({
         last_name: '',
@@ -710,6 +716,124 @@
         branch_city: '',
         campus_image: ''
       }, JSON.parse('{{ initial_form_json|default:"{}"|escapejs }}')),
+      fieldStep(fieldName) {
+        const fieldToStep = {
+          last_name: 1,
+          first_name: 1,
+          city: 1,
+          email: 2,
+          phone: 2,
+          birth_date: 2,
+          current_level: 2,
+          branch_id: 3,
+          formation_slug: 3,
+          documents: 3,
+        };
+        return fieldToStep[fieldName] || 1;
+      },
+      fieldSelector(fieldName) {
+        const selectors = {
+          last_name: '[data-field="last_name"]',
+          first_name: '[data-field="first_name"]',
+          city: '[data-field="city"]',
+          email: '[data-field="email"]',
+          phone: '[data-field="phone"]',
+          birth_date: '[data-field="birth_date"]',
+          current_level: '[data-field="current_level"]',
+          branch_id: '[data-field="branch_id"]',
+          formation_slug: '[data-field="formation_slug"]',
+          documents: '[data-field="documents"]',
+        };
+        return selectors[fieldName] || '';
+      },
+      firstErrorField() {
+        const order = [
+          'last_name',
+          'first_name',
+          'city',
+          'email',
+          'phone',
+          'birth_date',
+          'current_level',
+          'branch_id',
+          'formation_slug',
+          'documents',
+        ];
+        return order.find((key) => this.errors[key]);
+      },
+      syncStep3PhaseFromError(fieldName) {
+        if (fieldName === 'branch_id') {
+          this.step3Phase = 'school';
+          return;
+        }
+        if (fieldName === 'formation_slug' || fieldName === 'documents') {
+          this.step3Phase = this.formData.branch_id ? 'program' : 'school';
+        }
+      },
+      scrollToFieldError(fieldName) {
+        const selector = this.fieldSelector(fieldName);
+        if (!selector) return;
+        const target = document.querySelector(selector);
+        if (!target) return;
+
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const focusable = target.matches('input,select,textarea,button')
+          ? target
+          : target.querySelector('input,select,textarea,button');
+        if (focusable && typeof focusable.focus === 'function') {
+          focusable.focus({ preventScroll: true });
+        }
+      },
+      revealFirstError() {
+        const fieldName = this.firstErrorField();
+        if (!fieldName) return;
+        const stepNo = this.fieldStep(fieldName);
+        if (stepNo === 3) {
+          this.syncStep3PhaseFromError(fieldName);
+        }
+        this.step = stepNo;
+        this.$nextTick(() => {
+          this.scrollToFieldError(fieldName);
+        });
+      },
+      clearErrorsForStep(stepNo) {
+        const fieldsByStep = {
+          1: ['last_name', 'first_name', 'city'],
+          2: ['email', 'phone', 'birth_date', 'current_level'],
+          3: ['branch_id', 'formation_slug', 'documents'],
+        };
+        (fieldsByStep[stepNo] || []).forEach((fieldName) => {
+          delete this.errors[fieldName];
+        });
+      },
+      init() {
+        if (this.backendErrors && Object.keys(this.backendErrors).length) {
+          this.errors = Object.assign({}, this.backendErrors);
+          if (this.backendErrorField) {
+            this.syncStep3PhaseFromError(this.backendErrorField);
+          }
+          this.$nextTick(() => {
+            this.revealFirstError();
+          });
+        }
+
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+          if (!event.target || event.target.id !== 'step3-documents-list') {
+            return;
+          }
+          this.documentsRefreshTick += 1;
+        });
+
+        document.body.addEventListener('change', (event) => {
+          if (!event.target || !event.target.matches('#step3-documents-list input[type=file]')) {
+            return;
+          }
+          this.documentsRefreshTick += 1;
+          if (event.target.files && event.target.files.length > 0) {
+            this.documentsDeferred = false;
+          }
+        });
+      },
       isStepComplete(stepNo) {
         if (stepNo === 1) return this.formData.last_name && this.formData.first_name && this.formData.city;
         if (stepNo === 2) return this.formData.email && this.formData.phone && this.formData.birth_date && this.formData.current_level;
@@ -717,28 +841,52 @@
         return true;
       },
       validateStep(stepNo) {
-        this.errors = {};
+        this.clearErrorsForStep(stepNo);
+        const fieldsByStep = {
+          1: ['last_name', 'first_name', 'city'],
+          2: ['email', 'phone', 'birth_date', 'current_level'],
+          3: ['branch_id', 'formation_slug', 'documents'],
+        };
         if (stepNo === 1) {
-          if (!this.formData.last_name) this.errors.last_name = 'Le nom est obligatoire.';
-          if (!this.formData.first_name) this.errors.first_name = 'Le prenom est obligatoire.';
-          if (!this.formData.city) this.errors.city = 'La ville d\'origine est obligatoire.';
+          if (!this.formData.last_name) this.errors.last_name = 'Le champ nom est obligatoire.';
+          if (!this.formData.first_name) this.errors.first_name = 'Le champ prenom est obligatoire.';
+          if (!this.formData.city) this.errors.city = 'Veuillez renseigner votre ville d\'origine.';
         }
         if (stepNo === 2) {
-          if (!this.formData.email) this.errors.email = 'L\'email est obligatoire.';
-          if (!this.formData.phone) this.errors.phone = 'Le telephone est obligatoire.';
-          if (!this.formData.birth_date) this.errors.birth_date = 'La date de naissance est obligatoire.';
-          if (!this.formData.current_level) this.errors.current_level = 'Le niveau actuel est obligatoire.';
+          if (!this.formData.email) this.errors.email = 'Le champ email est obligatoire.';
+          if (!this.formData.phone) this.errors.phone = 'Veuillez renseigner votre numero de telephone.';
+          if (!this.formData.birth_date) this.errors.birth_date = 'Veuillez renseigner votre date de naissance.';
+          if (!this.formData.current_level) this.errors.current_level = 'Veuillez selectionner votre niveau d\'etudes.';
         }
         if (stepNo === 3 && !this.formData.branch_id) {
-          this.errors.formation_slug = 'Veuillez d\'abord choisir un campus puis une formation.';
-        } else if (stepNo === 3 && !this.formData.formation_slug) {
+          this.errors.branch_id = 'Veuillez selectionner un campus.';
+        }
+        if (stepNo === 3 && !this.formData.formation_slug) {
           this.errors.formation_slug = 'Veuillez choisir une formation.';
         }
-        return Object.keys(this.errors).length === 0;
+        return !(fieldsByStep[stepNo] || []).some((fieldName) => Boolean(this.errors[fieldName]));
+      },
+      submitForm(event) {
+        this.backendError = '';
+        this.errors = {};
+
+        if (!this.validateStep(1) || !this.validateStep(2) || !this.validateStep(3)) {
+          this.revealFirstError();
+          return;
+        }
+
+        if (!this.uploadedDocumentsCount()) {
+          this.documentsDeferred = true;
+        }
+
+        event.target.submit();
       },
       goTo(target) {
         if (target < 1 || target > 4) return;
-        if (target > this.step && !this.validateStep(this.step)) return;
+        if (target > this.step && !this.validateStep(this.step)) {
+          this.revealFirstError();
+          return;
+        }
         this.step = target;
         this.$nextTick(() => {
           if (typeof window.syncAdmissionTunnelLayout === 'function') {
@@ -773,9 +921,11 @@
           : 'top-4 text-sm text-slate-500 peer-focus:-top-2 peer-focus:text-xs peer-focus:text-[#1e4f6f]';
       },
       allDocumentInputs() {
+        this.documentsRefreshTick;
         return Array.from(document.querySelectorAll('#step3-documents-list input[type=file]'));
       },
       requiredDocumentInputs() {
+        this.documentsRefreshTick;
         return Array.from(document.querySelectorAll('#step3-documents-list input[type=file][data-required="1"]'));
       },
       uploadedDocumentsCount() {
@@ -803,16 +953,16 @@
         return 'Documents partiels';
       },
       documentSubmissionNote() {
-        if (this.documentsDeferred && !this.uploadedDocumentsCount()) {
-          return 'Pas de souci, vous pourrez les envoyer plus tard apres votre inscription.';
+        if (!this.uploadedDocumentsCount()) {
+          return 'Vous pourrez completer vos documents apres votre inscription.';
         }
         if (this.documentSubmissionStatus() === 'Documents partiels') {
-          return 'Vous avez deja transmis une partie des documents. Vous pourrez completer votre dossier plus tard.';
+          return 'Documents partiels enregistres. Vous pourrez completer votre dossier apres votre inscription.';
         }
         if (this.documentSubmissionStatus() === 'Documents complets') {
           return 'Vos documents actuellement fournis accompagnent deja votre candidature.';
         }
-        return 'Vous pouvez finaliser votre candidature maintenant et envoyer les documents plus tard si besoin.';
+        return 'Vous pourrez completer vos documents apres votre inscription.';
       },
       prettyValue(value, fallback = 'Non renseigne') {
         return value ? value : fallback;

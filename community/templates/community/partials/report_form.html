@@ -1,6 +1,6 @@
 <!-- community/templates/community/partials/report_form.html -->
 
-<div class="bg-white rounded-2xl border border-red-100 shadow-lg p-6 max-w-md mx-auto">
+<div class="bg-white rounded-2xl border border-red-100 shadow-lg p-5 sm:p-6 max-w-md mx-auto">
     <!-- Header -->
     <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
         <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
@@ -20,15 +20,15 @@
         </div>
     </div>
 
-    <!-- Formulaire -->
-    <form
-        {% if content_type == "topic" %}
-            hx-post="{% url 'community:report_topic' topic.slug %}"
-        {% else %}
-            hx-post="{% url 'community:report_answer' answer.id %}"
-        {% endif %}
-        hx-swap="outerHTML"
-        class="space-y-4">
+    {% if content_type == "topic" %}
+    <form hx-post="{% url 'community:report_topic' topic.slug %}"
+          hx-swap="outerHTML"
+          class="space-y-5 [&_select]:w-full [&_textarea]:w-full [&_select]:rounded-xl [&_textarea]:rounded-xl [&_select]:border [&_textarea]:border [&_select]:border-gray-300 [&_textarea]:border-gray-300 [&_select]:px-4 [&_textarea]:px-4 [&_select]:py-3 [&_textarea]:py-3 [&_select]:text-sm [&_textarea]:text-sm [&_select]:focus:outline-none [&_textarea]:focus:outline-none [&_select]:focus:ring-2 [&_textarea]:focus:ring-2 [&_select]:focus:ring-red-200 [&_textarea]:focus:ring-red-200 [&_select]:focus:border-red-400 [&_textarea]:focus:border-red-400">
+    {% else %}
+    <form hx-post="{% url 'community:report_answer' answer.id %}"
+          hx-swap="outerHTML"
+          class="space-y-5 [&_select]:w-full [&_textarea]:w-full [&_select]:rounded-xl [&_textarea]:rounded-xl [&_select]:border [&_textarea]:border [&_select]:border-gray-300 [&_textarea]:border-gray-300 [&_select]:px-4 [&_textarea]:px-4 [&_select]:py-3 [&_textarea]:py-3 [&_select]:text-sm [&_textarea]:text-sm [&_select]:focus:outline-none [&_textarea]:focus:outline-none [&_select]:focus:ring-2 [&_textarea]:focus:ring-2 [&_select]:focus:ring-red-200 [&_textarea]:focus:ring-red-200 [&_select]:focus:border-red-400 [&_textarea]:focus:border-red-400">
+    {% endif %}
 
         {% csrf_token %}
 
@@ -39,7 +39,7 @@
             </label>
             {{ form.reason }}
             {% if form.reason.errors %}
-                <p class="text-red-500 text-xs mt-1">{{ form.reason.errors.0 }}</p>
+                <p class="text-red-600 text-xs mt-1.5">{{ form.reason.errors.0 }}</p>
             {% endif %}
         </div>
 
@@ -57,20 +57,21 @@
         </div>
 
         <!-- Actions -->
-        <div class="flex gap-3 pt-2">
+        <div class="flex flex-col sm:flex-row gap-3 pt-2">
             <button
                 type="button"
-                onclick="this.closest('[hx-post]').remove()"
-                class="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium
+                onclick="this.form.remove()"
+                class="w-full sm:flex-1 px-4 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium
                        hover:bg-gray-50 transition-all duration-200">
                 Annuler
             </button>
             <button
                 type="submit"
-                class="flex-1 px-4 py-3 rounded-xl bg-red-600 text-white font-medium
+                class="w-full sm:flex-1 px-4 py-3 rounded-xl bg-red-600 text-white font-medium
                        hover:bg-red-700 transition-all duration-200">
                 Envoyer le signalement
             </button>
         </div>
     </form>
 </div>
+

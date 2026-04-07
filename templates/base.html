@@ -66,6 +66,17 @@
     display: none !important;
 }
 
+:root {
+    --esfe-radius: 1.5rem;
+    --esfe-border-soft: rgba(226, 232, 240, 0.82);
+    --esfe-shadow-soft: 0 18px 50px -32px rgba(15, 23, 42, 0.24);
+    --esfe-shadow-premium: 0 28px 80px -42px rgba(15, 23, 42, 0.38);
+}
+
+main {
+    position: relative;
+}
+
 /* ================= ANIMATIONS ================= */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(6px); }
@@ -93,7 +104,7 @@
 
 .topic-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 0.75rem 1.5rem rgba(0,0,0,.08);
+    box-shadow: var(--esfe-shadow-soft);
 }
 
 .topic-title:hover {
@@ -109,7 +120,7 @@
 }
 
 .topic-detail-card:hover {
-    box-shadow: 0 1rem 2rem rgba(0,0,0,.06);
+    box-shadow: var(--esfe-shadow-soft);
 }
 
 .topic-content {
@@ -122,7 +133,15 @@
 }
 
 .answer-card:hover {
-    box-shadow: 0 1rem 2rem rgba(0,0,0,.06);
+    box-shadow: var(--esfe-shadow-soft);
+}
+
+.news-card,
+.topic-card,
+.topic-detail-card,
+.answer-card {
+    border-color: var(--esfe-border-soft);
+    box-shadow: var(--esfe-shadow-soft);
 }
 
 .answer-content {
@@ -152,9 +171,101 @@
     transform: translateY(-10px) scale(1.08);
     box-shadow: 0 10px 30px rgba(29, 181, 176, 0.35);
 }
+
+.esfe-floating-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.esfe-floating-panel {
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    box-shadow: 0 18px 50px -28px rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(12px);
+}
+
+.esfe-fab {
+    width: 3.1rem;
+    height: 3.1rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+    box-shadow: 0 12px 34px -18px rgba(15, 23, 42, 0.5);
+}
+
+.esfe-fab:hover {
+    transform: scale(1.06);
+    filter: brightness(1.05);
+}
+
+.esfe-fab--social { background: linear-gradient(135deg, #1e40af, #0f766e); }
+.esfe-fab--assistant { background: linear-gradient(135deg, #7c3aed, #1e40af); animation: esfeAssistantFloat 4s ease-in-out infinite, esfeAssistantPulse 4s ease-in-out infinite; }
+.esfe-fab--rocket { background: linear-gradient(135deg, #0f172a, #334155); }
+.esfe-fab--whatsapp { background: #25d366; animation: esfeFabIn 0.45s ease-out; }
+
+.esfe-social-orb {
+    width: 2.55rem;
+    height: 2.55rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: 0 12px 30px -18px rgba(15, 23, 42, 0.45);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.esfe-social-orb:hover {
+    transform: scale(1.08);
+    box-shadow: 0 16px 36px -14px rgba(30, 64, 175, 0.42);
+}
+
+.esfe-tooltip {
+    position: absolute;
+    right: calc(100% + 0.7rem);
+    white-space: nowrap;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    font-size: 0.72rem;
+    padding: 0.32rem 0.7rem;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.group:hover .esfe-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes esfeAssistantPulse {
+    0%, 100% { box-shadow: 0 12px 34px -18px rgba(15, 23, 42, 0.5); }
+    50% { box-shadow: 0 16px 40px -14px rgba(124, 58, 237, 0.55); }
+}
+
+@keyframes esfeAssistantFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+@keyframes esfeFabIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+    .esfe-fab { width: 2.8rem; height: 2.8rem; }
+    .esfe-social-orb { width: 2.35rem; height: 2.35rem; }
+}
 </style>
 
-<body class="min-h-screen flex flex-col bg-gray-50 text-gray-800 font-roboto antialiased overflow-x-hidden"
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-roboto antialiased overflow-x-hidden"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
   <!-- ================= GLOBAL TOAST SYSTEM ================= -->
@@ -167,7 +278,7 @@
          x-show="show"
          x-transition
          x-init="setTimeout(() => show = false, 4000)"
-         class="flex items-start gap-3 p-4 rounded-xl shadow-xl border
+         class="flex items-start gap-3 p-4 rounded-2xl shadow-float border backdrop-blur-xl
                 {% if message.tags == 'success' %}
                 bg-green-50 border-green-200 text-green-700
                 {% elif message.tags == 'error' %}
@@ -206,7 +317,7 @@
       style="display: none;"
   >
     <div
-        class="rounded-xl shadow-lg overflow-hidden"
+        class="rounded-[1.4rem] shadow-float overflow-hidden border border-white/10 backdrop-blur-xl"
         :class="{
             'bg-secondary text-white': type === 'success',
             'bg-accent text-white': type === 'warning',
@@ -313,13 +424,28 @@
   </script>
 
   <script>
-  function smartRocketWidget() {
+  function esfeFloatingUi() {
     return {
-      open: false,
+      socialOpen: false,
+      assistantOpen: false,
       launched: false,
-      launchToTop() {
+      showTop: false,
+      init() {
+        const syncScrollState = () => {
+          this.showTop = window.scrollY > 320;
+        };
+        syncScrollState();
+        window.addEventListener('scroll', syncScrollState, { passive: true });
+      },
+      toggleSocial() {
+        this.socialOpen = !this.socialOpen;
+      },
+      toggleAssistant() {
+        this.assistantOpen = !this.assistantOpen;
+      },
+      scrollToTop() {
         this.launched = true;
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         setTimeout(() => { this.launched = false; }, 700);
       }
     }
@@ -334,8 +460,8 @@
 
   <!-- ================= NAVBAR ================= -->
   {% block public_navbar %}
-  <div x-data="navbarObserver()" x-init="init()" class="left-0 w-full z-50 transition-all duration-300"
-       :class="scrolled ? 'fixed top-0 backdrop-blur-md bg-primary-500/85 shadow-md' : 'absolute top-0 bg-transparent'">
+  <div x-data="navbarObserver()" x-init="init()" class="left-0 w-full z-[80] transition-all duration-300"
+       :class="scrolled ? 'fixed top-0 border-b border-white/10 bg-primary-900/72 backdrop-blur-md shadow-[0_16px_40px_-30px_rgba(15,23,42,0.55)]' : 'sticky top-0 border-b border-primary-700/40 bg-primary-700 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.4)]'">
     <div x-show="visible"
          x-cloak
          x-transition:enter="transition ease-out duration-300"
@@ -356,47 +482,62 @@
   </main>
 
   {% block public_floating_widget %}
-  {% if site_configuration and site_configuration.smart_rocket_enabled %}
-      <div x-data="smartRocketWidget()" class="fixed bottom-6 right-4 sm:right-6 z-[70] flex flex-col items-end gap-3">
-    <div x-show="open" x-transition @click.outside="open = false"
-         x-cloak
-         class="w-80 rounded-2xl shadow-2xl border border-slate-200 bg-white overflow-hidden">
-      <div class="px-4 py-3 bg-primary-700 text-white flex items-center justify-between">
-        <div class="text-sm font-semibold">{{ site_configuration.smart_rocket_title }}</div>
-        <button @click="open = false" class="text-white/80 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-      <div class="p-4 space-y-3">
-        <p class="text-sm text-slate-600">{{ site_configuration.smart_rocket_message }}</p>
-        <a href="{% url 'admissions:admission_tunnel' %}" class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm">
-          <i class="fa-solid fa-file-signature text-secondary"></i>
-          Postuler
-        </a>
-        <a href="/community/" class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm">
-          <i class="fa-regular fa-circle-question text-secondary"></i>
-          Questions frequentes
-        </a>
-        <a href="/contact/" class="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 text-sm">
-          <i class="fa-regular fa-envelope text-secondary"></i>
-          Contact
-        </a>
-      </div>
+  <div x-data="esfeFloatingUi()" x-init="init()" class="pointer-events-none fixed inset-0 z-[74]">
+    <div class="pointer-events-auto fixed left-4 sm:left-6 bottom-6 sm:bottom-8 z-[74] esfe-floating-stack" @click.outside="socialOpen = false">
+      <a href="https://instagram.com/esfe_officiel" x-show="socialOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3" style="transition-delay: 0ms" target="_blank" rel="noopener noreferrer" aria-label="Instagram ESFé esfe_officiel" title="Instagram • esfe_officiel" class="esfe-social-orb bg-gradient-to-br from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]"><i class="fa-brands fa-instagram"></i></a>
+      <a href="https://youtube.com/@esfe_tv" x-show="socialOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3" style="transition-delay: 65ms" target="_blank" rel="noopener noreferrer" aria-label="YouTube ESFé esfe_tv" title="YouTube • @esfe_tv" class="esfe-social-orb bg-[#FF0000]"><i class="fa-brands fa-youtube"></i></a>
+      <a href="https://www.facebook.com/" x-show="socialOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3" style="transition-delay: 120ms" target="_blank" rel="noopener noreferrer" aria-label="Facebook ESFé" title="Facebook • École de Santé Félix Houphouët Boigny Mali" class="esfe-social-orb bg-[#1877F2]"><i class="fa-brands fa-facebook-f"></i></a>
+      <a href="https://tiktok.com/@esfe_officiel" x-show="socialOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3" style="transition-delay: 180ms" target="_blank" rel="noopener noreferrer" aria-label="TikTok ESFé esfe_officiel" title="TikTok • esfe_officiel" class="esfe-social-orb bg-slate-950"><i class="fa-brands fa-tiktok"></i></a>
+      <button type="button" @click="toggleSocial()" :aria-expanded="socialOpen" aria-label="Ouvrir les réseaux sociaux ESFé" class="group esfe-fab esfe-fab--social">
+        <i class="fa-solid text-lg" :class="socialOpen ? 'fa-xmark' : 'fa-share-nodes'"></i>
+      </button>
     </div>
 
-    <div class="flex items-center gap-2">
-      <button @click="open = !open"
-              class="h-12 w-12 rounded-full bg-white border border-slate-200 shadow-lg hover:shadow-xl transition">
-        <i class="fa-regular fa-comments text-primary-700"></i>
+    <div class="pointer-events-auto fixed right-4 sm:right-6 bottom-6 sm:bottom-8 z-[74] esfe-floating-stack items-end" @click.outside="assistantOpen = false">
+      <div x-show="assistantOpen"
+           x-cloak
+           x-transition:enter="transition ease-out duration-300"
+           x-transition:enter-start="opacity-0 translate-y-3"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           x-transition:leave="transition ease-in duration-200"
+           x-transition:leave-start="opacity-100 translate-y-0"
+           x-transition:leave-end="opacity-0 translate-y-3"
+           class="esfe-floating-panel w-[18rem] sm:w-[20rem] overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-primary-700 to-secondary text-white">
+          <p class="text-xs uppercase tracking-[0.22em] text-white/70">Assistant IA</p>
+          <h3 class="text-sm font-semibold mt-1">Assistant IA ESFé</h3>
+          <p class="text-xs text-white/80 mt-1">Guidage rapide pour admissions, contact et informations utiles.</p>
+        </div>
+        <div class="p-4 space-y-2.5 text-sm text-slate-700">
+          <a href="{% url 'admissions:admission_tunnel' %}" class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition">
+            <i class="fa-solid fa-file-signature text-secondary"></i>
+            Commencer une candidature
+          </a>
+          <a href="{% url 'core:contact' %}" class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition">
+            <i class="fa-regular fa-envelope text-secondary"></i>
+            Contacter l'administration
+          </a>
+          <a href="https://wa.me/22397672087?text=Bonjour%2C%20je%20souhaite%20obtenir%20des%20informations%20sur%20les%20inscriptions%20%C3%A0%20l%E2%80%99ESF%C3%A9." target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition">
+            <i class="fa-brands fa-whatsapp text-secondary"></i>
+            Échanger sur WhatsApp
+          </a>
+        </div>
+      </div>
+
+      <button type="button" @click="toggleAssistant()" :aria-expanded="assistantOpen" aria-label="Assistant IA" class="esfe-fab esfe-fab--assistant hover:scale-105">
+        <i class="fa-solid fa-robot text-lg"></i>
       </button>
-      <button @click="launchToTop()"
-              :class="launched ? 'rocket-launch' : ''"
-              class="h-12 w-12 rounded-full bg-secondary text-white shadow-lg hover:shadow-xl transition duration-300">
-        <i class="fa-solid fa-rocket"></i>
+
+      <button type="button" x-show="showTop" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4" @click="scrollToTop()" :class="launched ? 'rocket-launch' : ''" aria-label="Retour en haut" class="esfe-fab esfe-fab--rocket hover:rotate-6">
+        <i class="fa-solid fa-rocket text-lg"></i>
       </button>
+
+      <a href="https://wa.me/22397672087?text=Bonjour%2C%20je%20souhaite%20obtenir%20des%20informations%20sur%20les%20inscriptions%20%C3%A0%20l%E2%80%99ESF%C3%A9." target="_blank" rel="noopener noreferrer" aria-label="Contacter ESFé sur WhatsApp" class="group relative esfe-fab esfe-fab--whatsapp hover:scale-105">
+        <span class="esfe-tooltip hidden md:block">Contactez-nous sur WhatsApp</span>
+        <i class="fa-brands fa-whatsapp text-xl"></i>
+      </a>
     </div>
   </div>
-  {% endif %}
   {% endblock %}
 
   <!-- ================= FOOTER ================= -->
@@ -417,16 +558,21 @@
   {% with formations_licence_url=formations_url|add:'?cycle=licence' formations_master_url=formations_url|add:'?cycle=master' formations_bts_url=formations_url|add:'?cycle=bts' %}
   {% component "footer"
      site_name="ESFE"
-     site_slogan="Excellence • Innovation • Engagement"
-     site_description="Établissement supérieur de formation en sciences de la santé, orienté vers l'excellence académique, l'innovation pédagogique et l'employabilité."
+     site_slogan="Demain c’est aujourd’hui"
+     site_description="ESFé forme les professionnels de santé de demain avec une identité forte, des informations officielles harmonisées et une expérience digitale moderne tournée vers l'accompagnement des candidats."
      logo_url=site_logo_url
-     footer_contact=contact
+     footer_contact={
+         'address': 'Bamako, Mali',
+         'phone': '76882411',
+         'email': 'esfereseaux@gmail.com',
+         'whatsapp_url': 'https://wa.me/22397672087?text=Bonjour%2C%20je%20souhaite%20obtenir%20des%20informations%20sur%20les%20inscriptions%20%C3%A0%20l%E2%80%99ESF%C3%A9.'
+     }
      opening_hours="Lun-Ven : 8h00 - 17h00"
      cta={
-         'title': 'Votre avenir dans la sante commence ici',
-         'description': 'Discutez avec notre equipe et identifiez la formation la plus adaptee a votre profil.',
-         'button_label': 'Voir les formations',
-         'button_url': formations_url
+         'title': 'Votre avenir dans la santé commence aujourd’hui',
+         'description': 'Discutez avec l’équipe ESFé, obtenez des informations fiables et rejoignez la formation qui correspond à votre projet.',
+         'button_label': 'Parler sur WhatsApp',
+         'button_url': 'https://wa.me/22397672087?text=Bonjour%2C%20je%20souhaite%20obtenir%20des%20informations%20sur%20les%20inscriptions%20%C3%A0%20l%E2%80%99ESF%C3%A9.'
      }
      footer_navigation=[
          {'title': 'Explorer', 'links': [
@@ -455,11 +601,11 @@
          ]}
      ]
      social_links=[
-         {'label': 'Facebook', 'url': '#', 'icon': 'facebook'},
-         {'label': 'Instagram', 'url': '#', 'icon': 'instagram'},
-         {'label': 'LinkedIn', 'url': '#', 'icon': 'linkedin'},
-         {'label': 'YouTube', 'url': '#', 'icon': 'youtube'},
-         {'label': 'WhatsApp', 'url': 'https://wa.me/22370000000', 'icon': 'whatsapp'}
+         {'label': 'Instagram', 'name': 'esfe_officiel', 'url': 'https://instagram.com/esfe_officiel', 'icon': 'instagram', 'aria_label': 'Instagram ESFé esfe_officiel'},
+         {'label': 'YouTube', 'name': '@esfe_tv', 'url': 'https://youtube.com/@esfe_tv', 'icon': 'youtube', 'aria_label': 'YouTube ESFé esfe_tv'},
+         {'label': 'Facebook', 'name': 'École de Santé Félix Houphouët Boigny Mali', 'url': 'https://www.facebook.com/', 'icon': 'facebook', 'aria_label': 'Facebook ESFé'},
+         {'label': 'TikTok', 'name': 'esfe_officiel', 'url': 'https://tiktok.com/@esfe_officiel', 'icon': 'tiktok', 'aria_label': 'TikTok ESFé esfe_officiel'},
+         {'label': 'WhatsApp', 'name': '+223 97 67 20 87', 'url': 'https://wa.me/22397672087?text=Bonjour%2C%20je%20souhaite%20obtenir%20des%20informations%20sur%20les%20inscriptions%20%C3%A0%20l%E2%80%99ESF%C3%A9.', 'icon': 'whatsapp', 'aria_label': 'Contacter ESFé sur WhatsApp'}
      ]
      stats=[
          {'label': 'Programmes', 'value': '20+'},
@@ -508,7 +654,7 @@
           const computeState = () => {
             if (!hero) {
               this.visible = true;
-              this.scrolled = true;
+              this.scrolled = window.scrollY > 16;
               return;
             }
 
@@ -628,14 +774,34 @@
   </script>
     <!-- AOS JS -->
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script>
-        AOS.init({
-            duration: 650,
-            easing: 'ease-out-cubic',
-            once: true,
-            offset: 40,
-        });
-    </script>
+      <script>
+          const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          const isMobile = window.matchMedia('(max-width: 767px)').matches;
+
+          // Apply lightweight AOS defaults on common UI blocks when not explicitly configured.
+          if (!prefersReducedMotion) {
+              document.querySelectorAll('main section:not([data-aos])').forEach((el) => {
+                  el.setAttribute('data-aos', isMobile ? 'fade-in' : 'fade-up');
+              });
+              document.querySelectorAll('main .card:not([data-aos]), main [class*="rounded-"]:not([data-aos])').forEach((el) => {
+                  if (el.closest('section')) {
+                      el.setAttribute('data-aos', isMobile ? 'fade-in' : 'zoom-in');
+                  }
+              });
+              document.querySelectorAll('main h1:not([data-aos]), main h2:not([data-aos]), main h3:not([data-aos]), main img:not([data-aos])').forEach((el) => {
+                  el.setAttribute('data-aos', isMobile ? 'fade-in' : 'fade-up');
+              });
+          }
+
+          AOS.init({
+              duration: isMobile ? 360 : 520,
+              easing: 'ease-out-cubic',
+              once: true,
+              offset: isMobile ? 12 : 24,
+              mirror: false,
+              disable: prefersReducedMotion,
+          });
+      </script>
 
     <!-- Exemple de script bloque tant que l'utilisateur n'accepte pas la categorie -->
     <script type="text/plain" data-cookie-category="analytics">

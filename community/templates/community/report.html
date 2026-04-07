@@ -3,9 +3,9 @@
 {% block title %}Signaler un contenu | Communauté{% endblock %}
 
 {% block content %}
-<section class="bg-soft min-h-screen py-20">
-    <div class="max-w-2xl mx-auto px-4">
-        <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-8">
+<section class="bg-soft min-h-screen py-12 md:py-16 lg:py-20">
+    <div class="max-w-2xl mx-auto px-4 md:px-6 lg:px-8">
+        <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-5 sm:p-6 md:p-8">
             <div class="mb-6">
                 <h1 class="text-2xl font-bold text-primary-700">Signaler un contenu</h1>
                 <p class="text-sm text-gray-500 mt-2">Votre signalement sera examiné par l'equipe de moderation.</p>
@@ -25,30 +25,30 @@
             </div>
             {% endif %}
 
-            <form method="post" class="space-y-5" hx-post="{{ request.path }}" hx-target="#report-feedback" hx-swap="innerHTML">
+            <form method="post" class="space-y-5 [&_select]:w-full [&_textarea]:w-full [&_select]:rounded-xl [&_textarea]:rounded-xl [&_select]:border [&_textarea]:border [&_select]:border-gray-300 [&_textarea]:border-gray-300 [&_select]:px-4 [&_textarea]:px-4 [&_select]:py-3 [&_textarea]:py-3 [&_select]:text-sm [&_textarea]:text-sm [&_select]:focus:outline-none [&_textarea]:focus:outline-none [&_select]:focus:ring-2 [&_textarea]:focus:ring-2 [&_select]:focus:ring-primary-200 [&_textarea]:focus:ring-primary-200 [&_select]:focus:border-primary-500 [&_textarea]:focus:border-primary-500" hx-post="{{ request.path }}" hx-target="#report-feedback" hx-swap="innerHTML">
                 {% csrf_token %}
                 {{ form.non_field_errors }}
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2" for="id_reason">Motif</label>
                     {{ form.reason }}
-                    {% if form.reason.errors %}<p class="text-sm text-red-600 mt-1">{{ form.reason.errors|striptags }}</p>{% endif %}
+                    {% if form.reason.errors %}<p class="text-xs text-red-600 mt-1.5">{{ form.reason.errors|striptags }}</p>{% endif %}
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2" for="id_details">Details</label>
                     {{ form.details }}
-                    {% if form.details.errors %}<p class="text-sm text-red-600 mt-1">{{ form.details.errors|striptags }}</p>{% endif %}
+                    {% if form.details.errors %}<p class="text-xs text-red-600 mt-1.5">{{ form.details.errors|striptags }}</p>{% endif %}
                 </div>
 
                 <div id="report-feedback"></div>
 
-                <div class="flex items-center gap-3 pt-2">
-                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white text-sm font-semibold transition">
+                <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                    <button type="submit" class="w-full sm:w-auto px-5 py-3 rounded-xl bg-accent hover:bg-accent-dark text-white text-sm font-semibold transition">
                         Envoyer le signalement
                     </button>
                     <a href="{% if topic %}{{ topic.get_absolute_url }}{% elif answer %}{{ answer.topic.get_absolute_url }}{% else %}{% url 'community:topic_list' %}{% endif %}"
-                       class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 transition">
+                       class="w-full sm:w-auto text-center px-5 py-3 rounded-xl border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 transition">
                         Annuler
                     </a>
                 </div>

@@ -42,6 +42,11 @@ class Profile(models.Model):
         ("student", "Étudiant"),
     ]
 
+    USER_TYPE_CHOICES = [
+        ("public", "Public"),
+        ("staff", "Staff"),
+    ]
+
     # ---------------------------------
     # RELATION UTILISATEUR
     # ---------------------------------
@@ -60,6 +65,14 @@ class Profile(models.Model):
         choices=ROLE_CHOICES,
         blank=True,
         db_index=True
+    )
+
+    user_type = models.CharField(
+        max_length=20,
+        choices=USER_TYPE_CHOICES,
+        blank=True,
+        db_index=True,
+        help_text="Type utilisateur normalisé pour le portail",
     )
 
     # ---------------------------------
@@ -165,6 +178,7 @@ class Profile(models.Model):
 
         indexes = [
             models.Index(fields=["role"]),
+            models.Index(fields=["user_type"]),
             models.Index(fields=["branch"]),
             models.Index(fields=["reputation"]),
         ]

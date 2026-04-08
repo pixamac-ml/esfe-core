@@ -3,6 +3,8 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 
+from .auth_views import PortalLoginView
+
 # Import des vues principales
 from .views import (
     register,
@@ -75,9 +77,7 @@ urlpatterns = [
     # ==========================================================
     path(
         "login/",
-        auth_views.LoginView.as_view(
-            template_name="accounts/registration/login.html"
-        ),
+        PortalLoginView.as_view(),
         name="login",
     ),
     path(

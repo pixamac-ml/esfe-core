@@ -8,9 +8,11 @@ Usage:
         group_required = 'admissions_managers'
 """
 
-from django.core.exceptions import PermissionDenied
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.http import HttpRequest
 from django.shortcuts import redirect
+
+from accounts.access import get_user_groups
 
 
 class GroupRequiredMixin(UserPassesTestMixin):
@@ -25,6 +27,7 @@ class GroupRequiredMixin(UserPassesTestMixin):
         group_required = 'finance_agents'
     """
 
+    request: HttpRequest
     group_required = None
 
     def test_func(self):
@@ -46,7 +49,7 @@ class GroupRequiredMixin(UserPassesTestMixin):
             required_groups = [required_groups]
 
         # Vérifier l'appartenance au groupe
-        user_groups = self.request.user.groups.values_list('name', flat=True)
+        user_groups = set(get_user_groups(self.request.user))
         return any(group in user_groups for group in required_groups)
 
     def handle_no_permission(self):
@@ -78,10 +81,6 @@ class ExecutiveDirectorMixin(GroupRequiredMixin):
 # DÉCORATEURS POUR FONCTIONS-BASED VIEWS
 # =====================================================
 
-from django.utils.decorators import method_decorator
-from django.views.decorators.http import require_http_methods
-
-
 def group_required(groups):
     """
     Décorateur pour les views fonctions.
@@ -91,6 +90,8 @@ def group_required(groups):
         def my_view(request):
             ...
     """
+    required_groups = [groups] if isinstance(groups, str) else list(groups)
+
     def decorator(view_func):
         def wrapped(request, *args, **kwargs):
             if not request.user.is_authenticated:
@@ -99,12 +100,9 @@ def group_required(groups):
             if request.user.is_superuser:
                 return view_func(request, *args, **kwargs)
 
-            user_groups = request.user.groups.values_list('name', flat=True)
+            user_groups = set(get_user_groups(request.user))
 
-            if isinstance(groups, str):
-                groups = [groups]
-
-            if not any(g in user_groups for g in groups):
+            if not any(g in user_groups for g in required_groups):
                 return redirect('core:access_denied')
 
             return view_func(request, *args, **kwargs)
@@ -126,7 +124,7 @@ def has_group(user, group_name):
             <a href="/dashboard/admissions/">Dashboard Admissions</a>
         {% endif %}
     """
-    return user.groups.filter(name=group_name).exists()
+    return group_name in set(get_user_groups(user))
 
 
 def get_user_group(user):

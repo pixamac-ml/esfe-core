@@ -203,7 +203,11 @@ main {
     filter: brightness(1.05);
 }
 
-.esfe-fab--social { background: linear-gradient(135deg, #1e40af, #0f766e); }
+.esfe-fab--social {
+    background: linear-gradient(135deg, #1e40af, #0f766e);
+    opacity: 0.78;
+}
+.esfe-fab--social:hover { opacity: 1; }
 .esfe-fab--assistant { background: linear-gradient(135deg, #7c3aed, #1e40af); animation: esfeAssistantFloat 4s ease-in-out infinite, esfeAssistantPulse 4s ease-in-out infinite; }
 .esfe-fab--rocket { background: linear-gradient(135deg, #0f172a, #334155); }
 .esfe-fab--whatsapp { background: #25d366; animation: esfeFabIn 0.45s ease-out; }
@@ -430,9 +434,14 @@ main {
       assistantOpen: false,
       launched: false,
       showTop: false,
+      showSocialTrigger: false,
       init() {
         const syncScrollState = () => {
           this.showTop = window.scrollY > 320;
+          this.showSocialTrigger = window.scrollY > 460;
+          if (!this.showSocialTrigger) {
+            this.socialOpen = false;
+          }
         };
         syncScrollState();
         window.addEventListener('scroll', syncScrollState, { passive: true });
@@ -483,7 +492,7 @@ main {
 
   {% block public_floating_widget %}
   <div x-data="esfeFloatingUi()" x-init="init()" class="pointer-events-none fixed inset-0 z-[74]">
-    <div class="pointer-events-auto fixed left-4 sm:left-6 bottom-6 sm:bottom-8 z-[74] esfe-floating-stack" @click.outside="socialOpen = false">
+    <div x-show="showSocialTrigger" x-cloak x-transition:enter="transition ease-out duration-250" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-180" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3" class="pointer-events-auto fixed left-4 sm:left-6 bottom-6 sm:bottom-8 z-[74] esfe-floating-stack hidden sm:flex" @click.outside="socialOpen = false">
       <a href="https://instagram.com/esfe_officiel" x-show="socialOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3" style="transition-delay: 0ms" target="_blank" rel="noopener noreferrer" aria-label="Instagram ESFé esfe_officiel" title="Instagram • esfe_officiel" class="esfe-social-orb bg-gradient-to-br from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]"><i class="fa-brands fa-instagram"></i></a>
       <a href="https://youtube.com/@esfe_tv" x-show="socialOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3" style="transition-delay: 65ms" target="_blank" rel="noopener noreferrer" aria-label="YouTube ESFé esfe_tv" title="YouTube • @esfe_tv" class="esfe-social-orb bg-[#FF0000]"><i class="fa-brands fa-youtube"></i></a>
       <a href="https://www.facebook.com/" x-show="socialOpen" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-3" style="transition-delay: 120ms" target="_blank" rel="noopener noreferrer" aria-label="Facebook ESFé" title="Facebook • École de Santé Félix Houphouët Boigny Mali" class="esfe-social-orb bg-[#1877F2]"><i class="fa-brands fa-facebook-f"></i></a>

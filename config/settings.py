@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "news",
     "community.apps.CommunityConfig",
     "accounts.apps.AccountsConfig",
+    "portal.apps.PortalConfig",
 ]
 
 if ENABLE_BROWSER_RELOAD and importlib.util.find_spec("django_browser_reload"):
@@ -264,7 +265,7 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply
 # ==================================================
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "accounts:profile"
+LOGIN_REDIRECT_URL = "accounts_portal:portal_dashboard"
 LOGOUT_REDIRECT_URL = "community:topic_list"
 
 # ==================================================

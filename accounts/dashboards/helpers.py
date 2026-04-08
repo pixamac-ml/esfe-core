@@ -11,8 +11,11 @@ Objectifs :
 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
-from payments.models import PaymentAgent
-from branches.models import Branch
+from accounts.access import (
+    get_user_annexe,
+    get_user_groups,
+    get_user_scope,
+)
 
 
 # ==========================================================
@@ -24,10 +27,7 @@ def user_has_group(user, group_name):
     Vérifie si l'utilisateur appartient à un groupe.
     """
 
-    if not user or not user.is_authenticated:
-        return False
-
-    return user.groups.filter(name=group_name).exists()
+    return group_name in get_user_groups(user)
 
 
 def is_manager(user):
@@ -78,44 +78,7 @@ def get_user_branch(user):
     4. Branch.manager
     """
 
-    if not user or not user.is_authenticated:
-        return None
-
-    # super admin = accès global
-    if user.is_superuser:
-        return None
-
-    # profil utilisateur
-    if hasattr(user, "profile"):
-
-        profile_branch = getattr(user.profile, "branch", None)
-
-        if profile_branch:
-            return profile_branch
-
-    # agent de paiement
-    try:
-
-        agent = (
-            PaymentAgent.objects
-            .select_related("branch")
-            .get(user=user)
-        )
-
-        if agent.branch:
-            return agent.branch
-
-    except PaymentAgent.DoesNotExist:
-        pass
-
-    # responsable annexe
-    managed_branch = (
-        Branch.objects
-        .filter(manager=user)
-        .first()
-    )
-
-    return managed_branch
+    return get_user_annexe(user)
 
 
 # ==========================================================
@@ -129,11 +92,7 @@ def is_global_viewer(user):
 
     if not user or not user.is_authenticated:
         return False
-
-    if user.is_superuser:
-        return True
-
-    return user_has_group(user, "executive")
+    return bool(get_user_scope(user)["is_global"])
 
 
 # ==========================================================

@@ -1,0 +1,62 @@
+<div class="bg-white border rounded-xl p-4 shadow-sm">
+
+    <!-- HEADER -->
+    <h2 class="text-lg font-semibold mb-4">
+        Résultats de {{ enrollment.student.student_profile.full_name }}
+    </h2>
+
+    <!-- LISTE SEMESTRES -->
+    {% for sem in results %}
+    <div class="border rounded-lg p-4 mb-4 bg-slate-50">
+
+        <!-- TOP BAR -->
+        <div class="flex justify-between items-center">
+
+            <div>
+                <strong class="text-base">
+                    Semestre {{ sem.semester.number }}
+                </strong>
+
+                <div class="text-sm text-slate-500 mt-1">
+                    Crédits : {{ sem.credit_obtained }} / {{ sem.credit_required }}
+                </div>
+            </div>
+
+            <div class="text-right">
+                <div class="text-sm text-slate-500">Moyenne</div>
+                <div class="font-bold text-lg">
+                    {{ sem.average }}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="mt-4 flex gap-2">
+
+            <!-- VERSION SIMPLE (HTMX) -->
+            <button
+                class="px-3 py-1 border rounded hover:bg-slate-100"
+                hx-get="{% url 'accounts_portal:load_grades_table' enrollment.id sem.semester.id %}"
+                hx-target="#grades-table"
+                hx-swap="innerHTML"
+            >
+                Saisie rapide
+            </button>
+
+            <!-- VERSION MAQUETTE (PAGE COMPLETE) -->
+            <a
+                href="{% url 'accounts_portal:excel_grade_view' enrollment.id sem.semester.id %}"
+                class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+                Tableau complet
+            </a>
+        </div>
+
+    </div>
+    {% endfor %}
+
+    <!-- ZONE DYNAMIQUE -->
+    <div id="grades-table" class="mt-6"></div>
+
+</div>

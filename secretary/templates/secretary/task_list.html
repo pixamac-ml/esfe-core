@@ -1,0 +1,66 @@
+{% extends "secretary/base.html" %}
+
+{% block title %}Taches{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="page-header">
+        <div>
+            <h1>Taches du secretariat</h1>
+            <p class="help-text">Pilotage des actions en attente et suivi des affectations.</p>
+        </div>
+        <a class="btn btn-primary" href="{% url 'secretary:task_create' %}">Nouvelle tache</a>
+    </div>
+
+    <form method="get" class="filters">
+        <input class="secretary-input" type="text" name="q" value="{{ filters.q }}" placeholder="Titre, agent, matricule...">
+        <select class="secretary-input" name="status">
+            <option value="">Tous statuts</option>
+            <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>En attente</option>
+            <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>En cours</option>
+            <option value="completed" {% if filters.status == "completed" %}selected{% endif %}>Terminee</option>
+            <option value="cancelled" {% if filters.status == "cancelled" %}selected{% endif %}>Annulee</option>
+        </select>
+        <button class="btn" type="submit">Filtrer</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Tache</th>
+                <th>Priorite</th>
+                <th>Assigne a</th>
+                <th>Echeance</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in page_obj %}
+                <tr>
+                    <td>{{ task.title }}<div class="help-text">{{ task.description|default:"-" }}</div></td>
+                    <td>{{ task.get_priority_display }}</td>
+                    <td>{{ task.assigned_to|default:"-" }}</td>
+                    <td>{{ task.due_date|date:"d/m/Y"|default:"-" }}</td>
+                    <td><span class="badge">{{ task.get_status_display }}</span></td>
+                    <td>
+                        {% if task.status != "completed" %}
+                            <a class="btn" href="{% url 'secretary:task_complete' task.id %}">Terminer</a>
+                        {% else %}
+                            <span class="help-text">Aucune action</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6">Aucune tache.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="pagination">
+        {% if page_obj.has_previous %}<a class="btn" href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&status={{ filters.status }}">Precedent</a>{% endif %}
+        <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a class="btn" href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&status={{ filters.status }}">Suivant</a>{% endif %}
+    </div>
+</section>
+{% endblock %}

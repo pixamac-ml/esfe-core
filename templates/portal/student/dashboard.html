@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100 py-10">
+  <div class="max-w-5xl mx-auto px-2 md:px-6">
+    <div class="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900 tracking-tight">{{ page_title }}</h1>
+        <p class="text-gray-500 text-base mt-1">{{ subtitle }}</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div
+        hx-get="{% url 'portal_student:profile_partial' %}"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+        hx-indicator="#loader-profile"
+        hx-on::response-error="this.innerHTML='Erreur de chargement du profil.'"
+        class="bg-white rounded-xl shadow border border-gray-100 p-4 md:p-6 hover:shadow-lg transition-all flex flex-col h-full"
+      >
+        <div id="loader-profile" class="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
+          <div class="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></div>
+          Chargement...
+        </div>
+      </div>
+      <div
+        hx-get="{% url 'portal_student:academics_partial' %}"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+        hx-indicator="#loader-academics"
+        hx-on::response-error="this.innerHTML='Erreur de chargement de la situation académique.'"
+        class="bg-white rounded-xl shadow border border-gray-100 p-4 md:p-6 hover:shadow-lg transition-all flex flex-col h-full"
+      >
+        <div id="loader-academics" class="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
+          <div class="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></div>
+          Chargement...
+        </div>
+      </div>
+      <div
+        hx-get="{% url 'portal_student:finance_partial' %}"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+        hx-indicator="#loader-finance"
+        hx-on::response-error="this.innerHTML='Erreur de chargement de la situation financière.'"
+        class="bg-white rounded-xl shadow border border-gray-100 p-4 md:p-6 hover:shadow-lg transition-all flex flex-col h-full"
+      >
+        <div id="loader-finance" class="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
+          <div class="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></div>
+          Chargement...
+        </div>
+      </div>
+      <div
+        hx-get="{% url 'portal_student:notifications_partial' %}"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+        hx-indicator="#loader-notifications"
+        hx-on::response-error="this.innerHTML='Erreur de chargement des notifications.'"
+        class="bg-white rounded-xl shadow border border-gray-100 p-4 md:p-6 hover:shadow-lg transition-all flex flex-col h-full"
+      >
+        <div id="loader-notifications" class="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
+          <div class="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></div>
+          Chargement...
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

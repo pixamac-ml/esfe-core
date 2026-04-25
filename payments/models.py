@@ -367,7 +367,7 @@ class Payment(models.Model):
 
         result = create_student_after_first_payment(self.inscription)
 
-        if result:
+        if result and result.get("created") and result.get("password"):
 
             send_student_credentials_email(
                 student=result["student"],

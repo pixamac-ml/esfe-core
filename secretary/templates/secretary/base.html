@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Secretariat{% endblock %}</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --surface: #ffffff;
+            --line: #d7dfeb;
+            --text: #132033;
+            --muted: #5c6b82;
+            --accent: #0f766e;
+            --accent-soft: #dff5f2;
+            --danger: #b42318;
+            --warning: #b54708;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", sans-serif;
+            background: linear-gradient(180deg, #eef4fb 0%, var(--bg) 100%);
+            color: var(--text);
+        }
+        .layout {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .topbar, .panel, .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            box-shadow: 0 14px 35px rgba(17, 24, 39, 0.06);
+        }
+        .topbar {
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 22px;
+            margin-bottom: 22px;
+        }
+        .nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0 0 20px;
+        }
+        .tab-link {
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid var(--line);
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 600;
+        }
+        .nav a, .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .btn-danger {
+            color: var(--danger);
+        }
+        .panel {
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .page-header h1, .page-header h2, .page-header h3 {
+            margin: 0;
+        }
+        .grid {
+            display: grid;
+            gap: 16px;
+        }
+        .grid-stats {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            padding: 18px;
+        }
+        .stat-card strong {
+            display: block;
+            font-size: 30px;
+            margin-top: 8px;
+        }
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .secretary-input {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fff;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px 10px;
+            border-bottom: 1px solid #ebf0f6;
+            vertical-align: top;
+        }
+        th {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--muted);
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .list-inline {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 10px;
+        }
+        .list-inline li {
+            border: 1px solid #edf2f7;
+            border-radius: 12px;
+            padding: 12px;
+            background: #fbfdff;
+        }
+        .pagination {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            align-items: center;
+        }
+        .message-list {
+            display: grid;
+            gap: 10px;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #edf2f7;
+            background: #fcfdff;
+        }
+        .chat-bubble {
+            background: #f7fbff;
+            border-left: 4px solid var(--accent);
+        }
+        .help-text {
+            color: var(--muted);
+            font-size: 14px;
+            margin-top: 6px;
+        }
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+        }
+        .drawer {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            width: min(360px, calc(100vw - 32px));
+            z-index: 40;
+        }
+        @media (max-width: 720px) {
+            .layout { padding: 16px; }
+            .topbar, .page-header { flex-direction: column; align-items: flex-start; }
+            table, thead, tbody, tr, th, td { display: block; }
+            thead { display: none; }
+            td { padding: 8px 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div class="topbar">
+        <div>
+            <strong>Secretariat</strong><br>
+            <span class="help-text">Gestion administrative, suivi et coordination</span>
+        </div>
+        <nav class="nav">
+            <a href="{% url 'secretary:secretary_dashboard' %}">Dashboard</a>
+            <a href="{% url 'secretary:registry_list' %}">Registre</a>
+            <a href="{% url 'secretary:appointment_list' %}">Rendez-vous</a>
+            <a href="{% url 'secretary:visitor_list' %}">Visiteurs</a>
+            <a href="{% url 'secretary:document_receipt_list' %}">Documents</a>
+            <a href="{% url 'secretary:task_list' %}">Taches</a>
+        </nav>
+    </div>
+
+    <div class="tabs">
+        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#dashboard">Dashboard</a>
+        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#students">Etudiants</a>
+        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#classes">Classes</a>
+        <a class="tab-link" href="{% url 'secretary:registry_list' %}">Registre</a>
+        <a class="tab-link" href="{% url 'secretary:appointment_list' %}">Rendez-vous</a>
+        <a class="tab-link" href="{% url 'secretary:visitor_list' %}">Visiteurs</a>
+        <a class="tab-link" href="{% url 'secretary:document_receipt_list' %}">Documents</a>
+        <a class="tab-link" href="{% url 'secretary:task_list' %}">Taches</a>
+        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#archives">Archives</a>
+        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#messages">Messages</a>
+    </div>
+
+    {% if messages %}
+        <div class="panel">
+            {% for message in messages %}
+                <div>{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>

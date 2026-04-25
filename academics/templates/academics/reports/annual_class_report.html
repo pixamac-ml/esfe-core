@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Résultats annuels</title>
+
+<style>
+@page {
+    size: A4 landscape;
+    margin: 10mm;
+}
+
+body{
+    font-family: "Roboto", Arial, sans-serif;
+    font-size: 11px;
+    color:#000;
+}
+
+.container{
+    width:100%;
+}
+
+/* HEADER */
+.header{
+    margin-bottom:10px;
+}
+
+.header h2{
+    margin:0;
+    font-size:14px;
+}
+
+.header p{
+    margin:2px 0;
+}
+
+/* TABLE GLOBAL */
+table{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+}
+
+th, td{
+    border:1px solid #000;
+    padding:4px;
+    text-align:center;
+}
+
+th{
+    background:#f0f0f0;
+}
+
+.section-title{
+    font-weight:bold;
+    background:#ddd;
+}
+
+/* COULEURS */
+.ok{ background:#d1fae5; }
+.warn{ background:#fef3c7; }
+.bad{ background:#fee2e2; }
+
+.left{text-align:left;}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+    <h2>Ecole de Santé Félix Houphouet Boigny (ESFé) {{ academic_class.name|upper }}</h2>
+    <p>Résultats annuels - {{ academic_year.name }}</p>
+    <p>Formation : {{ formation.name }}</p>
+</div>
+
+<!-- TABLE PRINCIPALE -->
+<table>
+
+<thead>
+
+<tr>
+    <th colspan="3">RESULTATS ANNEE SCOLAIRE</th>
+    <th colspan="3">MOYENNE SEMESTRE I</th>
+    <th colspan="3">MOYENNE SEMESTRE II</th>
+    <th colspan="4">Rapport Annuel</th>
+</tr>
+
+<tr>
+    <th colspan="3">Crédits requis</th>
+    <th colspan="3">{{ S1.total_credits }}</th>
+    <th colspan="3">{{ S2.total_credits }}</th>
+    <th colspan="2">Semestre(s) Validé(s)</th>
+    <th colspan="2">Observation</th>
+</tr>
+
+<tr>
+    <th colspan="3">Coefficients</th>
+    <th colspan="3">{{ S1.total_coefficients }}</th>
+    <th colspan="3">{{ S2.total_coefficients }}</th>
+    <th>S1</th>
+    <th>S2</th>
+    <th>Décision</th>
+    <th>Observation</th>
+</tr>
+
+<tr>
+    <th>N°</th>
+    <th>NOMS</th>
+    <th>PRENOMS</th>
+
+    <th>Moy</th>
+    <th>Pourcentage %</th>
+    <th>Crédits</th>
+
+    <th>Moy</th>
+    <th>Pourcentage %</th>
+    <th>Crédits</th>
+
+    <th>Sem I</th>
+    <th>Sem II</th>
+
+    <th>Décision</th>
+    <th>Observation</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for row in students %}
+<tr>
+<td>{{ forloop.counter }}</td>
+
+<td class="left">{{ row.student.user.last_name }}</td>
+<td class="left">{{ row.student.user.first_name }}</td>
+
+<td>{{ row.s1.average }}</td>
+<td>{{ row.s1.percentage }}%</td>
+<td>{{ row.s1.credits }}</td>
+
+<td>{{ row.s2.average }}</td>
+<td>{{ row.s2.percentage }}%</td>
+<td>{{ row.s2.credits }}</td>
+
+<td class="{% if row.validation_s1 %}ok{% else %}bad{% endif %}">
+    {% if row.validation_s1 %}Validé{% else %}Non validé{% endif %}
+</td>
+
+<td class="{% if row.validation_s2 %}ok{% else %}bad{% endif %}">
+    {% if row.validation_s2 %}Validé{% else %}Non validé{% endif %}
+</td>
+
+<td class="
+    {% if row.decision == 'Admis' %}ok
+    {% elif row.decision == 'Admissible' %}warn
+    {% else %}bad
+    {% endif %}
+">
+    {{ row.decision }}
+</td>
+
+<td>{{ row.observation|default:"" }}</td>
+
+</tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</body>
+</html>

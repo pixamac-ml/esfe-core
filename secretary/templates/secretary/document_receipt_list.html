@@ -1,0 +1,65 @@
+{% extends "secretary/base.html" %}
+
+{% block title %}Documents{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="page-header">
+        <div>
+            <h1>Recus de documents</h1>
+            <p class="help-text">Reception, rattachement et archivage des pieces.</p>
+        </div>
+        <a class="btn btn-primary" href="{% url 'secretary:document_receipt_create' %}">Nouveau document</a>
+    </div>
+
+    <form method="get" class="filters">
+        <input class="secretary-input" type="text" name="q" value="{{ filters.q }}" placeholder="Titre, deposant, registre...">
+        <select class="secretary-input" name="status">
+            <option value="">Tous statuts</option>
+            <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>En attente</option>
+            <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>En cours</option>
+            <option value="completed" {% if filters.status == "completed" %}selected{% endif %}>Termine</option>
+            <option value="cancelled" {% if filters.status == "cancelled" %}selected{% endif %}>Annule</option>
+        </select>
+        <button class="btn" type="submit">Filtrer</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Titre</th>
+                <th>Deposant</th>
+                <th>Etudiant</th>
+                <th>Registre</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for receipt in page_obj %}
+                <tr>
+                    <td>{{ receipt.title }}<div class="help-text">{{ receipt.received_at|date:"d/m/Y H:i" }}</div></td>
+                    <td>{{ receipt.submitted_by_name }}<div class="help-text">{{ receipt.submitted_by_phone|default:"-" }}</div></td>
+                    <td>{% if receipt.related_student %}{{ receipt.related_student.full_name }}{% else %}-{% endif %}</td>
+                    <td>{% if receipt.related_registry %}{{ receipt.related_registry.title }}{% else %}-{% endif %}</td>
+                    <td><span class="badge">{{ receipt.get_status_display }}</span></td>
+                    <td>
+                        <div class="actions">
+                            {% if receipt.file %}<a class="btn" href="{{ receipt.file.url }}" target="_blank" rel="noopener">Fichier</a>{% endif %}
+                            {% if not receipt.is_archived %}<a class="btn btn-danger" href="{% url 'secretary:document_receipt_archive' receipt.id %}">Archiver</a>{% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6">Aucun document.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="pagination">
+        {% if page_obj.has_previous %}<a class="btn" href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&status={{ filters.status }}">Precedent</a>{% endif %}
+        <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a class="btn" href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&status={{ filters.status }}">Suivant</a>{% endif %}
+    </div>
+</section>
+{% endblock %}

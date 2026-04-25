@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Rapport académique{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 14mm;
+    }
+
+    :root {
+      --text: #172033;
+      --muted: #5b6474;
+      --line: #d9dfeb;
+      --line-strong: #afb8cb;
+      --panel: #ffffff;
+      --panel-soft: #f5f7fb;
+      --accent: #163c7a;
+      --accent-soft: #e9effb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background: #eef2f8;
+      font-family: "Roboto", sans-serif;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .report-shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .report-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    .report-header,
+    .report-footer {
+      padding: 18px 22px;
+      background: var(--panel-soft);
+    }
+
+    .report-header {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .report-footer {
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .report-body {
+      padding: 22px;
+    }
+
+    .header-grid {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    .header-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.1;
+      color: var(--accent);
+    }
+
+    .header-subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .school-name {
+      font-size: 15px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin: 0 0 4px;
+    }
+
+    .footer-grid {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .report-shell {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .report-card {
+        border: 0;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="report-shell">
+    <div class="report-card">
+      <header class="report-header">
+        <div class="header-grid">
+          <div>
+            <p class="school-name">École de Santé Félix Houphouët Boigny</p>
+            <p class="header-subtitle">Bamako, Djelibougou</p>
+            <p class="header-subtitle">Tel : 76-37-88-66 / 66-37-88-66</p>
+          </div>
+          <div>
+            <h1 class="header-title">{% block report_title %}Rapport académique{% endblock %}</h1>
+            <p class="header-subtitle">{% block report_subtitle %}Document généré depuis Félix Santé{% endblock %}</p>
+          </div>
+        </div>
+      </header>
+
+      <main class="report-body">
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="report-footer">
+        <div class="footer-grid">
+          <span>{% block footer_left %}Document académique interne{% endblock %}</span>
+          <span>{% block footer_right %}Généré automatiquement{% endblock %}</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>

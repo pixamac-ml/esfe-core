@@ -74,12 +74,14 @@ INSTALLED_APPS = [
     "students",
     "formations",
     "branches",
+    "academics",
     # Contenu
     "blog.apps.BlogConfig",
     "news",
     "community.apps.CommunityConfig",
     "accounts.apps.AccountsConfig",
     "portal.apps.PortalConfig",
+    "secretary",
 ]
 
 if ENABLE_BROWSER_RELOAD and importlib.util.find_spec("django_browser_reload"):

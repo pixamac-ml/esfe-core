@@ -1,0 +1,261 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+
+<!-- GOOGLE FONT -->
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<title>Relevé de notes</title>
+
+<style>
+
+@page {
+    size: A4 portrait;
+    margin: 15mm;
+}
+
+body{
+    font-family: 'Roboto', sans-serif;
+    font-size:12px;
+    margin:0;
+    color:#222;
+}
+
+.page{
+    width:100%;
+    max-width:1100px;
+    margin:0 auto;
+}
+
+/* ================= HEADER ================= */
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:2px solid #000;
+    padding-bottom:10px;
+    margin-bottom:15px;
+}
+
+.header-left{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.logo{
+    width:65px;
+}
+
+.school-text{
+    font-size:12px;
+}
+
+.school-name{
+    font-weight:700;
+    font-size:14px;
+    text-transform:uppercase;
+}
+
+.header-right{
+    text-align:right;
+}
+
+.header-right h1{
+    margin:0;
+    font-size:22px;
+    font-weight:700;
+    text-decoration:underline;
+}
+
+/* ================= META ================= */
+.meta{
+    border:1px solid #000;
+    padding:10px;
+    margin-bottom:15px;
+    font-size:13px;
+    background:#fafafa;
+}
+
+.meta-line{
+    margin:4px 0;
+}
+
+/* ================= TABLE ================= */
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td{
+    border:1px solid #000;
+    padding:5px;
+    text-align:center;
+    vertical-align:middle;
+}
+
+thead th{
+    background:#e9ecef;
+    font-weight:600;
+}
+
+.left{
+    text-align:left;
+}
+
+.ue-block{
+    background:#f4f4f4;
+    font-weight:500;
+}
+
+/* ================= FOOTER ================= */
+.footer{
+    margin-top:20px;
+    display:flex;
+    justify-content:space-between;
+    font-size:13px;
+}
+
+.footer-right{
+    text-align:center;
+    width:260px;
+}
+
+.signature{
+    height:50px;
+}
+
+</style>
+</head>
+
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="header">
+    <div class="header-left">
+        <img src="{% static 'images/logo-esfe.png' %}" class="logo">
+
+        <div class="school-text">
+            <div class="school-name">École de Santé Félix Houphouët Boigny</div>
+            <div>Bamako, Djelibougou</div>
+            <div>Tel : 76-37-88-66 / 66-37-88-66</div>
+        </div>
+    </div>
+
+    <div class="header-right">
+        <h1>RELEVÉ DE NOTES</h1>
+    </div>
+</div>
+
+<!-- META -->
+<div class="meta">
+    <div class="meta-line">
+        <strong>Année :</strong> {{ academic_year.name }}
+        &nbsp;&nbsp;
+        <strong>Semestre :</strong> {{ semester.number }}
+        &nbsp;&nbsp;
+        <strong>Département :</strong> {{ department_name }}
+    </div>
+
+    <div class="meta-line">
+        <strong>Matricule :</strong> {{ student_matricule }}
+        &nbsp;&nbsp;
+        <strong>Nom :</strong> {{ student_last_name }}
+        &nbsp;&nbsp;
+        <strong>Prénom :</strong> {{ student_first_name }}
+    </div>
+
+    <div class="meta-line">
+        <strong>Date naissance :</strong> {{ student_birth_info }}
+        &nbsp;&nbsp;
+        <strong>Domaine :</strong> {{ domain_name }}
+        &nbsp;&nbsp;
+        <strong>Filière :</strong> {{ programme_name }}
+    </div>
+</div>
+
+<!-- TABLE -->
+<table>
+<thead>
+<tr>
+    <th colspan="4">U.E</th>
+    <th colspan="3">Matières</th>
+    <th colspan="5">Résultats</th>
+</tr>
+
+<tr>
+    <th>Code</th>
+    <th>UE</th>
+    <th>Crédits</th>
+    <th>Coef</th>
+
+    <th>Matière</th>
+    <th>Crédits</th>
+    <th>Coef</th>
+
+    <th>Note</th>
+    <th>Note coef</th>
+    <th>Crédits</th>
+
+    <th>Moyenne</th>
+    <th>Crédits</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for ue_result in semester_result.ue_results %}
+{% with rows=ue_result.rows row_count=ue_result.rows|length %}
+
+{% for ec_row in rows %}
+<tr>
+
+{% if forloop.first %}
+<td rowspan="{{ row_count }}" class="ue-block">{{ ue_result.ue.code }}</td>
+<td rowspan="{{ row_count }}" class="ue-block">{{ ue_result.ue.title }}</td>
+<td rowspan="{{ row_count }}">{{ ue_result.credit_required }}</td>
+<td rowspan="{{ row_count }}">{{ ue_result.total_coefficients }}</td>
+{% endif %}
+
+<td class="left">{{ ec_row.ec.title }}</td>
+<td>{{ ec_row.credit_required }}</td>
+<td>{{ ec_row.ec.coefficient }}</td>
+
+<td>{{ ec_row.note }}</td>
+<td>{{ ec_row.note_coefficient }}</td>
+<td>{{ ec_row.credit_obtained }}</td>
+
+{% if forloop.first %}
+<td rowspan="{{ row_count }}"><strong>{{ ue_result.average }}</strong></td>
+<td rowspan="{{ row_count }}"><strong>{{ ue_result.credit_obtained }}</strong></td>
+{% endif %}
+
+</tr>
+{% endfor %}
+
+{% endwith %}
+{% endfor %}
+
+</tbody>
+</table>
+
+<!-- FOOTER -->
+<div class="footer">
+    <div>
+        <strong>Observations :</strong>
+        ..............................................................................................
+    </div>
+
+    <div class="footer-right">
+        <div>Bamako, le ......................</div>
+        <div class="signature"></div>
+        <strong>Le Directeur Général</strong>
+    </div>
+</div>
+
+</div>
+</body>
+</html>

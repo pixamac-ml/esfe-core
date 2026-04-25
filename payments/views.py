@@ -10,6 +10,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.db import transaction
 from django.db.models import Q
+import logging
 
 from inscriptions.models import Inscription
 from payments.models import Payment, PaymentAgent, CashPaymentSession
@@ -19,6 +20,9 @@ from payments.services.cash import verify_agent_and_create_session, validate_cas
 from django.utils import timezone
 from datetime import timedelta
 import random
+
+
+logger = logging.getLogger(__name__)
 
 
 def _can_initiate_payment(inscription, has_pending_payment):
@@ -91,6 +95,12 @@ def student_initiate_payment(request, token):
 
     # Validation du formulaire
     if not form.is_valid():
+        logger.warning(
+            "Formulaire paiement invalide: token=%s data=%s errors=%s",
+            token,
+            dict(request.POST),
+            form.errors.get_json_data(),
+        )
         context["payment_form"] = form
         context["can_pay"] = can_pay
 
@@ -108,6 +118,13 @@ def student_initiate_payment(request, token):
     method = form.cleaned_data["method"]
 
     if amount > inscription.balance:
+        logger.warning(
+            "Montant paiement invalide: inscription=%s amount=%s balance=%s method=%s",
+            inscription.id,
+            amount,
+            inscription.balance,
+            method,
+        )
         form.add_error("amount", "Le montant dépasse le solde restant.")
         context["payment_form"] = form
         context["can_pay"] = can_pay
@@ -122,6 +139,11 @@ def student_initiate_payment(request, token):
         return response
 
     if has_pending_payment:
+        logger.warning(
+            "Paiement refuse car un paiement pending existe deja: inscription=%s method=%s",
+            inscription.id,
+            method,
+        )
         response = render(
             request,
             "payments/partials/payment_error.html",
@@ -142,6 +164,13 @@ def student_initiate_payment(request, token):
         can_pay = _can_initiate_payment(inscription, has_pending_payment)
 
         if not can_pay:
+            logger.warning(
+                "Paiement impossible pour inscription=%s status=%s balance=%s method=%s",
+                inscription.id,
+                inscription.status,
+                inscription.balance,
+                method,
+            )
             response = render(
                 request,
                 "payments/partials/payment_error.html",

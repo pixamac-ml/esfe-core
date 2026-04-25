@@ -1,0 +1,68 @@
+{% extends "secretary/base.html" %}
+
+{% block title %}Rendez-vous{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="page-header">
+        <div>
+            <h1>Rendez-vous</h1>
+            <p class="help-text">Agenda du secretariat avec controle de conflits.</p>
+        </div>
+        <a class="btn btn-primary" href="{% url 'secretary:appointment_create' %}">Nouveau rendez-vous</a>
+    </div>
+
+    <form method="get" class="filters">
+        <input class="secretary-input" type="text" name="q" value="{{ filters.q }}" placeholder="Nom, titre, email...">
+        <select class="secretary-input" name="status">
+            <option value="">Tous statuts</option>
+            <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>En attente</option>
+            <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>En cours</option>
+            <option value="completed" {% if filters.status == "completed" %}selected{% endif %}>Termine</option>
+            <option value="cancelled" {% if filters.status == "cancelled" %}selected{% endif %}>Annule</option>
+        </select>
+        <input class="secretary-input" type="date" name="date_from" value="{{ filters.date_from|default:'' }}">
+        <input class="secretary-input" type="date" name="date_to" value="{{ filters.date_to|default:'' }}">
+        <button class="btn" type="submit">Filtrer</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Objet</th>
+                <th>Personne</th>
+                <th>Horaire</th>
+                <th>Assigne</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appointment in page_obj %}
+                <tr>
+                    <td>{{ appointment.title }}<div class="help-text">{{ appointment.reason|default:"-" }}</div></td>
+                    <td>{{ appointment.person_name }}<div class="help-text">{{ appointment.phone }} {{ appointment.email }}</div></td>
+                    <td>{{ appointment.scheduled_at|date:"d/m/Y H:i" }}</td>
+                    <td>{{ appointment.assigned_to|default:"-" }}</td>
+                    <td><span class="badge">{{ appointment.get_status_display }}</span></td>
+                    <td>
+                        {% if appointment.status != "completed" %}
+                            <a class="btn" href="{% url 'secretary:appointment_complete' appointment.id %}">Cloturer</a>
+                        {% else %}
+                            <span class="help-text">Aucune action</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6">Aucun rendez-vous.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="pagination">
+        {% if page_obj.has_previous %}<a class="btn" href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&status={{ filters.status }}">Precedent</a>{% endif %}
+        <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a class="btn" href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&status={{ filters.status }}">Suivant</a>{% endif %}
+    </div>
+</section>
+{% endblock %}

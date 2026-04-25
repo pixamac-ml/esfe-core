@@ -1,0 +1,69 @@
+{% extends "secretary/base.html" %}
+
+{% block title %}Registre{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="page-header">
+        <div>
+            <h1>Registre administratif</h1>
+            <p class="help-text">Suivi traceable des demandes et dossiers.</p>
+        </div>
+        <a class="btn btn-primary" href="{% url 'secretary:registry_create' %}">Nouvelle entree</a>
+    </div>
+
+    <form method="get" class="filters">
+        <input class="secretary-input" type="text" name="q" value="{{ filters.q }}" placeholder="Titre, type, matricule...">
+        <select class="secretary-input" name="status">
+            <option value="">Tous statuts</option>
+            <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>En attente</option>
+            <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>En cours</option>
+            <option value="completed" {% if filters.status == "completed" %}selected{% endif %}>Termine</option>
+            <option value="cancelled" {% if filters.status == "cancelled" %}selected{% endif %}>Annule</option>
+        </select>
+        <button class="btn" type="submit">Filtrer</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Titre</th>
+                <th>Type</th>
+                <th>Etudiant</th>
+                <th>Statut</th>
+                <th>Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in page_obj %}
+                <tr>
+                    <td>{{ entry.title }}<div class="help-text">{{ entry.description|default:"-" }}</div></td>
+                    <td>{{ entry.entry_type }}</td>
+                    <td>{% if entry.related_student %}{{ entry.related_student.full_name }}{% else %}-{% endif %}</td>
+                    <td><span class="badge">{{ entry.get_status_display }}</span></td>
+                    <td>{{ entry.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <div class="actions">
+                            {% if entry.status != "completed" %}
+                                <a class="btn" href="{% url 'secretary:registry_mark_processed' entry.id %}">Marquer traite</a>
+                            {% endif %}
+                            {% if not entry.is_archived %}
+                                <a class="btn btn-danger" href="{% url 'secretary:registry_archive' entry.id %}">Archiver</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6">Aucune entree.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="pagination">
+        {% if page_obj.has_previous %}<a class="btn" href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&status={{ filters.status }}">Precedent</a>{% endif %}
+        <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a class="btn" href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&status={{ filters.status }}">Suivant</a>{% endif %}
+    </div>
+</section>
+{% endblock %}

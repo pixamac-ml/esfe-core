@@ -21,6 +21,8 @@ from accounts.access import (
 	get_user_role,
 	get_user_scope,
 )
+from portal.permissions import get_user_role as get_portal_user_role
+from portal.permissions import get_post_login_portal_url
 
 
 User = get_user_model()
@@ -303,7 +305,11 @@ class PortalPhaseOneTests(TestCase):
 		self.client.force_login(student)
 
 		response = self.client.get(reverse("accounts_portal:portal_student"))
-		self.assertEqual(response.status_code, 200)
+		self.assertRedirects(
+			response,
+			reverse("portal_student:dashboard"),
+			fetch_redirect_response=False,
+		)
 
 	def test_portal_teacher_route_denies_student(self):
 		student = self._create_user("portal_student_denied", role="student")
@@ -333,9 +339,47 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			reverse("accounts_portal:portal_student"),
+			reverse("portal_student:dashboard"),
 			fetch_redirect_response=False,
 		)
+
+	def test_login_redirects_staff_to_portal_staff(self):
+		staff_user = self._create_user("login_staff", groups=["admissions_managers"])
+
+		response = self.client.post(
+			reverse("accounts:login"),
+			{"username": staff_user.username, "password": "pass1234"},
+		)
+
+		self.assertRedirects(
+			response,
+			reverse("accounts_portal:portal_staff"),
+			fetch_redirect_response=False,
+		)
+
+	def test_post_login_portal_url_uses_existing_routes_only(self):
+		student = self._create_user("post_login_student", role="student")
+		staff_user = self._create_user("post_login_staff", groups=["finance_agents"])
+
+		self.assertEqual(
+			get_post_login_portal_url(student),
+			reverse("portal_student:dashboard"),
+		)
+		self.assertEqual(
+			get_post_login_portal_url(staff_user),
+			reverse("accounts_portal:portal_staff"),
+		)
+
+	def test_student_dashboard_requires_student_role(self):
+		staff_user = self._create_user("student_dashboard_staff", groups=["admissions_managers"])
+		self.client.force_login(staff_user)
+
+		response = self.client.get(reverse("portal_student:dashboard"))
+		self.assertEqual(response.status_code, 403)
+
+	def test_portal_role_falls_back_to_staff_from_groups(self):
+		staff_user = self._create_user("portal_role_group", groups=["finance_agents"], role="")
+		self.assertEqual(get_portal_user_role(staff_user), "staff")
 
 
 class BackfillUserRoleTypeCommandTests(TestCase):

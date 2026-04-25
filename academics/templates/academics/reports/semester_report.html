@@ -1,0 +1,225 @@
+{% extends "academics/reports/base_report.html" %}
+
+{% block title %}Relevé semestre {{ semester.number }}{% endblock %}
+{% block report_title %}Relevé de Notes{% endblock %}
+{% block report_subtitle %}Semestre {{ semester.number }}{% endblock %}
+{% block footer_left %}Année académique {{ academic_year.name }}{% endblock %}
+{% block footer_right %}Étudiant {{ student_matricule }}{% endblock %}
+
+{% block content %}
+  <style>
+    .meta-panel {
+      border: 1px solid #d9dfeb;
+      border-radius: 14px;
+      background: #f8faff;
+      padding: 16px 18px;
+      margin-bottom: 18px;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 24px;
+      margin-bottom: 8px;
+    }
+
+    .meta-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .meta-item {
+      min-width: 220px;
+    }
+
+    .meta-label {
+      color: #5b6474;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-right: 6px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .summary-card {
+      border: 1px solid #d9dfeb;
+      border-radius: 12px;
+      background: #fff;
+      padding: 12px 14px;
+    }
+
+    .summary-card .label {
+      color: #5b6474;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 6px;
+    }
+
+    .summary-card .value {
+      color: #163c7a;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      border: 1px solid #cfd6e4;
+      padding: 6px 7px;
+      text-align: center;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+
+    thead th {
+      background: #edf2fb;
+      font-weight: 600;
+    }
+
+    .left {
+      text-align: left;
+    }
+
+    .ue-cell {
+      background: #f7f9fd;
+      font-weight: 500;
+    }
+
+    .signature-block {
+      margin-top: 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-end;
+    }
+
+    .signature-box {
+      width: 260px;
+      text-align: center;
+    }
+
+    .signature-space {
+      height: 64px;
+    }
+
+    @media print {
+      .summary-grid {
+        break-inside: avoid;
+      }
+    }
+  </style>
+
+  <section class="meta-panel">
+    <div class="meta-row">
+      <div class="meta-item"><span class="meta-label">Année</span>{{ academic_year.name }}</div>
+      <div class="meta-item"><span class="meta-label">Semestre</span>{{ semester.number }}</div>
+      <div class="meta-item"><span class="meta-label">Classe</span>{{ enrollment.academic_class }}</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-item"><span class="meta-label">Matricule</span>{{ student_matricule }}</div>
+      <div class="meta-item"><span class="meta-label">Nom</span>{{ student_last_name }}</div>
+      <div class="meta-item"><span class="meta-label">Prénom</span>{{ student_first_name }}</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-item"><span class="meta-label">Naissance</span>{{ student_birth_info }}</div>
+      <div class="meta-item"><span class="meta-label">Filière</span>{{ programme_name }}</div>
+      <div class="meta-item"><span class="meta-label">Département</span>{{ department_name }}</div>
+      <div class="meta-item"><span class="meta-label">Domaine</span>{{ domain_name }}</div>
+    </div>
+  </section>
+
+  <section class="summary-grid">
+    <article class="summary-card">
+      <div class="label">Moyenne</div>
+      <div class="value">{{ semester_result.average_display }}</div>
+    </article>
+    <article class="summary-card">
+      <div class="label">Pourcentage</div>
+      <div class="value">{{ semester_result.percentage_display }}%</div>
+    </article>
+    <article class="summary-card">
+      <div class="label">Crédits obtenus</div>
+      <div class="value">{{ semester_result.credit_obtained_display }}</div>
+    </article>
+    <article class="summary-card">
+      <div class="label">Total coefficients</div>
+      <div class="value">{{ semester_result.total_coefficients_display }}</div>
+    </article>
+  </section>
+
+  <table>
+    <thead>
+      <tr>
+        <th colspan="4">Unités d'enseignement</th>
+        <th colspan="3">Éléments constitutifs</th>
+        <th colspan="5">Résultats</th>
+      </tr>
+      <tr>
+        <th>Code</th>
+        <th>UE</th>
+        <th>Crédits</th>
+        <th>Coef.</th>
+        <th>Matière</th>
+        <th>Crédits</th>
+        <th>Coef.</th>
+        <th>Note</th>
+        <th>Note coef.</th>
+        <th>Crédits</th>
+        <th>Moyenne UE</th>
+        <th>Crédits UE</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ue_result in semester_result.ue_results %}
+        {% with rows=ue_result.rows row_count=ue_result.rows|length %}
+          {% for ec_row in rows %}
+            <tr>
+              {% if forloop.first %}
+                <td rowspan="{{ row_count }}" class="ue-cell">{{ ue_result.ue.code }}</td>
+                <td rowspan="{{ row_count }}" class="ue-cell left">{{ ue_result.ue.title }}</td>
+                <td rowspan="{{ row_count }}">{{ ue_result.credit_required_display }}</td>
+                <td rowspan="{{ row_count }}">{{ ue_result.total_coefficients_display }}</td>
+              {% endif %}
+
+              <td class="left">{{ ec_row.ec.title }}</td>
+              <td>{{ ec_row.credit_required_display }}</td>
+              <td>{{ ec_row.ec_coefficient_display }}</td>
+              <td>{{ ec_row.note_display }}</td>
+              <td>{{ ec_row.note_coefficient_display }}</td>
+              <td>{{ ec_row.credit_obtained_display }}</td>
+
+              {% if forloop.first %}
+                <td rowspan="{{ row_count }}">{{ ue_result.average_display }}</td>
+                <td rowspan="{{ row_count }}">{{ ue_result.credit_obtained_display }}</td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <section class="signature-block">
+    <div>
+      <strong>Observations :</strong>
+      ....................................................................................................................
+    </div>
+    <div class="signature-box">
+      <div>Bamako, le ..................................</div>
+      <div class="signature-space"></div>
+      <strong>Le Directeur Général</strong>
+    </div>
+  </section>
+{% endblock %}

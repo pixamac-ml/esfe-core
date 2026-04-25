@@ -25,7 +25,6 @@ class Command(BaseCommand):
                 has_student=Exists(student_exists),
             )
             .filter(
-                status__in=[Inscription.STATUS_PARTIAL, Inscription.STATUS_ACTIVE],
                 has_validated_payment=True,
                 has_student=False,
             )

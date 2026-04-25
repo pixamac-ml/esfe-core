@@ -1,0 +1,79 @@
+<div class="bg-white border rounded-xl p-4 shadow-sm">
+
+    <h2 class="text-lg font-semibold mb-4">
+        Notes - {{ enrollment.student.student_profile.full_name }}
+    </h2>
+
+    {% for ue in ues %}
+    <div class="mb-6 border rounded-lg">
+
+        <!-- UE HEADER -->
+        <div class="bg-slate-100 px-3 py-2 font-semibold">
+            {{ ue.code }} - {{ ue.title }}
+        </div>
+
+        <!-- TABLE -->
+        <table class="w-full text-sm border-t">
+            <thead>
+                <tr class="border-b text-left">
+                    <th class="p-2">Matière (EC)</th>
+                    <th>Coef</th>
+                    <th>Crédit</th>
+                    <th>Note</th>
+                    <th></th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for ec in ue.ecs.all %}
+                <tr class="border-b">
+
+                    <td class="p-2">{{ ec.title }}</td>
+
+                    <td>{{ ec.coefficient }}</td>
+
+                    <td>{{ ec.credit_required }}</td>
+
+                    <td>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="20"
+                            class="border p-1 w-20"
+                            id="note-{{ ec.id }}"
+                        >
+                    </td>
+
+                    <td>
+                        <button
+                            class="px-2 py-1 bg-slate-900 text-white rounded"
+                            hx-post="{% url 'accounts_portal:save_grade' %}"
+                            hx-target="#msg-{{ ec.id }}"
+                            hx-swap="innerHTML"
+                            hx-include="#note-{{ ec.id }}"
+                            hx-vals='{
+                                "enrollment_id": "{{ enrollment.id }}",
+                                "ec_id": "{{ ec.id }}"
+                            }'
+                        >
+                            ✔
+                        </button>
+                    </td>
+
+                </tr>
+
+                <tr>
+                    <td colspan="5">
+                        <div id="msg-{{ ec.id }}" class="text-xs text-green-600"></div>
+                    </td>
+                </tr>
+
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+    {% endfor %}
+
+</div>

@@ -31,6 +31,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
+    path("portal/student-dashboard/", include("portal.student.urls")),
     path("portal/", include(("portal.urls", "accounts_portal"), namespace="accounts_portal")),
     #path("branches/", include("branches.urls")),
     # Applications métiers
@@ -41,9 +42,11 @@ urlpatterns = [
     path("payments/", include("payments.urls")),
     path("actualites/", include("news.urls", namespace="news")),
     path('superadmin/', include('superadmin.urls')),
+    path("secretary/", include("secretary.urls")),
     path("sitemap.xml", sitemap, {"sitemaps": build_sitemaps()}, name="sitemap_xml"),
     # Core (home + pages publiques)
     path("", include("core.urls")),
+    path("academics/", include("academics.urls")),
     path("community/", include("community.urls")),
     path("ckeditor5/", include("django_ckeditor_5.urls")),
 ]

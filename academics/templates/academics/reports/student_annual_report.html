@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Relevé annuel</title>
+
+<style>
+
+@page {
+    size: A4 portrait;
+    margin: 15mm;
+}
+
+body{
+    font-family: "Poppins", "Roboto", Arial, sans-serif;
+    font-size: 12px;
+    color:#111;
+}
+
+/* CONTAINER */
+.container{
+    width:100%;
+}
+
+/* HEADER */
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:3px solid #163c7a;
+    padding-bottom:10px;
+    margin-bottom:20px;
+}
+
+.logo{
+    height:55px;
+}
+
+.school-info{
+    text-align:right;
+}
+
+.school-info h2{
+    margin:0;
+    font-size:16px;
+    color:#163c7a;
+}
+
+.school-info p{
+    margin:2px 0;
+    font-size:11px;
+}
+
+/* IDENTITE */
+.identity{
+    border:1px solid #ddd;
+    padding:10px;
+    margin-bottom:20px;
+    background:#fafafa;
+}
+
+.identity p{
+    margin:4px 0;
+}
+
+/* SUMMARY */
+.summary{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:12px;
+    margin-bottom:20px;
+}
+
+.card{
+    border:1px solid #ddd;
+    padding:12px;
+    text-align:center;
+    border-radius:6px;
+}
+
+.card-title{
+    font-size:11px;
+    text-transform:uppercase;
+    margin-bottom:5px;
+    color:#555;
+}
+
+.card-value{
+    font-size:22px;
+    font-weight:700;
+}
+
+/* DECISION COLORS */
+.ok{ background:#e6f7ee; color:#15803d; }
+.warn{ background:#fff4e5; color:#b45309; }
+.bad{ background:#fdecea; color:#b91c1c; }
+
+/* TABLE */
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td{
+    border:1px solid #ccc;
+    padding:6px;
+    text-align:center;
+}
+
+th{
+    background:#f3f6fb;
+    font-weight:600;
+}
+
+.left{
+    text-align:left;
+}
+
+/* FOOTER */
+.footer{
+    margin-top:40px;
+    display:flex;
+    justify-content:space-between;
+}
+
+.signature{
+    text-align:center;
+}
+
+.signature-line{
+    margin-top:40px;
+    border-top:1px solid #000;
+    width:200px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+    <img src="/static/logo.png" class="logo">
+
+    <div class="school-info">
+        <h2>ÉCOLE DE SANTÉ FÉLIX HOUPHOUËT BOIGNY</h2>
+        <p>Bamako - Mali</p>
+        <p><strong>Année :</strong> {{ academic_year.name }}</p>
+    </div>
+</div>
+
+<!-- IDENTITE -->
+<div class="identity">
+    <p><strong>Nom :</strong> {{ student.user.last_name }}</p>
+    <p><strong>Prénom :</strong> {{ student.user.first_name }}</p>
+    <p><strong>Matricule :</strong> {{ student.matricule }}</p>
+    <p><strong>Classe :</strong> {{ academic_class.name }}</p>
+    <p><strong>Formation :</strong> {{ formation.name }}</p>
+</div>
+
+<!-- SUMMARY -->
+<div class="summary">
+
+    <div class="card">
+        <div class="card-title">Semestre 1</div>
+        <div class="card-value">{{ S1.average }}</div>
+        <small>{{ S1.percentage }}% | {{ S1.credits }} crédits</small>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Semestre 2</div>
+        <div class="card-value">{{ S2.average }}</div>
+        <small>{{ S2.percentage }}% | {{ S2.credits }} crédits</small>
+    </div>
+
+    <div class="card
+        {% if decision == 'Admis' %}ok
+        {% elif decision == 'Admissible' %}warn
+        {% else %}bad
+        {% endif %}
+    ">
+        <div class="card-title">Décision finale</div>
+        <div class="card-value">{{ decision }}</div>
+    </div>
+
+</div>
+
+<!-- TABLE -->
+<table>
+
+<thead>
+<tr>
+    <th>Semestre</th>
+    <th>Moyenne</th>
+    <th>Pourcentage</th>
+    <th>Crédits</th>
+    <th>Statut</th>
+</tr>
+</thead>
+
+<tbody>
+
+<tr>
+    <td>Semestre 1</td>
+    <td>{{ S1.average }}</td>
+    <td>{{ S1.percentage }}%</td>
+    <td>{{ S1.credits }}</td>
+    <td class="{% if S1.is_validated %}ok{% else %}bad{% endif %}">
+        {% if S1.is_validated %}Validé{% else %}Non validé{% endif %}
+    </td>
+</tr>
+
+<tr>
+    <td>Semestre 2</td>
+    <td>{{ S2.average }}</td>
+    <td>{{ S2.percentage }}%</td>
+    <td>{{ S2.credits }}</td>
+    <td class="{% if S2.is_validated %}ok{% else %}bad{% endif %}">
+        {% if S2.is_validated %}Validé{% else %}Non validé{% endif %}
+    </td>
+</tr>
+
+<tr>
+    <td colspan="4"><strong>Décision finale</strong></td>
+    <td class="
+        {% if decision == 'Admis' %}ok
+        {% elif decision == 'Admissible' %}warn
+        {% else %}bad
+        {% endif %}
+    ">
+        <strong>{{ decision }}</strong>
+    </td>
+</tr>
+
+</tbody>
+
+</table>
+
+<!-- FOOTER -->
+<div class="footer">
+
+    <div class="signature">
+        <p>Observations</p>
+    </div>
+
+    <div class="signature">
+        <p>Le Directeur Général</p>
+        <div class="signature-line"></div>
+    </div>
+
+</div>
+
+</div>
+
+</body>
+</html>

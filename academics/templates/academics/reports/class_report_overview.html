@@ -1,0 +1,102 @@
+{% extends "academics/reports/base_report.html" %}
+
+{% block title %}Vue globale des relevés{% endblock %}
+{% block report_title %}Relevés de la Classe{% endblock %}
+{% block report_subtitle %}Semestre {{ semester.number }}{% endblock %}
+
+{% block content %}
+  <style>
+    .overview-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .overview-chip {
+      border: 1px solid #d9dfeb;
+      background: #f8faff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #163c7a;
+      font-weight: 600;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      border: 1px solid #cfd6e4;
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    thead th {
+      background: #edf2fb;
+      font-weight: 600;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .action-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 10px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid #b9c8de;
+      background: #fff;
+      color: #1e293b;
+    }
+
+    .action-link.primary {
+      background: #1d4ed8;
+      border-color: #1d4ed8;
+      color: #fff;
+    }
+  </style>
+
+  <section class="overview-header">
+    <div>
+      <strong>{{ academic_class }}</strong><br>
+      <span>{{ rows|length }} relevé(s) disponibles</span>
+    </div>
+    <span class="overview-chip">Semestre {{ semester.number }}</span>
+  </section>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Matricule</th>
+        <th>Étudiant</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>{{ row.student_matricule }}</td>
+          <td>{{ row.student_name }}</td>
+          <td>
+            <div class="actions">
+              <a class="action-link" href="{% url 'academics:student_semester_report' row.student_id semester.id %}">Voir relevé</a>
+              <a class="action-link primary" href="{% url 'academics:student_semester_pdf' row.student_id semester.id %}" target="_blank">PDF</a>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

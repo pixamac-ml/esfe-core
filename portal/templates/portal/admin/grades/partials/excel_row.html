@@ -1,0 +1,108 @@
+<tr>
+  <td class="checkboxCol">
+    <input type="checkbox" class="student-check" name="selected_students" value="{{ row.student_id }}" form="bulk-report-form">
+  </td>
+  <td class="numCol">{{ row.index }}</td>
+  <td class="nameCol">{{ row.student_name }}</td>
+
+  {% for ue_block in row.ue_blocks %}
+    {% for ec_row in ue_block.rows %}
+      <td class="score-cell {% if ec_row.display_status == 'validated' %}cell-ok{% elif ec_row.display_status == 'failed' %}cell-bad{% else %}cell-empty{% endif %}">
+        <div class="score-stack">
+          <input
+            class="score-input{% if row.updated_ec_id == ec_row.ec.id %} is-saved{% endif %}"
+            type="number"
+            name="note"
+            min="0"
+            max="20"
+            step="0.01"
+            value="{{ ec_row.note_input_value }}"
+            id="note-{{ row.index }}-{{ ec_row.ec.id }}"
+            hx-post="{% url 'accounts_portal:save_grade' %}"
+            hx-trigger="blur, changed delay:150ms, keyup[key=='Enter']"
+            hx-include="closest td"
+            hx-target="closest tr"
+            hx-swap="outerHTML"
+            {% if not row.can_edit_current_session %}disabled{% endif %}
+          >
+          <div class="score-meta">
+            <span class="score-token normal">
+              <span class="score-token-label">N</span>
+              <span class="score-token-value">{{ ec_row.normal_score_display|default:"0,00" }}</span>
+            </span>
+            {% if row.active_session_type == "retake" %}
+              <span class="score-token retake">
+                <span class="score-token-label">R</span>
+                <span class="score-token-value">{{ ec_row.retake_score_display|default:"0,00" }}</span>
+              </span>
+              <span class="score-token final">
+                <span class="score-token-label">F</span>
+                <span class="score-token-value">{{ ec_row.final_score_display|default:"0,00" }}</span>
+              </span>
+            {% endif %}
+          </div>
+          {% if row.active_session_type == "retake" and ec_row.has_retake_score %}
+            <span class="retake-badge">R</span>
+          {% endif %}
+        </div>
+
+        <input type="hidden" name="enrollment_id" value="{{ row.enrollment.id }}">
+        <input type="hidden" name="ec_id" value="{{ ec_row.ec.id }}">
+        <input type="hidden" name="session_type" value="{{ row.active_session_type }}">
+      </td>
+
+      <td class="metric-cell {% if ec_row.display_status == 'validated' %}cell-ok{% elif ec_row.display_status == 'failed' %}cell-bad{% else %}cell-empty{% endif %}">
+        {{ ec_row.note_coefficient_display|default:"0,00" }}
+      </td>
+
+      <td class="credit-cell {% if ec_row.display_status == 'validated' %}cell-ok{% elif ec_row.display_status == 'failed' %}cell-bad{% else %}cell-empty{% endif %}">
+        {{ ec_row.credit_obtained_display|default:"0,00" }}
+      </td>
+    {% endfor %}
+
+    <td class="unit unit-summary">
+      {{ ue_block.average_display|default:"0,00" }}
+    </td>
+
+    <td class="unit unit-summary">
+      {{ ue_block.total_note_coefficients_display|default:"0,00" }}
+    </td>
+
+    <td class="unit unit-summary {% if ue_block.credit_obtained == 0 %}cell-bad{% else %}cell-ok{% endif %}">
+      {{ ue_block.credit_obtained_display|default:"0,00" }}
+    </td>
+  {% endfor %}
+
+  <td class="semester semester-result">
+    <span class="result-label">Moyenne</span>
+    <span class="result-value">{{ row.semester_average_display|default:"0,00" }}</span>
+  </td>
+
+  <td class="semester semester-result">
+    <span class="result-label">Pourcentage</span>
+    <span class="result-value">{{ row.semester_percentage_display|default:"0,00" }}%</span>
+  </td>
+
+  <td class="semester semester-result {% if row.semester_credits == 0 %}credit-bad cell-bad{% else %}credit-ok cell-ok{% endif %}">
+    <span class="result-label">Credits</span>
+    <span class="result-value">{{ row.semester_credits_display|default:"0,00" }}</span>
+  </td>
+
+  <td class="action-cell">
+    {% if row.student_profile_id and row.semester_id and row.can_generate_reports %}
+      <div class="action-stack">
+        <a href="{% url 'academics:student_semester_report' row.student_profile_id row.semester_id %}"
+           class="row-action primary">
+            Voir releve
+        </a>
+        <a href="{% url 'academics:student_semester_pdf' row.student_id row.semester_id %}"
+           target="_blank"
+           class="row-action dark">
+            PDF
+        </a>
+      </div>
+    {% else %}
+      <span class="text-xs text-gray-400">Verrouille</span>
+    {% endif %}
+  </td>
+</tr>

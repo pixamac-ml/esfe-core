@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maquette Notes - {{ academic_class }}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <style>
+    :root{
+      --bg:#f4f7fb;
+      --panel:#ffffff;
+      --line:#d9e2ef;
+      --line-dark:#b9c8de;
+      --text:#1e293b;
+      --muted:#64748b;
+      --primary:#1d4ed8;
+      --primary-soft:#dbeafe;
+      --success:#e8f7ed;
+      --warning:#fff7da;
+      --danger:#fdecec;
+      --shadow:0 10px 30px rgba(15, 23, 42, 0.08);
+      --radius:16px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    .app{
+      min-height:100vh;
+      display:grid;
+      grid-template-columns:280px 1fr;
+    }
+
+    .sidebar{
+      background:#0f172a;
+      color:#fff;
+      padding:20px 16px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      position:sticky;
+      top:0;
+      height:100vh;
+    }
+
+    .brand{
+      padding:10px 12px 18px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+    }
+
+    .brand h1{
+      margin:0;
+      font-size:20px;
+      line-height:1.2;
+    }
+
+    .brand p{
+      margin:6px 0 0;
+      font-size:13px;
+      color:#94a3b8;
+    }
+
+    .menu-group{display:flex;flex-direction:column;gap:8px}
+    .menu-title{
+      color:#94a3b8;
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      padding:0 12px;
+      margin-top:6px;
+    }
+
+    .menu-item{
+      border:1px solid rgba(255,255,255,.06);
+      background:rgba(255,255,255,.03);
+      color:#e2e8f0;
+      border-radius:12px;
+      padding:12px 14px;
+      font-size:14px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+
+    .menu-item.active{
+      background:rgba(59,130,246,.2);
+      border-color:rgba(96,165,250,.35);
+      color:#fff;
+      font-weight:bold;
+    }
+
+    .sidebar-footer{
+      margin-top:auto;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.04);
+      border-radius:14px;
+      padding:14px;
+      font-size:13px;
+      color:#cbd5e1;
+    }
+
+    .main{
+      padding:22px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:16px;
+      flex-wrap:wrap;
+    }
+
+    .page-title h2{
+      margin:0;
+      font-size:28px;
+      line-height:1.1;
+    }
+
+    .page-title p{
+      margin:8px 0 0;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      border:1px solid var(--line-dark);
+      background:#fff;
+      color:var(--text);
+      padding:11px 15px;
+      border-radius:12px;
+      font-size:14px;
+      cursor:pointer;
+      text-decoration:none;
+    }
+
+    .btn.primary{
+      background:var(--primary);
+      border-color:var(--primary);
+      color:#fff;
+      font-weight:bold;
+    }
+
+    .btn.soft{
+      background:var(--primary-soft);
+      border-color:#bfdbfe;
+      color:#1e40af;
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(180px,1fr));
+      gap:14px;
+    }
+
+    .stat-card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:16px;
+      box-shadow:var(--shadow);
+    }
+
+    .stat-card .label{
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:10px;
+    }
+
+    .stat-card .value{
+      font-size:28px;
+      font-weight:bold;
+      line-height:1;
+      margin-bottom:8px;
+    }
+
+    .stat-card .meta{
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    .tabs{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .tab{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:10px 14px;
+      font-size:14px;
+    }
+
+    .tab.active{
+      background:var(--primary);
+      color:#fff;
+      border-color:var(--primary);
+      font-weight:bold;
+    }
+
+    .filters{
+      display:grid;
+      grid-template-columns:repeat(5,minmax(160px,1fr));
+      gap:12px;
+    }
+
+    .filter-card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px 14px;
+    }
+
+    .filter-card label{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+
+    .filter-card .valuebox{
+      width:100%;
+      border:1px solid var(--line-dark);
+      border-radius:10px;
+      padding:10px 11px;
+      font-size:14px;
+      background:#fff;
+    }
+
+    .session-switch{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .session-pill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid var(--line-dark);
+      background:#fff;
+      color:var(--text);
+      border-radius:999px;
+      padding:8px 10px;
+      text-decoration:none;
+      font-size:13px;
+      font-weight:bold;
+    }
+
+    .session-pill.active{
+      background:var(--primary);
+      border-color:var(--primary);
+      color:#fff;
+    }
+
+    .sheet-card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:20px;
+      overflow:hidden;
+      box-shadow:var(--shadow);
+    }
+
+    .sheet-head{
+      background:linear-gradient(to right, #f8fbff, #eef4ff);
+      padding:16px 18px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+    }
+
+    .sheet-head h3{
+      margin:0;
+      font-size:20px;
+    }
+
+    .sheet-head p{
+      margin:6px 0 0;
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    .sheet-meta{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .meta-chip{
+      border:1px solid #bfdbfe;
+      background:#eff6ff;
+      color:#1d4ed8;
+      font-size:12px;
+      border-radius:999px;
+      padding:7px 10px;
+      font-weight:bold;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      max-width:100%;
+    }
+
+    .action-toolbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:14px;
+      margin-bottom:16px;
+      padding:14px 18px;
+      border-bottom:1px solid var(--line);
+      background:#fff;
+    }
+
+    .toolbar-info{
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .toolbar-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .toolbar-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:9px 14px;
+      border-radius:10px;
+      border:1px solid var(--line-dark);
+      background:#fff;
+      color:var(--text);
+      text-decoration:none;
+      font-size:13px;
+      font-weight:bold;
+      cursor:pointer;
+      transition:all .18s ease;
+    }
+
+    .toolbar-btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 8px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    .toolbar-btn.primary{
+      background:var(--primary);
+      border-color:var(--primary);
+      color:#fff;
+    }
+
+    .toolbar-btn.soft{
+      background:var(--primary-soft);
+      border-color:#bfdbfe;
+      color:#1e40af;
+    }
+
+    .toolbar-btn.dark{
+      background:#0f172a;
+      border-color:#0f172a;
+      color:#fff;
+    }
+
+    .toolbar-btn.disabled,
+    .session-pill.disabled,
+    .btn.disabled{
+      opacity:.45;
+      pointer-events:none;
+      cursor:not-allowed;
+      box-shadow:none;
+      transform:none;
+    }
+
+    .status-chip{
+      border-color:#cbd5e1;
+      background:#f8fafc;
+      color:#334155;
+    }
+
+    .checkboxCol{
+      width:42px;
+      min-width:42px;
+      max-width:42px;
+      background:#fff;
+      position:sticky;
+      left:0;
+      z-index:4;
+    }
+
+    .numCol{
+      left:42px;
+      z-index:3;
+    }
+
+    .nameCol{
+      left:78px;
+    }
+
+    .student-check{
+      width:16px;
+      height:16px;
+      accent-color:var(--primary);
+      cursor:pointer;
+    }
+
+    .action-cell{
+      min-width:176px;
+      background:#fff;
+    }
+
+    .action-stack{
+      display:flex;
+      gap:6px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+
+    .row-action{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:6px 9px;
+      border-radius:8px;
+      font-size:11px;
+      font-weight:bold;
+      text-decoration:none;
+      border:1px solid var(--line-dark);
+      background:#fff;
+      color:var(--text);
+      transition:all .18s ease;
+    }
+
+    .row-action:hover{
+      transform:translateY(-1px);
+    }
+
+    .row-action.primary{
+      background:#eff6ff;
+      border-color:#bfdbfe;
+      color:#1d4ed8;
+    }
+
+    .row-action.dark{
+      background:#0f172a;
+      border-color:#0f172a;
+      color:#fff;
+    }
+
+    table{
+      border-collapse:collapse;
+      min-width:2200px;
+      width:max-content;
+      background:#fff;
+    }
+
+    th,td{
+      border:1px solid var(--line);
+      padding:6px;
+      text-align:center;
+      font-size:12px;
+      white-space:nowrap;
+      vertical-align:middle;
+      font-variant-numeric:tabular-nums;
+    }
+
+    th{
+      background:#eef3ff;
+      font-weight:bold;
+    }
+
+    .block{
+      background:#dbeafe;
+      color:#17306b;
+      font-weight:bold;
+    }
+
+    .unit{
+      background:#ede9fe;
+      color:#4c1d95;
+      font-weight:bold;
+    }
+
+    .semester{
+      background:#f1f5f9;
+      font-weight:bold;
+    }
+
+    .nameCol{
+      min-width:220px;
+      text-align:left;
+      font-weight:bold;
+      background:#fff;
+      position:sticky;
+      z-index:2;
+    }
+
+    .numCol{
+      min-width:36px;
+      background:#fff;
+      position:sticky;
+    }
+
+    .leftLabel{
+      background:#f8fafc;
+      font-weight:bold;
+    }
+
+    .v{
+      writing-mode:vertical-rl;
+      transform:rotate(180deg);
+      font-size:11px;
+      line-height:1;
+      min-width:30px;
+    }
+
+    .score-input{
+      width:64px;
+      text-align:center;
+      border:1px solid var(--line-dark);
+      padding:6px 4px;
+      border-radius:8px;
+      background:#fff;
+      font-size:13px;
+      font-weight:bold;
+      outline:none;
+    }
+
+    .score-input:focus{
+      border-color:var(--primary);
+      box-shadow:0 0 0 3px rgba(29,78,216,.12);
+    }
+
+    .score-input.is-saved{
+      border-color:#16a34a;
+      box-shadow:0 0 0 3px rgba(22,163,74,.14);
+    }
+
+    .score-input.htmx-request{
+      border-color:#1d4ed8;
+      background:#eff6ff;
+    }
+
+    .cell-ok{background-color:#dcfce7}
+    .cell-bad{background-color:#fee2e2}
+    .cell-empty{background-color:#f1f5f9}
+    .cell-warn{background:var(--warning)}
+
+    .score-cell{
+      width:118px;
+      min-width:118px;
+      max-width:118px;
+      padding:6px 8px;
+    }
+
+    .metric-cell{
+      width:82px;
+      min-width:82px;
+      max-width:82px;
+      font-weight:bold;
+    }
+
+    .credit-cell{
+      width:92px;
+      min-width:92px;
+      max-width:92px;
+      font-weight:bold;
+    }
+
+    .score-stack{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:5px;
+      min-height:74px;
+    }
+
+    .score-meta{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(0, 1fr));
+      width:100%;
+      gap:3px;
+      color:#334155;
+      font-size:10px;
+      line-height:1.15;
+    }
+
+    .score-token{
+      display:flex;
+      flex-direction:column;
+      gap:1px;
+      border:1px solid rgba(148,163,184,.45);
+      background:rgba(255,255,255,.7);
+      border-radius:6px;
+      padding:3px 2px;
+    }
+
+    .score-token.normal{
+      border-color:#cbd5e1;
+      background:#f8fafc;
+    }
+
+    .score-token.retake{
+      border-color:#fdba74;
+      background:#ffedd5;
+    }
+
+    .score-token.final{
+      border-color:#86efac;
+      background:#dcfce7;
+    }
+
+    .score-token-label{
+      color:#64748b;
+      font-size:9px;
+      font-weight:bold;
+      letter-spacing:.04em;
+    }
+
+    .score-token-value{
+      color:#0f172a;
+      font-weight:bold;
+      font-size:10px;
+    }
+
+    .score-token.retake .score-token-label,
+    .score-token.retake .score-token-value{
+      color:#c2410c;
+    }
+
+    .score-token.final .score-token-label,
+    .score-token.final .score-token-value{
+      color:#15803d;
+    }
+
+    .retake-badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:18px;
+      height:18px;
+      border-radius:999px;
+      background:#1d4ed8;
+      color:#fff;
+      font-size:10px;
+      font-weight:bold;
+    }
+
+    .unit-summary{
+      width:92px;
+      min-width:92px;
+      max-width:92px;
+      font-weight:bold;
+      color:#4c1d95;
+    }
+
+    .semester-result{
+      width:112px;
+      min-width:112px;
+      max-width:112px;
+      background:#f8fafc;
+      font-weight:bold;
+    }
+
+    .semester-result .result-label{
+      display:block;
+      color:#64748b;
+      font-size:10px;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+      margin-bottom:2px;
+    }
+
+    .semester-result .result-value{
+      display:block;
+      color:#0f172a;
+      font-size:15px;
+      line-height:1.1;
+    }
+
+    .semester-result.credit-ok .result-value{
+      color:#15803d;
+    }
+
+    .semester-result.credit-bad .result-value{
+      color:#b91c1c;
+    }
+
+    @media (max-width: 1200px){
+      .app{grid-template-columns:1fr}
+      .sidebar{display:none}
+      .stats{grid-template-columns:repeat(2,minmax(180px,1fr))}
+      .filters{grid-template-columns:repeat(2,minmax(160px,1fr))}
+      .nameCol,.numCol{position:static}
+    }
+
+    @media (max-width: 700px){
+      .stats,.filters{grid-template-columns:1fr}
+      .main{padding:14px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Felix Sante</h1>
+        <p>Dashboard informaticien - notes et resultats</p>
+      </div>
+
+      <div class="menu-group">
+        <div class="menu-title">Pilotage</div>
+        <div class="menu-item active"><span>Saisie des notes</span><span>*</span></div>
+        <div class="menu-item"><span>Sessions</span><span>{{ semester.number }}</span></div>
+        <div class="menu-item"><span>Classe</span><span>{{ academic_class.level }}</span></div>
+        <div class="menu-item"><span>Exports</span><span>PDF</span></div>
+      </div>
+
+      <div class="menu-group">
+        <div class="menu-title">Structure</div>
+        <div class="menu-item"><span>Etudiants</span><span>{{ rows|length }}</span></div>
+        <div class="menu-item"><span>UE / EC</span><span>{{ ues|length }}</span></div>
+        <div class="menu-item"><span>Seuil</span><span>{{ academic_class.validation_threshold|default:"10" }}/20</span></div>
+      </div>
+
+      <div class="sidebar-footer">
+        Vue de saisie centralisee fidele a la maquette validee.
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="topbar">
+        <div class="page-title">
+          <h2>Dashboard de gestion des notes</h2>
+          <p>Vue classe + semestre - structure fidele au tableau Excel valide.</p>
+        </div>
+        <div class="top-actions">
+          <a class="btn" href="javascript:history.back()">Retour</a>
+          <a class="btn soft {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" href="{% if workflow_permissions.can_generate_reports %}{% url 'academics:export_class_reports' semester.id %}{% else %}#{% endif %}">Exporter PDF</a>
+          {% if workflow_permissions.can_publish and publish_ready %}
+            <form method="POST" action="{% url 'accounts_portal:publish_semester' enrollment.id semester.id %}">
+              {% csrf_token %}
+              <button type="submit" class="btn primary">Publier les resultats</button>
+            </form>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="stats">
+        <div class="stat-card">
+          <div class="label">Classe active</div>
+          <div class="value">{{ academic_class.level }}</div>
+          <div class="meta">{{ academic_class.programme }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Etudiants affiches</div>
+          <div class="value">{{ rows|length }}</div>
+          <div class="meta">Classe courante</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Credits semestre</div>
+          <div class="value">
+            {% for row in rows|slice:":1" %}
+              {{ row.semester_required_credits_display|default:"0,00" }}
+            {% endfor %}
+          </div>
+          <div class="meta">Total requis dynamique</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Seuil</div>
+          <div class="value">{{ academic_class.validation_threshold|default:"10" }}</div>
+          <div class="meta">Validation / 20</div>
+        </div>
+      </section>
+
+      <section class="tabs">
+        <div class="tab active">{{ academic_class.level }} {{ academic_class.programme }}</div>
+      </section>
+
+      <section class="filters">
+        <div class="filter-card">
+          <label>Annee academique</label>
+          <div class="valuebox">{{ academic_class.academic_year }}</div>
+        </div>
+        <div class="filter-card">
+          <label>Semestre</label>
+          <div class="valuebox">Semestre {{ semester.number }}</div>
+        </div>
+        <div class="filter-card">
+          <label>Session</label>
+          <div class="session-switch">
+            <a
+              class="session-pill {% if active_session_type == 'normal' %}active{% endif %} {% if not workflow_permissions.can_enter_normal %}disabled{% endif %}"
+              href="{% if workflow_permissions.can_enter_normal %}?session=normal{% else %}#{% endif %}"
+            >
+              Normale
+            </a>
+            <a
+              class="session-pill {% if active_session_type == 'retake' %}active{% endif %} {% if not workflow_permissions.can_enter_retake %}disabled{% endif %}"
+              href="{% if workflow_permissions.can_enter_retake %}?session=retake{% else %}#{% endif %}"
+            >
+              Rattrapage
+            </a>
+          </div>
+        </div>
+        <div class="filter-card">
+          <label>Seuil de validation</label>
+          <div class="valuebox">{{ academic_class.validation_threshold|default:"10" }} / 20</div>
+        </div>
+        <div class="filter-card">
+          <label>Annexe</label>
+          <div class="valuebox">{{ academic_class.branch }}</div>
+        </div>
+      </section>
+
+      <section class="sheet-card">
+        <div class="sheet-head">
+          <div>
+            <h3>Classe : {{ academic_class }}</h3>
+            <p>Maquette de reference de production, rendue dynamiquement avec les donnees de la base.</p>
+          </div>
+          <div class="sheet-meta">
+            <span class="meta-chip">Annee : {{ academic_class.academic_year }}</span>
+            <span class="meta-chip">Semestre {{ semester.number }}</span>
+            <span class="meta-chip">Session {{ active_session_label }}</span>
+            <span class="meta-chip status-chip">{{ workflow_badge.icon|safe }} {{ workflow_badge.label }}</span>
+          </div>
+        </div>
+
+        <form id="bulk-report-form" method="POST" action="{% url 'academics:export_selected_reports' semester.id %}">
+          {% csrf_token %}
+          <div class="action-toolbar flex justify-between items-center mb-4">
+            <div class="toolbar-info">
+              Selection multiple active pour l'export individuel et groupe.
+            </div>
+            <div class="toolbar-actions">
+              <button type="submit" class="toolbar-btn primary {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}>Exporter selection</button>
+              <a href="{% url 'academics:export_class_reports' semester.id %}" class="toolbar-btn dark {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}">Exporter tous</a>
+              <a href="{% url 'academics:class_reports_overview' semester.id %}" class="toolbar-btn soft {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" target="_blank">Voir releve global</a>
+              <a href="{% url 'academics:annual_class_report' academic_class.id %}" class="toolbar-btn {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" target="_blank">Releve annuel</a>
+            </div>
+          </div>
+        </form>
+
+        <div class="table-wrap" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+          <table>
+            <tr>
+              <th colspan="3">Etudiants</th>
+              {% for ue in ues %}
+                <th colspan="{{ ue.ecs.count|add:ue.ecs.count|add:ue.ecs.count|add:3 }}" class="block">
+                  {{ ue.code }} - {{ ue.title }}
+                </th>
+              {% endfor %}
+              <th colspan="3" class="semester">RESULTAT DU SEMESTRE</th>
+              <th rowspan="4" class="semester">Actions</th>
+            </tr>
+
+            <tr>
+              <th colspan="3" class="v">Matieres</th>
+              {% for ue in ues %}
+                {% for ec in ue.ecs.all %}
+                  <th colspan="3">{{ ec.title }}</th>
+                {% endfor %}
+                <th colspan="3" class="unit">Unite</th>
+              {% endfor %}
+              <th colspan="3" class="semester"></th>
+            </tr>
+
+            <tr>
+              <th colspan="3" class="leftLabel">Credits requis</th>
+              {% for ue in ues %}
+                {% for ec in ue.ecs.all %}
+                  <th colspan="3">{{ ec.credit_required }}</th>
+                {% endfor %}
+                <th colspan="3" class="unit">{{ ue.credit_required }}</th>
+              {% endfor %}
+              <th colspan="3" class="semester">
+                {% for row in rows|slice:":1" %}
+                  {{ row.semester_required_credits_display|default:"0,00" }}
+                {% endfor %}
+              </th>
+            </tr>
+
+            <tr>
+              <th colspan="3" class="leftLabel">Coefficients</th>
+              {% for ue in ues %}
+                {% for ec in ue.ecs.all %}
+                  <th colspan="3">{{ ec.coefficient }}</th>
+                {% endfor %}
+                <th colspan="3" class="unit">{{ ue.coefficient }}</th>
+              {% endfor %}
+              <th colspan="3" class="semester">
+                {% for row in rows|slice:":1" %}
+                  {{ row.semester_total_coefficients_display|default:"0,00" }}
+                {% endfor %}
+              </th>
+            </tr>
+
+            <tr>
+              <th class="checkboxCol">
+                <input type="checkbox" class="student-check" onclick="document.querySelectorAll('input[name=&quot;selected_students&quot;]').forEach(cb => cb.checked = this.checked)">
+              </th>
+              <th></th>
+              <th></th>
+              {% for ue in ues %}
+                {% for ec in ue.ecs.all %}
+                  <th class="v">Note</th>
+                  <th class="v">Note coef.</th>
+                  <th class="v">Credits obtenus</th>
+                {% endfor %}
+                <th class="v unit">Note</th>
+                <th class="v unit">Note coef.</th>
+                <th class="v unit">Credits obtenus</th>
+              {% endfor %}
+              <th class="v semester">Moyenne</th>
+              <th class="v semester">Pourcentage</th>
+              <th class="v semester">Credits</th>
+            </tr>
+
+            {% for row in rows %}
+              {% include "portal/admin/grades/partials/excel_row.html" with row=row %}
+            {% endfor %}
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

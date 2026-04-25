@@ -1,0 +1,157 @@
+{% extends "academics/reports/base_report.html" %}
+
+{% block title %}Résultat annuel {{ academic_year.name }}{% endblock %}
+{% block report_title %}Résultat Annuel{% endblock %}
+{% block report_subtitle %}Décision basée sur la validation des semestres{% endblock %}
+{% block footer_left %}Année académique {{ academic_year.name }}{% endblock %}
+{% block footer_right %}Étudiant {{ student.matricule|default:"N/A" }}{% endblock %}
+
+{% block content %}
+  <style>
+    .year-meta {
+      border: 1px solid #d9dfeb;
+      border-radius: 14px;
+      background: #f8faff;
+      padding: 16px 18px;
+      margin-bottom: 18px;
+    }
+
+    .year-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 24px;
+      margin-bottom: 8px;
+    }
+
+    .year-meta-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .year-meta-item {
+      min-width: 220px;
+    }
+
+    .year-meta-label {
+      color: #5b6474;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-right: 6px;
+    }
+
+    .year-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .year-card {
+      border: 1px solid #d9dfeb;
+      border-radius: 12px;
+      background: #fff;
+      padding: 14px;
+    }
+
+    .year-card .label {
+      color: #5b6474;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 8px;
+    }
+
+    .year-card .value {
+      color: #163c7a;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .decision-card .value {
+      font-size: 28px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      border: 1px solid #cfd6e4;
+      padding: 10px 12px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    thead th {
+      background: #edf2fb;
+      font-weight: 600;
+    }
+
+    .status-ok {
+      color: #15803d;
+      font-weight: 700;
+    }
+
+    .status-bad {
+      color: #b91c1c;
+      font-weight: 700;
+    }
+  </style>
+
+  <section class="year-meta">
+    <div class="year-meta-row">
+      <div class="year-meta-item"><span class="year-meta-label">Étudiant</span>{{ student.user.last_name }} {{ student.user.first_name }}</div>
+      <div class="year-meta-item"><span class="year-meta-label">Matricule</span>{{ student.matricule|default:"N/A" }}</div>
+      <div class="year-meta-item"><span class="year-meta-label">Année</span>{{ academic_year.name }}</div>
+    </div>
+    <div class="year-meta-row">
+      <div class="year-meta-item"><span class="year-meta-label">Classe</span>{{ enrollment.academic_class }}</div>
+      <div class="year-meta-item"><span class="year-meta-label">Filière</span>{{ enrollment.programme }}</div>
+      <div class="year-meta-item"><span class="year-meta-label">Annexe</span>{{ enrollment.branch }}</div>
+    </div>
+  </section>
+
+  <section class="year-summary">
+    <article class="year-card">
+      <div class="label">Moyenne S1</div>
+      <div class="value">{{ S1.average_display }}</div>
+    </article>
+    <article class="year-card">
+      <div class="label">Moyenne S2</div>
+      <div class="value">{{ S2.average_display }}</div>
+    </article>
+    <article class="year-card decision-card">
+      <div class="label">Décision finale</div>
+      <div class="value">{{ decision }}</div>
+    </article>
+  </section>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Semestre</th>
+        <th>Moyenne</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{% if S1.semester %}Semestre {{ S1.semester.number }}{% else %}Semestre 1{% endif %}</td>
+        <td>{{ S1.average_display }}</td>
+        <td class="{% if S1.is_validated %}status-ok{% else %}status-bad{% endif %}">{{ S1.status }}</td>
+      </tr>
+      <tr>
+        <td>{% if S2.semester %}Semestre {{ S2.semester.number }}{% else %}Semestre 2{% endif %}</td>
+        <td>{{ S2.average_display }}</td>
+        <td class="{% if S2.is_validated %}status-ok{% else %}status-bad{% endif %}">{{ S2.status }}</td>
+      </tr>
+      <tr>
+        <td colspan="2"><strong>Décision finale</strong></td>
+        <td><strong>{{ decision }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+{% endblock %}

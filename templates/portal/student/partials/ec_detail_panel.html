@@ -37,7 +37,7 @@
                 <h2 class="mt-1 text-lg font-bold text-[color:var(--text)]">{{ chapter.title }}</h2>
               </div>
               <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-1 text-[11px] font-bold text-[color:var(--muted)]">
-                {{ chapter.active_contents|length }} contenu{{ chapter.active_contents|pluralize }}
+                {{ chapter.active_content_count }} contenu{{ chapter.active_content_count|pluralize }}
               </span>
             </div>
 
@@ -65,10 +65,21 @@
                             target="_blank"
                             rel="noopener noreferrer"
                             data-track-content="{{ content.id }}"
-                            data-track-progress="20"
+                            data-track-progress="{{ content.initial_progress_step }}"
                             class="inline-flex items-center rounded-xl border border-[color:var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:border-primary-200 hover:text-primary-600"
                           >
                             Ouvrir
+                          </a>
+                        {% elif content.video_url and not content.embed_video_url %}
+                          <a
+                            href="{{ content.video_url }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-track-content="{{ content.id }}"
+                            data-track-progress="{{ content.initial_progress_step }}"
+                            class="inline-flex items-center rounded-xl border border-[color:var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:border-primary-200 hover:text-primary-600"
+                          >
+                            Ouvrir la video
                           </a>
                         {% endif %}
                         <button
@@ -86,15 +97,21 @@
                         <div class="h-full rounded-full bg-gradient-to-r from-[color:var(--school-primary)] to-[color:var(--school-secondary)]" style="width: {{ content.student_progress_percent }}%"></div>
                       </div>
 
-                      {% if content.content_type == "video" and content.video_url %}
+                      {% if content.preview_notice %}
+                        <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
+                          {{ content.preview_notice }}
+                        </div>
+                      {% endif %}
+
+                      {% if content.content_type == "video" and content.embed_video_url %}
                         <div class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-black">
                           <iframe
-                            src="{{ content.video_url }}"
+                            src="{{ content.embed_video_url }}"
                             class="aspect-video w-full"
                             allowfullscreen
                             loading="lazy"
                             data-track-content="{{ content.id }}"
-                            data-track-progress="15"
+                            data-track-progress="{{ content.initial_progress_step }}"
                           ></iframe>
                         </div>
                       {% elif content.content_type == "audio" and content.file %}
@@ -112,7 +129,7 @@
                           alt="{{ content.title }}"
                           class="max-h-[24rem] w-full rounded-xl border border-[color:var(--line)] object-contain bg-white"
                           data-track-content="{{ content.id }}"
-                          data-track-progress="60"
+                          data-track-progress="{{ content.initial_progress_step }}"
                         >
                       {% elif content.content_type == "pdf" and content.file %}
                         <div class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-white">
@@ -121,26 +138,36 @@
                             class="h-[28rem] w-full"
                             loading="lazy"
                             data-track-content="{{ content.id }}"
-                            data-track-progress="25"
+                            data-track-progress="{{ content.initial_progress_step }}"
                           ></iframe>
                         </div>
                       {% elif content.content_type == "text" and content.text_content %}
                         <div
                           class="whitespace-pre-line rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm leading-7 text-[color:var(--text)]"
                           data-track-content="{{ content.id }}"
-                          data-track-progress="40"
+                          data-track-progress="{{ content.initial_progress_step }}"
                         >
                           {{ content.text_content }}
                         </div>
                       {% elif content.document_like and content.file %}
                         <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
-                          Apercu integre indisponible pour ce format. Utilisez le bouton <strong>Ouvrir</strong> pour consulter le document.
+                          Ce format n'est pas previsualisable dans le dashboard. Utilisez le bouton <strong>Ouvrir</strong> pour consulter le document.
                         </div>
                       {% elif content.file %}
                         <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
                           Fichier disponible a la consultation.
                         </div>
+                      {% elif content.video_url %}
+                        <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
+                          La video existe mais n'est pas integrable ici. Ouvrez-la dans un nouvel onglet.
+                        </div>
+                      {% else %}
+                        <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
+                          La ressource de ce contenu n'est pas disponible pour le moment.
+                        </div>
                       {% endif %}
+
+                      <p class="text-xs text-[color:var(--muted)]">{{ content.completion_hint }}</p>
                     </div>
                   </div>
                 </article>

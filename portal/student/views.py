@@ -1,4 +1,5 @@
 import json
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth.decorators import login_required
 from django.db import connection
@@ -33,6 +34,46 @@ def _content_prefetch():
         "contents",
         queryset=ECContent.objects.filter(is_active=True).order_by("order", "id"),
     )
+
+
+def _get_video_embed_url(video_url: str) -> str:
+    if not video_url:
+        return ""
+    parsed = urlparse(video_url)
+    host = (parsed.netloc or "").lower()
+
+    if "youtube.com" in host:
+        query = parse_qs(parsed.query)
+        video_id = (query.get("v") or [""])[0]
+        if video_id:
+            return f"https://www.youtube.com/embed/{video_id}"
+        if "/embed/" in parsed.path:
+            return video_url
+    if "youtu.be" in host:
+        video_id = parsed.path.strip("/")
+        if video_id:
+            return f"https://www.youtube.com/embed/{video_id}"
+    if "vimeo.com" in host:
+        video_id = parsed.path.strip("/")
+        if video_id.isdigit():
+            return f"https://player.vimeo.com/video/{video_id}"
+    return ""
+
+
+def _content_progress_defaults(content):
+    if content.content_type == ECContent.CONTENT_TYPE_TEXT:
+        return {"initial_progress": 60, "completion_hint": "Lecture du texte puis validation manuelle."}
+    if content.content_type == ECContent.CONTENT_TYPE_PDF:
+        return {"initial_progress": 35, "completion_hint": "Consultation du support PDF."}
+    if content.content_type in {ECContent.CONTENT_TYPE_DOC, ECContent.CONTENT_TYPE_EXCEL, ECContent.CONTENT_TYPE_PPT}:
+        return {"initial_progress": 25, "completion_hint": "Ouverture du document bureautique."}
+    if content.content_type == ECContent.CONTENT_TYPE_IMAGE:
+        return {"initial_progress": 70, "completion_hint": "Consultation du visuel pedagogique."}
+    if content.content_type == ECContent.CONTENT_TYPE_VIDEO:
+        return {"initial_progress": 15, "completion_hint": "Progression mise a jour pendant la lecture video."}
+    if content.content_type == ECContent.CONTENT_TYPE_AUDIO:
+        return {"initial_progress": 10, "completion_hint": "Progression mise a jour pendant l'ecoute audio."}
+    return {"initial_progress": 20, "completion_hint": "Consultation du contenu."}
 
 
 def _get_student_ec_queryset(enrollment):
@@ -76,16 +117,17 @@ def _prepare_chapter_contents(request, user, chapters):
 
     for chapter in chapters:
         chapter.active_contents = list(chapter.contents.all())
+        chapter.active_content_count = len(chapter.active_contents)
         for content in chapter.active_contents:
             progress_entry = progress_map.get(content.id)
             content.student_progress_percent = progress_entry.progress_percent if progress_entry else 0
             content.student_is_completed = progress_entry.is_completed if progress_entry else False
             content.student_last_position = progress_entry.last_position if progress_entry else 0
             content.absolute_file_url = request.build_absolute_uri(content.file.url) if content.file else ""
-            content.preview_with_iframe = content.content_type in {
-                ECContent.CONTENT_TYPE_PDF,
-                ECContent.CONTENT_TYPE_VIDEO,
-            }
+            defaults = _content_progress_defaults(content)
+            content.initial_progress_step = defaults["initial_progress"]
+            content.completion_hint = defaults["completion_hint"]
+            content.embed_video_url = _get_video_embed_url(content.video_url or "")
             content.preview_as_media = content.content_type in {
                 ECContent.CONTENT_TYPE_AUDIO,
                 ECContent.CONTENT_TYPE_IMAGE,
@@ -95,6 +137,34 @@ def _prepare_chapter_contents(request, user, chapters):
                 ECContent.CONTENT_TYPE_EXCEL,
                 ECContent.CONTENT_TYPE_PPT,
             }
+            content.preview_with_iframe = bool(content.embed_video_url) or content.content_type == ECContent.CONTENT_TYPE_PDF
+            content.has_inline_preview = (
+                (content.content_type == ECContent.CONTENT_TYPE_VIDEO and bool(content.embed_video_url))
+                or (content.content_type == ECContent.CONTENT_TYPE_AUDIO and bool(content.file))
+                or (content.content_type == ECContent.CONTENT_TYPE_IMAGE and bool(content.file))
+                or (content.content_type == ECContent.CONTENT_TYPE_PDF and bool(content.file))
+                or (content.content_type == ECContent.CONTENT_TYPE_TEXT and bool((content.text_content or "").strip()))
+            )
+            content.has_accessible_source = bool(content.file or content.video_url or (content.text_content or "").strip())
+            content.has_broken_source = not content.has_accessible_source
+            content.source_label = {
+                ECContent.CONTENT_TYPE_PDF: "Support PDF",
+                ECContent.CONTENT_TYPE_VIDEO: "Video",
+                ECContent.CONTENT_TYPE_DOC: "Document Word",
+                ECContent.CONTENT_TYPE_EXCEL: "Fichier Excel",
+                ECContent.CONTENT_TYPE_PPT: "Presentation",
+                ECContent.CONTENT_TYPE_IMAGE: "Image",
+                ECContent.CONTENT_TYPE_AUDIO: "Audio",
+                ECContent.CONTENT_TYPE_TEXT: "Texte",
+            }.get(content.content_type, "Contenu")
+            if content.content_type == ECContent.CONTENT_TYPE_VIDEO and not content.embed_video_url and content.video_url:
+                content.preview_notice = "La video ne peut pas etre integree ici. Utilisez le lien d'ouverture."
+            elif content.document_like and content.file:
+                content.preview_notice = "Apercu integre non disponible pour ce format. Ouvrez le document dans un nouvel onglet."
+            elif content.has_broken_source:
+                content.preview_notice = "La ressource source est indisponible ou incomplete."
+            else:
+                content.preview_notice = ""
 
     return chapters
 

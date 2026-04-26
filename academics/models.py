@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from branches.models import Branch
@@ -205,8 +206,18 @@ class AcademicEnrollment(models.Model):
     def clean(self):
         errors = {}
 
-        if self.inscription.status != "active":
-            errors["inscription"] = "L'inscription doit être active pour créer une inscription académique."
+        validated_payment_exists = self.inscription.payments.filter(status="validated").exists()
+        linked_student_exists = hasattr(self.inscription, "student")
+
+        if not (
+            self.inscription.status in {"partial_paid", "active"}
+            or validated_payment_exists
+            or linked_student_exists
+        ):
+            errors["inscription"] = (
+                "L'inscription doit avoir au moins un paiement valide ou un etudiant cree "
+                "pour permettre la creation d'une inscription academique."
+            )
 
         candidature = self.inscription.candidature
 
@@ -454,12 +465,18 @@ class ECContent(models.Model):
     CONTENT_TYPE_VIDEO = "video"
     CONTENT_TYPE_DOC = "doc"
     CONTENT_TYPE_EXCEL = "excel"
+    CONTENT_TYPE_PPT = "ppt"
+    CONTENT_TYPE_IMAGE = "image"
+    CONTENT_TYPE_AUDIO = "audio"
     CONTENT_TYPE_TEXT = "text"
     CONTENT_TYPE_CHOICES = [
         (CONTENT_TYPE_PDF, "PDF"),
         (CONTENT_TYPE_VIDEO, "Vidéo"),
         (CONTENT_TYPE_DOC, "Word"),
         (CONTENT_TYPE_EXCEL, "Excel"),
+        (CONTENT_TYPE_PPT, "PowerPoint"),
+        (CONTENT_TYPE_IMAGE, "Image"),
+        (CONTENT_TYPE_AUDIO, "Audio"),
         (CONTENT_TYPE_TEXT, "Texte"),
     ]
 
@@ -473,8 +490,11 @@ class ECContent(models.Model):
     file = models.FileField(upload_to="courses/", null=True, blank=True)
     video_url = models.URLField(null=True, blank=True)
     text_content = models.TextField(blank=True)
+    duration = models.PositiveIntegerField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["order", "id"]
@@ -490,11 +510,15 @@ class ECContent(models.Model):
 
     def clean(self):
         errors = {}
+        text_value = (self.text_content or "").strip()
 
         file_based_types = {
             self.CONTENT_TYPE_PDF,
             self.CONTENT_TYPE_DOC,
             self.CONTENT_TYPE_EXCEL,
+            self.CONTENT_TYPE_PPT,
+            self.CONTENT_TYPE_IMAGE,
+            self.CONTENT_TYPE_AUDIO,
         }
         if self.content_type in file_based_types and not self.file:
             errors["file"] = "Un fichier est requis pour ce type de contenu."
@@ -502,17 +526,70 @@ class ECContent(models.Model):
         if self.content_type == self.CONTENT_TYPE_VIDEO and not self.video_url:
             errors["video_url"] = "Une URL vidéo est requise pour ce type de contenu."
 
-        if self.content_type == self.CONTENT_TYPE_TEXT and not self.text_content.strip():
+        if self.content_type == self.CONTENT_TYPE_TEXT and not text_value:
             errors["text_content"] = "Un texte est requis pour ce type de contenu."
 
         if self.content_type != self.CONTENT_TYPE_VIDEO and self.video_url:
             errors["video_url"] = "L'URL vidéo ne doit être utilisée que pour un contenu vidéo."
 
-        if self.content_type != self.CONTENT_TYPE_TEXT and self.text_content.strip():
+        if self.content_type != self.CONTENT_TYPE_TEXT and text_value:
             errors["text_content"] = "Le texte direct n'est disponible que pour le type Texte."
+
+        if self.content_type not in file_based_types and self.file:
+            errors["file"] = "Le fichier n'est disponible que pour les contenus bases sur fichier."
+
+        if self.duration is not None and self.duration <= 0:
+            errors["duration"] = "La duree doit etre superieure a 0."
 
         if errors:
             raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class StudentContentProgress(models.Model):
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="content_progresses",
+    )
+    content = models.ForeignKey(
+        ECContent,
+        on_delete=models.CASCADE,
+        related_name="student_progresses",
+    )
+    is_completed = models.BooleanField(default=False)
+    progress_percent = models.PositiveSmallIntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
+    last_position = models.PositiveIntegerField(default=0)
+    first_viewed_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        verbose_name = "Progression contenu etudiant"
+        verbose_name_plural = "Progressions contenus etudiants"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "content"],
+                name="unique_student_content_progress",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.student} - {self.content} ({self.progress_percent}%)"
+
+    def clean(self):
+        if self.is_completed and self.progress_percent < 100:
+            self.progress_percent = 100
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class ECGrade(models.Model):
@@ -623,3 +700,161 @@ class ECGrade(models.Model):
         self.full_clean()
         apply_ec_grade(self)
         super().save(*args, **kwargs)
+
+
+class AcademicScheduleEvent(models.Model):
+    EVENT_TYPE_COURSE = "course"
+    EVENT_TYPE_EXAM = "exam"
+    EVENT_TYPE_MEETING = "meeting"
+    EVENT_TYPE_PRACTICAL = "practical"
+    EVENT_TYPE_SEMINAR = "seminar"
+    EVENT_TYPE_OTHER = "other"
+    EVENT_TYPE_CHOICES = [
+        (EVENT_TYPE_COURSE, "Cours"),
+        (EVENT_TYPE_EXAM, "Examen"),
+        (EVENT_TYPE_MEETING, "Reunion"),
+        (EVENT_TYPE_PRACTICAL, "Travaux pratiques"),
+        (EVENT_TYPE_SEMINAR, "Seminaire"),
+        (EVENT_TYPE_OTHER, "Autre"),
+    ]
+
+    STATUS_DRAFT = "draft"
+    STATUS_PLANNED = "planned"
+    STATUS_ONGOING = "ongoing"
+    STATUS_COMPLETED = "completed"
+    STATUS_POSTPONED = "postponed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_PLANNED, "Planifie"),
+        (STATUS_ONGOING, "En cours"),
+        (STATUS_COMPLETED, "Termine"),
+        (STATUS_POSTPONED, "Reporte"),
+        (STATUS_CANCELLED, "Annule"),
+    ]
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, default=EVENT_TYPE_COURSE, db_index=True)
+    academic_class = models.ForeignKey("AcademicClass", on_delete=models.PROTECT, related_name="schedule_events")
+    ec = models.ForeignKey("EC", on_delete=models.PROTECT, related_name="schedule_events")
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="teaching_schedule_events")
+    branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="schedule_events")
+    academic_year = models.ForeignKey("AcademicYear", on_delete=models.PROTECT, related_name="schedule_events")
+    start_datetime = models.DateTimeField(db_index=True)
+    end_datetime = models.DateTimeField(db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+    location = models.CharField(max_length=255, blank=True)
+    is_online = models.BooleanField(default=False)
+    meeting_link = models.URLField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_schedule_events")
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="updated_schedule_events")
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["start_datetime", "id"]
+        verbose_name = "Evenement academique"
+        verbose_name_plural = "Evenements academiques"
+        indexes = [
+            models.Index(fields=["branch", "academic_year", "start_datetime"]),
+            models.Index(fields=["academic_class", "start_datetime"]),
+            models.Index(fields=["teacher", "start_datetime"]),
+            models.Index(fields=["status", "start_datetime"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} - {self.academic_class} ({self.start_datetime:%d/%m %H:%M})"
+
+    @property
+    def duration_minutes(self):
+        return int((self.end_datetime - self.start_datetime).total_seconds() // 60)
+
+    def clean(self):
+        errors = {}
+
+        if self.start_datetime and self.end_datetime and self.start_datetime >= self.end_datetime:
+            errors["end_datetime"] = "La date de fin doit etre posterieure a la date de debut."
+
+        if self.academic_class_id and self.branch_id and self.academic_class.branch_id != self.branch_id:
+            errors["branch"] = "L'annexe ne correspond pas a la classe academique."
+
+        if self.academic_class_id and self.academic_year_id and self.academic_class.academic_year_id != self.academic_year_id:
+            errors["academic_year"] = "L'annee academique ne correspond pas a la classe academique."
+
+        if self.ec_id and self.academic_class_id and self.ec.ue.semester.academic_class_id != self.academic_class_id:
+            errors["ec"] = "L'EC ne correspond pas a la classe academique selectionnee."
+
+        if self.is_online and not self.meeting_link:
+            errors["meeting_link"] = "Le lien de reunion est obligatoire pour un evenement en ligne."
+
+        if not self.is_online and self.meeting_link and not self.location:
+            # allowed but encourage explicit destination
+            pass
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class AcademicScheduleChangeLog(models.Model):
+    ACTION_CREATED = "created"
+    ACTION_UPDATED = "updated"
+    ACTION_POSTPONED = "postponed"
+    ACTION_CANCELLED = "cancelled"
+    ACTION_COMPLETED = "completed"
+    ACTION_CHOICES = [
+        (ACTION_CREATED, "Cree"),
+        (ACTION_UPDATED, "Mis a jour"),
+        (ACTION_POSTPONED, "Reporte"),
+        (ACTION_CANCELLED, "Annule"),
+        (ACTION_COMPLETED, "Termine"),
+    ]
+
+    event = models.ForeignKey(AcademicScheduleEvent, on_delete=models.CASCADE, related_name="change_logs")
+    action_type = models.CharField(max_length=20, choices=ACTION_CHOICES, db_index=True)
+    old_start_datetime = models.DateTimeField(null=True, blank=True)
+    old_end_datetime = models.DateTimeField(null=True, blank=True)
+    new_start_datetime = models.DateTimeField(null=True, blank=True)
+    new_end_datetime = models.DateTimeField(null=True, blank=True)
+    old_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, blank=True)
+    reason = models.TextField(blank=True)
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="schedule_change_logs")
+    changed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-changed_at", "-id"]
+        verbose_name = "Historique emploi du temps"
+        verbose_name_plural = "Historiques emploi du temps"
+
+    def __str__(self):
+        return f"{self.event} - {self.action_type}"
+
+
+class AcademicScheduleExecutionLog(models.Model):
+    event = models.ForeignKey(AcademicScheduleEvent, on_delete=models.CASCADE, related_name="execution_logs")
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    actual_teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="executed_schedule_events")
+    notes = models.TextField(blank=True)
+    is_completed = models.BooleanField(default=False)
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="completed_schedule_execution_logs", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Execution emploi du temps"
+        verbose_name_plural = "Executions emploi du temps"
+
+    def __str__(self):
+        return f"{self.event} - execution"
+
+    def clean(self):
+        errors = {}
+        if self.started_at and self.ended_at and self.started_at > self.ended_at:
+            errors["ended_at"] = "La fin d'execution doit etre posterieure au debut."
+        if self.is_completed and not self.completed_by:
+            errors["completed_by"] = "Un responsable de cloture est requis quand l'execution est terminee."
+        if errors:
+            raise ValidationError(errors)

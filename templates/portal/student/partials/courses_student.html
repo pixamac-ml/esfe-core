@@ -1,0 +1,64 @@
+<div class="mb-5 flex items-start justify-between gap-3">
+  <div>
+    <p class="student-section-kicker">Cours</p>
+    <h3 class="mt-1 student-section-title">Matieres et contenus</h3>
+  </div>
+  <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-extrabold text-[color:var(--muted)]">
+    {{ courses|length }} element{{ courses|length|pluralize }}
+  </span>
+</div>
+
+{% if courses %}
+  <div class="grid gap-3 xl:grid-cols-2">
+    {% for course in courses %}
+      <article class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--card)]">
+        <div class="flex items-center justify-between border-b border-[color:var(--line)] bg-[color:var(--card-soft)] px-4 py-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
+              <i data-lucide="{{ course.icon }}" style="width:18px;height:18px;"></i>
+            </div>
+            <div class="min-w-0">
+              <h4 class="truncate text-sm font-black tracking-tight text-[color:var(--text)]">{{ course.title }}</h4>
+              <p class="truncate text-xs font-bold uppercase tracking-wide text-[color:var(--muted-2)]">S{{ course.semester }} · {{ course.code }}</p>
+            </div>
+          </div>
+          <span class="ml-3 shrink-0 rounded-full bg-[color:var(--school-primary-soft)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--school-primary)]">{{ course.progress }}%</span>
+        </div>
+
+        <div class="p-4">
+          <div class="flex items-center justify-between gap-3 text-sm text-[color:var(--muted)]">
+            <p class="truncate">{{ course.teacher }}</p>
+            <span class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted-2)]">{{ course.content_count }} contenu{{ course.content_count|pluralize }}</span>
+          </div>
+
+          <div class="mt-3">
+            <div class="mb-2 flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--muted)]">
+              <span>Progression</span>
+              <button type="button" @click="openCourseDetail('{% url 'portal_student:ec_detail' course.id %}', '{{ course.title|escapejs }}')" class="text-[color:var(--school-primary)]">
+                Ouvrir
+              </button>
+            </div>
+            <div class="h-2 overflow-hidden rounded-full bg-[color:var(--surface-2)]">
+              <div class="h-full rounded-full bg-gradient-to-r from-[color:var(--school-primary)] to-[color:var(--school-secondary)]" style="width: {{ course.progress }}%"></div>
+            </div>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between gap-3 border-t border-[color:var(--line)] pt-3">
+            <span class="text-xs text-[color:var(--muted)]">Consultation integree</span>
+            <button type="button" @click="openCourseDetail('{% url 'portal_student:ec_detail' course.id %}', '{{ course.title|escapejs }}')" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-600">
+              Voir le contenu
+            </button>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">
+    {% if academic_status == "assigned" %}
+      Aucun EC n'est encore configure pour votre classe academique.
+    {% else %}
+      {{ academic_status_message }}
+    {% endif %}
+  </div>
+{% endif %}

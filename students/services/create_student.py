@@ -1,14 +1,32 @@
 import secrets
+import logging
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from academics.services.enrollment_service import assign_student_academic_enrollment
 from accounts.models import Profile
 from inscriptions.models import Inscription
 from students.models import Student
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
+
+def _safe_assign_academic_enrollment(inscription):
+    try:
+        return assign_student_academic_enrollment(inscription)
+    except Exception:
+        logger.exception(
+            "Echec non bloquant de liaison academique pour inscription=%s",
+            getattr(inscription, "pk", None),
+        )
+        return {
+            "status": "error",
+            "enrollment": None,
+            "reason": "unexpected_error",
+        }
 
 
 def ensure_student_role(user):
@@ -68,10 +86,12 @@ def create_student_after_first_payment(inscription):
         )
         if existing_student:
             ensure_student_role(existing_student.user)
+            academic_result = _safe_assign_academic_enrollment(inscription_locked)
             return {
                 "student": existing_student,
                 "password": None,
                 "created": False,
+                "academic_enrollment": academic_result,
             }
 
         username = f"etu_esfe{inscription_locked.id}"
@@ -95,10 +115,12 @@ def create_student_after_first_payment(inscription):
                     "Un compte etudiant existe deja pour cet utilisateur sur une autre inscription."
                 )
             ensure_student_role(user)
+            academic_result = _safe_assign_academic_enrollment(inscription_locked)
             return {
                 "student": conflicting_student,
                 "password": None,
                 "created": False,
+                "academic_enrollment": academic_result,
             }
 
         ensure_student_role(user)
@@ -113,8 +135,11 @@ def create_student_after_first_payment(inscription):
             matricule=matricule,
         )
 
+        academic_result = _safe_assign_academic_enrollment(inscription_locked)
+
         return {
             "student": student,
             "password": raw_password,
             "created": True,
+            "academic_enrollment": academic_result,
         }

@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="fr" x-data="studentDashboard()" :class="{ 'dark-preview': darkMode, 'compact-sidebar': sidebarCompact }">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESFHB — Dashboard Étudiant Officiel</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- AOS Animation -->
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+
+  <!-- Lucide icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      /* Palette officielle provisoire — remplace ici avec ton fichier JS couleurs */
+      --school-primary: #007A3D;
+      --school-primary-dark: #045c32;
+      --school-primary-soft: #e8f7ee;
+      --school-accent: #f4b000;
+      --school-accent-soft: #fff7dc;
+      --school-blue: #3f58a8;
+
+      --bg-deep: #064e3b;
+      --bg-deep-2: #0f766e;
+      --sidebar-main: #007A3D;
+      --sidebar-rail: #0ea35d;
+
+      --surface: #f5f7fb;
+      --surface-2: #eef2f7;
+      --card: #ffffff;
+      --card-soft: #f9fafb;
+      --line: #e3e8f0;
+      --line-strong: #d5dce8;
+      --text: #111827;
+      --muted: #667085;
+      --muted-2: #98a2b3;
+
+      --danger: #dc2626;
+      --warning: #d97706;
+      --success: #059669;
+      --info: #2563eb;
+
+      --radius-shell: 30px;
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+
+      --shadow-shell: 0 30px 85px rgba(2, 44, 34, .25);
+      --shadow-card: 0 16px 45px rgba(15, 23, 42, .07);
+      --shadow-hover: 0 22px 55px rgba(15, 23, 42, .11);
+
+      --sidebar-width: 292px;
+      --sidebar-compact-width: 90px;
+    }
+
+    .dark-preview {
+      --surface: #111827;
+      --surface-2: #172033;
+      --card: #1f2937;
+      --card-soft: #273449;
+      --line: #344156;
+      --line-strong: #45546b;
+      --text: #f9fafb;
+      --muted: #cbd5e1;
+      --muted-2: #94a3b8;
+      --shadow-card: 0 16px 45px rgba(0, 0, 0, .20);
+      --shadow-hover: 0 22px 55px rgba(0, 0, 0, .28);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 15%, rgba(244,176,0,.16), transparent 28%),
+        radial-gradient(circle at 85% 18%, rgba(14,163,93,.20), transparent 28%),
+        linear-gradient(135deg, var(--bg-deep), var(--bg-deep-2));
+      overflow-x: hidden;
+    }
+
+    button, input, select { font-family: inherit; }
+
+    a { color: inherit; text-decoration: none; }
+
+    [x-cloak] { display: none !important; }
+
+    .page-brand-title {
+      position: absolute;
+      top: 52px;
+      right: 7vw;
+      color: rgba(255,255,255,.96);
+      text-align: right;
+      z-index: 1;
+    }
+
+    .page-brand-title h1 {
+      font-size: clamp(30px, 4.6vw, 58px);
+      font-weight: 900;
+      line-height: .95;
+      letter-spacing: -.055em;
+    }
+
+    .page-brand-title p {
+      margin-top: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: rgba(255,255,255,.72);
+    }
+
+    .mode-pill {
+      position: absolute;
+      top: 166px;
+      right: 0;
+      min-width: 252px;
+      height: 52px;
+      padding-left: 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-radius: 999px 0 0 999px;
+      background: rgba(255,255,255,.95);
+      color: var(--school-primary-dark);
+      font-weight: 900;
+      font-size: 18px;
+      box-shadow: 0 18px 45px rgba(2, 44, 34, .22);
+      cursor: pointer;
+      user-select: none;
+      z-index: 2;
+    }
+
+    .stage {
+      width: min(1280px, calc(100vw - 42px));
+      min-height: 760px;
+      margin: 275px auto 70px;
+      position: relative;
+      border-radius: var(--radius-shell);
+      box-shadow: var(--shadow-shell);
+    }
+
+    .dashboard-shell {
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      min-height: 760px;
+      overflow: hidden;
+      background: var(--surface);
+      border-radius: var(--radius-shell);
+      transition: grid-template-columns .28s ease;
+    }
+
+    .compact-sidebar .dashboard-shell {
+      grid-template-columns: var(--sidebar-compact-width) minmax(0, 1fr);
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      display: grid;
+      grid-template-columns: 74px 1fr;
+      position: relative;
+      overflow: hidden;
+      color: white;
+      background:
+        radial-gradient(circle at top, rgba(255,255,255,.16), transparent 34%),
+        linear-gradient(180deg, var(--sidebar-main), var(--school-primary-dark));
+      transition: grid-template-columns .28s ease;
+    }
+
+    .compact-sidebar .sidebar {
+      grid-template-columns: 90px 0;
+    }
+
+    .icon-rail {
+      background: linear-gradient(180deg, var(--sidebar-rail), var(--school-primary));
+      padding: 92px 0 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+      border-radius: 25px;
+      z-index: 2;
+    }
+
+    .rail-icon {
+      width: 42px;
+      height: 42px;
+      border: 0;
+      background: transparent;
+      color: rgba(255,255,255,.88);
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      cursor: pointer;
+      position: relative;
+      transition: .22s ease;
+    }
+
+    .rail-icon:hover,
+    .rail-icon.active {
+      background: rgba(255,255,255,.14);
+      color: #fff;
+      transform: translateX(2px);
+    }
+
+    .rail-icon.active::before {
+      content: '';
+      position: absolute;
+      left: -10px;
+      width: 5px;
+      height: 30px;
+      background: #fff;
+      border-radius: 99px;
+    }
+
+    .rail-bottom {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .nav-panel {
+      min-width: 218px;
+      padding: 28px 0 26px;
+      position: relative;
+      overflow: hidden;
+      transition: opacity .2s ease;
+    }
+
+    .compact-sidebar .nav-panel {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .brand {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 28px;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -.03em;
+      white-space: nowrap;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: rgba(255,255,255,.13);
+    }
+
+    .nav-items {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-item {
+      min-height: 44px;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: rgba(255,255,255,.92);
+      text-align: left;
+      padding: 0 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: .22s ease;
+      white-space: nowrap;
+    }
+
+    .nav-item:hover {
+      transform: translateX(6px);
+    }
+
+    .nav-item.active {
+      background: #fff;
+      color: var(--school-primary-dark);
+      border-radius: 999px 0 0 999px;
+      box-shadow: 0 12px 28px rgba(2, 44, 34, .18);
+    }
+
+    .student-mini-card {
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      bottom: 84px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .student-mini-card img {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      object-fit: cover;
+    }
+
+    .student-mini-card strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.1;
+    }
+
+    .student-mini-card span {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      color: rgba(255,255,255,.74);
+      font-weight: 600;
+    }
+
+    .logout {
+      position: absolute;
+      left: 28px;
+      right: 20px;
+      bottom: 25px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 900;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      color: rgba(255,255,255,.94);
+    }
+
+    /* MAIN */
+    .main {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 66px minmax(0, 1fr);
+    }
+
+    .topbar {
+      height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 0 30px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.40);
+      backdrop-filter: blur(14px);
+    }
+
+    .dark-preview .topbar {
+      background: rgba(31,41,55,.55);
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .sidebar-toggle,
+    .mobile-toggle {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: .2s ease;
+    }
+
+    .sidebar-toggle:hover,
+    .mobile-toggle:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-card);
+    }
+
+    .mobile-toggle { display: none; }
+
+    .search-box {
+      width: min(430px, 100%);
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 15px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--card);
+      color: var(--muted-2);
+    }
+
+    .search-box input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    .top-icon-btn {
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      cursor: pointer;
+      position: relative;
+      transition: .22s ease;
+    }
+
+    .top-icon-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-card);
+    }
+
+    .badge {
+      position: absolute;
+      right: -4px;
+      top: -5px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      display: grid;
+      place-items: center;
+      border-radius: 99px;
+      background: var(--school-accent);
+      color: #111827;
+      font-size: 10px;
+      font-weight: 900;
+      border: 2px solid var(--card);
+    }
+
+    .profile-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 16px;
+      cursor: pointer;
+    }
+
+    .profile-top img {
+      width: 36px;
+      height: 36px;
+      border-radius: 13px;
+      object-fit: cover;
+    }
+
+    .profile-top strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .profile-top span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* CONTENT */
+    .content {
+      min-width: 0;
+      padding: 34px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.65fr) minmax(330px, .9fr);
+      gap: 28px;
+      overflow: auto;
+    }
+
+    .thin-scrollbar::-webkit-scrollbar,
+    .content::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .thin-scrollbar::-webkit-scrollbar-thumb,
+    .content::-webkit-scrollbar-thumb {
+      background: rgba(100,116,139,.25);
+      border-radius: 99px;
+    }
+
+    .left-stack,
+    .right-stack {
+      display: grid;
+      align-content: start;
+      gap: 24px;
+    }
+
+    .hero-card {
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
+      min-height: 172px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      background: var(--card);
+      box-shadow: var(--shadow-card);
+    }
+
+    .hero-text {
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .eyebrow {
+      width: fit-content;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding: 8px 12px;
+      border-radius: 99px;
+      background: var(--school-primary-soft);
+      color: var(--school-primary-dark);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .hero-text h2 {
+      font-size: clamp(24px, 3vw, 34px);
+      line-height: 1.05;
+      letter-spacing: -.05em;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .hero-text p {
+      margin-top: 14px;
+      max-width: 560px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+      font-weight: 500;
+    }
+
+    .hero-actions {
+      margin-top: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      border: 0;
+      border-radius: 15px;
+      padding: 12px 17px;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: .22s ease;
+    }
+
+    .btn-primary {
+      background: var(--school-primary);
+      color: white;
+      box-shadow: 0 14px 28px rgba(0,122,61,.18);
+    }
+
+    .btn-secondary {
+      background: var(--card-soft);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+
+    .btn-primary:hover,
+    .btn-secondary:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-card);
+    }
+
+    .hero-visual {
+      position: relative;
+      min-height: 172px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 70% 35%, rgba(244,176,0,.18), transparent 30%),
+        linear-gradient(135deg, var(--school-primary-soft), #fff);
+    }
+
+    .dark-preview .hero-visual {
+      background:
+        radial-gradient(circle at 70% 35%, rgba(244,176,0,.12), transparent 30%),
+        linear-gradient(135deg, rgba(0,122,61,.16), rgba(31,41,55,.88));
+    }
+
+    .hero-visual img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: .84;
+      mix-blend-mode: multiply;
+    }
+
+    .dark-preview .hero-visual img { opacity: .45; }
+
+    .floating-card {
+      position: absolute;
+      right: 22px;
+      bottom: 22px;
+      min-width: 185px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.92);
+      box-shadow: var(--shadow-card);
+      backdrop-filter: blur(10px);
+      animation: floaty 3.4s ease-in-out infinite;
+    }
+
+    .floating-card strong {
+      display: block;
+      font-size: 13px;
+      color: #111827;
+    }
+
+    .floating-card span {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      color: #667085;
+      font-weight: 600;
+    }
+
+    @keyframes floaty {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-7px); }
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 24px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      background: var(--card);
+      box-shadow: var(--shadow-card);
+      transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-hover);
+      border-color: rgba(0,122,61,.24);
+    }
+
+    .card-pad { padding: 24px; }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .section-head h3 {
+      font-size: 19px;
+      line-height: 1.15;
+      font-weight: 900;
+      letter-spacing: -.035em;
+    }
+
+    .section-head p {
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--school-primary);
+    }
+
+    .pill-select {
+      height: 32px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--card-soft);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .performance-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .metric-box {
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--card-soft);
+      border: 1px solid var(--line);
+    }
+
+    .metric-box span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .metric-box strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: -.04em;
+    }
+
+    .metric-box strong small {
+      font-size: 14px;
+      color: var(--muted);
+      letter-spacing: 0;
+    }
+
+    .progress-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .progress-line {
+      display: grid;
+      gap: 8px;
+    }
+
+    .progress-line header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .progress-track {
+      height: 9px;
+      border-radius: 99px;
+      background: var(--surface-2);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--school-primary), #34d399);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .mini-stat {
+      padding: 17px;
+      border-radius: 20px;
+      background: var(--card-soft);
+      border: 1px solid var(--line);
+    }
+
+    .mini-stat .icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      margin-bottom: 14px;
+      color: var(--school-primary);
+      background: var(--school-primary-soft);
+    }
+
+    .mini-stat strong {
+      display: block;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -.04em;
+    }
+
+    .mini-stat span {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .course-rail-wrap { overflow: hidden; }
+
+    .course-rail {
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      padding: 2px 2px 10px;
+      scroll-behavior: smooth;
+    }
+
+    .course-card {
+      min-width: 222px;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      box-shadow: 0 10px 25px rgba(15,23,42,.05);
+      transition: .22s ease;
+    }
+
+    .course-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .course-cover {
+      height: 112px;
+      display: grid;
+      place-items: center;
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .course-cover::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top right, rgba(255,255,255,.28), transparent 35%);
+    }
+
+    .course-cover i { position: relative; z-index: 1; }
+
+    .course-body {
+      padding: 15px;
+    }
+
+    .course-body h4 {
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 900;
+    }
+
+    .course-body p {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .course-footer {
+      margin-top: 14px;
+    }
+
+    .course-footer header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .right-stack .card { overflow: hidden; }
+
+    .calendar-body {
+      display: grid;
+      gap: 15px;
+    }
+
+    .calendar-line {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .calendar-time {
+      padding-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .calendar-item {
+      position: relative;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: var(--card-soft);
+      padding: 14px 15px;
+    }
+
+    .calendar-item::before {
+      content: '';
+      position: absolute;
+      left: -23px;
+      top: 21px;
+      width: 11px;
+      height: 11px;
+      border-radius: 99px;
+      background: var(--school-primary);
+      box-shadow: 0 0 0 4px var(--school-primary-soft);
+    }
+
+    .calendar-item.active {
+      background: var(--school-primary-soft);
+      border-color: rgba(0,122,61,.20);
+    }
+
+    .calendar-item strong {
+      display: block;
+      font-size: 14px;
+      line-height: 1.2;
+      font-weight: 900;
+    }
+
+    .calendar-item span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .event-row,
+    .message-row,
+    .teacher-row {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 13px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: var(--card-soft);
+      transition: .2s ease;
+    }
+
+    .event-row:hover,
+    .message-row:hover,
+    .teacher-row:hover {
+      transform: translateX(3px);
+      border-color: rgba(0,122,61,.25);
+    }
+
+    .event-date {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      background: var(--school-primary-soft);
+      color: var(--school-primary-dark);
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .event-date strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .event-date span {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .row-content { min-width: 0; flex: 1; }
+
+    .row-content strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.2;
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .row-content span {
+      display: block;
+      margin-top: 5px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .avatar-sm {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      border-radius: 15px;
+      object-fit: cover;
+    }
+
+    .rows {
+      display: grid;
+      gap: 13px;
+    }
+
+    .mobile-overlay {
+      display: none;
+    }
+
+    footer {
+      color: var(--muted-2);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      padding: 8px 0 0;
+    }
+
+    @media (max-width: 1180px) {
+      .page-brand-title {
+        position: static;
+        padding: 42px 24px 0;
+        text-align: center;
+      }
+
+      .mode-pill {
+        top: 124px;
+      }
+
+      .stage {
+        margin-top: 96px;
+      }
+
+      .content {
+        grid-template-columns: 1fr;
+      }
+
+      .right-stack {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 920px) {
+      .stage {
+        width: calc(100vw - 18px);
+        margin-top: 86px;
+      }
+
+      .dashboard-shell,
+      .compact-sidebar .dashboard-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(310px, 86vw);
+        z-index: 50;
+        transform: translateX(-104%);
+        transition: transform .28s ease;
+        border-radius: 0 28px 28px 0;
+      }
+
+      .sidebar.mobile-open {
+        transform: translateX(0);
+      }
+
+      .mobile-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 45;
+        background: rgba(2, 6, 23, .55);
+      }
+
+      .mobile-toggle { display: grid; }
+      .sidebar-toggle { display: none; }
+
+      .topbar {
+        padding: 0 16px;
+      }
+
+      .profile-top .profile-text,
+      .top-actions .top-icon-btn:nth-child(1) {
+        display: none;
+      }
+
+      .content {
+        padding: 22px 16px;
+      }
+
+      .section-grid,
+      .hero-card {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-visual {
+        min-height: 190px;
+      }
+
+      .right-stack {
+        grid-template-columns: 1fr;
+      }
+
+      .mode-pill {
+        min-width: 190px;
+        top: 116px;
+        height: 44px;
+        font-size: 15px;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .page-brand-title h1 {
+        font-size: 30px;
+      }
+
+      .page-brand-title p {
+        font-size: 13px;
+      }
+
+      .stage {
+        border-radius: 20px;
+      }
+
+      .dashboard-shell {
+        border-radius: 20px;
+      }
+
+      .top-actions {
+        gap: 8px;
+      }
+
+      .top-icon-btn,
+      .mobile-toggle {
+        width: 38px;
+        height: 38px;
+      }
+
+      .search-box {
+        height: 40px;
+      }
+
+      .hero-text {
+        padding: 22px;
+      }
+
+      .card-pad {
+        padding: 19px;
+      }
+
+      .performance-row,
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .calendar-line {
+        grid-template-columns: 48px 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-brand-title" data-aos="fade-left">
+    <h1>Dashboard étudiant</h1>
+    <p>Vue académique, cours, agenda et progression — version officielle ESFHB.</p>
+  </div>
+
+  <button class="mode-pill" @click="toggleDarkMode()" data-aos="fade-left" data-aos-delay="120">
+    <i :data-lucide="darkMode ? 'moon' : 'sun'" style="width:20px;height:20px;"></i>
+    <span x-text="darkMode ? 'Dark mode' : 'Light mode'"></span>
+  </button>
+
+  <template x-if="mobileMenu">
+    <div class="mobile-overlay" @click="mobileMenu=false"></div>
+  </template>
+
+  <main class="stage" data-aos="zoom-in-up" data-aos-duration="780">
+    <section class="dashboard-shell">
+      <!-- Sidebar -->
+      <aside class="sidebar" :class="{ 'mobile-open': mobileMenu }">
+        <div class="icon-rail">
+          <template x-for="item in navItems" :key="'rail-' + item.label">
+            <button class="rail-icon" :class="{ active: activeNav === item.label }" @click="setActive(item.label)">
+              <i :data-lucide="item.icon" style="width:19px;height:19px;"></i>
+            </button>
+          </template>
+
+          <div class="rail-bottom">
+            <button class="rail-icon" @click="toggleDarkMode()">
+              <i :data-lucide="darkMode ? 'moon' : 'sun'" style="width:19px;height:19px;"></i>
+            </button>
+            <button class="rail-icon">
+              <i data-lucide="log-out" style="width:19px;height:19px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="nav-panel">
+          <div class="brand">
+            <span class="brand-logo"><i data-lucide="graduation-cap" style="width:22px;height:22px;"></i></span>
+            <span>ESFHB</span>
+          </div>
+
+          <nav class="nav-items">
+            <template x-for="item in navItems" :key="'nav-' + item.label">
+              <button class="nav-item" :class="{ active: activeNav === item.label }" @click="setActive(item.label)">
+                <i :data-lucide="item.icon" style="width:17px;height:17px;"></i>
+                <span x-text="item.label"></span>
+              </button>
+            </template>
+          </nav>
+
+          <div class="student-mini-card">
+            <img src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=120&q=80" alt="Étudiant">
+            <div>
+              <strong>Mohamed Traoré</strong>
+              <span>L1 · Biomédicale</span>
+            </div>
+          </div>
+
+          <div class="logout">
+            <i data-lucide="log-out" style="width:19px;height:19px;"></i>
+            <span>Déconnexion</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <section class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="mobile-toggle" @click="mobileMenu=true">
+              <i data-lucide="menu" style="width:20px;height:20px;"></i>
+            </button>
+
+            <button class="sidebar-toggle" @click="toggleSidebar()">
+              <i :data-lucide="sidebarCompact ? 'panel-right-open' : 'panel-left-close'" style="width:20px;height:20px;"></i>
+            </button>
+
+            <label class="search-box">
+              <i data-lucide="search" style="width:17px;height:17px;"></i>
+              <input type="search" placeholder="Rechercher un cours, une ressource..." x-model="search">
+            </label>
+          </div>
+
+          <div class="top-actions">
+            <button class="top-icon-btn" @click="toggleDarkMode()">
+              <i :data-lucide="darkMode ? 'moon' : 'sun'" style="width:19px;height:19px;"></i>
+            </button>
+
+            <button class="top-icon-btn">
+              <i data-lucide="bell" style="width:19px;height:19px;"></i>
+              <span class="badge">3</span>
+            </button>
+
+            <button class="top-icon-btn">
+              <i data-lucide="mail" style="width:19px;height:19px;"></i>
+              <span class="badge">5</span>
+            </button>
+
+            <div class="profile-top">
+              <img src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=120&q=80" alt="Profil">
+              <div class="profile-text">
+                <strong>Mohamed Traoré</strong>
+                <span>L1 · Biomédicale</span>
+              </div>
+              <i data-lucide="chevron-down" style="width:16px;height:16px;"></i>
+            </div>
+          </div>
+        </header>
+
+        <div class="content thin-scrollbar">
+          <section class="left-stack">
+            <!-- Hero -->
+            <article class="hero-card" data-aos="fade-up">
+              <div class="hero-text">
+                <span class="eyebrow">
+                  <i data-lucide="sparkles" style="width:15px;height:15px;"></i>
+                  Espace étudiant connecté
+                </span>
+                <h2>Bonjour, Mohamed ! 👋</h2>
+                <p>
+                  Votre tableau de bord centralise vos cours, votre progression, vos notifications,
+                  votre emploi du temps et les ressources pédagogiques disponibles.
+                </p>
+                <div class="hero-actions">
+                  <button class="btn-primary">Continuer les cours</button>
+                  <button class="btn-secondary">Voir ma situation</button>
+                </div>
+              </div>
+
+              <div class="hero-visual">
+                <img src="https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=950&q=80" alt="Étudiant au travail">
+                <div class="floating-card">
+                  <i data-lucide="book-open-check" style="width:30px;height:30px;color:var(--school-primary);"></i>
+                  <div>
+                    <strong>12 cours actifs</strong>
+                    <span>2 devoirs à rendre</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <!-- Performance + Résumé -->
+            <div class="section-grid">
+              <article class="card card-pad" data-aos="fade-up" data-aos-delay="80">
+                <div class="section-head">
+                  <div>
+                    <p>Performance</p>
+                    <h3>Progression académique</h3>
+                  </div>
+                  <select class="pill-select">
+                    <option>Ce semestre</option>
+                    <option>Année complète</option>
+                  </select>
+                </div>
+
+                <div class="performance-row">
+                  <div class="metric-box">
+                    <span>Moyenne générale</span>
+                    <strong>14.2<small>/20</small></strong>
+                  </div>
+                  <div class="metric-box">
+                    <span>Classement</span>
+                    <strong>12<small>ème / 78</small></strong>
+                  </div>
+                </div>
+
+                <div class="progress-list">
+                  <template x-for="bar in progressBars" :key="bar.label">
+                    <div class="progress-line">
+                      <header>
+                        <span x-text="bar.label"></span>
+                        <span x-text="bar.value + '%'"></span>
+                      </header>
+                      <div class="progress-track">
+                        <div class="progress-fill" :style="'width:' + bar.value + '%'"></div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </article>
+
+              <article class="card card-pad" data-aos="fade-up" data-aos-delay="140">
+                <div class="section-head">
+                  <div>
+                    <p>Résumé</p>
+                    <h3>Vue rapide</h3>
+                  </div>
+                  <a href="#" style="color:var(--school-primary);font-size:13px;font-weight:900;">Voir tout</a>
+                </div>
+
+                <div class="stats-grid">
+                  <template x-for="stat in miniStats" :key="stat.label">
+                    <div class="mini-stat">
+                      <span class="icon">
+                        <i :data-lucide="stat.icon" style="width:22px;height:22px;"></i>
+                      </span>
+                      <strong x-text="stat.value"></strong>
+                      <span x-text="stat.label"></span>
+                    </div>
+                  </template>
+                </div>
+              </article>
+            </div>
+
+            <!-- Courses -->
+            <article class="card card-pad" data-aos="fade-up" data-aos-delay="180">
+              <div class="section-head">
+                <div>
+                  <p>Cours récents</p>
+                  <h3>Dernières matières consultées</h3>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <button class="top-icon-btn" @click="scrollCourses(-1)">
+                    <i data-lucide="chevron-left" style="width:18px;height:18px;"></i>
+                  </button>
+                  <button class="top-icon-btn" @click="scrollCourses(1)">
+                    <i data-lucide="chevron-right" style="width:18px;height:18px;"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="course-rail-wrap">
+                <div id="courseRail" class="course-rail thin-scrollbar">
+                  <template x-for="course in courses" :key="course.title">
+                    <article class="course-card">
+                      <div class="course-cover" :style="'background:' + course.gradient">
+                        <i :data-lucide="course.icon" style="width:50px;height:50px;"></i>
+                      </div>
+                      <div class="course-body">
+                        <h4 x-text="course.title"></h4>
+                        <p x-text="course.teacher"></p>
+                        <div class="course-footer">
+                          <header>
+                            <span x-text="course.progress + '% terminé'"></span>
+                            <span style="color:var(--school-primary);">Continuer</span>
+                          </header>
+                          <div class="progress-track">
+                            <div class="progress-fill" :style="'width:' + course.progress + '%'"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  </template>
+                </div>
+              </div>
+            </article>
+
+            <!-- Teachers -->
+            <article class="card card-pad" data-aos="fade-up" data-aos-delay="220">
+              <div class="section-head">
+                <div>
+                  <p>Encadrement</p>
+                  <h3>Enseignants liés</h3>
+                </div>
+                <a href="#" style="color:var(--school-primary);font-size:13px;font-weight:900;">Voir tout</a>
+              </div>
+
+              <div class="rows">
+                <template x-for="teacher in teachers" :key="teacher.name">
+                  <div class="teacher-row">
+                    <img class="avatar-sm" :src="teacher.avatar" :alt="teacher.name">
+                    <div class="row-content">
+                      <strong x-text="teacher.name"></strong>
+                      <span x-text="teacher.subject"></span>
+                    </div>
+                    <button class="top-icon-btn" style="width:36px;height:36px;"><i data-lucide="mail" style="width:16px;height:16px;"></i></button>
+                    <button class="top-icon-btn" style="width:36px;height:36px;"><i data-lucide="phone" style="width:16px;height:16px;"></i></button>
+                  </div>
+                </template>
+              </div>
+            </article>
+          </section>
+
+          <aside class="right-stack">
+            <!-- Calendar -->
+            <article class="card card-pad" data-aos="fade-left">
+              <div class="section-head">
+                <div>
+                  <p>Calendrier</p>
+                  <h3>Aujourd’hui</h3>
+                </div>
+                <select class="pill-select">
+                  <option>10 Juin</option>
+                  <option>Semaine</option>
+                </select>
+              </div>
+
+              <div class="calendar-body">
+                <template x-for="slot in timetable" :key="slot.time">
+                  <div class="calendar-line">
+                    <div class="calendar-time" x-text="slot.time"></div>
+                    <div class="calendar-item" :class="{ active: slot.active }">
+                      <strong x-text="slot.title"></strong>
+                      <span x-text="slot.location"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <!-- Events -->
+            <article class="card card-pad" data-aos="fade-left" data-aos-delay="100">
+              <div class="section-head">
+                <div>
+                  <p>Agenda</p>
+                  <h3>Événements à venir</h3>
+                </div>
+                <a href="#" style="color:var(--school-primary);font-size:13px;font-weight:900;">Voir tout</a>
+              </div>
+
+              <div class="rows">
+                <template x-for="event in upcoming" :key="event.title">
+                  <div class="event-row">
+                    <div class="event-date">
+                      <div>
+                        <strong x-text="event.day"></strong>
+                        <span x-text="event.month"></span>
+                      </div>
+                    </div>
+                    <div class="row-content">
+                      <strong x-text="event.title"></strong>
+                      <span x-text="event.desc"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <!-- Messages -->
+            <article class="card card-pad" data-aos="fade-left" data-aos-delay="160">
+              <div class="section-head">
+                <div>
+                  <p>Communication</p>
+                  <h3>Messages récents</h3>
+                </div>
+                <a href="#" style="color:var(--school-primary);font-size:13px;font-weight:900;">Voir tout</a>
+              </div>
+
+              <div class="rows">
+                <template x-for="msg in messages" :key="msg.name">
+                  <div class="message-row">
+                    <img class="avatar-sm" :src="msg.avatar" :alt="msg.name">
+                    <div class="row-content">
+                      <strong x-text="msg.name"></strong>
+                      <span x-text="msg.text"></span>
+                    </div>
+                    <span style="font-size:11px;color:var(--muted-2);font-weight:800;" x-text="msg.time"></span>
+                  </div>
+                </template>
+              </div>
+            </article>
+          </aside>
+
+          <footer>
+            © 2025 ESFHB — École de Santé Félix Houphouët-Boigny. Tous droits réservés.
+          </footer>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    function studentDashboard() {
+      return {
+        darkMode: false,
+        sidebarCompact: false,
+        mobileMenu: false,
+        search: '',
+        activeNav: 'Tableau de bord',
+        navItems: [
+          { label: 'Tableau de bord', icon: 'layout-dashboard' },
+          { label: 'Mes cours', icon: 'book-open-check' },
+          { label: 'Emploi du temps', icon: 'calendar-days' },
+          { label: 'Mes notes', icon: 'clipboard-check' },
+          { label: 'Ressources', icon: 'folder-open' },
+          { label: 'Forum', icon: 'messages-square' },
+          { label: 'Évaluations', icon: 'file-check-2' },
+          { label: 'Messages', icon: 'mail' },
+          { label: 'Paramètres', icon: 'settings' }
+        ],
+        progressBars: [
+          { label: 'Sciences fondamentales', value: 78 },
+          { label: 'Biologie médicale', value: 64 },
+          { label: 'Anatomie générale', value: 82 },
+          { label: 'Travaux pratiques', value: 52 }
+        ],
+        miniStats: [
+          { label: 'Cours suivis', value: 12, icon: 'book-open' },
+          { label: 'Devoirs à rendre', value: 2, icon: 'file-text' },
+          { label: 'Évaluations', value: 5, icon: 'clipboard-check' },
+          { label: 'Nouvelles notes', value: 3, icon: 'badge-check' }
+        ],
+        courses: [
+          { title: 'Biologie Cellulaire', teacher: 'Pr. Diarra Abdoulaye', progress: 75, icon: 'dna', gradient: 'linear-gradient(135deg,#1d4ed8,#6366f1)' },
+          { title: 'Physiologie Humaine', teacher: 'Dr. Keita Mariam', progress: 60, icon: 'heart-pulse', gradient: 'linear-gradient(135deg,#be123c,#fb7185)' },
+          { title: 'Anatomie Générale', teacher: 'Pr. Koné Ibrahim', progress: 80, icon: 'brain', gradient: 'linear-gradient(135deg,#6d28d9,#a78bfa)' },
+          { title: 'Biochimie Médicale', teacher: 'Dr. Traoré Aïssata', progress: 45, icon: 'flask-conical', gradient: 'linear-gradient(135deg,#047857,#34d399)' },
+          { title: 'Santé Publique', teacher: 'Dr. Coulibaly Amadou', progress: 35, icon: 'hospital', gradient: 'linear-gradient(135deg,#0e7490,#38bdf8)' }
+        ],
+        teachers: [
+          { name: 'Dr. Keita Mariam', subject: 'Physiologie Humaine', avatar: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=96&q=80' },
+          { name: 'Pr. Diarra Abdoulaye', subject: 'Biologie Cellulaire', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=96&q=80' }
+        ],
+        timetable: [
+          { time: '08:00', title: 'Cours de Physiologie', location: 'Salle B12', active: true },
+          { time: '10:00', title: 'Travaux pratiques', location: 'Laboratoire 2', active: false },
+          { time: '14:00', title: 'Cours d’Anatomie', location: 'Amphithéâtre A', active: false },
+          { time: '16:00', title: 'Réunion département', location: 'Salle de réunion', active: false }
+        ],
+        upcoming: [
+          { day: '15', month: 'JUIN', title: 'Session d’examen', desc: 'Du 15 au 30 Juin 2025 · Session semestrielle' },
+          { day: '22', month: 'JUIN', title: 'Conférence santé publique', desc: '22 Juin 2025 à 10:00 · Amphithéâtre principal' }
+        ],
+        messages: [
+          { name: 'Dr. Keita Mariam', text: 'N’oubliez pas le devoir sur la physiologie...', time: '10:30', avatar: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=96&q=80' },
+          { name: 'Groupe L1 Biomédicale', text: 'Planning des TP disponible', time: 'Hier', avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=96&q=80' },
+          { name: 'Administration', text: 'Inscriptions aux examens...', time: '2 Juin', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=96&q=80' }
+        ],
+        init() {
+          this.darkMode = localStorage.getItem('esfhb_student_dark') === '1';
+          this.sidebarCompact = localStorage.getItem('esfhb_student_sidebar') === 'compact';
+
+          this.$nextTick(() => {
+            AOS.init({ once: true, duration: 650, easing: 'ease-out-cubic', offset: 50 });
+            lucide.createIcons();
+          });
+
+          this.$watch('darkMode', value => {
+            localStorage.setItem('esfhb_student_dark', value ? '1' : '0');
+            setTimeout(() => lucide.createIcons(), 50);
+          });
+
+          this.$watch('sidebarCompact', value => {
+            localStorage.setItem('esfhb_student_sidebar', value ? 'compact' : 'full');
+            setTimeout(() => lucide.createIcons(), 50);
+          });
+        },
+        setActive(label) {
+          this.activeNav = label;
+          this.mobileMenu = false;
+          setTimeout(() => lucide.createIcons(), 50);
+        },
+        toggleSidebar() {
+          this.sidebarCompact = !this.sidebarCompact;
+        },
+        toggleDarkMode() {
+          this.darkMode = !this.darkMode;
+        },
+        scrollCourses(direction) {
+          const rail = document.getElementById('courseRail');
+          if (rail) rail.scrollBy({ left: direction * 260, behavior: 'smooth' });
+        }
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => lucide.createIcons(), 120);
+    });
+
+    document.addEventListener('alpine:updated', () => {
+      setTimeout(() => lucide.createIcons(), 50);
+    });
+  </script>
+</body>
+</html>

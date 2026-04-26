@@ -1,0 +1,63 @@
+<aside class="student-sidebar" :class="{ 'is-open': mobileMenu }">
+  <div class="flex flex-col items-center gap-4 bg-[color:var(--sidebar-rail)] px-0 py-16">
+    <button class="rail-icon rounded-2xl bg-white/10 p-3 text-white transition hover:bg-white/15" @click="toggleSidebar()">
+      <i :data-lucide="sidebarCompact ? 'panel-right-open' : 'panel-left-close'" style="width:19px;height:19px;"></i>
+    </button>
+    <template x-for="item in navItems" :key="item.label">
+      <button
+        type="button"
+        class="rail-icon rounded-2xl p-3 text-white/90 transition hover:bg-white/10"
+        :class="{ 'bg-white/15': activeNav === item.label }"
+        @click="goToSection(item.target, item.label)"
+      >
+        <i :data-lucide="item.icon" style="width:19px;height:19px;"></i>
+      </button>
+    </template>
+  </div>
+
+  <div class="relative overflow-hidden px-4 py-6" x-show="!sidebarCompact || window.innerWidth < 992">
+    <div class="mb-6 flex items-center gap-3 text-2xl font-black tracking-tight text-white">
+      <span class="grid h-10 w-10 place-items-center rounded-2xl bg-white/15">
+        <i data-lucide="graduation-cap" style="width:22px;height:22px;"></i>
+      </span>
+      <span>ESFE</span>
+    </div>
+
+    <nav class="flex flex-col gap-1.5">
+      <template x-for="item in navItems" :key="'full-' + item.label">
+        <button
+          type="button"
+          class="flex min-h-11 items-center gap-3 rounded-2xl px-4 text-sm font-extrabold text-white/95 transition hover:translate-x-1"
+          :class="{ 'bg-white text-[color:var(--school-primary-dark)] shadow-lg': activeNav === item.label }"
+          @click="goToSection(item.target, item.label)"
+        >
+          <i :data-lucide="item.icon" style="width:17px;height:17px;"></i>
+          <span x-text="item.label"></span>
+        </button>
+      </template>
+    </nav>
+
+    <div class="mt-8 rounded-3xl border border-white/15 bg-white/10 p-4 text-white">
+      <div class="flex items-center gap-3">
+        <div class="grid h-12 w-12 place-items-center rounded-2xl bg-white/15 text-lg font-black">
+          {{ student.full_name|default:student.user.username|slice:":1"|upper }}
+        </div>
+        <div class="min-w-0">
+          <strong class="block truncate text-sm">{{ student.full_name|default:student.user.username }}</strong>
+          <span class="mt-1 block truncate text-xs text-white/75">
+            {% if enrollment %}
+              {{ enrollment.academic_class.level }} · {{ enrollment.programme.title }}
+            {% else %}
+              Affectation en attente
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <a href="{% url 'accounts:logout' %}" class="mt-6 inline-flex items-center gap-2 text-sm font-black text-white/90">
+      <i data-lucide="log-out" style="width:18px;height:18px;"></i>
+      <span>Deconnexion</span>
+    </a>
+  </div>
+</aside>

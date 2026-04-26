@@ -10,10 +10,15 @@ from portal.views import (
 )
 from portal.views.admin_grades import excel_grade_view
 from portal.views.views import (
+    admissions_portal,
+    director_portal,
+    finance_portal,
     portal_dashboard,
     portal_home,
+    secretary_portal,
     staff_portal,
     student_portal,
+    supervisor_portal,
     teacher_portal,
 )
 app_name = "accounts_portal"
@@ -28,6 +33,11 @@ urlpatterns = [
     path("student/", student_portal, name="portal_student"),
     path("staff/", staff_portal, name="portal_staff"),
     path("teacher/", teacher_portal, name="portal_teacher"),
+    path("finance/", finance_portal, name="portal_finance"),
+    path("secretary/", secretary_portal, name="portal_secretary"),
+    path("admissions/", admissions_portal, name="portal_admissions"),
+    path("director/", director_portal, name="portal_director"),
+    path("supervisor/", supervisor_portal, name="portal_supervisor"),
 
     # 🔥 SYSTEME NOTES
     path("admin/grades/", admin_grade_dashboard, name="admin_grade_dashboard"),

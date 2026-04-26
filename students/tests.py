@@ -1,10 +1,12 @@
 from io import StringIO
+from datetime import date
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 
+from academics.models import AcademicClass, AcademicEnrollment, AcademicYear
 from admissions.models import Candidature
 from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
@@ -63,6 +65,12 @@ class StudentCreationWorkflowTests(TestCase):
             amount_due=100000,
             status=Inscription.STATUS_CREATED,
         )
+        self.academic_year = AcademicYear.objects.create(
+            name="2025-2026",
+            start_date=date(2025, 10, 1),
+            end_date=date(2026, 7, 31),
+            is_active=True,
+        )
 
     def _create_validated_payment(self, amount):
         with self.captureOnCommitCallbacks(execute=True):
@@ -98,6 +106,32 @@ class StudentCreationWorkflowTests(TestCase):
         self.assertEqual(self.inscription.status, Inscription.STATUS_PARTIAL)
         self.assertEqual(student.user.profile.role, "student")
         self.assertEqual(User.objects.filter(username=f"etu_esfe{self.inscription.id}").count(), 1)
+        self.assertEqual(
+            Student.objects.get(inscription=self.inscription).inscription.status,
+            Inscription.STATUS_PARTIAL,
+        )
+        self.assertFalse(AcademicEnrollment.objects.filter(inscription=self.inscription).exists())
+        send_credentials.assert_called_once()
+        send_confirmation.assert_not_called()
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_partial_payment_creates_academic_enrollment_when_matching_class_exists(self, send_credentials, send_confirmation):
+        AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            is_active=True,
+        )
+
+        self._create_validated_payment(25000)
+
+        enrollment = AcademicEnrollment.objects.select_related("academic_class").get(inscription=self.inscription)
+        self.inscription.refresh_from_db()
+        self.assertEqual(self.inscription.status, Inscription.STATUS_PARTIAL)
+        self.assertEqual(enrollment.academic_class.level, "L1")
         send_credentials.assert_called_once()
         send_confirmation.assert_not_called()
 
@@ -112,6 +146,39 @@ class StudentCreationWorkflowTests(TestCase):
         self.assertEqual(Student.objects.filter(inscription=self.inscription).count(), 1)
         self.assertEqual(Student.objects.filter(user=first_student.user).count(), 1)
         self.assertEqual(User.objects.filter(username=f"etu_esfe{self.inscription.id}").count(), 1)
+        send_credentials.assert_called_once()
+        self.assertEqual(send_confirmation.call_count, 1)
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_full_payment_creates_academic_enrollment_when_matching_class_exists(self, send_credentials, send_confirmation):
+        AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            is_active=True,
+        )
+
+        self._create_validated_payment(25000)
+        self._create_validated_payment(75000)
+
+        enrollment = AcademicEnrollment.objects.select_related("academic_class").get(inscription=self.inscription)
+        self.assertEqual(enrollment.student.username, f"etu_esfe{self.inscription.id}")
+        self.assertEqual(enrollment.academic_class.level, "L1")
+        self.assertEqual(enrollment.programme, self.programme)
+        self.assertEqual(enrollment.branch, self.branch)
+        send_credentials.assert_called_once()
+        self.assertEqual(send_confirmation.call_count, 1)
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_full_payment_without_matching_class_keeps_student_without_enrollment(self, send_credentials, send_confirmation):
+        self._create_validated_payment(25000)
+        self._create_validated_payment(75000)
+
+        self.assertFalse(AcademicEnrollment.objects.filter(inscription=self.inscription).exists())
         send_credentials.assert_called_once()
         self.assertEqual(send_confirmation.call_count, 1)
 
@@ -147,6 +214,59 @@ class StudentCreationWorkflowTests(TestCase):
         self.assertEqual(result["student"].pk, student.pk)
         self.assertFalse(result["created"])
         self.assertEqual(student.user.profile.role, "student")
+        self.assertEqual(result["academic_enrollment"]["status"], "manual_required_no_class")
+
+    def test_manual_academic_enrollment_allowed_after_first_validated_payment(self):
+        self._create_validated_payment(25000)
+        student = Student.objects.get(inscription=self.inscription)
+        academic_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            is_active=True,
+        )
+
+        enrollment = AcademicEnrollment.objects.create(
+            inscription=self.inscription,
+            student=student.user,
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            academic_class=academic_class,
+        )
+
+        self.inscription.refresh_from_db()
+        self.assertEqual(self.inscription.status, Inscription.STATUS_PARTIAL)
+        self.assertEqual(enrollment.academic_class, academic_class)
+
+    def test_service_returns_already_assigned_when_enrollment_exists(self):
+        academic_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            is_active=True,
+        )
+        self._create_validated_payment(25000)
+
+        result = create_student_after_first_payment(self.inscription)
+
+        self.assertEqual(result["academic_enrollment"]["status"], "already_assigned")
+        self.assertEqual(result["academic_enrollment"]["enrollment"].academic_class, academic_class)
+
+    def test_service_returns_manual_required_missing_data_when_year_unresolved(self):
+        self.candidature.academic_year = "2029-2030"
+        self.candidature.save(update_fields=["academic_year"])
+        self._create_validated_payment(25000)
+
+        result = create_student_after_first_payment(self.inscription)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["academic_enrollment"]["status"], "manual_required_missing_data")
+        self.assertEqual(result["academic_enrollment"]["reason"], "academic_year_not_found")
 
     def test_backfill_creates_missing_student_and_assigns_role(self):
         self._create_validated_payment(25000)

@@ -1,29 +1,31 @@
+import json
+
 from django.contrib.auth.decorators import login_required
+from django.db import connection
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 
 from django.db.models import Prefetch
+from django.views.decorators.http import require_POST
 
-from academics.models import AcademicEnrollment, EC, ECChapter
+from academics.models import AcademicEnrollment, EC, ECChapter, ECContent, StudentContentProgress
 from portal.permissions import role_required
 
-from .services import get_student_dashboard_shell
+from .services import get_student_dashboard_data
 from .widgets.profile import get_profile_widget
-from .widgets.academics import get_academics_widget
+from .widgets.academics import get_academics_widget, get_student_academic_snapshot
 from .widgets.finance import get_finance_widget
 from .widgets.notifications import get_notifications_widget
 
 
-def _get_active_enrollment_for_user(user):
-    return (
-        AcademicEnrollment.objects.select_related(
-            "academic_class",
-            "academic_year",
-            "programme",
-            "branch",
-        )
-        .filter(student=user, is_active=True)
-        .order_by("-created_at", "-id")
-        .first()
+def _academic_chapters_available():
+    return "academics_ecchapter" in connection.introspection.table_names()
+
+
+def _content_prefetch():
+    return Prefetch(
+        "contents",
+        queryset=ECContent.objects.filter(is_active=True).order_by("order", "id"),
     )
 
 
@@ -31,35 +33,70 @@ def _get_student_ec_queryset(enrollment):
     if enrollment is None:
         return EC.objects.none()
 
-    return (
+    queryset = (
         EC.objects.select_related(
             "ue",
             "ue__semester",
             "ue__semester__academic_class",
         )
-        .prefetch_related(
-            Prefetch(
-                "chapters",
-                queryset=ECChapter.objects.prefetch_related("contents").order_by("order", "id"),
-            )
-        )
         .filter(ue__semester__academic_class=enrollment.academic_class)
         .order_by("ue__semester__number", "ue__code", "id")
     )
+
+    if _academic_chapters_available():
+        queryset = queryset.prefetch_related(
+            Prefetch(
+                "chapters",
+                queryset=ECChapter.objects.prefetch_related(_content_prefetch()).order_by("order", "id"),
+            )
+        )
+
+    return queryset
+
+
+def _prepare_chapter_contents(request, user, chapters):
+    content_ids = [
+        content.id
+        for chapter in chapters
+        for content in chapter.contents.all()
+    ]
+    progress_map = {
+        entry.content_id: entry
+        for entry in StudentContentProgress.objects.filter(
+            student=user,
+            content_id__in=content_ids,
+        )
+    }
+
+    for chapter in chapters:
+        chapter.active_contents = list(chapter.contents.all())
+        for content in chapter.active_contents:
+            progress_entry = progress_map.get(content.id)
+            content.student_progress_percent = progress_entry.progress_percent if progress_entry else 0
+            content.student_is_completed = progress_entry.is_completed if progress_entry else False
+            content.student_last_position = progress_entry.last_position if progress_entry else 0
+            content.absolute_file_url = request.build_absolute_uri(content.file.url) if content.file else ""
+            content.preview_with_iframe = content.content_type in {
+                ECContent.CONTENT_TYPE_PDF,
+                ECContent.CONTENT_TYPE_VIDEO,
+            }
+            content.preview_as_media = content.content_type in {
+                ECContent.CONTENT_TYPE_AUDIO,
+                ECContent.CONTENT_TYPE_IMAGE,
+            }
+            content.document_like = content.content_type in {
+                ECContent.CONTENT_TYPE_DOC,
+                ECContent.CONTENT_TYPE_EXCEL,
+                ECContent.CONTENT_TYPE_PPT,
+            }
+
+    return chapters
 
 
 @login_required
 @role_required("student")
 def dashboard(request):
-    context = get_student_dashboard_shell(request.user)
-    enrollment = _get_active_enrollment_for_user(request.user)
-    course_preview = list(_get_student_ec_queryset(enrollment)[:6])
-    context.update(
-        {
-            "course_preview": course_preview,
-            "course_preview_count": len(course_preview),
-        }
-    )
+    context = get_student_dashboard_data(request.user)
     return render(request, "portal/student/dashboard.html", context)
 
 
@@ -93,14 +130,39 @@ def notifications_partial(request):
 
 @login_required
 @role_required("student")
+def courses_partial(request):
+    context = get_student_dashboard_data(request.user)
+    return render(request, "portal/student/partials/courses_student.html", context)
+
+
+@login_required
+@role_required("student")
+def messages_partial(request):
+    context = get_student_dashboard_data(request.user)
+    return render(request, "portal/student/partials/messages_student.html", context)
+
+
+@login_required
+@role_required("student")
+def timetable_partial(request):
+    context = get_student_dashboard_data(request.user)
+    return render(request, "portal/student/partials/calendar_student.html", context)
+
+
+@login_required
+@role_required("student")
 def student_courses(request):
-    enrollment = _get_active_enrollment_for_user(request.user)
+    academic_snapshot = get_student_academic_snapshot(request.user)
+    enrollment = academic_snapshot["academic_enrollment"]
 
     ec_rows = []
     if enrollment is not None:
         ecs = _get_student_ec_queryset(enrollment)
         for ec in ecs:
-            content_count = sum(chapter.contents.count() for chapter in ec.chapters.all())
+            if _academic_chapters_available():
+                content_count = sum(chapter.contents.count() for chapter in ec.chapters.all())
+            else:
+                content_count = 0
             ec_rows.append({
                 "ec": ec,
                 "content_count": content_count,
@@ -113,6 +175,8 @@ def student_courses(request):
             "page_title": "Mes cours",
             "subtitle": "Consultez vos matieres et les contenus pedagogiques disponibles.",
             "enrollment": enrollment,
+            "academic_status": academic_snapshot["academic_status"],
+            "academic_status_message": academic_snapshot["academic_status_message"],
             "ec_rows": ec_rows,
         },
     )
@@ -121,33 +185,96 @@ def student_courses(request):
 @login_required
 @role_required("student")
 def ec_detail(request, ec_id):
+    academic_snapshot = get_student_academic_snapshot(request.user)
     enrollment = get_object_or_404(
-        AcademicEnrollment.objects.filter(pk=getattr(_get_active_enrollment_for_user(request.user), "pk", None)),
+        AcademicEnrollment.objects.filter(pk=getattr(academic_snapshot["academic_enrollment"], "pk", None)),
     )
 
-    ec = get_object_or_404(
-        EC.objects.select_related(
-            "ue",
-            "ue__semester",
-            "ue__semester__academic_class",
-        ).prefetch_related(
+    ec_queryset = EC.objects.select_related(
+        "ue",
+        "ue__semester",
+        "ue__semester__academic_class",
+    )
+    if _academic_chapters_available():
+        ec_queryset = ec_queryset.prefetch_related(
             Prefetch(
                 "chapters",
-                queryset=ECChapter.objects.prefetch_related("contents").order_by("order", "id"),
+                queryset=ECChapter.objects.prefetch_related(_content_prefetch()).order_by("order", "id"),
             )
-        ),
+        )
+
+    ec = get_object_or_404(
+        ec_queryset,
         pk=ec_id,
         ue__semester__academic_class=enrollment.academic_class,
     )
 
-    return render(
-        request,
-        "portal/student/ec_detail.html",
-        {
-            "page_title": ec.title,
-            "subtitle": "Contenus lies a cette matiere.",
-            "enrollment": enrollment,
-            "ec": ec,
-            "chapters": ec.chapters.all(),
+    chapters = list(ec.chapters.all()) if _academic_chapters_available() else []
+    _prepare_chapter_contents(request, request.user, chapters)
+
+    context = {
+        "page_title": ec.title,
+        "subtitle": "Contenus lies a cette matiere.",
+        "enrollment": enrollment,
+        "ec": ec,
+        "chapters_available": _academic_chapters_available(),
+        "chapters": chapters,
+    }
+
+    template_name = (
+        "portal/student/partials/ec_detail_panel.html"
+        if request.GET.get("partial") == "1"
+        else "portal/student/ec_detail.html"
+    )
+    return render(request, template_name, context)
+
+
+@login_required
+@role_required("student")
+@require_POST
+def update_content_progress(request, content_id):
+    academic_snapshot = get_student_academic_snapshot(request.user)
+    enrollment = get_object_or_404(
+        AcademicEnrollment.objects.filter(pk=getattr(academic_snapshot["academic_enrollment"], "pk", None)),
+    )
+    content = get_object_or_404(
+        ECContent,
+        pk=content_id,
+        is_active=True,
+        chapter__ec__ue__semester__academic_class=enrollment.academic_class,
+    )
+
+    payload = json.loads(request.body or "{}")
+    progress_percent = int(payload.get("progress_percent", 0) or 0)
+    last_position = int(payload.get("last_position", 0) or 0)
+    is_completed = bool(payload.get("is_completed", False))
+
+    progress_percent = max(0, min(progress_percent, 100))
+    if is_completed:
+        progress_percent = 100
+
+    progress, _ = StudentContentProgress.objects.get_or_create(
+        student=request.user,
+        content=content,
+        defaults={
+            "progress_percent": progress_percent,
+            "last_position": max(0, last_position),
+            "is_completed": is_completed,
         },
+    )
+
+    if progress.progress_percent < progress_percent:
+        progress.progress_percent = progress_percent
+    progress.last_position = max(progress.last_position, max(0, last_position))
+    progress.is_completed = progress.is_completed or is_completed or progress.progress_percent >= 100
+    if progress.is_completed:
+        progress.progress_percent = 100
+    progress.save()
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "progress_percent": progress.progress_percent,
+            "is_completed": progress.is_completed,
+        }
     )

@@ -1,0 +1,66 @@
+<div class="mb-5 flex items-start justify-between gap-3">
+  <div>
+    <p class="student-section-kicker">Calendrier</p>
+    <h3 class="mt-1 student-section-title">Semaine academique</h3>
+  </div>
+  {% if timetable.week_start %}
+    <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-extrabold text-[color:var(--muted)]">
+      Semaine du {{ timetable.week_start|date:"d/m" }}
+    </span>
+  {% endif %}
+</div>
+
+{% if timetable.events %}
+  <div class="overflow-x-auto">
+    <div class="min-w-[720px]">
+      <div class="grid grid-cols-[60px_repeat(7,minmax(92px,1fr))] gap-2">
+        <div></div>
+        {% for day in timetable.days %}
+          <div class="rounded-lg border px-2 py-2 text-center {% if day.is_today %}border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)]{% else %}border-[color:var(--line)] bg-[color:var(--card-soft)]{% endif %}">
+            <span class="block text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">{{ day.label }}</span>
+            <strong class="mt-1 block text-sm text-[color:var(--text)]">{{ day.day_number }}</strong>
+          </div>
+        {% endfor %}
+
+        {% for slot in timetable.slots %}
+          <div class="flex items-start justify-center pt-3 text-[11px] font-black text-[color:var(--muted)]">
+            {{ slot.label }}
+          </div>
+          {% for cell in slot.cells %}
+            <div class="min-h-[92px] rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-2">
+              {% if cell.events %}
+                <div class="grid gap-1.5">
+                  {% for event in cell.events %}
+                    <article class="rounded-md border px-2 py-2 {% if event.status == 'cancelled' %}border-rose-200 bg-rose-50{% elif event.status == 'postponed' %}border-amber-200 bg-amber-50{% elif event.is_today %}border-[color:var(--school-primary)] bg-white{% else %}border-[color:var(--line)] bg-white{% endif %}">
+                      <div class="flex items-start justify-between gap-2">
+                        <strong class="block text-[11px] font-bold leading-4 text-[color:var(--text)]">{{ event.title }}</strong>
+                        <span class="shrink-0 text-[10px] font-bold text-[color:var(--muted)]">{{ event.start_time }}</span>
+                      </div>
+                      <p class="mt-1 line-clamp-1 text-[10px] text-[color:var(--muted)]">{{ event.teacher_name }}</p>
+                      <p class="mt-1 line-clamp-1 text-[10px] text-[color:var(--muted)]">{{ event.location }}</p>
+                      {% if event.status == 'postponed' %}
+                        <span class="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">Reporte</span>
+                      {% elif event.status == 'cancelled' %}
+                        <span class="mt-2 inline-flex rounded-full bg-rose-100 px-2 py-1 text-[10px] font-bold text-rose-700">Annule</span>
+                      {% elif event.status == 'ongoing' %}
+                        <span class="mt-2 inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">En cours</span>
+                      {% endif %}
+                    </article>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="flex h-full min-h-[74px] items-center justify-center rounded-md border border-dashed border-[color:var(--line)] bg-white/60 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--muted-2)]">
+                  Libre
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">
+    Aucun cours programme pour cette periode.
+  </div>
+{% endif %}

@@ -10,9 +10,9 @@ def get_profile_widget(user):
             "annexe": "Non disponible",
             "photo_url": None,
         }
-    full_name = user.get_full_name() or getattr(user, "username", "")
+
     context = {
-        "full_name": full_name,
+        "full_name": user.get_full_name() or getattr(user, "username", ""),
         "email": getattr(user, "email", ""),
         "phone": "",
         "matricule": "Non disponible",
@@ -21,10 +21,24 @@ def get_profile_widget(user):
         "annexe": "Non disponible",
         "photo_url": None,
     }
-    try:
-        # Préparer pour brancher le modèle Student plus tard
-        pass
-    except AttributeError:
-        pass
-    return context
 
+    student = getattr(user, "student_profile", None)
+    if student is None:
+        return context
+
+    candidature = student.inscription.candidature
+    context.update(
+        {
+            "full_name": student.full_name,
+            "email": student.email,
+            "matricule": student.matricule,
+            "formation": getattr(candidature.programme, "title", "Non disponible"),
+            "annexe": getattr(candidature.branch, "name", "Non disponible"),
+        }
+    )
+
+    enrollment = getattr(student.inscription, "academic_enrollment", None)
+    if enrollment is not None:
+        context["classroom"] = enrollment.academic_class.display_name
+
+    return context

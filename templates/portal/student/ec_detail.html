@@ -2,103 +2,123 @@
 
 {% block title %}{{ page_title }}{% endblock %}
 
+{% block extra_head %}
+<style>
+  :root {
+    --school-primary: #1e4f6f;
+    --school-primary-dark: #123145;
+    --school-primary-soft: #eef4f7;
+    --surface: #f4f6f9;
+    --card: #ffffff;
+    --card-soft: #f8fbfc;
+    --line: rgba(214, 228, 236, 0.95);
+    --text: #123145;
+    --muted: #64748b;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-100 py-10">
-  <div class="max-w-5xl mx-auto px-4 sm:px-6">
+  <div class="mx-auto max-w-5xl px-4 sm:px-6">
     <div class="mb-8">
       <a href="{% url 'portal_student:student_courses' %}" class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
         Retour aux matieres
       </a>
     </div>
 
-    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <p class="text-xs uppercase tracking-wide text-slate-500">
-        S{{ ec.ue.semester.number }} · {{ ec.ue.code }} · {{ enrollment.academic_class.display_name }}
-      </p>
-      <h1 class="mt-2 text-3xl font-bold text-slate-900">{{ ec.title }}</h1>
-      <p class="mt-2 text-slate-600">{{ subtitle }}</p>
-
-      <div class="mt-5 grid gap-3 sm:grid-cols-3">
-        <div class="rounded-xl bg-slate-50 p-4">
-          <p class="text-xs uppercase tracking-wide text-slate-500">UE</p>
-          <p class="mt-1 font-semibold text-slate-900">{{ ec.ue.title }}</p>
-        </div>
-        <div class="rounded-xl bg-slate-50 p-4">
-          <p class="text-xs uppercase tracking-wide text-slate-500">Coefficient</p>
-          <p class="mt-1 font-semibold text-slate-900">{{ ec.coefficient }}</p>
-        </div>
-        <div class="rounded-xl bg-slate-50 p-4">
-          <p class="text-xs uppercase tracking-wide text-slate-500">Credit</p>
-          <p class="mt-1 font-semibold text-slate-900">{{ ec.credit_required }}</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="mt-6 space-y-6">
-      {% for chapter in chapters %}
-        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-xs uppercase tracking-wide text-slate-500">Chapitre {{ forloop.counter }}</p>
-              <h2 class="mt-1 text-xl font-semibold text-slate-900">{{ chapter.title }}</h2>
-            </div>
-            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {{ chapter.contents.count }} contenu{{ chapter.contents.count|pluralize }}
-            </span>
-          </div>
-
-          <div class="mt-5 space-y-4">
-            {% for content in chapter.contents.all %}
-              <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <div class="flex flex-col gap-4">
-                  <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p class="text-xs uppercase tracking-wide text-slate-500">{{ content.get_content_type_display }}</p>
-                      <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ content.title }}</h3>
-                      <p class="mt-2 text-sm text-slate-500">Ajoute le {{ content.created_at|date:"d/m/Y H:i" }}</p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                      {% if content.file %}
-                        <a href="{{ content.file.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-                          Telecharger
-                        </a>
-                      {% endif %}
-                    </div>
-                  </div>
-
-                  {% if content.content_type == "video" and content.video_url %}
-                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-black">
-                      <iframe
-                        src="{{ content.video_url }}"
-                        class="aspect-video w-full"
-                        allowfullscreen
-                        loading="lazy"
-                      ></iframe>
-                    </div>
-                  {% elif content.content_type == "text" and content.text_content %}
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
-                      {{ content.text_content }}
-                    </div>
-                  {% elif content.file %}
-                    <p class="text-sm text-slate-600">
-                      Fichier disponible au telechargement.
-                    </p>
-                  {% endif %}
-                </div>
-              </article>
-            {% empty %}
-              <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-600">
-                Aucun contenu dans ce chapitre.
-              </div>
-            {% endfor %}
-          </div>
-        </section>
-      {% empty %}
-        <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-600">
-          Aucun chapitre pedagogique n'est encore associe a cette matiere.
-        </div>
-      {% endfor %}
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {% include "portal/student/partials/ec_detail_panel.html" %}
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const studentContentProgressUrlTemplate = "{% url 'portal_student:content_progress' 0 %}";
+
+  function getCsrfToken() {
+    const match = document.cookie.match(/csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  async function updateStudentContentProgress(contentId, payload) {
+    const progressUrl = studentContentProgressUrlTemplate.replace("/0/", `/${contentId}/`);
+    const response = await fetch(progressUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error("progress-update-failed");
+    }
+
+    return response.json();
+  }
+
+  function initStudentContentTracking(root = document) {
+    root.querySelectorAll("[data-track-content]").forEach((node) => {
+      if (node.dataset.boundTrack === "1") return;
+      node.dataset.boundTrack = "1";
+
+      const sendProgress = () => {
+        updateStudentContentProgress(node.dataset.trackContent, {
+          progress_percent: Number(node.dataset.trackProgress || 10),
+        }).catch(() => {});
+      };
+
+      if (node.tagName === "IFRAME" || node.tagName === "IMG") {
+        node.addEventListener("load", sendProgress, { once: true });
+      } else if (node.tagName === "A") {
+        node.addEventListener("click", sendProgress);
+      } else {
+        sendProgress();
+      }
+    });
+
+    root.querySelectorAll("[data-complete-content]").forEach((node) => {
+      if (node.dataset.boundTrack === "1") return;
+      node.dataset.boundTrack = "1";
+      node.addEventListener("click", () => {
+        updateStudentContentProgress(node.dataset.completeContent, {
+          progress_percent: 100,
+          is_completed: true,
+        }).then(() => window.location.reload()).catch(() => {});
+      });
+    });
+
+    root.querySelectorAll("[data-media-progress-content]").forEach((node) => {
+      if (node.dataset.boundTrack === "1") return;
+      node.dataset.boundTrack = "1";
+      node.addEventListener("timeupdate", () => {
+        if (!node.duration || !Number.isFinite(node.duration) || node.duration <= 0) return;
+        const progressPercent = Math.min(100, Math.round((node.currentTime / node.duration) * 100));
+        const lastSent = Number(node.dataset.lastSentProgress || 0);
+        if (progressPercent < 100 && progressPercent - lastSent < 10) return;
+        node.dataset.lastSentProgress = String(progressPercent);
+        updateStudentContentProgress(node.dataset.mediaProgressContent, {
+          progress_percent: progressPercent,
+          last_position: Math.round(node.currentTime),
+          is_completed: progressPercent >= 100,
+        }).catch(() => {});
+      });
+      node.addEventListener("ended", () => {
+        updateStudentContentProgress(node.dataset.mediaProgressContent, {
+          progress_percent: 100,
+          is_completed: true,
+          last_position: Math.round(node.duration || 0),
+        }).then(() => window.location.reload()).catch(() => {});
+      });
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    initStudentContentTracking(document);
+  });
+</script>
 {% endblock %}

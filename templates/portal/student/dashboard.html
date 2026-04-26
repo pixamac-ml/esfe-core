@@ -1,103 +1,640 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block public_navbar %}{% endblock %}
+{% block public_footer %}{% endblock %}
+{% block public_floating_widget %}{% endblock %}
 
 {% block title %}{{ page_title }}{% endblock %}
 
+{% block extra_head %}
+<style>
+  :root {
+    --school-primary: #1e4f6f;
+    --school-primary-dark: #123145;
+    --school-primary-soft: #eef4f7;
+    --school-secondary: #1db5b0;
+    --school-secondary-soft: rgba(29, 181, 176, 0.14);
+    --school-accent: #f39c12;
+    --school-accent-soft: rgba(243, 156, 18, 0.14);
+    --bg-deep: #f3f6f9;
+    --bg-deep-2: #edf2f6;
+    --sidebar-main: #163b53;
+    --sidebar-rail: #123145;
+    --surface: #f4f6f9;
+    --surface-2: #e8eef3;
+    --card: #ffffff;
+    --card-soft: #f8fbfc;
+    --line: rgba(214, 228, 236, 0.95);
+    --text: #123145;
+    --muted: #64748b;
+    --muted-2: #98a2b3;
+    --shadow-shell: 0 18px 48px rgba(15, 23, 42, .08);
+    --shadow-card: 0 12px 28px rgba(15, 23, 42, .05);
+    --sidebar-width: 268px;
+    --sidebar-compact-width: 84px;
+    --radius-shell: 22px;
+    --radius-xl: 18px;
+  }
+
+  .student-dashboard-page {
+    min-height: 100vh;
+    color: var(--text);
+    background: linear-gradient(180deg, var(--bg-deep), var(--bg-deep-2));
+  }
+
+  .student-dashboard-page.dark-preview {
+    --surface: #111827;
+    --surface-2: #172033;
+    --card: #1f2937;
+    --card-soft: #273449;
+    --line: #344156;
+    --text: #f9fafb;
+    --muted: #cbd5e1;
+    --muted-2: #94a3b8;
+  }
+
+  .student-stage {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .student-shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    min-height: 100vh;
+    overflow: hidden;
+    border-radius: 0;
+    background: var(--surface);
+    box-shadow: none;
+    transition: grid-template-columns .28s ease;
+  }
+
+  .compact-sidebar .student-shell {
+    grid-template-columns: var(--sidebar-compact-width) minmax(0, 1fr);
+  }
+
+  .student-sidebar {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    overflow: hidden;
+    color: white;
+    background: linear-gradient(180deg, var(--sidebar-main), var(--school-primary-dark));
+  }
+
+  .compact-sidebar .student-sidebar {
+    grid-template-columns: 90px 0;
+  }
+
+  .student-main {
+    min-width: 0;
+    display: grid;
+    grid-template-rows: 64px minmax(0, 1fr);
+  }
+
+  .student-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(14px);
+  }
+
+  .dark-preview .student-topbar {
+    background: rgba(31,41,55,.55);
+  }
+
+  .student-content {
+    overflow: auto;
+    padding: 0.9rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1.9fr) minmax(320px, 0.8fr);
+    gap: 0.75rem;
+  }
+
+  .student-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--card);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+  }
+
+  .student-card-pad {
+    padding: 0.85rem;
+  }
+
+  .student-hero {
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, .72fr);
+    min-height: 136px;
+  }
+
+  .student-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    border-radius: 999px;
+    background: var(--school-secondary-soft);
+    color: var(--school-primary-dark);
+    padding: .48rem .76rem;
+    font-size: .75rem;
+    font-weight: 800;
+  }
+
+  .student-grid-two {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 0.75rem;
+  }
+
+  .student-left-stack,
+  .student-right-stack {
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+  }
+
+  .student-section-title {
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .student-section-kicker {
+    font-size: .7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .16em;
+    color: var(--school-primary);
+  }
+
+  .student-section {
+    scroll-margin-top: 84px;
+  }
+
+  .student-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(15, 23, 42, 0.34);
+    backdrop-filter: blur(2px);
+  }
+
+  .student-detail-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.75rem;
+  }
+
+  .student-detail-panel {
+    width: min(760px, 100%);
+    height: calc(100vh - 1.5rem);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: var(--card);
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 60px minmax(0, 1fr);
+  }
+
+  .student-detail-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.96);
+  }
+
+  .student-detail-content {
+    min-height: 0;
+    background: var(--surface);
+  }
+
+  .student-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .student-scroll::-webkit-scrollbar-thumb {
+    background: rgba(100,116,139,.25);
+    border-radius: 999px;
+  }
+
+  @media (max-width: 1199px) {
+    .student-content {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 991px) {
+    .student-shell {
+      grid-template-columns: 1fr;
+      min-height: auto;
+    }
+
+    .student-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: min(320px, 86vw);
+      z-index: 40;
+      transform: translateX(-100%);
+      transition: transform .28s ease;
+      box-shadow: 0 24px 50px rgba(15, 23, 42, .28);
+    }
+
+    .student-sidebar.is-open {
+      transform: translateX(0);
+    }
+
+    .student-topbar {
+      padding: 0 0.85rem;
+    }
+
+    .student-content {
+      padding: 0.7rem;
+    }
+
+    .student-hero,
+    .student-grid-two {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .student-stage {
+      width: 100%;
+    }
+
+    .student-card-pad {
+      padding: 0.8rem;
+    }
+
+    .student-content {
+      gap: 0.65rem;
+    }
+
+    .student-detail-shell {
+      padding: 0;
+    }
+
+    .student-detail-panel {
+      width: 100%;
+      height: 100vh;
+      border-radius: 0;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100 py-10">
-  <div class="max-w-5xl mx-auto px-2 md:px-6">
-    <div class="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-2">
-      <div>
-        <h1 class="text-3xl font-bold text-gray-900 tracking-tight">{{ page_title }}</h1>
-        <p class="text-gray-500 text-base mt-1">{{ subtitle }}</p>
-      </div>
-      <a
-        href="{% url 'portal_student:student_courses' %}"
-        class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-      >
-        Ouvrir mes cours
-      </a>
-    </div>
+{{ courses|json_script:"student-courses-data" }}
+{{ teachers|json_script:"student-teachers-data" }}
+{{ timetable|json_script:"student-timetable-data" }}
+{{ events|json_script:"student-events-data" }}
+{{ messages|json_script:"student-messages-data" }}
+{{ stats.mini_stats|json_script:"student-mini-stats-data" }}
+{{ stats.progress_bars|json_script:"student-progress-bars-data" }}
 
-    <section class="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p class="text-sm font-medium text-blue-700">Apercu pedagogique</p>
-          <h2 class="text-xl font-semibold text-slate-900 mt-1">Mes matieres</h2>
+<div
+  x-data="studentDashboard()"
+  x-init="init()"
+  x-cloak
+  :class="{ 'dark-preview': darkMode, 'compact-sidebar': sidebarCompact }"
+  class="student-dashboard-page"
+>
+  <div
+    x-show="mobileMenu && window.innerWidth < 992"
+    x-transition.opacity
+    class="student-sidebar-overlay"
+    @click="mobileMenu = false"
+  ></div>
+  <div
+    x-show="courseDetailUrl"
+    x-transition.opacity
+    class="student-sidebar-overlay"
+    @click="closeCourseDetail()"
+  ></div>
+  <div x-show="courseDetailUrl" x-transition class="student-detail-shell">
+    <section class="student-detail-panel">
+      <header class="student-detail-topbar">
+        <div class="min-w-0">
+          <strong class="block truncate text-sm text-[color:var(--text)]" x-text="courseDetailTitle || 'Detail du cours'"></strong>
+          <span class="block text-xs text-[color:var(--muted)]">Consultation integree au dashboard</span>
         </div>
-        <a href="{% url 'portal_student:student_courses' %}" class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-          Voir tout
-        </a>
-      </div>
-
-      <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {% for ec in course_preview %}
-          <a href="{% url 'portal_student:ec_detail' ec.id %}" class="block rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-slate-100">
-            <p class="text-xs uppercase tracking-wide text-slate-500">S{{ ec.ue.semester.number }} · {{ ec.ue.code }}</p>
-            <h3 class="mt-2 font-semibold text-slate-900">{{ ec.title }}</h3>
-            <p class="mt-2 text-sm text-slate-600">{{ ec.ue.title }}</p>
-          </a>
-        {% empty %}
-          <div class="md:col-span-2 xl:col-span-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-600">
-            Aucune matiere n'est encore disponible dans votre espace.
-          </div>
-        {% endfor %}
-      </div>
+        <button
+          type="button"
+          class="grid h-10 w-10 place-items-center rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] text-[color:var(--school-primary)]"
+          @click="closeCourseDetail()"
+        >
+          <i data-lucide="x" style="width:18px;height:18px;"></i>
+        </button>
+      </header>
+      <div
+        id="studentCourseDetailBody"
+        class="student-detail-content"
+        hx-target="this"
+        hx-swap="innerHTML"
+      ></div>
     </section>
+  </div>
+  <div class="student-stage">
+    <section class="student-shell">
+      {% include "portal/student/partials/sidebar_student.html" %}
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-      <div
-        hx-get="{% url 'portal_student:profile_partial' %}"
-        hx-trigger="load"
-        hx-swap="innerHTML"
-        hx-indicator="#loader-profile"
-        hx-on::response-error="this.innerHTML='Erreur de chargement du profil.'"
-        class="bg-white rounded-xl shadow border border-gray-100 p-4 md:p-6 hover:shadow-lg transition-all flex flex-col h-full"
-      >
-        <div id="loader-profile" class="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
-          <div class="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></div>
-          Chargement...
+      <section class="student-main">
+        {% include "portal/student/partials/topbar_student.html" %}
+
+        <div class="student-content student-scroll" id="dashboardTop">
+          <section class="student-left-stack">
+            <section id="overview" class="student-section">
+              {% include "portal/student/partials/hero_student.html" %}
+            </section>
+
+            <div class="student-grid-two">
+              <section id="progress" class="student-section">
+                {% include "portal/student/partials/stats_student.html" %}
+              </section>
+              <section id="profile" class="student-section student-card student-card-pad">
+                {% include "portal/student/partials/profile.html" %}
+              </section>
+            </div>
+
+            <section
+              id="courses"
+              class="student-section student-card student-card-pad"
+              hx-get="{% url 'portal_student:courses_partial' %}"
+              hx-trigger="load"
+              hx-swap="innerHTML"
+            >
+              {% include "portal/student/partials/courses_student.html" %}
+            </section>
+
+            <section id="teachers" class="student-section student-card student-card-pad">
+              {% include "portal/student/partials/teachers_student.html" %}
+            </section>
+          </section>
+
+          <aside class="student-right-stack">
+            <section
+              id="schedule"
+              class="student-section student-card student-card-pad"
+              hx-get="{% url 'portal_student:timetable_partial' %}"
+              hx-trigger="load"
+              hx-swap="innerHTML"
+            >
+              {% include "portal/student/partials/calendar_student.html" %}
+            </section>
+
+            <section id="events" class="student-section student-card student-card-pad">
+              {% include "portal/student/partials/events_student.html" %}
+            </section>
+
+            <section
+              id="messages"
+              class="student-section student-card student-card-pad"
+              hx-get="{% url 'portal_student:messages_partial' %}"
+              hx-trigger="load"
+              hx-swap="innerHTML"
+            >
+              {% include "portal/student/partials/messages_student.html" %}
+            </section>
+          </aside>
         </div>
-      </div>
-      <div
-        hx-get="{% url 'portal_student:academics_partial' %}"
-        hx-trigger="load"
-        hx-swap="innerHTML"
-        hx-indicator="#loader-academics"
-        hx-on::response-error="this.innerHTML='Erreur de chargement de la situation académique.'"
-        class="bg-white rounded-xl shadow border border-gray-100 p-4 md:p-6 hover:shadow-lg transition-all flex flex-col h-full"
-      >
-        <div id="loader-academics" class="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
-          <div class="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></div>
-          Chargement...
-        </div>
-      </div>
-      <div
-        hx-get="{% url 'portal_student:finance_partial' %}"
-        hx-trigger="load"
-        hx-swap="innerHTML"
-        hx-indicator="#loader-finance"
-        hx-on::response-error="this.innerHTML='Erreur de chargement de la situation financière.'"
-        class="bg-white rounded-xl shadow border border-gray-100 p-4 md:p-6 hover:shadow-lg transition-all flex flex-col h-full"
-      >
-        <div id="loader-finance" class="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
-          <div class="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></div>
-          Chargement...
-        </div>
-      </div>
-      <div
-        hx-get="{% url 'portal_student:notifications_partial' %}"
-        hx-trigger="load"
-        hx-swap="innerHTML"
-        hx-indicator="#loader-notifications"
-        hx-on::response-error="this.innerHTML='Erreur de chargement des notifications.'"
-        class="bg-white rounded-xl shadow border border-gray-100 p-4 md:p-6 hover:shadow-lg transition-all flex flex-col h-full"
-      >
-        <div id="loader-notifications" class="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
-          <div class="w-4 h-4 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></div>
-          Chargement...
-        </div>
-      </div>
-    </div>
+      </section>
+    </section>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const studentContentProgressUrlTemplate = "{% url 'portal_student:content_progress' 0 %}";
+
+  function getCsrfToken() {
+    const match = document.cookie.match(/csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  async function updateStudentContentProgress(contentId, payload) {
+    const progressUrl = studentContentProgressUrlTemplate.replace("/0/", `/${contentId}/`);
+    const response = await fetch(progressUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error("progress-update-failed");
+    }
+
+    return response.json();
+  }
+
+  function initStudentContentTracking(root = document) {
+    root.querySelectorAll("[data-track-content]").forEach((node) => {
+      if (node.dataset.boundTrack === "1") return;
+      node.dataset.boundTrack = "1";
+
+      const sendProgress = () => {
+        updateStudentContentProgress(node.dataset.trackContent, {
+          progress_percent: Number(node.dataset.trackProgress || 10),
+        }).catch(() => {});
+      };
+
+      if (node.tagName === "IFRAME" || node.tagName === "IMG") {
+        node.addEventListener("load", sendProgress, { once: true });
+      } else if (node.tagName === "A") {
+        node.addEventListener("click", sendProgress);
+      } else {
+        sendProgress();
+      }
+    });
+
+    root.querySelectorAll("[data-complete-content]").forEach((node) => {
+      if (node.dataset.boundTrack === "1") return;
+      node.dataset.boundTrack = "1";
+      node.addEventListener("click", () => {
+        updateStudentContentProgress(node.dataset.completeContent, {
+          progress_percent: 100,
+          is_completed: true,
+        }).then(() => {
+          const body = document.getElementById("studentCourseDetailBody");
+          if (body && body.dataset.detailUrl && window.htmx) {
+            window.htmx.ajax("GET", body.dataset.detailUrl, "#studentCourseDetailBody");
+          }
+        }).catch(() => {});
+      });
+    });
+
+    root.querySelectorAll("[data-media-progress-content]").forEach((node) => {
+      if (node.dataset.boundTrack === "1") return;
+      node.dataset.boundTrack = "1";
+      node.addEventListener("timeupdate", () => {
+        if (!node.duration || !Number.isFinite(node.duration) || node.duration <= 0) return;
+        const progressPercent = Math.min(100, Math.round((node.currentTime / node.duration) * 100));
+        const lastSent = Number(node.dataset.lastSentProgress || 0);
+        if (progressPercent < 100 && progressPercent - lastSent < 10) return;
+        node.dataset.lastSentProgress = String(progressPercent);
+        updateStudentContentProgress(node.dataset.mediaProgressContent, {
+          progress_percent: progressPercent,
+          last_position: Math.round(node.currentTime),
+          is_completed: progressPercent >= 100,
+        }).catch(() => {});
+      });
+      node.addEventListener("ended", () => {
+        updateStudentContentProgress(node.dataset.mediaProgressContent, {
+          progress_percent: 100,
+          is_completed: true,
+          last_position: Math.round(node.duration || 0),
+        }).catch(() => {});
+      });
+    });
+  }
+
+  function parseDashboardData(id, fallback) {
+    const node = document.getElementById(id);
+    if (!node) return fallback;
+    try {
+      return JSON.parse(node.textContent);
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  function studentDashboard() {
+    return {
+      darkMode: false,
+      sidebarCompact: false,
+      mobileMenu: false,
+      search: "",
+      activeNav: "Tableau de bord",
+      courseDetailUrl: "",
+      courseDetailTitle: "",
+      navItems: [
+        { label: "Tableau de bord", icon: "layout-dashboard", target: "overview" },
+        { label: "Progression", icon: "chart-column", target: "progress" },
+        { label: "Mes cours", icon: "book-open-check", target: "courses" },
+        { label: "Calendrier", icon: "calendar-days", target: "schedule" },
+        { label: "Messages", icon: "messages-square", target: "messages" }
+      ],
+      courses: [],
+      teachers: [],
+      timetable: [],
+      upcoming: [],
+      messages: [],
+      miniStats: [],
+      progressBars: [],
+      init() {
+        this.darkMode = localStorage.getItem("esfe_student_dark") === "1";
+        this.sidebarCompact = localStorage.getItem("esfe_student_sidebar") === "compact";
+        this.courses = parseDashboardData("student-courses-data", []);
+        this.teachers = parseDashboardData("student-teachers-data", []);
+        this.timetable = parseDashboardData("student-timetable-data", []);
+        this.upcoming = parseDashboardData("student-events-data", []);
+        this.messages = parseDashboardData("student-messages-data", []);
+        this.miniStats = parseDashboardData("student-mini-stats-data", []);
+        this.progressBars = parseDashboardData("student-progress-bars-data", []);
+        this.$watch("darkMode", value => {
+          localStorage.setItem("esfe_student_dark", value ? "1" : "0");
+          setTimeout(() => window.lucide && lucide.createIcons(), 50);
+        });
+        this.$watch("sidebarCompact", value => {
+          localStorage.setItem("esfe_student_sidebar", value ? "compact" : "full");
+          setTimeout(() => window.lucide && lucide.createIcons(), 50);
+        });
+        window.addEventListener("resize", () => {
+          if (window.innerWidth >= 992) {
+            this.mobileMenu = false;
+          }
+        });
+        this.$nextTick(() => {
+          if (window.AOS) {
+            AOS.refreshHard();
+          }
+          if (window.lucide) {
+            lucide.createIcons();
+          }
+        });
+      },
+      toggleSidebar() {
+        if (window.innerWidth < 992) {
+          this.mobileMenu = !this.mobileMenu;
+          return;
+        }
+        this.sidebarCompact = !this.sidebarCompact;
+      },
+      toggleDarkMode() {
+        this.darkMode = !this.darkMode;
+      },
+      setActive(label) {
+        this.activeNav = label;
+        this.mobileMenu = false;
+      },
+      goToSection(target, label) {
+        const section = document.getElementById(target);
+        if (section) {
+          this.activeNav = label;
+          this.mobileMenu = false;
+          section.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      },
+      openCourseDetail(url, title) {
+        this.courseDetailUrl = `${url}?partial=1`;
+        this.courseDetailTitle = title || "Detail du cours";
+        this.mobileMenu = false;
+        document.body.style.overflow = "hidden";
+        this.$nextTick(() => {
+          const body = document.getElementById("studentCourseDetailBody");
+          if (body) {
+            body.dataset.detailUrl = this.courseDetailUrl;
+          }
+          if (window.htmx) {
+            window.htmx.ajax("GET", this.courseDetailUrl, "#studentCourseDetailBody");
+          }
+        });
+      },
+      closeCourseDetail() {
+        this.courseDetailUrl = "";
+        this.courseDetailTitle = "";
+        document.body.style.overflow = "";
+        const body = document.getElementById("studentCourseDetailBody");
+        if (body) {
+          delete body.dataset.detailUrl;
+          body.innerHTML = "";
+        }
+      },
+      scrollCourses(direction) {
+        const rail = document.getElementById("courseRail");
+        if (rail) {
+          rail.scrollBy({ left: direction * 260, behavior: "smooth" });
+        }
+      }
+    }
+  }
+
+  document.body.addEventListener("htmx:afterSwap", () => {
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+    if (window.AOS) {
+      AOS.refreshHard();
+    }
+    initStudentContentTracking(document.getElementById("studentCourseDetailBody") || document);
+  });
+</script>
 {% endblock %}

@@ -1,100 +1,56 @@
-OBJECTIF
+OBJECTIF :
 
-Améliorer le système de cours basé sur EC pour ajouter une structure pédagogique avec chapitres.
+Refactoriser complètement le dashboard étudiant en architecture par sections UX modernes.
 
----
+PROBLÈME ACTUEL :
 
-IMPORTANT
+- affichage en blocs empilés
+- manque de hiérarchie visuelle
+- calendrier en liste (mauvais UX)
+- alignement incohérent
+- surcharge visuelle
 
-* ne pas casser EC existant
-* améliorer ECContent
-* ajouter une hiérarchie propre
+ATTENDU :
 
----
+1. STRUCTURER EN SECTIONS :
 
-PARTIE 1 — MODELS
+- HERO (bienvenue + actions rapides)
+- CALENDRIER (GRID hebdomadaire obligatoire)
+- MES COURS (cards propres)
+- PROGRESSION (indicateurs visuels)
+- ACTIVITÉS (notifications)
 
-Créer modèle :
+2. CALENDRIER (CRITIQUE) :
 
-```python
-class ECChapter(models.Model):
-    ec = models.ForeignKey("EC", on_delete=models.CASCADE, related_name="chapters")
-    title = models.CharField(max_length=255)
-    order = models.PositiveIntegerField(default=0)
-```
+REMPLACER le système actuel par :
 
----
+- une grille (jours x heures)
+- affichage type tableau
+- cases vides visibles
+- événements positionnés correctement
 
-Modifier ECContent :
+3. DESIGN :
 
-```python
-class ECContent(models.Model):
-    chapter = models.ForeignKey("ECChapter", on_delete=models.CASCADE, related_name="contents")
-    title = models.CharField(max_length=255)
-    content_type = models.CharField(max_length=20, choices=[
-        ("pdf", "PDF"),
-        ("video", "Vidéo"),
-        ("doc", "Word"),
-        ("excel", "Excel"),
-        ("text", "Texte"),
-    ])
-    file = models.FileField(upload_to="courses/", null=True, blank=True)
-    video_url = models.URLField(null=True, blank=True)
-    order = models.PositiveIntegerField(default=0)
-```
+- respecter Tailwind config fourni
+- alignement strict
+- spacing cohérent (gap-4 max)
+- supprimer marges inutiles
+- sidebar inchangée
 
----
+4. UX :
 
-PARTIE 2 — VUES
+- lecture rapide
+- pas de surcharge
+- logique SaaS moderne
 
-Créer :
+5. INTERDIT :
 
-* student_courses(request)
-* ec_detail(request, ec_id)
+- ne pas toucher au backend
+- ne pas modifier les services
+- ne pas ajouter de nouvelles features
 
----
+6. LIVRABLE :
 
-Dans ec_detail :
-
-* récupérer EC
-* récupérer chapters triés
-* récupérer contents triés
-
----
-
-PARTIE 3 — TEMPLATE
-
-Afficher :
-
-* EC titre
-* liste chapitres
-* sous chaque chapitre → contenus
-
----
-
-PARTIE 4 — AFFICHAGE CONTENU
-
-Si :
-
-* PDF → lien download
-* vidéo → iframe ou lecteur
-* texte → affichage direct
-
----
-
-PARTIE 5 — DASHBOARD
-
-Intégrer dans dashboard étudiant :
-
-* liste EC
-* clic → détail EC
-
----
-
-OBJECTIF FINAL
-
-Permettre :
-
-* navigation par matière
-* organisation par chapitre
-* accès aux contenus pédagogiques
+- templates Django refactorisés
+- partials par section
+- code propre et structuré

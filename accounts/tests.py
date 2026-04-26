@@ -12,6 +12,7 @@ from students.models import Student
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from formations.models import Programme, Cycle, Diploma, Filiere
+from academics.models import AcademicClass, AcademicEnrollment, AcademicYear, Semester, UE, EC
 
 from accounts.access import (
 	can_access,
@@ -53,6 +54,7 @@ class AccessCompatibilityTests(TestCase):
 		*,
 		groups=None,
 		role="",
+		position="",
 		branch=None,
 		is_staff=True,
 		is_superuser=False,
@@ -78,8 +80,9 @@ class AccessCompatibilityTests(TestCase):
 
 		profile = user.profile
 		profile.role = role
+		profile.position = position
 		profile.branch = branch
-		profile.save(update_fields=["role", "branch", "updated_at"])
+		profile.save(update_fields=["role", "position", "branch", "updated_at"])
 		return user
 
 	def test_get_user_groups_expands_legacy_aliases(self):
@@ -114,6 +117,10 @@ class AccessCompatibilityTests(TestCase):
 		PaymentAgent.objects.create(user=user, branch=self.branch_agent, is_active=True)
 
 		self.assertEqual(get_user_position(user), "payment_agent")
+
+	def test_get_user_position_prefers_profile_position(self):
+		user = self._create_user("supervisor_user", position="academic_supervisor")
+		self.assertEqual(get_user_position(user), "academic_supervisor")
 
 	def test_can_access_preserves_profile_role_compatibility(self):
 		admissions_user = self._create_user(
@@ -170,7 +177,7 @@ class DashboardRedirectCompatibilityTests(TestCase):
 			slug="annexe-redirect",
 		)
 
-	def _create_user(self, username, *, groups=None, role="", branch=None):
+	def _create_user(self, username, *, groups=None, role="", position="", branch=None):
 		user = USER_MANAGER.create_user(
 			username=username,
 			email=f"{username}@example.com",
@@ -185,8 +192,9 @@ class DashboardRedirectCompatibilityTests(TestCase):
 
 		profile = user.profile
 		profile.role = role
+		profile.position = position
 		profile.branch = branch
-		profile.save(update_fields=["role", "branch", "updated_at"])
+		profile.save(update_fields=["role", "position", "branch", "updated_at"])
 		return user
 
 	def test_dashboard_redirect_prioritizes_executive(self):
@@ -279,7 +287,7 @@ class PortalPhaseOneTests(TestCase):
 			slug="annexe-portal",
 		)
 
-	def _create_user(self, username, *, role="", groups=None):
+	def _create_user(self, username, *, role="", position="", groups=None):
 		user = USER_MANAGER.create_user(
 			username=username,
 			email=f"{username}@example.com",
@@ -292,9 +300,32 @@ class PortalPhaseOneTests(TestCase):
 				user.groups.add(group)
 		profile = user.profile
 		profile.role = role
+		profile.position = position
 		profile.branch = self.branch
-		profile.save(update_fields=["role", "branch", "updated_at"])
+		profile.save(update_fields=["role", "position", "branch", "updated_at"])
 		return user
+
+	def _create_student_record(self, user, *, inscription_status=Inscription.STATUS_PARTIAL):
+		candidature = Candidature.objects.create(
+			first_name="Portal",
+			last_name="Student",
+			birth_date="2000-01-01",
+			birth_place="Bamako",
+			gender="male",
+			email=f"{user.username}@example.com",
+			phone="70000000",
+			programme=self.programme,
+			branch=self.branch,
+			academic_year="2025-2026",
+			entry_year=1,
+			status="accepted",
+		)
+		inscription = Inscription.objects.create(
+			candidature=candidature,
+			amount_due=100000,
+			status=inscription_status,
+		)
+		return Student.objects.create(user=user, inscription=inscription, matricule=f"MAT-{user.pk}")
 
 	def test_login_page_loads(self):
 		response = self.client.get(reverse("accounts:login"))
@@ -377,9 +408,151 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("portal_student:dashboard"))
 		self.assertEqual(response.status_code, 403)
 
+	def test_student_dashboard_shows_real_academic_assignment(self):
+		student_user = self._create_user("student_dashboard_real", role="student")
+		student = self._create_student_record(student_user)
+		academic_year = AcademicYear.objects.create(
+			name="2025-2026",
+			start_date="2025-10-01",
+			end_date="2026-07-31",
+			is_active=True,
+		)
+		academic_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			level="L1",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		self.client.force_login(student_user)
+
+		response = self.client.get(reverse("portal_student:dashboard"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Ma situation academique")
+		self.assertContains(response, self.programme.title)
+		self.assertContains(response, "Affecte")
+		self.assertContains(response, "2025-2026")
+
+	def test_student_dashboard_shows_pending_message_without_enrollment(self):
+		student_user = self._create_user("student_dashboard_pending", role="student")
+		self._create_student_record(student_user)
+		self.client.force_login(student_user)
+
+		response = self.client.get(reverse("portal_student:dashboard"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Affectation academique en cours ou requise.")
+
+	def test_student_ec_detail_shows_only_enrolled_class_ec(self):
+		student_user = self._create_user("student_ec_detail_ok", role="student")
+		student = self._create_student_record(student_user)
+		academic_year = AcademicYear.objects.create(
+			name="2025-2026",
+			start_date="2025-10-01",
+			end_date="2026-07-31",
+			is_active=True,
+		)
+		academic_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			level="L1",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		semester = Semester.objects.create(academic_class=academic_class, number=1)
+		ue = UE.objects.create(semester=semester, code="UE101", title="Fondamentaux")
+		ec = EC.objects.create(ue=ue, title="Introduction", credit_required=3, coefficient=2)
+		self.client.force_login(student_user)
+
+		response = self.client.get(reverse("portal_student:ec_detail", args=[ec.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Introduction")
+		self.assertContains(response, "Fondamentaux")
+
+	def test_student_ec_detail_hides_ec_from_other_class(self):
+		student_user = self._create_user("student_ec_detail_denied", role="student")
+		student = self._create_student_record(student_user)
+		academic_year = AcademicYear.objects.create(
+			name="2025-2026",
+			start_date="2025-10-01",
+			end_date="2026-07-31",
+			is_active=True,
+		)
+		student_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			level="L1",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=student_class,
+		)
+		other_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			level="L2",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		other_semester = Semester.objects.create(academic_class=other_class, number=1)
+		other_ue = UE.objects.create(semester=other_semester, code="UE201", title="Approfondissement")
+		other_ec = EC.objects.create(ue=other_ue, title="EC Hors Classe", credit_required=3, coefficient=2)
+		self.client.force_login(student_user)
+
+		response = self.client.get(reverse("portal_student:ec_detail", args=[other_ec.id]))
+
+		self.assertEqual(response.status_code, 404)
+
 	def test_portal_role_falls_back_to_staff_from_groups(self):
 		staff_user = self._create_user("portal_role_group", groups=["finance_agents"], role="")
 		self.assertEqual(get_portal_user_role(staff_user), "staff")
+
+	def test_login_redirects_finance_position_to_finance_portal(self):
+		finance_user = self._create_user("portal_finance_user", role="finance", position="finance_manager")
+		response = self.client.post(
+			reverse("accounts:login"),
+			{"username": finance_user.username, "password": "pass1234"},
+		)
+		self.assertRedirects(
+			response,
+			reverse("accounts_portal:portal_finance"),
+			fetch_redirect_response=False,
+		)
+
+	def test_supervisor_portal_renders_placeholder(self):
+		supervisor = self._create_user("portal_supervisor", position="academic_supervisor")
+		self.client.force_login(supervisor)
+		response = self.client.get(reverse("accounts_portal:portal_supervisor"))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Dashboard Supervision Academique")
 
 
 class BackfillUserRoleTypeCommandTests(TestCase):
@@ -483,4 +656,33 @@ class BackfillUserRoleTypeCommandTests(TestCase):
 		# Ne pas écraser un profil déjà valide.
 		self.assertEqual(valid_profile_user.profile.user_type, "staff")
 		self.assertEqual(valid_profile_user.profile.role, "teacher")
+
+
+class FixUserPositionsCommandTests(TestCase):
+	def setUp(self):
+		self.branch = Branch.objects.create(
+			name="Annexe Position",
+			code="APS",
+			slug="annexe-position",
+		)
+
+	def test_fix_user_positions_sets_detectable_position(self):
+		user = USER_MANAGER.create_user(
+			username="position_finance",
+			email="position_finance@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		group, _ = Group.objects.get_or_create(name="finance_agents")
+		user.groups.add(group)
+		PaymentAgent.objects.create(user=user, branch=self.branch, is_active=True)
+
+		profile = user.profile
+		profile.position = ""
+		profile.save(update_fields=["position", "updated_at"])
+
+		call_command("fix_user_positions")
+
+		user.refresh_from_db()
+		self.assertEqual(user.profile.position, "payment_agent")
 

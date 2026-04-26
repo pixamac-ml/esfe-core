@@ -6,7 +6,12 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 from django.urls import reverse
 
-from accounts.access import get_user_groups, get_user_profile_role, get_user_role as get_canonical_user_role
+from accounts.access import (
+    get_user_groups,
+    get_user_position,
+    get_user_profile_role,
+    get_user_role as get_canonical_user_role,
+)
 def get_user_role(user):
     if not getattr(user, "is_authenticated", False):
         return None
@@ -71,9 +76,25 @@ def get_post_login_portal_url(user):
     if not getattr(user, "is_authenticated", False):
         return reverse("accounts_portal:portal_home")
 
+    position = get_user_position(user)
+    if position in {"finance_manager", "payment_agent"}:
+        return reverse("accounts_portal:portal_finance")
+    if position == "secretary":
+        return reverse("accounts_portal:portal_secretary")
+    if position == "admissions":
+        return reverse("accounts_portal:portal_admissions")
+    if position in {"director_of_studies", "executive_director", "super_admin"}:
+        return reverse("accounts_portal:portal_director")
+    if position == "academic_supervisor":
+        return reverse("accounts_portal:portal_supervisor")
+
     role = get_user_role(user)
     if role == "student":
         return reverse("portal_student:dashboard")
+    if role == "staff" and get_user_profile_role(user) == "finance":
+        return reverse("accounts:finance_dashboard")
+    if role == "staff" and get_user_profile_role(user) == "admissions":
+        return reverse("accounts:admissions_dashboard")
     if role == "staff":
         return reverse("accounts_portal:portal_staff")
     if role == "admin":

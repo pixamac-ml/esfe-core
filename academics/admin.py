@@ -3,7 +3,21 @@
 # ==================================================
 
 from django.contrib import admin
-from .models import AcademicEnrollment, AcademicYear, AcademicClass, Semester, EC, UE, ECGrade, ECChapter, ECContent
+from .models import (
+    AcademicEnrollment,
+    AcademicYear,
+    AcademicClass,
+    Semester,
+    EC,
+    UE,
+    ECGrade,
+    ECChapter,
+    ECContent,
+    StudentContentProgress,
+    AcademicScheduleEvent,
+    AcademicScheduleChangeLog,
+    AcademicScheduleExecutionLog,
+)
 
 @admin.register(AcademicYear)
 class AcademicYearAdmin(admin.ModelAdmin):
@@ -78,9 +92,10 @@ class ECGradeAdmin(admin.ModelAdmin):
     )
 
 
-class ECContentInline(admin.TabularInline):
+class ECContentInline(admin.StackedInline):
     model = ECContent
     extra = 0
+    fields = ("title", "content_type", "file", "video_url", "text_content", "duration", "order", "is_active")
 
 
 @admin.register(ECChapter)
@@ -93,6 +108,93 @@ class ECChapterAdmin(admin.ModelAdmin):
 
 @admin.register(ECContent)
 class ECContentAdmin(admin.ModelAdmin):
-    list_display = ("title", "chapter", "content_type", "order", "created_at")
-    list_filter = ("content_type", "chapter__ec__ue__semester__academic_class")
+    list_display = ("title", "chapter", "content_type", "order", "is_active", "updated_at")
+    list_filter = ("content_type", "is_active", "chapter__ec__ue__semester__academic_class")
     search_fields = ("title", "chapter__title", "chapter__ec__title", "chapter__ec__ue__code")
+    ordering = ("chapter", "order", "id")
+
+
+@admin.register(StudentContentProgress)
+class StudentContentProgressAdmin(admin.ModelAdmin):
+    list_display = ("student", "content", "progress_percent", "is_completed", "updated_at")
+    list_filter = ("is_completed", "content__content_type", "content__chapter__ec__ue__semester__academic_class")
+    search_fields = ("student__username", "student__email", "content__title", "content__chapter__title")
+    readonly_fields = ("first_viewed_at", "updated_at")
+
+
+class AcademicScheduleChangeLogInline(admin.TabularInline):
+    model = AcademicScheduleChangeLog
+    extra = 0
+    readonly_fields = (
+        "action_type",
+        "old_start_datetime",
+        "old_end_datetime",
+        "new_start_datetime",
+        "new_end_datetime",
+        "old_status",
+        "new_status",
+        "reason",
+        "changed_by",
+        "changed_at",
+    )
+    can_delete = False
+
+
+class AcademicScheduleExecutionLogInline(admin.TabularInline):
+    model = AcademicScheduleExecutionLog
+    extra = 0
+
+
+@admin.register(AcademicScheduleEvent)
+class AcademicScheduleEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "event_type",
+        "academic_class",
+        "teacher",
+        "branch",
+        "start_datetime",
+        "end_datetime",
+        "status",
+        "is_active",
+    )
+    list_filter = (
+        "event_type",
+        "status",
+        "is_active",
+        "branch",
+        "academic_year",
+        "academic_class",
+        "teacher",
+        "start_datetime",
+    )
+    search_fields = ("title", "description", "location", "ec__title", "academic_class__name", "teacher__username")
+    ordering = ("-start_datetime",)
+    inlines = [AcademicScheduleChangeLogInline, AcademicScheduleExecutionLogInline]
+
+
+@admin.register(AcademicScheduleChangeLog)
+class AcademicScheduleChangeLogAdmin(admin.ModelAdmin):
+    list_display = ("event", "action_type", "changed_by", "changed_at")
+    list_filter = ("action_type", "event__branch", "event__academic_class", "event__teacher", "changed_at")
+    search_fields = ("event__title", "reason", "changed_by__username")
+    readonly_fields = (
+        "event",
+        "action_type",
+        "old_start_datetime",
+        "old_end_datetime",
+        "new_start_datetime",
+        "new_end_datetime",
+        "old_status",
+        "new_status",
+        "reason",
+        "changed_by",
+        "changed_at",
+    )
+
+
+@admin.register(AcademicScheduleExecutionLog)
+class AcademicScheduleExecutionLogAdmin(admin.ModelAdmin):
+    list_display = ("event", "actual_teacher", "started_at", "ended_at", "is_completed", "completed_by")
+    list_filter = ("is_completed", "event__branch", "event__academic_class", "event__teacher", "started_at")
+    search_fields = ("event__title", "notes", "actual_teacher__username", "completed_by__username")

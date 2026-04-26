@@ -1,0 +1,162 @@
+<div class="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]" data-student-content-root>
+  <section class="border-b border-[color:var(--line)] bg-[color:var(--card)] px-5 py-4">
+    <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">
+      S{{ ec.ue.semester.number }} · {{ ec.ue.code }} · {{ enrollment.academic_class.display_name }}
+    </p>
+    <h1 class="mt-2 text-2xl font-black tracking-tight text-[color:var(--text)]">{{ ec.title }}</h1>
+    <p class="mt-2 text-sm text-[color:var(--muted)]">{{ subtitle }}</p>
+
+    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
+        <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">UE</p>
+        <p class="mt-1 text-sm font-semibold text-[color:var(--text)]">{{ ec.ue.title }}</p>
+      </div>
+      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
+        <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">Coefficient</p>
+        <p class="mt-1 text-sm font-semibold text-[color:var(--text)]">{{ ec.coefficient }}</p>
+      </div>
+      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
+        <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">Credit</p>
+        <p class="mt-1 text-sm font-semibold text-[color:var(--text)]">{{ ec.credit_required }}</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="min-h-0 overflow-y-auto bg-[color:var(--surface)] px-5 py-4">
+    <div class="space-y-4">
+      {% if not chapters_available %}
+        <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
+          Les chapitres et contenus pedagogiques detailles ne sont pas encore disponibles dans cet environnement.
+        </div>
+      {% else %}
+        {% for chapter in chapters %}
+          <section class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">Chapitre {{ forloop.counter }}</p>
+                <h2 class="mt-1 text-lg font-bold text-[color:var(--text)]">{{ chapter.title }}</h2>
+              </div>
+              <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-1 text-[11px] font-bold text-[color:var(--muted)]">
+                {{ chapter.active_contents|length }} contenu{{ chapter.active_contents|pluralize }}
+              </span>
+            </div>
+
+            <div class="mt-4 space-y-3">
+              {% for content in chapter.active_contents %}
+                <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
+                  <div class="flex flex-col gap-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">{{ content.get_content_type_display }}</p>
+                          {% if content.student_is_completed %}
+                            <span class="rounded-full bg-[color:var(--school-primary-soft)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--school-primary)]">Termine</span>
+                          {% else %}
+                            <span class="rounded-full border border-[color:var(--line)] bg-white px-2.5 py-1 text-[11px] font-bold text-[color:var(--muted)]">{{ content.student_progress_percent }}%</span>
+                          {% endif %}
+                        </div>
+                        <h3 class="mt-1 text-base font-bold text-[color:var(--text)]">{{ content.title }}</h3>
+                        <p class="mt-2 text-sm text-[color:var(--muted)]">Ajoute le {{ content.created_at|date:"d/m/Y H:i" }}</p>
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        {% if content.file %}
+                          <a
+                            href="{{ content.file.url }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-track-content="{{ content.id }}"
+                            data-track-progress="20"
+                            class="inline-flex items-center rounded-xl border border-[color:var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:border-primary-200 hover:text-primary-600"
+                          >
+                            Ouvrir
+                          </a>
+                        {% endif %}
+                        <button
+                          type="button"
+                          data-complete-content="{{ content.id }}"
+                          class="inline-flex items-center rounded-xl bg-[color:var(--school-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-600"
+                        >
+                          Marquer termine
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="space-y-3">
+                      <div class="h-2 overflow-hidden rounded-full bg-white">
+                        <div class="h-full rounded-full bg-gradient-to-r from-[color:var(--school-primary)] to-[color:var(--school-secondary)]" style="width: {{ content.student_progress_percent }}%"></div>
+                      </div>
+
+                      {% if content.content_type == "video" and content.video_url %}
+                        <div class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-black">
+                          <iframe
+                            src="{{ content.video_url }}"
+                            class="aspect-video w-full"
+                            allowfullscreen
+                            loading="lazy"
+                            data-track-content="{{ content.id }}"
+                            data-track-progress="15"
+                          ></iframe>
+                        </div>
+                      {% elif content.content_type == "audio" and content.file %}
+                        <audio
+                          controls
+                          preload="metadata"
+                          class="w-full"
+                          data-media-progress-content="{{ content.id }}"
+                        >
+                          <source src="{{ content.file.url }}">
+                        </audio>
+                      {% elif content.content_type == "image" and content.file %}
+                        <img
+                          src="{{ content.file.url }}"
+                          alt="{{ content.title }}"
+                          class="max-h-[24rem] w-full rounded-xl border border-[color:var(--line)] object-contain bg-white"
+                          data-track-content="{{ content.id }}"
+                          data-track-progress="60"
+                        >
+                      {% elif content.content_type == "pdf" and content.file %}
+                        <div class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-white">
+                          <iframe
+                            src="{{ content.file.url }}"
+                            class="h-[28rem] w-full"
+                            loading="lazy"
+                            data-track-content="{{ content.id }}"
+                            data-track-progress="25"
+                          ></iframe>
+                        </div>
+                      {% elif content.content_type == "text" and content.text_content %}
+                        <div
+                          class="whitespace-pre-line rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm leading-7 text-[color:var(--text)]"
+                          data-track-content="{{ content.id }}"
+                          data-track-progress="40"
+                        >
+                          {{ content.text_content }}
+                        </div>
+                      {% elif content.document_like and content.file %}
+                        <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
+                          Apercu integre indisponible pour ce format. Utilisez le bouton <strong>Ouvrir</strong> pour consulter le document.
+                        </div>
+                      {% elif content.file %}
+                        <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
+                          Fichier disponible a la consultation.
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </article>
+              {% empty %}
+                <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-5 text-center text-sm text-[color:var(--muted)]">
+                  Aucun contenu actif dans ce chapitre.
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+        {% empty %}
+          <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
+            Aucun chapitre pedagogique n'est encore associe a cette matiere.
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</div>

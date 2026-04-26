@@ -2421,6 +2421,7 @@ def user_create(request):
         'first_name': '',
         'last_name': '',
         'role': '',
+        'position': '',
         'branch': '',
         'is_staff': True,
         'is_active': True,
@@ -2434,6 +2435,7 @@ def user_create(request):
         last_name = request.POST.get('last_name', '').strip()
         password = request.POST.get('password', '').strip()
         role = request.POST.get('role', '').strip()
+        position = request.POST.get('position', '').strip()
         branch_id = request.POST.get('branch', '').strip()
         selected_groups = request.POST.getlist('groups')
         is_staff = request.POST.get('is_staff') == 'on'
@@ -2445,6 +2447,7 @@ def user_create(request):
             'first_name': first_name,
             'last_name': last_name,
             'role': role,
+            'position': position,
             'branch': branch_id,
             'is_staff': is_staff,
             'is_active': is_active,
@@ -2468,8 +2471,9 @@ def user_create(request):
 
             profile, _ = Profile.objects.get_or_create(user=user)
             profile.role = role
+            profile.position = position
             profile.branch_id = branch_id or None
-            profile.save(update_fields=['role', 'branch'])
+            profile.save(update_fields=['role', 'position', 'branch'])
 
             user.groups.set(groups.filter(id__in=selected_groups))
             messages.success(request, 'Utilisateur cree avec succes.')
@@ -2481,6 +2485,7 @@ def user_create(request):
         'target_user': None,
         'groups': groups,
         'role_choices': Profile.ROLE_CHOICES,
+        'position_choices': Profile.POSITION_CHOICES,
         'branches': branches,
         'form_data': form_data,
         'selected_group_ids': selected_group_ids,
@@ -2502,6 +2507,7 @@ def user_edit(request, pk):
         'first_name': target_user.first_name,
         'last_name': target_user.last_name,
         'role': profile.role or '',
+        'position': profile.position or '',
         'branch': str(profile.branch_id) if profile.branch_id else '',
         'is_staff': target_user.is_staff,
         'is_active': target_user.is_active,
@@ -2514,6 +2520,7 @@ def user_edit(request, pk):
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
         role = request.POST.get('role', '').strip()
+        position = request.POST.get('position', '').strip()
         branch_id = request.POST.get('branch', '').strip()
         selected_groups = request.POST.getlist('groups')
         is_staff = request.POST.get('is_staff') == 'on'
@@ -2525,6 +2532,7 @@ def user_edit(request, pk):
             'first_name': first_name,
             'last_name': last_name,
             'role': role,
+            'position': position,
             'branch': branch_id,
             'is_staff': is_staff,
             'is_active': is_active,
@@ -2550,8 +2558,9 @@ def user_edit(request, pk):
             target_user.save()
 
             profile.role = role
+            profile.position = position
             profile.branch_id = branch_id or None
-            profile.save(update_fields=['role', 'branch'])
+            profile.save(update_fields=['role', 'position', 'branch'])
 
             target_user.groups.set(groups.filter(id__in=selected_groups))
 
@@ -2564,6 +2573,7 @@ def user_edit(request, pk):
         'target_user': target_user,
         'groups': groups,
         'role_choices': Profile.ROLE_CHOICES,
+        'position_choices': Profile.POSITION_CHOICES,
         'branches': branches,
         'form_data': form_data,
         'selected_group_ids': selected_group_ids,

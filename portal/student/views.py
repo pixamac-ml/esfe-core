@@ -118,6 +118,8 @@ def _prepare_chapter_contents(request, user, chapters):
     for chapter in chapters:
         chapter.active_contents = list(chapter.contents.all())
         chapter.active_content_count = len(chapter.active_contents)
+        chapter.completed_content_count = 0
+        chapter.has_accessible_content = False
         for content in chapter.active_contents:
             progress_entry = progress_map.get(content.id)
             content.student_progress_percent = progress_entry.progress_percent if progress_entry else 0
@@ -165,6 +167,8 @@ def _prepare_chapter_contents(request, user, chapters):
                 content.preview_notice = "La ressource source est indisponible ou incomplete."
             else:
                 content.preview_notice = ""
+            chapter.completed_content_count += 1 if content.student_is_completed else 0
+            chapter.has_accessible_content = chapter.has_accessible_content or content.has_accessible_source
 
     return chapters
 
@@ -294,6 +298,9 @@ def ec_detail(request, ec_id):
 
     chapters = list(ec.chapters.all()) if _academic_chapters_available() else []
     _prepare_chapter_contents(request, request.user, chapters)
+    total_active_content_count = sum(chapter.active_content_count for chapter in chapters)
+    total_completed_content_count = sum(chapter.completed_content_count for chapter in chapters)
+    has_any_accessible_content = any(chapter.has_accessible_content for chapter in chapters)
 
     context = {
         "page_title": ec.title,
@@ -302,6 +309,10 @@ def ec_detail(request, ec_id):
         "ec": ec,
         "chapters_available": _academic_chapters_available(),
         "chapters": chapters,
+        "chapter_count": len(chapters),
+        "total_active_content_count": total_active_content_count,
+        "total_completed_content_count": total_completed_content_count,
+        "has_any_accessible_content": has_any_accessible_content,
     }
 
     template_name = (

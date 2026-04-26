@@ -1,129 +1,243 @@
-<!-- ============================================ -->
-<!-- TOAST NOTIFICATIONS - Alpine.js + HTMX      -->
-<!-- Utilisation: Déclenché via HTMX-Trigger    -->
-<!-- Ex: response["HX-Trigger"] = '{"toast": {"type": "success", "message": "Paiement réussi!"}}' -->
-<!-- ============================================ -->
-
+<!-- Unified toast system: site, dashboard, superadmin -->
 <div
-    x-data="toastComponent()"
-    x-show="show"
-    x-transition:enter="transition ease-out duration-300"
-    x-transition:enter-start="opacity-0 translate-y-4"
-    x-transition:enter-end="opacity-100 translate-y-0"
-    x-transition:leave="transition ease-in duration-200"
-    x-transition:leave-start="opacity-100 translate-y-0"
-    x-transition:leave-end="opacity-0 translate-y-4"
-    @toast.window="showToast($event.detail)"
-    class="fixed top-4 right-4 z-50 max-w-sm w-full"
-    style="display: none;"
+    x-data="esfeToastCenter()"
+    x-init="init()"
+    class="pointer-events-none fixed inset-x-0 top-4 z-[90] px-3 sm:top-6 sm:px-6"
+    aria-live="polite"
+    aria-atomic="true"
 >
-    <div
-        class="rounded-xl shadow-lg overflow-hidden"
-        :class="{
-            'bg-secondary text-white': type === 'success',
-            'bg-accent text-white': type === 'warning',
-            'bg-red-500 text-white': type === 'error',
-            'bg-primary-500 text-white': type === 'info'
-        }"
-    >
-        <div class="p-4 flex items-start gap-3">
-            <!-- Icône -->
-            <div class="flex-shrink-0 w-6 h-6">
-                <template x-if="type === 'success'">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </template>
-                <template x-if="type === 'error'">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </template>
-                <template x-if="type === 'warning'">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                </template>
-                <template x-if="type === 'info'">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </template>
-            </div>
-
-            <!-- Contenu -->
-            <div class="flex-1">
-                <p class="font-medium" x-text="message"></p>
-            </div>
-
-            <!-- Bouton fermer -->
-            <button
-                @click="close()"
-                class="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
-            >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-        </div>
-
-        <!-- Progress>
-            </button bar -->
-        <div class="h-1 bg-black/10">
+    <div class="mx-auto flex w-full max-w-2xl flex-col items-center gap-3 sm:items-end">
+        <template x-for="toast in toasts" :key="toast.id">
             <div
-                class="h-full bg-white/50 transition-all duration-[duration] ease-linear"
-                :style="`width: ${progress}%`"
-            ></div>
-        </div>
+                x-show="toast.visible"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-3 sm:translate-x-6 sm:translate-y-0 scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 sm:translate-x-0 scale-100"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0 sm:translate-x-0 scale-100"
+                x-transition:leave-end="opacity-0 -translate-y-2 sm:translate-x-6 sm:translate-y-0 scale-95"
+                class="pointer-events-auto w-full max-w-xl overflow-hidden rounded-[1.35rem] border shadow-[0_18px_45px_-20px_rgba(15,23,42,0.45)] backdrop-blur-xl"
+                :class="toneClasses(toast.type)"
+                role="status"
+            >
+                <div class="flex items-start gap-3 px-4 py-4 sm:px-5">
+                    <div class="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                        <span class="text-lg" x-text="iconFor(toast.type)"></span>
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-white/70" x-text="labelFor(toast.type)"></p>
+                        <p class="mt-1 text-sm font-medium leading-6 text-white" x-text="toast.message"></p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
+                        @click="dismiss(toast.id)"
+                        aria-label="Fermer la notification"
+                    >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="h-1 w-full bg-white/10">
+                    <div class="h-full bg-white/50 origin-left" :style="`animation: esfe-toast-progress ${toast.duration}ms linear forwards;`"></div>
+                </div>
+            </div>
+        </template>
     </div>
 </div>
 
+{% if messages %}
+<script id="esfe-toast-bootstrap" type="application/json">
+[
+{% for message in messages %}
+  {
+    "message": "{{ message|escapejs }}",
+    "type": "{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %}"
+  }{% if not forloop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+{% endif %}
+
+<style>
+@keyframes esfe-toast-progress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+}
+</style>
+
 <script>
-function toastComponent() {
+function esfeToastCenter() {
     return {
-        show: false,
-        type: 'info',
-        message: '',
-        progress: 100,
-        duration: 5000,
-        timer: null,
+        toasts: [],
+        nextId: 0,
 
-        showToast(detail) {
-            // Configurer le toast
-            this.type = detail.type || 'info';
-            this.message = detail.message || '';
-            this.duration = detail.duration || 5000;
-
-            // Afficher
-            this.show = true;
-            this.progress = 100;
-
-            // Démarrer la progress bar
-            this.startProgress();
-
-            // Auto-fermeture
-            clearTimeout(this.timer);
-            this.timer = setTimeout(() => {
-                this.close();
-            }, this.duration);
+        init() {
+            this.bindGlobalListeners();
+            this.bootstrapServerMessages();
         },
 
-        startProgress() {
-            const startTime = Date.now();
-            const updateProgress = () => {
-                const elapsed = Date.now() - startTime;
-                this.progress = Math.max(0, 100 - (elapsed / this.duration) * 100);
+        bindGlobalListeners() {
+            if (!window.__esfeToastListenersBound) {
+                const forward = (detail, fallbackType = 'info') => {
+                    window.dispatchEvent(new CustomEvent('esfe:toast', {
+                        detail: this.normalize(detail, fallbackType)
+                    }));
+                };
 
-                if (this.progress > 0 && this.show) {
-                    requestAnimationFrame(updateProgress);
+                window.esfeToast = (messageOrDetail, type = 'info', options = {}) => {
+                    const detail = typeof messageOrDetail === 'object' && messageOrDetail !== null
+                        ? { ...messageOrDetail }
+                        : { message: messageOrDetail, type, ...options };
+                    forward(detail, type);
+                };
+                window.showToast = window.esfeToast;
+
+                const eventTargets = [window, document.body];
+                eventTargets.forEach((target) => {
+                    if (!target) {
+                        return;
+                    }
+                    target.addEventListener('toast', (event) => forward(event.detail, 'info'));
+                    target.addEventListener('showToast', (event) => forward(event.detail, 'success'));
+                });
+
+                document.body.addEventListener('htmx:afterRequest', (event) => {
+                    this.consumeHtmxHeaders(event.detail && event.detail.xhr);
+                });
+                document.body.addEventListener('htmx:afterOnLoad', (event) => {
+                    this.consumeHtmxHeaders(event.detail && event.detail.xhr);
+                });
+
+                window.__esfeToastListenersBound = true;
+            }
+
+            if (!window.__esfeToastCenterBound) {
+                window.addEventListener('esfe:toast', (event) => {
+                    this.enqueue(event.detail);
+                });
+                window.__esfeToastCenterBound = true;
+            }
+        },
+
+        bootstrapServerMessages() {
+            const bootstrap = document.getElementById('esfe-toast-bootstrap');
+            if (!bootstrap || bootstrap.dataset.loaded === 'true') {
+                return;
+            }
+
+            bootstrap.dataset.loaded = 'true';
+
+            try {
+                const messages = JSON.parse(bootstrap.textContent || '[]');
+                messages.forEach((message) => this.enqueue(message));
+            } catch (error) {
+                console.error('Toast bootstrap parsing failed.', error);
+            }
+        },
+
+        consumeHtmxHeaders(xhr) {
+            if (!xhr) {
+                return;
+            }
+
+            ['HX-Trigger', 'HX-Trigger-After-Swap', 'HX-Trigger-After-Settle'].forEach((headerName) => {
+                const headerValue = xhr.getResponseHeader(headerName);
+                if (!headerValue) {
+                    return;
                 }
-            };
-            requestAnimationFrame(updateProgress);
+
+                try {
+                    const payload = JSON.parse(headerValue);
+                    if (payload.toast !== undefined) {
+                        window.esfeToast(payload.toast, 'info');
+                    }
+                    if (payload.showToast !== undefined) {
+                        window.esfeToast(payload.showToast, 'success');
+                    }
+                } catch (error) {
+                    // Ignore non-JSON headers.
+                }
+            });
         },
 
-        close() {
-            this.show = false;
-            clearTimeout(this.timer);
+        normalize(detail, fallbackType = 'info') {
+            if (typeof detail === 'string') {
+                return { message: detail, type: fallbackType, duration: 5000 };
+            }
+
+            if (!detail || typeof detail !== 'object') {
+                return { message: '', type: fallbackType, duration: 5000 };
+            }
+
+            return {
+                message: detail.message || detail.text || '',
+                type: detail.type || fallbackType,
+                duration: Number(detail.duration) > 0 ? Number(detail.duration) : 5000
+            };
+        },
+
+        enqueue(detail) {
+            const toast = this.normalize(detail);
+            if (!toast.message) {
+                return;
+            }
+
+            const id = ++this.nextId;
+            const entry = {
+                id,
+                message: toast.message,
+                type: toast.type,
+                duration: toast.duration,
+                visible: true
+            };
+
+            this.toasts.push(entry);
+            window.setTimeout(() => this.dismiss(id), entry.duration);
+        },
+
+        dismiss(id) {
+            const toast = this.toasts.find((item) => item.id === id);
+            if (!toast) {
+                return;
+            }
+
+            toast.visible = false;
+            window.setTimeout(() => {
+                this.toasts = this.toasts.filter((item) => item.id !== id);
+            }, 220);
+        },
+
+        toneClasses(type) {
+            return {
+                success: 'border-emerald-300/40 bg-[linear-gradient(135deg,#0f766e_0%,#14b8a6_100%)]',
+                error: 'border-rose-300/40 bg-[linear-gradient(135deg,#b91c1c_0%,#ef4444_100%)]',
+                warning: 'border-amber-200/50 bg-[linear-gradient(135deg,#b45309_0%,#f59e0b_100%)]',
+                info: 'border-sky-300/40 bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_100%)]'
+            }[type] || 'border-slate-300/40 bg-[linear-gradient(135deg,#334155_0%,#475569_100%)]';
+        },
+
+        labelFor(type) {
+            return {
+                success: 'Succes',
+                error: 'Erreur',
+                warning: 'Attention',
+                info: 'Information'
+            }[type] || 'Notification';
+        },
+
+        iconFor(type) {
+            return {
+                success: '✓',
+                error: '!',
+                warning: '!',
+                info: 'i'
+            }[type] || 'i';
         }
-    }
+    };
 }
 </script>

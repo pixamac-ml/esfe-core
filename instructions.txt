@@ -1,215 +1,71 @@
-OBJECTIF
+SMTPServerDisconnected at /superadmin/candidatures/bulk-action/
+Connection unexpectedly closed
+Request Method:	POST
+Request URL:	http://127.0.0.1:8000/superadmin/candidatures/bulk-action/
+Django Version:	6.0.1
+Exception Type:	SMTPServerDisconnected
+Exception Value:	
+Connection unexpectedly closed
+Exception Location:	C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 412, in getreply
+Raised during:	superadmin.views.candidature_bulk_action
+Python Executable:	C:\Users\PIX\PycharmProjects\esfe-core\.venv\Scripts\python.exe
+Python Version:	3.14.3
+Python Path:	
+['C:\\Users\\PIX\\PycharmProjects\\esfe-core',
+ 'C:\\Users\\PIX\\PycharmProjects\\esfe-core\\.venv\\Scripts\\python314.zip',
+ 'C:\\Users\\PIX\\AppData\\Local\\Python\\pythoncore-3.14-64\\DLLs',
+ 'C:\\Users\\PIX\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib',
+ 'C:\\Users\\PIX\\AppData\\Local\\Python\\pythoncore-3.14-64',
+ 'C:\\Users\\PIX\\PycharmProjects\\esfe-core\\.venv',
+ 'C:\\Users\\PIX\\PycharmProjects\\esfe-core\\.venv\\Lib\\site-packages',
+ 'C:\\Users\\PIX\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages']
+Server time:	Sun, 26 Apr 2026 05:50:58 +0000
+Traceback Switch to copy-and-paste view
+C:\Users\PIX\PycharmProjects\esfe-core\admissions\services\emails.py, line 16, in send_institutional_email
+        return send_templated_email(
+                    …
+Local vars
+C:\Users\PIX\PycharmProjects\esfe-core\core\emailing.py, line 74, in send_templated_email
+    message.send(fail_silently=fail_silently)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\PIX\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\mail\message.py, line 358, in send
+        return self.get_connection(fail_silently).send_messages([self])
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\PIX\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\mail\backends\smtp.py, line 130, in send_messages
+            new_conn_created = self.open()
+                                    ^^^^^^^^^^^ …
+Local vars
+C:\Users\PIX\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\mail\backends\smtp.py, line 95, in open
+                self.connection.starttls(context=self.ssl_context)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 781, in starttls
+        self.ehlo_or_helo_if_needed()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 619, in ehlo_or_helo_if_needed
+                (code, resp) = self.helo()
+                                    ^^^^^^^^^^^ …
+Local vars
+C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 448, in helo
+        (code, msg) = self.getreply()
+                           ^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 412, in getreply
 
-Analyser complètement le système d’authentification et de redirection de la plateforme Félix Santé.
 
-IMPORTANT
+EMAIL_HOST_USER=calymoham9999@gmail.com
+EMAIL_HOST_PASSWORD=jrijhletunyxrwko
 
-Ne modifie aucun fichier.
-Ne corrige rien.
-Ne crée rien.
-Fais uniquement une analyse claire et complète.
+DB_PASSWORD=2026
 
----
 
-CONTEXTE
+SECRET_KEY=django-insecure-change-this-key-later
 
-Je veux comprendre exactement :
+DB_NAME=esfe_db
+DB_USER=esfe_user
 
-1. Comment les utilisateurs sont créés
-2. Comment ils se connectent
-3. Comment leurs rôles sont définis
-4. Comment leurs positions/fonctions sont définies
-5. Comment ils sont liés aux annexes
-6. Comment ils sont redirigés vers leurs dashboards
-7. Quels types d’utilisateurs existent déjà
-8. Quels types ne sont pas encore bien pris en charge
-
----
-
-À ANALYSER
-
-1. Authentification
-
-Inspecter :
-
-* accounts/auth_views.py
-* accounts/views.py
-* accounts/models.py
-* accounts/signals.py
-* accounts/access.py
-* config/urls.py
-* portal/urls.py
-* portal/permissions.py
-* portal/views/views.py
-
-Répondre :
-
-* Quelle LoginView est utilisée ?
-* Quelle URL de login est utilisée ?
-* Quelle fonction décide de la redirection après login ?
-* Est-ce que `next` est respecté ?
-* Est-ce qu’il existe plusieurs systèmes de redirection concurrents ?
-
----
-
-2. Modèle utilisateur
-
-Analyser :
-
-* User Django
-* Profile
-* Student
-* PaymentAgent
-* Branch.manager
-* tout autre modèle lié aux utilisateurs
-
-Répondre :
-
-* Où est stocké le rôle principal ?
-* Où est stockée la fonction/position métier ?
-* Où est stockée l’annexe ?
-* Est-ce que ces informations sont centralisées ou dispersées ?
-
----
-
-3. Types d’utilisateurs existants
-
-Lister tous les types détectés :
-
-* étudiant
-* enseignant
-* secrétaire
-* gestionnaire
-* finance
-* admission
-* directeur des études
-* directeur général
-* superadmin
-* informaticien
-* responsable marketing
-* surveillant
-* autres si présents
-
-Pour chaque type, préciser :
-
-* comment il est identifié actuellement
-* via Profile.role ?
-* via user_type ?
-* via groupe Django ?
-* via PaymentAgent ?
-* via Branch.manager ?
-* via une permission ?
-* via une fonction custom ?
-
----
-
-4. Étudiants
-
-Analyser le flux étudiant :
-
-* création candidature
-* inscription
-* paiement
-* création User
-* création Student
-* attribution du rôle
-* redirection dashboard étudiant
-
-Répondre :
-
-* est-ce que l’étudiant est bien connecté au système d’auth ?
-* est-ce que son rôle est fiable ?
-* est-ce que son dashboard est correctement accessible ?
-
----
-
-5. Staff administratif
-
-Analyser les utilisateurs staff :
-
-* secrétaire
-* gestionnaire
-* finance
-* admission
-* directeur des études
-* DG
-* informaticien
-* marketing
-* surveillant
-
-Répondre :
-
-* est-ce qu’ils sont tous représentés dans le système actuel ?
-* lesquels sont clairement identifiés ?
-* lesquels ne sont pas encore modélisés ?
-* lesquels tombent dans un dashboard générique ?
-* lesquels ont déjà un dashboard spécialisé ?
-
----
-
-6. Dashboards existants
-
-Lister tous les dashboards existants avec leurs routes et leurs vues :
-
-* dashboard étudiant
-* dashboard staff
-* dashboard finance
-* dashboard admission
-* dashboard gestionnaire
-* dashboard executive
-* dashboard secrétaire
-* dashboard enseignant
-* dashboard superadmin
-* autres
-
-Pour chaque dashboard, préciser :
-
-* URL
-* vue
-* app
-* rôle ou position censée y accéder
-
----
-
-7. Problèmes actuels
-
-Identifier précisément :
-
-* doublons de logique
-* redirections contradictoires
-* namespaces problématiques
-* rôles non fiables
-* positions manquantes
-* annexes mal résolues
-* accès qui peuvent créer des conflits
-
----
-
-8. Recommandation
-
-Proposer une architecture propre, mais sans coder.
-
-La recommandation doit dire :
-
-* quelle source doit être la vérité pour le rôle
-* quelle source doit être la vérité pour la position
-* quelle source doit être la vérité pour l’annexe
-* comment créer une redirection extensible si demain on ajoute une nouvelle position
-* comment éviter de coder un `if position == ...` partout
-* comment éviter de casser les dashboards existants
-
----
-
-FORMAT DE SORTIE ATTENDU
-
-Répondre avec :
-
-1. Résumé du système actuel
-2. Tableau des types utilisateurs
-3. Tableau des dashboards existants
-4. Problèmes détectés
-5. Architecture recommandée
-6. Plan d’action en étapes
-
-Aucune modification de code.
-Analyse uniquement.
+DB_HOST=localhost
+DB_PORT=5432

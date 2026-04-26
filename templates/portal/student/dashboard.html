@@ -111,9 +111,7 @@
   .student-content {
     overflow: auto;
     padding: 0.9rem;
-    display: grid;
-    grid-template-columns: minmax(0, 1.9fr) minmax(320px, 0.8fr);
-    gap: 0.75rem;
+    display: block;
   }
 
   .student-card {
@@ -175,7 +173,49 @@
   }
 
   .student-section {
-    scroll-margin-top: 84px;
+    min-width: 0;
+  }
+
+  .student-workspace {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .student-workspace-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.25rem 0.15rem 0;
+  }
+
+  .student-workspace-panel {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .student-overview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.9fr);
+    gap: 0.75rem;
+  }
+
+  .student-overview-stack {
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+  }
+
+  .student-solo-panel {
+    min-width: 0;
+  }
+
+  .student-panel-frame {
+    min-height: calc(100vh - 10.5rem);
+  }
+
+  .student-panel-frame-auto {
+    min-height: 0;
   }
 
   .student-sidebar-overlay {
@@ -233,7 +273,7 @@
   }
 
   @media (max-width: 1199px) {
-    .student-content {
+    .student-overview-grid {
       grid-template-columns: 1fr;
     }
   }
@@ -267,7 +307,8 @@
     }
 
     .student-hero,
-    .student-grid-two {
+    .student-grid-two,
+    .student-overview-grid {
       grid-template-columns: 1fr;
     }
   }
@@ -357,60 +398,89 @@
         {% include "portal/student/partials/topbar_student.html" %}
 
         <div class="student-content student-scroll" id="dashboardTop">
-          <section class="student-left-stack">
-            <section id="overview" class="student-section">
-              {% include "portal/student/partials/hero_student.html" %}
+          <div class="student-workspace">
+            <header class="student-workspace-head">
+              <div>
+                <p class="student-section-kicker" x-text="activeMeta.kicker"></p>
+                <h1 class="student-section-title text-[1.2rem]" x-text="activeMeta.title"></h1>
+                <p class="mt-1 text-sm text-[color:var(--muted)]" x-text="activeMeta.description"></p>
+              </div>
+              <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]" x-text="activeMeta.badge"></span>
+            </header>
+
+            <section x-show="activeSection === 'overview'" x-cloak class="student-workspace-panel">
+              <section id="overview" class="student-section">
+                {% include "portal/student/partials/hero_student.html" %}
+              </section>
+
+              <div class="student-overview-grid">
+                <div class="student-overview-stack">
+                  <section id="progress" class="student-section">
+                    {% include "portal/student/partials/stats_student.html" %}
+                  </section>
+                  <section id="courses-overview" class="student-section student-card student-card-pad student-panel-frame-auto">
+                    {% include "portal/student/partials/courses_student.html" %}
+                  </section>
+                </div>
+
+                <aside class="student-overview-stack">
+                  <section id="profile" class="student-section student-card student-card-pad">
+                    {% include "portal/student/partials/profile.html" %}
+                  </section>
+                  <section id="events" class="student-section student-card student-card-pad">
+                    {% include "portal/student/partials/events_student.html" %}
+                  </section>
+                </aside>
+              </div>
             </section>
 
-            <div class="student-grid-two">
-              <section id="progress" class="student-section">
-                {% include "portal/student/partials/stats_student.html" %}
+            <section x-show="activeSection === 'courses'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
+              <section
+                id="courses"
+                hx-get="{% url 'portal_student:courses_partial' %}"
+                hx-trigger="load"
+                hx-swap="innerHTML"
+              >
+                {% include "portal/student/partials/courses_student.html" %}
               </section>
-              <section id="profile" class="student-section student-card student-card-pad">
+            </section>
+
+            <section x-show="activeSection === 'schedule'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
+              <section
+                id="schedule"
+                hx-get="{% url 'portal_student:timetable_partial' %}"
+                hx-trigger="load"
+                hx-swap="innerHTML"
+              >
+                {% include "portal/student/partials/calendar_student.html" %}
+              </section>
+            </section>
+
+            <section x-show="activeSection === 'messages'" x-cloak class="student-workspace-panel">
+              <section class="student-section student-card student-card-pad student-solo-panel">
+                <section
+                  id="messages"
+                  hx-get="{% url 'portal_student:messages_partial' %}"
+                  hx-trigger="load"
+                  hx-swap="innerHTML"
+                >
+                  {% include "portal/student/partials/messages_student.html" %}
+                </section>
+              </section>
+              <section class="student-section student-card student-card-pad student-solo-panel">
+                {% include "portal/student/partials/events_student.html" %}
+              </section>
+            </section>
+
+            <section x-show="activeSection === 'teachers'" x-cloak class="student-workspace-panel">
+              <section class="student-section student-card student-card-pad student-solo-panel">
+                {% include "portal/student/partials/teachers_student.html" %}
+              </section>
+              <section class="student-section student-card student-card-pad student-solo-panel">
                 {% include "portal/student/partials/profile.html" %}
               </section>
-            </div>
-
-            <section
-              id="courses"
-              class="student-section student-card student-card-pad"
-              hx-get="{% url 'portal_student:courses_partial' %}"
-              hx-trigger="load"
-              hx-swap="innerHTML"
-            >
-              {% include "portal/student/partials/courses_student.html" %}
             </section>
-
-            <section id="teachers" class="student-section student-card student-card-pad">
-              {% include "portal/student/partials/teachers_student.html" %}
-            </section>
-          </section>
-
-          <aside class="student-right-stack">
-            <section
-              id="schedule"
-              class="student-section student-card student-card-pad"
-              hx-get="{% url 'portal_student:timetable_partial' %}"
-              hx-trigger="load"
-              hx-swap="innerHTML"
-            >
-              {% include "portal/student/partials/calendar_student.html" %}
-            </section>
-
-            <section id="events" class="student-section student-card student-card-pad">
-              {% include "portal/student/partials/events_student.html" %}
-            </section>
-
-            <section
-              id="messages"
-              class="student-section student-card student-card-pad"
-              hx-get="{% url 'portal_student:messages_partial' %}"
-              hx-trigger="load"
-              hx-swap="innerHTML"
-            >
-              {% include "portal/student/partials/messages_student.html" %}
-            </section>
-          </aside>
+          </div>
         </div>
       </section>
     </section>
@@ -523,14 +593,58 @@
       mobileMenu: false,
       search: "",
       activeNav: "Tableau de bord",
+      activeSection: "overview",
       courseDetailUrl: "",
       courseDetailTitle: "",
+      activeMeta: {
+        kicker: "Dashboard",
+        title: "Tableau de bord etudiant",
+        description: "Vue d'ensemble de votre activite academique, de vos cours et de vos actions rapides.",
+        badge: "Vue generale"
+      },
       navItems: [
         { label: "Tableau de bord", icon: "layout-dashboard", target: "overview" },
-        { label: "Progression", icon: "chart-column", target: "progress" },
         { label: "Mes cours", icon: "book-open-check", target: "courses" },
         { label: "Calendrier", icon: "calendar-days", target: "schedule" },
-        { label: "Messages", icon: "messages-square", target: "messages" }
+        { label: "Messages", icon: "messages-square", target: "messages" },
+        { label: "Encadrement", icon: "users-round", target: "teachers" }
+      ],
+      sectionMeta: [
+        {
+          key: "overview",
+          kicker: "Dashboard",
+          title: "Tableau de bord etudiant",
+          description: "Vue d'ensemble de votre activite academique, de vos cours et de vos actions rapides.",
+          badge: "Vue generale"
+        },
+        {
+          key: "courses",
+          kicker: "Cours",
+          title: "Mes cours et ressources",
+          description: "Consultez vos matieres, ouvrez les contenus et suivez votre progression sans quitter le dashboard.",
+          badge: "Section cours"
+        },
+        {
+          key: "schedule",
+          kicker: "Calendrier",
+          title: "Emploi du temps hebdomadaire",
+          description: "Affichage metier de la semaine, avec vos cours, vos disponibilites et les statuts utiles.",
+          badge: "Vue planning"
+        },
+        {
+          key: "messages",
+          kicker: "Communication",
+          title: "Messages et activites",
+          description: "Consultez vos echanges recents et les activites a venir dans un espace dedie.",
+          badge: "Section messages"
+        },
+        {
+          key: "teachers",
+          kicker: "Encadrement",
+          title: "Enseignants et profil",
+          description: "Retrouvez vos enseignants lies et vos informations etudiantes sans surcharge visuelle.",
+          badge: "Section encadrement"
+        }
       ],
       courses: [],
       teachers: [],
@@ -563,6 +677,7 @@
           }
         });
         this.$nextTick(() => {
+          this.setActiveSection(this.activeSection, this.activeNav);
           if (window.AOS) {
             AOS.refreshHard();
           }
@@ -585,13 +700,22 @@
         this.activeNav = label;
         this.mobileMenu = false;
       },
-      goToSection(target, label) {
-        const section = document.getElementById(target);
-        if (section) {
-          this.activeNav = label;
-          this.mobileMenu = false;
-          section.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActiveSection(target, label) {
+        const meta = this.sectionMeta.find((item) => item.key === target);
+        this.activeSection = target;
+        this.activeNav = label || this.activeNav;
+        if (meta) {
+          this.activeMeta = {
+            kicker: meta.kicker,
+            title: meta.title,
+            description: meta.description,
+            badge: meta.badge
+          };
         }
+        this.mobileMenu = false;
+      },
+      goToSection(target, label) {
+        this.setActiveSection(target, label);
       },
       openCourseDetail(url, title) {
         this.courseDetailUrl = `${url}?partial=1`;

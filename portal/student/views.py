@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.core.exceptions import ValidationError
 
 from django.db.models import Prefetch
 from django.views.decorators.http import require_POST
@@ -12,6 +13,11 @@ from academics.models import AcademicEnrollment, EC, ECChapter, ECContent, Stude
 from portal.permissions import role_required
 
 from .services import get_student_dashboard_data
+from .profile_service import (
+    get_profile_data,
+    handle_document_upload,
+    update_editable_fields,
+)
 from .widgets.profile import get_profile_widget
 from .widgets.academics import get_academics_widget, get_student_academic_snapshot
 from .widgets.finance import get_finance_widget
@@ -119,6 +125,13 @@ def academics_partial(request):
 def finance_partial(request):
     context = get_finance_widget(request.user)
     return render(request, "portal/student/partials/finance.html", context)
+
+
+@login_required
+@role_required("student")
+def settings_partial(request):
+    context = get_profile_data(request.user)
+    return render(request, "portal/student/partials/settings_student.html", context)
 
 
 @login_required
@@ -278,3 +291,46 @@ def update_content_progress(request, content_id):
             "is_completed": progress.is_completed,
         }
     )
+
+
+@login_required
+@role_required("student")
+@require_POST
+def update_settings_profile(request):
+    try:
+        context = update_editable_fields(
+            request.user,
+            {
+                "email": request.POST.get("email", ""),
+                "phone": request.POST.get("phone", ""),
+            },
+        )
+        context["form_success"] = "Informations mises a jour."
+        context["form_errors"] = {}
+    except ValidationError as exc:
+        context = get_profile_data(request.user)
+        context["form_success"] = ""
+        context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
+    return render(request, "portal/student/partials/settings_student.html", context)
+
+
+@login_required
+@role_required("student")
+@require_POST
+def upload_settings_document(request):
+    try:
+        context = handle_document_upload(
+            request.user,
+            request.FILES.get("file"),
+            int(request.POST.get("document_type_id") or 0),
+        )
+        context["form_success"] = "Document televerse avec succes."
+        context["form_errors"] = {}
+    except (ValidationError, ValueError) as exc:
+        context = get_profile_data(request.user)
+        if isinstance(exc, ValidationError):
+            context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
+        else:
+            context["form_errors"] = {"document_type_id": ["Type de document invalide."]}
+        context["form_success"] = ""
+    return render(request, "portal/student/partials/settings_student.html", context)

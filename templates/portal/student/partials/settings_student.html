@@ -1,0 +1,172 @@
+<div class="grid gap-4">
+  <div class="rounded-xl border {% if completion.alert_level == 'success' %}border-emerald-200 bg-emerald-50{% elif completion.alert_level == 'warning' %}border-amber-200 bg-amber-50{% else %}border-rose-200 bg-rose-50{% endif %} p-4">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p class="student-section-kicker">Parametres</p>
+        <h3 class="mt-1 student-section-title">Centre de gestion du profil</h3>
+        <p class="mt-2 text-sm leading-6 {% if completion.alert_level == 'success' %}text-emerald-800{% elif completion.alert_level == 'warning' %}text-amber-800{% else %}text-rose-800{% endif %}">
+          {{ completion.message }}
+        </p>
+      </div>
+      <span class="rounded-full bg-white/80 px-3 py-2 text-sm font-black {% if completion.alert_level == 'success' %}text-emerald-700{% elif completion.alert_level == 'warning' %}text-amber-700{% else %}text-rose-700{% endif %}">
+        {{ completion.percent }}%
+      </span>
+    </div>
+    <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/70">
+      <div class="h-full rounded-full {% if completion.alert_level == 'success' %}bg-emerald-500{% elif completion.alert_level == 'warning' %}bg-amber-500{% else %}bg-rose-500{% endif %}" style="width: {{ completion.percent }}%"></div>
+    </div>
+    {% if alerts %}
+      <div class="mt-4 flex flex-wrap gap-2">
+        {% for item in alerts %}
+          <span class="rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-[11px] font-bold text-[color:var(--text)]">{{ item }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  {% if form_success %}
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+      {{ form_success }}
+    </div>
+  {% endif %}
+
+  {% if form_errors %}
+    <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+      {% for field, errors in form_errors.items %}
+        <p><strong>{{ field }}</strong> : {{ errors|join:", " }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="grid gap-4 xl:grid-cols-2">
+    <section class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+      <div class="mb-4">
+        <p class="student-section-kicker">Profil</p>
+        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations personnelles</h4>
+      </div>
+      <form
+        hx-post="{% url 'portal_student:update_settings_profile' %}"
+        hx-target="#settings"
+        hx-swap="outerHTML"
+        class="grid gap-4"
+      >
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Nom complet</span>
+            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.full_name|default:"Non disponible" }}</strong>
+          </div>
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Matricule</span>
+            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.matricule|default:"Non disponible" }}</strong>
+          </div>
+          <label class="grid gap-2">
+            <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Email</span>
+            <input type="email" name="email" value="{{ editable_fields.email }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
+          </label>
+          <label class="grid gap-2">
+            <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Telephone</span>
+            <input type="text" name="phone" value="{{ editable_fields.phone }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
+          </label>
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Date de naissance</span>
+            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.birth_date|default:"Non renseignee" }}</strong>
+          </div>
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Lieu de naissance</span>
+            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.birth_place|default:"Non renseigne" }}</strong>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-600">
+            Mettre a jour
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+      <div class="mb-4">
+        <p class="student-section-kicker">Academique</p>
+        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations en lecture seule</h4>
+      </div>
+      <div class="grid gap-3">
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Formation</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.formation|default:"Non disponible" }}</strong>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Classe</span>
+            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.classroom|default:"Non disponible" }}</strong>
+          </div>
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Annee academique</span>
+            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.academic_year|default:"Non disponible" }}</strong>
+          </div>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Statut inscription</span>
+            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.enrollment_status|default:"Non disponible" }}</strong>
+          </div>
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Annexe</span>
+            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.annexe|default:"Non disponible" }}</strong>
+          </div>
+        </div>
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Statut academique</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.academic_status|default:"Non disponible" }}</strong>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+    <div class="mb-4">
+      <p class="student-section-kicker">Documents</p>
+      <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Pieces et justificatifs etudiants</h4>
+    </div>
+    <div class="grid gap-3">
+      {% for document in documents %}
+        <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <strong class="block text-sm text-[color:var(--text)]">{{ document.name }}</strong>
+              {% if document.description %}
+                <p class="mt-1 text-sm text-[color:var(--muted)]">{{ document.description }}</p>
+              {% endif %}
+            </div>
+            <span class="rounded-full px-3 py-1 text-[11px] font-bold {% if document.status == 'valide' %}bg-emerald-100 text-emerald-700{% elif document.status == 'en_attente' %}bg-amber-100 text-amber-700{% else %}bg-rose-100 text-rose-700{% endif %}">
+              {{ document.status_label }}
+            </span>
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            {% if document.file_url %}
+              <a href="{{ document.file_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--text)]">
+                Consulter le fichier
+              </a>
+            {% endif %}
+            <form
+              hx-post="{% url 'portal_student:upload_settings_document' %}"
+              hx-target="#settings"
+              hx-swap="outerHTML"
+              hx-encoding="multipart/form-data"
+              class="flex flex-wrap items-center gap-3"
+            >
+              <input type="hidden" name="document_type_id" value="{{ document.id }}">
+              <input type="file" name="file" class="block text-sm text-[color:var(--muted)]">
+              <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-sm font-bold text-white transition hover:bg-primary-600">
+                Televerser
+              </button>
+            </form>
+          </div>
+        </div>
+      {% empty %}
+        <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">
+          Aucun document n'est encore rattache a votre dossier.
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>

@@ -603,3 +603,118 @@ class AcademicScheduleServiceTests(TestCase):
         self.assertTrue(schedule["events"])
         self.assertEqual(schedule["events"][0]["title"], "Algorithmique")
         self.assertTrue(any(cell["events"] for slot in schedule["slots"] for cell in slot["cells"]))
+        self.assertIn("summary", schedule)
+        self.assertIn("empty_days", schedule)
+
+    def test_get_student_week_schedule_handles_empty_week(self):
+        schedule = get_student_week_schedule(self.student, self.week_start)
+
+        self.assertEqual(schedule["events"], [])
+        self.assertEqual(len(schedule["slots"]), 4)
+        self.assertEqual(len(schedule["empty_days"]), 6)
+        self.assertFalse(schedule["has_extra_slots"])
+
+    def test_get_student_week_schedule_exposes_non_standard_slots(self):
+        create_schedule_event(
+            user=self.director,
+            title="Cours hors grille",
+            description="",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            start_datetime=self._aware_dt(2, 11),
+            end_datetime=self._aware_dt(2, 13),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle A1",
+            is_online=False,
+            meeting_link="",
+            is_active=True,
+        )
+
+        schedule = get_student_week_schedule(self.student, self.week_start)
+
+        self.assertTrue(schedule["has_extra_slots"])
+        self.assertEqual(schedule["extra_slots"][0]["label"], "11:00")
+        self.assertEqual(schedule["extra_slots"][0]["cells"][2]["events"][0]["title"], "Algorithmique")
+
+    def test_get_student_week_schedule_keeps_cancelled_and_planned_same_slot(self):
+        cancelled_event = create_schedule_event(
+            user=self.director,
+            title="Cours annule cellule",
+            description="",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            start_datetime=self._aware_dt(0, 8),
+            end_datetime=self._aware_dt(0, 10),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle A1",
+            is_online=False,
+            meeting_link="",
+            is_active=True,
+        )
+        cancel_schedule_event(cancelled_event, "Annulation test", self.director)
+        create_schedule_event(
+            user=self.director,
+            title="Cours maintenu cellule",
+            description="",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec_two,
+            teacher=self.teacher_two,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            start_datetime=self._aware_dt(0, 8),
+            end_datetime=self._aware_dt(0, 10),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle B1",
+            is_online=False,
+            meeting_link="",
+            is_active=True,
+        )
+
+        schedule = get_student_week_schedule(self.student, self.week_start)
+
+        monday_first_cell = schedule["slots"][0]["cells"][0]
+        self.assertEqual(len(monday_first_cell["events"]), 2)
+        self.assertEqual({event["status"] for event in monday_first_cell["events"]}, {"cancelled", "planned"})
+
+    def test_get_student_week_schedule_marks_completed_events(self):
+        event = create_schedule_event(
+            user=self.director,
+            title="Cours termine affichage",
+            description="",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            start_datetime=self._aware_dt(4, 16),
+            end_datetime=self._aware_dt(4, 18),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle A1",
+            is_online=False,
+            meeting_link="",
+            is_active=True,
+        )
+        complete_schedule_event(
+            event,
+            self.director,
+            notes="Fin de cours",
+            started_at=self._aware_dt(4, 16),
+            ended_at=self._aware_dt(4, 18),
+        )
+
+        schedule = get_student_week_schedule(self.student, self.week_start)
+        completed = next(item for item in schedule["events"] if item["id"] == event.id)
+
+        self.assertTrue(completed["is_completed"])
+        self.assertEqual(completed["status_label"], "Termine")
+        self.assertEqual(schedule["summary"]["completed"], 1)

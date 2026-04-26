@@ -1,48 +1,174 @@
-OBJECTIF :
+CONTEXTE
 
-Refactoriser complètement l'affichage du calendrier étudiant en grille professionnelle.
+Projet Django modulaire (Félix Santé).
+Dashboard étudiant déjà fonctionnel avec sections via sidebar :
+- Dashboard
+- Cours
+- Calendrier
+- Académique
+- Finance
+- Paramètres
 
-PROBLÈME :
+La section "Paramètres" existe déjà mais elle est trop basique.
+On veut la transformer en un véritable MODULE MÉTIER COMPLET.
 
-- affichage actuel en liste verticale
-- aucun repère horaire
-- UX non exploitable
-- pas de vision globale de la semaine
+---
 
-ATTENDU :
+OBJECTIF
 
-1. Remplacer l'affichage actuel par une GRID :
+Transformer "Paramètres étudiant" en un module central de gestion du profil étudiant.
 
-- colonnes = jours (Lundi → Samedi)
-- lignes = créneaux horaires (08h, 10h, 14h, 16h)
+Ce module doit devenir la source officielle des informations utilisateur côté étudiant.
 
-2. Chaque cellule doit :
+---
 
-- afficher un cours si présent
-- afficher "Libre" sinon
+RÈGLES MÉTIER
 
-3. Ajouter styles :
+1. Le module Paramètres doit contenir :
 
-- normal → bleu
-- reporté → jaune
-- annulé → rouge
-- en cours → vert
+### A. Informations personnelles (READ + PARTIAL EDIT)
+- Nom
+- Prénom
+- Email
+- Téléphone
+- Photo de profil
+- Date de naissance (optionnel)
 
-4. STRUCTURE :
+👉 Certains champs sont MODIFIABLES :
+- téléphone
+- photo
+- email (avec validation)
 
-- grid CSS (tailwind)
-- alignement strict
-- pas de padding excessif
-- pas de blocs verticaux
+👉 Certains champs NON MODIFIABLES :
+- matricule
+- nom
+- prénom (sauf logique admin)
+- formation
+- classe
 
-5. IMPORTANT :
+---
 
-- ne pas modifier backend
-- utiliser les données existantes
-- transformer uniquement l’affichage
+### B. Informations académiques (READ ONLY)
+- Formation
+- Classe actuelle
+- Année académique
+- Statut d’inscription
+- Statut académique (affecté / non affecté)
 
-6. BONUS :
+---
 
-- afficher nom professeur
-- afficher salle
-- afficher heure dans la cellule
+### C. Documents étudiants
+
+Créer une section DOCUMENTS avec :
+
+- Pièce d’identité
+- Diplôme requis
+- Photo officielle
+- Autres documents administratifs
+
+👉 États :
+- manquant
+- en attente
+- validé
+
+---
+
+### D. Complétude du profil (IMPORTANT)
+
+Créer un système de "profil completeness":
+
+- calculer un pourcentage de complétion
+- afficher une barre de progression
+
+SI profil incomplet :
+- afficher alerte dans dashboard
+- afficher alerte dans Paramètres
+- notifier étudiant via système existant
+
+---
+
+### E. Notifications intelligentes
+
+SI :
+- document manquant
+- champ obligatoire vide
+
+ALORS :
+- créer notification automatique
+- message clair dans dashboard
+
+---
+
+### F. Sécurité
+
+- empêcher modification des champs sensibles
+- validation serveur obligatoire
+- upload sécurisé pour fichiers
+
+---
+
+ARCHITECTURE TECHNIQUE
+
+Respect strict :
+
+- logique métier → services.py
+- vues → légères
+- templates → sans logique
+
+Créer si nécessaire :
+
+services/student_profile_service.py
+
+Fonctions attendues :
+- get_profile_data(user)
+- get_profile_completion(user)
+- get_missing_fields(user)
+- update_editable_fields(user, data)
+- handle_document_upload(user, file)
+
+---
+
+UI / UX
+
+- garder le design actuel du dashboard (sidebar + cards)
+- structurer Paramètres en SECTIONS claires :
+
+    1. Profil
+    2. Académique
+    3. Documents
+    4. Sécurité / Compte
+
+- design cohérent avec le reste (cards, spacing, Tailwind config existant)
+- mobile-first
+
+---
+
+CONTRAINTES
+
+- NE PAS casser le dashboard existant
+- NE PAS recréer User ou Profile inutilement
+- utiliser les modèles existants si présents
+- sinon enrichir proprement
+
+---
+
+FORMAT DE SORTIE
+
+- fichiers modifiés (models, services, views, templates)
+- code complet
+- commentaires clairs
+- aucune logique métier dans templates
+
+---
+
+IMPORTANT
+
+On veut un module PROFESSIONNEL, type SaaS :
+
+- clair
+- structuré
+- intelligent
+- évolutif
+
+Ce n’est pas une simple page de settings.
+C’est le centre de gestion du profil étudiant.

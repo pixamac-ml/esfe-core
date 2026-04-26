@@ -6,6 +6,7 @@ from community.models import Notification as CommunityNotification
 from core.models import Notification as CoreNotification
 from news.models import Event
 from payments.models import Payment
+from .profile_service import get_profile_data
 from portal.student.widgets.academics import get_student_academic_snapshot
 
 
@@ -237,6 +238,7 @@ def get_student_dashboard_data(user):
         "academic_programme": snapshot["academic_programme"],
         "academic_year": snapshot["academic_year"],
         "academic_level": snapshot["academic_level"],
+        "profile_settings": get_profile_data(user),
         "page_title": "Dashboard etudiant",
         "subtitle": "Vue d'ensemble de votre parcours academique",
     }

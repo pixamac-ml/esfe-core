@@ -21,10 +21,8 @@ from portal.student.widgets.academics import get_student_academic_snapshot
 DEFAULT_TIME_SLOTS = [
     time(8, 0),
     time(10, 0),
-    time(12, 0),
     time(14, 0),
     time(16, 0),
-    time(18, 0),
 ]
 ACTIVE_EVENT_STATUSES = {
     AcademicScheduleEvent.STATUS_DRAFT,
@@ -80,18 +78,41 @@ def _conflict_item(conflict_type: str, message: str, event) -> dict:
 def _serialize_event(event: AcademicScheduleEvent, *, highlight_today: date | None = None) -> dict:
     today = timezone.localdate()
     event_day = timezone.localtime(event.start_datetime).date()
+    local_start = timezone.localtime(event.start_datetime)
+    local_end = timezone.localtime(event.end_datetime)
     display_title = event.ec.title if event.ec_id else event.title
+    slot_time = local_start.time().replace(second=0, microsecond=0)
+    is_standard_slot = slot_time in DEFAULT_TIME_SLOTS
+    status_labels = {
+        AcademicScheduleEvent.STATUS_PLANNED: "Planifie",
+        AcademicScheduleEvent.STATUS_ONGOING: "En cours",
+        AcademicScheduleEvent.STATUS_POSTPONED: "Reporte",
+        AcademicScheduleEvent.STATUS_CANCELLED: "Annule",
+        AcademicScheduleEvent.STATUS_COMPLETED: "Termine",
+        AcademicScheduleEvent.STATUS_DRAFT: "Brouillon",
+    }
+    status_theme = {
+        AcademicScheduleEvent.STATUS_PLANNED: "sky",
+        AcademicScheduleEvent.STATUS_ONGOING: "emerald",
+        AcademicScheduleEvent.STATUS_POSTPONED: "amber",
+        AcademicScheduleEvent.STATUS_CANCELLED: "rose",
+        AcademicScheduleEvent.STATUS_COMPLETED: "slate",
+        AcademicScheduleEvent.STATUS_DRAFT: "slate",
+    }
     return {
         "id": event.id,
         "title": display_title,
         "event_title": event.title,
         "description": event.description,
         "status": event.status,
+        "status_label": status_labels.get(event.status, "Planifie"),
+        "status_theme": status_theme.get(event.status, "sky"),
         "event_type": event.event_type,
         "start_datetime": event.start_datetime,
         "end_datetime": event.end_datetime,
-        "start_time": timezone.localtime(event.start_datetime).strftime("%H:%M"),
-        "end_time": timezone.localtime(event.end_datetime).strftime("%H:%M"),
+        "start_time": local_start.strftime("%H:%M"),
+        "end_time": local_end.strftime("%H:%M"),
+        "time_range": f"{local_start.strftime('%H:%M')} - {local_end.strftime('%H:%M')}",
         "weekday_index": event_day.weekday(),
         "weekday_label": event_day.strftime("%A"),
         "teacher_name": (event.teacher.get_full_name() or event.teacher.username) if event.teacher_id else "Enseignant non defini",
@@ -99,17 +120,21 @@ def _serialize_event(event: AcademicScheduleEvent, *, highlight_today: date | No
         "branch_name": event.branch.name,
         "class_name": event.academic_class.display_name,
         "ec_code": event.ec.ue.code if event.ec_id else "",
+        "is_online": event.is_online,
+        "slot_label": slot_time.strftime("%H:%M"),
+        "is_standard_slot": is_standard_slot,
+        "duration_minutes": event.duration_minutes,
         "is_today": event_day == (highlight_today or today),
         "is_postponed": event.status == AcademicScheduleEvent.STATUS_POSTPONED,
         "is_cancelled": event.status == AcademicScheduleEvent.STATUS_CANCELLED,
+        "is_completed": event.status == AcademicScheduleEvent.STATUS_COMPLETED,
     }
 
 
 def _build_week_grid(events, week_start: date):
     days = []
     day_labels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-    include_sunday = any(timezone.localtime(event.start_datetime).date().weekday() == 6 for event in events)
-    day_count = 7 if include_sunday else 6
+    day_count = 6
     today = timezone.localdate()
     for offset in range(day_count):
         current_day = week_start + timedelta(days=offset)
@@ -122,34 +147,74 @@ def _build_week_grid(events, week_start: date):
             }
         )
 
-    dynamic_slot_times = {slot for slot in DEFAULT_TIME_SLOTS}
-    for event in events:
-        local_start = timezone.localtime(event.start_datetime).time().replace(second=0, microsecond=0)
-        dynamic_slot_times.add(local_start)
+    serialized_events = [_serialize_event(event, highlight_today=today) for event in events]
+    standard_slot_labels = [slot.strftime("%H:%M") for slot in DEFAULT_TIME_SLOTS]
+    extra_slot_labels = sorted(
+        {
+            event["slot_label"]
+            for event in serialized_events
+            if event["weekday_index"] < 6 and event["slot_label"] not in standard_slot_labels
+        }
+    )
 
     slots = []
-    for slot_time in sorted(dynamic_slot_times):
+    for slot_label in standard_slot_labels:
         row = {
-            "label": slot_time.strftime("%H:%M"),
+            "label": slot_label,
+            "is_standard": True,
             "cells": [],
         }
         for offset, current_day in enumerate(days):
             day_date = current_day["date"]
             cell_events = []
-            for event in events:
-                event_start = timezone.localtime(event.start_datetime)
-                if event_start.date() != day_date:
+            for event in serialized_events:
+                if event["weekday_index"] != offset:
                     continue
-                if event_start.time().hour == slot_time.hour and event_start.time().minute == slot_time.minute:
-                    cell_events.append(_serialize_event(event, highlight_today=today))
+                if event["slot_label"] == slot_label:
+                    cell_events.append(event)
             row["cells"].append({"day_index": offset, "events": cell_events})
         slots.append(row)
+
+    extra_slots = []
+    for slot_label in extra_slot_labels:
+        row = {
+            "label": slot_label,
+            "is_standard": False,
+            "cells": [],
+        }
+        for offset, current_day in enumerate(days):
+            cell_events = [event for event in serialized_events if event["weekday_index"] == offset and event["slot_label"] == slot_label]
+            row["cells"].append({"day_index": offset, "events": cell_events})
+        extra_slots.append(row)
+
+    day_event_counts = []
+    for offset, current_day in enumerate(days):
+        day_events = [event for event in serialized_events if event["weekday_index"] == offset]
+        day_event_counts.append(
+            {
+                "day_index": offset,
+                "date": current_day["date"],
+                "count": len(day_events),
+                "has_events": bool(day_events),
+            }
+        )
 
     return {
         "week_start": week_start,
         "days": days,
         "slots": slots,
-        "events": [_serialize_event(event, highlight_today=today) for event in events],
+        "extra_slots": extra_slots,
+        "has_extra_slots": bool(extra_slots),
+        "events": serialized_events,
+        "empty_days": [item for item in day_event_counts if not item["has_events"]],
+        "day_event_counts": day_event_counts,
+        "summary": {
+            "planned": sum(1 for event in serialized_events if event["status"] == AcademicScheduleEvent.STATUS_PLANNED),
+            "ongoing": sum(1 for event in serialized_events if event["status"] == AcademicScheduleEvent.STATUS_ONGOING),
+            "postponed": sum(1 for event in serialized_events if event["status"] == AcademicScheduleEvent.STATUS_POSTPONED),
+            "cancelled": sum(1 for event in serialized_events if event["status"] == AcademicScheduleEvent.STATUS_CANCELLED),
+            "completed": sum(1 for event in serialized_events if event["status"] == AcademicScheduleEvent.STATUS_COMPLETED),
+        },
     }
 
 

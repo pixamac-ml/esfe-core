@@ -472,12 +472,64 @@
               </section>
             </section>
 
+            <section x-show="activeSection === 'academics'" x-cloak class="student-workspace-panel">
+              <section class="student-section student-card student-card-pad student-solo-panel">
+                <section
+                  id="academics"
+                  hx-get="{% url 'portal_student:academics_partial' %}"
+                  hx-trigger="load"
+                  hx-swap="innerHTML"
+                >
+                  {% include "portal/student/partials/academics.html" %}
+                </section>
+              </section>
+              <section class="student-section student-card student-card-pad student-solo-panel">
+                {% include "portal/student/partials/stats_student.html" %}
+              </section>
+            </section>
+
+            <section x-show="activeSection === 'finance'" x-cloak class="student-workspace-panel">
+              <section class="student-section student-card student-card-pad student-solo-panel">
+                <section
+                  id="finance"
+                  hx-get="{% url 'portal_student:finance_partial' %}"
+                  hx-trigger="load"
+                  hx-swap="innerHTML"
+                >
+                  {% include "portal/student/partials/finance.html" %}
+                </section>
+              </section>
+              <section class="student-section student-card student-card-pad student-solo-panel">
+                <section
+                  id="notifications"
+                  hx-get="{% url 'portal_student:notifications_partial' %}"
+                  hx-trigger="load"
+                  hx-swap="innerHTML"
+                >
+                  {% include "portal/student/partials/notifications.html" %}
+                </section>
+              </section>
+            </section>
+
             <section x-show="activeSection === 'teachers'" x-cloak class="student-workspace-panel">
               <section class="student-section student-card student-card-pad student-solo-panel">
                 {% include "portal/student/partials/teachers_student.html" %}
               </section>
               <section class="student-section student-card student-card-pad student-solo-panel">
                 {% include "portal/student/partials/profile.html" %}
+              </section>
+            </section>
+
+            <section x-show="activeSection === 'settings'" x-cloak class="student-workspace-panel">
+              <section class="student-section student-card student-card-pad student-solo-panel">
+                <section
+                  id="settings"
+                  hx-get="{% url 'portal_student:settings_partial' %}"
+                  hx-trigger="load"
+                  hx-swap="innerHTML"
+                >
+                  {% include "portal/student/partials/settings_student.html" with editable_fields=profile_settings.editable_fields readonly_fields=profile_settings.readonly_fields academic_fields=profile_settings.academic_fields documents=profile_settings.documents completion=profile_settings.completion alerts=profile_settings.alerts %}
+                </section>
               </section>
             </section>
           </div>
@@ -606,8 +658,11 @@
         { label: "Tableau de bord", icon: "layout-dashboard", target: "overview" },
         { label: "Mes cours", icon: "book-open-check", target: "courses" },
         { label: "Calendrier", icon: "calendar-days", target: "schedule" },
+        { label: "Academique", icon: "graduation-cap", target: "academics" },
+        { label: "Finance", icon: "wallet", target: "finance" },
         { label: "Messages", icon: "messages-square", target: "messages" },
-        { label: "Encadrement", icon: "users-round", target: "teachers" }
+        { label: "Encadrement", icon: "users-round", target: "teachers" },
+        { label: "Parametres", icon: "settings-2", target: "settings" }
       ],
       sectionMeta: [
         {
@@ -639,11 +694,32 @@
           badge: "Section messages"
         },
         {
+          key: "academics",
+          kicker: "Academique",
+          title: "Situation academique",
+          description: "Retrouvez votre affectation, vos credits, vos semestres et votre etat academique dans un espace dedie.",
+          badge: "Section academique"
+        },
+        {
+          key: "finance",
+          kicker: "Finance",
+          title: "Situation financiere",
+          description: "Consultez les montants dus, les paiements valides et le reste a regler sans quitter le dashboard.",
+          badge: "Section finance"
+        },
+        {
           key: "teachers",
           kicker: "Encadrement",
           title: "Enseignants et profil",
           description: "Retrouvez vos enseignants lies et vos informations etudiantes sans surcharge visuelle.",
           badge: "Section encadrement"
+        },
+        {
+          key: "settings",
+          kicker: "Parametres",
+          title: "Preferences et compte",
+          description: "Pilotez votre affichage, vos raccourcis et vos informations de compte dans un espace plus propre.",
+          badge: "Section parametres"
         }
       ],
       courses: [],

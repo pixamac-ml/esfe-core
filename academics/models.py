@@ -431,6 +431,90 @@ class EC(models.Model):
             raise ValidationError(errors)
 
 
+class ECChapter(models.Model):
+    ec = models.ForeignKey(
+        "EC",
+        on_delete=models.CASCADE,
+        related_name="chapters",
+    )
+    title = models.CharField(max_length=255)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "Chapitre EC"
+        verbose_name_plural = "Chapitres EC"
+
+    def __str__(self):
+        return f"{self.ec.title} - {self.title}"
+
+
+class ECContent(models.Model):
+    CONTENT_TYPE_PDF = "pdf"
+    CONTENT_TYPE_VIDEO = "video"
+    CONTENT_TYPE_DOC = "doc"
+    CONTENT_TYPE_EXCEL = "excel"
+    CONTENT_TYPE_TEXT = "text"
+    CONTENT_TYPE_CHOICES = [
+        (CONTENT_TYPE_PDF, "PDF"),
+        (CONTENT_TYPE_VIDEO, "Vidéo"),
+        (CONTENT_TYPE_DOC, "Word"),
+        (CONTENT_TYPE_EXCEL, "Excel"),
+        (CONTENT_TYPE_TEXT, "Texte"),
+    ]
+
+    chapter = models.ForeignKey(
+        "ECChapter",
+        on_delete=models.CASCADE,
+        related_name="contents",
+    )
+    title = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES)
+    file = models.FileField(upload_to="courses/", null=True, blank=True)
+    video_url = models.URLField(null=True, blank=True)
+    text_content = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "Contenu EC"
+        verbose_name_plural = "Contenus EC"
+
+    def __str__(self):
+        return f"{self.title} - {self.chapter.title}"
+
+    @property
+    def ec(self):
+        return self.chapter.ec
+
+    def clean(self):
+        errors = {}
+
+        file_based_types = {
+            self.CONTENT_TYPE_PDF,
+            self.CONTENT_TYPE_DOC,
+            self.CONTENT_TYPE_EXCEL,
+        }
+        if self.content_type in file_based_types and not self.file:
+            errors["file"] = "Un fichier est requis pour ce type de contenu."
+
+        if self.content_type == self.CONTENT_TYPE_VIDEO and not self.video_url:
+            errors["video_url"] = "Une URL vidéo est requise pour ce type de contenu."
+
+        if self.content_type == self.CONTENT_TYPE_TEXT and not self.text_content.strip():
+            errors["text_content"] = "Un texte est requis pour ce type de contenu."
+
+        if self.content_type != self.CONTENT_TYPE_VIDEO and self.video_url:
+            errors["video_url"] = "L'URL vidéo ne doit être utilisée que pour un contenu vidéo."
+
+        if self.content_type != self.CONTENT_TYPE_TEXT and self.text_content.strip():
+            errors["text_content"] = "Le texte direct n'est disponible que pour le type Texte."
+
+        if errors:
+            raise ValidationError(errors)
+
+
 class ECGrade(models.Model):
     """
     Note d'un étudiant sur un EC.

@@ -10,7 +10,40 @@
         <h1 class="text-3xl font-bold text-gray-900 tracking-tight">{{ page_title }}</h1>
         <p class="text-gray-500 text-base mt-1">{{ subtitle }}</p>
       </div>
+      <a
+        href="{% url 'portal_student:student_courses' %}"
+        class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+      >
+        Ouvrir mes cours
+      </a>
     </div>
+
+    <section class="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-sm font-medium text-blue-700">Apercu pedagogique</p>
+          <h2 class="text-xl font-semibold text-slate-900 mt-1">Mes matieres</h2>
+        </div>
+        <a href="{% url 'portal_student:student_courses' %}" class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          Voir tout
+        </a>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {% for ec in course_preview %}
+          <a href="{% url 'portal_student:ec_detail' ec.id %}" class="block rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-slate-100">
+            <p class="text-xs uppercase tracking-wide text-slate-500">S{{ ec.ue.semester.number }} · {{ ec.ue.code }}</p>
+            <h3 class="mt-2 font-semibold text-slate-900">{{ ec.title }}</h3>
+            <p class="mt-2 text-sm text-slate-600">{{ ec.ue.title }}</p>
+          </a>
+        {% empty %}
+          <div class="md:col-span-2 xl:col-span-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-600">
+            Aucune matiere n'est encore disponible dans votre espace.
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
       <div
         hx-get="{% url 'portal_student:profile_partial' %}"

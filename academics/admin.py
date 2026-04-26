@@ -3,7 +3,7 @@
 # ==================================================
 
 from django.contrib import admin
-from .models import AcademicEnrollment, AcademicYear, AcademicClass, Semester, EC, UE, ECGrade
+from .models import AcademicEnrollment, AcademicYear, AcademicClass, Semester, EC, UE, ECGrade, ECChapter, ECContent
 
 @admin.register(AcademicYear)
 class AcademicYearAdmin(admin.ModelAdmin):
@@ -30,6 +30,11 @@ class ECInline(admin.TabularInline):
     extra = 1
 
 
+class ECChapterInline(admin.TabularInline):
+    model = ECChapter
+    extra = 0
+
+
 @admin.register(UE)
 class UEAdmin(admin.ModelAdmin):
     list_display = ("code", "title", "semester")
@@ -43,6 +48,7 @@ class ECAdmin(admin.ModelAdmin):
     list_display = ("title", "ue", "credit_required", "coefficient")
     list_filter = ("ue",)
     search_fields = ("title",)
+    inlines = [ECChapterInline]
 
 
 @admin.register(AcademicEnrollment)
@@ -70,3 +76,23 @@ class ECGradeAdmin(admin.ModelAdmin):
         "credit_obtained",
         "is_validated"
     )
+
+
+class ECContentInline(admin.TabularInline):
+    model = ECContent
+    extra = 0
+
+
+@admin.register(ECChapter)
+class ECChapterAdmin(admin.ModelAdmin):
+    list_display = ("title", "ec", "order")
+    list_filter = ("ec__ue__semester__academic_class",)
+    search_fields = ("title", "ec__title", "ec__ue__title", "ec__ue__code")
+    inlines = [ECContentInline]
+
+
+@admin.register(ECContent)
+class ECContentAdmin(admin.ModelAdmin):
+    list_display = ("title", "chapter", "content_type", "order", "created_at")
+    list_filter = ("content_type", "chapter__ec__ue__semester__academic_class")
+    search_fields = ("title", "chapter__title", "chapter__ec__title", "chapter__ec__ue__code")

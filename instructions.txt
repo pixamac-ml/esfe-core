@@ -1,71 +1,100 @@
-SMTPServerDisconnected at /superadmin/candidatures/bulk-action/
-Connection unexpectedly closed
-Request Method:	POST
-Request URL:	http://127.0.0.1:8000/superadmin/candidatures/bulk-action/
-Django Version:	6.0.1
-Exception Type:	SMTPServerDisconnected
-Exception Value:	
-Connection unexpectedly closed
-Exception Location:	C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 412, in getreply
-Raised during:	superadmin.views.candidature_bulk_action
-Python Executable:	C:\Users\PIX\PycharmProjects\esfe-core\.venv\Scripts\python.exe
-Python Version:	3.14.3
-Python Path:	
-['C:\\Users\\PIX\\PycharmProjects\\esfe-core',
- 'C:\\Users\\PIX\\PycharmProjects\\esfe-core\\.venv\\Scripts\\python314.zip',
- 'C:\\Users\\PIX\\AppData\\Local\\Python\\pythoncore-3.14-64\\DLLs',
- 'C:\\Users\\PIX\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib',
- 'C:\\Users\\PIX\\AppData\\Local\\Python\\pythoncore-3.14-64',
- 'C:\\Users\\PIX\\PycharmProjects\\esfe-core\\.venv',
- 'C:\\Users\\PIX\\PycharmProjects\\esfe-core\\.venv\\Lib\\site-packages',
- 'C:\\Users\\PIX\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages']
-Server time:	Sun, 26 Apr 2026 05:50:58 +0000
-Traceback Switch to copy-and-paste view
-C:\Users\PIX\PycharmProjects\esfe-core\admissions\services\emails.py, line 16, in send_institutional_email
-        return send_templated_email(
-                    …
-Local vars
-C:\Users\PIX\PycharmProjects\esfe-core\core\emailing.py, line 74, in send_templated_email
-    message.send(fail_silently=fail_silently)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\PIX\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\mail\message.py, line 358, in send
-        return self.get_connection(fail_silently).send_messages([self])
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\PIX\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\mail\backends\smtp.py, line 130, in send_messages
-            new_conn_created = self.open()
-                                    ^^^^^^^^^^^ …
-Local vars
-C:\Users\PIX\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\mail\backends\smtp.py, line 95, in open
-                self.connection.starttls(context=self.ssl_context)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 781, in starttls
-        self.ehlo_or_helo_if_needed()
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 619, in ehlo_or_helo_if_needed
-                (code, resp) = self.helo()
-                                    ^^^^^^^^^^^ …
-Local vars
-C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 448, in helo
-        (code, msg) = self.getreply()
-                           ^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\PIX\AppData\Local\Python\pythoncore-3.14-64\Lib\smtplib.py, line 412, in getreply
+OBJECTIF
 
+Améliorer le système de cours basé sur EC pour ajouter une structure pédagogique avec chapitres.
 
-EMAIL_HOST_USER=calymoham9999@gmail.com
-EMAIL_HOST_PASSWORD=jrijhletunyxrwko
+---
 
-DB_PASSWORD=2026
+IMPORTANT
 
+* ne pas casser EC existant
+* améliorer ECContent
+* ajouter une hiérarchie propre
 
-SECRET_KEY=django-insecure-change-this-key-later
+---
 
-DB_NAME=esfe_db
-DB_USER=esfe_user
+PARTIE 1 — MODELS
 
-DB_HOST=localhost
-DB_PORT=5432
+Créer modèle :
+
+```python
+class ECChapter(models.Model):
+    ec = models.ForeignKey("EC", on_delete=models.CASCADE, related_name="chapters")
+    title = models.CharField(max_length=255)
+    order = models.PositiveIntegerField(default=0)
+```
+
+---
+
+Modifier ECContent :
+
+```python
+class ECContent(models.Model):
+    chapter = models.ForeignKey("ECChapter", on_delete=models.CASCADE, related_name="contents")
+    title = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=20, choices=[
+        ("pdf", "PDF"),
+        ("video", "Vidéo"),
+        ("doc", "Word"),
+        ("excel", "Excel"),
+        ("text", "Texte"),
+    ])
+    file = models.FileField(upload_to="courses/", null=True, blank=True)
+    video_url = models.URLField(null=True, blank=True)
+    order = models.PositiveIntegerField(default=0)
+```
+
+---
+
+PARTIE 2 — VUES
+
+Créer :
+
+* student_courses(request)
+* ec_detail(request, ec_id)
+
+---
+
+Dans ec_detail :
+
+* récupérer EC
+* récupérer chapters triés
+* récupérer contents triés
+
+---
+
+PARTIE 3 — TEMPLATE
+
+Afficher :
+
+* EC titre
+* liste chapitres
+* sous chaque chapitre → contenus
+
+---
+
+PARTIE 4 — AFFICHAGE CONTENU
+
+Si :
+
+* PDF → lien download
+* vidéo → iframe ou lecteur
+* texte → affichage direct
+
+---
+
+PARTIE 5 — DASHBOARD
+
+Intégrer dans dashboard étudiant :
+
+* liste EC
+* clic → détail EC
+
+---
+
+OBJECTIF FINAL
+
+Permettre :
+
+* navigation par matière
+* organisation par chapitre
+* accès aux contenus pédagogiques

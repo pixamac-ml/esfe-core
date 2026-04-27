@@ -1,0 +1,58 @@
+{% load humanize %}
+<tr id="manager-payment-row-{{ payment.id }}" class="hover:bg-slate-50 transition">
+    <td class="px-6 py-4">
+        <span class="font-mono text-sm text-primary">{{ payment.reference }}</span>
+        {% if payment.receipt_number %}
+        <p class="text-xs text-slate-400">Recu: {{ payment.receipt_number }}</p>
+        {% endif %}
+    </td>
+    <td class="px-6 py-4">
+        <p class="text-sm font-medium text-slate-900">{{ payment.inscription.candidature.full_name }}</p>
+        <p class="text-xs text-slate-500">{{ payment.inscription.public_token }}</p>
+    </td>
+    <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ payment.amount|intcomma }} FCFA</td>
+    <td class="px-6 py-4 text-sm text-slate-600">{{ payment.get_method_display }}</td>
+    <td class="px-6 py-4">
+        <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if payment.status == 'validated' %}bg-green-100 text-green-700{% elif payment.status == 'pending' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+            {{ payment.get_status_display }}
+        </span>
+        {% if payment.agent %}
+        <p class="text-xs text-slate-400 mt-1">{{ payment.agent.user.get_full_name }}{% if payment.agent.agent_code %} • {{ payment.agent.agent_code }}{% endif %}</p>
+        {% endif %}
+    </td>
+    <td class="px-6 py-4 text-sm text-slate-500">{{ payment.paid_at|date:"d/m/Y H:i" }}</td>
+    <td class="px-6 py-4 text-right">
+        <div class="flex items-center justify-end gap-2">
+            <button hx-get="{% url 'accounts:htmx_payment_detail' payment.pk %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="p-2 rounded-lg text-primary hover:bg-primary/10 transition"
+                    onclick="openDashboardModal()">
+                <i class="fas fa-eye"></i>
+            </button>
+            {% if payment.status == 'pending' %}
+            <button hx-post="{% url 'accounts:htmx_payment_validate' payment.pk %}"
+                    hx-target="#manager-payment-row-{{ payment.pk }}"
+                    hx-swap="outerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-confirm="Valider ce paiement ?"
+                    class="p-2 rounded-lg text-green-600 hover:bg-green-50 transition">
+                <i class="fas fa-check"></i>
+            </button>
+            <button hx-post="{% url 'accounts:htmx_payment_cancel' payment.pk %}"
+                    hx-target="#manager-payment-row-{{ payment.pk }}"
+                    hx-swap="outerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-confirm="Annuler ce paiement ?"
+                    class="p-2 rounded-lg text-red-600 hover:bg-red-50 transition">
+                <i class="fas fa-times"></i>
+            </button>
+            {% endif %}
+            {% if payment.receipt_pdf %}
+            <a href="{{ payment.receipt_pdf.url }}" target="_blank" class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition">
+                <i class="fas fa-file-pdf"></i>
+            </a>
+            {% endif %}
+        </div>
+    </td>
+</tr>

@@ -1,0 +1,56 @@
+{% load humanize %}
+<tr id="manager-salary-row-{{ employee_profile.user_id }}" class="hover:bg-slate-50 transition">
+    <td class="px-6 py-4">
+        <p class="text-sm font-medium text-slate-900">{{ employee_profile.user.get_full_name|default:employee_profile.user.username }}</p>
+        <p class="text-xs text-slate-500">
+            {% if employee_profile.employee_code %}{{ employee_profile.employee_code }} • {% endif %}
+            {{ employee_profile.user.email|default:"-" }}
+        </p>
+    </td>
+    <td class="px-6 py-4">
+        <p class="text-sm text-slate-900">{{ employee_profile.get_position_display|default:employee_profile.position|default:"Non renseignee" }}</p>
+        <p class="text-xs text-slate-500">{{ employee_profile.get_employment_status_display }}</p>
+    </td>
+    <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ employee_profile.salary_base|intcomma }} FCFA</td>
+    <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">
+        {% if employee_profile.current_payroll %}
+        {{ employee_profile.current_payroll.net_salary|intcomma }} FCFA
+        {% else %}
+        <span class="text-slate-400">-</span>
+        {% endif %}
+    </td>
+    <td class="px-6 py-4 text-right text-sm text-emerald-700">
+        {% if employee_profile.current_payroll %}
+        {{ employee_profile.current_payroll.paid_amount|intcomma }} FCFA
+        {% else %}
+        <span class="text-slate-400">-</span>
+        {% endif %}
+    </td>
+    <td class="px-6 py-4 text-right text-sm text-rose-700">
+        {% if employee_profile.current_payroll %}
+        {{ employee_profile.current_payroll.remaining_salary|intcomma }} FCFA
+        {% else %}
+        <span class="text-slate-400">-</span>
+        {% endif %}
+    </td>
+    <td class="px-6 py-4">
+        {% if employee_profile.current_payroll %}
+        <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if employee_profile.current_payroll.status == 'paid' %}bg-green-100 text-green-700{% elif employee_profile.current_payroll.status == 'partial' %}bg-amber-100 text-amber-700{% elif employee_profile.current_payroll.status == 'ready' %}bg-violet-100 text-violet-700{% else %}bg-slate-100 text-slate-700{% endif %}">
+            {{ employee_profile.current_payroll.get_status_display }}
+        </span>
+        {% else %}
+        <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">Non preparee</span>
+        {% endif %}
+    </td>
+    <td class="px-6 py-4 text-right">
+        <button
+            hx-get="{% url 'accounts:htmx_manager_salary_detail' employee_profile.user_id %}?salary_month={{ salary_month_value }}"
+            hx-target="#modal-container"
+            hx-swap="innerHTML"
+            class="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/15 transition"
+            onclick="openDashboardModal()">
+            <i class="fas fa-wallet"></i>
+            Gerer
+        </button>
+    </td>
+</tr>

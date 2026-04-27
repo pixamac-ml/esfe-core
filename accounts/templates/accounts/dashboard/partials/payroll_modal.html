@@ -1,0 +1,123 @@
+{% load humanize %}
+<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
+    <div class="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">Paie employe</h2>
+                <p class="text-sm text-slate-500">{{ employee_profile.user.get_full_name|default:employee_profile.user.username }} • {{ payroll_month|date:"F Y" }}</p>
+            </div>
+            <button onclick="closeDashboardModal()" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-slate-500 transition">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Employe</p>
+                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ employee_profile.user.get_full_name|default:employee_profile.user.username }}</p>
+                    <p class="text-xs text-slate-500 mt-1">{{ employee_profile.user.email|default:"-" }}</p>
+                </div>
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Fonction</p>
+                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ employee_profile.get_position_display|default:employee_profile.position|default:"Non renseignee" }}</p>
+                    <p class="text-xs text-slate-500 mt-1">{{ employee_profile.branch.name }}</p>
+                </div>
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Base employee</p>
+                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ employee_profile.salary_base|intcomma }} FCFA</p>
+                    <p class="text-xs text-slate-500 mt-1">{{ employee_profile.get_employment_status_display }}</p>
+                </div>
+            </div>
+
+            {% if payroll_entry %}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4"><p class="text-xs uppercase tracking-wide text-emerald-700">Net</p><p class="mt-2 text-xl font-bold text-slate-900">{{ payroll_entry.net_salary|intcomma }}</p></div>
+                <div class="rounded-2xl bg-blue-50 border border-blue-100 p-4"><p class="text-xs uppercase tracking-wide text-blue-700">Paye</p><p class="mt-2 text-xl font-bold text-slate-900">{{ payroll_entry.paid_amount|intcomma }}</p></div>
+                <div class="rounded-2xl bg-rose-50 border border-rose-100 p-4"><p class="text-xs uppercase tracking-wide text-rose-700">Reste</p><p class="mt-2 text-xl font-bold text-slate-900">{{ payroll_entry.remaining_salary|intcomma }}</p></div>
+                <div class="rounded-2xl bg-violet-50 border border-violet-100 p-4"><p class="text-xs uppercase tracking-wide text-violet-700">Etat</p><p class="mt-2 text-sm font-bold text-slate-900">{{ payroll_entry.get_status_display }}</p></div>
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6">
+                <form
+                    hx-post="{% url 'accounts:htmx_manager_salary_upsert' employee_profile.user_id %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Periode</label>
+                            {{ payroll_form.period_month }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Salaire de base</label>
+                            {{ payroll_form.base_salary }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Primes</label>
+                            {{ payroll_form.allowances }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Retenues</label>
+                            {{ payroll_form.deductions }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Avances</label>
+                            {{ payroll_form.advances }}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Notes internes</label>
+                        {{ payroll_form.notes }}
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <button type="submit" name="submit_action" value="draft" class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
+                            <i class="fas fa-save"></i>
+                            Enregistrer brouillon
+                        </button>
+                        <button type="submit" name="submit_action" value="ready" class="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition">
+                            <i class="fas fa-badge-check"></i>
+                            Marquer prete
+                        </button>
+                    </div>
+                </form>
+
+                <div class="rounded-3xl bg-slate-50 border border-slate-100 p-5 space-y-4">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-slate-400">Paiement salaire</p>
+                        <h3 class="text-lg font-semibold text-slate-900 mt-1">Enregistrer un versement</h3>
+                    </div>
+                    {% if payroll_entry %}
+                    <form
+                        hx-post="{% url 'accounts:htmx_manager_salary_pay' payroll_entry.id %}"
+                        hx-target="#modal-container"
+                        hx-swap="innerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Montant a verser</label>
+                            <input type="number" name="payment_amount" min="1" max="{{ payroll_entry.remaining_salary }}" value="{{ payroll_entry.remaining_salary }}" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required>
+                        </div>
+                        <div class="rounded-2xl bg-white border border-slate-200 p-4 text-sm text-slate-600 space-y-2">
+                            <div class="flex justify-between"><span>Net du mois</span><span class="font-semibold text-slate-900">{{ payroll_entry.net_salary|intcomma }} FCFA</span></div>
+                            <div class="flex justify-between"><span>Deja paye</span><span class="font-semibold text-slate-900">{{ payroll_entry.paid_amount|intcomma }} FCFA</span></div>
+                            <div class="flex justify-between"><span>Reste</span><span class="font-semibold text-rose-600">{{ payroll_entry.remaining_salary|intcomma }} FCFA</span></div>
+                        </div>
+                        <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                            <i class="fas fa-money-bill-wave"></i>
+                            Enregistrer le paiement
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                        Prepare d'abord la paie du mois pour cet employe.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,156 +1,105 @@
-<div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-    <!-- Header -->
-    <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
-        <div>
-            <h2 class="text-xl font-bold">Inscription {{ inscription.reference }}</h2>
-            <p class="text-blue-100 text-sm">{{ inscription.candidature.full_name }}</p>
-        </div>
-        <button @click="modalOpen = false" class="p-2 hover:bg-white/20 rounded-lg transition">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-        </button>
-    </div>
-
-    <div class="p-6 space-y-6">
-        <!-- Statut -->
-        <div class="flex items-center justify-between">
+<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
+    <div class="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
             <div>
-                {% if inscription.status == 'active' %}
-                    <span class="px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">Active</span>
-                {% elif inscription.status == 'initiated' %}
-                    <span class="px-3 py-1 text-sm font-medium rounded-full bg-yellow-100 text-yellow-800">Initiée</span>
-                {% elif inscription.status == 'completed' %}
-                    <span class="px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800">Complétée</span>
-                {% else %}
-                    <span class="px-3 py-1 text-sm font-medium rounded-full bg-red-100 text-red-800">Annulée</span>
-                {% endif %}
+                <h2 class="text-xl font-bold text-slate-900">Inscription {{ inscription.reference }}</h2>
+                <p class="text-sm text-slate-500">{{ inscription.candidature.full_name }}</p>
             </div>
-            <p class="text-sm text-gray-500">Créée le {{ inscription.created_at|date:"d/m/Y à H:i" }}</p>
+            <button onclick="closeDashboardModal()" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-slate-500 transition">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
 
-        <!-- Informations étudiant -->
-        <div class="bg-gray-50 rounded-xl p-4">
-            <h3 class="font-semibold text-gray-900 mb-3">Informations de l'étudiant</h3>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                    <p class="text-gray-500">Nom complet</p>
-                    <p class="font-medium text-gray-900">{{ inscription.candidature.last_name }} {{ inscription.candidature.first_name }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500">Email</p>
-                    <p class="font-medium text-gray-900">{{ inscription.candidature.email }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500">Téléphone</p>
-                    <p class="font-medium text-gray-900">{{ inscription.candidature.phone }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500">Annexe</p>
-                    <p class="font-medium text-gray-900">{{ inscription.candidature.branch.name }}</p>
-                </div>
+        <div class="p-6 space-y-6">
+            <div class="flex items-center justify-between">
+                <span class="px-3 py-1.5 rounded-full text-sm font-semibold {% if inscription.status == 'active' %}bg-green-100 text-green-700{% elif inscription.status == 'partial_paid' %}bg-amber-100 text-amber-700{% elif inscription.status == 'awaiting_payment' %}bg-orange-100 text-orange-700{% else %}bg-slate-100 text-slate-700{% endif %}">
+                    {{ inscription.get_status_display }}
+                </span>
+                <p class="text-sm text-slate-500">Creee le {{ inscription.created_at|date:"d/m/Y H:i" }}</p>
             </div>
-        </div>
 
-        <!-- Programme -->
-        <div class="bg-blue-50 rounded-xl p-4">
-            <h3 class="font-semibold text-gray-900 mb-3">Programme</h3>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                    <p class="text-gray-500">Programme</p>
-                    <p class="font-medium text-gray-900">{{ inscription.candidature.programme.title }}</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5 space-y-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Etudiant</h3>
+                    <div><p class="text-xs text-slate-400">Nom complet</p><p class="text-sm font-medium text-slate-900">{{ inscription.candidature.full_name }}</p></div>
+                    <div><p class="text-xs text-slate-400">Email</p><p class="text-sm text-slate-900">{{ inscription.candidature.email }}</p></div>
+                    <div><p class="text-xs text-slate-400">Telephone</p><p class="text-sm text-slate-900">{{ inscription.candidature.phone }}</p></div>
+                    <div><p class="text-xs text-slate-400">Annexe</p><p class="text-sm text-slate-900">{{ inscription.candidature.branch.name }}</p></div>
                 </div>
-                <div>
-                    <p class="text-gray-500">Cycle</p>
-                    <p class="font-medium text-gray-900">{{ inscription.candidature.programme.cycle.name }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500">Année d'entrée</p>
-                    <p class="font-medium text-gray-900">{{ inscription.candidature.entry_year }}ère année</p>
-                </div>
-                <div>
-                    <p class="text-gray-500">Année académique</p>
-                    <p class="font-medium text-gray-900">{{ inscription.candidature.academic_year }}</p>
-                </div>
-            </div>
-        </div>
 
-        <!-- Finances -->
-        <div class="bg-green-50 rounded-xl p-4">
-            <h3 class="font-semibold text-gray-900 mb-3">Situation financière</h3>
-            <div class="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                    <p class="text-gray-500">Frais totaux</p>
-                    <p class="font-bold text-xl text-gray-900">{{ inscription.amount_due|floatformat:0 }} FCFA</p>
-                </div>
-                <div>
-                    <p class="text-gray-500">Montant payé</p>
-                    <p class="font-bold text-xl text-green-600">{{ inscription.amount_paid|default:0|floatformat:0 }} FCFA</p>
-                </div>
-                <div>
-                    <p class="text-gray-500">Reste à payer</p>
-                    <p class="font-bold text-xl text-red-600">{{ inscription.remaining_amount|default:inscription.amount_due|floatformat:0 }} FCFA</p>
+                <div class="rounded-2xl bg-blue-50 border border-blue-100 p-5 space-y-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-blue-800">Programme</h3>
+                    <div><p class="text-xs text-slate-400">Programme</p><p class="text-sm font-medium text-slate-900">{{ inscription.candidature.programme.title }}</p></div>
+                    <div><p class="text-xs text-slate-400">Cycle</p><p class="text-sm text-slate-900">{{ inscription.candidature.programme.cycle.name }}</p></div>
+                    <div><p class="text-xs text-slate-400">Annee academique</p><p class="text-sm text-slate-900">{{ inscription.candidature.academic_year }}</p></div>
+                    <div><p class="text-xs text-slate-400">Token public</p><p class="text-sm font-mono text-primary">{{ inscription.public_token }}</p></div>
+                    <div><p class="text-xs text-slate-400">Code d'acces dossier</p><p class="text-sm font-mono text-slate-900">{{ inscription.access_code }}</p></div>
                 </div>
             </div>
 
-            <!-- Barre de progression -->
-            <div class="mt-4">
-                <div class="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>Progression du paiement</span>
-                    {% widthratio inscription.amount_paid inscription.amount_due 100 as percent %}
-                    <span>{{ percent|default:0 }}%</span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-green-500 h-2 rounded-full transition-all" style="width: {{ percent|default:0 }}%"></div>
+            <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-emerald-800 mb-4">Situation financiere</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div><p class="text-xs text-slate-400">Frais totaux</p><p class="text-xl font-bold text-slate-900">{{ inscription.amount_due|floatformat:0 }} FCFA</p></div>
+                    <div><p class="text-xs text-slate-400">Montant paye</p><p class="text-xl font-bold text-emerald-600">{{ inscription.amount_paid|floatformat:0 }} FCFA</p></div>
+                    <div><p class="text-xs text-slate-400">Reste a payer</p><p class="text-xl font-bold text-rose-600">{{ inscription.balance|floatformat:0 }} FCFA</p></div>
                 </div>
             </div>
-        </div>
 
-        <!-- Liste des paiements -->
-        {% if inscription.payments.exists %}
-        <div>
-            <h3 class="font-semibold text-gray-900 mb-3">Historique des paiements</h3>
-            <div class="space-y-2">
-                {% for payment in inscription.payments.all %}
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div class="flex items-center space-x-3">
-                        {% if payment.status == 'validated' %}
-                            <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                            </div>
-                        {% elif payment.status == 'pending' %}
-                            <div class="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                                <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </div>
+            <div class="rounded-2xl border border-violet-100 bg-violet-50 p-5 space-y-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-violet-800">Paiement en espece</h3>
+                        {% if manager_agent %}
+                        <p class="text-sm text-slate-700 mt-2">Agent assigne: <span class="font-semibold">{{ manager_agent.user.get_full_name }}</span> • <span class="font-mono">{{ manager_agent.agent_code }}</span></p>
                         {% else %}
-                            <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                            </div>
+                        <p class="text-sm text-amber-700 mt-2">Aucun `PaymentAgent` actif attribue a cette gestionnaire.</p>
                         {% endif %}
-                        <div>
-                            <p class="font-medium text-gray-900">{{ payment.amount|floatformat:0 }} FCFA</p>
-                            <p class="text-xs text-gray-500">{{ payment.reference }} • {{ payment.paid_at|date:"d/m/Y" }}</p>
-                        </div>
                     </div>
-                    <span class="text-sm text-gray-500">{{ payment.get_method_display }}</span>
+                    {% if can_create_cash_session %}
+                    <button
+                        hx-post="{% url 'accounts:htmx_manager_cash_session_create' inscription.id %}"
+                        hx-target="#manager-cash-session-panel"
+                        hx-swap="innerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition">
+                        <i class="fas fa-key"></i>
+                        Generer le code
+                    </button>
+                    {% endif %}
+                </div>
+
+                <div id="manager-cash-session-panel">
+                    {% if active_cash_session %}
+                    {% include "accounts/dashboard/partials/manager_cash_session_card.html" with session=active_cash_session manager_agent=active_cash_session.agent %}
+                    {% elif manager_agent %}
+                    <div class="rounded-2xl border border-dashed border-violet-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                        Aucun code espèce actif pour cette inscription.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if payments %}
+            <div class="space-y-3">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Historique des paiements</h3>
+                {% for payment in payments %}
+                <div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div>
+                        <p class="text-sm font-medium text-slate-900">{{ payment.amount|floatformat:0 }} FCFA</p>
+                        <p class="text-xs text-slate-500">{{ payment.reference }} - {{ payment.paid_at|date:"d/m/Y" }}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if payment.status == 'validated' %}bg-green-100 text-green-700{% elif payment.status == 'pending' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+                            {{ payment.get_status_display }}
+                        </span>
+                        <p class="text-xs text-slate-500 mt-2">{{ payment.get_method_display }}</p>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
+            {% endif %}
         </div>
-        {% endif %}
-
-    </div>
-
-    <!-- Footer -->
-    <div class="sticky bottom-0 bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end space-x-3 rounded-b-2xl">
-        <button @click="modalOpen = false" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
-            Fermer
-        </button>
     </div>
 </div>

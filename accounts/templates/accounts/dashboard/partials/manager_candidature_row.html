@@ -1,0 +1,69 @@
+<tr id="manager-candidature-row-{{ candidature.id }}" class="hover:bg-slate-50 transition">
+    <td class="px-6 py-4">
+        <p class="text-sm font-medium text-slate-900">{{ candidature.last_name|upper }} {{ candidature.first_name }}</p>
+        <p class="text-xs text-slate-500">{{ candidature.email }}</p>
+    </td>
+    <td class="px-6 py-4">
+        <p class="text-sm text-slate-900">{{ candidature.programme.title }}</p>
+        <p class="text-xs text-slate-500">{{ candidature.programme.cycle.name }} - Annee {{ candidature.entry_year }}</p>
+    </td>
+    <td class="px-6 py-4">
+        <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if candidature.status == 'submitted' %}bg-blue-100 text-blue-700{% elif candidature.status == 'under_review' %}bg-purple-100 text-purple-700{% elif candidature.status == 'to_complete' %}bg-orange-100 text-orange-700{% elif candidature.status == 'accepted' or candidature.status == 'accepted_with_reserve' %}bg-green-100 text-green-700{% elif candidature.status == 'rejected' %}bg-red-100 text-red-700{% else %}bg-slate-100 text-slate-700{% endif %}">
+            {{ candidature.get_status_display }}
+        </span>
+    </td>
+    <td class="px-6 py-4 text-sm text-slate-500">
+        {{ candidature.submitted_at|date:"d/m/Y" }}
+        <span class="block text-xs">{{ candidature.submitted_at|date:"H:i" }}</span>
+    </td>
+    <td class="px-6 py-4 text-right">
+        <div class="flex items-center justify-end gap-2">
+            <button hx-get="{% url 'accounts:htmx_candidature_detail' candidature.pk %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="p-2 rounded-lg text-primary hover:bg-primary/10 transition"
+                    onclick="openDashboardModal()">
+                <i class="fas fa-eye"></i>
+            </button>
+
+            {% if candidature.status == 'submitted' or candidature.status == 'under_review' %}
+            <button hx-post="{% url 'accounts:htmx_candidature_accept' candidature.pk %}"
+                    hx-target="#manager-candidature-row-{{ candidature.pk }}"
+                    hx-swap="outerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-confirm="Accepter cette candidature ?"
+                    class="p-2 rounded-lg text-green-600 hover:bg-green-50 transition">
+                <i class="fas fa-check"></i>
+            </button>
+            <button hx-post="{% url 'accounts:htmx_candidature_reject' candidature.pk %}"
+                    hx-target="#manager-candidature-row-{{ candidature.pk }}"
+                    hx-swap="outerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-confirm="Refuser cette candidature ?"
+                    class="p-2 rounded-lg text-red-600 hover:bg-red-50 transition">
+                <i class="fas fa-times"></i>
+            </button>
+            <button hx-post="{% url 'accounts:htmx_candidature_to_complete' candidature.pk %}"
+                    hx-target="#manager-candidature-row-{{ candidature.pk }}"
+                    hx-swap="outerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    class="px-3 py-2 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 transition">
+                A completer
+            </button>
+            {% endif %}
+
+            {% if candidature.status == 'accepted' or candidature.status == 'accepted_with_reserve' %}
+            {% if not candidature.inscription %}
+            <button hx-post="{% url 'accounts:htmx_inscription_create' candidature.pk %}"
+                    hx-target="#manager-candidature-row-{{ candidature.pk }}"
+                    hx-swap="afterend"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-confirm="Creer l'inscription pour ce candidat ?"
+                    class="px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary-light transition">
+                Creer inscription
+            </button>
+            {% endif %}
+            {% endif %}
+        </div>
+    </td>
+</tr>

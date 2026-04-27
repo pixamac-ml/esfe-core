@@ -1,5 +1,6 @@
 import json
 from urllib.parse import parse_qs, urlparse
+from urllib.parse import quote as urlquote
 
 from django.contrib.auth.decorators import login_required
 from django.db import connection
@@ -13,7 +14,12 @@ from django.views.decorators.http import require_POST
 from academics.models import AcademicEnrollment, EC, ECChapter, ECContent, StudentContentProgress
 from portal.permissions import role_required
 
-from .services import get_student_dashboard_data
+from .services import (
+    get_student_overview_data,
+    get_student_courses_context,
+    get_student_messages_context,
+    get_student_timetable_context,
+)
 from .profile_service import (
     get_profile_data,
     handle_document_upload,
@@ -139,9 +145,18 @@ def _prepare_chapter_contents(request, user, chapters):
                 ECContent.CONTENT_TYPE_EXCEL,
                 ECContent.CONTENT_TYPE_PPT,
             }
+            content.office_embed_url = ""
+            if content.document_like and content.absolute_file_url:
+                # Viewer Office Online (permet un rendu "inline" type Udemy).
+                # Note: exige que l'URL soit accessible depuis le navigateur (et souvent publiquement).
+                content.office_embed_url = (
+                    "https://view.officeapps.live.com/op/embed.aspx?src="
+                    + urlquote(content.absolute_file_url, safe="")
+                )
             content.preview_with_iframe = bool(content.embed_video_url) or content.content_type == ECContent.CONTENT_TYPE_PDF
             content.has_inline_preview = (
                 (content.content_type == ECContent.CONTENT_TYPE_VIDEO and bool(content.embed_video_url))
+                or (content.document_like and bool(content.office_embed_url))
                 or (content.content_type == ECContent.CONTENT_TYPE_AUDIO and bool(content.file))
                 or (content.content_type == ECContent.CONTENT_TYPE_IMAGE and bool(content.file))
                 or (content.content_type == ECContent.CONTENT_TYPE_PDF and bool(content.file))
@@ -161,7 +176,7 @@ def _prepare_chapter_contents(request, user, chapters):
             }.get(content.content_type, "Contenu")
             if content.content_type == ECContent.CONTENT_TYPE_VIDEO and not content.embed_video_url and content.video_url:
                 content.preview_notice = "La video ne peut pas etre integree ici. Utilisez le lien d'ouverture."
-            elif content.document_like and content.file:
+            elif content.document_like and content.file and not content.office_embed_url:
                 content.preview_notice = "Apercu integre non disponible pour ce format. Ouvrez le document dans un nouvel onglet."
             elif content.has_broken_source:
                 content.preview_notice = "La ressource source est indisponible ou incomplete."
@@ -176,7 +191,7 @@ def _prepare_chapter_contents(request, user, chapters):
 @login_required
 @role_required("student")
 def dashboard(request):
-    context = get_student_dashboard_data(request.user)
+    context = get_student_overview_data(request.user)
     return render(request, "portal/student/dashboard.html", context)
 
 
@@ -218,21 +233,21 @@ def notifications_partial(request):
 @login_required
 @role_required("student")
 def courses_partial(request):
-    context = get_student_dashboard_data(request.user)
+    context = get_student_courses_context(request.user)
     return render(request, "portal/student/partials/courses_student.html", context)
 
 
 @login_required
 @role_required("student")
 def messages_partial(request):
-    context = get_student_dashboard_data(request.user)
+    context = get_student_messages_context(request.user)
     return render(request, "portal/student/partials/messages_student.html", context)
 
 
 @login_required
 @role_required("student")
 def timetable_partial(request):
-    context = get_student_dashboard_data(request.user)
+    context = get_student_timetable_context(request.user)
     return render(request, "portal/student/partials/calendar_student.html", context)
 
 
@@ -321,6 +336,63 @@ def ec_detail(request, ec_id):
         else "portal/student/ec_detail.html"
     )
     return render(request, template_name, context)
+
+
+@login_required
+@role_required("student")
+def ec_preview(request, ec_id):
+    """
+    Apercu "leger" d'un EC pour la liste des cours (avant ouverture du detail complet).
+    """
+    academic_snapshot = get_student_academic_snapshot(request.user)
+    enrollment = get_object_or_404(
+        AcademicEnrollment.objects.filter(pk=getattr(academic_snapshot["academic_enrollment"], "pk", None)),
+    )
+
+    ec_queryset = EC.objects.select_related(
+        "ue",
+        "ue__semester",
+        "ue__semester__academic_class",
+    )
+    if _academic_chapters_available():
+        ec_queryset = ec_queryset.prefetch_related(
+            Prefetch(
+                "chapters",
+                queryset=ECChapter.objects.prefetch_related(_content_prefetch()).order_by("order", "id"),
+            )
+        )
+
+    ec = get_object_or_404(
+        ec_queryset,
+        pk=ec_id,
+        ue__semester__academic_class=enrollment.academic_class,
+    )
+
+    chapters = list(ec.chapters.all()) if _academic_chapters_available() else []
+    _prepare_chapter_contents(request, request.user, chapters)
+
+    contents = [content for chapter in chapters for content in getattr(chapter, "active_contents", [])]
+    preview_content = None
+    for content in contents:
+        if getattr(content, "has_inline_preview", False):
+            preview_content = content
+            break
+    if preview_content is None:
+        for content in contents:
+            if getattr(content, "has_accessible_source", False):
+                preview_content = content
+                break
+
+    return render(
+        request,
+        "portal/student/partials/ec_preview.html",
+        {
+            "ec": ec,
+            "enrollment": enrollment,
+            "chapters_available": _academic_chapters_available(),
+            "preview_content": preview_content,
+        },
+    )
 
 
 @login_required

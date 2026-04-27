@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 
-from .models import Profile
+from .models import PayrollEntry, Profile
 
 User = get_user_model()
 
@@ -112,4 +112,30 @@ class EmailUpdateForm(forms.ModelForm):
             "class": INPUT_CLASS,
             "placeholder": "exemple@domaine.com",
             "type": "email"
+        })
+
+
+class PayrollEntryForm(forms.ModelForm):
+    class Meta:
+        model = PayrollEntry
+        fields = [
+            "period_month",
+            "base_salary",
+            "allowances",
+            "deductions",
+            "advances",
+            "notes",
+        ]
+        widgets = {
+            "period_month": forms.DateInput(attrs={"type": "date"}),
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ["period_month", "base_salary", "allowances", "deductions", "advances"]:
+            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+        self.fields["notes"].widget.attrs.update({
+            "class": TEXTAREA_CLASS,
+            "placeholder": "Observations internes sur la paie du mois...",
         })

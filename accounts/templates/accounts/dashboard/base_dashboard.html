@@ -943,6 +943,19 @@
                 </a>
                 {% endif %}
 
+                {% if request.user|has_group:'gestionnaire' or request.user|has_group:'manager' %}
+                <a href="{% url 'accounts:manager_dashboard' %}"
+                   class="sidebar-link {% if dashboard_type == 'manager' %}active{% endif %}">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-briefcase"></i>
+                    </div>
+                    <span class="sidebar-link-text">Gestionnaire</span>
+                    {% if pending_candidatures_count or pending_payments_count %}
+                    <span class="sidebar-link-badge">{{ pending_candidatures_count|default:0|add:pending_payments_count|default:0 }}</span>
+                    {% endif %}
+                </a>
+                {% endif %}
+
                 {% if request.user|has_group:'executive_director' or request.user.is_superuser %}
                 <a href="{% url 'accounts:executive_dashboard' %}"
                    class="sidebar-link {% if dashboard_type == 'executive' %}active{% endif %}">

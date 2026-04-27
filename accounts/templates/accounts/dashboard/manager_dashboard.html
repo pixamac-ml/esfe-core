@@ -2,396 +2,770 @@
 {% load humanize %}
 
 {% block dashboard_title %}Dashboard Gestionnaire{% endblock %}
-{% block dashboard_subtitle %}Gestion des inscriptions et paiements – {{ branch.name }}{% endblock %}
+{% block dashboard_subtitle %}Pilotage candidatures, inscriptions et paiements - {{ branch.name }}{% endblock %}
 
 {% block dashboard_content %}
-
 <div class="space-y-6">
-
-    <div class="rounded-2xl bg-gradient-to-r from-primary-700 to-primary-600 text-white p-5 border border-white/10 shadow-sm">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
-                    <i class="fas fa-briefcase"></i>
+    <div class="rounded-3xl bg-gradient-to-br from-primary-700 via-primary-600 to-secondary text-white p-6 sm:p-7 border border-white/10 shadow-sm">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div class="space-y-3 max-w-3xl">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center">
+                        <i class="fas fa-briefcase text-accent"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.24em] text-white/70">Poste gestionnaire</p>
+                        <h2 class="text-xl sm:text-2xl font-bold">Un seul dashboard pour traiter toute la chaine du dossier et de l'encaissement.</h2>
+                    </div>
                 </div>
-                <div>
-                    <p class="text-xs uppercase tracking-wide text-primary-100">Poste gestionnaire</p>
-                    <p class="font-bold text-lg">Suivi quotidien inscriptions, candidatures et encaissements</p>
-                </div>
+                <p class="text-sm sm:text-base text-white/85">
+                    Cette vue fusionne le suivi des candidatures, la creation des inscriptions et la validation des paiements sur une seule interface, comme pour le dashboard etudiant.
+                </p>
             </div>
-            <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">Annexe: {{ branch.name }}</span>
-                <a href="{% url 'accounts:manager_paiements' %}" class="px-3 py-1.5 rounded-full bg-white text-primary-700 text-xs font-semibold hover:bg-slate-100 transition-colors">Voir paiements</a>
+            <div class="grid grid-cols-2 gap-3 sm:min-w-[320px]">
+                <div class="rounded-2xl bg-white/10 border border-white/15 p-4">
+                    <p class="text-xs uppercase tracking-wide text-white/60">Annexe</p>
+                    <p class="mt-2 text-lg font-semibold">{{ branch.name }}</p>
+                </div>
+                <div class="rounded-2xl bg-white/10 border border-white/15 p-4">
+                    <p class="text-xs uppercase tracking-wide text-white/60">Alertes</p>
+                    <p class="mt-2 text-lg font-semibold">{{ candidatures_pending|add:pending_payments }}</p>
+                </div>
+                <div class="rounded-2xl bg-white/10 border border-white/15 p-4">
+                    <p class="text-xs uppercase tracking-wide text-white/60">Encaisse aujourd'hui</p>
+                    <p class="mt-2 text-lg font-semibold">{{ total_today|intcomma }} FCFA</p>
+                </div>
+                <div class="rounded-2xl bg-white/10 border border-white/15 p-4">
+                    <p class="text-xs uppercase tracking-wide text-white/60">Agent caisse</p>
+                    {% if manager_agent %}
+                    <p class="mt-2 text-lg font-semibold">{{ manager_agent.agent_code }}</p>
+                    <p class="text-xs text-white/70 mt-1">{{ manager_agent.user.get_full_name }}</p>
+                    {% else %}
+                    <p class="mt-2 text-sm font-semibold text-amber-100">Non attribue</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ================= STATS CARDS ================= -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-        <!-- Total Inscriptions -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Total Inscriptions</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ total_inscriptions|intcomma }}</p>
-                    <p class="text-xs text-green-600 mt-1">
-                        <span class="font-medium">+{{ inscriptions_this_month }}</span> ce mois
-                    </p>
-                </div>
-                <div class="p-3 rounded-full bg-blue-100">
-                    <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-4">
+        <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <a href="{% url 'accounts:manager_dashboard' %}?section=overview" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'overview' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                    Vue d'ensemble
+                </a>
+                <a href="{% url 'accounts:manager_dashboard' %}?section=candidatures" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'candidatures' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                    Candidatures
+                </a>
+                <a href="{% url 'accounts:manager_dashboard' %}?section=inscriptions" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'inscriptions' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                    Inscriptions
+                </a>
+                <a href="{% url 'accounts:manager_dashboard' %}?section=paiements" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'paiements' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                    Paiements
+                </a>
+                <a href="{% url 'accounts:manager_dashboard' %}?section=salaires" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'salaires' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                    Salaires
+                </a>
             </div>
-        </div>
 
-        <!-- Paiements en attente -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Paiements en attente</p>
-                    <p class="text-3xl font-bold text-yellow-600 mt-1">{{ pending_payments }}</p>
-                    <p class="text-xs text-gray-500 mt-1">{{ pending_payments_amount|intcomma }} FCFA</p>
+            <form method="get" class="flex flex-col sm:flex-row gap-3 xl:min-w-[420px]">
+                <input type="hidden" name="section" value="{{ active_section }}">
+                <div class="relative flex-1">
+                    <input type="text" name="q" value="{{ manager_search }}" placeholder="Recherche rapide globale..." class="w-full rounded-2xl border border-slate-200 pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 </div>
-                <div class="p-3 rounded-full bg-yellow-100">
-                    <svg class="w-7 h-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                </div>
-            </div>
+                <button type="submit" class="px-5 py-3 rounded-2xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">Chercher</button>
+            </form>
         </div>
-
-        <!-- Encaissé aujourd'hui -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Encaissé aujourd'hui</p>
-                    <p class="text-3xl font-bold text-green-600 mt-1">{{ total_today|intcomma }}</p>
-                    <p class="text-xs text-gray-500 mt-1">{{ validated_today_count }} paiement{{ validated_today_count|pluralize }}</p>
-                </div>
-                <div class="p-3 rounded-full bg-green-100">
-                    <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
-        <!-- Total du mois -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Total du mois</p>
-                    <p class="text-3xl font-bold text-purple-600 mt-1">{{ total_month|intcomma }}</p>
-                    <p class="text-xs text-gray-500 mt-1">{{ total_week|intcomma }} FCFA cette semaine</p>
-                </div>
-                <div class="p-3 rounded-full bg-purple-100">
-                    <svg class="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
     </div>
 
-    <!-- ================= STATS SECONDAIRES ================= -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-
-        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
-            <p class="text-blue-100 text-sm">Étudiants actifs</p>
-            <p class="text-2xl font-bold">{{ total_students }}</p>
+    {% if manager_search %}
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-slate-900">Resultats rapides</h3>
+            <span class="text-xs uppercase tracking-wide text-slate-400">{{ manager_search }}</span>
         </div>
-
-        <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white">
-            <p class="text-emerald-100 text-sm">Inscriptions actives</p>
-            <p class="text-2xl font-bold">{{ inscriptions_active }}</p>
-        </div>
-
-        <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-4 text-white">
-            <p class="text-amber-100 text-sm">Candidatures à traiter</p>
-            <p class="text-2xl font-bold">{{ candidatures_pending }}</p>
-        </div>
-
-        <div class="bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl p-4 text-white">
-            <p class="text-rose-100 text-sm">Soldes en attente</p>
-            <p class="text-2xl font-bold">{{ inscriptions_with_balance }}</p>
-        </div>
-
-    </div>
-
-    <!-- ================= ALERTES ================= -->
-    {% if candidatures_pending > 0 or candidatures_to_complete > 0 %}
-    <div class="space-y-3">
-        {% if candidatures_pending > 0 %}
-        <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg flex items-center justify-between">
-            <div class="flex items-center">
-                <svg class="w-5 h-5 text-amber-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-                <span class="text-amber-800">
-                    <strong>{{ candidatures_pending }}</strong> candidature{{ candidatures_pending|pluralize }} en attente de traitement
-                </span>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                <p class="text-sm font-semibold text-slate-800 mb-3">Candidatures</p>
+                <div class="space-y-3">
+                    {% for candidature in quick_results.candidatures %}
+                    <div class="text-sm">
+                        <p class="font-medium text-slate-900">{{ candidature.full_name }}</p>
+                        <p class="text-slate-500">{{ candidature.programme.title }}</p>
+                    </div>
+                    {% empty %}
+                    <p class="text-sm text-slate-400">Aucun resultat.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                <p class="text-sm font-semibold text-slate-800 mb-3">Inscriptions</p>
+                <div class="space-y-3">
+                    {% for inscription in quick_results.inscriptions %}
+                    <div class="text-sm">
+                        <p class="font-medium text-slate-900">{{ inscription.candidature.full_name }}</p>
+                        <p class="text-slate-500">{{ inscription.public_token }}</p>
+                    </div>
+                    {% empty %}
+                    <p class="text-sm text-slate-400">Aucun resultat.</p>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                <p class="text-sm font-semibold text-slate-800 mb-3">Paiements</p>
+                <div class="space-y-3">
+                    {% for payment in quick_results.payments %}
+                    <div class="text-sm">
+                        <p class="font-medium text-slate-900">{{ payment.inscription.candidature.full_name }}</p>
+                        <p class="text-slate-500">{{ payment.reference }} - {{ payment.amount|intcomma }} FCFA</p>
+                    </div>
+                    {% empty %}
+                    <p class="text-sm text-slate-400">Aucun resultat.</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-        {% endif %}
+    </div>
+    {% endif %}
 
-        {% if candidatures_to_complete > 0 %}
-        <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-r-lg flex items-center justify-between">
-            <div class="flex items-center">
-                <svg class="w-5 h-5 text-orange-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <span class="text-orange-800">
-                    <strong>{{ candidatures_to_complete }}</strong> dossier{{ candidatures_to_complete|pluralize }} à compléter
-                </span>
+    {% if active_section == "overview" %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-sm text-slate-500">Total inscriptions</p>
+            <p class="text-3xl font-bold text-slate-900 mt-2">{{ total_inscriptions|intcomma }}</p>
+            <p class="text-xs text-green-600 mt-2">+{{ inscriptions_this_month }} ce mois</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-sm text-slate-500">Paiements en attente</p>
+            <p class="text-3xl font-bold text-amber-600 mt-2">{{ pending_payments }}</p>
+            <p class="text-xs text-slate-500 mt-2">{{ pending_payments_amount|intcomma }} FCFA</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-sm text-slate-500">Encaisse aujourd'hui</p>
+            <p class="text-3xl font-bold text-emerald-600 mt-2">{{ total_today|intcomma }}</p>
+            <p class="text-xs text-slate-500 mt-2">{{ validated_today_count }} paiement(s)</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <p class="text-sm text-slate-500">Recettes du mois</p>
+            <p class="text-3xl font-bold text-primary mt-2">{{ total_month|intcomma }}</p>
+            <p class="text-xs text-slate-500 mt-2">{{ total_week|intcomma }} FCFA cette semaine</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+        <div class="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-4 text-white">
+            <p class="text-sm text-blue-100">Etudiants actifs</p>
+            <p class="text-2xl font-bold mt-2">{{ total_students }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 text-white">
+            <p class="text-sm text-emerald-100">Inscriptions actives</p>
+            <p class="text-2xl font-bold mt-2">{{ inscriptions_active }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 p-4 text-white">
+            <p class="text-sm text-amber-100">Candidatures a traiter</p>
+            <p class="text-2xl font-bold mt-2">{{ candidatures_pending }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 p-4 text-white">
+            <p class="text-sm text-rose-100">Soldes en attente</p>
+            <p class="text-2xl font-bold mt-2">{{ inscriptions_with_balance }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 p-4 text-white">
+            <p class="text-sm text-slate-200">Employes annexe</p>
+            <p class="text-2xl font-bold mt-2">{{ branch_staff_count }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-fuchsia-600 to-violet-700 p-4 text-white">
+            <p class="text-sm text-fuchsia-100">Masse salariale</p>
+            <p class="text-2xl font-bold mt-2">{{ payroll_stats.due_total|intcomma }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 p-4 text-white">
+            <p class="text-sm text-emerald-100">Salaires payes</p>
+            <p class="text-2xl font-bold mt-2">{{ payroll_stats.paid_total|intcomma }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-4 text-white">
+            <p class="text-sm text-amber-100">Reste salaires</p>
+            <p class="text-2xl font-bold mt-2">{{ payroll_stats.remaining_total|intcomma }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-2 space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-slate-900">Inscriptions recentes</h3>
+                    <a href="{% url 'accounts:manager_dashboard' %}?section=inscriptions" class="text-sm font-medium text-primary hover:text-primary-light">Ouvrir la section</a>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[860px] divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etudiant</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Programme</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Statut</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            {% for inscription in overview_inscriptions %}
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <p class="text-sm font-medium text-slate-900">{{ inscription.candidature.full_name }}</p>
+                                    <p class="text-xs text-slate-500">{{ inscription.candidature.email }}</p>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <p class="text-sm text-slate-900">{{ inscription.candidature.programme.title }}</p>
+                                    <p class="text-xs text-slate-500">{{ inscription.candidature.programme.cycle.name }}</p>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if inscription.status == 'active' %}bg-green-100 text-green-700{% elif inscription.status == 'partial_paid' %}bg-amber-100 text-amber-700{% elif inscription.status == 'awaiting_payment' %}bg-orange-100 text-orange-700{% else %}bg-slate-100 text-slate-700{% endif %}">
+                                        {{ inscription.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-slate-500">{{ inscription.created_at|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="px-6 py-10 text-center text-slate-400">Aucune inscription recente.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-slate-900">Paiements du jour</h3>
+                    <a href="{% url 'accounts:manager_dashboard' %}?section=paiements" class="text-sm font-medium text-primary hover:text-primary-light">Ouvrir la section</a>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[900px] divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Reference</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etudiant</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Montant</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Statut</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Heure</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            {% for payment in payments_today %}
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 text-sm font-mono text-primary">{{ payment.reference }}</td>
+                                <td class="px-6 py-4">
+                                    <p class="text-sm font-medium text-slate-900">{{ payment.inscription.candidature.full_name }}</p>
+                                    <p class="text-xs text-slate-500">{{ payment.inscription.candidature.programme.title }}</p>
+                                </td>
+                                <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ payment.amount|intcomma }} FCFA</td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if payment.status == 'validated' %}bg-green-100 text-green-700{% elif payment.status == 'pending' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                        {{ payment.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-slate-500">{{ payment.created_at|date:"H:i" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="px-6 py-10 text-center text-slate-400">Aucun paiement aujourd'hui.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100">
+                    <h3 class="text-lg font-semibold text-slate-900">Candidatures recentes</h3>
+                </div>
+                <div class="divide-y divide-slate-50">
+                    {% for candidature in recent_candidatures %}
+                    <div class="px-6 py-4">
+                        <p class="text-sm font-medium text-slate-900">{{ candidature.full_name }}</p>
+                        <p class="text-xs text-slate-500">{{ candidature.programme.title }}</p>
+                    </div>
+                    {% empty %}
+                    <div class="px-6 py-8 text-center text-slate-400">Aucune candidature recente.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100">
+                    <h3 class="text-lg font-semibold text-slate-900">Paiements recents</h3>
+                </div>
+                <div class="divide-y divide-slate-50">
+                    {% for payment in recent_payments %}
+                    <div class="px-6 py-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-medium text-slate-900">{{ payment.inscription.candidature.full_name }}</p>
+                                <p class="text-xs text-slate-500">{{ payment.created_at|date:"d/m/Y H:i" }}</p>
+                            </div>
+                            <p class="text-sm font-semibold text-slate-900">{{ payment.amount|intcomma }} FCFA</p>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="px-6 py-8 text-center text-slate-400">Aucun paiement recent.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="rounded-2xl bg-slate-900 text-white p-6">
+                <h3 class="text-lg font-semibold mb-4">Resume rapide</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between"><span class="text-slate-400">Candidatures acceptees</span><span>{{ candidatures_accepted }}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Inscriptions actives</span><span>{{ inscriptions_active }}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Etudiants</span><span>{{ total_students }}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Recettes du mois</span><span class="font-bold text-emerald-400">{{ total_month|intcomma }} FCFA</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if active_section == "candidatures" %}
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Total</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ candidature_stats.total }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Soumises</p><p class="text-2xl font-bold text-blue-600 mt-2">{{ candidature_stats.submitted }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Analyse</p><p class="text-2xl font-bold text-purple-600 mt-2">{{ candidature_stats.under_review }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">A completer</p><p class="text-2xl font-bold text-orange-600 mt-2">{{ candidature_stats.to_complete }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Acceptees</p><p class="text-2xl font-bold text-green-600 mt-2">{{ candidature_stats.accepted }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Refusees</p><p class="text-2xl font-bold text-red-600 mt-2">{{ candidature_stats.rejected }}</p></div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 p-4">
+        <form method="get" class="flex flex-col lg:flex-row gap-3">
+            <input type="hidden" name="section" value="candidatures">
+            <div class="flex-1">
+                <input type="text" name="cand_q" value="{{ cand_search }}" placeholder="Rechercher par nom, prenom ou email..." class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+            </div>
+            <div>
+                <select name="cand_status" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <option value="">Tous les statuts</option>
+                    <option value="submitted" {% if cand_status == 'submitted' %}selected{% endif %}>Soumises</option>
+                    <option value="under_review" {% if cand_status == 'under_review' %}selected{% endif %}>En analyse</option>
+                    <option value="to_complete" {% if cand_status == 'to_complete' %}selected{% endif %}>A completer</option>
+                    <option value="accepted" {% if cand_status == 'accepted' %}selected{% endif %}>Acceptees</option>
+                    <option value="rejected" {% if cand_status == 'rejected' %}selected{% endif %}>Refusees</option>
+                </select>
+            </div>
+            <button type="submit" class="px-5 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-light transition">Filtrer</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[980px] divide-y divide-slate-100">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Candidat</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Programme</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Statut</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for candidature in candidatures %}
+                    {% include "accounts/dashboard/partials/manager_candidature_row.html" with candidature=candidature %}
+                    {% empty %}
+                    <tr><td colspan="5" class="px-6 py-12 text-center text-slate-400">Aucune candidature trouvee.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if candidatures.has_other_pages %}
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p class="text-sm text-slate-500">Page {{ candidatures.number }} sur {{ candidatures.paginator.num_pages }}</p>
+            <div class="flex gap-2">
+                {% if candidatures.has_previous %}
+                <a href="?section=candidatures&cand_page={{ candidatures.previous_page_number }}{% if cand_status %}&cand_status={{ cand_status }}{% endif %}{% if cand_search %}&cand_q={{ cand_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm hover:bg-slate-50">Precedent</a>
+                {% endif %}
+                {% if candidatures.has_next %}
+                <a href="?section=candidatures&cand_page={{ candidatures.next_page_number }}{% if cand_status %}&cand_status={{ cand_status }}{% endif %}{% if cand_search %}&cand_q={{ cand_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-light">Suivant</a>
+                {% endif %}
             </div>
         </div>
         {% endif %}
     </div>
     {% endif %}
 
-    <!-- ================= GRILLE PRINCIPALE ================= -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        <!-- COLONNE GAUCHE : Inscriptions + Candidatures -->
-        <div class="lg:col-span-2 space-y-6">
-
-            <!-- INSCRIPTIONS RÉCENTES -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                    <h3 class="text-lg font-semibold text-gray-900">Inscriptions récentes</h3>
-                    <span class="text-xs text-gray-400">{{ total_inscriptions }} total</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[900px] divide-y divide-gray-100">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Étudiant</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Programme</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Statut</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-50">
-                            {% for inscription in inscriptions %}
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center">
-                                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-sm mr-3">
-                                            {{ inscription.candidature.first_name|slice:":1" }}{{ inscription.candidature.last_name|slice:":1" }}
-                                        </div>
-                                        <div class="min-w-0">
-                                            <div class="text-sm font-medium text-gray-900">
-                                                <span class="max-w-[220px] truncate block">{{ inscription.candidature.last_name|upper }} {{ inscription.candidature.first_name }}</span>
-                                            </div>
-                                            <div class="text-xs text-gray-500 max-w-[220px] truncate">{{ inscription.candidature.email }}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">{{ inscription.candidature.programme.title|truncatechars:25 }}</div>
-                                    <div class="text-xs text-gray-500">{{ inscription.candidature.programme.cycle.name }}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
-                                        {% if inscription.status == 'active' %}bg-green-100 text-green-800
-                                        {% elif inscription.status == 'partial_paid' %}bg-amber-100 text-amber-800
-                                        {% elif inscription.status == 'awaiting_payment' %}bg-orange-100 text-orange-800
-                                        {% elif inscription.status == 'created' %}bg-blue-100 text-blue-800
-                                        {% elif inscription.status == 'suspended' %}bg-red-100 text-red-800
-                                        {% elif inscription.status == 'cancelled' %}bg-gray-100 text-gray-800
-                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                        {{ inscription.get_status_display }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {{ inscription.created_at|date:"d/m/Y" }}
-                                    <span class="text-gray-400 text-xs block">{{ inscription.created_at|date:"H:i" }}</span>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="px-6 py-8 text-center text-gray-400">
-                                    <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                    </svg>
-                                    Aucune inscription récente
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- PAIEMENTS DU JOUR -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                    <h3 class="text-lg font-semibold text-gray-900">Paiements du jour</h3>
-                    <span class="text-sm font-medium text-green-600">{{ total_today|intcomma }} FCFA</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[860px] divide-y divide-gray-100">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Référence</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Étudiant</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Montant</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Heure</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-50">
-                            {% for payment in payments_today %}
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="text-sm font-mono font-medium text-gray-900">{{ payment.reference }}</span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900">
-                                        {{ payment.inscription.candidature.last_name|upper }} {{ payment.inscription.candidature.first_name }}
-                                    </div>
-                                    <div class="text-xs text-gray-500 max-w-[220px] truncate">{{ payment.inscription.candidature.programme.title }}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right">
-                                    <span class="text-sm font-bold text-gray-900">{{ payment.amount|intcomma }}</span>
-                                    <span class="text-xs text-gray-500">FCFA</span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
-                                        {% if payment.status == 'validated' %}bg-green-100 text-green-800
-                                        {% elif payment.status == 'pending' %}bg-yellow-100 text-yellow-800
-                                        {% elif payment.status == 'cancelled' %}bg-red-100 text-red-800
-                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                        {{ payment.get_status_display }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {{ payment.created_at|date:"H:i" }}
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="5" class="px-6 py-8 text-center text-gray-400">
-                                    <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                    </svg>
-                                    Aucun paiement aujourd'hui
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- COLONNE DROITE : Sidebar -->
-        <div class="space-y-6">
-
-            <!-- CANDIDATURES RÉCENTES -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100">
-                    <h3 class="text-lg font-semibold text-gray-900">Candidatures récentes</h3>
-                </div>
-                <div class="divide-y divide-gray-50">
-                    {% for candidature in recent_candidatures %}
-                    <div class="px-6 py-4 hover:bg-gray-50 transition-colors">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center">
-                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm mr-3">
-                                    {{ candidature.first_name|slice:":1" }}{{ candidature.last_name|slice:":1" }}
-                                </div>
-                                <div>
-                                    <p class="text-sm font-medium text-gray-900">{{ candidature.full_name }}</p>
-                                    <p class="text-xs text-gray-500">{{ candidature.programme.title|truncatechars:22 }}</p>
-                                </div>
-                            </div>
-                            <span class="px-2 py-1 text-xs font-medium rounded-full
-                                {% if candidature.status == 'submitted' %}bg-blue-100 text-blue-700
-                                {% elif candidature.status == 'under_review' %}bg-purple-100 text-purple-700
-                                {% elif candidature.status == 'to_complete' %}bg-orange-100 text-orange-700
-                                {% elif candidature.status == 'accepted' %}bg-green-100 text-green-700
-                                {% elif candidature.status == 'rejected' %}bg-red-100 text-red-700
-                                {% else %}bg-gray-100 text-gray-700{% endif %}">
-                                {{ candidature.get_status_display }}
-                            </span>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="px-6 py-8 text-center text-gray-400">
-                        Aucune candidature récente
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- PAIEMENTS RÉCENTS -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100">
-                    <h3 class="text-lg font-semibold text-gray-900">Paiements récents</h3>
-                </div>
-                <div class="divide-y divide-gray-50">
-                    {% for payment in recent_payments|slice:":5" %}
-                    <div class="px-6 py-4 hover:bg-gray-50 transition-colors">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-900">
-                                    {{ payment.inscription.candidature.last_name|upper }} {{ payment.inscription.candidature.first_name|slice:":1" }}.
-                                </p>
-                                <p class="text-xs text-gray-500">{{ payment.created_at|date:"d/m/Y H:i" }}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-bold text-gray-900">{{ payment.amount|intcomma }}</p>
-                                <span class="px-2 py-0.5 text-xs font-medium rounded-full
-                                    {% if payment.status == 'validated' %}bg-green-100 text-green-700
-                                    {% elif payment.status == 'pending' %}bg-yellow-100 text-yellow-700
-                                    {% else %}bg-red-100 text-red-700{% endif %}">
-                                    {{ payment.get_status_display }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="px-6 py-8 text-center text-gray-400">
-                        Aucun paiement récent
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- RÉSUMÉ RAPIDE -->
-            <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 text-white">
-                <h4 class="font-semibold mb-4">Résumé {{ branch.name }}</h4>
-                <div class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">Candidatures acceptées</span>
-                        <span class="font-medium">{{ candidatures_accepted }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">Inscriptions actives</span>
-                        <span class="font-medium">{{ inscriptions_active }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">Étudiants</span>
-                        <span class="font-medium">{{ total_students }}</span>
-                    </div>
-                    <hr class="border-slate-700 my-2">
-                    <div class="flex justify-between">
-                        <span class="text-slate-400">Recettes du mois</span>
-                        <span class="font-bold text-green-400">{{ total_month|intcomma }} FCFA</span>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
+    {% if active_section == "inscriptions" %}
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Total</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ inscription_stats.total }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Creees</p><p class="text-2xl font-bold text-blue-600 mt-2">{{ inscription_stats.created }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">En attente paiement</p><p class="text-2xl font-bold text-amber-600 mt-2">{{ inscription_stats.awaiting }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Paiement partiel</p><p class="text-2xl font-bold text-orange-600 mt-2">{{ inscription_stats.partial }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Actives</p><p class="text-2xl font-bold text-green-600 mt-2">{{ inscription_stats.active }}</p></div>
     </div>
 
+    <div class="bg-white rounded-2xl border border-slate-100 p-4">
+        <form method="get" class="flex flex-col lg:flex-row gap-3">
+            <input type="hidden" name="section" value="inscriptions">
+            <div class="flex-1">
+                <input type="text" name="ins_q" value="{{ ins_search }}" placeholder="Rechercher par nom, email ou reference..." class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+            </div>
+            <div>
+                <select name="ins_status" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <option value="">Tous les statuts</option>
+                    <option value="created" {% if ins_status == 'created' %}selected{% endif %}>Creees</option>
+                    <option value="awaiting_payment" {% if ins_status == 'awaiting_payment' %}selected{% endif %}>En attente paiement</option>
+                    <option value="partial_paid" {% if ins_status == 'partial_paid' %}selected{% endif %}>Paiement partiel</option>
+                    <option value="active" {% if ins_status == 'active' %}selected{% endif %}>Actives</option>
+                </select>
+            </div>
+            <button type="submit" class="px-5 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-light transition">Filtrer</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1040px] divide-y divide-slate-100">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Reference</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etudiant</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Programme</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Statut</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Paiement</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for inscription in inscriptions %}
+                    <tr id="manager-inscription-row-{{ inscription.id }}" class="hover:bg-slate-50 transition">
+                        <td class="px-6 py-4 text-sm font-mono text-primary">{{ inscription.public_token }}</td>
+                        <td class="px-6 py-4">
+                            <p class="text-sm font-medium text-slate-900">{{ inscription.candidature.full_name }}</p>
+                            <p class="text-xs text-slate-500">{{ inscription.candidature.email }}</p>
+                        </td>
+                        <td class="px-6 py-4">
+                            <p class="text-sm text-slate-900">{{ inscription.candidature.programme.title }}</p>
+                            <p class="text-xs text-slate-500">{{ inscription.candidature.programme.cycle.name }}</p>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if inscription.status == 'active' %}bg-green-100 text-green-700{% elif inscription.status == 'partial_paid' %}bg-amber-100 text-amber-700{% elif inscription.status == 'awaiting_payment' %}bg-orange-100 text-orange-700{% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ inscription.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <p class="text-sm font-semibold text-slate-900">{{ inscription.amount_paid|default:0|floatformat:0 }} FCFA</p>
+                            <p class="text-xs text-slate-500">/ {{ inscription.amount_due|floatformat:0 }} FCFA</p>
+                            {% if inscription.active_cash_session %}
+                            <p class="text-xs font-medium text-violet-600 mt-1">Code actif: {{ inscription.active_cash_session.verification_code }}</p>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-slate-500">{{ inscription.created_at|date:"d/m/Y" }}</td>
+                        <td class="px-6 py-4 text-right">
+                            <button hx-get="{% url 'accounts:htmx_inscription_detail' inscription.id %}" hx-target="#modal-container" hx-swap="innerHTML" class="p-2 rounded-lg text-primary hover:bg-primary/10 transition" onclick="openDashboardModal()">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="px-6 py-12 text-center text-slate-400">Aucune inscription trouvee.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if inscriptions.has_other_pages %}
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p class="text-sm text-slate-500">Page {{ inscriptions.number }} sur {{ inscriptions.paginator.num_pages }}</p>
+            <div class="flex gap-2">
+                {% if inscriptions.has_previous %}
+                <a href="?section=inscriptions&ins_page={{ inscriptions.previous_page_number }}{% if ins_status %}&ins_status={{ ins_status }}{% endif %}{% if ins_search %}&ins_q={{ ins_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm hover:bg-slate-50">Precedent</a>
+                {% endif %}
+                {% if inscriptions.has_next %}
+                <a href="?section=inscriptions&ins_page={{ inscriptions.next_page_number }}{% if ins_status %}&ins_status={{ ins_status }}{% endif %}{% if ins_search %}&ins_q={{ ins_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-light">Suivant</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if active_section == "paiements" %}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Total</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ payment_stats.total }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">En attente</p><p class="text-2xl font-bold text-amber-600 mt-2">{{ payment_stats.pending }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Valides</p><p class="text-2xl font-bold text-green-600 mt-2">{{ payment_stats.validated }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Total encaisse</p><p class="text-2xl font-bold text-primary mt-2">{{ payment_stats.total_amount|intcomma }}</p></div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-6">
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Poste espèces</p>
+                <h3 class="text-lg font-semibold text-slate-900 mt-1">Agent et codes d'accès</h3>
+            </div>
+            {% if manager_agent %}
+            <div class="rounded-2xl bg-slate-900 text-white p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-400">PaymentAgent</p>
+                <p class="mt-2 text-lg font-semibold">{{ manager_agent.user.get_full_name }}</p>
+                <div class="mt-3 flex items-center justify-between gap-3 text-sm">
+                    <span class="text-slate-400">Code agent</span>
+                    <span class="font-mono">{{ manager_agent.agent_code }}</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between gap-3 text-sm">
+                    <span class="text-slate-400">Annexe</span>
+                    <span>{{ manager_agent.branch.name }}</span>
+                </div>
+                <div class="mt-2 flex items-center justify-between gap-3 text-sm">
+                    <span class="text-slate-400">Sessions actives</span>
+                    <span>{{ active_cash_sessions_count }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                Aucun profil `PaymentAgent` actif n'est encore attribue a cette gestionnaire. L'admin doit l'assigner pour activer les paiements en espece.
+            </div>
+            {% endif %}
+
+            {% if manager_agent and payable_inscriptions %}
+            <form class="space-y-3">
+                <div>
+                    <label for="manager-cash-inscription" class="text-sm font-medium text-slate-700">Creer un code pour une inscription</label>
+                    <select id="manager-cash-inscription" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm">
+                        <option value="">Choisir une inscription payable</option>
+                        {% for inscription in payable_inscriptions %}
+                        <option value="{{ inscription.id }}">
+                            {{ inscription.candidature.full_name }} • {{ inscription.balance|intcomma }} FCFA
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button
+                    type="button"
+                    class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition"
+                    onclick="createManagerCashSession()">
+                    <i class="fas fa-key"></i>
+                    Generer un code espèce
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <div class="flex items-center justify-between gap-3 mb-4">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Sessions cash</p>
+                    <h3 class="text-lg font-semibold text-slate-900 mt-1">Codes actifs de la gestionnaire</h3>
+                </div>
+                <span class="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">{{ active_cash_sessions_count }}</span>
+            </div>
+            <div id="manager-cash-session-list" class="space-y-4">
+                {% for session in active_cash_sessions %}
+                {% include "accounts/dashboard/partials/manager_cash_session_card.html" with session=session manager_agent=manager_agent %}
+                {% empty %}
+                <div id="manager-cash-session-empty" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500">
+                    Aucun code espèce actif pour le moment.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 p-4">
+        <form method="get" class="flex flex-col lg:flex-row gap-3">
+            <input type="hidden" name="section" value="paiements">
+            <div class="flex-1">
+                <input type="text" name="pay_q" value="{{ pay_search }}" placeholder="Rechercher par reference, recu ou etudiant..." class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+            </div>
+            <div>
+                <select name="pay_status" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <option value="">Tous les statuts</option>
+                    <option value="pending" {% if pay_status == 'pending' %}selected{% endif %}>En attente</option>
+                    <option value="validated" {% if pay_status == 'validated' %}selected{% endif %}>Valides</option>
+                    <option value="cancelled" {% if pay_status == 'cancelled' %}selected{% endif %}>Annules</option>
+                </select>
+            </div>
+            <div>
+                <select name="pay_date" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <option value="">Toutes periodes</option>
+                    <option value="today" {% if pay_date == 'today' %}selected{% endif %}>Aujourd'hui</option>
+                    <option value="week" {% if pay_date == 'week' %}selected{% endif %}>Cette semaine</option>
+                    <option value="month" {% if pay_date == 'month' %}selected{% endif %}>Ce mois</option>
+                </select>
+            </div>
+            <button type="submit" class="px-5 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-light transition">Filtrer</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1100px] divide-y divide-slate-100">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Reference</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etudiant</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Montant</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Mode</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Statut</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for payment in payments %}
+                    {% include "accounts/dashboard/partials/manager_payment_row.html" with payment=payment %}
+                    {% empty %}
+                    <tr><td colspan="7" class="px-6 py-12 text-center text-slate-400">Aucun paiement trouve.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if payments.has_other_pages %}
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p class="text-sm text-slate-500">Page {{ payments.number }} sur {{ payments.paginator.num_pages }}</p>
+            <div class="flex gap-2">
+                {% if payments.has_previous %}
+                <a href="?section=paiements&pay_page={{ payments.previous_page_number }}{% if pay_status %}&pay_status={{ pay_status }}{% endif %}{% if pay_date %}&pay_date={{ pay_date }}{% endif %}{% if pay_search %}&pay_q={{ pay_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm hover:bg-slate-50">Precedent</a>
+                {% endif %}
+                {% if payments.has_next %}
+                <a href="?section=paiements&pay_page={{ payments.next_page_number }}{% if pay_status %}&pay_status={{ pay_status }}{% endif %}{% if pay_date %}&pay_date={{ pay_date }}{% endif %}{% if pay_search %}&pay_q={{ pay_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-light">Suivant</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if active_section == "salaires" %}
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Employes</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ payroll_stats.employees }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Paies preparees</p><p class="text-2xl font-bold text-blue-600 mt-2">{{ payroll_stats.prepared }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Pretes</p><p class="text-2xl font-bold text-violet-600 mt-2">{{ payroll_stats.ready }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Partielles</p><p class="text-2xl font-bold text-amber-600 mt-2">{{ payroll_stats.partial }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Payees</p><p class="text-2xl font-bold text-emerald-600 mt-2">{{ payroll_stats.paid }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Masse salariale</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ payroll_stats.due_total|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Reste a payer</p><p class="text-2xl font-bold text-rose-600 mt-2">{{ payroll_stats.remaining_total|intcomma }}</p></div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 p-4">
+        <form method="get" class="flex flex-col xl:flex-row gap-3">
+            <input type="hidden" name="section" value="salaires">
+            <div class="flex-1">
+                <input type="text" name="salary_q" value="{{ salary_search }}" placeholder="Rechercher un employe, code ou fonction..." class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+            </div>
+            <div>
+                <input type="month" name="salary_month" value="{{ salary_month_value }}" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+            </div>
+            <div>
+                <select name="salary_status" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <option value="">Tous les etats</option>
+                    <option value="missing" {% if salary_status == 'missing' %}selected{% endif %}>Non preparee</option>
+                    <option value="draft" {% if salary_status == 'draft' %}selected{% endif %}>Brouillon</option>
+                    <option value="ready" {% if salary_status == 'ready' %}selected{% endif %}>Pret a payer</option>
+                    <option value="partial" {% if salary_status == 'partial' %}selected{% endif %}>Partielle</option>
+                    <option value="paid" {% if salary_status == 'paid' %}selected{% endif %}>Payee</option>
+                </select>
+            </div>
+            <button type="submit" class="px-5 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-light transition">Filtrer</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1220px] divide-y divide-slate-100">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Employe</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Fonction</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Base</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Net mois</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Paye</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Reste</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etat</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for employee_profile in payroll_entries %}
+                    {% include "accounts/dashboard/partials/manager_salary_row.html" with employee_profile=employee_profile salary_month_value=salary_month_value %}
+                    {% empty %}
+                    <tr><td colspan="8" class="px-6 py-12 text-center text-slate-400">Aucun employe correspondant pour cette annexe.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if payroll_entries.has_other_pages %}
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p class="text-sm text-slate-500">Page {{ payroll_entries.number }} sur {{ payroll_entries.paginator.num_pages }}</p>
+            <div class="flex gap-2">
+                {% if payroll_entries.has_previous %}
+                <a href="?section=salaires&salary_page={{ payroll_entries.previous_page_number }}&salary_month={{ salary_month_value }}{% if salary_status %}&salary_status={{ salary_status }}{% endif %}{% if salary_search %}&salary_q={{ salary_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm hover:bg-slate-50">Precedent</a>
+                {% endif %}
+                {% if payroll_entries.has_next %}
+                <a href="?section=salaires&salary_page={{ payroll_entries.next_page_number }}&salary_month={{ salary_month_value }}{% if salary_status %}&salary_status={{ salary_status }}{% endif %}{% if salary_search %}&salary_q={{ salary_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-light">Suivant</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
+<div id="modal-container"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openDashboardModal() {
+    document.body.classList.add("overflow-hidden");
+}
+
+function closeDashboardModal() {
+    const container = document.getElementById("modal-container");
+    if (container) {
+        container.innerHTML = "";
+    }
+    document.body.classList.remove("overflow-hidden");
+}
+
+function createManagerCashSession() {
+    const select = document.getElementById("manager-cash-inscription");
+    if (!select || !select.value) {
+        return;
+    }
+    const urlTemplate = "{% url 'accounts:htmx_manager_cash_session_create' 0 %}";
+    const url = urlTemplate.replace("/0/", `/${select.value}/`);
+    fetch(url, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": "{{ csrf_token }}",
+            "HX-Request": "true"
+        }
+    })
+        .then((response) => response.text())
+        .then((html) => {
+            const list = document.getElementById("manager-cash-session-list");
+            if (!list) {
+                return;
+            }
+            const wrapper = document.createElement("div");
+            wrapper.innerHTML = html.trim();
+            const node = wrapper.firstElementChild;
+            if (!node) {
+                return;
+            }
+            const emptyState = document.getElementById("manager-cash-session-empty");
+            if (emptyState) {
+                emptyState.remove();
+            }
+            const existing = document.getElementById(node.id);
+            if (existing) {
+                existing.replaceWith(node);
+            } else {
+                list.prepend(node);
+            }
+        });
+}
+
+document.body.addEventListener("htmx:afterSwap", function (event) {
+    if (event.target && event.target.id === "modal-container" && event.target.innerHTML.trim()) {
+        openDashboardModal();
+    }
+});
+</script>
 {% endblock %}

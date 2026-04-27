@@ -342,12 +342,6 @@ urlpatterns = [
         export_executive_csv,
         name="export_executive_csv"
     ),
-    path(
-        "manager/",
-        manager_dashboard,
-        name="manager_dashboard"
-    ),
-
     # =============================================
     # MANAGER DASHBOARD
     # =============================================
@@ -359,27 +353,46 @@ urlpatterns = [
     # =============================================
     # HTMX ACTIONS - CANDIDATURES
     # =============================================
-    path("htmx/candidature/<int:pk>/detail/", candidature_detail, name="htmx_candidature_detail"),
-    path("htmx/candidature/<int:pk>/accept/", candidature_accept, name="htmx_candidature_accept"),
-    path("htmx/candidature/<int:pk>/reject/", candidature_reject, name="htmx_candidature_reject"),
-    path("htmx/candidature/<int:pk>/to-complete/", candidature_to_complete,
+    path("htmx/manager/candidature/<int:pk>/detail/", candidature_detail, name="htmx_candidature_detail"),
+    path("htmx/manager/candidature/<int:pk>/accept/", candidature_accept, name="htmx_candidature_accept"),
+    path("htmx/manager/candidature/<int:pk>/reject/", candidature_reject, name="htmx_candidature_reject"),
+    path("htmx/manager/candidature/<int:pk>/to-complete/", candidature_to_complete,
          name="htmx_candidature_to_complete"),
 
     # =============================================
     # HTMX ACTIONS - INSCRIPTIONS
     # =============================================
-    path("htmx/inscription/<int:pk>/detail/", inscription_detail, name="htmx_inscription_detail"),
-    path("htmx/inscription/<int:pk>/create/", inscription_create, name="htmx_inscription_create"),
+    path("htmx/manager/inscription/<int:pk>/detail/", inscription_detail, name="htmx_inscription_detail"),
+    path("htmx/manager/inscription/<int:pk>/create/", inscription_create, name="htmx_inscription_create"),
 
     # =============================================
     # HTMX ACTIONS - PAIEMENTS
     # =============================================
-    path("htmx/payment/<int:pk>/detail/", payment_detail, name="htmx_payment_detail"),
-    path("htmx/payment/<int:pk>/validate/", payment_validate, name="htmx_payment_validate"),
-    path("htmx/payment/<int:pk>/cancel/", payment_cancel, name="htmx_payment_cancel"),
+    path("htmx/manager/payment/<int:pk>/detail/", payment_detail, name="htmx_payment_detail"),
+    path("htmx/manager/payment/<int:pk>/validate/", payment_validate, name="htmx_payment_validate"),
+    path("htmx/manager/payment/<int:pk>/cancel/", payment_cancel, name="htmx_payment_cancel"),
+
+    # =============================================
+    # HTMX ACTIONS - SESSIONS CASH GESTIONNAIRE
+    # =============================================
+    path("htmx/manager/inscription/<int:pk>/cash-session/create/", cash_session_create,
+         name="htmx_manager_cash_session_create"),
+    path("htmx/manager/cash-session/<int:pk>/regenerate/", cash_session_regenerate,
+         name="htmx_manager_cash_session_regenerate"),
+    path("htmx/manager/cash-session/<int:pk>/complete/", cash_session_complete,
+         name="htmx_manager_cash_session_complete"),
+    path("htmx/manager/cash-session/<int:pk>/cancel/", cash_session_cancel,
+         name="htmx_manager_cash_session_cancel"),
+
+    # =============================================
+    # HTMX ACTIONS - SALAIRES GESTIONNAIRE
+    # =============================================
+    path("htmx/manager/salary/<int:pk>/detail/", salary_detail, name="htmx_manager_salary_detail"),
+    path("htmx/manager/salary/<int:pk>/save/", salary_upsert, name="htmx_manager_salary_upsert"),
+    path("htmx/manager/payroll/<int:pk>/pay/", salary_pay, name="htmx_manager_salary_pay"),
 
     # =============================================
     # RECHERCHE
     # =============================================
-    path("htmx/search/", global_search, name="htmx_search"),
+    path("htmx/manager/search/", global_search, name="htmx_search"),
 ]

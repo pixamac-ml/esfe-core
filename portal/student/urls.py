@@ -14,6 +14,7 @@ from .views import (
     update_settings_profile,
     upload_settings_document,
     update_content_progress,
+    ec_preview,
 )
 
 app_name = "portal_student"
@@ -30,6 +31,7 @@ urlpatterns = [
     path("partials/timetable/", timetable_partial, name="timetable_partial"),
     path("courses/", student_courses, name="student_courses"),
     path("courses/ec/<int:ec_id>/", ec_detail, name="ec_detail"),
+    path("courses/ec/<int:ec_id>/preview/", ec_preview, name="ec_preview"),
     path("contents/<int:content_id>/progress/", update_content_progress, name="content_progress"),
     path("settings/profile/", update_settings_profile, name="update_settings_profile"),
     path("settings/documents/", upload_settings_document, name="upload_settings_document"),

@@ -309,7 +309,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", not 
 SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", not DEBUG)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
-X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "DENY")
+# Le dashboard integre certains contenus (PDF, previews) via iframe.
+# SAMEORIGIN garde la protection clickjacking tout en autorisant l'integration interne.
+X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "SAMEORIGIN")
 
 if DEBUG:
     SECURE_SSL_REDIRECT = False

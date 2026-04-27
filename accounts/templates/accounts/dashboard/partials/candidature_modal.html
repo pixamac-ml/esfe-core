@@ -1,128 +1,84 @@
-<div class="p-6">
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-bold text-gray-900">Détail Candidature</h2>
-        <button onclick="closeModal()" class="p-2 hover:bg-gray-100 rounded-lg">
-            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-        </button>
-    </div>
-
-    <!-- Status Badge -->
-    <div class="mb-6">
-        <span class="px-3 py-1.5 text-sm font-semibold rounded-full
-            {% if candidature.status == 'submitted' %}bg-blue-100 text-blue-700
-            {% elif candidature.status == 'under_review' %}bg-purple-100 text-purple-700
-            {% elif candidature.status == 'to_complete' %}bg-orange-100 text-orange-700
-            {% elif candidature.status == 'accepted' or candidature.status == 'accepted_with_reserve' %}bg-green-100 text-green-700
-            {% elif candidature.status == 'rejected' %}bg-red-100 text-red-700
-            {% else %}bg-gray-100 text-gray-700{% endif %}">
-            {{ candidature.get_status_display }}
-        </span>
-    </div>
-
-    <!-- Info Grid -->
-    <div class="grid grid-cols-2 gap-6 mb-6">
-        <div>
-            <h3 class="text-sm font-semibold text-gray-500 uppercase mb-3">Informations personnelles</h3>
-            <dl class="space-y-2">
-                <div>
-                    <dt class="text-xs text-gray-400">Nom complet</dt>
-                    <dd class="text-sm font-medium text-gray-900">{{ candidature.last_name|upper }} {{ candidature.first_name }}</dd>
-                </div>
-                <div>
-                    <dt class="text-xs text-gray-400">Date de naissance</dt>
-                    <dd class="text-sm text-gray-900">{{ candidature.birth_date|date:"d/m/Y" }} à {{ candidature.birth_place }}</dd>
-                </div>
-                <div>
-                    <dt class="text-xs text-gray-400">Genre</dt>
-                    <dd class="text-sm text-gray-900">{{ candidature.get_gender_display }}</dd>
-                </div>
-            </dl>
+<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
+    <div class="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">Detail candidature</h2>
+                <p class="text-sm text-slate-500">{{ candidature.full_name }}</p>
+            </div>
+            <button onclick="closeDashboardModal()" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-slate-500 transition">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
-        <div>
-            <h3 class="text-sm font-semibold text-gray-500 uppercase mb-3">Contact</h3>
-            <dl class="space-y-2">
-                <div>
-                    <dt class="text-xs text-gray-400">Email</dt>
-                    <dd class="text-sm text-gray-900">{{ candidature.email }}</dd>
-                </div>
-                <div>
-                    <dt class="text-xs text-gray-400">Téléphone</dt>
-                    <dd class="text-sm text-gray-900">{{ candidature.phone }}</dd>
-                </div>
-                <div>
-                    <dt class="text-xs text-gray-400">Adresse</dt>
-                    <dd class="text-sm text-gray-900">{{ candidature.address|default:"-" }}, {{ candidature.city|default:"-" }}</dd>
-                </div>
-            </dl>
-        </div>
-    </div>
 
-    <!-- Programme -->
-    <div class="bg-gray-50 rounded-xl p-4 mb-6">
-        <h3 class="text-sm font-semibold text-gray-500 uppercase mb-3">Programme choisi</h3>
-        <p class="text-lg font-medium text-gray-900">{{ candidature.programme.title }}</p>
-        <p class="text-sm text-gray-500">{{ candidature.programme.cycle.name }} – Année {{ candidature.entry_year }} – {{ candidature.academic_year }}</p>
-    </div>
+        <div class="p-6 space-y-6">
+            <div>
+                <span class="px-3 py-1.5 text-sm font-semibold rounded-full {% if candidature.status == 'submitted' %}bg-blue-100 text-blue-700{% elif candidature.status == 'under_review' %}bg-purple-100 text-purple-700{% elif candidature.status == 'to_complete' %}bg-orange-100 text-orange-700{% elif candidature.status == 'accepted' or candidature.status == 'accepted_with_reserve' %}bg-green-100 text-green-700{% elif candidature.status == 'rejected' %}bg-red-100 text-red-700{% else %}bg-slate-100 text-slate-700{% endif %}">
+                    {{ candidature.get_status_display }}
+                </span>
+            </div>
 
-    <!-- Documents -->
-    <div class="mb-6">
-        <h3 class="text-sm font-semibold text-gray-500 uppercase mb-3">Documents ({{ documents.count }})</h3>
-        <div class="space-y-2">
-            {% for doc in documents %}
-            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div class="flex items-center space-x-3">
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    <span class="text-sm text-gray-900">{{ doc.document_type.name }}</span>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5 space-y-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Informations personnelles</h3>
+                    <div>
+                        <p class="text-xs text-slate-400">Nom complet</p>
+                        <p class="text-sm font-medium text-slate-900">{{ candidature.last_name|upper }} {{ candidature.first_name }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Naissance</p>
+                        <p class="text-sm text-slate-900">{{ candidature.birth_date|date:"d/m/Y" }} a {{ candidature.birth_place }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Genre</p>
+                        <p class="text-sm text-slate-900">{{ candidature.get_gender_display }}</p>
+                    </div>
                 </div>
-                <div class="flex items-center space-x-2">
-                    {% if doc.is_valid %}
-                    <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Validé</span>
-                    {% else %}
-                    <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">En attente</span>
-                    {% endif %}
-                    <a href="{{ doc.file.url }}" target="_blank" class="text-blue-600 hover:text-blue-800">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                        </svg>
-                    </a>
+
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5 space-y-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Contact</h3>
+                    <div>
+                        <p class="text-xs text-slate-400">Email</p>
+                        <p class="text-sm text-slate-900">{{ candidature.email }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Telephone</p>
+                        <p class="text-sm text-slate-900">{{ candidature.phone }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Adresse</p>
+                        <p class="text-sm text-slate-900">{{ candidature.address|default:"-" }}, {{ candidature.city|default:"-" }}</p>
+                    </div>
                 </div>
             </div>
-            {% empty %}
-            <p class="text-sm text-gray-500 text-center py-4">Aucun document soumis</p>
-            {% endfor %}
+
+            <div class="rounded-2xl bg-blue-50 border border-blue-100 p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-blue-800 mb-3">Programme choisi</h3>
+                <p class="text-lg font-semibold text-slate-900">{{ candidature.programme.title }}</p>
+                <p class="text-sm text-slate-600">{{ candidature.programme.cycle.name }} - Annee {{ candidature.entry_year }} - {{ candidature.academic_year }}</p>
+            </div>
+
+            <div class="space-y-3">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Documents ({{ documents.count }})</h3>
+                {% for doc in documents %}
+                <div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div>
+                        <p class="text-sm font-medium text-slate-900">{{ doc.document_type.name }}</p>
+                        <p class="text-xs text-slate-500">{{ doc.uploaded_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if doc.is_valid %}bg-green-100 text-green-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                            {% if doc.is_valid %}Valide{% else %}En attente{% endif %}
+                        </span>
+                        <a href="{{ doc.file.url }}" target="_blank" class="text-primary hover:text-primary-light transition">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="p-6 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-sm text-slate-400 text-center">Aucun document soumis.</div>
+                {% endfor %}
+            </div>
         </div>
     </div>
-
-    <!-- Actions -->
-    {% if candidature.status in 'submitted,under_review' %}
-    <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100">
-        <button hx-post="{% url 'accounts:htmx_candidature_to_complete' candidature.pk %}"
-                hx-target="#candidature-{{ candidature.pk }}"
-                hx-swap="outerHTML"
-                onclick="closeModal()"
-                class="px-4 py-2 border border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors text-sm font-medium">
-            Demander complétion
-        </button>
-        <button hx-post="{% url 'accounts:htmx_candidature_reject' candidature.pk %}"
-                hx-target="#candidature-{{ candidature.pk }}"
-                hx-swap="outerHTML"
-                hx-confirm="Refuser cette candidature ?"
-                onclick="closeModal()"
-                class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium">
-            Refuser
-        </button>
-        <button hx-post="{% url 'accounts:htmx_candidature_accept' candidature.pk %}"
-                hx-target="#candidature-{{ candidature.pk }}"
-                hx-swap="outerHTML"
-                hx-confirm="Accepter cette candidature ?"
-                onclick="closeModal()"
-                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
-            Accepter
-        </button>
-    </div>
-    {% endif %}
 </div>

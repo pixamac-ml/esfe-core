@@ -75,6 +75,9 @@ function esfeToastCenter() {
     return {
         toasts: [],
         nextId: 0,
+        maxToasts: 3,
+        dedupeWindowMs: 2500,
+        recentKeys: {},
 
         init() {
             this.bindGlobalListeners();
@@ -185,6 +188,31 @@ function esfeToastCenter() {
             const toast = this.normalize(detail);
             if (!toast.message) {
                 return;
+            }
+
+            const key = `${toast.type}::${toast.message}`.slice(0, 340);
+            const now = Date.now();
+            const last = this.recentKeys[key] || 0;
+            if (now - last < this.dedupeWindowMs) {
+                return;
+            }
+            this.recentKeys[key] = now;
+
+            // Clean old keys occasionally (cheap bounded cleanup).
+            if (Object.keys(this.recentKeys).length > 60) {
+                Object.entries(this.recentKeys).forEach(([k, ts]) => {
+                    if (now - ts > this.dedupeWindowMs * 4) {
+                        delete this.recentKeys[k];
+                    }
+                });
+            }
+
+            // Keep the stack small: dismiss the oldest visible toast.
+            if (this.toasts.length >= this.maxToasts) {
+                const oldest = this.toasts[0];
+                if (oldest) {
+                    this.dismiss(oldest.id);
+                }
             }
 
             const id = ++this.nextId;

@@ -9,6 +9,8 @@
 
 {% block extra_head %}
 <style>
+  .htmx-indicator { display: none; }
+  .htmx-request .htmx-indicator { display: inline-flex; }
   :root {
     --school-primary: #1e4f6f;
     --school-primary-dark: #123145;
@@ -110,6 +112,7 @@
 
   .student-content {
     overflow: auto;
+    overflow-x: hidden;
     padding: 0.9rem;
     display: block;
   }
@@ -119,6 +122,7 @@
     border-radius: 14px;
     background: var(--card);
     box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+    min-width: 0;
   }
 
   .student-card-pad {
@@ -162,6 +166,17 @@
     font-weight: 900;
     letter-spacing: -0.02em;
     color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  .student-content img,
+  .student-content video,
+  .student-content iframe {
+    max-width: 100%;
+  }
+
+  .student-content table {
+    max-width: 100%;
   }
 
   .student-section-kicker {
@@ -341,8 +356,6 @@
 
 {% block content %}
 {{ courses|json_script:"student-courses-data" }}
-{{ teachers|json_script:"student-teachers-data" }}
-{{ timetable|json_script:"student-timetable-data" }}
 {{ events|json_script:"student-events-data" }}
 {{ messages|json_script:"student-messages-data" }}
 {{ stats.mini_stats|json_script:"student-mini-stats-data" }}
@@ -437,22 +450,24 @@
             <section x-show="activeSection === 'courses'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
               <section
                 id="courses"
-                hx-get="{% url 'portal_student:courses_partial' %}"
-                hx-trigger="load"
-                hx-swap="innerHTML"
+                data-section-url="{% url 'portal_student:courses_partial' %}"
+                data-section-loaded="0"
               >
-                {% include "portal/student/partials/courses_student.html" %}
+                <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-6 text-sm text-[color:var(--muted)]">
+                  Chargement des cours...
+                </div>
               </section>
             </section>
 
             <section x-show="activeSection === 'schedule'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
               <section
                 id="schedule"
-                hx-get="{% url 'portal_student:timetable_partial' %}"
-                hx-trigger="load"
-                hx-swap="innerHTML"
+                data-section-url="{% url 'portal_student:timetable_partial' %}"
+                data-section-loaded="0"
               >
-                {% include "portal/student/partials/calendar_student.html" %}
+                <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-6 text-sm text-[color:var(--muted)]">
+                  Chargement du calendrier...
+                </div>
               </section>
             </section>
 
@@ -460,11 +475,12 @@
               <section class="student-section student-card student-card-pad student-solo-panel">
                 <section
                   id="messages"
-                  hx-get="{% url 'portal_student:messages_partial' %}"
-                  hx-trigger="load"
-                  hx-swap="innerHTML"
+                  data-section-url="{% url 'portal_student:messages_partial' %}"
+                  data-section-loaded="0"
                 >
-                  {% include "portal/student/partials/messages_student.html" %}
+                  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-6 text-sm text-[color:var(--muted)]">
+                    Chargement des messages...
+                  </div>
                 </section>
               </section>
               <section class="student-section student-card student-card-pad student-solo-panel">
@@ -476,11 +492,12 @@
               <section class="student-section student-card student-card-pad student-solo-panel">
                 <section
                   id="academics"
-                  hx-get="{% url 'portal_student:academics_partial' %}"
-                  hx-trigger="load"
-                  hx-swap="innerHTML"
+                  data-section-url="{% url 'portal_student:academics_partial' %}"
+                  data-section-loaded="0"
                 >
-                  {% include "portal/student/partials/academics.html" %}
+                  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-6 text-sm text-[color:var(--muted)]">
+                    Chargement de la situation academique...
+                  </div>
                 </section>
               </section>
               <section class="student-section student-card student-card-pad student-solo-panel">
@@ -492,21 +509,23 @@
               <section class="student-section student-card student-card-pad student-solo-panel">
                 <section
                   id="finance"
-                  hx-get="{% url 'portal_student:finance_partial' %}"
-                  hx-trigger="load"
-                  hx-swap="innerHTML"
+                  data-section-url="{% url 'portal_student:finance_partial' %}"
+                  data-section-loaded="0"
                 >
-                  {% include "portal/student/partials/finance.html" %}
+                  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-6 text-sm text-[color:var(--muted)]">
+                    Chargement de la situation financiere...
+                  </div>
                 </section>
               </section>
               <section class="student-section student-card student-card-pad student-solo-panel">
                 <section
                   id="notifications"
-                  hx-get="{% url 'portal_student:notifications_partial' %}"
-                  hx-trigger="load"
-                  hx-swap="innerHTML"
+                  data-section-url="{% url 'portal_student:notifications_partial' %}"
+                  data-section-loaded="0"
                 >
-                  {% include "portal/student/partials/notifications.html" %}
+                  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-6 text-sm text-[color:var(--muted)]">
+                    Chargement des notifications...
+                  </div>
                 </section>
               </section>
             </section>
@@ -524,11 +543,12 @@
               <section class="student-section student-card student-card-pad student-solo-panel">
                 <section
                   id="settings"
-                  hx-get="{% url 'portal_student:settings_partial' %}"
-                  hx-trigger="load"
-                  hx-swap="innerHTML"
+                  data-section-url="{% url 'portal_student:settings_partial' %}"
+                  data-section-loaded="0"
                 >
-                  {% include "portal/student/partials/settings_student.html" with editable_fields=profile_settings.editable_fields readonly_fields=profile_settings.readonly_fields academic_fields=profile_settings.academic_fields documents=profile_settings.documents completion=profile_settings.completion alerts=profile_settings.alerts %}
+                  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-6 text-sm text-[color:var(--muted)]">
+                    Chargement des parametres...
+                  </div>
                 </section>
               </section>
             </section>
@@ -733,8 +753,6 @@
         this.darkMode = localStorage.getItem("esfe_student_dark") === "1";
         this.sidebarCompact = localStorage.getItem("esfe_student_sidebar") === "compact";
         this.courses = parseDashboardData("student-courses-data", []);
-        this.teachers = parseDashboardData("student-teachers-data", []);
-        this.timetable = parseDashboardData("student-timetable-data", []);
         this.upcoming = parseDashboardData("student-events-data", []);
         this.messages = parseDashboardData("student-messages-data", []);
         this.miniStats = parseDashboardData("student-mini-stats-data", []);
@@ -754,6 +772,7 @@
         });
         this.$nextTick(() => {
           this.setActiveSection(this.activeSection, this.activeNav);
+          this.ensureSectionLoaded(this.activeSection);
           if (window.AOS) {
             AOS.refreshHard();
           }
@@ -789,9 +808,36 @@
           };
         }
         this.mobileMenu = false;
+        this.ensureSectionLoaded(target);
       },
       goToSection(target, label) {
         this.setActiveSection(target, label);
+      },
+      refreshSection(elementId) {
+        const el = document.getElementById(elementId);
+        if (!el || !window.htmx) return;
+        const url = el.dataset.sectionUrl;
+        if (!url) return;
+        window.htmx.ajax("GET", url, `#${elementId}`);
+      },
+      ensureSectionLoaded(sectionKey) {
+        const idsToLoad = [];
+        if (sectionKey === "courses") idsToLoad.push("courses");
+        if (sectionKey === "schedule") idsToLoad.push("schedule");
+        if (sectionKey === "messages") idsToLoad.push("messages");
+        if (sectionKey === "academics") idsToLoad.push("academics");
+        if (sectionKey === "finance") idsToLoad.push("finance", "notifications");
+        if (sectionKey === "settings") idsToLoad.push("settings");
+
+        idsToLoad.forEach((elementId) => {
+          const el = document.getElementById(elementId);
+          if (!el) return;
+          if (el.dataset.sectionLoaded === "1") return;
+          const url = el.dataset.sectionUrl;
+          if (!url || !window.htmx) return;
+          el.dataset.sectionLoaded = "1";
+          window.htmx.ajax("GET", url, `#${elementId}`);
+        });
       },
       openCourseDetail(url, title) {
         this.courseDetailUrl = `${url}?partial=1`;

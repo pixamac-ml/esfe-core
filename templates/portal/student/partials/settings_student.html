@@ -1,4 +1,4 @@
-<div class="grid gap-4">
+<div class="grid gap-4" x-data="{ tab: 'profile' }">
   <div class="rounded-xl border {% if completion.alert_level == 'success' %}border-emerald-200 bg-emerald-50{% elif completion.alert_level == 'warning' %}border-amber-200 bg-amber-50{% else %}border-rose-200 bg-rose-50{% endif %} p-4">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -24,6 +24,24 @@
     {% endif %}
   </div>
 
+  <div class="flex flex-wrap gap-2">
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]"
+      :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'profile' }"
+      @click="tab='profile'">
+      Profil
+    </button>
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]"
+      :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'academics' }"
+      @click="tab='academics'">
+      Academique
+    </button>
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]"
+      :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'documents' }"
+      @click="tab='documents'">
+      Documents
+    </button>
+  </div>
+
   {% if form_success %}
     <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
       {{ form_success }}
@@ -38,8 +56,8 @@
     </div>
   {% endif %}
 
-  <div class="grid gap-4 xl:grid-cols-2">
-    <section class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+  <div x-show="tab === 'profile' || tab === 'academics'" x-cloak class="grid gap-4 xl:grid-cols-2">
+    <section x-show="tab === 'profile'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
       <div class="mb-4">
         <p class="student-section-kicker">Profil</p>
         <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations personnelles</h4>
@@ -48,6 +66,7 @@
         hx-post="{% url 'portal_student:update_settings_profile' %}"
         hx-target="#settings"
         hx-swap="outerHTML"
+        hx-disabled-elt="find button"
         class="grid gap-4"
       >
         <div class="grid gap-3 md:grid-cols-2">
@@ -76,7 +95,8 @@
             <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.birth_place|default:"Non renseigne" }}</strong>
           </div>
         </div>
-        <div class="flex justify-end">
+        <div class="flex items-center justify-end gap-3">
+          <span class="htmx-indicator text-xs font-bold text-[color:var(--muted)]">Enregistrement...</span>
           <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-600">
             Mettre a jour
           </button>
@@ -84,7 +104,7 @@
       </form>
     </section>
 
-    <section class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+    <section x-show="tab === 'academics'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
       <div class="mb-4">
         <p class="student-section-kicker">Academique</p>
         <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations en lecture seule</h4>
@@ -122,7 +142,7 @@
     </section>
   </div>
 
-  <section class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+  <section x-show="tab === 'documents'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
     <div class="mb-4">
       <p class="student-section-kicker">Documents</p>
       <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Pieces et justificatifs etudiants</h4>
@@ -152,10 +172,12 @@
               hx-target="#settings"
               hx-swap="outerHTML"
               hx-encoding="multipart/form-data"
+              hx-disabled-elt="find button"
               class="flex flex-wrap items-center gap-3"
             >
               <input type="hidden" name="document_type_id" value="{{ document.id }}">
-              <input type="file" name="file" class="block text-sm text-[color:var(--muted)]">
+              <input type="file" name="file" class="block text-sm text-[color:var(--muted)]" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+              <span class="htmx-indicator text-xs font-bold text-[color:var(--muted)]">Televersement...</span>
               <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-sm font-bold text-white transition hover:bg-primary-600">
                 Televerser
               </button>

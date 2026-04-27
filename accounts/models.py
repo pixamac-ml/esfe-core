@@ -49,6 +49,13 @@ class Profile(models.Model):
         ("staff", "Staff"),
     ]
 
+    EMPLOYMENT_STATUS_CHOICES = [
+        ("active", "Actif"),
+        ("on_leave", "En conge"),
+        ("suspended", "Suspendu"),
+        ("inactive", "Inactif"),
+    ]
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -86,6 +93,30 @@ class Profile(models.Model):
         blank=True,
         related_name="staff_profiles",
         db_index=True,
+    )
+
+    employee_code = models.CharField(
+        max_length=30,
+        blank=True,
+        db_index=True,
+        help_text="Code employe interne pour la gestion de paie.",
+    )
+
+    salary_base = models.PositiveBigIntegerField(
+        default=0,
+        help_text="Salaire mensuel de base en FCFA.",
+    )
+
+    employment_status = models.CharField(
+        max_length=20,
+        choices=EMPLOYMENT_STATUS_CHOICES,
+        default="active",
+        db_index=True,
+    )
+
+    hire_date = models.DateField(
+        null=True,
+        blank=True,
     )
 
     avatar = models.ImageField(
@@ -140,6 +171,7 @@ class Profile(models.Model):
             models.Index(fields=["user_type"]),
             models.Index(fields=["position"]),
             models.Index(fields=["branch"]),
+            models.Index(fields=["employment_status"]),
             models.Index(fields=["reputation"]),
         ]
 
@@ -167,3 +199,116 @@ class Profile(models.Model):
     @property
     def is_teacher(self):
         return self.role == "teacher"
+
+
+class PayrollEntry(models.Model):
+    STATUS_DRAFT = "draft"
+    STATUS_READY = "ready"
+    STATUS_PARTIAL = "partial"
+    STATUS_PAID = "paid"
+
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_READY, "Pret a payer"),
+        (STATUS_PARTIAL, "Paiement partiel"),
+        (STATUS_PAID, "Paye"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="payroll_entries",
+        db_index=True,
+    )
+
+    employee = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="payroll_entries",
+        db_index=True,
+    )
+
+    period_month = models.DateField(
+        db_index=True,
+        help_text="Premier jour du mois de paie.",
+    )
+
+    base_salary = models.PositiveBigIntegerField(default=0)
+    allowances = models.PositiveBigIntegerField(default=0)
+    deductions = models.PositiveBigIntegerField(default=0)
+    advances = models.PositiveBigIntegerField(default=0)
+    paid_amount = models.PositiveBigIntegerField(default=0)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        db_index=True,
+    )
+
+    paid_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    notes = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_payroll_entries",
+    )
+
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_payroll_entries",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-period_month", "employee__last_name", "employee__first_name"]
+        verbose_name = "Fiche de paie"
+        verbose_name_plural = "Fiches de paie"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["branch", "employee", "period_month"],
+                name="accounts_unique_branch_employee_payroll_period",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["branch", "period_month"]),
+            models.Index(fields=["employee", "period_month"]),
+            models.Index(fields=["status", "period_month"]),
+        ]
+
+    def __str__(self):
+        return f"Paie {self.employee} - {self.period_month:%Y-%m}"
+
+    @property
+    def net_salary(self):
+        gross = self.base_salary + self.allowances
+        charges = self.deductions + self.advances
+        return max(gross - charges, 0)
+
+    @property
+    def remaining_salary(self):
+        return max(self.net_salary - self.paid_amount, 0)
+
+    def refresh_status(self):
+        if self.paid_amount >= self.net_salary and self.net_salary > 0:
+            self.status = self.STATUS_PAID
+            if not self.paid_at:
+                self.paid_at = timezone.now()
+        elif self.paid_amount > 0:
+            self.status = self.STATUS_PARTIAL
+            self.paid_at = timezone.now()
+        elif self.status == self.STATUS_PAID:
+            self.status = self.STATUS_READY
+            self.paid_at = None
+
+    def save(self, *args, **kwargs):
+        self.refresh_status()
+        super().save(*args, **kwargs)

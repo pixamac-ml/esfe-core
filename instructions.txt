@@ -172,3 +172,81 @@ On veut un module PROFESSIONNEL, type SaaS :
 
 Ce n’est pas une simple page de settings.
 C’est le centre de gestion du profil étudiant.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+• Je fais un dernier contrôle HTTP sur le dashboard gestionnaire après migration et ajout des salariés de démonstration, pour valider que la page répond toujours
+  correctement.
+
+• Ran try { (Invoke-WebRequest -Uri 'http://127.0.0.1:8000/accounts/manager/?section=salaires' -UseBasicParsing).StatusCode } catch { $_.Exception.Message }
+  └ 200
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Le dashboard gestionnaire couvre maintenant une vraie première couche pilotage annexe + salaires, toujours dans accounts, et filtrée par annexe.
+
+  J’ai ajouté un module de paie mensuelle par employé d’annexe:
+
+  - nouveaux champs staff sur le profil: employee_code, salary_base, employment_status, hire_date
+  - nouveau modèle PayrollEntry par annexe + employé + mois
+  - nouvelle section Salaires dans le dashboard gestionnaire
+  - préparation d’une paie du mois
+  - ajustement primes / retenues / avances
+  - enregistrement d’un paiement partiel ou complet
+  - stats salariales dans la vue d’ensemble et dans la section dédiée
+
+  J’ai aussi appliqué la migration en base et créé 2 employés de démo dans FATEC pour que la section ne soit pas vide:
+
+  - fatec_sec_01 / StaffDemo123!
+  - fatec_adm_01 / StaffDemo123!
+
+  Accès test:
+
+  - login: http://127.0.0.1:8000/accounts/login/
+  - dashboard gestionnaire: http://127.0.0.1:8000/accounts/manager/
+  - section salaires: http://127.0.0.1:8000/accounts/manager/?section=salaires
+
+  Compte gestionnaire:
+
+  - gestionnaire_test
+  - GestioTest123!
+
+  Vérifié:
+
+  - migration accounts appliquée
+  - python manage.py check OK
+  - page section=salaires répond en 200
+
+  Ce qu’on a maintenant, concrètement:
+
+  - la gestionnaire peut piloter candidatures, inscriptions, paiements étudiants et paiements cash
+  - elle peut aussi commencer la gestion salariale locale de son annexe
+  - tout est borné à son annexe, pas en global
+
+  Ce qu’il reste pour rendre ça vraiment “très complet”:
+
+  - dépenses hors salaires
+  - caisse / sorties de fonds
+  - journal comptable d’annexe
+  - employés absents / congés / avances formalisées
+  - exports paie et reçus salariaux
+  - ensuite la refonte visuelle façon portal/student
+
+  Je recommande la suite dans cet ordre:
+
+  1. finir salaires + dépenses + caisse annexe
+  2. ajouter journal opérationnel annexe
+  3. seulement après, refondre le rendu en style portal
+
+  Si tu veux, j’attaque maintenant directement la phase suivante: dépenses et caisse d’annexe dans ce même dashboard gestionnaire.

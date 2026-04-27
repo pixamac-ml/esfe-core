@@ -1,98 +1,60 @@
-<div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-    <!-- Header -->
-    <div class="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
-        <div>
-            <h2 class="text-xl font-bold">Paiement {{ payment.reference }}</h2>
-            <p class="text-green-100 text-sm">{{ payment.inscription.candidature.full_name }}</p>
-        </div>
-        <button @click="modalOpen = false" class="p-2 hover:bg-white/20 rounded-lg transition">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-        </button>
-    </div>
-
-    <div class="p-6 space-y-6">
-        <!-- Montant principal -->
-        <div class="text-center py-4">
-            <p class="text-sm text-gray-500 mb-1">Montant</p>
-            <p class="text-4xl font-bold text-gray-900">{{ payment.amount|floatformat:0 }} FCFA</p>
-            {% if payment.status == 'validated' %}
-                <span class="inline-block mt-2 px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">Validé</span>
-            {% elif payment.status == 'pending' %}
-                <span class="inline-block mt-2 px-3 py-1 text-sm font-medium rounded-full bg-yellow-100 text-yellow-800">En attente</span>
-            {% else %}
-                <span class="inline-block mt-2 px-3 py-1 text-sm font-medium rounded-full bg-red-100 text-red-800">Annulé</span>
-            {% endif %}
+<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
+    <div class="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-4 flex items-center justify-between rounded-t-3xl">
+            <div>
+                <h2 class="text-xl font-bold">Paiement {{ payment.reference }}</h2>
+                <p class="text-sm text-green-100">{{ payment.inscription.candidature.full_name }}</p>
+            </div>
+            <button onclick="closeDashboardModal()" class="w-10 h-10 rounded-xl hover:bg-white/15 transition">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
 
-        <!-- Détails -->
-        <div class="bg-gray-50 rounded-xl p-4 space-y-3">
-            <div class="flex justify-between">
-                <span class="text-gray-500">Référence</span>
-                <span class="font-mono font-medium">{{ payment.reference }}</span>
+        <div class="p-6 space-y-6">
+            <div class="text-center py-2">
+                <p class="text-sm text-slate-500 mb-2">Montant</p>
+                <p class="text-4xl font-bold text-slate-900">{{ payment.amount|floatformat:0 }} FCFA</p>
+                <span class="inline-flex mt-3 px-3 py-1.5 rounded-full text-sm font-semibold {% if payment.status == 'validated' %}bg-green-100 text-green-700{% elif payment.status == 'pending' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+                    {{ payment.get_status_display }}
+                </span>
             </div>
-            {% if payment.receipt_number %}
-            <div class="flex justify-between">
-                <span class="text-gray-500">N° Reçu</span>
-                <span class="font-mono font-medium">{{ payment.receipt_number }}</span>
-            </div>
-            {% endif %}
-            <div class="flex justify-between">
-                <span class="text-gray-500">Mode de paiement</span>
-                <span class="font-medium">{{ payment.get_method_display }}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-gray-500">Date de paiement</span>
-                <span class="font-medium">{{ payment.paid_at|date:"d/m/Y à H:i" }}</span>
-            </div>
-            {% if payment.agent %}
-            <div class="flex justify-between">
-                <span class="text-gray-500">Agent</span>
-                <span class="font-medium">{{ payment.agent.user.get_full_name }}</span>
-            </div>
-            {% endif %}
-        </div>
 
-        <!-- Inscription liée -->
-        <div class="bg-blue-50 rounded-xl p-4">
-            <h3 class="font-semibold text-gray-900 mb-2">Inscription liée</h3>
-            <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Référence</span>
-                    <span class="font-mono">{{ payment.inscription.reference }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Programme</span>
-                    <span class="font-medium">{{ payment.inscription.candidature.programme.title }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500">Total dû</span>
-                    <span class="font-medium">{{ payment.inscription.amount_due|floatformat:0 }} FCFA</span>
-                </div>
+            <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5 space-y-3">
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Reference</span><span class="font-mono font-medium text-slate-900">{{ payment.reference }}</span></div>
+                {% if payment.receipt_number %}
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Numero recu</span><span class="font-mono font-medium text-slate-900">{{ payment.receipt_number }}</span></div>
+                {% endif %}
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Mode de paiement</span><span class="font-medium text-slate-900">{{ payment.get_method_display }}</span></div>
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Date de paiement</span><span class="font-medium text-slate-900">{{ payment.paid_at|date:"d/m/Y H:i" }}</span></div>
+                {% if payment.agent %}
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Agent</span><span class="font-medium text-slate-900">{{ payment.agent.user.get_full_name }}</span></div>
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Code agent</span><span class="font-mono font-medium text-slate-900">{{ payment.agent.agent_code }}</span></div>
+                {% endif %}
+                {% if payment.cash_session %}
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Code espèce utilisé</span><span class="font-mono font-medium text-violet-700">{{ payment.cash_session.verification_code }}</span></div>
+                {% endif %}
+            </div>
+
+            <div class="rounded-2xl bg-blue-50 border border-blue-100 p-5 space-y-3">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-blue-800">Inscription liee</h3>
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Reference inscription</span><span class="font-mono text-slate-900">{{ payment.inscription.reference }}</span></div>
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Programme</span><span class="text-slate-900">{{ payment.inscription.candidature.programme.title }}</span></div>
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Montant du dossier</span><span class="text-slate-900">{{ payment.inscription.amount_due|floatformat:0 }} FCFA</span></div>
+                <div class="flex justify-between gap-4"><span class="text-slate-500">Token public</span><span class="font-mono text-slate-900">{{ payment.inscription.public_token }}</span></div>
             </div>
         </div>
 
-    </div>
-
-    <!-- Footer -->
-    <div class="sticky bottom-0 bg-gray-50 px-6 py-4 border-t border-gray-200 rounded-b-2xl">
-        <div class="flex justify-between items-center">
+        <div class="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex items-center justify-between rounded-b-3xl">
             {% if payment.receipt_pdf %}
-            <a href="{{ payment.receipt_pdf.url }}" target="_blank"
-               class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Télécharger le reçu
+            <a href="{{ payment.receipt_pdf.url }}" target="_blank" class="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-light transition">
+                <i class="fas fa-download mr-2"></i>
+                Telecharger le recu
             </a>
             {% else %}
             <div></div>
             {% endif %}
-
-            <button @click="modalOpen = false" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
-                Fermer
-            </button>
+            <button onclick="closeDashboardModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Fermer</button>
         </div>
     </div>
 </div>

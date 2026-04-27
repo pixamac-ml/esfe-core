@@ -1,4 +1,5 @@
 from django.db.models import Prefetch, Sum
+from django.core.cache import cache
 
 from academics.models import EC, ECContent, StudentContentProgress
 from academics.services.schedule_service import get_student_week_schedule
@@ -145,8 +146,14 @@ def get_student_timetable(student):
 def get_student_events(student):
     snapshot = get_student_academic_snapshot(student.user)
     branch = _get_student_branch(student, snapshot["academic_enrollment"])
+
+    cache_key = f"portal_student:events:v1:branch:{getattr(branch, 'id', 'none')}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     events = Event.objects.filter(is_published=True).order_by("event_date")[:4]
-    return [
+    payload = [
         {
             "day": event.event_date.strftime("%d"),
             "month": event.event_date.strftime("%b").upper(),
@@ -156,9 +163,16 @@ def get_student_events(student):
         }
         for event in events
     ]
+    cache.set(cache_key, payload, 30)
+    return payload
 
 
 def get_student_messages(student):
+    cache_key = f"portal_student:messages:v1:user:{getattr(getattr(student, 'user', None), 'id', 'anon')}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     email = getattr(student, "email", "")
     core_items = list(
         CoreNotification.objects.filter(recipient_email=email)
@@ -166,7 +180,7 @@ def get_student_messages(student):
         .values("title", "message", "created_at")[:3]
     )
     if core_items:
-        return [
+        payload = [
             {
                 "name": item["title"],
                 "text": item["message"][:90] + ("..." if len(item["message"]) > 90 else ""),
@@ -175,13 +189,15 @@ def get_student_messages(student):
             }
             for item in core_items
         ]
+        cache.set(cache_key, payload, 30)
+        return payload
 
     community_items = (
         CommunityNotification.objects.select_related("actor")
         .filter(user=student.user)
         .order_by("-created_at")[:3]
     )
-    return [
+    payload = [
         {
             "name": item.actor.get_full_name() or item.actor.username,
             "text": item.get_notification_type_display(),
@@ -190,6 +206,8 @@ def get_student_messages(student):
         }
         for item in community_items
     ]
+    cache.set(cache_key, payload, 30)
+    return payload
 
 
 def get_student_dashboard_data(user):
@@ -246,3 +264,81 @@ def get_student_dashboard_data(user):
 
 def get_student_dashboard_shell(user):
     return get_student_dashboard_data(user)
+
+
+def get_student_overview_data(user):
+    """
+    Donnees minimales pour le rendu initial (section overview uniquement).
+    Les autres sections sont chargees a la demande via HTMX.
+    """
+    snapshot = get_student_academic_snapshot(user)
+    student = snapshot["student"]
+    enrollment = snapshot["academic_enrollment"]
+
+    if student is None:
+        return {
+            "student": None,
+            "enrollment": None,
+            "courses": [],
+            "events": [],
+            "messages": [],
+            "stats": {
+                "average": "Non disponible",
+                "ranking": "Non disponible",
+                "completed_courses": 0,
+                "credits": 0,
+                "payments_validated": 0,
+                "remaining_amount": 0,
+                "enrollment_status": "En attente",
+                "mini_stats": [],
+                "progress_bars": [],
+            },
+            "academic_status": snapshot["academic_status"],
+            "academic_status_message": snapshot["academic_status_message"],
+            "academic_class": snapshot["academic_class"],
+            "academic_programme": snapshot["academic_programme"],
+            "academic_year": snapshot["academic_year"],
+            "academic_level": snapshot["academic_level"],
+            "page_title": "Dashboard etudiant",
+            "subtitle": "Vue d'ensemble de votre parcours academique",
+        }
+
+    # Overview: hero + stats + courses overview + profile + events
+    return {
+        "student": student,
+        "enrollment": enrollment,
+        "courses": get_student_courses(student),
+        "events": get_student_events(student),
+        "messages": get_student_messages(student),
+        "stats": get_student_stats(student),
+        "academic_status": snapshot["academic_status"],
+        "academic_status_message": snapshot["academic_status_message"],
+        "academic_class": snapshot["academic_class"],
+        "academic_programme": snapshot["academic_programme"],
+        "academic_year": snapshot["academic_year"],
+        "academic_level": snapshot["academic_level"],
+        "page_title": "Dashboard etudiant",
+        "subtitle": "Vue d'ensemble de votre parcours academique",
+    }
+
+
+def get_student_courses_context(user):
+    snapshot = get_student_academic_snapshot(user)
+    student = snapshot["student"]
+    return {
+        "courses": get_student_courses(student) if student else [],
+        "academic_status": snapshot["academic_status"],
+        "academic_status_message": snapshot["academic_status_message"],
+    }
+
+
+def get_student_messages_context(user):
+    snapshot = get_student_academic_snapshot(user)
+    student = snapshot["student"]
+    return {"messages": get_student_messages(student) if student else []}
+
+
+def get_student_timetable_context(user):
+    snapshot = get_student_academic_snapshot(user)
+    student = snapshot["student"]
+    return {"timetable": get_student_timetable(student) if student else {}}

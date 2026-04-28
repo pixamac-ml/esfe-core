@@ -35,6 +35,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{% include "portal/student/partials/student_course_immersive_script.html" %}
 <script>
   const studentContentProgressUrlTemplate = "{% url 'portal_student:content_progress' 0 %}";
 
@@ -75,6 +76,8 @@
       if (node.tagName === "IFRAME" || node.tagName === "IMG") {
         node.addEventListener("load", sendProgress, { once: true });
       } else if (node.tagName === "A") {
+        node.addEventListener("click", sendProgress);
+      } else if (node.tagName === "BUTTON") {
         node.addEventListener("click", sendProgress);
       } else {
         sendProgress();

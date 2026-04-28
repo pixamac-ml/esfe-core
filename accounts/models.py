@@ -312,3 +312,145 @@ class PayrollEntry(models.Model):
     def save(self, *args, **kwargs):
         self.refresh_status()
         super().save(*args, **kwargs)
+
+
+def branch_expense_upload_path(instance, filename):
+    return f"branches/{instance.branch_id}/expenses/{filename}"
+
+
+class BranchExpense(models.Model):
+    STATUS_DRAFT = "draft"
+    STATUS_SUBMITTED = "submitted"
+    STATUS_APPROVED = "approved"
+    STATUS_PAID = "paid"
+    STATUS_REJECTED = "rejected"
+
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_SUBMITTED, "A valider"),
+        (STATUS_APPROVED, "Approuvee"),
+        (STATUS_PAID, "Payee"),
+        (STATUS_REJECTED, "Rejetee"),
+    ]
+
+    CATEGORY_RENT = "rent"
+    CATEGORY_UTILITIES = "utilities"
+    CATEGORY_SUPPLIES = "supplies"
+    CATEGORY_MAINTENANCE = "maintenance"
+    CATEGORY_TRANSPORT = "transport"
+    CATEGORY_COMMUNICATION = "communication"
+    CATEGORY_OTHER = "other"
+
+    CATEGORY_CHOICES = [
+        (CATEGORY_RENT, "Loyer"),
+        (CATEGORY_UTILITIES, "Eau / electricite"),
+        (CATEGORY_SUPPLIES, "Fournitures"),
+        (CATEGORY_MAINTENANCE, "Maintenance"),
+        (CATEGORY_TRANSPORT, "Transport"),
+        (CATEGORY_COMMUNICATION, "Communication"),
+        (CATEGORY_OTHER, "Autre"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="expenses",
+        db_index=True,
+    )
+    title = models.CharField(max_length=180)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER, db_index=True)
+    amount = models.PositiveBigIntegerField()
+    expense_date = models.DateField(default=timezone.localdate, db_index=True)
+    supplier = models.CharField(max_length=150, blank=True)
+    reference = models.CharField(max_length=80, blank=True, db_index=True)
+    receipt = models.FileField(upload_to=branch_expense_upload_path, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_SUBMITTED, db_index=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_branch_expenses")
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_branch_expenses")
+    paid_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="paid_branch_expenses")
+    approved_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    paid_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-expense_date", "-created_at"]
+        verbose_name = "Depense annexe"
+        verbose_name_plural = "Depenses annexes"
+        indexes = [
+            models.Index(fields=["branch", "expense_date"]),
+            models.Index(fields=["branch", "status"]),
+            models.Index(fields=["category", "expense_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} - {self.amount} FCFA"
+
+    @property
+    def can_be_approved(self):
+        return self.status in {self.STATUS_DRAFT, self.STATUS_SUBMITTED}
+
+    @property
+    def can_be_paid(self):
+        return self.status == self.STATUS_APPROVED
+
+
+class BranchCashMovement(models.Model):
+    TYPE_IN = "in"
+    TYPE_OUT = "out"
+
+    TYPE_CHOICES = [
+        (TYPE_IN, "Entree"),
+        (TYPE_OUT, "Sortie"),
+    ]
+
+    SOURCE_MANUAL = "manual"
+    SOURCE_EXPENSE = "expense"
+    SOURCE_PAYROLL = "payroll"
+    SOURCE_STUDENT_PAYMENT = "student_payment"
+    SOURCE_ADJUSTMENT = "adjustment"
+
+    SOURCE_CHOICES = [
+        (SOURCE_MANUAL, "Saisie manuelle"),
+        (SOURCE_EXPENSE, "Depense"),
+        (SOURCE_PAYROLL, "Salaire"),
+        (SOURCE_STUDENT_PAYMENT, "Paiement etudiant"),
+        (SOURCE_ADJUSTMENT, "Ajustement caisse"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="cash_movements",
+        db_index=True,
+    )
+    movement_type = models.CharField(max_length=10, choices=TYPE_CHOICES, db_index=True)
+    source = models.CharField(max_length=30, choices=SOURCE_CHOICES, default=SOURCE_MANUAL, db_index=True)
+    amount = models.PositiveBigIntegerField()
+    label = models.CharField(max_length=180)
+    movement_date = models.DateField(default=timezone.localdate, db_index=True)
+    expense = models.ForeignKey(
+        BranchExpense,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cash_movements",
+    )
+    reference = models.CharField(max_length=80, blank=True, db_index=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_cash_movements")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-movement_date", "-created_at"]
+        verbose_name = "Mouvement de caisse"
+        verbose_name_plural = "Mouvements de caisse"
+        indexes = [
+            models.Index(fields=["branch", "movement_date"]),
+            models.Index(fields=["branch", "movement_type"]),
+            models.Index(fields=["source", "movement_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_movement_type_display()} {self.amount} FCFA - {self.label}"

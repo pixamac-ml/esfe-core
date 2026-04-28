@@ -50,7 +50,7 @@
 
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-4">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
                 <a href="{% url 'accounts:manager_dashboard' %}?section=overview" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'overview' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
                     Vue d'ensemble
                 </a>
@@ -65,6 +65,12 @@
                 </a>
                 <a href="{% url 'accounts:manager_dashboard' %}?section=salaires" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'salaires' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
                     Salaires
+                </a>
+                <a href="{% url 'accounts:manager_dashboard' %}?section=depenses" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'depenses' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                    Depenses
+                </a>
+                <a href="{% url 'accounts:manager_dashboard' %}?section=caisse" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'caisse' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                    Caisse
                 </a>
             </div>
 
@@ -129,6 +135,16 @@
     </div>
     {% endif %}
 
+    {% if manager_intelligence.alerts %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {% for alert in manager_intelligence.alerts %}
+        <div class="rounded-2xl border px-5 py-4 text-sm font-medium {% if alert.level == 'danger' %}border-rose-200 bg-rose-50 text-rose-800{% else %}border-amber-200 bg-amber-50 text-amber-800{% endif %}">
+            <i class="fas fa-triangle-exclamation mr-2"></i>{{ alert.message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% if active_section == "overview" %}
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
@@ -153,7 +169,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-10 gap-4">
         <div class="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-4 text-white">
             <p class="text-sm text-blue-100">Etudiants actifs</p>
             <p class="text-2xl font-bold mt-2">{{ total_students }}</p>
@@ -185,6 +201,52 @@
         <div class="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-4 text-white">
             <p class="text-sm text-amber-100">Reste salaires</p>
             <p class="text-2xl font-bold mt-2">{{ payroll_stats.remaining_total|intcomma }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-red-500 to-rose-700 p-4 text-white">
+            <p class="text-sm text-red-100">Depenses mois</p>
+            <p class="text-2xl font-bold mt-2">{{ expense_stats.month_amount|intcomma }}</p>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-700 p-4 text-white">
+            <p class="text-sm text-cyan-100">Solde estime</p>
+            <p class="text-2xl font-bold mt-2">{{ cash_stats.estimated_month_balance|intcomma }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="text-xs uppercase tracking-wide text-slate-400">Pilotage intelligent</p>
+                <h3 class="text-lg font-semibold text-slate-900 mt-1">Actions prioritaires de l'annexe</h3>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button hx-post="{% url 'accounts:htmx_manager_cash_sync' %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                    <i class="fas fa-arrows-rotate mr-2"></i>Synchroniser caisse
+                </button>
+                <button hx-post="{% url 'accounts:htmx_manager_salary_prepare_all' %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700">
+                    <i class="fas fa-layer-group mr-2"></i>Preparer paies
+                </button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div class="divide-y divide-slate-50">
+                {% for item in manager_intelligence.priorities %}
+                <div class="px-6 py-4 flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">{{ item.title }}</p>
+                        <p class="text-sm text-slate-500 mt-1">{{ item.message }}</p>
+                    </div>
+                    <a href="{% url 'accounts:manager_dashboard' %}?section={{ item.section }}" class="shrink-0 px-3 py-2 rounded-lg text-xs font-semibold {% if item.level == 'high' %}bg-rose-50 text-rose-700{% elif item.level == 'medium' %}bg-amber-50 text-amber-700{% else %}bg-slate-100 text-slate-700{% endif %}">Traiter</a>
+                </div>
+                {% empty %}
+                <div class="px-6 py-10 text-center text-sm text-slate-400">Aucune action urgente detectee.</div>
+                {% endfor %}
+            </div>
+            <div class="bg-slate-50 p-5 border-t lg:border-t-0 lg:border-l border-slate-100 space-y-3">
+                <div class="flex justify-between text-sm"><span class="text-slate-500">Paiements non synchronises</span><span class="font-semibold text-slate-900">{{ manager_intelligence.unsynced_payments_count }}</span></div>
+                <div class="flex justify-between text-sm"><span class="text-slate-500">Paies manquantes</span><span class="font-semibold text-slate-900">{{ manager_intelligence.missing_payroll_count }}</span></div>
+                <div class="flex justify-between text-sm"><span class="text-slate-500">Depenses approuvees</span><span class="font-semibold text-slate-900">{{ manager_intelligence.approved_expenses_count }}</span></div>
+                <div class="pt-3 border-t border-slate-200 flex justify-between text-sm"><span class="text-slate-500">Apres engagements</span><span class="font-bold {% if manager_intelligence.balance_after_commitments < 0 %}text-rose-600{% else %}text-emerald-600{% endif %}">{{ manager_intelligence.balance_after_commitments|intcomma }} FCFA</span></div>
+            </div>
         </div>
     </div>
 
@@ -643,7 +705,8 @@
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-100 p-4">
-        <form method="get" class="flex flex-col xl:flex-row gap-3">
+        <div class="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+        <form method="get" class="flex flex-col xl:flex-row gap-3 flex-1">
             <input type="hidden" name="section" value="salaires">
             <div class="flex-1">
                 <input type="text" name="salary_q" value="{{ salary_search }}" placeholder="Rechercher un employe, code ou fonction..." class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
@@ -663,6 +726,15 @@
             </div>
             <button type="submit" class="px-5 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-light transition">Filtrer</button>
         </form>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <button hx-post="{% url 'accounts:htmx_manager_salary_prepare_all' %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-4 py-3 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700">
+                <i class="fas fa-layer-group mr-2"></i>Preparer manquantes
+            </button>
+            <button hx-post="{% url 'accounts:htmx_manager_salary_pay_ready_all' %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                <i class="fas fa-money-bill-wave mr-2"></i>Payer paies pretes
+            </button>
+        </div>
+        </div>
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
@@ -702,6 +774,191 @@
             </div>
         </div>
         {% endif %}
+    </div>
+    {% endif %}
+
+    {% if active_section == "depenses" %}
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Total</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ expense_stats.total }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">A valider</p><p class="text-2xl font-bold text-amber-600 mt-2">{{ expense_stats.submitted }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Approuvees</p><p class="text-2xl font-bold text-blue-600 mt-2">{{ expense_stats.approved }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Payees</p><p class="text-2xl font-bold text-emerald-600 mt-2">{{ expense_stats.paid }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Mois</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ expense_stats.month_amount|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Paye mois</p><p class="text-2xl font-bold text-emerald-600 mt-2">{{ expense_stats.paid_month_amount|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">En attente</p><p class="text-2xl font-bold text-rose-600 mt-2">{{ expense_stats.pending_amount|intcomma }}</p></div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-6">
+        <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-900 mb-4">Nouvelle depense</h3>
+            {% include "accounts/dashboard/partials/manager_expense_form.html" %}
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white rounded-2xl border border-slate-100 p-4">
+                <form method="get" class="flex flex-col xl:flex-row gap-3">
+                    <input type="hidden" name="section" value="depenses">
+                    <input type="text" name="expense_q" value="{{ expense_search }}" placeholder="Rechercher libelle, fournisseur ou reference..." class="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <select name="expense_category" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                        <option value="">Toutes categories</option>
+                        {% for value,label in expense_categories %}
+                        <option value="{{ value }}" {% if expense_category == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="expense_status" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                        <option value="">Tous etats</option>
+                        <option value="submitted" {% if expense_status == 'submitted' %}selected{% endif %}>A valider</option>
+                        <option value="approved" {% if expense_status == 'approved' %}selected{% endif %}>Approuvee</option>
+                        <option value="paid" {% if expense_status == 'paid' %}selected{% endif %}>Payee</option>
+                        <option value="rejected" {% if expense_status == 'rejected' %}selected{% endif %}>Rejetee</option>
+                    </select>
+                    <button type="submit" class="px-5 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-light transition">Filtrer</button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[1040px] divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Depense</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Categorie</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Montant</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etat</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            {% for expense in expenses %}
+                            <tr class="hover:bg-slate-50 transition">
+                                <td class="px-6 py-4"><p class="text-sm font-semibold text-slate-900">{{ expense.title }}</p><p class="text-xs text-slate-500">{{ expense.supplier|default:"-" }}{% if expense.reference %} - {{ expense.reference }}{% endif %}</p></td>
+                                <td class="px-6 py-4 text-sm text-slate-600">{{ expense.get_category_display }}</td>
+                                <td class="px-6 py-4 text-sm font-semibold text-right text-slate-900">{{ expense.amount|intcomma }} FCFA</td>
+                                <td class="px-6 py-4 text-sm text-slate-500">{{ expense.expense_date|date:"d/m/Y" }}</td>
+                                <td class="px-6 py-4"><span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if expense.status == 'paid' %}bg-emerald-100 text-emerald-700{% elif expense.status == 'approved' %}bg-blue-100 text-blue-700{% elif expense.status == 'rejected' %}bg-rose-100 text-rose-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ expense.get_status_display }}</span></td>
+                                <td class="px-6 py-4">
+                                    <div class="flex justify-end gap-2">
+                                        {% if expense.can_be_approved %}
+                                        <button hx-post="{% url 'accounts:htmx_manager_expense_approve' expense.id %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100">Approuver</button>
+                                        <button hx-post="{% url 'accounts:htmx_manager_expense_reject' expense.id %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-3 py-2 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100">Rejeter</button>
+                                        {% endif %}
+                                        {% if expense.can_be_paid %}
+                                        <button hx-post="{% url 'accounts:htmx_manager_expense_pay' expense.id %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700">Payer</button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="px-6 py-12 text-center text-slate-400">Aucune depense trouvee.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if expenses.has_other_pages %}
+                <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+                    <p class="text-sm text-slate-500">Page {{ expenses.number }} sur {{ expenses.paginator.num_pages }}</p>
+                    <div class="flex gap-2">
+                        {% if expenses.has_previous %}
+                        <a href="?section=depenses&expense_page={{ expenses.previous_page_number }}{% if expense_status %}&expense_status={{ expense_status }}{% endif %}{% if expense_category %}&expense_category={{ expense_category }}{% endif %}{% if expense_search %}&expense_q={{ expense_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm hover:bg-slate-50">Precedent</a>
+                        {% endif %}
+                        {% if expenses.has_next %}
+                        <a href="?section=depenses&expense_page={{ expenses.next_page_number }}{% if expense_status %}&expense_status={{ expense_status }}{% endif %}{% if expense_category %}&expense_category={{ expense_category }}{% endif %}{% if expense_search %}&expense_q={{ expense_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-light">Suivant</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if active_section == "caisse" %}
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Recettes etudiants</p><p class="text-2xl font-bold text-emerald-600 mt-2">{{ cash_stats.student_receipts_month|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Entrees caisse</p><p class="text-2xl font-bold text-blue-600 mt-2">{{ cash_stats.in_month|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Sorties caisse</p><p class="text-2xl font-bold text-rose-600 mt-2">{{ cash_stats.out_month|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Depenses payees</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ cash_stats.expenses_paid_month|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Salaires payes</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ cash_stats.salary_paid_month|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Net mouvements</p><p class="text-2xl font-bold text-primary mt-2">{{ cash_stats.net_month|intcomma }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Solde estime</p><p class="text-2xl font-bold text-cyan-700 mt-2">{{ cash_stats.estimated_month_balance|intcomma }}</p></div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-6">
+        <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-900 mb-4">Mouvement manuel</h3>
+            {% include "accounts/dashboard/partials/manager_cash_movement_form.html" %}
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white rounded-2xl border border-slate-100 p-4">
+                <div class="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
+                <form method="get" class="flex flex-col xl:flex-row gap-3 flex-1">
+                    <input type="hidden" name="section" value="caisse">
+                    <input type="text" name="cash_q" value="{{ cash_search }}" placeholder="Rechercher libelle ou reference..." class="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    <select name="cash_type" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                        <option value="">Tous sens</option>
+                        <option value="in" {% if cash_type == 'in' %}selected{% endif %}>Entrees</option>
+                        <option value="out" {% if cash_type == 'out' %}selected{% endif %}>Sorties</option>
+                    </select>
+                    <select name="cash_source" class="rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                        <option value="">Toutes sources</option>
+                        {% for value,label in cash_sources %}
+                        <option value="{{ value }}" {% if cash_source == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="px-5 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-light transition">Filtrer</button>
+                </form>
+                <button hx-post="{% url 'accounts:htmx_manager_cash_sync' %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="px-4 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                    <i class="fas fa-arrows-rotate mr-2"></i>Synchroniser encaissements
+                </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[980px] divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Mouvement</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Source</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Entree</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Sortie</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Agent</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            {% for movement in cash_movements %}
+                            <tr class="hover:bg-slate-50 transition">
+                                <td class="px-6 py-4"><p class="text-sm font-semibold text-slate-900">{{ movement.label }}</p><p class="text-xs text-slate-500">{{ movement.reference|default:"-" }}</p></td>
+                                <td class="px-6 py-4 text-sm text-slate-600">{{ movement.get_source_display }}</td>
+                                <td class="px-6 py-4 text-sm font-semibold text-right text-emerald-600">{% if movement.movement_type == 'in' %}{{ movement.amount|intcomma }} FCFA{% else %}-{% endif %}</td>
+                                <td class="px-6 py-4 text-sm font-semibold text-right text-rose-600">{% if movement.movement_type == 'out' %}{{ movement.amount|intcomma }} FCFA{% else %}-{% endif %}</td>
+                                <td class="px-6 py-4 text-sm text-slate-500">{{ movement.movement_date|date:"d/m/Y" }}</td>
+                                <td class="px-6 py-4 text-sm text-slate-600">{{ movement.created_by.get_full_name|default:movement.created_by.username|default:"-" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="px-6 py-12 text-center text-slate-400">Aucun mouvement de caisse.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if cash_movements.has_other_pages %}
+                <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+                    <p class="text-sm text-slate-500">Page {{ cash_movements.number }} sur {{ cash_movements.paginator.num_pages }}</p>
+                    <div class="flex gap-2">
+                        {% if cash_movements.has_previous %}
+                        <a href="?section=caisse&cash_page={{ cash_movements.previous_page_number }}{% if cash_type %}&cash_type={{ cash_type }}{% endif %}{% if cash_source %}&cash_source={{ cash_source }}{% endif %}{% if cash_search %}&cash_q={{ cash_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm hover:bg-slate-50">Precedent</a>
+                        {% endif %}
+                        {% if cash_movements.has_next %}
+                        <a href="?section=caisse&cash_page={{ cash_movements.next_page_number }}{% if cash_type %}&cash_type={{ cash_type }}{% endif %}{% if cash_source %}&cash_source={{ cash_source }}{% endif %}{% if cash_search %}&cash_q={{ cash_search|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-light">Suivant</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
     {% endif %}
 </div>

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from accounts.models import PayrollEntry, Profile
+from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
 
 
 @admin.register(Profile)
@@ -17,3 +17,19 @@ class PayrollEntryAdmin(admin.ModelAdmin):
     list_filter = ("branch", "status", "period_month")
     search_fields = ("employee__username", "employee__first_name", "employee__last_name", "employee__email")
     autocomplete_fields = ("employee", "branch", "created_by", "updated_by")
+
+
+@admin.register(BranchExpense)
+class BranchExpenseAdmin(admin.ModelAdmin):
+    list_display = ("title", "branch", "category", "amount", "expense_date", "status", "paid_at")
+    list_filter = ("branch", "category", "status", "expense_date")
+    search_fields = ("title", "supplier", "reference")
+    autocomplete_fields = ("branch", "created_by", "approved_by", "paid_by")
+
+
+@admin.register(BranchCashMovement)
+class BranchCashMovementAdmin(admin.ModelAdmin):
+    list_display = ("label", "branch", "movement_type", "source", "amount", "movement_date", "created_by")
+    list_filter = ("branch", "movement_type", "source", "movement_date")
+    search_fields = ("label", "reference", "notes")
+    autocomplete_fields = ("branch", "expense", "created_by")

@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 
-from .models import PayrollEntry, Profile
+from .models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
 
 User = get_user_model()
 
@@ -138,4 +138,63 @@ class PayrollEntryForm(forms.ModelForm):
         self.fields["notes"].widget.attrs.update({
             "class": TEXTAREA_CLASS,
             "placeholder": "Observations internes sur la paie du mois...",
+        })
+
+
+class BranchExpenseForm(forms.ModelForm):
+    class Meta:
+        model = BranchExpense
+        fields = [
+            "title",
+            "category",
+            "amount",
+            "expense_date",
+            "supplier",
+            "reference",
+            "receipt",
+            "notes",
+        ]
+        widgets = {
+            "expense_date": forms.DateInput(attrs={"type": "date"}),
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ["title", "category", "amount", "expense_date", "supplier", "reference"]:
+            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+        self.fields["receipt"].widget.attrs.update({
+            "class": INPUT_CLASS,
+            "accept": ".pdf,image/jpeg,image/png,image/webp",
+        })
+        self.fields["notes"].widget.attrs.update({
+            "class": TEXTAREA_CLASS,
+            "placeholder": "Motif, details ou justification interne...",
+        })
+
+
+class BranchCashMovementForm(forms.ModelForm):
+    class Meta:
+        model = BranchCashMovement
+        fields = [
+            "movement_type",
+            "source",
+            "amount",
+            "label",
+            "movement_date",
+            "reference",
+            "notes",
+        ]
+        widgets = {
+            "movement_date": forms.DateInput(attrs={"type": "date"}),
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ["movement_type", "source", "amount", "label", "movement_date", "reference"]:
+            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+        self.fields["notes"].widget.attrs.update({
+            "class": TEXTAREA_CLASS,
+            "placeholder": "Commentaire interne sur ce mouvement...",
         })

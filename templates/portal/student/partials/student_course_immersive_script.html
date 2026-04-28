@@ -1,0 +1,83 @@
+<script>
+  function studentCourseImmersive() {
+    return {
+      nav: [],
+      activeId: null,
+      orderedIds: [],
+      docViewerUrl: null,
+      init() {
+        const el = document.getElementById("ec-player-bundle-data");
+        if (el) {
+          try {
+            const bundle = JSON.parse(el.textContent || "{}");
+            this.nav = bundle.nav || [];
+            this.orderedIds = this.nav.map((row) => row.id);
+            this.activeId = bundle.initialId != null ? bundle.initialId : null;
+          } catch (e) {
+            this.nav = [];
+            this.orderedIds = [];
+            this.activeId = null;
+          }
+        }
+        this.$nextTick(() => {
+          if (window.lucide) {
+            lucide.createIcons();
+          }
+        });
+      },
+      currentIndex() {
+        return this.orderedIds.indexOf(this.activeId);
+      },
+      get canPrev() {
+        return this.orderedIds.length > 0 && this.currentIndex() > 0;
+      },
+      get canNext() {
+        const i = this.currentIndex();
+        return i >= 0 && i < this.orderedIds.length - 1;
+      },
+      setActive(id) {
+        this.activeId = id;
+        this.$nextTick(() => {
+          if (window.lucide) {
+            lucide.createIcons();
+          }
+        });
+      },
+      prevLesson() {
+        const i = this.currentIndex();
+        if (i > 0) {
+          this.activeId = this.orderedIds[i - 1];
+          this.$nextTick(() => {
+            if (window.lucide) {
+              lucide.createIcons();
+            }
+          });
+        }
+      },
+      nextLesson() {
+        const i = this.currentIndex();
+        if (i >= 0 && i < this.orderedIds.length - 1) {
+          this.activeId = this.orderedIds[i + 1];
+          this.$nextTick(() => {
+            if (window.lucide) {
+              lucide.createIcons();
+            }
+          });
+        }
+      },
+      activeLessonTitle() {
+        const row = this.nav.find((n) => n.id === this.activeId);
+        return row ? row.title : "";
+      },
+      openDocViewer(url) {
+        if (!url) {
+          return;
+        }
+        this.docViewerUrl = url;
+      },
+      closeDocViewer() {
+        this.docViewerUrl = null;
+      },
+    };
+  }
+</script>

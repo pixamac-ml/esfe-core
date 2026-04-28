@@ -136,6 +136,12 @@ def _prepare_chapter_contents(request, user, chapters):
             content.initial_progress_step = defaults["initial_progress"]
             content.completion_hint = defaults["completion_hint"]
             content.embed_video_url = _get_video_embed_url(content.video_url or "")
+            content.video_try_direct_player = (
+                content.content_type == ECContent.CONTENT_TYPE_VIDEO
+                and not content.embed_video_url
+                and bool((content.video_url or "").strip())
+                and not content.file
+            )
             content.preview_as_media = content.content_type in {
                 ECContent.CONTENT_TYPE_AUDIO,
                 ECContent.CONTENT_TYPE_IMAGE,
@@ -174,10 +180,10 @@ def _prepare_chapter_contents(request, user, chapters):
                 ECContent.CONTENT_TYPE_AUDIO: "Audio",
                 ECContent.CONTENT_TYPE_TEXT: "Texte",
             }.get(content.content_type, "Contenu")
-            if content.content_type == ECContent.CONTENT_TYPE_VIDEO and not content.embed_video_url and content.video_url:
-                content.preview_notice = "La video ne peut pas etre integree ici. Utilisez le lien d'ouverture."
+            if content.content_type == ECContent.CONTENT_TYPE_VIDEO and not content.embed_video_url and content.video_url and not content.file:
+                content.preview_notice = ""
             elif content.document_like and content.file and not content.office_embed_url:
-                content.preview_notice = "Apercu integre non disponible pour ce format. Ouvrez le document dans un nouvel onglet."
+                content.preview_notice = "Consultez le document via le lecteur integre ou le telechargement."
             elif content.has_broken_source:
                 content.preview_notice = "La ressource source est indisponible ou incomplete."
             else:
@@ -186,6 +192,28 @@ def _prepare_chapter_contents(request, user, chapters):
             chapter.has_accessible_content = chapter.has_accessible_content or content.has_accessible_source
 
     return chapters
+
+
+def _build_course_player_bundle(chapters):
+    flat_nav = []
+    for chapter in chapters:
+        for content in getattr(chapter, "active_contents", []):
+            flat_nav.append(
+                {
+                    "id": content.id,
+                    "title": content.title,
+                    "chapter_title": chapter.title,
+                    "done": bool(content.student_is_completed),
+                }
+            )
+    initial_id = None
+    for row in flat_nav:
+        if not row["done"]:
+            initial_id = row["id"]
+            break
+    if initial_id is None and flat_nav:
+        initial_id = flat_nav[0]["id"]
+    return {"nav": flat_nav, "initialId": initial_id}
 
 
 @login_required
@@ -317,6 +345,7 @@ def ec_detail(request, ec_id):
     total_completed_content_count = sum(chapter.completed_content_count for chapter in chapters)
     has_any_accessible_content = any(chapter.has_accessible_content for chapter in chapters)
 
+    player_bundle = _build_course_player_bundle(chapters)
     context = {
         "page_title": ec.title,
         "subtitle": "Contenus lies a cette matiere.",
@@ -328,6 +357,7 @@ def ec_detail(request, ec_id):
         "total_active_content_count": total_active_content_count,
         "total_completed_content_count": total_completed_content_count,
         "has_any_accessible_content": has_any_accessible_content,
+        "player_bundle": player_bundle,
     }
 
     template_name = (

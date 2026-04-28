@@ -390,6 +390,18 @@ urlpatterns = [
     path("htmx/manager/salary/<int:pk>/detail/", salary_detail, name="htmx_manager_salary_detail"),
     path("htmx/manager/salary/<int:pk>/save/", salary_upsert, name="htmx_manager_salary_upsert"),
     path("htmx/manager/payroll/<int:pk>/pay/", salary_pay, name="htmx_manager_salary_pay"),
+    path("htmx/manager/payroll/prepare-all/", salary_prepare_all, name="htmx_manager_salary_prepare_all"),
+    path("htmx/manager/payroll/pay-ready-all/", salary_pay_ready_all, name="htmx_manager_salary_pay_ready_all"),
+
+    # =============================================
+    # HTMX ACTIONS - DEPENSES ET CAISSE GESTIONNAIRE
+    # =============================================
+    path("htmx/manager/expense/create/", expense_create, name="htmx_manager_expense_create"),
+    path("htmx/manager/expense/<int:pk>/approve/", expense_approve, name="htmx_manager_expense_approve"),
+    path("htmx/manager/expense/<int:pk>/reject/", expense_reject, name="htmx_manager_expense_reject"),
+    path("htmx/manager/expense/<int:pk>/pay/", expense_pay, name="htmx_manager_expense_pay"),
+    path("htmx/manager/cash-movement/create/", cash_movement_create, name="htmx_manager_cash_movement_create"),
+    path("htmx/manager/cash/sync/", cash_sync, name="htmx_manager_cash_sync"),
 
     # =============================================
     # RECHERCHE

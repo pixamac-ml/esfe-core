@@ -7,7 +7,9 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from admissions.models import Candidature
-from accounts.models import PayrollEntry, Profile
+from accounts.forms import BranchCashMovementForm, BranchExpenseForm
+from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
+from accounts.services.manager_intelligence import build_manager_intelligence_context
 from inscriptions.models import Inscription
 from payments.models import CashPaymentSession, Payment, PaymentAgent
 from students.models import Student
@@ -306,6 +308,73 @@ def _manager_context(request, active_section="overview"):
         ).aggregate(total=Sum("amount"))["total"] or 0,
     }
 
+    expense_status = request.GET.get("expense_status", "").strip()
+    expense_category = request.GET.get("expense_category", "").strip()
+    expense_search = request.GET.get("expense_q", "").strip()
+    expenses_qs = BranchExpense.objects.filter(branch=branch).order_by("-expense_date", "-created_at")
+    if expense_status:
+        expenses_qs = expenses_qs.filter(status=expense_status)
+    if expense_category:
+        expenses_qs = expenses_qs.filter(category=expense_category)
+    if expense_search:
+        expenses_qs = expenses_qs.filter(
+            Q(title__icontains=expense_search)
+            | Q(supplier__icontains=expense_search)
+            | Q(reference__icontains=expense_search)
+        )
+    expenses_page = _paginate(request, expenses_qs, param_name="expense_page", per_page=15)
+    expenses_month = BranchExpense.objects.filter(branch=branch, expense_date__gte=start_of_month)
+    expense_stats = {
+        "total": BranchExpense.objects.filter(branch=branch).count(),
+        "submitted": BranchExpense.objects.filter(branch=branch, status=BranchExpense.STATUS_SUBMITTED).count(),
+        "approved": BranchExpense.objects.filter(branch=branch, status=BranchExpense.STATUS_APPROVED).count(),
+        "paid": BranchExpense.objects.filter(branch=branch, status=BranchExpense.STATUS_PAID).count(),
+        "month_amount": expenses_month.exclude(status=BranchExpense.STATUS_REJECTED).aggregate(total=Sum("amount"))["total"] or 0,
+        "paid_month_amount": expenses_month.filter(status=BranchExpense.STATUS_PAID).aggregate(total=Sum("amount"))["total"] or 0,
+        "pending_amount": BranchExpense.objects.filter(
+            branch=branch,
+            status__in=[BranchExpense.STATUS_SUBMITTED, BranchExpense.STATUS_APPROVED],
+        ).aggregate(total=Sum("amount"))["total"] or 0,
+    }
+
+    cash_type = request.GET.get("cash_type", "").strip()
+    cash_source = request.GET.get("cash_source", "").strip()
+    cash_search = request.GET.get("cash_q", "").strip()
+    cash_movements_qs = BranchCashMovement.objects.filter(branch=branch).select_related("expense", "created_by")
+    if cash_type:
+        cash_movements_qs = cash_movements_qs.filter(movement_type=cash_type)
+    if cash_source:
+        cash_movements_qs = cash_movements_qs.filter(source=cash_source)
+    if cash_search:
+        cash_movements_qs = cash_movements_qs.filter(
+            Q(label__icontains=cash_search)
+            | Q(reference__icontains=cash_search)
+            | Q(notes__icontains=cash_search)
+        )
+    cash_movements_page = _paginate(
+        request,
+        cash_movements_qs.order_by("-movement_date", "-created_at"),
+        param_name="cash_page",
+        per_page=15,
+    )
+    cash_month_movements = BranchCashMovement.objects.filter(branch=branch, movement_date__gte=start_of_month)
+    cash_in_month = cash_month_movements.filter(movement_type=BranchCashMovement.TYPE_IN).aggregate(total=Sum("amount"))["total"] or 0
+    cash_out_month = cash_month_movements.filter(movement_type=BranchCashMovement.TYPE_OUT).aggregate(total=Sum("amount"))["total"] or 0
+    salary_paid_month = PayrollEntry.objects.filter(
+        branch=branch,
+        period_month=start_of_month,
+    ).aggregate(total=Sum("paid_amount"))["total"] or 0
+    cash_stats = {
+        "movements": BranchCashMovement.objects.filter(branch=branch).count(),
+        "in_month": cash_in_month,
+        "out_month": cash_out_month,
+        "net_month": cash_in_month - cash_out_month,
+        "estimated_month_balance": cash_in_month - cash_out_month,
+        "student_receipts_month": total_month,
+        "expenses_paid_month": expense_stats["paid_month_amount"],
+        "salary_paid_month": salary_paid_month,
+    }
+
     payroll_entries_qs = (
         PayrollEntry.objects
         .filter(
@@ -366,6 +435,16 @@ def _manager_context(request, active_section="overview"):
         "paid_total": payroll_total_paid,
         "remaining_total": payroll_remaining,
     }
+    intelligence = build_manager_intelligence_context(
+        branch=branch,
+        payroll_month=payroll_month,
+        base_payments=base_payments,
+        base_inscriptions=base_inscriptions,
+        payroll_stats=payroll_stats,
+        expense_stats=expense_stats,
+        cash_stats=cash_stats,
+        branch_staff_user_ids=branch_staff_user_ids,
+    )
 
     quick_search = request.GET.get("q", "").strip()
     quick_results = {"candidatures": [], "inscriptions": [], "payments": []}
@@ -438,6 +517,21 @@ def _manager_context(request, active_section="overview"):
         "pay_status": pay_status,
         "pay_date": pay_date,
         "pay_search": pay_search,
+        "expenses": expenses_page,
+        "expense_stats": expense_stats,
+        "expense_status": expense_status,
+        "expense_category": expense_category,
+        "expense_search": expense_search,
+        "expense_form": BranchExpenseForm(),
+        "expense_categories": BranchExpense.CATEGORY_CHOICES,
+        "cash_movements": cash_movements_page,
+        "cash_stats": cash_stats,
+        "cash_type": cash_type,
+        "cash_source": cash_source,
+        "cash_search": cash_search,
+        "cash_form": BranchCashMovementForm(),
+        "cash_sources": BranchCashMovement.SOURCE_CHOICES,
+        "manager_intelligence": intelligence,
         "manager_search": quick_search,
         "quick_results": quick_results,
         "dashboard_type": "manager",
@@ -455,7 +549,7 @@ def _render_manager_dashboard(request, active_section):
 @manager_required
 def manager_dashboard(request):
     section = request.GET.get("section", "overview").strip() or "overview"
-    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires"}
+    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse"}
     if section not in allowed_sections:
         section = "overview"
     return _render_manager_dashboard(request, section)

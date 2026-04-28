@@ -1,214 +1,136 @@
-<div class="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]" data-student-content-root>
-  <section class="border-b border-[color:var(--line)] bg-[color:var(--card)] px-5 py-4">
-    <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">
+{{ player_bundle|json_script:"ec-player-bundle-data" }}
+
+<div
+  class="ec-immersive-root flex h-full min-h-0 flex-col bg-[color:var(--surface)] text-[color:var(--text)]"
+  x-data="studentCourseImmersive()"
+  x-init="init()"
+>
+  {# Lecteur document / URL plein ecran (meme onglet, sans target=_blank) #}
+  <div
+    x-show="docViewerUrl"
+    x-cloak
+    class="fixed inset-0 z-[90] flex flex-col bg-[color:var(--text)]"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[color:var(--school-primary-dark)] px-3 py-2 text-white">
+      <span class="min-w-0 truncate text-sm font-bold">Lecteur integre</span>
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-extrabold uppercase tracking-wide hover:bg-white/20"
+        @click="closeDocViewer()"
+      >
+        Fermer
+      </button>
+    </div>
+    <iframe :src="docViewerUrl" class="min-h-0 w-full flex-1 border-0 bg-white" title="Document"></iframe>
+  </div>
+
+  <header class="shrink-0 border-b border-[color:var(--line)] bg-[color:var(--card)] px-4 py-3 sm:px-5">
+    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">
       S{{ ec.ue.semester.number }} · {{ ec.ue.code }} · {{ enrollment.academic_class.display_name }}
     </p>
-    <h1 class="mt-2 text-2xl font-black tracking-tight text-[color:var(--text)]">{{ ec.title }}</h1>
-    <p class="mt-2 text-sm text-[color:var(--muted)]">{{ subtitle }}</p>
+    <h1 class="mt-1 text-lg font-black tracking-tight text-[color:var(--text)] sm:text-xl">{{ ec.title }}</h1>
+    <p class="mt-1 text-sm text-[color:var(--muted)]">{{ subtitle }}</p>
+    <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-[color:var(--muted)]">
+      <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1">{{ total_completed_content_count }}/{{ total_active_content_count }} lecons</span>
+      <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1">{{ chapter_count }} chapitre{{ chapter_count|pluralize }}</span>
+    </div>
+  </header>
 
-    <div class="mt-4 grid gap-3 sm:grid-cols-3">
-      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
-        <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">UE</p>
-        <p class="mt-1 text-sm font-semibold text-[color:var(--text)]">{{ ec.ue.title }}</p>
-      </div>
-      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
-        <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">Coefficient</p>
-        <p class="mt-1 text-sm font-semibold text-[color:var(--text)]">{{ ec.coefficient }}</p>
-      </div>
-      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
-        <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">Credit</p>
-        <p class="mt-1 text-sm font-semibold text-[color:var(--text)]">{{ ec.credit_required }}</p>
+  {% if not chapters_available %}
+    <div class="flex flex-1 items-center justify-center p-6">
+      <div class="max-w-md rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
+        Les chapitres et contenus pedagogiques detailles ne sont pas encore disponibles dans cet environnement.
       </div>
     </div>
-  </section>
-
-  <div class="min-h-0 overflow-y-auto bg-[color:var(--surface)] px-5 py-4">
-    <div class="space-y-4">
-      {% if not chapters_available %}
-        <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
-          Les chapitres et contenus pedagogiques detailles ne sont pas encore disponibles dans cet environnement.
+  {% else %}
+    <div class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
+      <aside class="flex max-h-[min(38vh,320px)] min-h-0 flex-col border-b border-[color:var(--line)] bg-[color:var(--card)] lg:max-h-none lg:border-b-0 lg:border-r">
+        <div class="shrink-0 border-b border-[color:var(--line)] px-3 py-2 lg:hidden">
+          <span class="text-xs font-extrabold uppercase tracking-wide text-[color:var(--muted)]">Plan du cours</span>
         </div>
-      {% else %}
-        {% for chapter in chapters %}
-          <section class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">Chapitre {{ forloop.counter }}</p>
-                <h2 class="mt-1 text-lg font-bold text-[color:var(--text)]">{{ chapter.title }}</h2>
-              </div>
-              <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-1 text-[11px] font-bold text-[color:var(--muted)]">
-                {{ chapter.active_content_count }} contenu{{ chapter.active_content_count|pluralize }}
-              </span>
-            </div>
-
-            <div class="mt-4 space-y-3">
-              {% for content in chapter.active_contents %}
-                <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
-                  <div class="flex flex-col gap-4">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">{{ content.get_content_type_display }}</p>
-                          {% if content.student_is_completed %}
-                            <span class="rounded-full bg-[color:var(--school-primary-soft)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--school-primary)]">Termine</span>
-                          {% else %}
-                            <span class="rounded-full border border-[color:var(--line)] bg-white px-2.5 py-1 text-[11px] font-bold text-[color:var(--muted)]">{{ content.student_progress_percent }}%</span>
-                          {% endif %}
-                        </div>
-                        <h3 class="mt-1 text-base font-bold text-[color:var(--text)]">{{ content.title }}</h3>
-                        <p class="mt-2 text-sm text-[color:var(--muted)]">Ajoute le {{ content.created_at|date:"d/m/Y H:i" }}</p>
-                      </div>
-                      <div class="flex flex-wrap gap-2">
-                        {% if content.file %}
-                          <a
-                            href="{{ content.file.url }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            data-track-content="{{ content.id }}"
-                            data-track-progress="{{ content.initial_progress_step }}"
-                            class="inline-flex items-center rounded-xl border border-[color:var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:border-primary-200 hover:text-primary-600"
-                          >
-                            Ouvrir
-                          </a>
-                        {% elif content.video_url and not content.embed_video_url %}
-                          <a
-                            href="{{ content.video_url }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            data-track-content="{{ content.id }}"
-                            data-track-progress="{{ content.initial_progress_step }}"
-                            class="inline-flex items-center rounded-xl border border-[color:var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:border-primary-200 hover:text-primary-600"
-                          >
-                            Ouvrir la video
-                          </a>
-                        {% endif %}
-                        <button
-                          type="button"
-                          data-complete-content="{{ content.id }}"
-                          class="inline-flex items-center rounded-xl bg-[color:var(--school-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-600"
-                        >
-                          Marquer termine
-                        </button>
-                      </div>
-                    </div>
-
-                    <div class="space-y-3">
-                      <div class="h-2 overflow-hidden rounded-full bg-white">
-                        <div class="h-full rounded-full bg-gradient-to-r from-[color:var(--school-primary)] to-[color:var(--school-secondary)]" style="width: {{ content.student_progress_percent }}%"></div>
-                      </div>
-
-                      {% if content.preview_notice %}
-                        <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
-                          {{ content.preview_notice }}
-                        </div>
-                      {% endif %}
-
-                      {% if content.content_type == "video" and content.file %}
-                        <video
-                          controls
-                          preload="metadata"
-                          class="w-full rounded-xl border border-[color:var(--line)] bg-black"
-                          data-media-progress-content="{{ content.id }}"
-                        >
-                          <source src="{{ content.file.url }}">
-                        </video>
-                      {% elif content.content_type == "video" and content.embed_video_url %}
-                        <div class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-black">
-                          <iframe
-                            src="{{ content.embed_video_url }}"
-                            class="aspect-video w-full"
-                            allowfullscreen
-                            loading="lazy"
-                            data-track-content="{{ content.id }}"
-                            data-track-progress="{{ content.initial_progress_step }}"
-                          ></iframe>
-                        </div>
-                      {% elif content.content_type == "audio" and content.file %}
-                        <audio
-                          controls
-                          preload="metadata"
-                          class="w-full"
-                          data-media-progress-content="{{ content.id }}"
-                        >
-                          <source src="{{ content.file.url }}">
-                        </audio>
-                      {% elif content.content_type == "image" and content.file %}
-                        <img
-                          src="{{ content.file.url }}"
-                          alt="{{ content.title }}"
-                          class="max-h-[24rem] w-full rounded-xl border border-[color:var(--line)] object-contain bg-white"
-                          data-track-content="{{ content.id }}"
-                          data-track-progress="{{ content.initial_progress_step }}"
-                        >
-                      {% elif content.content_type == "pdf" and content.file %}
-                        <div class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-white">
-                          <iframe
-                            src="{{ content.file.url }}"
-                            class="h-[28rem] w-full"
-                            loading="lazy"
-                            data-track-content="{{ content.id }}"
-                            data-track-progress="{{ content.initial_progress_step }}"
-                          ></iframe>
-                        </div>
-                      {% elif content.content_type == "text" and content.text_content %}
-                        <div
-                          class="whitespace-pre-line rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm leading-7 text-[color:var(--text)]"
-                          data-track-content="{{ content.id }}"
-                          data-track-progress="{{ content.initial_progress_step }}"
-                        >
-                          {{ content.text_content }}
-                        </div>
-                      {% elif content.document_like and content.file %}
-                        {% if content.office_embed_url %}
-                          <div class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-white">
-                            <iframe
-                              src="{{ content.office_embed_url }}"
-                              class="h-[28rem] w-full"
-                              loading="lazy"
-                              data-track-content="{{ content.id }}"
-                              data-track-progress="{{ content.initial_progress_step }}"
-                            ></iframe>
-                          </div>
-                          <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[color:var(--muted)]">
-                            <span>Apercu via Office Online (si accessible).</span>
-                            <a href="{{ content.file.url }}" target="_blank" rel="noopener noreferrer" class="font-bold text-[color:var(--school-primary)]">Telecharger</a>
-                          </div>
-                        {% else %}
-                          <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
-                            Ce format n'est pas previsualisable ici. Utilisez <strong>Ouvrir</strong> pour consulter le document.
-                          </div>
-                        {% endif %}
-                      {% elif content.file %}
-                        <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
-                          Fichier disponible a la consultation.
-                        </div>
-                      {% elif content.video_url %}
-                        <div class="rounded-xl border border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
-                          La video existe mais n'est pas integrable ici. Ouvrez-la dans un nouvel onglet.
-                        </div>
+        <div class="student-scroll min-h-0 flex-1 overflow-y-auto p-3">
+          {% for chapter in chapters %}
+            <div class="mb-4 last:mb-0">
+              <p class="px-2 pb-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-[color:var(--muted-2)]">{{ chapter.title }}</p>
+              <div class="flex flex-col gap-1">
+                {% for content in chapter.active_contents %}
+                  <button
+                    type="button"
+                    class="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left text-sm font-semibold transition"
+                    :class="activeId === {{ content.id }} ? 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary-dark)] ring-1 ring-[color:var(--school-primary)]/25' : 'text-[color:var(--text)] hover:bg-[color:var(--card-soft)]'"
+                    @click="setActive({{ content.id }})"
+                  >
+                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg border border-[color:var(--line)] bg-white text-[10px] font-black text-[color:var(--muted)]">
+                      {% if content.student_is_completed %}
+                        <i data-lucide="check" class="h-3.5 w-3.5 text-[color:var(--school-secondary)]"></i>
                       {% else %}
-                        <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-white p-4 text-sm text-[color:var(--muted)]">
-                          La ressource de ce contenu n'est pas disponible pour le moment.
-                        </div>
+                        {{ forloop.counter }}
                       {% endif %}
-
-                      <p class="text-xs text-[color:var(--muted)]">{{ content.completion_hint }}</p>
-                    </div>
-                  </div>
-                </article>
-              {% empty %}
-                <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-5 text-center text-sm text-[color:var(--muted)]">
-                  Aucun contenu actif dans ce chapitre.
-                </div>
-              {% endfor %}
+                    </span>
+                    <span class="min-w-0 leading-snug">{{ content.title }}</span>
+                  </button>
+                {% endfor %}
+              </div>
             </div>
-          </section>
-        {% empty %}
-          <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
-            Aucun chapitre pedagogique n'est encore associe a cette matiere.
-          </div>
-        {% endfor %}
-      {% endif %}
+          {% empty %}
+            <p class="p-3 text-sm text-[color:var(--muted)]">Aucun chapitre.</p>
+          {% endfor %}
+        </div>
+      </aside>
+
+      <main class="flex min-h-0 min-w-0 flex-col bg-[color:var(--surface)]">
+        <div
+          class="flex shrink-0 flex-wrap items-center gap-2 border-b border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 sm:px-4"
+          x-show="activeId !== null && orderedIds.length"
+          x-cloak
+        >
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-xs font-extrabold text-[color:var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
+            @click="prevLesson()"
+            :disabled="!canPrev"
+          >
+            <i data-lucide="chevron-left" class="h-4 w-4"></i>
+            Precedent
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-xs font-extrabold text-[color:var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
+            @click="nextLesson()"
+            :disabled="!canNext"
+          >
+            Suivant
+            <i data-lucide="chevron-right" class="h-4 w-4"></i>
+          </button>
+          <span class="ml-auto min-w-0 max-w-[55%] truncate text-xs font-bold text-[color:var(--muted)]" x-text="activeLessonTitle()"></span>
+        </div>
+
+        <div class="student-scroll flex min-h-0 flex-1 flex-col overflow-y-auto p-3 sm:p-4">
+          {% for chapter in chapters %}
+            {% for content in chapter.active_contents %}
+              <div
+                x-show="activeId === {{ content.id }}"
+                x-cloak
+                class="flex min-h-0 flex-1 flex-col"
+              >
+                {% include "portal/student/partials/ec_content_lesson.html" with content=content only %}
+              </div>
+            {% endfor %}
+          {% empty %}
+            <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
+              Aucun chapitre pedagogique n'est encore associe a cette matiere.
+            </div>
+          {% endfor %}
+
+          {% if chapters and not total_active_content_count %}
+            <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
+              Aucun contenu actif dans les chapitres de ce cours.
+            </div>
+          {% endif %}
+        </div>
+      </main>
     </div>
-  </div>
+  {% endif %}
 </div>

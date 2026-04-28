@@ -11,8 +11,15 @@ from django.views.decorators.http import require_GET, require_POST
 from django.db.models import Q
 
 from admissions.models import Candidature
-from accounts.forms import PayrollEntryForm
-from accounts.models import PayrollEntry, Profile
+from accounts.forms import BranchCashMovementForm, BranchExpenseForm, PayrollEntryForm
+from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
+from accounts.services.manager_intelligence import (
+    payment_cash_reference,
+    pay_ready_payroll_entries,
+    payroll_cash_reference,
+    prepare_missing_payroll_entries,
+    sync_student_payment_cash_movements,
+)
 from inscriptions.models import Inscription
 from payments.models import CashPaymentSession, Payment, PaymentAgent
 
@@ -95,6 +102,18 @@ def manager_salary_redirect_response(period_month):
     response["HX-Redirect"] = (
         f"{reverse('accounts:manager_dashboard')}?section=salaires&salary_month={period_month.strftime('%Y-%m')}"
     )
+    return response
+
+
+def manager_section_redirect_response(section):
+    response = HttpResponse("")
+    response["HX-Redirect"] = f"{reverse('accounts:manager_dashboard')}?section={section}"
+    return response
+
+
+def manager_section_notice_redirect_response(section, message):
+    response = HttpResponse("")
+    response["HX-Redirect"] = f"{reverse('accounts:manager_dashboard')}?section={section}&notice={message}"
     return response
 
 
@@ -261,6 +280,19 @@ def payment_validate(request, pk):
     payment.status = Payment.STATUS_VALIDATED
     payment.paid_at = timezone.now()
     payment.save()
+    BranchCashMovement.objects.get_or_create(
+        branch=request.branch,
+        source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+        reference=payment_cash_reference(payment),
+        defaults={
+            "movement_type": BranchCashMovement.TYPE_IN,
+            "amount": payment.amount,
+            "label": f"Paiement etudiant - {payment.inscription.candidature.full_name}",
+            "movement_date": payment.paid_at.date(),
+            "notes": f"Synchronisation automatique paiement #{payment.pk}.",
+            "created_by": request.user,
+        },
+    )
     payment.refresh_from_db()
     return render(
         request,
@@ -471,6 +503,19 @@ def cash_session_complete(request, pk):
             agent=manager_agent,
             cash_session=session,
         )
+        BranchCashMovement.objects.get_or_create(
+            branch=request.branch,
+            source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+            reference=payment_cash_reference(payment),
+            defaults={
+                "movement_type": BranchCashMovement.TYPE_IN,
+                "amount": payment.amount,
+                "label": f"Paiement etudiant - {payment.inscription.candidature.full_name}",
+                "movement_date": payment.paid_at.date(),
+                "notes": f"Synchronisation automatique paiement #{payment.pk}.",
+                "created_by": request.user,
+            },
+        )
         session.is_used = True
         session.save(update_fields=["is_used"])
 
@@ -608,5 +653,143 @@ def salary_pay(request, pk):
     payroll_entry.paid_amount += payment_amount
     payroll_entry.updated_by = request.user
     payroll_entry.save()
+    BranchCashMovement.objects.create(
+        branch=request.branch,
+        movement_type=BranchCashMovement.TYPE_OUT,
+        source=BranchCashMovement.SOURCE_PAYROLL,
+        amount=payment_amount,
+        label=f"Salaire - {payroll_entry.employee.get_full_name() or payroll_entry.employee.username}",
+        movement_date=timezone.localdate(),
+        reference=payroll_cash_reference(payroll_entry, payment_amount),
+        notes=f"Paiement salaire {payroll_entry.period_month:%Y-%m}.",
+        created_by=request.user,
+    )
 
     return manager_salary_redirect_response(payroll_entry.period_month)
+
+
+@manager_required
+@require_POST
+def salary_prepare_all(request):
+    payroll_month = get_salary_period_from_request(request)
+    result = prepare_missing_payroll_entries(request.branch, payroll_month, request.user)
+    return manager_section_notice_redirect_response(
+        "salaires",
+        f"paies_preparees_{result['created']}",
+    )
+
+
+@manager_required
+@require_POST
+def salary_pay_ready_all(request):
+    payroll_month = get_salary_period_from_request(request)
+    result = pay_ready_payroll_entries(request.branch, payroll_month, request.user)
+    return manager_section_notice_redirect_response(
+        "salaires",
+        f"salaires_payes_{result['paid_count']}",
+    )
+
+
+@manager_required
+@require_POST
+def expense_create(request):
+    form = BranchExpenseForm(request.POST, request.FILES)
+    if not form.is_valid():
+        response = render(
+            request,
+            "accounts/dashboard/partials/manager_expense_form.html",
+            {"expense_form": form},
+        )
+        response.status_code = 400
+        return response
+
+    expense = form.save(commit=False)
+    expense.branch = request.branch
+    expense.created_by = request.user
+    expense.status = BranchExpense.STATUS_SUBMITTED
+    expense.save()
+    return manager_section_redirect_response("depenses")
+
+
+@manager_required
+@require_POST
+def expense_approve(request, pk):
+    expense = get_object_or_404(BranchExpense, pk=pk, branch=request.branch)
+    if not expense.can_be_approved:
+        return HttpResponse("Cette depense ne peut pas etre approuvee.", status=400)
+    expense.status = BranchExpense.STATUS_APPROVED
+    expense.approved_by = request.user
+    expense.approved_at = timezone.now()
+    expense.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
+    return manager_section_redirect_response("depenses")
+
+
+@manager_required
+@require_POST
+def expense_reject(request, pk):
+    expense = get_object_or_404(BranchExpense, pk=pk, branch=request.branch)
+    if expense.status == BranchExpense.STATUS_PAID:
+        return HttpResponse("Une depense deja payee ne peut pas etre rejetee.", status=400)
+    expense.status = BranchExpense.STATUS_REJECTED
+    expense.save(update_fields=["status", "updated_at"])
+    return manager_section_redirect_response("depenses")
+
+
+@manager_required
+@require_POST
+def expense_pay(request, pk):
+    with transaction.atomic():
+        expense = get_object_or_404(
+            BranchExpense.objects.select_for_update(),
+            pk=pk,
+            branch=request.branch,
+        )
+        if not expense.can_be_paid:
+            return HttpResponse("Cette depense doit etre approuvee avant paiement.", status=400)
+        expense.status = BranchExpense.STATUS_PAID
+        expense.paid_by = request.user
+        expense.paid_at = timezone.now()
+        expense.save(update_fields=["status", "paid_by", "paid_at", "updated_at"])
+        BranchCashMovement.objects.create(
+            branch=request.branch,
+            movement_type=BranchCashMovement.TYPE_OUT,
+            source=BranchCashMovement.SOURCE_EXPENSE,
+            amount=expense.amount,
+            label=expense.title,
+            movement_date=expense.expense_date,
+            expense=expense,
+            reference=expense.reference,
+            notes=expense.notes,
+            created_by=request.user,
+        )
+    return manager_section_redirect_response("depenses")
+
+
+@manager_required
+@require_POST
+def cash_movement_create(request):
+    form = BranchCashMovementForm(request.POST)
+    if not form.is_valid():
+        response = render(
+            request,
+            "accounts/dashboard/partials/manager_cash_movement_form.html",
+            {"cash_form": form},
+        )
+        response.status_code = 400
+        return response
+
+    movement = form.save(commit=False)
+    movement.branch = request.branch
+    movement.created_by = request.user
+    movement.save()
+    return manager_section_redirect_response("caisse")
+
+
+@manager_required
+@require_POST
+def cash_sync(request):
+    result = sync_student_payment_cash_movements(request.branch, request.user)
+    return manager_section_notice_redirect_response(
+        "caisse",
+        f"caisse_sync_{result['created']}",
+    )

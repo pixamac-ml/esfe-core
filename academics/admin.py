@@ -17,6 +17,7 @@ from .models import (
     AcademicScheduleEvent,
     AcademicScheduleChangeLog,
     AcademicScheduleExecutionLog,
+    LessonLog,
 )
 
 @admin.register(AcademicYear)
@@ -198,3 +199,43 @@ class AcademicScheduleExecutionLogAdmin(admin.ModelAdmin):
     list_display = ("event", "actual_teacher", "started_at", "ended_at", "is_completed", "completed_by")
     list_filter = ("is_completed", "event__branch", "event__academic_class", "event__teacher", "started_at")
     search_fields = ("event__title", "notes", "actual_teacher__username", "completed_by__username")
+
+
+@admin.register(LessonLog)
+class LessonLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "academic_class",
+        "ec",
+        "teacher",
+        "date",
+        "start_time",
+        "end_time",
+        "status",
+        "branch",
+    )
+    list_filter = (
+        "status",
+        "date",
+        "academic_class",
+        "branch",
+        "teacher",
+    )
+    search_fields = (
+        "academic_class__name",
+        "academic_class__programme__title",
+        "ec__title",
+        "teacher__username",
+        "teacher__first_name",
+        "teacher__last_name",
+        "content",
+        "observations",
+    )
+    autocomplete_fields = (
+        "academic_class",
+        "ec",
+        "teacher",
+        "schedule_event",
+        "branch",
+        "created_by",
+        "validated_by",
+    )

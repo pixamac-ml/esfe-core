@@ -250,3 +250,538 @@ C’est le centre de gestion du profil étudiant.
   3. seulement après, refondre le rendu en style portal
 
   Si tu veux, j’attaque maintenant directement la phase suivante: dépenses et caisse d’annexe dans ce même dashboard gestionnaire.
+
+
+
+
+MANUEL D’UTILISATION DU LOGICIEL DE GESTION ACCADEMIQUE
+N°	Poste	Rôle et tâches 	Ressources
+	Directeur des Etudes 	1-Création des classes
+2-Elaboration de programme par classe sur la base des relevés transmis.
+3-Création de la base des enseignants en fonction du programme
+4-Elaboration des emplois du temps en fonction de la disponibilité des enseignants.
+5-Transmission des documents (syllabus des cours/programme et l’emploi du temps)
+6-Suivi de l’évolution du programme et des cours.
+7-Arrêt des cours.
+8- Programmation et organisation des évaluations (partielle et semestrielle) et la gestion des notes.
+9-Elaboration de document administratif (fiche de transfert, fiche de fréquentation, lettre de stage etc…)
+10-Le bon fonctionnement de l’établissement.	-Curriculum de formation
+-Les maquettes pédagogiques
+-règlement intérieur
+-Charte des examens
+-Charte de stage
+
+	Gestionnaires	1-Inscription (remplissage de la fiche d’inscription sur la base des dossiers, du bulletin de paiement sur la base du paiement sanctionné par un reçu)
+2-Elaboration de la liste des étudiants par filière et par niveau.
+3-Transmission de la liste au DE et surveillant
+4-Rappel des non paiements et encaissement.
+5-Dépenses (paiement du personnel, paiement des enseignants, sorti d’argent pour le fonctionnement, versement d’argent.
+6-Calcul de l’argent disponible (état de caisse)	-Bulletin de paie
+-Formulaire d’inscription
+-Bon de sortie/Entré
+
+	Informaticien	1-Gestion des notes et relevés
+2-Assurer le bon fonctionnement des outils informatique
+3-Dispensation de cours NTIC
+4-Gestion de la salle informatique (photocopie, impression, reliure etc…)
+	Secrétaires 	1-Acceuil – orientation – renseignements - information des usagers
+2- Gestion des rendez-vous et agenda
+3-Archivage
+4-Elaboration des documents administratifs
+5- Photocopie, impression
+6-Tenue du registre d’information et de contact.
+	Moniteur/trice	1-Dispensation de cours (théoriques, pratiques, démonstrations, suppléance des enseignants)
+2-Gestion des laboratoires (soins infirmiers, soins obstétricaux, biologie médicale)
+3-Premiers soins
+4-Suivi des stagiaires
+5-Correction des carnets de stage
+	Surveillant	1-Suivi de l’assiduité, la régularité (présence, absence, ponctualité, porte de la tenue, discipline) des étudiants, des enseignants et autres usagers.
+2-Suivi du bon déroulement des activités scolaires (cours, évaluations, évènements, réunion, cahier de texte etc…)
+3-Gestion de la relation école-parent
+4-Transmission des informations au DE et gestionnaire
+5-Organisation de la surveillance des examens et évaluations
+
+
+
+
+Analyse entièrement le projet Django avant toute modification.
+
+Objectif global :
+Mettre en place la couche métier "vie scolaire" (assiduité + cahier de texte) de manière complète, modulaire et indépendante, sans connexion au dashboard pour le moment.
+
+IMPORTANT :
+On ne touche PAS aux dashboards existants.
+On développe uniquement les modèles, services, vues backend et endpoints nécessaires.
+Le branchement UI se fera plus tard.
+
+---
+
+CONTEXTE ARCHITECTURE
+
+- Projet Django modulaire existant
+- Apps déjà présentes : academics, students, accounts, portal, secretary, core, inscriptions
+- Gestion par annexe (branch) déjà en place → OBLIGATOIRE dans toutes les requêtes
+- Planning académique déjà fonctionnel (AcademicScheduleEvent, services existants)
+
+Règles strictes :
+
+- Toute logique métier → services.py
+- Vues Django = fines (appel services uniquement)
+- AUCUNE logique métier dans templates
+- Code structuré, réutilisable et testable
+- Filtrage par annexe obligatoire sur toutes les données
+- Ne pas casser les modèles existants
+
+---
+
+PHASE 1 : MODULE ASSIDUITÉ
+
+Créer les modèles suivants :
+
+1. StudentAttendance
+
+- student (FK Student)
+- classroom (FK Classroom)
+- date (DateField)
+- status (present, absent, late)
+- arrival_time (TimeField nullable)
+- justification (TextField nullable)
+- recorded_by (FK User)
+- branch (FK Branch)
+- created_at / updated_at
+
+Contraintes :
+
+- unicité (student, date)
+- index sur (classroom, date)
+- index sur (branch, date)
+
+---
+
+2. TeacherAttendance
+
+- teacher (FK User ou Teacher)
+- date
+- status (present, absent, late)
+- arrival_time
+- justification
+- recorded_by
+- branch
+- timestamps
+
+---
+
+3. AttendanceAlert (optionnel mais recommandé)
+
+- type (absence_repetition, late_repetition)
+- student
+- count
+- triggered_at
+- is_resolved
+
+---
+
+---
+
+PHASE 2 : CAHIER DE TEXTE (CRITIQUE)
+
+Créer le modèle :
+
+LessonLog
+
+- classroom (FK Classroom)
+- subject (FK Subject)
+- teacher (FK User)
+- schedule_event (FK AcademicScheduleEvent nullable)
+- date
+- start_time
+- end_time
+
+- status (planned, done, cancelled, absent_teacher)
+
+- content (TextField)  → contenu du cours
+- homework (TextField nullable)
+- observations (TextField nullable)
+
+- branch (FK Branch)
+- created_by
+- validated_by (nullable)
+
+- timestamps
+
+Contraintes :
+
+- index (classroom, date)
+- index (teacher, date)
+
+---
+
+PHASE 3 : SERVICES MÉTIER
+
+Créer :
+
+students/services/attendance_service.py
+academics/services/lesson_log_service.py
+
+---
+
+Fonctions attendues :
+
+ATTENDANCE SERVICE :
+
+- mark_student_attendance(...)
+- mark_teacher_attendance(...)
+- get_class_attendance_summary(classroom, date)
+- get_student_attendance_history(student)
+- detect_repeated_absences(student)
+- detect_repeated_lates(student)
+
+---
+
+LESSON LOG SERVICE :
+
+- create_lesson_log(...)
+- update_lesson_log(...)
+- get_class_lesson_logs(classroom)
+- get_teacher_lesson_logs(teacher)
+- get_daily_lesson_status(branch, date)
+
+---
+
+PHASE 4 : API / VUES BACKEND
+
+Créer des vues Django (sans frontend) :
+
+- enregistrer présence étudiant
+- enregistrer présence enseignant
+- créer cahier de texte
+- modifier cahier de texte
+- récupérer données (JSON)
+
+Utiliser :
+
+- JsonResponse ou DRF si déjà présent
+
+---
+
+PHASE 5 : VALIDATIONS MÉTIER
+
+Implémenter les règles suivantes :
+
+- 3 absences consécutives → alerte
+- 3 retards → alerte
+- cours sans LessonLog → considéré comme non tenu
+- teacher absent + lesson planned → statut critique
+
+---
+
+PHASE 6 : ADMIN DJANGO
+
+Configurer admin pour :
+
+- StudentAttendance
+- TeacherAttendance
+- LessonLog
+
+Avec :
+
+- filtres par date
+- filtres par classe
+- filtres par annexe
+- recherche par étudiant / enseignant
+
+---
+
+PHASE 7 : TESTS MINIMUM
+
+Créer tests unitaires pour :
+
+- création présence
+- création lesson log
+- détection anomalies
+
+---
+
+LIVRABLE ATTENDU :
+
+- modèles complets
+- services structurés
+- vues backend fonctionnelles
+- admin configuré
+- code commenté
+- aucune dépendance UI
+
+---
+
+IMPORTANT FINAL :
+
+Ne PAS connecter au dashboard.
+Ne PAS modifier portal.
+Ne PAS modifier UI.
+
+Construire uniquement une couche métier solide, testable et prête à être consommée plus tard.
+
+
+
+Analyse en profondeur l’implémentation actuelle de la couche vie scolaire (assiduité + cahier de texte) que tu viens de développer.
+
+Objectif :
+Renforcer la cohérence métier, corriger les éventuelles failles logiques, puis implémenter des tests API complets.
+
+---
+
+PHASE 1 : AUDIT MÉTIER
+
+Vérifie et corrige si nécessaire :
+
+1. Lien avec le planning académique
+
+- StudentAttendance doit être lié à AcademicScheduleEvent
+- TeacherAttendance doit être lié à AcademicScheduleEvent
+- LessonLog doit être cohérent avec schedule_event
+
+2. Cohérence TeacherAttendance / LessonLog
+
+- Si teacher absent → LessonLog.status doit être "absent_teacher"
+- Implémenter cette logique automatiquement dans les services
+
+3. Détection des absences consécutives
+
+- Baser la logique sur les événements planifiés (schedule_event)
+- Pas sur les dates brutes
+
+4. Cahier de texte obligatoire
+
+- Un cours planifié sans LessonLog doit être détecté comme "non tenu"
+- Ajouter fonction dédiée dans lesson_log_service
+
+5. Filtrage par annexe
+
+- Vérifier que toutes les requêtes filtrent correctement par branch
+
+6. Transactions
+
+- Ajouter @transaction.atomic sur toutes les opérations critiques :
+  - marquage présence
+  - création alertes
+  - création lesson log
+
+---
+
+PHASE 2 : AMÉLIORATION SERVICES
+
+Renforcer :
+
+attendance_service.py
+lesson_log_service.py
+
+Ajouter :
+
+- fonctions de synchronisation avec planning
+- fonctions de contrôle qualité des données
+- fonctions de détection anomalies globales
+
+---
+
+PHASE 3 : TESTS API
+
+Créer tests complets pour endpoints JSON :
+
+- création présence étudiant
+- création présence enseignant
+- création lesson log
+- récupération données
+
+Tests à inclure :
+
+- cas normal
+- cas erreur (données invalides)
+- cas multi-annexe (isolation des données)
+- cas anomalies (absence répétée)
+
+---
+
+PHASE 4 : VALIDATION FINALE
+
+- Tous les tests doivent passer
+- Code propre et structuré
+- Aucune dépendance au dashboard
+
+---
+
+IMPORTANT :
+
+Ne pas connecter au dashboard.
+Ne pas modifier portal.
+
+Objectif :
+Avoir une couche métier robuste, cohérente et prête à être consommée.
+
+Analyse toute la couche "vie scolaire" actuellement implémentée (assiduité + cahier de texte) ainsi que les modèles académiques existants.
+
+Objectif :
+Transformer cette couche métier en un système intelligent exploitable par le dashboard du surveillant général, en définissant clairement :
+
+- les règles métier globales
+- les indicateurs clés (KPI)
+- les anomalies à détecter automatiquement
+- la structure fonctionnelle du dashboard
+
+IMPORTANT :
+Ne pas écrire de code UI.
+Ne pas modifier le dashboard existant.
+On travaille uniquement sur la structuration logique, métier et UX.
+
+---
+
+PHASE 1 : INTELLIGENCE MÉTIER
+
+Définir clairement toutes les règles intelligentes du système :
+
+1. Assiduité
+
+- absence simple
+- absences répétées
+- retards répétés
+- étudiant à risque
+
+2. Cours / cahier de texte
+
+- cours planifié mais non démarré
+- cours sans LessonLog
+- enseignant absent
+- cours annulé ou reporté
+
+3. Anomalies critiques
+
+- classe sans cours
+- cours sans enseignant
+- cours sans salle
+- cours non suivi
+
+Créer une liste exhaustive des anomalies détectables automatiquement.
+
+---
+
+PHASE 2 : SYSTÈME D’ALERTES
+
+Définir :
+
+- types d’alertes (info, warning, critique)
+- règles de déclenchement
+- priorisation
+
+Exemple :
+
+- critique → enseignant absent + cours non remplacé
+- warning → 3 retards étudiant
+- info → cours terminé normalement
+
+---
+
+PHASE 3 : KPI MÉTIER
+
+Définir les indicateurs que le dashboard doit afficher :
+
+- absents du jour
+- retards du jour
+- enseignants absents
+- cours non tenus
+- classes en anomalie
+- étudiants à risque
+
+---
+
+PHASE 4 : STRUCTURE DU DASHBOARD (SANS CODE)
+
+Organiser le dashboard du surveillant en sections claires :
+
+1. Vue générale
+2. Présences & retards
+3. Cours & activités
+4. Discipline (préparation future)
+5. Parents (préparation future)
+6. Examens (préparation future)
+7. Signalements
+
+Pour chaque section, définir :
+
+- objectif métier
+- données affichées
+- actions possibles
+
+---
+
+PHASE 5 : SIMPLIFICATION UX
+
+Définir les règles UX suivantes :
+
+- un surveillant doit comprendre la situation en 10 secondes
+- priorité aux anomalies
+- éviter surcharge d’information
+- afficher uniquement ce qui nécessite une action
+
+Proposer :
+
+- organisation des blocs
+- hiérarchisation visuelle (critique > warning > info)
+- logique d’affichage minimaliste
+
+---
+
+PHASE 6 : ACTIONS MÉTIER
+
+Définir les actions que le surveillant peut faire :
+
+- enregistrer une absence
+- signaler un incident
+- contacter un parent
+- valider un cours
+- envoyer un rapport
+
+---
+
+LIVRABLE ATTENDU :
+
+- document structuré
+- règles métier claires
+- liste des anomalies
+- structure du dashboard
+- logique UX
+
+---
+
+IMPORTANT :
+
+Ne pas coder le frontend.
+Ne pas connecter au dashboard.
+
+Objectif :
+Créer un système intelligent prêt à être branché sur une interface simple, efficace et professionnelle.
+donc tu peux brancher cela au dashboard du surveillant maintenant, en respectant la structure définie et en affichant les données et alertes de manière claire et hiérarchisée.
+
+ProgrammingError at /portal/dashboard/
+ERREUR:  la relation « students_studentattendance » n'existe pas
+LINE 1: ...cademics_academicscheduleevent"."updated_at" FROM "students_...
+                                                             ^
+Request Method:	GET
+Request URL:	http://127.0.0.1:8000/portal/dashboard/
+Django Version:	6.0.1
+Exception Type:	ProgrammingError
+Exception Value:
+ERREUR:  la relation « students_studentattendance » n'existe pas
+LINE 1: ...cademics_academicscheduleevent"."updated_at" FROM "students_...
+                                                             ^
+Exception Location:	C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\backends\utils.py, line 105, in _execute
+Raised during:	portal.views.views.portal_dashboard
+Python Executable:	C:\Users\WORK\PycharmProjects\esfe-core\.venv\Scripts\python.exe
+Python Version:	3.12.10
+Python Path:
+['C:\\Users\\WORK\\PycharmProjects\\esfe-core',
+ 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip',
+ 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\DLLs',
+ 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\Lib',
+ 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312',
+ 'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv',
+ 'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv\\Lib\\site-packages']
+Server time:	Tue, 28 Apr 2026 19:42:08 +0000

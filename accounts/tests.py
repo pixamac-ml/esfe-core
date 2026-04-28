@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, cast
 
 from django.contrib.auth import get_user_model
@@ -5,14 +6,15 @@ from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from branches.models import Branch
 from payments.models import PaymentAgent
-from students.models import Student
+from students.models import Student, StudentAttendance, TeacherAttendance
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from formations.models import Programme, Cycle, Diploma, Filiere
-from academics.models import AcademicClass, AcademicEnrollment, AcademicYear, Semester, UE, EC
+from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, LessonLog, Semester, UE
 
 from accounts.access import (
 	can_access,
@@ -327,6 +329,47 @@ class PortalPhaseOneTests(TestCase):
 		)
 		return Student.objects.create(user=user, inscription=inscription, matricule=f"MAT-{user.pk}")
 
+	def _create_academic_class_bundle(self, level="L1"):
+		academic_year = AcademicYear.objects.create(
+			name=f"25-26-{level}",
+			start_date="2025-10-01",
+			end_date="2026-07-31",
+			is_active=True,
+		)
+		academic_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			level=level,
+			study_level="LICENCE",
+			is_active=True,
+		)
+		semester = Semester.objects.create(academic_class=academic_class, number=1)
+		ue = UE.objects.create(semester=semester, code=f"UE-{level}", title=f"UE {level}")
+		ec = EC.objects.create(ue=ue, title=f"EC {level}", credit_required=3, coefficient=2)
+		return academic_year, academic_class, ec
+
+	def _create_course_event(self, academic_class, academic_year, ec, teacher, *, hour=8):
+		start_datetime = timezone.make_aware(datetime(2026, 4, 28, hour, 0))
+		end_datetime = timezone.make_aware(datetime(2026, 4, 28, hour + 2, 0))
+		return AcademicScheduleEvent.objects.create(
+			title=f"Cours {ec.title}",
+			description="Cours test",
+			event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+			academic_class=academic_class,
+			ec=ec,
+			teacher=teacher,
+			branch=self.branch,
+			academic_year=academic_year,
+			start_datetime=start_datetime,
+			end_datetime=end_datetime,
+			status=AcademicScheduleEvent.STATUS_PLANNED,
+			location="Salle A1",
+			created_by=teacher,
+			updated_by=teacher,
+			is_active=True,
+		)
+
 	def test_login_page_loads(self):
 		response = self.client.get(reverse("accounts:login"))
 		self.assertEqual(response.status_code, 200)
@@ -338,7 +381,7 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_student"))
 		self.assertRedirects(
 			response,
-			reverse("portal_student:dashboard"),
+			reverse("accounts_portal:portal_dashboard"),
 			fetch_redirect_response=False,
 		)
 
@@ -349,16 +392,13 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_teacher"))
 		self.assertEqual(response.status_code, 403)
 
-	def test_portal_dashboard_redirects_staff_admin_to_staff_page(self):
+	def test_portal_dashboard_renders_staff_page_from_single_entry(self):
 		staff_user = self._create_user("portal_staff", groups=["admissions_managers"])
 		self.client.force_login(staff_user)
 
 		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
-		self.assertRedirects(
-			response,
-			reverse("accounts_portal:portal_staff"),
-			fetch_redirect_response=False,
-		)
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Portail staff")
 
 	def test_login_redirects_to_portal_student(self):
 		student = self._create_user("login_student", role="student")
@@ -370,7 +410,7 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			reverse("portal_student:dashboard"),
+			reverse("accounts_portal:portal_dashboard"),
 			fetch_redirect_response=False,
 		)
 
@@ -384,21 +424,21 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			reverse("accounts_portal:portal_staff"),
+			reverse("accounts_portal:portal_dashboard"),
 			fetch_redirect_response=False,
 		)
 
-	def test_post_login_portal_url_uses_existing_routes_only(self):
+	def test_post_login_portal_url_uses_single_portal_entry(self):
 		student = self._create_user("post_login_student", role="student")
 		staff_user = self._create_user("post_login_staff", groups=["finance_agents"])
 
 		self.assertEqual(
 			get_post_login_portal_url(student),
-			reverse("portal_student:dashboard"),
+			reverse("accounts_portal:portal_dashboard"),
 		)
 		self.assertEqual(
 			get_post_login_portal_url(staff_user),
-			reverse("accounts_portal:portal_staff"),
+			reverse("accounts_portal:portal_dashboard"),
 		)
 
 	def test_student_dashboard_requires_student_role(self):
@@ -543,16 +583,134 @@ class PortalPhaseOneTests(TestCase):
 		)
 		self.assertRedirects(
 			response,
-			reverse("accounts_portal:portal_finance"),
+			reverse("accounts_portal:portal_dashboard"),
 			fetch_redirect_response=False,
 		)
 
-	def test_supervisor_portal_renders_placeholder(self):
+	def test_portal_dashboard_renders_supervisor_dashboard_from_single_entry(self):
 		supervisor = self._create_user("portal_supervisor", position="academic_supervisor")
 		self.client.force_login(supervisor)
-		response = self.client.get(reverse("accounts_portal:portal_supervisor"))
+		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Dashboard Supervision Academique")
+		self.assertContains(response, "Dashboard Surveillant General")
+		self.assertContains(response, "Pilotage des classes, du temps et de la discipline")
+
+	def test_portal_dashboard_renders_director_dashboard_from_single_entry(self):
+		director = self._create_user("portal_director", role="executive", position="director_of_studies")
+		self.client.force_login(director)
+		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Dashboard Direction des Etudes")
+		self.assertContains(response, "Pilotage de la qualite academique et des charges")
+
+	def test_portal_dashboard_renders_it_dashboard_from_single_entry(self):
+		it_user = self._create_user("portal_it", position="it_support")
+		self.client.force_login(it_user)
+		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Dashboard Informaticien")
+		self.assertContains(response, "Support technique, acces, et sante du portail")
+
+	def test_legacy_supervisor_route_redirects_to_single_entry(self):
+		supervisor = self._create_user("portal_supervisor_legacy", position="academic_supervisor")
+		self.client.force_login(supervisor)
+		response = self.client.get(reverse("accounts_portal:portal_supervisor"))
+		self.assertRedirects(
+			response,
+			reverse("accounts_portal:portal_dashboard"),
+			fetch_redirect_response=False,
+		)
+
+	def test_supervisor_dashboard_marks_student_attendance(self):
+		supervisor = self._create_user("portal_supervisor_att_student", position="academic_supervisor")
+		teacher = self._create_user("portal_teacher_att_student", role="teacher", position="teacher")
+		student_user = self._create_user("portal_student_att", role="student")
+		student = self._create_student_record(student_user, inscription_status=Inscription.STATUS_ACTIVE)
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L1A")
+		AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		schedule_event = self._create_course_event(academic_class, academic_year, ec, teacher, hour=8)
+		self.client.force_login(supervisor)
+
+		response = self.client.post(
+			reverse("accounts_portal:supervisor_mark_student_attendance"),
+			{
+				"schedule_event_id": schedule_event.id,
+				"student_id": student.id,
+				"status": StudentAttendance.STATUS_LATE,
+				"arrival_time": "08:17",
+				"justification": "Transport",
+			},
+		)
+
+		self.assertRedirects(
+			response,
+			f"{reverse('accounts_portal:portal_dashboard')}#attendance",
+			fetch_redirect_response=False,
+		)
+		attendance = StudentAttendance.objects.get(student=student, schedule_event=schedule_event)
+		self.assertEqual(attendance.status, StudentAttendance.STATUS_LATE)
+		self.assertEqual(attendance.branch, self.branch)
+		self.assertEqual(attendance.recorded_by, supervisor)
+
+	def test_supervisor_dashboard_marks_teacher_attendance(self):
+		supervisor = self._create_user("portal_supervisor_att_teacher", position="academic_supervisor")
+		teacher = self._create_user("portal_teacher_att_teacher", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L1B")
+		schedule_event = self._create_course_event(academic_class, academic_year, ec, teacher, hour=10)
+		self.client.force_login(supervisor)
+
+		response = self.client.post(
+			reverse("accounts_portal:supervisor_mark_teacher_attendance"),
+			{
+				"schedule_event_id": schedule_event.id,
+				"status": TeacherAttendance.STATUS_ABSENT,
+				"justification": "Indisponible",
+			},
+		)
+
+		self.assertRedirects(
+			response,
+			f"{reverse('accounts_portal:portal_dashboard')}#attendance",
+			fetch_redirect_response=False,
+		)
+		attendance = TeacherAttendance.objects.get(teacher=teacher, schedule_event=schedule_event)
+		self.assertEqual(attendance.status, TeacherAttendance.STATUS_ABSENT)
+		self.assertEqual(attendance.recorded_by, supervisor)
+
+	def test_supervisor_dashboard_creates_or_updates_lesson_log(self):
+		supervisor = self._create_user("portal_supervisor_log", position="academic_supervisor")
+		teacher = self._create_user("portal_teacher_log", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L1C")
+		schedule_event = self._create_course_event(academic_class, academic_year, ec, teacher, hour=14)
+		self.client.force_login(supervisor)
+
+		response = self.client.post(
+			reverse("accounts_portal:supervisor_save_lesson_log"),
+			{
+				"schedule_event_id": schedule_event.id,
+				"status": LessonLog.STATUS_DONE,
+				"content": "Fonctions et derives.",
+				"homework": "Serie 1",
+				"observations": "Classe calme",
+			},
+		)
+
+		self.assertRedirects(
+			response,
+			f"{reverse('accounts_portal:portal_dashboard')}#courses",
+			fetch_redirect_response=False,
+		)
+		lesson_log = LessonLog.objects.get(schedule_event=schedule_event)
+		self.assertEqual(lesson_log.status, LessonLog.STATUS_DONE)
+		self.assertEqual(lesson_log.created_by, supervisor)
+		self.assertEqual(lesson_log.content, "Fonctions et derives.")
 
 
 class BackfillUserRoleTypeCommandTests(TestCase):

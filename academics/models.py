@@ -858,3 +858,119 @@ class AcademicScheduleExecutionLog(models.Model):
             errors["completed_by"] = "Un responsable de cloture est requis quand l'execution est terminee."
         if errors:
             raise ValidationError(errors)
+
+
+class LessonLog(models.Model):
+    STATUS_PLANNED = "planned"
+    STATUS_DONE = "done"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_ABSENT_TEACHER = "absent_teacher"
+
+    STATUS_CHOICES = [
+        (STATUS_PLANNED, "Planifie"),
+        (STATUS_DONE, "Fait"),
+        (STATUS_CANCELLED, "Annule"),
+        (STATUS_ABSENT_TEACHER, "Enseignant absent"),
+    ]
+
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="lesson_logs",
+    )
+    ec = models.ForeignKey(
+        EC,
+        on_delete=models.PROTECT,
+        related_name="lesson_logs",
+    )
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="lesson_logs",
+    )
+    schedule_event = models.ForeignKey(
+        AcademicScheduleEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lesson_logs",
+    )
+    date = models.DateField(db_index=True)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PLANNED,
+        db_index=True,
+    )
+    content = models.TextField(blank=True)
+    homework = models.TextField(blank=True)
+    observations = models.TextField(blank=True)
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="lesson_logs",
+        db_index=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_lesson_logs",
+    )
+    validated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="validated_lesson_logs",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date", "-start_time", "-id"]
+        verbose_name = "Cahier de texte"
+        verbose_name_plural = "Cahiers de texte"
+        indexes = [
+            models.Index(fields=["academic_class", "date"]),
+            models.Index(fields=["teacher", "date"]),
+            models.Index(fields=["branch", "date"]),
+            models.Index(fields=["status", "date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.academic_class} - {self.ec} - {self.date}"
+
+    def clean(self):
+        errors = {}
+
+        if self.start_time and self.end_time and self.start_time >= self.end_time:
+            errors["end_time"] = "L'heure de fin doit etre posterieure a l'heure de debut."
+
+        if self.academic_class_id and self.branch_id and self.academic_class.branch_id != self.branch_id:
+            errors["branch"] = "L'annexe ne correspond pas a la classe academique."
+
+        if self.ec_id and self.academic_class_id and self.ec.ue.semester.academic_class_id != self.academic_class_id:
+            errors["ec"] = "La matiere ne correspond pas a la classe academique."
+
+        if self.schedule_event_id:
+            event = self.schedule_event
+            if self.academic_class_id and event.academic_class_id != self.academic_class_id:
+                errors["schedule_event"] = "L'evenement planifie ne correspond pas a la classe."
+            elif self.ec_id and event.ec_id != self.ec_id:
+                errors["schedule_event"] = "L'evenement planifie ne correspond pas a la matiere."
+            elif self.teacher_id and event.teacher_id != self.teacher_id:
+                errors["schedule_event"] = "L'evenement planifie ne correspond pas a l'enseignant."
+            elif self.branch_id and event.branch_id != self.branch_id:
+                errors["schedule_event"] = "L'evenement planifie ne correspond pas a l'annexe."
+
+        if self.status == self.STATUS_DONE and not (self.content or "").strip():
+            errors["content"] = "Le contenu du cours est obligatoire quand le cours est marque comme fait."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

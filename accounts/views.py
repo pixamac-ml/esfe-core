@@ -96,11 +96,11 @@ def dashboard_redirect(request):
     if check_executive_access(user):
         return redirect("accounts:executive_dashboard")
 
-    if is_manager(user):
-        return redirect("accounts:manager_dashboard")
-
     if check_finance_access(user):
         return redirect("accounts:finance_dashboard")
+
+    if is_manager(user):
+        return redirect("accounts:manager_dashboard")
 
     if check_admissions_access(user):
         return redirect("accounts:admissions_dashboard")

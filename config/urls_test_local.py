@@ -14,6 +14,8 @@ urlpatterns = [
     path("admissions/", include("admissions.urls")),
     path("inscriptions/", include("inscriptions.urls")),
     path("payments/", include("payments.urls")),
+    path("students/", include("students.urls")),
+    path("academics/", include("academics.urls")),
     path("actualites/", include("news.urls", namespace="news")),
     path("superadmin/", include("superadmin.urls")),
     path("sitemap.xml", sitemap, {"sitemaps": build_sitemaps()}, name="sitemap_xml"),

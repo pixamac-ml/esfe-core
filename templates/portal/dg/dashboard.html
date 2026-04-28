@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block public_navbar %}{% endblock %}
+{% block public_footer %}{% endblock %}
+{% block public_floating_widget %}{% endblock %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Reprise du style dashboard étudiant pour cohérence */
+  :root {
+    --school-primary: #1e4f6f;
+    --school-primary-dark: #123145;
+    --sidebar-main: #163b53;
+    --sidebar-rail: #123145;
+    --surface: #f4f6f9;
+    --surface-2: #e8eef3;
+    --card: #ffffff;
+    --card-soft: #f8fbfc;
+    --line: rgba(214, 228, 236, 0.95);
+    --text: #123145;
+    --muted: #64748b;
+    --muted-2: #98a2b3;
+    --sidebar-width: 268px;
+    --sidebar-compact-width: 84px;
+    --radius-shell: 22px;
+    --radius-xl: 18px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="student-dashboard-page" x-data="dgDashboard()" x-init="init()">
+  <div class="student-stage">
+    <section class="student-shell">
+      {% include "portal/dg/partials/sidebar_dg.html" %}
+      <section class="student-main">
+        {% include "portal/dg/partials/topbar_dg.html" %}
+        <div class="student-content student-scroll" id="dashboardTop">
+          <div class="student-workspace">
+            <header class="student-workspace-head">
+              <div>
+                <p class="student-section-kicker" x-text="activeMeta.kicker"></p>
+                <h1 class="student-section-title text-[1.2rem]" x-text="activeMeta.title"></h1>
+                <p class="mt-1 text-sm text-[color:var(--muted)]" x-text="activeMeta.description"></p>
+              </div>
+              <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]" x-text="activeMeta.badge"></span>
+            </header>
+            <section x-show="activeSection === 'overview'" x-cloak class="student-workspace-panel">
+              <section id="overview" class="student-section">
+                <!-- Section Vue générale DG -->
+                <div class="student-card student-card-pad">Bienvenue sur le tableau de bord du Directeur Général.</div>
+              </section>
+            </section>
+            <section x-show="activeSection === 'kpi'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
+              <section id="kpi">Indicateurs clés (KPI) à venir...</section>
+            </section>
+            <section x-show="activeSection === 'reports'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
+              <section id="reports">Rapports et statistiques à venir...</section>
+            </section>
+            <section x-show="activeSection === 'users'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
+              <section id="users">Gestion des utilisateurs à venir...</section>
+            </section>
+            <section x-show="activeSection === 'settings'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
+              <section id="settings">Paramètres généraux à venir...</section>
+            </section>
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+</div>
+<script>
+function dgDashboard() {
+  return {
+    darkMode: false,
+    sidebarCompact: false,
+    mobileMenu: false,
+    search: "",
+    activeNav: "Vue générale",
+    activeSection: "overview",
+    activeMeta: {
+      kicker: "Dashboard DG",
+      title: "Tableau de bord Directeur Général",
+      description: "Vue d'ensemble de l'établissement, indicateurs et actions globales.",
+      badge: "Vue générale"
+    },
+    navItems: [
+      { label: "Vue générale", icon: "layout-dashboard", target: "overview" },
+      { label: "Indicateurs", icon: "activity", target: "kpi" },
+      { label: "Rapports", icon: "bar-chart-2", target: "reports" },
+      { label: "Utilisateurs", icon: "users", target: "users" },
+      { label: "Paramètres", icon: "settings", target: "settings" }
+    ],
+    sectionMeta: [
+      { key: "overview", kicker: "Dashboard DG", title: "Tableau de bord Directeur Général", description: "Vue d'ensemble de l'établissement, indicateurs et actions globales.", badge: "Vue générale" },
+      { key: "kpi", kicker: "Indicateurs", title: "Indicateurs clés", description: "Suivi des KPI institutionnels.", badge: "KPI" },
+      { key: "reports", kicker: "Rapports", title: "Rapports et statistiques", description: "Accès aux rapports consolidés.", badge: "Rapports" },
+      { key: "users", kicker: "Utilisateurs", title: "Gestion des utilisateurs", description: "Gestion des accès et des rôles.", badge: "Utilisateurs" },
+      { key: "settings", kicker: "Paramètres", title: "Paramètres généraux", description: "Configuration de la plateforme.", badge: "Paramètres" }
+    ],
+    init() {
+      // Initialisation éventuelle
+    }
+  }
+}
+</script>
+{% endblock %}
+

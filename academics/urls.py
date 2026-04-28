@@ -3,12 +3,17 @@ from django.urls import path
 from .views import (
     annual_class_report_view,
     class_reports_overview_view,
+    class_lesson_logs_view,
+    daily_lesson_status_view,
     export_class_reports_view,
     export_selected_reports_view,
+    lesson_log_create_view,
+    lesson_log_update_view,
     student_annual_report_view,
     student_semester_pdf_view,
     student_semester_report_view,
     student_year_report_view,
+    teacher_lesson_logs_view,
 )
 
 app_name = "academics"
@@ -52,5 +57,30 @@ urlpatterns = [
         "reports/student/<int:student_id>/year/<int:academic_year_id>/",
         student_year_report_view,
         name="student_year_report",
+    ),
+    path(
+        "lesson-logs/create/",
+        lesson_log_create_view,
+        name="lesson_log_create",
+    ),
+    path(
+        "lesson-logs/<int:lesson_log_id>/update/",
+        lesson_log_update_view,
+        name="lesson_log_update",
+    ),
+    path(
+        "lesson-logs/class/<int:class_id>/",
+        class_lesson_logs_view,
+        name="class_lesson_logs",
+    ),
+    path(
+        "lesson-logs/teacher/<int:teacher_id>/",
+        teacher_lesson_logs_view,
+        name="teacher_lesson_logs",
+    ),
+    path(
+        "lesson-logs/daily-status/",
+        daily_lesson_status_view,
+        name="daily_lesson_status",
     ),
 ]

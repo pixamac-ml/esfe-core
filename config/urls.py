@@ -44,6 +44,7 @@ urlpatterns = [
     path("actualites/", include("news.urls", namespace="news")),
     path('superadmin/', include('superadmin.urls')),
     path("secretary/", include("secretary.urls")),
+    path("students/", include("students.urls")),
     path("sitemap.xml", sitemap, {"sitemaps": build_sitemaps()}, name="sitemap_xml"),
     # Core (home + pages publiques)
     path("", include("core.urls")),

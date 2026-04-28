@@ -1,9 +1,10 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from academics.models import (
@@ -13,8 +14,16 @@ from academics.models import (
     AcademicScheduleEvent,
     AcademicYear,
     EC,
+    LessonLog,
     Semester,
     UE,
+)
+from academics.services.lesson_log_service import (
+    create_lesson_log,
+    get_class_lesson_logs,
+    get_daily_lesson_status,
+    get_teacher_lesson_logs,
+    update_lesson_log,
 )
 from academics.services.schedule_service import (
     cancel_schedule_event,
@@ -34,7 +43,7 @@ from admissions.models import Candidature
 from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
-from students.models import Student
+from students.models import Student, TeacherAttendance
 
 
 User = get_user_model()
@@ -718,3 +727,371 @@ class AcademicScheduleServiceTests(TestCase):
         self.assertTrue(completed["is_completed"])
         self.assertEqual(completed["status_label"], "Termine")
         self.assertEqual(schedule["summary"]["completed"], 1)
+
+
+class LessonLogServiceTests(TestCase):
+    def setUp(self):
+        self.supervisor = User.objects.create_user(username="supervisor_log", password="x")
+        self.teacher = User.objects.create_user(username="teacher_log", password="x", first_name="Grace", last_name="Hopper")
+
+        self.branch = Branch.objects.create(name="ESFE Kayes", code="KYS", slug="esfe-kayes")
+        cycle = Cycle.objects.create(name="Licence Log", min_duration_years=3, max_duration_years=3)
+        diploma = Diploma.objects.create(name="Licence Log", level="superieur")
+        filiere = Filiere.objects.create(name="Gestion")
+        self.programme = Programme.objects.create(
+            title="Gestion des organisations",
+            filiere=filiere,
+            cycle=cycle,
+            diploma_awarded=diploma,
+            duration_years=3,
+            short_description="Programme log",
+            description="Programme log",
+        )
+        self.academic_year = AcademicYear.objects.create(
+            name="2027-2028",
+            start_date=date(2027, 10, 1),
+            end_date=date(2028, 7, 31),
+            is_active=True,
+        )
+        self.academic_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L2",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        semester = Semester.objects.create(
+            academic_class=self.academic_class,
+            number=1,
+            total_required_credits=Decimal("30.00"),
+        )
+        ue = UE.objects.create(semester=semester, code="GST201", title="Pilotage")
+        self.ec = EC.objects.create(
+            ue=ue,
+            title="Management",
+            credit_required=Decimal("3.00"),
+            coefficient=Decimal("3.00"),
+        )
+        self.lesson_date = date(2027, 10, 5)
+        self.schedule_event = create_schedule_event(
+            user=self.supervisor,
+            title="Cours Management",
+            description="Seance 1",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            start_datetime=timezone.make_aware(datetime.combine(self.lesson_date, datetime.min.time().replace(hour=8))),
+            end_datetime=timezone.make_aware(datetime.combine(self.lesson_date, datetime.min.time().replace(hour=10))),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle M1",
+            is_online=False,
+            meeting_link="",
+            is_active=True,
+        )
+
+    def test_create_lesson_log_creates_expected_record(self):
+        lesson_log = create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.supervisor,
+            content="Introduction au management",
+            homework="Lire le chapitre 1",
+        )
+
+        self.assertEqual(LessonLog.objects.count(), 1)
+        self.assertEqual(lesson_log.schedule_event, self.schedule_event)
+        self.assertEqual(lesson_log.status, LessonLog.STATUS_DONE)
+
+    def test_update_lesson_log_updates_content_and_validation(self):
+        lesson_log = create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_PLANNED,
+            branch=self.branch,
+            created_by=self.supervisor,
+        )
+
+        updated = update_lesson_log(
+            lesson_log,
+            updated_by=self.supervisor,
+            status=LessonLog.STATUS_DONE,
+            content="Cours dispense",
+            homework="Exercice 1",
+        )
+
+        self.assertEqual(updated.status, LessonLog.STATUS_DONE)
+        self.assertEqual(updated.validated_by, self.supervisor)
+        self.assertEqual(updated.content, "Cours dispense")
+
+    def test_get_daily_lesson_status_flags_missing_logs_and_teacher_absence(self):
+        TeacherAttendance.objects.create(
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            status=TeacherAttendance.STATUS_ABSENT,
+            recorded_by=self.supervisor,
+            branch=self.branch,
+        )
+
+        daily_status = get_daily_lesson_status(self.branch, self.lesson_date)
+
+        self.assertEqual(daily_status["scheduled_courses"], 1)
+        self.assertEqual(daily_status["missing_lesson_logs_count"], 1)
+        self.assertEqual(daily_status["critical_count"], 1)
+        self.assertEqual(daily_status["critical_items"][0]["status"], "teacher_absent_with_planned_lesson")
+
+    def test_create_lesson_log_for_absent_teacher_forces_absent_teacher_status(self):
+        TeacherAttendance.objects.create(
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            status=TeacherAttendance.STATUS_ABSENT,
+            recorded_by=self.supervisor,
+            branch=self.branch,
+        )
+
+        lesson_log = create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.supervisor,
+            content="Cours non tenu",
+        )
+
+        self.assertEqual(lesson_log.status, LessonLog.STATUS_ABSENT_TEACHER)
+
+    def test_get_class_and_teacher_lesson_logs_return_created_items(self):
+        lesson_log = create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.supervisor,
+            content="Cours dispense",
+        )
+
+        class_logs = get_class_lesson_logs(self.academic_class)
+        teacher_logs = get_teacher_lesson_logs(self.teacher, branch=self.branch)
+
+        self.assertEqual(class_logs[0].id, lesson_log.id)
+        self.assertEqual(teacher_logs[0].id, lesson_log.id)
+
+
+class LessonLogApiTests(TestCase):
+    def setUp(self):
+        self.supervisor = User.objects.create_user(username="lesson_api", password="pass1234")
+        self.supervisor.profile.position = "academic_supervisor"
+        self.supervisor.profile.user_type = "staff"
+        self.branch = Branch.objects.create(name="ESFE Sikasso", code="SKO", slug="esfe-sikasso")
+        self.other_branch = Branch.objects.create(name="ESFE Gao", code="GAO", slug="esfe-gao")
+        self.supervisor.profile.branch = self.branch
+        self.supervisor.profile.save(update_fields=["position", "user_type", "branch", "updated_at"])
+
+        self.teacher = User.objects.create_user(username="teacher_api_log", password="x", first_name="Marie", last_name="Curie")
+        self.teacher_other = User.objects.create_user(username="teacher_api_log_other", password="x")
+
+        cycle = Cycle.objects.create(name="Licence API Log", min_duration_years=3, max_duration_years=3)
+        diploma = Diploma.objects.create(name="Licence API Log", level="superieur")
+        filiere = Filiere.objects.create(name="Informatique API Log")
+        self.programme = Programme.objects.create(
+            title="Developpement logiciel",
+            filiere=filiere,
+            cycle=cycle,
+            diploma_awarded=diploma,
+            duration_years=3,
+            short_description="Prog API log",
+            description="Prog API log",
+        )
+        self.academic_year = AcademicYear.objects.create(
+            name="2029-2030",
+            start_date=date(2029, 10, 1),
+            end_date=date(2030, 7, 31),
+            is_active=True,
+        )
+        self.academic_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        self.other_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.other_branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        semester = Semester.objects.create(academic_class=self.academic_class, number=1, total_required_credits=Decimal("30.00"))
+        other_semester = Semester.objects.create(academic_class=self.other_class, number=1, total_required_credits=Decimal("30.00"))
+        ue = UE.objects.create(semester=semester, code="LOG101", title="Log")
+        other_ue = UE.objects.create(semester=other_semester, code="LOG201", title="Log2")
+        self.ec = EC.objects.create(ue=ue, title="Python", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        self.other_ec = EC.objects.create(ue=other_ue, title="Java", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        self.event = AcademicScheduleEvent.objects.create(
+            title="Cours Python",
+            description="",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            start_datetime=timezone.make_aware(datetime(2029, 10, 5, 8, 0)),
+            end_datetime=timezone.make_aware(datetime(2029, 10, 5, 10, 0)),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle L1",
+            created_by=self.supervisor,
+            updated_by=self.supervisor,
+            is_active=True,
+        )
+        self.other_event = AcademicScheduleEvent.objects.create(
+            title="Cours Java",
+            description="",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.other_class,
+            ec=self.other_ec,
+            teacher=self.teacher_other,
+            branch=self.other_branch,
+            academic_year=self.academic_year,
+            start_datetime=timezone.make_aware(datetime(2029, 10, 5, 8, 0)),
+            end_datetime=timezone.make_aware(datetime(2029, 10, 5, 10, 0)),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle G1",
+            created_by=self.supervisor,
+            updated_by=self.supervisor,
+            is_active=True,
+        )
+        self.client.force_login(self.supervisor)
+
+    def test_lesson_log_create_api_creates_record(self):
+        response = self.client.post(
+            reverse("academics:lesson_log_create"),
+            data={
+                "academic_class_id": self.academic_class.id,
+                "ec_id": self.ec.id,
+                "teacher_id": self.teacher.id,
+                "schedule_event_id": self.event.id,
+                "date": "2029-10-05",
+                "start_time": "08:00",
+                "end_time": "10:00",
+                "status": LessonLog.STATUS_DONE,
+                "content": "Variables et boucles",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(LessonLog.objects.count(), 1)
+        self.assertEqual(LessonLog.objects.get().schedule_event, self.event)
+
+    def test_lesson_log_create_api_rejects_cross_branch_event(self):
+        response = self.client.post(
+            reverse("academics:lesson_log_create"),
+            data={
+                "academic_class_id": self.other_class.id,
+                "ec_id": self.other_ec.id,
+                "teacher_id": self.teacher_other.id,
+                "schedule_event_id": self.other_event.id,
+                "date": "2029-10-05",
+                "start_time": "08:00",
+                "end_time": "10:00",
+                "status": LessonLog.STATUS_DONE,
+                "content": "Test",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(LessonLog.objects.count(), 0)
+
+    def test_lesson_log_create_api_rejects_invalid_time(self):
+        response = self.client.post(
+            reverse("academics:lesson_log_create"),
+            data={
+                "academic_class_id": self.academic_class.id,
+                "ec_id": self.ec.id,
+                "teacher_id": self.teacher.id,
+                "schedule_event_id": self.event.id,
+                "date": "2029-10-05",
+                "start_time": "10:00",
+                "end_time": "08:00",
+                "status": LessonLog.STATUS_DONE,
+                "content": "Test",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(LessonLog.objects.count(), 0)
+
+    def test_lesson_log_daily_status_api_returns_missing_course(self):
+        response = self.client.get(
+            reverse("academics:daily_lesson_status"),
+            {"date": "2029-10-05"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["missing_lesson_logs_count"], 1)
+
+    def test_lesson_log_create_api_marks_absent_teacher_automatically(self):
+        TeacherAttendance.objects.create(
+            teacher=self.teacher,
+            schedule_event=self.event,
+            date=date(2029, 10, 5),
+            status=TeacherAttendance.STATUS_ABSENT,
+            recorded_by=self.supervisor,
+            branch=self.branch,
+        )
+
+        response = self.client.post(
+            reverse("academics:lesson_log_create"),
+            data={
+                "academic_class_id": self.academic_class.id,
+                "ec_id": self.ec.id,
+                "teacher_id": self.teacher.id,
+                "schedule_event_id": self.event.id,
+                "date": "2029-10-05",
+                "start_time": "08:00",
+                "end_time": "10:00",
+                "status": LessonLog.STATUS_DONE,
+                "content": "Tentative",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["lesson_log"]["status"], LessonLog.STATUS_ABSENT_TEACHER)

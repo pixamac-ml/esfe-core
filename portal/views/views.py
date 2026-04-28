@@ -543,3 +543,19 @@ def supervisor_save_lesson_log(request):
         f"Cahier de texte enregistre pour {lesson_log.academic_class.display_name} - {lesson_log.ec.title}.",
     )
     return _redirect_supervisor_dashboard("courses")
+
+
+from django.contrib.auth.decorators import login_required
+from accounts.access import get_user_position
+from django.http import HttpResponseForbidden
+from django.shortcuts import render
+
+@login_required
+def dg_portal(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "super_admin"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    return render(request, "portal/dg/dashboard.html", {
+        "page_title": "Dashboard Directeur Général",
+        "user_display_name": request.user.get_full_name() or request.user.username,
+    })

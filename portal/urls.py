@@ -39,7 +39,6 @@ urlpatterns = [
     path("director/", director_portal, name="portal_director"),
     path("supervisor/", supervisor_portal, name="portal_supervisor"),
     path("it/", it_portal, name="portal_it"),
-    path("dg/", dg_portal, name="portal_dg"),
     path(
         "supervisor/actions/student-attendance/",
         supervisor_mark_student_attendance,

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block public_navbar %}{% endblock %}
+{% block public_footer %}{% endblock %}
+{% block public_floating_widget %}{% endblock %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --school-primary: #1e4f6f;
+    --school-primary-dark: #123145;
+    --school-primary-soft: #eef4f7;
+    --school-secondary: #1db5b0;
+    --school-secondary-soft: rgba(29, 181, 176, 0.14);
+    --school-accent: #f39c12;
+    --school-accent-soft: rgba(243, 156, 18, 0.14);
+    --bg-deep: #f3f6f9;
+    --bg-deep-2: #edf2f6;
+    --sidebar-main: #163b53;
+    --sidebar-rail: #123145;
+    --surface: #f4f6f9;
+    --card: #ffffff;
+    --line: rgba(214, 228, 236, 0.95);
+    --text: #123145;
+    --muted: #64748b;
+  }
+
+  .portal-dashboard-page {
+    min-height: 100vh;
+    color: var(--text);
+    background: linear-gradient(180deg, var(--bg-deep), var(--bg-deep-2));
+  }
+
+  .portal-stage {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .portal-shell {
+    display: grid;
+    grid-template-columns: 268px minmax(0, 1fr);
+    min-height: 100vh;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .portal-sidebar {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    overflow: hidden;
+    color: white;
+    background: linear-gradient(180deg, var(--sidebar-main), var(--school-primary-dark));
+  }
+
+  .portal-main {
+    min-width: 0;
+    display: grid;
+    grid-template-rows: 64px minmax(0, 1fr);
+  }
+
+  .portal-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(14px);
+  }
+
+  .portal-content {
+    overflow: auto;
+    overflow-x: hidden;
+    padding: 0.9rem;
+    display: block;
+  }
+
+  .portal-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--card);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+    min-width: 0;
+  }
+
+  .portal-card-pad {
+    padding: 0.85rem;
+  }
+
+  .portal-hero {
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, .72fr);
+    min-height: 136px;
+  }
+
+  .portal-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    border-radius: 999px;
+    background: var(--school-secondary-soft);
+    color: var(--school-primary-dark);
+    padding: .48rem .76rem;
+    font-size: .75rem;
+    font-weight: 800;
+  }
+
+  .portal-grid-two {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 0.75rem;
+  }
+
+  .portal-section-title {
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  .portal-section-kicker {
+    font-size: .7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .16em;
+    color: var(--school-primary);
+  }
+
+  .portal-list-link {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    width: 100%;
+    border-radius: 14px;
+    padding: .85rem 1rem;
+    color: rgba(255,255,255,.92);
+    background: rgba(255,255,255,.06);
+  }
+
+  .portal-list-link:hover {
+    background: rgba(255,255,255,.12);
+  }
+
+  .portal-list-link.active {
+    background: rgba(255,255,255,.16);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+  }
+
+  .portal-stat {
+    min-width: 0;
+  }
+
+  @media (max-width: 1100px) {
+    .portal-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .portal-sidebar {
+      grid-template-columns: 1fr;
+    }
+
+    .portal-hero,
+    .portal-grid-two {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="portal-dashboard-page">
+  <div class="portal-stage">
+    <div class="portal-shell">
+      <aside class="portal-sidebar">
+        <div class="bg-[var(--sidebar-rail)] px-3 py-4 flex flex-col items-center gap-3">
+          <div class="h-12 w-12 rounded-2xl bg-white/10 grid place-items-center font-black text-lg">ES</div>
+        </div>
+        <div class="px-4 py-4 flex flex-col min-w-0">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-[0.22em] text-white/55">Portal</p>
+            <h1 class="mt-1 text-lg font-black text-white leading-tight">{{ page_title }}</h1>
+            <p class="mt-2 text-sm text-white/70">{{ welcome_message }}</p>
+          </div>
+          <nav class="mt-6 space-y-2">
+            {% block sidebar_nav %}{% endblock %}
+          </nav>
+          <div class="mt-auto pt-6 text-xs text-white/55">
+            <p class="font-semibold text-white/80">{{ user_display_name }}</p>
+            <p>{{ branch.name|default:"Acces global" }}</p>
+          </div>
+        </div>
+      </aside>
+
+      <main class="portal-main">
+        <header class="portal-topbar">
+          <div class="min-w-0">
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ dashboard_kind|default:"Portail academique" }}</p>
+            <p class="text-sm font-semibold text-slate-900 truncate">{{ page_title }}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            {% block topbar_actions %}{% endblock %}
+          </div>
+        </header>
+
+        <div class="portal-content">
+          {% block dashboard_content %}{% endblock %}
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+{% endblock %}

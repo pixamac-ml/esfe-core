@@ -1,0 +1,163 @@
+{% extends "portal/staff/dashboard_shell.html" %}
+
+{% block sidebar_nav %}
+<a class="portal-list-link active" href="#overview"><i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i><span>Vue generale</span></a>
+<a class="portal-list-link" href="#support"><i data-lucide="life-buoy" style="width:18px;height:18px;"></i><span>Support</span></a>
+<a class="portal-list-link" href="#health"><i data-lucide="activity" style="width:18px;height:18px;"></i><span>Sante</span></a>
+<a class="portal-list-link" href="#activity"><i data-lucide="monitor-check" style="width:18px;height:18px;"></i><span>Activite</span></a>
+{% endblock %}
+
+{% block topbar_actions %}
+<span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{{ branch.name|default:"Support global" }}</span>
+<span class="inline-flex items-center rounded-full bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</span>
+{% endblock %}
+
+{% block dashboard_content %}
+<section id="overview" class="portal-card portal-hero">
+  <div class="portal-card-pad flex flex-col justify-between gap-4">
+    <div>
+      <p class="portal-section-kicker">Informaticien</p>
+      <h2 class="mt-2 text-2xl font-black text-slate-900 leading-tight">Support technique, acces, et sante du portail</h2>
+      <p class="mt-3 max-w-2xl text-sm text-slate-600">Espace de surveillance pour garder les dashboards disponibles, les comptes propres et les alertes visibles.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% for module in module_cards %}
+      <span class="portal-pill">{{ module }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="border-l border-slate-100 bg-slate-50 p-5">
+    <div class="grid grid-cols-2 gap-3">
+      <div class="portal-card portal-stat p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Utilisateurs</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_users }}</p>
+      </div>
+      <div class="portal-card portal-stat p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Staff actifs</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_active_staff }}</p>
+      </div>
+      <div class="portal-card portal-stat p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Etudiants</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_students }}</p>
+      </div>
+      <div class="portal-card portal-stat p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Sante portail</p>
+        <p class="mt-2 text-2xl font-black {% if quality.score >= 85 %}text-emerald-600{% elif quality.score >= 70 %}text-blue-600{% elif quality.score >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ quality.score|default:0 }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mt-4 portal-grid-two">
+  <div class="space-y-4">
+    <div class="portal-card portal-card-pad" id="support">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="portal-section-kicker">Support</p>
+          <h3 class="portal-section-title">Actions rapides</h3>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {% for action in support_actions %}
+        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <p class="text-sm font-semibold text-slate-900">{{ action }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="portal-card portal-card-pad" id="activity">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="portal-section-kicker">Activite</p>
+          <h3 class="portal-section-title">Evenements recents</h3>
+        </div>
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ recent_events|length }}</span>
+      </div>
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full min-w-[820px] divide-y divide-slate-100">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Annexe</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Classe</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Enseignant</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etat</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-50">
+            {% for event in recent_events %}
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-3 text-sm font-semibold text-slate-900">{{ event.updated_at|date:"d/m/Y H:i" }}</td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ event.branch.name }}</td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ event.academic_class.display_name }}</td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ event.teacher.get_full_name|default:event.teacher.username }}</td>
+              <td class="px-4 py-3 text-sm">
+                <span class="rounded-full px-2.5 py-1 text-xs font-bold {% if event.status == 'completed' %}bg-emerald-100 text-emerald-700{% elif event.status == 'ongoing' %}bg-blue-100 text-blue-700{% elif event.status == 'planned' %}bg-amber-100 text-amber-700{% elif event.status == 'postponed' %}bg-violet-100 text-violet-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ event.get_status_display }}</span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-400">Aucune activite recente.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <div class="portal-card portal-card-pad" id="health">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="portal-section-kicker">Sante</p>
+          <h3 class="portal-section-title">Etat du portail</h3>
+        </div>
+        <span class="rounded-full px-3 py-1 text-xs font-bold {% if quality.status == 'excellent' %}bg-emerald-100 text-emerald-700{% elif quality.status == 'good' %}bg-blue-100 text-blue-700{% elif quality.status == 'medium' %}bg-amber-100 text-amber-700{% else %}bg-rose-100 text-rose-700{% endif %}">{{ quality.status|default:"indefini" }}</span>
+      </div>
+      <div class="mt-4 space-y-2">
+        {% for warning in quality.warnings %}
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ warning }}</div>
+        {% empty %}
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Aucune anomalie critique detectee.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="portal-card portal-card-pad">
+      <div>
+        <p class="portal-section-kicker">Alertes</p>
+        <h3 class="portal-section-title">Priorites du support</h3>
+      </div>
+      <div class="mt-4 space-y-2">
+        {% for alert in alerts %}
+        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ alert.type }}</p>
+          <p class="mt-1 text-sm text-slate-700">{{ alert.message }}</p>
+        </div>
+        {% empty %}
+        <p class="text-sm text-slate-400">Aucune alerte visible.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="portal-card portal-card-pad">
+      <div>
+        <p class="portal-section-kicker">Annexes</p>
+        <h3 class="portal-section-title">Points de contact</h3>
+      </div>
+      <div class="mt-4 space-y-3">
+        {% for academic_class in classes %}
+        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-sm font-semibold text-slate-900">{{ academic_class.display_name }}</span>
+            <span class="text-xs font-bold text-slate-500">{{ academic_class.branch.name }}</span>
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-sm text-slate-400">Aucune classe referencee.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

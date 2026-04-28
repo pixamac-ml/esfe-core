@@ -30,6 +30,7 @@ POSITION_TO_CANONICAL = {
     "executive_director": "directeur_etudes",
     "branch_manager": "staff_admin",
     "academic_supervisor": "staff_admin",
+    "it_support": "staff_admin",
     "super_admin": "super_admin",
 }
 

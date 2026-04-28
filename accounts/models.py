@@ -41,6 +41,7 @@ class Profile(models.Model):
         ("executive_director", "Direction executive"),
         ("branch_manager", "Gestionnaire annexe"),
         ("academic_supervisor", "Surveillant academique"),
+        ("it_support", "Informaticien"),
         ("super_admin", "Super administrateur"),
     ]
 

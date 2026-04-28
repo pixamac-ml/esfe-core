@@ -87,6 +87,8 @@ def get_post_login_portal_url(user):
         return reverse("accounts_portal:portal_director")
     if position == "academic_supervisor":
         return reverse("accounts_portal:portal_supervisor")
+    if position == "it_support":
+        return reverse("accounts_portal:portal_it")
 
     role = get_user_role(user)
     if role == "student":

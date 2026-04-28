@@ -13,6 +13,7 @@ from portal.views.views import (
     admissions_portal,
     director_portal,
     finance_portal,
+    it_portal,
     portal_dashboard,
     portal_home,
     secretary_portal,
@@ -38,6 +39,7 @@ urlpatterns = [
     path("admissions/", admissions_portal, name="portal_admissions"),
     path("director/", director_portal, name="portal_director"),
     path("supervisor/", supervisor_portal, name="portal_supervisor"),
+    path("it/", it_portal, name="portal_it"),
 
     # 🔥 SYSTEME NOTES
     path("admin/grades/", admin_grade_dashboard, name="admin_grade_dashboard"),

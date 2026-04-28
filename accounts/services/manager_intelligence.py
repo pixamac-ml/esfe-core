@@ -3,6 +3,7 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
+from accounts.services.accounting_documents import create_cash_movement
 from inscriptions.models import Inscription
 from payments.models import Payment
 
@@ -36,21 +37,25 @@ def sync_student_payment_cash_movements(branch, user):
     created = 0
     for payment in payments:
         reference = payment_cash_reference(payment)
-        _, was_created = BranchCashMovement.objects.get_or_create(
+        movement = BranchCashMovement.objects.filter(
             branch=branch,
             source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
-            reference=reference,
-            defaults={
-                "movement_type": BranchCashMovement.TYPE_IN,
-                "amount": payment.amount,
-                "label": f"Paiement etudiant - {payment.inscription.candidature.full_name}",
-                "movement_date": payment.paid_at.date() if payment.paid_at else timezone.localdate(),
-                "notes": f"Synchronisation automatique paiement #{payment.pk}.",
-                "created_by": user,
-            },
+            source_reference=reference,
+        ).first()
+        if movement:
+            continue
+        create_cash_movement(
+            branch=branch,
+            source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+            source_reference=reference,
+            movement_type=BranchCashMovement.TYPE_IN,
+            amount=payment.amount,
+            label=f"Paiement etudiant - {payment.inscription.candidature.full_name}",
+            movement_date=payment.paid_at.date() if payment.paid_at else timezone.localdate(),
+            notes=f"Synchronisation automatique paiement #{payment.pk}.",
+            created_by=user,
         )
-        if was_created:
-            created += 1
+        created += 1
     return {"created": created, "scanned": payments.count()}
 
 
@@ -110,14 +115,14 @@ def pay_ready_payroll_entries(branch, period_month, user):
             entry.paid_amount += amount
             entry.updated_by = user
             entry.save()
-            BranchCashMovement.objects.create(
+            create_cash_movement(
                 branch=branch,
                 movement_type=BranchCashMovement.TYPE_OUT,
                 source=BranchCashMovement.SOURCE_PAYROLL,
                 amount=amount,
                 label=f"Salaire - {entry.employee.get_full_name() or entry.employee.username}",
                 movement_date=timezone.localdate(),
-                reference=payroll_cash_reference(entry, amount),
+                source_reference=payroll_cash_reference(entry, amount),
                 notes=f"Paiement automatique de la paie {entry.period_month:%Y-%m}.",
                 created_by=user,
             )
@@ -140,7 +145,7 @@ def build_manager_intelligence_context(
     synced_payment_refs = set(BranchCashMovement.objects.filter(
         branch=branch,
         source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
-    ).values_list("reference", flat=True))
+    ).values_list("source_reference", flat=True))
     validated_payments = list(base_payments.filter(status=Payment.STATUS_VALIDATED))
     unsynced_payments_count = sum(
         1 for payment in validated_payments

@@ -2,7 +2,7 @@ from datetime import date
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
@@ -13,6 +13,12 @@ from django.db.models import Q
 from admissions.models import Candidature
 from accounts.forms import BranchCashMovementForm, BranchExpenseForm, PayrollEntryForm
 from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
+from accounts.services.accounting_documents import (
+    create_cash_movement,
+    ensure_expense_reference,
+    ensure_cash_movement_receipt,
+    finalize_cash_movement_document,
+)
 from accounts.services.manager_intelligence import (
     payment_cash_reference,
     pay_ready_payroll_entries,
@@ -280,19 +286,23 @@ def payment_validate(request, pk):
     payment.status = Payment.STATUS_VALIDATED
     payment.paid_at = timezone.now()
     payment.save()
-    BranchCashMovement.objects.get_or_create(
+    existing_movement = BranchCashMovement.objects.filter(
         branch=request.branch,
         source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
-        reference=payment_cash_reference(payment),
-        defaults={
-            "movement_type": BranchCashMovement.TYPE_IN,
-            "amount": payment.amount,
-            "label": f"Paiement etudiant - {payment.inscription.candidature.full_name}",
-            "movement_date": payment.paid_at.date(),
-            "notes": f"Synchronisation automatique paiement #{payment.pk}.",
-            "created_by": request.user,
-        },
-    )
+        source_reference=payment_cash_reference(payment),
+    ).first()
+    if not existing_movement:
+        create_cash_movement(
+            branch=request.branch,
+            source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+            source_reference=payment_cash_reference(payment),
+            movement_type=BranchCashMovement.TYPE_IN,
+            amount=payment.amount,
+            label=f"Paiement etudiant - {payment.inscription.candidature.full_name}",
+            movement_date=payment.paid_at.date(),
+            notes=f"Synchronisation automatique paiement #{payment.pk}.",
+            created_by=request.user,
+        )
     payment.refresh_from_db()
     return render(
         request,
@@ -503,19 +513,23 @@ def cash_session_complete(request, pk):
             agent=manager_agent,
             cash_session=session,
         )
-        BranchCashMovement.objects.get_or_create(
+        existing_movement = BranchCashMovement.objects.filter(
             branch=request.branch,
             source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
-            reference=payment_cash_reference(payment),
-            defaults={
-                "movement_type": BranchCashMovement.TYPE_IN,
-                "amount": payment.amount,
-                "label": f"Paiement etudiant - {payment.inscription.candidature.full_name}",
-                "movement_date": payment.paid_at.date(),
-                "notes": f"Synchronisation automatique paiement #{payment.pk}.",
-                "created_by": request.user,
-            },
-        )
+            source_reference=payment_cash_reference(payment),
+        ).first()
+        if not existing_movement:
+            create_cash_movement(
+                branch=request.branch,
+                source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+                source_reference=payment_cash_reference(payment),
+                movement_type=BranchCashMovement.TYPE_IN,
+                amount=payment.amount,
+                label=f"Paiement etudiant - {payment.inscription.candidature.full_name}",
+                movement_date=payment.paid_at.date(),
+                notes=f"Synchronisation automatique paiement #{payment.pk}.",
+                created_by=request.user,
+            )
         session.is_used = True
         session.save(update_fields=["is_used"])
 
@@ -653,14 +667,14 @@ def salary_pay(request, pk):
     payroll_entry.paid_amount += payment_amount
     payroll_entry.updated_by = request.user
     payroll_entry.save()
-    BranchCashMovement.objects.create(
+    create_cash_movement(
         branch=request.branch,
         movement_type=BranchCashMovement.TYPE_OUT,
         source=BranchCashMovement.SOURCE_PAYROLL,
         amount=payment_amount,
         label=f"Salaire - {payroll_entry.employee.get_full_name() or payroll_entry.employee.username}",
         movement_date=timezone.localdate(),
-        reference=payroll_cash_reference(payroll_entry, payment_amount),
+        source_reference=payroll_cash_reference(payroll_entry, payment_amount),
         notes=f"Paiement salaire {payroll_entry.period_month:%Y-%m}.",
         created_by=request.user,
     )
@@ -708,6 +722,7 @@ def expense_create(request):
     expense.created_by = request.user
     expense.status = BranchExpense.STATUS_SUBMITTED
     expense.save()
+    ensure_expense_reference(expense)
     return manager_section_redirect_response("depenses")
 
 
@@ -750,7 +765,8 @@ def expense_pay(request, pk):
         expense.paid_by = request.user
         expense.paid_at = timezone.now()
         expense.save(update_fields=["status", "paid_by", "paid_at", "updated_at"])
-        BranchCashMovement.objects.create(
+        ensure_expense_reference(expense)
+        create_cash_movement(
             branch=request.branch,
             movement_type=BranchCashMovement.TYPE_OUT,
             source=BranchCashMovement.SOURCE_EXPENSE,
@@ -758,7 +774,7 @@ def expense_pay(request, pk):
             label=expense.title,
             movement_date=expense.expense_date,
             expense=expense,
-            reference=expense.reference,
+            source_reference=expense.reference,
             notes=expense.notes,
             created_by=request.user,
         )
@@ -782,6 +798,7 @@ def cash_movement_create(request):
     movement.branch = request.branch
     movement.created_by = request.user
     movement.save()
+    finalize_cash_movement_document(movement)
     return manager_section_redirect_response("caisse")
 
 
@@ -792,4 +809,22 @@ def cash_sync(request):
     return manager_section_notice_redirect_response(
         "caisse",
         f"caisse_sync_{result['created']}",
+    )
+
+
+@manager_required
+@require_GET
+def cash_movement_receipt(request, pk):
+    movement = get_object_or_404(
+        BranchCashMovement,
+        pk=pk,
+        branch=request.branch,
+    )
+    ensure_cash_movement_receipt(movement)
+    if not movement.receipt_pdf:
+        raise Http404("Piece de caisse indisponible.")
+    return FileResponse(
+        movement.receipt_pdf.open("rb"),
+        as_attachment=True,
+        filename=f"piece-caisse-{movement.receipt_number or movement.reference}.pdf",
     )

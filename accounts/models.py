@@ -438,6 +438,14 @@ class BranchCashMovement(models.Model):
         related_name="cash_movements",
     )
     reference = models.CharField(max_length=80, blank=True, db_index=True)
+    source_reference = models.CharField(
+        max_length=120,
+        blank=True,
+        db_index=True,
+        help_text="Reference technique de la source pour eviter les doublons de synchronisation.",
+    )
+    receipt_number = models.CharField(max_length=80, blank=True, db_index=True)
+    receipt_pdf = models.FileField(upload_to="accounts/cash-receipts/", null=True, blank=True)
     notes = models.TextField(blank=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_cash_movements")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -450,7 +458,41 @@ class BranchCashMovement(models.Model):
             models.Index(fields=["branch", "movement_date"]),
             models.Index(fields=["branch", "movement_type"]),
             models.Index(fields=["source", "movement_date"]),
+            models.Index(fields=["branch", "source", "source_reference"]),
         ]
 
     def __str__(self):
         return f"{self.get_movement_type_display()} {self.amount} FCFA - {self.label}"
+
+
+class AccountingDocumentSequence(models.Model):
+    DOCUMENT_EXPENSE = "expense"
+    DOCUMENT_CASH = "cash"
+
+    DOCUMENT_CHOICES = [
+        (DOCUMENT_EXPENSE, "Depense"),
+        (DOCUMENT_CASH, "Caisse"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="accounting_sequences",
+    )
+    document_type = models.CharField(max_length=30, choices=DOCUMENT_CHOICES)
+    year = models.PositiveSmallIntegerField()
+    last_number = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Sequence comptable"
+        verbose_name_plural = "Sequences comptables"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["branch", "document_type", "year"],
+                name="accounts_unique_accounting_sequence_branch_type_year",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.branch} - {self.document_type} - {self.year}: {self.last_number}"

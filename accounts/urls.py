@@ -402,6 +402,8 @@ urlpatterns = [
     path("htmx/manager/expense/<int:pk>/pay/", expense_pay, name="htmx_manager_expense_pay"),
     path("htmx/manager/cash-movement/create/", cash_movement_create, name="htmx_manager_cash_movement_create"),
     path("htmx/manager/cash/sync/", cash_sync, name="htmx_manager_cash_sync"),
+    path("htmx/manager/cash-movement/<int:pk>/receipt/", cash_movement_receipt,
+         name="htmx_manager_cash_movement_receipt"),
 
     # =============================================
     # RECHERCHE

@@ -150,7 +150,6 @@ class BranchExpenseForm(forms.ModelForm):
             "amount",
             "expense_date",
             "supplier",
-            "reference",
             "receipt",
             "notes",
         ]
@@ -161,7 +160,7 @@ class BranchExpenseForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ["title", "category", "amount", "expense_date", "supplier", "reference"]:
+        for field_name in ["title", "category", "amount", "expense_date", "supplier"]:
             self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
         self.fields["receipt"].widget.attrs.update({
             "class": INPUT_CLASS,
@@ -182,7 +181,6 @@ class BranchCashMovementForm(forms.ModelForm):
             "amount",
             "label",
             "movement_date",
-            "reference",
             "notes",
         ]
         widgets = {
@@ -192,7 +190,7 @@ class BranchCashMovementForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ["movement_type", "source", "amount", "label", "movement_date", "reference"]:
+        for field_name in ["movement_type", "source", "amount", "label", "movement_date"]:
             self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
         self.fields["notes"].widget.attrs.update({
             "class": TEXTAREA_CLASS,

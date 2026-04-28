@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
+from accounts.models import AccountingDocumentSequence, BranchCashMovement, BranchExpense, PayrollEntry, Profile
 
 
 @admin.register(Profile)
@@ -29,7 +29,14 @@ class BranchExpenseAdmin(admin.ModelAdmin):
 
 @admin.register(BranchCashMovement)
 class BranchCashMovementAdmin(admin.ModelAdmin):
-    list_display = ("label", "branch", "movement_type", "source", "amount", "movement_date", "created_by")
+    list_display = ("reference", "receipt_number", "label", "branch", "movement_type", "source", "amount", "movement_date", "created_by")
     list_filter = ("branch", "movement_type", "source", "movement_date")
-    search_fields = ("label", "reference", "notes")
+    search_fields = ("label", "reference", "source_reference", "receipt_number", "notes")
     autocomplete_fields = ("branch", "expense", "created_by")
+
+
+@admin.register(AccountingDocumentSequence)
+class AccountingDocumentSequenceAdmin(admin.ModelAdmin):
+    list_display = ("branch", "document_type", "year", "last_number", "updated_at")
+    list_filter = ("branch", "document_type", "year")
+    search_fields = ("branch__name", "branch__code")

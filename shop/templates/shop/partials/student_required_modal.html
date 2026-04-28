@@ -1,0 +1,37 @@
+{% load humanize %}
+{% if show_popup %}
+<div id="shop-required-modal" class="fixed inset-0 z-[80] flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onclick="document.getElementById('shop-required-modal').remove()"></div>
+  <section class="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+    <header class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wide text-primary">Articles requis</p>
+        <h2 class="mt-1 text-xl font-black text-slate-900">Completer vos articles ecole</h2>
+        <p class="mt-1 text-sm text-slate-500">Certains articles sont necessaires pour votre presence en classe et vos activites pratiques.</p>
+      </div>
+      <button type="button" onclick="document.getElementById('shop-required-modal').remove()" class="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600">
+        <i data-lucide="x" style="width:18px;height:18px;"></i>
+      </button>
+    </header>
+    <form method="post" action="{% url 'shop:student_create_required_order' %}" class="p-5">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {% for product in missing_required %}
+        <label class="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <input type="checkbox" name="product_ids" value="{{ product.id }}" checked class="mt-1 rounded border-slate-300 text-primary">
+          <span class="min-w-0">
+            <span class="block text-sm font-bold text-slate-900">{{ product.name }}</span>
+            <span class="block text-xs text-slate-500">{{ product.get_category_display }}{% if product.current_stock <= product.low_stock_threshold %} - stock limite{% endif %}</span>
+            <span class="mt-2 block text-sm font-semibold text-primary">{{ product.unit_price|intcomma }} FCFA</span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="mt-5 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <button type="button" onclick="document.getElementById('shop-required-modal').remove()" class="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600">Voir plus tard</button>
+        <button type="submit" class="rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white hover:bg-primary-light">Creer ma commande</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endif %}

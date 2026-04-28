@@ -10,6 +10,8 @@ from admissions.models import Candidature
 from accounts.forms import BranchCashMovementForm, BranchExpenseForm
 from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
 from accounts.services.manager_intelligence import build_manager_intelligence_context
+from shop.forms import ShopProductForm, ShopStockInForm
+from shop.services.shop_service import get_manager_shop_context
 from inscriptions.models import Inscription
 from payments.models import CashPaymentSession, Payment, PaymentAgent
 from students.models import Student
@@ -445,6 +447,7 @@ def _manager_context(request, active_section="overview"):
         cash_stats=cash_stats,
         branch_staff_user_ids=branch_staff_user_ids,
     )
+    shop_context = get_manager_shop_context(branch)
 
     quick_search = request.GET.get("q", "").strip()
     quick_results = {"candidatures": [], "inscriptions": [], "payments": []}
@@ -532,6 +535,9 @@ def _manager_context(request, active_section="overview"):
         "cash_form": BranchCashMovementForm(),
         "cash_sources": BranchCashMovement.SOURCE_CHOICES,
         "manager_intelligence": intelligence,
+        "shop_product_form": ShopProductForm(),
+        "shop_stock_form": ShopStockInForm(branch=branch),
+        **shop_context,
         "manager_search": quick_search,
         "quick_results": quick_results,
         "dashboard_type": "manager",
@@ -549,7 +555,7 @@ def _render_manager_dashboard(request, active_section):
 @manager_required
 def manager_dashboard(request):
     section = request.GET.get("section", "overview").strip() or "overview"
-    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse"}
+    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse", "boutique"}
     if section not in allowed_sections:
         section = "overview"
     return _render_manager_dashboard(request, section)

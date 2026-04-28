@@ -29,6 +29,7 @@ from .widgets.profile import get_profile_widget
 from .widgets.academics import get_academics_widget, get_student_academic_snapshot
 from .widgets.finance import get_finance_widget
 from .widgets.notifications import get_notifications_widget
+from shop.services.shop_service import get_required_shop_context
 
 
 def _academic_chapters_available():
@@ -220,6 +221,7 @@ def _build_course_player_bundle(chapters):
 @role_required("student")
 def dashboard(request):
     context = get_student_overview_data(request.user)
+    context["shop_required"] = get_required_shop_context(request.user)
     return render(request, "portal/student/dashboard.html", context)
 
 

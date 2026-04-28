@@ -40,6 +40,7 @@ urlpatterns = [
     path("admissions/", include("admissions.urls")),
     path("inscriptions/", include("inscriptions.urls")),
     path("payments/", include("payments.urls")),
+    path("shop/", include("shop.urls")),
     path("actualites/", include("news.urls", namespace="news")),
     path('superadmin/', include('superadmin.urls')),
     path("secretary/", include("secretary.urls")),

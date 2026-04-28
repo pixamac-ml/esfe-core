@@ -409,6 +409,7 @@ class BranchCashMovement(models.Model):
     SOURCE_EXPENSE = "expense"
     SOURCE_PAYROLL = "payroll"
     SOURCE_STUDENT_PAYMENT = "student_payment"
+    SOURCE_SHOP = "shop"
     SOURCE_ADJUSTMENT = "adjustment"
 
     SOURCE_CHOICES = [
@@ -416,6 +417,7 @@ class BranchCashMovement(models.Model):
         (SOURCE_EXPENSE, "Depense"),
         (SOURCE_PAYROLL, "Salaire"),
         (SOURCE_STUDENT_PAYMENT, "Paiement etudiant"),
+        (SOURCE_SHOP, "Boutique"),
         (SOURCE_ADJUSTMENT, "Ajustement caisse"),
     ]
 

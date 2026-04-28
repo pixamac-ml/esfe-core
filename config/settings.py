@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "formations",
     "branches",
     "academics",
+    "shop.apps.ShopConfig",
     # Contenu
     "blog.apps.BlogConfig",
     "news",

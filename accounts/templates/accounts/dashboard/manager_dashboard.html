@@ -50,7 +50,7 @@
 
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-4">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
+            <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2">
                 <a href="{% url 'accounts:manager_dashboard' %}?section=overview" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'overview' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
                     Vue d'ensemble
                 </a>
@@ -71,6 +71,9 @@
                 </a>
                 <a href="{% url 'accounts:manager_dashboard' %}?section=caisse" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'caisse' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
                     Caisse
+                </a>
+                <a href="{% url 'accounts:manager_dashboard' %}?section=boutique" class="px-4 py-3 rounded-2xl border text-sm font-semibold transition {% if active_section == 'boutique' %}bg-primary text-white border-primary shadow-sm{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                    Boutique
                 </a>
             </div>
 
@@ -964,6 +967,106 @@
                     </div>
                 </div>
                 {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if active_section == "boutique" %}
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Articles</p><p class="text-2xl font-bold text-slate-900 mt-2">{{ shop_stats.products }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Requis</p><p class="text-2xl font-bold text-primary mt-2">{{ shop_stats.required }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Stock faible</p><p class="text-2xl font-bold text-rose-600 mt-2">{{ shop_stats.low_stock }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Commandes attente</p><p class="text-2xl font-bold text-amber-600 mt-2">{{ shop_stats.pending_orders }}</p></div>
+        <div class="bg-white rounded-2xl border border-slate-100 p-4"><p class="text-sm text-slate-500">Ventes mois</p><p class="text-2xl font-bold text-emerald-600 mt-2">{{ shop_stats.month_sales|intcomma }}</p></div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-6">
+        <div class="space-y-4">
+            <div class="bg-white rounded-2xl border border-slate-100 p-5">
+                <h3 class="text-lg font-semibold text-slate-900 mb-4">Nouvel article</h3>
+                <form method="post" action="{% url 'shop:manager_product_create' %}" class="space-y-3">
+                    {% csrf_token %}
+                    {{ shop_product_form.name }}
+                    {{ shop_product_form.category }}
+                    {{ shop_product_form.unit_price }}
+                    {{ shop_product_form.description }}
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <label class="flex items-center gap-2">{{ shop_product_form.is_required }} Requis</label>
+                        <label class="flex items-center gap-2">{{ shop_product_form.is_active }} Actif</label>
+                    </div>
+                    {{ shop_product_form.low_stock_threshold }}
+                    <button class="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white">Ajouter</button>
+                </form>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-100 p-5">
+                <h3 class="text-lg font-semibold text-slate-900 mb-4">Entrée stock</h3>
+                <form method="post" action="{% url 'shop:manager_stock_in' %}" class="space-y-3">
+                    {% csrf_token %}
+                    {{ shop_stock_form.product }}
+                    {{ shop_stock_form.quantity }}
+                    {{ shop_stock_form.notes }}
+                    <button class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">Ajouter au stock</button>
+                </form>
+            </div>
+        </div>
+        <div class="space-y-4">
+            <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100"><h3 class="text-lg font-semibold text-slate-900">Commandes boutique</h3></div>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[980px] divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Commande</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Etudiant</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Etat</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                        {% for order in shop_orders %}
+                            <tr>
+                                <td class="px-6 py-4"><p class="text-sm font-semibold text-slate-900">{{ order.reference }}</p><p class="text-xs text-slate-500">{{ order.created_at|date:"d/m/Y H:i" }}</p></td>
+                                <td class="px-6 py-4 text-sm text-slate-700">{{ order.student.get_full_name|default:order.student.username }}</td>
+                                <td class="px-6 py-4 text-right text-sm font-semibold">{{ order.total_amount|intcomma }} FCFA</td>
+                                <td class="px-6 py-4 text-sm">{{ order.get_status_display }}</td>
+                                <td class="px-6 py-4">
+                                    <div class="flex justify-end gap-2">
+                                        {% for payment in order.payments.all %}
+                                            {% if payment.status == "pending" %}
+                                            <button hx-post="{% url 'shop:manager_payment_validate' payment.id %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Valider paiement</button>
+                                            {% endif %}
+                                            {% if payment.receipt_pdf %}
+                                            <a href="{% url 'shop:payment_receipt' payment.id %}" target="_blank" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">Recu</a>
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if order.status == "paid" %}
+                                        <button hx-post="{% url 'shop:manager_order_deliver' order.id %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white">Remettre</button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="5" class="px-6 py-10 text-center text-slate-400">Aucune commande boutique.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100"><h3 class="text-lg font-semibold text-slate-900">Catalogue</h3></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 p-4">
+                    {% for product in shop_products %}
+                    <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                        <p class="text-sm font-semibold text-slate-900">{{ product.name }}</p>
+                        <p class="text-xs text-slate-500">{{ product.get_category_display }} - stock {{ product.current_stock }}</p>
+                        <p class="mt-2 text-sm font-bold text-primary">{{ product.unit_price|intcomma }} FCFA</p>
+                    </div>
+                    {% empty %}
+                    <p class="text-sm text-slate-400">Aucun article configure.</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>

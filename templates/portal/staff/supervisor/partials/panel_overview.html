@@ -1,0 +1,133 @@
+<div class="space-y-4" x-data="{ showDetails: false }">
+  <article class="portal-card portal-card-pad">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div class="min-w-0">
+        <p class="portal-section-kicker">Pilotage annexe</p>
+        <h2 class="mt-2 text-2xl font-black text-slate-900 leading-tight">Surveillance générale</h2>
+        <p class="mt-2 supervisor-muted">Vue courte, orientée action. Le détail reste disponible mais ne surcharge plus l’écran.</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <span class="supervisor-chip"><i data-lucide="school" style="width:16px;height:16px;"></i>{{ branch.name|default:"Acces global" }}</span>
+          <span class="supervisor-chip"><i data-lucide="calendar-days" style="width:16px;height:16px;"></i>{{ today|date:"d/m/Y" }}</span>
+          <span class="supervisor-chip"><i data-lucide="users" style="width:16px;height:16px;"></i>{{ total_students }} etudiants</span>
+        </div>
+      </div>
+      <div class="supervisor-kpi-compact">
+        <div class="supervisor-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Critiques</p>
+          <p class="value {% if supervisor_kpis.critical_courses %}text-rose-600{% else %}text-slate-900{% endif %}">{{ supervisor_kpis.critical_courses }}</p>
+          <p class="supervisor-muted">Cours bloquants a traiter.</p>
+        </div>
+        <div class="supervisor-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Absents</p>
+          <p class="value {% if supervisor_kpis.absent_students %}text-rose-600{% else %}text-slate-900{% endif %}">{{ supervisor_kpis.absent_students }}</p>
+          <p class="supervisor-muted">Etudiants absents aujourd'hui.</p>
+        </div>
+        <div class="supervisor-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Retards</p>
+          <p class="value {% if supervisor_kpis.late_students %}text-amber-600{% else %}text-slate-900{% endif %}">{{ supervisor_kpis.late_students }}</p>
+          <p class="supervisor-muted">Retards saisis aujourd'hui.</p>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <div class="supervisor-shell-grid">
+    <article class="portal-card portal-card-pad">
+      <div class="supervisor-panel-head">
+        <div>
+          <p class="portal-section-kicker">A traiter maintenant</p>
+          <h3 class="portal-section-title">Priorites</h3>
+        </div>
+        <span class="supervisor-badge {% if daily_lesson_status.critical_count %}bg-rose-100 text-rose-700{% elif daily_lesson_status.missing_lesson_logs_count or supervisor_kpis.late_students %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+          {% if daily_lesson_status.critical_count %}critique{% elif daily_lesson_status.missing_lesson_logs_count or supervisor_kpis.late_students %}attention{% else %}stable{% endif %}
+        </span>
+      </div>
+      <div class="mt-4 supervisor-actions">
+        <a href="#courses" class="supervisor-action">
+          <div class="min-w-0">
+            <p class="text-sm font-black text-slate-900 truncate">Suivre les cours critiques</p>
+            <p class="text-xs text-slate-500 truncate">{{ daily_lesson_status.critical_count|default:0 }} cours critiques · {{ daily_lesson_status.missing_lesson_logs_count|default:0 }} cahiers manquants</p>
+          </div>
+          <span class="supervisor-badge bg-slate-100 text-slate-700">Ouvrir</span>
+        </a>
+        <a href="#attendance" class="supervisor-action">
+          <div class="min-w-0">
+            <p class="text-sm font-black text-slate-900 truncate">Saisir / corriger les presences</p>
+            <p class="text-xs text-slate-500 truncate">{{ today_attendance_total }} saisies etudiants · {{ today_teacher_attendance_total }} saisies enseignants</p>
+          </div>
+          <span class="supervisor-badge bg-slate-100 text-slate-700">Ouvrir</span>
+        </a>
+        <a href="#alerts" class="supervisor-action">
+          <div class="min-w-0">
+            <p class="text-sm font-black text-slate-900 truncate">Traiter les alertes</p>
+            <p class="text-xs text-slate-500 truncate">{{ alerts|length }} alertes actives</p>
+          </div>
+          <span class="supervisor-badge bg-slate-100 text-slate-700">Ouvrir</span>
+        </a>
+      </div>
+      <div class="mt-4">
+        <div class="supervisor-accordion">
+          <button type="button" @click="showDetails = !showDetails">
+            <span class="text-sm">Indicateurs & charge (details)</span>
+            <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showDetails ? 'Masquer' : 'Afficher'"></span>
+          </button>
+          <div class="content" x-show="showDetails" x-transition.duration.180ms>
+            <div class="grid gap-3 md:grid-cols-2">
+              <div class="supervisor-mini-item">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Enseignants absents</p>
+                <p class="mt-1 text-2xl font-black text-slate-900">{{ supervisor_kpis.absent_teachers }}</p>
+              </div>
+              <div class="supervisor-mini-item">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Etudiants a risque</p>
+                <p class="mt-1 text-2xl font-black text-slate-900">{{ supervisor_kpis.risk_students }}</p>
+              </div>
+              <div class="supervisor-mini-item">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Cours non tenus</p>
+                <p class="mt-1 text-2xl font-black text-slate-900">{{ supervisor_kpis.missing_lesson_logs }}</p>
+              </div>
+              <div class="supervisor-mini-item">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Evenements (semaine)</p>
+                <p class="mt-1 text-2xl font-black text-slate-900">{{ schedule_stats.total_events|default:0 }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="portal-card portal-card-pad" x-data="{ open: false }">
+      <div class="supervisor-panel-head">
+        <div>
+          <p class="portal-section-kicker">Synthese</p>
+          <h3 class="portal-section-title">Alertes chaudes</h3>
+        </div>
+        <button type="button" class="supervisor-badge bg-slate-100 text-slate-700" @click="open = !open">
+          Voir {% if alerts|length > 4 %}toutes{% else %}plus{% endif %}
+        </button>
+      </div>
+      <div class="mt-4 supervisor-alert-stack">
+        {% for alert in alerts|slice:":3" %}
+        <div class="supervisor-alert-card {% if alert.level == 'critical' %}border-rose-200 bg-rose-50{% elif alert.level == 'warning' %}border-amber-200 bg-amber-50{% else %}border-slate-100 bg-slate-50{% endif %}">
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-[11px] font-bold uppercase tracking-wide {% if alert.level == 'critical' %}text-rose-600{% elif alert.level == 'warning' %}text-amber-700{% else %}text-slate-500{% endif %}">{{ alert.type }}</p>
+            <span class="supervisor-badge bg-slate-100 text-slate-700">{{ alert.level }}</span>
+          </div>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ alert.message }}</p>
+        </div>
+        {% empty %}
+        <div class="supervisor-empty">Aucune alerte detectee.</div>
+        {% endfor %}
+      </div>
+      <div class="mt-3" x-show="open" x-transition.duration.180ms>
+        <a href="#alerts" class="supervisor-action">
+          <div class="min-w-0">
+            <p class="text-sm font-black text-slate-900 truncate">Ouvrir la liste complete</p>
+            <p class="text-xs text-slate-500 truncate">Prioriser, filtrer et agir sur les alertes</p>
+          </div>
+          <span class="supervisor-badge bg-slate-100 text-slate-700">{{ alerts|length }}</span>
+        </a>
+      </div>
+    </article>
+  </div>
+</div>
+

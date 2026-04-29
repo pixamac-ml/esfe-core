@@ -26,6 +26,7 @@ from accounts.access import (
 )
 from portal.permissions import get_user_role as get_portal_user_role
 from portal.permissions import get_post_login_portal_url
+from portal.models import SupportAuditLog
 
 
 User = get_user_model()
@@ -610,6 +611,108 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Dashboard Informaticien")
 		self.assertContains(response, "Support technique, acces, et sante du portail")
+		self.assertContains(response, "Gestion des notes")
+		self.assertContains(response, "Inscriptions sans affectation")
+
+	def test_it_user_can_access_grade_dashboard(self):
+		it_user = self._create_user("portal_it_grades", position="it_support")
+		self.client.force_login(it_user)
+
+		response = self.client.get(reverse("accounts_portal:admin_grade_dashboard"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Gestion des notes")
+
+	def test_it_dashboard_can_toggle_scoped_staff_account(self):
+		it_user = self._create_user("portal_it_toggle", position="it_support")
+		target_user = self._create_user("portal_staff_target", position="secretary")
+		self.client.force_login(it_user)
+
+		response = self.client.post(
+			reverse("accounts_portal:it_toggle_account"),
+			{
+				"target_user_id": target_user.id,
+				"kind": "staff",
+				"id": target_user.id,
+				"q": target_user.username,
+			},
+		)
+
+		self.assertRedirects(
+			response,
+			f"{reverse('accounts_portal:portal_dashboard')}?q={target_user.username}&kind=staff&id={target_user.id}#diagnostics",
+			fetch_redirect_response=False,
+		)
+		target_user.refresh_from_db()
+		self.assertFalse(target_user.is_active)
+		self.assertTrue(
+			SupportAuditLog.objects.filter(
+				actor=it_user,
+				target_user=target_user,
+				action_type=SupportAuditLog.ACTION_ACCOUNT_DEACTIVATED,
+			).exists()
+		)
+
+	def test_it_dashboard_can_reset_scoped_user_password(self):
+		it_user = self._create_user("portal_it_reset", position="it_support")
+		target_user = self._create_user("portal_staff_reset", position="secretary")
+		self.client.force_login(it_user)
+
+		response = self.client.post(
+			reverse("accounts_portal:it_reset_password"),
+			{
+				"target_user_id": target_user.id,
+				"kind": "staff",
+				"id": target_user.id,
+				"q": target_user.username,
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		session_feedback = self.client.session.get("it_support_feedback")
+		self.assertIsNotNone(session_feedback)
+		self.assertTrue(session_feedback.get("password"))
+		target_user.refresh_from_db()
+		self.assertTrue(target_user.check_password(session_feedback["password"]))
+		self.assertTrue(
+			SupportAuditLog.objects.filter(
+				actor=it_user,
+				target_user=target_user,
+				action_type=SupportAuditLog.ACTION_PASSWORD_RESET,
+			).exists()
+		)
+
+	def test_it_dashboard_rejects_cross_branch_account_action(self):
+		it_user = self._create_user("portal_it_scope", position="it_support")
+		other_branch = Branch.objects.create(
+			name="Annexe Hors Scope",
+			code="AHS",
+			slug="annexe-hors-scope",
+		)
+		target_user = self._create_user("portal_staff_other_branch", position="secretary")
+		target_user.profile.branch = other_branch
+		target_user.profile.save(update_fields=["branch", "updated_at"])
+		self.client.force_login(it_user)
+
+		response = self.client.post(
+			reverse("accounts_portal:it_toggle_account"),
+			{
+				"target_user_id": target_user.id,
+				"kind": "staff",
+				"id": target_user.id,
+				"q": target_user.username,
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		target_user.refresh_from_db()
+		self.assertTrue(target_user.is_active)
+		self.assertFalse(
+			SupportAuditLog.objects.filter(
+				actor=it_user,
+				target_user=target_user,
+			).exists()
+		)
 
 	def test_legacy_supervisor_route_redirects_to_single_entry(self):
 		supervisor = self._create_user("portal_supervisor_legacy", position="academic_supervisor")

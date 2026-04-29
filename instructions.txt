@@ -1,4 +1,251 @@
+ProgrammingError at /portal/dashboard/
+ERREUR:  la relation « portal_supportauditlog » n'existe pas
+LINE 1: ..."is_staff", T4."is_active", T4."date_joined" FROM "portal_su...
+                                                             ^
+Request Method:	GET
+Request URL:	http://127.0.0.1:8000/portal/dashboard/
+Django Version:	6.0.1
+Exception Type:	ProgrammingError
+Exception Value:
+ERREUR:  la relation « portal_supportauditlog » n'existe pas
+LINE 1: ..."is_staff", T4."is_active", T4."date_joined" FROM "portal_su...
+                                                             ^
+Exception Location:	C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\backends\utils.py, line 105, in _execute
+Raised during:	portal.views.views.portal_dashboard
+Python Executable:	C:\Users\WORK\PycharmProjects\esfe-core\.venv\Scripts\python.exe
+Python Version:	3.12.10
+Python Path:
+['C:\\Users\\WORK\\PycharmProjects\\esfe-core',
+ 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip',
+ 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\DLLs',
+ 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\Lib',
+ 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312',
+ 'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv',
+ 'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv\\Lib\\site-packages']
+Server time:	Wed, 29 Apr 2026 20:34:39 +0000
+Traceback Switch to copy-and-paste view
+C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\backends\utils.py, line 105, in _execute
+                return self.cursor.execute(sql, params)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+The above exception (ERREUR: la relation « portal_supportauditlog » n'existe pas LINE 1: ..."is_staff", T4."is_active", T4."date_joined" FROM "portal_su... ^ ) was the direct cause of the following exception:
+C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py, line 55, in inner
+                response = get_response(request)
+                               ^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\base.py, line 198, in _get_response
+                response = wrapped_callback(request, *callback_args, **callback_kwargs)
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\contrib\auth\decorators.py, line 59, in _view_wrapper
+                    return view_func(request, *args, **kwargs)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\WORK\PycharmProjects\esfe-core\portal\views\views.py, line 291, in portal_dashboard
+        return _render_it_dashboard(request)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\WORK\PycharmProjects\esfe-core\portal\views\views.py, line 267, in _render_it_dashboard
+        _build_it_dashboard_context(request),
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+C:\Users\WORK\PycharmProjects\esfe-core\portal\views\views.py, line 132, in _build_it_dashboard_context
+    return build_it_dashboard_context(
+                 …
+Local vars
+C:\Users\WORK\PycharmProjects\esfe-core\portal\services\it_dashboard_service.py, line 180, in build_it_dashboard_context
+        "recent_support_logs": get_recent_support_logs(branch=branch, limit=8),
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
+Local vars
+
+
+
+
+Tu es un agent développeur senior Django chargé d’analyser un projet existant avant toute modification.
+
+🎯 OBJECTIF
+Analyser le projet pour préparer la mise en place du **dashboard métier de l’informaticien**, en réutilisant au maximum les éléments existants.
+
+⚠️ IMPORTANT
+
+* NE PAS coder immédiatement
+* NE PAS modifier le projet
+* Commencer par une ANALYSE COMPLÈTE
+* L’objectif est de comprendre ce qui existe déjà et éviter toute duplication
+
+---
+
+# 🧠 PHASE 1 : ANALYSE GLOBALE DU PROJET
+
+Explorer entièrement le projet Django.
+
+Identifier :
+
+1. Les apps principales :
+
+   * academics
+   * students
+   * teachers
+   * classes
+   * formations
+   * accounts
+   * portal
+   * payments
+   * autres apps éventuelles
+
+2. L’architecture actuelle :
+
+   * services existants
+   * selectors éventuels
+   * organisation des vues
+   * structure des templates
+
+3. Les modules déjà développés liés à :
+
+   * gestion des notes
+   * calcul académique
+   * étudiants
+   * comptes utilisateurs
+   * inscriptions
+   * classes
+   * annexes
+
+---
+
+# 🧠 PHASE 2 : ANALYSE SPÉCIFIQUE DU SYSTÈME DE NOTES
+
+Identifier précisément :
+
+* où sont stockées les notes
+* comment les notes sont calculées
+* les modèles liés :
+
+  * ECUE / matières
+  * UE
+  * semestre
+  * classe
+  * étudiant
+* les services de calcul existants
+* les workflows existants (saisie, validation, calcul)
+
+🎯 OBJECTIF :
+Comprendre comment exploiter le système EXISTANT sans le recréer.
+
+---
+
+# 🧠 PHASE 3 : ANALYSE DU DASHBOARD INFORMATICIEN EXISTANT
+
+Identifier :
+
+* s’il existe déjà une structure de dashboard informaticien
+* les vues existantes
+* les templates existants
+* les routes (urls.py)
+* les composants réutilisables
+
+---
+
+# 🧠 PHASE 4 : IDENTIFICATION DES FONCTIONNALITÉS RÉUTILISABLES
+
+Lister clairement :
+
+✔️ ce qui existe déjà et peut être utilisé directement
+✔️ ce qui existe mais doit être adapté
+❌ ce qui n’existe pas et doit être créé
+
+---
+
+# 🧠 PHASE 5 : DÉFINITION DU RÔLE MÉTIER DE L’INFORMATICIEN
+
+L’informaticien est responsable technique, pas pédagogique.
+
+Fonctions métiers attendues :
+
+1. Gestion des notes (via système existant)
+
+   * importer les notes (Excel)
+   * lancer recalcul
+   * vérifier cohérence
+
+2. Génération de template Excel
+
+   * modèle dynamique basé sur classe et ECUE
+
+3. Diagnostic étudiant
+
+   * vérifier compte, inscription, classe, paiement, notes
+
+4. Support utilisateurs
+
+   * reset mot de passe
+   * activer / désactiver compte
+   * vérifier accès dashboard
+
+5. Gestion technique des données
+
+   * corriger incohérences
+   * réassigner étudiant/classe
+
+6. Génération de cartes étudiantes
+
+7. Journal technique (audit des actions)
+
+8. Filtrage strict par annexe
+
+---
+
+# 🧠 PHASE 6 : PLAN D’INTÉGRATION
+
+Proposer un plan clair :
+
+* où intégrer les nouvelles fonctionnalités
+* quelles apps utiliser
+* quels services créer
+* quelles vues ajouter
+* quelles parties du code réutiliser
+
+---
+
+# 🧠 PHASE 7 : CONTRAINTES TECHNIQUES
+
+Respecter :
+
+* ❌ aucune logique métier dans les templates
+* ❌ ne pas dupliquer du code existant
+* ❌ ne pas casser les fonctionnalités existantes
+* ✅ utiliser services.py pour toute logique métier
+* ✅ filtrage par annexe obligatoire
+* ✅ vues fines
+* ✅ HTMX/AJAX pour interactions dynamiques si déjà utilisé
+
+---
+
+# 🎯 LIVRABLE ATTENDU
+
+Un rapport structuré contenant :
+
+1. Analyse du projet
+2. Analyse du système de notes
+3. État du dashboard informaticien actuel
+4. Liste des fonctionnalités existantes réutilisables
+5. Liste des fonctionnalités à développer
+6. Plan d’intégration détaillé
+7. Recommandations techniques
+
+---
+
+⚠️ N
+E PAS CODER
+⚠️ NE PAS MODIFIER
+⚠️ FOURNIR UNIQUEMENT UNE ANALYSE STRUCTURÉE
+
+Une fois l’analyse validée, les implémentations seront demandées dans une seconde phase.
+
+
 CONTEXTE
+
+
+
 
 Projet Django modulaire (Félix Santé).
 Dashboard étudiant déjà fonctionnel avec sections via sidebar :
@@ -785,3 +1032,327 @@ Python Path:
  'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv',
  'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv\\Lib\\site-packages']
 Server time:	Tue, 28 Apr 2026 19:42:08 +0000
+
+
+Analyse l’ensemble du projet Django avant modification.
+
+Objectif :
+Refondre le dashboard du surveillant général pour qu’il ne soit plus un simple écran de consultation, mais un véritable cockpit opérationnel de vie scolaire, capable d’afficher, filtrer, agir et piloter les classes, les étudiants, les cours, l’assiduité, le calendrier et les périodes d’évaluation.
+
+IMPORTANT :
+- Le dashboard doit rester filtré par annexe.
+- Ne pas casser les modules existants.
+- Utiliser les services métier existants.
+- Aucune logique métier dans les templates.
+- Les vues doivent rester fines.
+- Utiliser HTMX/AJAX pour les interactions dynamiques.
+- Le surveillant général doit pouvoir agir réellement sur les données, pas seulement les lire.
+
+CONTEXTE :
+La couche vie scolaire existe déjà :
+- StudentAttendance
+- TeacherAttendance
+- AttendanceAlert
+- LessonLog
+- endpoints JSON
+- services d’assiduité
+- services cahier de texte
+- liaison avec AcademicScheduleEvent
+
+Maintenant, il faut consommer ces éléments dans le dashboard du surveillant général de façon intelligente.
+
+---
+
+PHASE 1 : STRUCTURE FONCTIONNELLE DU DASHBOARD
+
+Organiser le dashboard en grandes sections métiers :
+
+1. Vue générale temps réel
+2. Classes de l’annexe
+3. Étudiants par classe
+4. Planning / emploi du temps
+5. Cours & cahier de texte
+6. Assiduité / retards / absences
+7. Périodes d’évaluation / examens
+8. Alertes & anomalies
+9. Fiches individuelles étudiants
+
+Chaque section doit être claire, séparée, bien alignée et orientée action.
+
+---
+
+PHASE 2 : CLASSES DE L’ANNEXE
+
+Créer une section permettant au surveillant général de voir toutes les classes de son annexe.
+
+Pour chaque classe afficher :
+
+- nom de la classe
+- formation
+- niveau
+- effectif total
+- nombre de filles
+- nombre de garçons
+- professeur principal ou responsable de classe si disponible
+- cours en cours actuellement selon le planning
+- prochain cours
+- statut de la classe :
+  - en cours
+  - en pause
+  - sans cours
+  - en examen
+  - anomalie
+
+Quand le surveillant clique sur une classe, charger dynamiquement les détails de la classe.
+
+---
+
+PHASE 3 : ÉTUDIANTS PAR CLASSE
+
+Quand une classe est sélectionnée, afficher :
+
+- liste des étudiants
+- nom
+- prénom
+- sexe
+- matricule si disponible
+- statut administratif si disponible
+- présence du jour
+- retards
+- absences récentes
+- alertes liées à l’étudiant
+
+Prévoir filtres :
+
+- tous
+- filles
+- garçons
+- absents
+- en retard
+- étudiants à risque
+
+Le surveillant doit pouvoir accéder à la fiche détaillée d’un étudiant.
+
+---
+
+PHASE 4 : FICHE INDIVIDUELLE ÉTUDIANT
+
+Créer une vue/partial de fiche étudiant orientée vie scolaire.
+
+Elle doit afficher :
+
+- identité
+- classe
+- formation
+- annexe
+- historique des présences
+- retards
+- absences
+- alertes
+- interactions récentes
+- cours manqués
+- observations du surveillant
+- éventuels incidents futurs si module discipline disponible plus tard
+
+Objectif :
+Le surveillant doit comprendre rapidement le comportement réel de l’étudiant sur la semaine, le mois et l’année.
+
+---
+
+PHASE 5 : PLANNING / EMPLOI DU TEMPS
+
+Ramener le planning académique dans le dashboard surveillant.
+
+Afficher :
+
+- emploi du temps du jour
+- emploi du temps de la semaine
+- cours en cours maintenant
+- cours à venir
+- cours terminés
+- cours annulés
+- cours reportés
+- cours sans enseignant
+- cours sans salle
+- cours sans LessonLog
+
+Le surveillant doit pouvoir voir en temps réel quelle classe est censée être en cours, avec quel enseignant, dans quelle salle.
+
+---
+
+PHASE 6 : CAHIER DE TEXTE
+
+Dans la section cours, afficher :
+
+- cours planifiés
+- cours réellement effectués
+- LessonLog rempli / non rempli
+- enseignant absent
+- contenu du cours
+- devoirs donnés
+- observations
+
+Règle métier :
+Un cours planifié sans LessonLog doit être considéré comme anomalie.
+
+---
+
+PHASE 7 : ASSIDUITÉ
+
+Créer une section opérationnelle :
+
+Actions possibles :
+
+- marquer présence
+- marquer absence
+- marquer retard
+- justifier absence
+- voir historique par classe
+- voir historique par étudiant
+
+Afficher :
+
+- absents du jour
+- retards du jour
+- absences répétées
+- retards répétés
+- alertes automatiques
+
+---
+
+PHASE 8 : PÉRIODES D’ÉVALUATION / EXAMENS
+
+Créer une base fonctionnelle permettant au surveillant général ou au rôle autorisé de définir des périodes d’évaluation.
+
+Fonctionnalités attendues :
+
+- créer une période d’évaluation
+- définir date de début
+- définir date de fin
+- rattacher aux classes concernées
+- rattacher aux formations/niveaux concernés
+- définir le type :
+  - évaluation continue
+  - examen partiel
+  - examen semestriel
+  - rattrapage
+  - surveillance spéciale
+
+Quand une période d’évaluation est créée, elle doit pouvoir affecter les dashboards concernés plus tard :
+- étudiants
+- enseignants
+- surveillant
+- direction des études
+
+Préparer la logique backend pour générer des alertes :
+- examen dans 3 semaines
+- examen dans 2 semaines
+- examen dans 1 semaine
+- examen demain
+- examen aujourd’hui
+
+Prévoir un compteur de jours restants basé sur les vraies dates.
+
+Ne pas faire encore l’intégration complète dans tous les dashboards, mais préparer proprement les services et endpoints.
+
+---
+
+PHASE 9 : ALERTES TEMPS RÉEL / SIGNAUX
+
+Le dashboard doit prioriser les informations importantes :
+
+Critique :
+- enseignant absent avec cours planifié
+- cours non tenu
+- classe sans surveillance
+- examen proche
+- étudiant avec absences répétées
+
+Warning :
+- retard répété
+- LessonLog manquant
+- classe sans cours prévu
+
+Info :
+- cours terminé normalement
+- présence validée
+- période d’évaluation créée
+
+---
+
+PHASE 10 : UX FONCTIONNELLE
+
+Le dashboard doit rester simple.
+
+Règles UX :
+
+- le surveillant doit comprendre la situation en moins de 10 secondes
+- afficher d’abord les anomalies
+- éviter les longues listes inutiles
+- utiliser filtres par catégorie
+- charger les détails seulement au clic
+- organiser les éléments par sections et sous-sections
+- chaque bloc doit répondre à une action possible
+
+Ne pas faire une UI trop décorative pour le moment.
+Faire une interface propre, lisible, professionnelle et fonctionnelle.
+
+---
+
+PHASE 11 : ORGANISATION TECHNIQUE
+
+Créer ou améliorer :
+
+- vues dédiées au dashboard surveillant
+- services d’agrégation dashboard
+- partials HTMX
+- endpoints JSON/HTMX
+- sélecteurs si nécessaire
+
+Architecture recommandée :
+
+portal/views/supervisor.py
+portal/services/supervisor_dashboard_service.py
+templates/portal/supervisor/
+templates/portal/supervisor/partials/
+
+Ne pas mettre toute la logique dans une seule vue.
+
+---
+
+PHASE 12 : LIVRABLE ATTENDU
+
+Livrer :
+
+1. dashboard surveillant restructuré
+2. sections fonctionnelles
+3. filtres classes / étudiants / statut
+4. affichage dynamique par classe
+5. fiche étudiant
+6. planning semaine/jour
+7. anomalies visibles
+8. actions assiduité
+9. base périodes d’évaluation
+10. services propres
+11. tests si possible
+
+---
+
+CONTRAINTE FINALE :
+
+Ce dashboard doit devenir un moteur opérationnel de vie scolaire.
+
+Il ne doit pas seulement afficher des chiffres.
+Il doit permettre au surveillant général de savoir :
+
+- quelles classes sont en cours
+- quels étudiants sont présents
+- quels étudiants sont absents
+- quels enseignants sont absents
+- quels cours sont non tenus
+- quelles classes sont en anomalie
+- quelles évaluations arrivent
+- quelles actions doivent être faites immédiatement
+
+Objectif final :
+Créer un dashboard professionnel, intelligent, dynamique et exploitable sur le terrain.

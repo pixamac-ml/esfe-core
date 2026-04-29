@@ -126,7 +126,7 @@ ACCESS_RULES = {
     ("view_portal", "dashboard"): {
         "groups": set(),
         "profile_roles": {"superadmin"},
-        "positions": {"super_admin"},
+        "positions": {"super_admin", "it_support"},
         "canonical_roles": {"super_admin"},
         "allow_global": False,
     },

@@ -209,6 +209,186 @@
       grid-template-columns: 1fr;
     }
   }
+
+  .supervisor-indicator {
+    display: none;
+    font-size: .78rem;
+    font-weight: 700;
+    color: rgba(100, 116, 139, .95);
+  }
+
+  .htmx-request .supervisor-indicator {
+    display: inline-flex;
+  }
+
+  .supervisor-toast {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: .9rem 1rem;
+    background: #ffffff;
+  }
+
+  .supervisor-toast.is-success {
+    border-color: rgba(16, 185, 129, .25);
+    background: rgba(16, 185, 129, .08);
+    color: #065f46;
+  }
+
+  .supervisor-toast.is-error {
+    border-color: rgba(244, 63, 94, .25);
+    background: rgba(244, 63, 94, .08);
+    color: #9f1239;
+  }
+
+  .supervisor-toast.is-info {
+    border-color: rgba(59, 130, 246, .25);
+    background: rgba(59, 130, 246, .08);
+    color: #1e3a8a;
+  }
+
+  .supervisor-search-wrap {
+    position: relative;
+    min-width: 320px;
+  }
+
+  .supervisor-search-input {
+    width: 100%;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 999px;
+    background: white;
+    padding: .6rem .9rem;
+    font-size: .9rem;
+    color: #0f172a;
+  }
+
+  .supervisor-search-dropdown {
+    position: absolute;
+    top: calc(100% + .55rem);
+    left: 0;
+    right: 0;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    box-shadow: 0 28px 80px -52px rgba(15, 23, 42, 0.55);
+    padding: .85rem;
+    display: none;
+    z-index: 40;
+    max-height: 420px;
+    overflow: auto;
+  }
+
+  .supervisor-search-dropdown.is-open {
+    display: block;
+    animation: supervisorFade .14s ease-out;
+  }
+
+  .supervisor-search-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .8rem;
+    border-radius: 14px;
+    padding: .7rem .75rem;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(248, 250, 252, 0.85);
+  }
+
+  .supervisor-search-empty {
+    border: 1px dashed rgba(148, 163, 184, 0.55);
+    border-radius: 16px;
+    padding: .85rem .85rem;
+    background: rgba(248, 250, 252, 0.8);
+  }
+
+  .supervisor-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ffffff, #f8fbfc);
+    padding: 1rem;
+  }
+
+  .supervisor-kpi-compact {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .8rem;
+  }
+
+  .supervisor-kpi-compact .value {
+    font-size: 1.9rem;
+    font-weight: 900;
+    line-height: 1.1;
+  }
+
+  .supervisor-actions {
+    display: grid;
+    gap: .65rem;
+  }
+
+  .supervisor-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .9rem;
+    border-radius: 16px;
+    padding: .85rem 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(248, 250, 252, 0.85);
+    transition: .15s ease;
+  }
+
+  .supervisor-action:hover {
+    background: rgba(241, 245, 249, 0.95);
+    transform: translateY(-1px);
+  }
+
+  .supervisor-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    border-radius: 999px;
+    padding: .35rem .75rem;
+    font-size: .75rem;
+    font-weight: 900;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(248, 250, 252, 0.9);
+    color: #0f172a;
+  }
+
+  .supervisor-accordion {
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(255, 255, 255, 0.92);
+    overflow: hidden;
+  }
+
+  .supervisor-accordion button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .9rem;
+    padding: .85rem 1rem;
+    font-weight: 900;
+    color: #0f172a;
+    background: rgba(248, 250, 252, 0.9);
+  }
+
+  .supervisor-accordion .content {
+    padding: 1rem;
+    background: #fff;
+  }
+
+  .supervisor-muted {
+    color: #64748b;
+    font-size: .86rem;
+    font-weight: 600;
+  }
+
+  @media (max-width: 1200px) {
+    .supervisor-kpi-compact {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -251,474 +431,45 @@
 {% endblock %}
 
 {% block topbar_actions %}
+<div class="supervisor-search-wrap">
+  <input
+    id="supervisor-global-search"
+    class="supervisor-search-input"
+    type="search"
+    name="q"
+    placeholder="Rechercher (etudiant, classe, cours du jour)…"
+    autocomplete="off"
+    hx-get="{% url 'accounts_portal:supervisor_quick_search' %}"
+    hx-trigger="keyup changed delay:250ms"
+    hx-target="#supervisor-global-search-results"
+    hx-indicator="#supervisor-global-search-indicator"
+  >
+  <div id="supervisor-global-search-indicator" class="supervisor-indicator">Recherche…</div>
+  <div id="supervisor-global-search-results" class="supervisor-search-dropdown"></div>
+</div>
 <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{{ branch.name|default:"Acces global" }}</span>
 <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">{{ today|date:"d/m/Y" }}</span>
 {% endblock %}
 
 {% block dashboard_content %}
 <section class="supervisor-panel is-active" data-panel="overview">
-  <div class="supervisor-shell-grid">
-    <div class="space-y-4">
-      <article class="portal-card portal-hero">
-        <div class="portal-card-pad flex flex-col justify-between gap-4">
-          <div>
-            <p class="portal-section-kicker">Surveillant general</p>
-            <h2 class="mt-2 text-3xl font-black text-slate-900 leading-tight">Situation terrain, assiduite et execution des cours</h2>
-            <p class="mt-2 text-sm font-semibold text-slate-700">Pilotage des classes, du temps et de la discipline</p>
-            <p class="mt-3 max-w-2xl text-sm text-slate-600">Un poste de controle de l'annexe: comprendre en 10 secondes, agir vite, puis tracer proprement.</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            {% for module in module_cards %}
-            <span class="portal-pill">{{ module }}</span>
-            {% endfor %}
-          </div>
-        </div>
-        <div class="border-l border-slate-100 bg-slate-50 p-5">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Etat du jour</p>
-          <div class="mt-4 space-y-3">
-            <div class="flex items-center justify-between rounded-2xl bg-white px-4 py-3">
-              <span class="text-sm font-semibold text-slate-600">Classes visibles</span>
-              <span class="text-lg font-black text-slate-900">{{ total_classes }}</span>
-            </div>
-            <div class="flex items-center justify-between rounded-2xl bg-white px-4 py-3">
-              <span class="text-sm font-semibold text-slate-600">Etudiants suivis</span>
-              <span class="text-lg font-black text-slate-900">{{ total_students }}</span>
-            </div>
-            <div class="flex items-center justify-between rounded-2xl bg-white px-4 py-3">
-              <span class="text-sm font-semibold text-slate-600">Enseignants visibles</span>
-              <span class="text-lg font-black text-slate-900">{{ total_teachers }}</span>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <div class="supervisor-kpi-grid">
-        <article class="supervisor-kpi-card">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Absents du jour</p>
-          <p class="mt-2 text-3xl font-black text-rose-600">{{ supervisor_kpis.absent_students }}</p>
-          <p class="mt-2 text-sm text-slate-500">Etudiants declares absents aujourd'hui.</p>
-        </article>
-        <article class="supervisor-kpi-card">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Retards du jour</p>
-          <p class="mt-2 text-3xl font-black text-amber-600">{{ supervisor_kpis.late_students }}</p>
-          <p class="mt-2 text-sm text-slate-500">Presences hors horaire deja saisies.</p>
-        </article>
-        <article class="supervisor-kpi-card">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Enseignants absents</p>
-          <p class="mt-2 text-3xl font-black text-rose-600">{{ supervisor_kpis.absent_teachers }}</p>
-          <p class="mt-2 text-sm text-slate-500">Cours a requalifier ou a couvrir.</p>
-        </article>
-        <article class="supervisor-kpi-card">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Cours non tenus</p>
-          <p class="mt-2 text-3xl font-black {% if supervisor_kpis.missing_lesson_logs %}text-rose-600{% else %}text-emerald-600{% endif %}">{{ supervisor_kpis.missing_lesson_logs }}</p>
-          <p class="mt-2 text-sm text-slate-500">Cours planifies sans cahier de texte.</p>
-        </article>
-        <article class="supervisor-kpi-card">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Cours critiques</p>
-          <p class="mt-2 text-3xl font-black {% if supervisor_kpis.critical_courses %}text-rose-600{% else %}text-slate-900{% endif %}">{{ supervisor_kpis.critical_courses }}</p>
-          <p class="mt-2 text-sm text-slate-500">Absence enseignant ou situation terrain bloquante.</p>
-        </article>
-        <article class="supervisor-kpi-card">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Etudiants a risque</p>
-          <p class="mt-2 text-3xl font-black {% if supervisor_kpis.risk_students %}text-amber-600{% else %}text-emerald-600{% endif %}">{{ supervisor_kpis.risk_students }}</p>
-          <p class="mt-2 text-sm text-slate-500">Risque assiduite ou retard repetitif.</p>
-        </article>
-      </div>
-    </div>
-
-    <div class="space-y-4">
-      <article class="portal-card portal-card-pad">
-        <div class="supervisor-panel-head">
-          <div>
-            <p class="portal-section-kicker">Priorites</p>
-            <h3 class="portal-section-title">Actions immediates</h3>
-          </div>
-          <span class="supervisor-badge {% if daily_lesson_status.critical_count %}bg-rose-100 text-rose-700{% elif daily_lesson_status.missing_lesson_logs_count or supervisor_kpis.late_students %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
-            {% if daily_lesson_status.critical_count %}critique{% elif daily_lesson_status.missing_lesson_logs_count or supervisor_kpis.late_students %}attention{% else %}stable{% endif %}
-          </span>
-        </div>
-        <div class="mt-4 supervisor-mini-list">
-          {% for action in attention_actions %}
-          <div class="supervisor-mini-item">{{ action }}</div>
-          {% endfor %}
-        </div>
-      </article>
-
-      <article class="portal-card portal-card-pad">
-        <div class="supervisor-panel-head">
-          <div>
-            <p class="portal-section-kicker">Semaine</p>
-            <h3 class="portal-section-title">Charge et qualite</h3>
-          </div>
-          <span class="supervisor-badge bg-slate-100 text-slate-700">Score {{ quality.score|default:0 }}</span>
-        </div>
-        <div class="mt-4 space-y-3">
-          <div class="supervisor-mini-item">
-            <p class="text-xs uppercase tracking-wide text-slate-400">Evenements planifies</p>
-            <p class="mt-1 text-xl font-black text-slate-900">{{ schedule_stats.total_events|default:0 }}</p>
-          </div>
-          <div class="supervisor-mini-item">
-            <p class="text-xs uppercase tracking-wide text-slate-400">Presences saisies</p>
-            <p class="mt-1 text-xl font-black text-slate-900">{{ today_attendance_total }}</p>
-          </div>
-          <div class="supervisor-mini-item">
-            <p class="text-xs uppercase tracking-wide text-slate-400">Cahiers traces</p>
-            <p class="mt-1 text-xl font-black text-slate-900">{{ daily_lesson_status.lesson_logs_count }}</p>
-          </div>
-        </div>
-      </article>
-
-      <article class="portal-card portal-card-pad">
-        <div class="supervisor-panel-head">
-          <div>
-            <p class="portal-section-kicker">Alertes chaudes</p>
-            <h3 class="portal-section-title">Ce qui demande une action</h3>
-          </div>
-          <span class="supervisor-badge bg-slate-100 text-slate-700">{{ alerts|length }}</span>
-        </div>
-        <div class="mt-4 supervisor-alert-stack">
-          {% for alert in alerts|slice:":4" %}
-          <div class="supervisor-alert-card {% if alert.level == 'critical' %}border-rose-200 bg-rose-50{% elif alert.level == 'warning' %}border-amber-200 bg-amber-50{% else %}border-slate-100 bg-slate-50{% endif %}">
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-[11px] font-bold uppercase tracking-wide {% if alert.level == 'critical' %}text-rose-600{% elif alert.level == 'warning' %}text-amber-700{% else %}text-slate-500{% endif %}">{{ alert.type }}</span>
-              <span class="text-[11px] font-bold uppercase {% if alert.level == 'critical' %}text-rose-600{% elif alert.level == 'warning' %}text-amber-700{% else %}text-slate-500{% endif %}">{{ alert.level }}</span>
-            </div>
-            <p class="mt-2 text-sm text-slate-800">{{ alert.message }}</p>
-          </div>
-          {% empty %}
-          <div class="supervisor-empty">Aucune alerte detectee.</div>
-          {% endfor %}
-        </div>
-      </article>
-    </div>
-  </div>
+  {% include "portal/staff/supervisor/partials/panel_overview.html" %}
 </section>
 
 <section class="supervisor-panel" data-panel="attendance">
-  <div class="space-y-4">
-    <article class="portal-card portal-card-pad">
-      <div class="supervisor-panel-head">
-        <div>
-          <p class="portal-section-kicker">Assiduite</p>
-          <h3 class="portal-section-title">Presences, retards et saisies terrain</h3>
-        </div>
-        <span class="supervisor-badge bg-slate-100 text-slate-700">{{ today|date:"d/m/Y" }}</span>
-      </div>
-      <div class="mt-4 supervisor-actions-grid">
-        <form method="post" action="{% url 'accounts_portal:supervisor_mark_student_attendance' %}" class="supervisor-form-card space-y-3">
-          {% csrf_token %}
-          <div>
-            <p class="text-sm font-black text-slate-900">Presence etudiant</p>
-            <p class="mt-1 text-xs text-slate-500">Associer l'etudiant a son cours du jour.</p>
-          </div>
-          <select name="schedule_event_id" required>
-            <option value="">Choisir le cours</option>
-            {% for item in course_action_options %}
-            <option value="{{ item.id }}">{{ item.label }}</option>
-            {% endfor %}
-          </select>
-          <select name="student_id" required>
-            <option value="">Choisir l'etudiant</option>
-            {% for item in student_action_options %}
-            <option value="{{ item.id }}">{{ item.label }}</option>
-            {% endfor %}
-          </select>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <select name="status" required>
-              <option value="present">Present</option>
-              <option value="absent">Absent</option>
-              <option value="late">En retard</option>
-            </select>
-            <input type="time" name="arrival_time">
-          </div>
-          <textarea name="justification" rows="2" placeholder="Justification ou observation"></textarea>
-          <button type="submit" class="supervisor-submit bg-[var(--school-primary)]">Enregistrer</button>
-        </form>
-
-        <form method="post" action="{% url 'accounts_portal:supervisor_mark_teacher_attendance' %}" class="supervisor-form-card space-y-3">
-          {% csrf_token %}
-          <div>
-            <p class="text-sm font-black text-slate-900">Presence enseignant</p>
-            <p class="mt-1 text-xs text-slate-500">Marquer la situation du professeur par cours.</p>
-          </div>
-          <select name="schedule_event_id" required>
-            <option value="">Choisir le cours</option>
-            {% for item in teacher_action_options %}
-            <option value="{{ item.id }}">{{ item.label }}</option>
-            {% endfor %}
-          </select>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <select name="status" required>
-              <option value="present">Present</option>
-              <option value="absent">Absent</option>
-              <option value="late">En retard</option>
-            </select>
-            <input type="time" name="arrival_time">
-          </div>
-          <textarea name="justification" rows="2" placeholder="Motif ou observation"></textarea>
-          <button type="submit" class="supervisor-submit bg-[var(--school-secondary)]">Enregistrer</button>
-        </form>
-
-        <article class="supervisor-form-card">
-          <div>
-            <p class="text-sm font-black text-slate-900">Lecture rapide</p>
-            <p class="mt-1 text-xs text-slate-500">Etat instantane de l'assiduite du jour.</p>
-          </div>
-          <div class="mt-4 supervisor-mini-list">
-            <div class="supervisor-mini-item">
-              <p class="text-xs uppercase tracking-wide text-slate-400">Presences etudiants saisies</p>
-              <p class="mt-1 text-2xl font-black text-slate-900">{{ today_attendance_total }}</p>
-            </div>
-            <div class="supervisor-mini-item">
-              <p class="text-xs uppercase tracking-wide text-slate-400">Presences enseignants</p>
-              <p class="mt-1 text-2xl font-black text-slate-900">{{ today_teacher_attendance_total }}</p>
-            </div>
-            <div class="supervisor-mini-item">
-              <p class="text-xs uppercase tracking-wide text-slate-400">Alertes actives</p>
-              <p class="mt-1 text-2xl font-black text-amber-600">{{ attendance_anomalies.active_absence_alerts_count|add:attendance_anomalies.active_late_alerts_count }}</p>
-            </div>
-          </div>
-        </article>
-      </div>
-    </article>
-
-    <div class="supervisor-shell-grid">
-      <article class="portal-card portal-card-pad">
-        <div class="supervisor-panel-head">
-          <div>
-            <p class="portal-section-kicker">Etudiants</p>
-            <h3 class="portal-section-title">Dernieres presences enregistrees</h3>
-          </div>
-        </div>
-        <div class="mt-4 supervisor-mini-list">
-          {% for item in recent_student_attendances %}
-          <div class="supervisor-mini-item">
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-sm font-semibold text-slate-900">{{ item.student_name }}</span>
-              <span class="supervisor-badge {% if item.status_code == 'absent' %}bg-rose-100 text-rose-700{% elif item.status_code == 'late' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.status }}</span>
-            </div>
-            <p class="mt-1 text-xs text-slate-500">{{ item.class_name }}{% if item.event_time %} · {{ item.event_time }}{% endif %}</p>
-          </div>
-          {% empty %}
-          <div class="supervisor-empty">Aucune saisie etudiant pour l'instant.</div>
-          {% endfor %}
-        </div>
-      </article>
-
-      <article class="portal-card portal-card-pad">
-        <div class="supervisor-panel-head">
-          <div>
-            <p class="portal-section-kicker">Enseignants</p>
-            <h3 class="portal-section-title">Dernieres presences enregistrees</h3>
-          </div>
-        </div>
-        <div class="mt-4 supervisor-mini-list">
-          {% for item in recent_teacher_attendances %}
-          <div class="supervisor-mini-item">
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-sm font-semibold text-slate-900">{{ item.teacher_name }}</span>
-              <span class="supervisor-badge {% if item.status_code == 'absent' %}bg-rose-100 text-rose-700{% elif item.status_code == 'late' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.status }}</span>
-            </div>
-            <p class="mt-1 text-xs text-slate-500">{{ item.class_name }}{% if item.event_time %} · {{ item.event_time }}{% endif %}</p>
-          </div>
-          {% empty %}
-          <div class="supervisor-empty">Aucune saisie enseignant pour l'instant.</div>
-          {% endfor %}
-        </div>
-      </article>
-    </div>
-  </div>
+  {% include "portal/staff/supervisor/partials/panel_attendance.html" %}
 </section>
 
 <section class="supervisor-panel" data-panel="courses">
-  <div class="space-y-4">
-    <article class="portal-card portal-card-pad">
-      <div class="supervisor-panel-head">
-        <div>
-          <p class="portal-section-kicker">Cours du jour</p>
-          <h3 class="portal-section-title">Suivi des cours et cahier de texte</h3>
-        </div>
-        <span class="supervisor-badge bg-slate-100 text-slate-700">{{ daily_lesson_status.scheduled_courses }} cours</span>
-      </div>
-      <div class="mt-4 supervisor-actions-grid" style="grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);">
-        <div class="supervisor-table-wrap">
-          <table class="supervisor-table">
-            <thead>
-              <tr>
-                <th>Horaire</th>
-                <th>Classe</th>
-                <th>Enseignant</th>
-                <th>Cours</th>
-                <th>Suivi terrain</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for item in today_course_statuses %}
-              <tr>
-                <td>{{ item.time_range }}</td>
-                <td>{{ item.class_name }}</td>
-                <td>{{ item.teacher_name }}</td>
-                <td>{{ item.subject_title }}</td>
-                <td>
-                  <span class="supervisor-badge {% if item.supervision_level == 'critical' %}bg-rose-100 text-rose-700{% elif item.supervision_level == 'warning' %}bg-amber-100 text-amber-700{% elif item.supervision_level == 'good' %}bg-emerald-100 text-emerald-700{% else %}bg-slate-100 text-slate-700{% endif %}">
-                    {{ item.supervision_status }}
-                  </span>
-                </td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="5"><div class="supervisor-empty">Aucun cours programme aujourd'hui.</div></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
-        <form method="post" action="{% url 'accounts_portal:supervisor_save_lesson_log' %}" class="supervisor-form-card space-y-3">
-          {% csrf_token %}
-          <div>
-            <p class="text-sm font-black text-slate-900">Cahier de texte</p>
-            <p class="mt-1 text-xs text-slate-500">Creer ou corriger le suivi d'un cours planifie.</p>
-          </div>
-          <select name="schedule_event_id" required>
-            <option value="">Choisir le cours</option>
-            {% for item in course_action_options %}
-            <option value="{{ item.id }}">{{ item.label }}</option>
-            {% endfor %}
-          </select>
-          <select name="status" required>
-            <option value="done">Cours fait</option>
-            <option value="planned">Cours planifie</option>
-            <option value="cancelled">Cours annule</option>
-            <option value="absent_teacher">Enseignant absent</option>
-          </select>
-          <textarea name="content" rows="3" placeholder="Contenu du cours"></textarea>
-          <textarea name="homework" rows="2" placeholder="Travail a faire"></textarea>
-          <textarea name="observations" rows="2" placeholder="Observations du surveillant"></textarea>
-          <button type="submit" class="supervisor-submit bg-[var(--school-accent)]">Enregistrer le cahier</button>
-        </form>
-      </div>
-    </article>
-
-    <article class="portal-card portal-card-pad">
-      <div class="supervisor-panel-head">
-        <div>
-          <p class="portal-section-kicker">Historique</p>
-          <h3 class="portal-section-title">Derniers cahiers enregistres</h3>
-        </div>
-      </div>
-      <div class="mt-4 supervisor-class-grid">
-        {% for item in recent_lesson_logs %}
-        <div class="supervisor-mini-item">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-sm font-semibold text-slate-900">{{ item.class_name }}</span>
-            <span class="supervisor-badge {% if item.status_code == 'absent_teacher' %}bg-rose-100 text-rose-700{% elif item.status_code == 'planned' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.status }}</span>
-          </div>
-          <p class="mt-1 text-sm text-slate-600">{{ item.subject_title }}</p>
-          <p class="mt-1 text-xs text-slate-500">{{ item.teacher_name }} · {{ item.time_range }}</p>
-        </div>
-        {% empty %}
-        <div class="supervisor-empty">Aucun cahier de texte saisi aujourd'hui.</div>
-        {% endfor %}
-      </div>
-    </article>
-  </div>
+  {% include "portal/staff/supervisor/partials/panel_courses.html" %}
 </section>
 
 <section class="supervisor-panel" data-panel="classes">
-  <div class="space-y-4">
-    <article class="portal-card portal-card-pad">
-      <div class="supervisor-panel-head">
-        <div>
-          <p class="portal-section-kicker">Pilotage classes</p>
-          <h3 class="portal-section-title">Classes a surveiller aujourd'hui</h3>
-        </div>
-        <span class="supervisor-badge bg-slate-100 text-slate-700">{{ classes|length }} visibles</span>
-      </div>
-      <div class="mt-4 supervisor-class-grid">
-        {% for academic_class in class_watchlist %}
-        <article class="supervisor-mini-item">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="text-base font-black text-slate-900">{{ academic_class.class_name }}</p>
-              <p class="mt-1 text-xs text-slate-500">{{ academic_class.programme_title }}</p>
-            </div>
-            <span class="supervisor-badge {% if academic_class.severity == 'critical' %}bg-rose-100 text-rose-700{% elif academic_class.severity == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
-              {{ academic_class.student_count|default:0 }} etudiants
-            </span>
-          </div>
-          <div class="mt-4 grid grid-cols-3 gap-3 text-center">
-            <div class="rounded-2xl bg-white px-3 py-3">
-              <p class="text-[11px] uppercase tracking-wide text-slate-400">Absents</p>
-              <p class="mt-1 text-lg font-black text-slate-900">{{ academic_class.absent_count }}</p>
-            </div>
-            <div class="rounded-2xl bg-white px-3 py-3">
-              <p class="text-[11px] uppercase tracking-wide text-slate-400">Retards</p>
-              <p class="mt-1 text-lg font-black text-slate-900">{{ academic_class.late_count }}</p>
-            </div>
-            <div class="rounded-2xl bg-white px-3 py-3">
-              <p class="text-[11px] uppercase tracking-wide text-slate-400">Alertes</p>
-              <p class="mt-1 text-lg font-black text-slate-900">{{ academic_class.issue_count }}</p>
-            </div>
-          </div>
-        </article>
-        {% empty %}
-        <div class="supervisor-empty">Aucune classe rattachee.</div>
-        {% endfor %}
-      </div>
-    </article>
-
-    <article class="portal-card portal-card-pad">
-      <div class="supervisor-panel-head">
-        <div>
-          <p class="portal-section-kicker">Charge hebdo</p>
-          <h3 class="portal-section-title">Top enseignants de la semaine</h3>
-        </div>
-      </div>
-      <div class="mt-4 supervisor-class-grid">
-        {% for teacher_name, load in teacher_load_items %}
-        <div class="supervisor-mini-item">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-sm font-semibold text-slate-900">{{ teacher_name }}</span>
-            <span class="text-xs font-bold text-slate-500">{{ load.hours|floatformat:1 }} h</span>
-          </div>
-          <p class="mt-2 text-sm text-slate-600">{{ load.count }} cours planifies</p>
-        </div>
-        {% empty %}
-        <div class="supervisor-empty">Aucune charge detectee.</div>
-        {% endfor %}
-      </div>
-    </article>
-  </div>
+  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
 </section>
 
 <section class="supervisor-panel" data-panel="alerts">
-  <div class="space-y-4">
-    <article class="portal-card portal-card-pad">
-      <div class="supervisor-panel-head">
-        <div>
-          <p class="portal-section-kicker">Alertes</p>
-          <h3 class="portal-section-title">Signalement et priorisation</h3>
-        </div>
-        <span class="supervisor-badge bg-slate-100 text-slate-700">{{ alerts|length }}</span>
-      </div>
-      <div class="mt-4 supervisor-alert-stack">
-        {% for alert in alerts %}
-        <div class="supervisor-alert-card {% if alert.level == 'critical' %}border-rose-200 bg-rose-50{% elif alert.level == 'warning' %}border-amber-200 bg-amber-50{% else %}border-slate-100 bg-slate-50{% endif %}">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-[11px] font-bold uppercase tracking-wide {% if alert.level == 'critical' %}text-rose-600{% elif alert.level == 'warning' %}text-amber-700{% else %}text-slate-500{% endif %}">{{ alert.type }}</p>
-              <p class="mt-2 text-sm font-semibold text-slate-900">{{ alert.message }}</p>
-            </div>
-            <span class="supervisor-badge {% if alert.level == 'critical' %}bg-rose-100 text-rose-700{% elif alert.level == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ alert.level }}</span>
-          </div>
-        </div>
-        {% empty %}
-        <div class="supervisor-empty">Aucune alerte detectee.</div>
-        {% endfor %}
-      </div>
-    </article>
-  </div>
+  {% include "portal/staff/supervisor/partials/panel_alerts.html" %}
 </section>
 
 <script>
@@ -729,20 +480,67 @@
       return;
     }
 
-    function activatePanel(target) {
+    const allowed = new Set(panels.map((panel) => panel.dataset.panel));
+    const searchInput = document.getElementById("supervisor-global-search");
+    const searchDropdown = document.getElementById("supervisor-global-search-results");
+
+    function activatePanel(target, { pushHash = true } = {}) {
       navButtons.forEach((button) => {
         button.classList.toggle("is-active", button.dataset.panelTarget === target);
       });
       panels.forEach((panel) => {
         panel.classList.toggle("is-active", panel.dataset.panel === target);
       });
+      if (pushHash) {
+        history.replaceState(null, "", `#${target}`);
+      }
     }
 
     navButtons.forEach((button) => {
       button.addEventListener("click", () => activatePanel(button.dataset.panelTarget));
     });
 
-    activatePanel("overview");
+    function fromHash() {
+      const hash = (window.location.hash || "").replace("#", "").trim();
+      if (hash && allowed.has(hash)) {
+        return hash;
+      }
+      return "overview";
+    }
+
+    window.addEventListener("hashchange", () => {
+      activatePanel(fromHash(), { pushHash: false });
+    });
+
+    activatePanel(fromHash(), { pushHash: false });
+
+    if (searchInput && searchDropdown) {
+      const open = () => searchDropdown.classList.add("is-open");
+      const close = () => searchDropdown.classList.remove("is-open");
+
+      searchInput.addEventListener("focus", () => {
+        if ((searchInput.value || "").trim().length >= 2) {
+          open();
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest(".supervisor-search-wrap")) return;
+        close();
+      });
+
+      document.body.addEventListener("htmx:afterSwap", (event) => {
+        if (event && event.target === searchDropdown) {
+          if ((searchInput.value || "").trim().length >= 2) {
+            open();
+          } else {
+            close();
+          }
+        }
+      });
+    }
   })();
 </script>
 {% endblock %}

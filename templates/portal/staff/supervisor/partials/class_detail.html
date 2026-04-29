@@ -1,0 +1,130 @@
+{% if toast %}
+<div class="supervisor-toast {% if toast.level == 'success' %}is-success{% elif toast.level == 'error' %}is-error{% else %}is-info{% endif %}">
+  <p class="text-sm font-semibold">{{ toast.message }}</p>
+</div>
+{% endif %}
+
+{% if academic_class %}
+<article class="portal-card portal-card-pad">
+  <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+    <div class="min-w-0">
+      <p class="portal-section-kicker">Classe</p>
+      <h3 class="mt-1 text-xl font-black text-slate-900">{{ academic_class.display_name }}</h3>
+      <p class="mt-1 text-sm text-slate-500">{{ academic_class.programme.title }} · {{ academic_class.student_count|default:0 }} etudiants</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <span class="supervisor-chip"><i data-lucide="calendar-days" style="width:16px;height:16px;"></i>{{ schedule.week_start|date:"d/m/Y" }}</span>
+      <span class="supervisor-chip"><i data-lucide="map-pin" style="width:16px;height:16px;"></i>{{ branch.name }}</span>
+    </div>
+  </div>
+</article>
+
+<article class="portal-card portal-card-pad" x-data="{ showStudents: true, showPlanner: true }">
+  <div class="supervisor-panel-head">
+    <div>
+      <p class="portal-section-kicker">Terrain</p>
+      <h3 class="portal-section-title">Emploi du temps semaine + liste etudiants</h3>
+    </div>
+  </div>
+
+  <div class="mt-4 grid gap-4 lg:grid-cols-2">
+    <div class="supervisor-accordion">
+      <button type="button" @click="showPlanner = !showPlanner">
+        <span class="text-sm">Programmation semaine</span>
+        <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showPlanner ? 'Masquer' : 'Afficher'"></span>
+      </button>
+      <div class="content" x-show="showPlanner" x-transition.duration.180ms>
+        {% include "portal/staff/supervisor/partials/schedule_week_grid.html" %}
+
+        <div class="mt-4 supervisor-accordion" x-data="{ open: false }">
+          <button type="button" @click="open = !open">
+            <span class="text-sm">Ajouter un cours</span>
+            <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="open ? 'Fermer' : 'Ouvrir'"></span>
+          </button>
+          <div class="content" x-show="open" x-transition.duration.180ms>
+            <form
+              method="post"
+              action="{% url 'accounts_portal:supervisor_create_schedule_event' academic_class.id %}"
+              class="space-y-3"
+              hx-post="{% url 'accounts_portal:supervisor_create_schedule_event' academic_class.id %}"
+              hx-target="#supervisor-class-detail"
+              hx-swap="innerHTML"
+            >
+              {% csrf_token %}
+              <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}">
+              <div class="grid gap-3 md:grid-cols-2">
+                <div>
+                  <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Date</p>
+                  <input name="date" type="date" required value="{{ schedule.week_start|date:'Y-m-d' }}" class="supervisor-search-input" style="border-radius: 14px;">
+                </div>
+                <div>
+                  <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Salle (optionnel)</p>
+                  <input name="location" type="text" placeholder="Ex: Salle 2" class="supervisor-search-input" style="border-radius: 14px;">
+                </div>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-2">
+                <div>
+                  <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Heure debut</p>
+                  <input name="start_time" type="time" required class="supervisor-search-input" style="border-radius: 14px;">
+                </div>
+                <div>
+                  <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Heure fin</p>
+                  <input name="end_time" type="time" required class="supervisor-search-input" style="border-radius: 14px;">
+                </div>
+              </div>
+
+              <div>
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Matiere (EC)</p>
+                <select name="ec_id" required class="supervisor-search-input" style="border-radius: 14px;">
+                  <option value="">Choisir un EC</option>
+                  {% for ec in ecs %}
+                  <option value="{{ ec.id }}">{{ ec.title }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div>
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Enseignant</p>
+                <select name="teacher_id" required class="supervisor-search-input" style="border-radius: 14px;">
+                  <option value="">Choisir un enseignant</option>
+                  {% for teacher in teachers %}
+                  <option value="{{ teacher.id }}">{{ teacher.get_full_name|default:teacher.username }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <button type="submit" class="supervisor-submit bg-[var(--school-primary)]">Programmer</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="supervisor-accordion">
+      <button type="button" @click="showStudents = !showStudents">
+        <span class="text-sm">Etudiants de la classe</span>
+        <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showStudents ? 'Masquer' : 'Afficher'"></span>
+      </button>
+      <div class="content" x-show="showStudents" x-transition.duration.180ms>
+        <div class="space-y-2">
+          {% for student in students %}
+          <div class="supervisor-action">
+            <div class="min-w-0">
+              <p class="text-sm font-black text-slate-900 truncate">{{ student.full_name }}</p>
+              <p class="text-xs text-slate-500 truncate">{{ student.matricule|default:"-" }}</p>
+            </div>
+            <span class="supervisor-badge bg-slate-100 text-slate-700">OK</span>
+          </div>
+          {% empty %}
+          <div class="supervisor-empty">Aucun etudiant rattache a cette classe.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+{% else %}
+<div class="supervisor-empty">Classe introuvable.</div>
+{% endif %}
+

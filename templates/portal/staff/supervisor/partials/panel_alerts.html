@@ -1,0 +1,69 @@
+<div class="space-y-4" x-data="{ level: 'critical' }">
+  <article class="portal-card portal-card-pad">
+    <div class="supervisor-panel-head">
+      <div>
+        <p class="portal-section-kicker">Alertes</p>
+        <h3 class="portal-section-title">A traiter</h3>
+      </div>
+      <span class="supervisor-badge bg-slate-100 text-slate-700">{{ alerts|length }}</span>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button type="button" class="supervisor-chip" @click="level = 'critical'">
+        <i data-lucide="triangle-alert" style="width:16px;height:16px;"></i>Critiques
+      </button>
+      <button type="button" class="supervisor-chip" @click="level = 'warning'">
+        <i data-lucide="alert-circle" style="width:16px;height:16px;"></i>Warnings
+      </button>
+      <button type="button" class="supervisor-chip" @click="level = 'info'">
+        <i data-lucide="info" style="width:16px;height:16px;"></i>Info
+      </button>
+      <button type="button" class="supervisor-chip" @click="level = 'all'">
+        <i data-lucide="list" style="width:16px;height:16px;"></i>Toutes
+      </button>
+    </div>
+    <div class="mt-4 supervisor-alert-stack">
+      {% for alert in alerts %}
+      <div
+        class="supervisor-alert-card {% if alert.level == 'critical' %}border-rose-200 bg-rose-50{% elif alert.level == 'warning' %}border-amber-200 bg-amber-50{% else %}border-slate-100 bg-slate-50{% endif %}"
+        x-show="level === 'all' || level === '{{ alert.level }}'"
+        x-data="{ open: false }"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[11px] font-bold uppercase tracking-wide {% if alert.level == 'critical' %}text-rose-600{% elif alert.level == 'warning' %}text-amber-700{% else %}text-slate-500{% endif %}">{{ alert.type }}</p>
+            <p class="mt-2 text-sm font-semibold text-slate-900">{{ alert.message }}</p>
+            {% if alert.target %}
+            <button type="button" class="mt-3 supervisor-chip" @click="open = !open">
+              <i data-lucide="more-horizontal" style="width:16px;height:16px;"></i>Actions
+            </button>
+            {% endif %}
+          </div>
+          <span class="supervisor-badge {% if alert.level == 'critical' %}bg-rose-100 text-rose-700{% elif alert.level == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ alert.level }}</span>
+        </div>
+        {% if alert.target %}
+        <div class="mt-3" x-show="open" x-transition.duration.180ms>
+          <div class="grid gap-2 md:grid-cols-2">
+            <a href="#courses" class="supervisor-action">
+              <div class="min-w-0">
+                <p class="text-sm font-black text-slate-900 truncate">Ouvrir panneau Cours</p>
+                <p class="text-xs text-slate-500 truncate">Traiter la situation liee au planning</p>
+              </div>
+              <span class="supervisor-badge bg-slate-100 text-slate-700">Aller</span>
+            </a>
+            <a href="#attendance" class="supervisor-action">
+              <div class="min-w-0">
+                <p class="text-sm font-black text-slate-900 truncate">Ouvrir panneau Presences</p>
+                <p class="text-xs text-slate-500 truncate">Saisir / corriger presences</p>
+              </div>
+              <span class="supervisor-badge bg-slate-100 text-slate-700">Aller</span>
+            </a>
+          </div>
+        </div>
+        {% endif %}
+      {% empty %}
+      <div class="supervisor-empty">Aucune alerte detectee.</div>
+      {% endfor %}
+    </div>
+  </article>
+</div>
+

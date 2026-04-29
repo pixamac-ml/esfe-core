@@ -1,0 +1,146 @@
+<div id="supervisor-courses-panel" class="space-y-4">
+  {% if toast %}
+  <div class="supervisor-toast {% if toast.level == 'success' %}is-success{% elif toast.level == 'error' %}is-error{% else %}is-info{% endif %}">
+    <p class="text-sm font-semibold">{{ toast.message }}</p>
+  </div>
+  {% endif %}
+
+  <article class="portal-card portal-card-pad" x-data="{ showLog: false, showTable: false }">
+    <div class="supervisor-panel-head">
+      <div>
+        <p class="portal-section-kicker">Cours du jour</p>
+        <h3 class="portal-section-title">Suivi</h3>
+      </div>
+      <span class="supervisor-badge bg-slate-100 text-slate-700">{{ daily_lesson_status.scheduled_courses }} cours</span>
+    </div>
+    <div class="mt-4 grid gap-3 lg:grid-cols-3">
+      <div class="supervisor-card">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Critiques</p>
+        <p class="mt-2 text-2xl font-black {% if daily_lesson_status.critical_count %}text-rose-600{% else %}text-slate-900{% endif %}">{{ daily_lesson_status.critical_count }}</p>
+        <p class="supervisor-muted">Absence enseignant / blocage.</p>
+      </div>
+      <div class="supervisor-card">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Cahiers manquants</p>
+        <p class="mt-2 text-2xl font-black {% if daily_lesson_status.missing_lesson_logs_count %}text-amber-600{% else %}text-slate-900{% endif %}">{{ daily_lesson_status.missing_lesson_logs_count }}</p>
+        <p class="supervisor-muted">Cours finis sans trace.</p>
+      </div>
+      <div class="supervisor-card">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Cahiers saisis</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ daily_lesson_status.lesson_logs_count }}</p>
+        <p class="supervisor-muted">Saisie du jour.</p>
+      </div>
+    </div>
+
+    <div class="mt-4 grid gap-3 lg:grid-cols-2">
+      <div class="supervisor-accordion">
+        <button type="button" @click="showTable = !showTable">
+          <span class="text-sm">Voir la liste des cours du jour</span>
+          <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showTable ? 'Masquer' : 'Afficher'"></span>
+        </button>
+        <div class="content" x-show="showTable" x-transition.duration.180ms>
+          <div class="supervisor-table-wrap">
+        <table class="supervisor-table">
+          <thead>
+            <tr>
+              <th>Horaire</th>
+              <th>Classe</th>
+              <th>Enseignant</th>
+              <th>Cours</th>
+              <th>Suivi terrain</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in today_course_statuses %}
+            <tr>
+              <td>{{ item.time_range }}</td>
+              <td>{{ item.class_name }}</td>
+              <td>{{ item.teacher_name }}</td>
+              <td>{{ item.subject_title }}</td>
+              <td>
+                <span class="supervisor-badge {% if item.supervision_level == 'critical' %}bg-rose-100 text-rose-700{% elif item.supervision_level == 'warning' %}bg-amber-100 text-amber-700{% elif item.supervision_level == 'good' %}bg-emerald-100 text-emerald-700{% else %}bg-slate-100 text-slate-700{% endif %}">
+                  {{ item.supervision_status }}
+                </span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5"><div class="supervisor-empty">Aucun cours programme aujourd'hui.</div></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+        </div>
+      </div>
+
+      <div class="supervisor-accordion">
+        <button type="button" @click="showLog = !showLog">
+          <span class="text-sm">Saisir / corriger un cahier de texte</span>
+          <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showLog ? 'Fermer' : 'Ouvrir'"></span>
+        </button>
+        <div class="content" x-show="showLog" x-transition.duration.180ms>
+          <form
+        method="post"
+        action="{% url 'accounts_portal:supervisor_save_lesson_log' %}"
+        class="supervisor-form-card space-y-3"
+        hx-post="{% url 'accounts_portal:supervisor_save_lesson_log' %}"
+        hx-target="#supervisor-courses-panel"
+        hx-swap="outerHTML"
+        hx-indicator="#supervisor-courses-indicator"
+      >
+        {% csrf_token %}
+        <div>
+          <p class="text-sm font-black text-slate-900">Cahier de texte</p>
+          <p class="mt-1 text-xs text-slate-500">Creer ou corriger le suivi d'un cours planifie.</p>
+        </div>
+        <select name="schedule_event_id" required>
+          <option value="">Choisir le cours</option>
+          {% for item in course_action_options %}
+          <option value="{{ item.id }}">{{ item.label }}</option>
+          {% endfor %}
+        </select>
+        <select name="status" required>
+          <option value="done">Cours fait</option>
+          <option value="planned">Cours planifie</option>
+          <option value="cancelled">Cours annule</option>
+          <option value="absent_teacher">Enseignant absent</option>
+        </select>
+        <textarea name="content" rows="3" placeholder="Contenu du cours"></textarea>
+        <textarea name="homework" rows="2" placeholder="Travail a faire"></textarea>
+        <textarea name="observations" rows="2" placeholder="Observations du surveillant"></textarea>
+        <div class="flex items-center justify-between gap-3">
+          <button type="submit" class="supervisor-submit bg-[var(--school-accent)]">Enregistrer le cahier</button>
+          <div id="supervisor-courses-indicator" class="supervisor-indicator" aria-live="polite">
+            Mise a jour…
+          </div>
+        </div>
+      </form>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="portal-card portal-card-pad">
+    <div class="supervisor-panel-head">
+      <div>
+        <p class="portal-section-kicker">Historique</p>
+        <h3 class="portal-section-title">Derniers cahiers enregistres</h3>
+      </div>
+    </div>
+    <div class="mt-4 supervisor-class-grid">
+      {% for item in recent_lesson_logs %}
+      <div class="supervisor-mini-item">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-sm font-semibold text-slate-900">{{ item.class_name }}</span>
+          <span class="supervisor-badge {% if item.status_code == 'absent_teacher' %}bg-rose-100 text-rose-700{% elif item.status_code == 'planned' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.status }}</span>
+        </div>
+        <p class="mt-1 text-sm text-slate-600">{{ item.subject_title }}</p>
+        <p class="mt-1 text-xs text-slate-500">{{ item.teacher_name }} · {{ item.time_range }}</p>
+      </div>
+      {% empty %}
+      <div class="supervisor-empty">Aucun cahier de texte saisi aujourd'hui.</div>
+      {% endfor %}
+    </div>
+  </article>
+</div>
+

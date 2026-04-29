@@ -1,0 +1,191 @@
+<div id="supervisor-attendance-panel" class="space-y-4">
+  {% if toast %}
+  <div class="supervisor-toast {% if toast.level == 'success' %}is-success{% elif toast.level == 'error' %}is-error{% else %}is-info{% endif %}">
+    <p class="text-sm font-semibold">{{ toast.message }}</p>
+  </div>
+  {% endif %}
+
+  <article class="portal-card portal-card-pad" x-data="{ showStudent: false, showTeacher: false }">
+    <div class="supervisor-panel-head">
+      <div>
+        <p class="portal-section-kicker">Assiduite</p>
+        <h3 class="portal-section-title">Presences</h3>
+      </div>
+      <span class="supervisor-badge bg-slate-100 text-slate-700">{{ today|date:"d/m/Y" }}</span>
+    </div>
+    <div class="mt-4 grid gap-3 lg:grid-cols-3">
+      <div class="supervisor-card">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Saisies etudiants</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ today_attendance_total }}</p>
+        <p class="supervisor-muted">Dernieres saisies en bas.</p>
+      </div>
+      <div class="supervisor-card">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Saisies enseignants</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ today_teacher_attendance_total }}</p>
+        <p class="supervisor-muted">Absences impact cours.</p>
+      </div>
+      <div class="supervisor-card">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Alertes actives</p>
+        <p class="mt-2 text-2xl font-black text-amber-600">{{ attendance_anomalies.active_absence_alerts_count|add:attendance_anomalies.active_late_alerts_count }}</p>
+        <p class="supervisor-muted">Absences/retards repetitifs.</p>
+      </div>
+    </div>
+
+    <div class="mt-4 grid gap-3 lg:grid-cols-2">
+      <div class="supervisor-accordion">
+        <button type="button" @click="showStudent = !showStudent">
+          <span class="text-sm">Saisir une presence etudiant</span>
+          <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showStudent ? 'Fermer' : 'Ouvrir'"></span>
+        </button>
+        <div class="content" x-show="showStudent" x-transition.duration.180ms>
+          <form
+        method="post"
+        action="{% url 'accounts_portal:supervisor_mark_student_attendance' %}"
+        class="supervisor-form-card space-y-3"
+        hx-post="{% url 'accounts_portal:supervisor_mark_student_attendance' %}"
+        hx-target="#supervisor-attendance-panel"
+        hx-swap="outerHTML"
+        hx-indicator="#supervisor-attendance-indicator"
+      >
+        {% csrf_token %}
+        <div>
+          <p class="text-sm font-black text-slate-900">Presence etudiant</p>
+          <p class="mt-1 text-xs text-slate-500">Associer l'etudiant a son cours du jour.</p>
+        </div>
+        <select name="schedule_event_id" required>
+          <option value="">Choisir le cours</option>
+          {% for item in course_action_options %}
+          <option value="{{ item.id }}">{{ item.label }}</option>
+          {% endfor %}
+        </select>
+        <div class="space-y-2">
+          <input
+            type="search"
+            name="q"
+            placeholder="Rechercher un etudiant (nom, prenom, matricule)…"
+            class="supervisor-search-input"
+            hx-get="{% url 'accounts_portal:supervisor_student_options' %}"
+            hx-trigger="keyup changed delay:250ms"
+            hx-target="#supervisor-student-select"
+            hx-swap="innerHTML"
+          >
+          <select id="supervisor-student-select" name="student_id" required>
+            <option value="">Choisir l'etudiant</option>
+            {% for item in student_action_options %}
+            <option value="{{ item.id }}">{{ item.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <select name="status" required>
+            <option value="present">Present</option>
+            <option value="absent">Absent</option>
+            <option value="late">En retard</option>
+          </select>
+          <input type="time" name="arrival_time">
+        </div>
+        <textarea name="justification" rows="2" placeholder="Justification ou observation"></textarea>
+        <div class="flex items-center justify-between gap-3">
+          <button type="submit" class="supervisor-submit bg-[var(--school-primary)]">Enregistrer</button>
+          <div id="supervisor-attendance-indicator" class="supervisor-indicator" aria-live="polite">
+            Mise a jour…
+          </div>
+        </div>
+      </form>
+        </div>
+      </div>
+
+      <div class="supervisor-accordion">
+        <button type="button" @click="showTeacher = !showTeacher">
+          <span class="text-sm">Saisir une presence enseignant</span>
+          <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showTeacher ? 'Fermer' : 'Ouvrir'"></span>
+        </button>
+        <div class="content" x-show="showTeacher" x-transition.duration.180ms>
+          <form
+        method="post"
+        action="{% url 'accounts_portal:supervisor_mark_teacher_attendance' %}"
+        class="supervisor-form-card space-y-3"
+        hx-post="{% url 'accounts_portal:supervisor_mark_teacher_attendance' %}"
+        hx-target="#supervisor-attendance-panel"
+        hx-swap="outerHTML"
+        hx-indicator="#supervisor-attendance-indicator-2"
+      >
+        {% csrf_token %}
+        <div>
+          <p class="text-sm font-black text-slate-900">Presence enseignant</p>
+          <p class="mt-1 text-xs text-slate-500">Marquer la situation du professeur par cours.</p>
+        </div>
+        <select name="schedule_event_id" required>
+          <option value="">Choisir le cours</option>
+          {% for item in teacher_action_options %}
+          <option value="{{ item.id }}">{{ item.label }}</option>
+          {% endfor %}
+        </select>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <select name="status" required>
+            <option value="present">Present</option>
+            <option value="absent">Absent</option>
+            <option value="late">En retard</option>
+          </select>
+          <input type="time" name="arrival_time">
+        </div>
+        <textarea name="justification" rows="2" placeholder="Motif ou observation"></textarea>
+        <div class="flex items-center justify-between gap-3">
+          <button type="submit" class="supervisor-submit bg-[var(--school-secondary)]">Enregistrer</button>
+          <div id="supervisor-attendance-indicator-2" class="supervisor-indicator" aria-live="polite">
+            Mise a jour…
+          </div>
+        </div>
+      </form>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <div class="supervisor-shell-grid">
+    <article class="portal-card portal-card-pad">
+      <div class="supervisor-panel-head">
+        <div>
+          <p class="portal-section-kicker">Etudiants</p>
+          <h3 class="portal-section-title">Dernieres presences enregistrees</h3>
+        </div>
+      </div>
+      <div class="mt-4 supervisor-mini-list">
+        {% for item in recent_student_attendances %}
+        <div class="supervisor-mini-item">
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-sm font-semibold text-slate-900">{{ item.student_name }}</span>
+            <span class="supervisor-badge {% if item.status_code == 'absent' %}bg-rose-100 text-rose-700{% elif item.status_code == 'late' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.status }}</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">{{ item.class_name }}{% if item.event_time %} · {{ item.event_time }}{% endif %}</p>
+        </div>
+        {% empty %}
+        <div class="supervisor-empty">Aucune saisie etudiant pour l'instant.</div>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="portal-card portal-card-pad">
+      <div class="supervisor-panel-head">
+        <div>
+          <p class="portal-section-kicker">Enseignants</p>
+          <h3 class="portal-section-title">Dernieres presences enregistrees</h3>
+        </div>
+      </div>
+      <div class="mt-4 supervisor-mini-list">
+        {% for item in recent_teacher_attendances %}
+        <div class="supervisor-mini-item">
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-sm font-semibold text-slate-900">{{ item.teacher_name }}</span>
+            <span class="supervisor-badge {% if item.status_code == 'absent' %}bg-rose-100 text-rose-700{% elif item.status_code == 'late' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.status }}</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">{{ item.class_name }}{% if item.event_time %} · {{ item.event_time }}{% endif %}</p>
+        </div>
+        {% empty %}
+        <div class="supervisor-empty">Aucune saisie enseignant pour l'instant.</div>
+        {% endfor %}
+      </div>
+    </article>
+  </div>
+</div>
+

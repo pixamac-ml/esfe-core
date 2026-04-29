@@ -218,6 +218,17 @@ def build_supervisor_dashboard_context(request, *, branch, page_title, page_kick
         classes_qs = classes_qs.filter(branch=branch)
     classes_qs = classes_qs.annotate(student_count=Count("enrollments")).order_by("level", "programme__title")
     classes = list(classes_qs[:8])
+    class_picker_items = [
+        {
+            "id": academic_class.id,
+            "label": academic_class.display_name,
+            "programme_title": academic_class.programme.title,
+            "level": academic_class.level,
+            "student_count": getattr(academic_class, "student_count", 0),
+        }
+        for academic_class in classes_qs[:40]
+    ]
+    default_class_id = class_picker_items[0]["id"] if class_picker_items else None
 
     week_events_qs = AcademicScheduleEvent.objects.select_related("academic_class", "teacher", "ec", "branch").filter(
         start_datetime__date__gte=week_start,
@@ -416,6 +427,8 @@ def build_supervisor_dashboard_context(request, *, branch, page_title, page_kick
         )[:5],
         "sidebar_links": sidebar_links,
         "supervisor_kpis": kpis,
+        "class_picker_items": class_picker_items,
+        "default_class_id": default_class_id,
         "today_attendance_total": len(today_student_attendances),
         "today_teacher_attendance_total": len(today_teacher_attendances),
         "daily_lesson_status": daily_lesson_status,

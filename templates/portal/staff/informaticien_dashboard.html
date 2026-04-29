@@ -1,10 +1,11 @@
 {% extends "portal/staff/dashboard_shell.html" %}
 
 {% block sidebar_nav %}
-<a class="portal-list-link active" href="#overview"><i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i><span>Vue generale</span></a>
-<a class="portal-list-link" href="#support"><i data-lucide="life-buoy" style="width:18px;height:18px;"></i><span>Support</span></a>
+<a class="portal-list-link active" href="#overview"><i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i><span>Accueil</span></a>
+<a class="portal-list-link" href="#grades"><i data-lucide="sheet" style="width:18px;height:18px;"></i><span>Notes</span></a>
+<a class="portal-list-link" href="#diagnostics"><i data-lucide="stethoscope" style="width:18px;height:18px;"></i><span>Diagnostic</span></a>
+<a class="portal-list-link" href="#accounts"><i data-lucide="shield-check" style="width:18px;height:18px;"></i><span>Comptes</span></a>
 <a class="portal-list-link" href="#health"><i data-lucide="activity" style="width:18px;height:18px;"></i><span>Sante</span></a>
-<a class="portal-list-link" href="#activity"><i data-lucide="monitor-check" style="width:18px;height:18px;"></i><span>Activite</span></a>
 {% endblock %}
 
 {% block topbar_actions %}
@@ -13,151 +14,475 @@
 {% endblock %}
 
 {% block dashboard_content %}
-<section id="overview" class="portal-card portal-hero">
-  <div class="portal-card-pad flex flex-col justify-between gap-4">
+<style>
+  .it-module-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .it-module-tile {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    padding: 1rem;
+    min-width: 0;
+    cursor: pointer;
+    transition: .18s ease;
+  }
+
+  .it-module-tile:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
+  }
+
+  .it-module-tile.active {
+    border-color: rgba(14, 165, 233, .34);
+    box-shadow: inset 0 0 0 1px rgba(14, 165, 233, .18);
+    background: linear-gradient(180deg, #f0f9ff, #ffffff);
+  }
+
+  .it-icon-wrap {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: #e0f2fe;
+    color: #0f172a;
+  }
+
+  .it-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .it-kpi-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: white;
+    padding: 1rem;
+  }
+
+  .it-action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .it-action-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: white;
+    padding: 1rem;
+  }
+
+  .it-panel-stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .it-mini-list {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .it-mini-item {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    padding: 0.85rem 0.95rem;
+  }
+
+  @media (max-width: 1100px) {
+    .it-module-grid,
+    .it-kpi-grid,
+    .it-action-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .it-module-grid,
+    .it-kpi-grid,
+    .it-action-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+{% if support_feedback %}
+<section class="mb-4 rounded-2xl border {% if support_feedback.level == 'success' %}border-emerald-200 bg-emerald-50{% else %}border-rose-200 bg-rose-50{% endif %} px-4 py-4">
+  <div class="flex flex-col gap-2">
     <div>
-      <p class="portal-section-kicker">Informaticien</p>
-      <h2 class="mt-2 text-2xl font-black text-slate-900 leading-tight">Support technique, acces, et sante du portail</h2>
-      <p class="mt-3 max-w-2xl text-sm text-slate-600">Espace de surveillance pour garder les dashboards disponibles, les comptes propres et les alertes visibles.</p>
+      <p class="text-xs font-bold uppercase tracking-wide {% if support_feedback.level == 'success' %}text-emerald-700{% else %}text-rose-700{% endif %}">{{ support_feedback.title }}</p>
+      <p class="mt-1 text-sm {% if support_feedback.level == 'success' %}text-emerald-900{% else %}text-rose-900{% endif %}">{{ support_feedback.message }}</p>
     </div>
-    <div class="flex flex-wrap gap-2">
-      {% for module in module_cards %}
-      <span class="portal-pill">{{ module }}</span>
-      {% endfor %}
+    {% if support_feedback.password %}
+    <div class="rounded-xl border border-amber-200 bg-white px-3 py-3">
+      <p class="text-xs font-bold uppercase tracking-wide text-amber-700">Mot de passe temporaire</p>
+      <p class="mt-1 font-mono text-base font-black text-slate-900">{{ support_feedback.password }}</p>
     </div>
-  </div>
-  <div class="border-l border-slate-100 bg-slate-50 p-5">
-    <div class="grid grid-cols-2 gap-3">
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Utilisateurs</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_users }}</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Staff actifs</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_active_staff }}</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Etudiants</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_students }}</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Sante portail</p>
-        <p class="mt-2 text-2xl font-black {% if quality.score >= 85 %}text-emerald-600{% elif quality.score >= 70 %}text-blue-600{% elif quality.score >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ quality.score|default:0 }}</p>
-      </div>
-    </div>
+    {% endif %}
   </div>
 </section>
+{% endif %}
 
-<section class="mt-4 portal-grid-two">
-  <div class="space-y-4">
-    <div class="portal-card portal-card-pad" id="support">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="portal-section-kicker">Support</p>
-          <h3 class="portal-section-title">Actions rapides</h3>
+<div
+  x-data="{
+    activeSection: window.location.hash ? window.location.hash.replace('#', '') : 'overview',
+    setSection(section) {
+      this.activeSection = section;
+      window.location.hash = section;
+    }
+  }"
+  @hashchange.window="activeSection = window.location.hash ? window.location.hash.replace('#', '') : 'overview'"
+  class="space-y-4"
+>
+  <section class="portal-card portal-card-pad">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div>
+        <p class="portal-section-kicker">Informaticien</p>
+        <h2 class="mt-1 text-2xl font-black text-slate-900">Cockpit technique</h2>
+      </div>
+      <div class="it-kpi-grid w-full xl:max-w-[720px]">
+        <div class="it-kpi-card">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Utilisateurs</p>
+          <p class="mt-2 text-2xl font-black text-slate-900">{{ total_users }}</p>
+        </div>
+        <div class="it-kpi-card">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Staff actifs</p>
+          <p class="mt-2 text-2xl font-black text-slate-900">{{ total_active_staff }}</p>
+        </div>
+        <div class="it-kpi-card">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Etudiants</p>
+          <p class="mt-2 text-2xl font-black text-slate-900">{{ total_students }}</p>
+        </div>
+        <div class="it-kpi-card">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Sante</p>
+          <p class="mt-2 text-2xl font-black {% if quality.score >= 85 %}text-emerald-600{% elif quality.score >= 70 %}text-blue-600{% elif quality.score >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ quality.score|default:0 }}</p>
         </div>
       </div>
-      <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {% for action in support_actions %}
-        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <p class="text-sm font-semibold text-slate-900">{{ action }}</p>
+    </div>
+  </section>
+
+  <section class="it-module-grid">
+    <button type="button" class="it-module-tile text-left" :class="{ 'active': activeSection === 'overview' }" @click="setSection('overview')">
+      <div class="it-icon-wrap"><i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i></div>
+      <p class="mt-4 text-sm font-black text-slate-900">Vue globale</p>
+      <p class="mt-1 text-2xl font-black text-slate-900">{{ alerts|length }}</p>
+    </button>
+    <button type="button" class="it-module-tile text-left" :class="{ 'active': activeSection === 'grades' }" @click="setSection('grades')">
+      <div class="it-icon-wrap"><i data-lucide="sheet" style="width:20px;height:20px;"></i></div>
+      <p class="mt-4 text-sm font-black text-slate-900">Notes</p>
+      <p class="mt-1 text-2xl font-black text-slate-900">{{ grade_metrics.pending_semesters }}</p>
+    </button>
+    <button type="button" class="it-module-tile text-left" :class="{ 'active': activeSection === 'diagnostics' }" @click="setSection('diagnostics')">
+      <div class="it-icon-wrap"><i data-lucide="stethoscope" style="width:20px;height:20px;"></i></div>
+      <p class="mt-4 text-sm font-black text-slate-900">Diagnostic</p>
+      <p class="mt-1 text-2xl font-black text-slate-900">{{ diagnostic_metrics.inscriptions_without_assignment }}</p>
+    </button>
+    <button type="button" class="it-module-tile text-left" :class="{ 'active': activeSection === 'accounts' }" @click="setSection('accounts')">
+      <div class="it-icon-wrap"><i data-lucide="shield-check" style="width:20px;height:20px;"></i></div>
+      <p class="mt-4 text-sm font-black text-slate-900">Comptes</p>
+      <p class="mt-1 text-2xl font-black text-slate-900">{{ access_metrics.inactive_accounts }}</p>
+    </button>
+  </section>
+
+  <section x-show="activeSection === 'overview'" x-transition.opacity.duration.150ms class="it-panel-stack" id="overview">
+    <div class="portal-card portal-card-pad">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="portal-section-kicker">Priorites</p>
+          <h3 class="portal-section-title">Actions immediates</h3>
+        </div>
+      </div>
+      <div class="mt-4 it-action-grid">
+        <button type="button" class="it-action-card text-left" @click="setSection('diagnostics')">
+          <div class="flex items-center gap-3">
+            <div class="it-icon-wrap"><i data-lucide="search-code" style="width:18px;height:18px;"></i></div>
+            <div>
+              <p class="text-sm font-black text-slate-900">Lancer un diagnostic</p>
+              <p class="text-xs text-slate-500">{{ diagnostic_metrics.active_students_without_active_enrollment }} dossier(s) a verifier</p>
+            </div>
+          </div>
+        </button>
+        <a href="{{ grades_dashboard_url }}" class="it-action-card block">
+          <div class="flex items-center gap-3">
+            <div class="it-icon-wrap"><i data-lucide="file-spreadsheet" style="width:18px;height:18px;"></i></div>
+            <div>
+              <p class="text-sm font-black text-slate-900">Ouvrir les notes</p>
+              <p class="text-xs text-slate-500">{{ grade_metrics.enrollments_without_grades }} inscription(s) sans notes</p>
+            </div>
+          </div>
+        </a>
+        <button type="button" class="it-action-card text-left" @click="setSection('accounts')">
+          <div class="flex items-center gap-3">
+            <div class="it-icon-wrap"><i data-lucide="user-round-cog" style="width:18px;height:18px;"></i></div>
+            <div>
+              <p class="text-sm font-black text-slate-900">Gerer les comptes</p>
+              <p class="text-xs text-slate-500">{{ access_metrics.staff_missing_position }} profil(s) incomplets</p>
+            </div>
+          </div>
+        </button>
+        <button type="button" class="it-action-card text-left" @click="setSection('health')">
+          <div class="flex items-center gap-3">
+            <div class="it-icon-wrap"><i data-lucide="siren" style="width:18px;height:18px;"></i></div>
+            <div>
+              <p class="text-sm font-black text-slate-900">Voir la sante</p>
+              <p class="text-xs text-slate-500">{{ quality.warnings|length }} alerte(s) detectee(s)</p>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <div class="portal-grid-two">
+      <div class="portal-card portal-card-pad">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="portal-section-kicker">Alertes</p>
+            <h3 class="portal-section-title">File de priorite</h3>
+          </div>
+        </div>
+        <div class="mt-4 it-mini-list">
+          {% for alert in alerts %}
+          <div class="it-mini-item">
+            <p class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ alert.type }}</p>
+            <p class="mt-1 text-sm font-semibold text-slate-800">{{ alert.message }}</p>
+          </div>
+          {% empty %}
+          <p class="text-sm text-slate-400">Aucune alerte visible.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="portal-card portal-card-pad">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="portal-section-kicker">Journal</p>
+            <h3 class="portal-section-title">Dernieres actions</h3>
+          </div>
+        </div>
+        <div class="mt-4 it-mini-list">
+          {% for log in recent_support_logs %}
+          <div class="it-mini-item">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-sm font-black text-slate-900">{{ log.get_action_type_display }}</p>
+              <span class="text-xs font-bold text-slate-400">{{ log.created_at|date:"d/m H:i" }}</span>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">{{ log.target_label|default:"Cible" }}</p>
+          </div>
+          {% empty %}
+          <p class="text-sm text-slate-400">Aucune action support journalisee.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section x-show="activeSection === 'grades'" x-transition.opacity.duration.150ms class="it-panel-stack" id="grades" style="display:none;">
+    <div class="portal-card portal-card-pad">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="portal-section-kicker">Module Notes</p>
+          <h3 class="portal-section-title">Gestion academique</h3>
+        </div>
+        <a href="{{ grades_dashboard_url }}" class="rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white">Ouvrir</a>
+      </div>
+      <div class="mt-4 it-kpi-grid">
+        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Classes</p><p class="mt-2 text-2xl font-black text-slate-900">{{ grade_metrics.active_classes }}</p></div>
+        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Semestres</p><p class="mt-2 text-2xl font-black text-slate-900">{{ grade_metrics.pending_semesters }}</p></div>
+        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Sans notes</p><p class="mt-2 text-2xl font-black text-slate-900">{{ grade_metrics.enrollments_without_grades }}</p></div>
+        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Lignes</p><p class="mt-2 text-2xl font-black text-slate-900">{{ grade_metrics.grade_entries }}</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section x-show="activeSection === 'diagnostics'" x-transition.opacity.duration.150ms class="it-panel-stack" id="diagnostics" style="display:none;">
+    <div class="portal-card portal-card-pad">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="portal-section-kicker">Diagnostic</p>
+          <h3 class="portal-section-title">Recherche operationnelle</h3>
+        </div>
+      </div>
+      <form method="get" action="{% url 'accounts_portal:portal_dashboard' %}" class="mt-4 flex flex-col gap-3 sm:flex-row">
+        <input type="hidden" name="kind" value="{{ request.GET.kind }}">
+        <input type="hidden" name="id" value="{{ request.GET.id }}">
+        <input
+          type="text"
+          name="q"
+          value="{{ support_search.query }}"
+          placeholder="Matricule, nom, username, email..."
+          class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400"
+        >
+        <button type="submit" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white">Rechercher</button>
+      </form>
+      {% if support_search.query %}
+      <div class="mt-4 it-action-grid">
+        <div class="it-action-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Etudiants</p>
+          <div class="mt-3 it-mini-list">
+            {% for item in support_search.students %}
+            <a href="?q={{ support_search.query|urlencode }}&kind=student&id={{ item.id }}#diagnostics" class="it-mini-item block">
+              <p class="text-sm font-black text-slate-900">{{ item.full_name }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ item.matricule }}</p>
+            </a>
+            {% empty %}
+            <p class="text-sm text-slate-400">Aucun resultat.</p>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="it-action-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Staff / Inscriptions</p>
+          <div class="mt-3 it-mini-list">
+            {% for item in support_search.staff %}
+            <a href="?q={{ support_search.query|urlencode }}&kind=staff&id={{ item.id }}#diagnostics" class="it-mini-item block">
+              <p class="text-sm font-black text-slate-900">{{ item.get_full_name|default:item.username }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ item.username }}</p>
+            </a>
+            {% empty %}{% endfor %}
+            {% for item in support_search.inscriptions %}
+            <a href="?q={{ support_search.query|urlencode }}&kind=inscription&id={{ item.id }}#diagnostics" class="it-mini-item block">
+              <p class="text-sm font-black text-slate-900">{{ item.candidature.first_name }} {{ item.candidature.last_name }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ item.get_status_display }}</p>
+            </a>
+            {% empty %}
+            <p class="text-sm text-slate-400">Aucun resultat.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="portal-card portal-card-pad">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="portal-section-kicker">Fiche</p>
+          <h3 class="portal-section-title">{% if diagnostic_payload %}{{ diagnostic_payload.title }}{% else %}Aucune cible selectionnee{% endif %}</h3>
+        </div>
+        {% if diagnostic_payload and diagnostic_payload.target_user_id %}
+        <div class="flex flex-wrap gap-2">
+          <form method="post" action="{% url 'accounts_portal:it_toggle_account' %}">
+            {% csrf_token %}
+            <input type="hidden" name="target_user_id" value="{{ diagnostic_payload.target_user_id }}">
+            <input type="hidden" name="q" value="{{ support_search.query }}">
+            <input type="hidden" name="kind" value="{{ diagnostic_payload.kind }}">
+            <input type="hidden" name="id" value="{{ request.GET.id }}">
+            <button type="submit" class="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700">
+              {% if diagnostic_payload.account_active %}Desactiver{% else %}Activer{% endif %}
+            </button>
+          </form>
+          <form method="post" action="{% url 'accounts_portal:it_reset_password' %}">
+            {% csrf_token %}
+            <input type="hidden" name="target_user_id" value="{{ diagnostic_payload.target_user_id }}">
+            <input type="hidden" name="q" value="{{ support_search.query }}">
+            <input type="hidden" name="kind" value="{{ diagnostic_payload.kind }}">
+            <input type="hidden" name="id" value="{{ request.GET.id }}">
+            <button type="submit" class="rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white">Reset mot de passe</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% if diagnostic_payload %}
+      <div class="mt-4 it-action-grid">
+        {% for section in diagnostic_payload.sections %}
+        <div class="it-action-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ section.title }}</p>
+          <div class="mt-3 it-mini-list">
+            {% for label, value in section.rows %}
+            <div class="it-mini-item">
+              <div class="flex items-start justify-between gap-4">
+                <span class="text-xs font-bold text-slate-400">{{ label }}</span>
+                <span class="text-sm font-semibold text-slate-900 text-right">{{ value }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
         </div>
         {% endfor %}
       </div>
-    </div>
-
-    <div class="portal-card portal-card-pad" id="activity">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="portal-section-kicker">Activite</p>
-          <h3 class="portal-section-title">Evenements recents</h3>
-        </div>
-        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ recent_events|length }}</span>
-      </div>
-      <div class="mt-4 overflow-x-auto">
-        <table class="w-full min-w-[820px] divide-y divide-slate-100">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Annexe</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Classe</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Enseignant</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etat</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            {% for event in recent_events %}
-            <tr class="hover:bg-slate-50">
-              <td class="px-4 py-3 text-sm font-semibold text-slate-900">{{ event.updated_at|date:"d/m/Y H:i" }}</td>
-              <td class="px-4 py-3 text-sm text-slate-700">{{ event.branch.name }}</td>
-              <td class="px-4 py-3 text-sm text-slate-700">{{ event.academic_class.display_name }}</td>
-              <td class="px-4 py-3 text-sm text-slate-700">{{ event.teacher.get_full_name|default:event.teacher.username }}</td>
-              <td class="px-4 py-3 text-sm">
-                <span class="rounded-full px-2.5 py-1 text-xs font-bold {% if event.status == 'completed' %}bg-emerald-100 text-emerald-700{% elif event.status == 'ongoing' %}bg-blue-100 text-blue-700{% elif event.status == 'planned' %}bg-amber-100 text-amber-700{% elif event.status == 'postponed' %}bg-violet-100 text-violet-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ event.get_status_display }}</span>
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-400">Aucune activite recente.</td></tr>
+      <div class="mt-4 it-action-grid">
+        <div class="it-action-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Controle</p>
+          <div class="mt-3 it-mini-list">
+            {% for item in diagnostic_payload.issues %}
+            <div class="it-mini-item"><p class="text-sm font-semibold text-slate-800">{{ item }}</p></div>
             {% endfor %}
-          </tbody>
-        </table>
+          </div>
+        </div>
+        <div class="it-action-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Recent</p>
+          <div class="mt-3 it-mini-list">
+            {% for item in diagnostic_payload.recent_items %}
+            <div class="it-mini-item"><p class="text-sm font-semibold text-slate-800">{{ item }}</p></div>
+            {% empty %}
+            <p class="text-sm text-slate-400">Aucun element recent.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section x-show="activeSection === 'accounts'" x-transition.opacity.duration.150ms class="it-panel-stack" id="accounts" style="display:none;">
+    <div class="portal-card portal-card-pad">
+      <div>
+        <p class="portal-section-kicker">Comptes</p>
+        <h3 class="portal-section-title">Etat des acces</h3>
+      </div>
+      <div class="mt-4 it-kpi-grid">
+        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Inactifs</p><p class="mt-2 text-2xl font-black text-slate-900">{{ access_metrics.inactive_accounts }}</p></div>
+        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Sans position</p><p class="mt-2 text-2xl font-black text-slate-900">{{ access_metrics.staff_missing_position }}</p></div>
+        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Sans annexe</p><p class="mt-2 text-2xl font-black text-slate-900">{{ access_metrics.staff_missing_branch }}</p></div>
+        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Sans code</p><p class="mt-2 text-2xl font-black text-slate-900">{{ access_metrics.staff_missing_employee_code }}</p></div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="space-y-4">
-    <div class="portal-card portal-card-pad" id="health">
-      <div class="flex items-center justify-between">
+  <section x-show="activeSection === 'health'" x-transition.opacity.duration.150ms class="it-panel-stack" id="health" style="display:none;">
+    <div class="portal-card portal-card-pad">
+      <div class="flex items-center justify-between gap-3">
         <div>
           <p class="portal-section-kicker">Sante</p>
           <h3 class="portal-section-title">Etat du portail</h3>
         </div>
         <span class="rounded-full px-3 py-1 text-xs font-bold {% if quality.status == 'excellent' %}bg-emerald-100 text-emerald-700{% elif quality.status == 'good' %}bg-blue-100 text-blue-700{% elif quality.status == 'medium' %}bg-amber-100 text-amber-700{% else %}bg-rose-100 text-rose-700{% endif %}">{{ quality.status|default:"indefini" }}</span>
       </div>
-      <div class="mt-4 space-y-2">
+      <div class="mt-4 it-mini-list">
         {% for warning in quality.warnings %}
-        <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ warning }}</div>
+        <div class="it-mini-item"><p class="text-sm font-semibold text-slate-800">{{ warning }}</p></div>
         {% empty %}
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Aucune anomalie critique detectee.</div>
+        <div class="it-mini-item"><p class="text-sm font-semibold text-emerald-700">Aucune anomalie critique detectee.</p></div>
         {% endfor %}
       </div>
     </div>
 
     <div class="portal-card portal-card-pad">
-      <div>
-        <p class="portal-section-kicker">Alertes</p>
-        <h3 class="portal-section-title">Priorites du support</h3>
-      </div>
-      <div class="mt-4 space-y-2">
-        {% for alert in alerts %}
-        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-          <p class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ alert.type }}</p>
-          <p class="mt-1 text-sm text-slate-700">{{ alert.message }}</p>
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="portal-section-kicker">Activite</p>
+          <h3 class="portal-section-title">Evenements recents</h3>
         </div>
-        {% empty %}
-        <p class="text-sm text-slate-400">Aucune alerte visible.</p>
-        {% endfor %}
       </div>
-    </div>
-
-    <div class="portal-card portal-card-pad">
-      <div>
-        <p class="portal-section-kicker">Annexes</p>
-        <h3 class="portal-section-title">Points de contact</h3>
-      </div>
-      <div class="mt-4 space-y-3">
-        {% for academic_class in classes %}
-        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+      <div class="mt-4 it-mini-list">
+        {% for event in recent_events %}
+        <div class="it-mini-item">
           <div class="flex items-center justify-between gap-3">
-            <span class="text-sm font-semibold text-slate-900">{{ academic_class.display_name }}</span>
-            <span class="text-xs font-bold text-slate-500">{{ academic_class.branch.name }}</span>
+            <p class="text-sm font-black text-slate-900">{{ event.academic_class.display_name }}</p>
+            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {% if event.status == 'completed' %}bg-emerald-100 text-emerald-700{% elif event.status == 'ongoing' %}bg-blue-100 text-blue-700{% elif event.status == 'planned' %}bg-amber-100 text-amber-700{% elif event.status == 'postponed' %}bg-violet-100 text-violet-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ event.get_status_display }}</span>
           </div>
+          <p class="mt-1 text-xs text-slate-500">{{ event.branch.name }} • {{ event.teacher.get_full_name|default:event.teacher.username }} • {{ event.updated_at|date:"d/m H:i" }}</p>
         </div>
         {% empty %}
-        <p class="text-sm text-slate-400">Aucune classe referencee.</p>
+        <p class="text-sm text-slate-400">Aucune activite recente.</p>
         {% endfor %}
       </div>
     </div>
-  </div>
-</section>
+  </section>
+</div>
 {% endblock %}

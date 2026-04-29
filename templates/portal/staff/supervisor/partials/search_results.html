@@ -1,0 +1,56 @@
+{% if query|length < 2 %}
+<div class="supervisor-search-empty">
+  <p class="text-xs font-semibold text-slate-500">Tape au moins 2 lettres pour rechercher.</p>
+</div>
+{% else %}
+<div class="space-y-3">
+  <div>
+    <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Etudiants</p>
+    <div class="mt-2 space-y-2">
+      {% for student in students %}
+      <div class="supervisor-search-row">
+        <div class="min-w-0">
+          <p class="text-sm font-bold text-slate-900 truncate">{{ student.full_name }}</p>
+          <p class="text-xs text-slate-500 truncate">Matricule: {{ student.matricule|default:"-" }}</p>
+        </div>
+      </div>
+      {% empty %}
+      <p class="text-xs text-slate-500">Aucun etudiant trouvé.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div>
+    <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Classes</p>
+    <div class="mt-2 space-y-2">
+      {% for academic_class in classes %}
+      <div class="supervisor-search-row">
+        <div class="min-w-0">
+          <p class="text-sm font-bold text-slate-900 truncate">{{ academic_class.display_name }}</p>
+          <p class="text-xs text-slate-500 truncate">{{ academic_class.programme.title }}</p>
+        </div>
+      </div>
+      {% empty %}
+      <p class="text-xs text-slate-500">Aucune classe trouvée.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div>
+    <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Cours du jour</p>
+    <div class="mt-2 space-y-2">
+      {% for event in events %}
+      <div class="supervisor-search-row">
+        <div class="min-w-0">
+          <p class="text-sm font-bold text-slate-900 truncate">{{ event.academic_class.display_name }} · {{ event.ec.title }}</p>
+          <p class="text-xs text-slate-500 truncate">{{ event.teacher.get_full_name|default:event.teacher.username }} · {{ event.location|default:"Salle non precisee" }}</p>
+        </div>
+      </div>
+      {% empty %}
+      <p class="text-xs text-slate-500">Aucun cours correspondant.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+

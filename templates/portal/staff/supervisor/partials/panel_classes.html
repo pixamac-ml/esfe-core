@@ -1,0 +1,56 @@
+<div class="space-y-4">
+  <article class="portal-card portal-card-pad">
+    <div class="supervisor-panel-head">
+      <div>
+        <p class="portal-section-kicker">Terrain</p>
+        <h3 class="portal-section-title">Classes · Etudiants · Emploi du temps</h3>
+      </div>
+      <span class="supervisor-badge bg-slate-100 text-slate-700">{{ total_classes }} classes</span>
+    </div>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+      <aside class="space-y-3">
+        <div class="supervisor-card">
+          <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Classes de l'annexe</p>
+          <p class="mt-2 supervisor-muted">Clique sur une classe pour voir les etudiants et programmer la semaine.</p>
+        </div>
+
+        <div class="space-y-2">
+          {% for item in class_picker_items %}
+          <button
+            type="button"
+            class="supervisor-action"
+            hx-get="{% url 'accounts_portal:supervisor_class_detail' item.id %}"
+            hx-target="#supervisor-class-detail"
+            hx-swap="innerHTML"
+          >
+            <div class="min-w-0">
+              <p class="text-sm font-black text-slate-900 truncate">{{ item.label }}</p>
+              <p class="text-xs text-slate-500 truncate">{{ item.programme_title }}</p>
+            </div>
+            <span class="supervisor-badge bg-slate-100 text-slate-700">{{ item.student_count }}</span>
+          </button>
+          {% empty %}
+          <div class="supervisor-empty">Aucune classe rattachee.</div>
+          {% endfor %}
+        </div>
+      </aside>
+
+      <section class="min-w-0">
+        <div
+          id="supervisor-class-detail"
+          class="space-y-3"
+          {% if default_class_id %}
+          hx-get="{% url 'accounts_portal:supervisor_class_detail' default_class_id %}"
+          hx-trigger="load"
+          hx-target="this"
+          hx-swap="innerHTML"
+          {% endif %}
+        >
+          <div class="supervisor-empty">Selectionne une classe.</div>
+        </div>
+      </section>
+    </div>
+  </article>
+</div>
+

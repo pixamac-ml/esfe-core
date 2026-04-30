@@ -1,111 +1,178 @@
-{% extends "base.html" %}
-{% load static %}
+{% extends "portal/staff/dashboard_shell.html" %}
+{% load humanize %}
 
-{% block public_navbar %}{% endblock %}
-{% block public_footer %}{% endblock %}
-{% block public_floating_widget %}{% endblock %}
-
-{% block title %}{{ page_title }}{% endblock %}
-
-{% block extra_head %}
-<style>
-  /* Reprise du style dashboard étudiant pour cohérence */
-  :root {
-    --school-primary: #1e4f6f;
-    --school-primary-dark: #123145;
-    --sidebar-main: #163b53;
-    --sidebar-rail: #123145;
-    --surface: #f4f6f9;
-    --surface-2: #e8eef3;
-    --card: #ffffff;
-    --card-soft: #f8fbfc;
-    --line: rgba(214, 228, 236, 0.95);
-    --text: #123145;
-    --muted: #64748b;
-    --muted-2: #98a2b3;
-    --sidebar-width: 268px;
-    --sidebar-compact-width: 84px;
-    --radius-shell: 22px;
-    --radius-xl: 18px;
-  }
-</style>
+{% block sidebar_nav %}
+<a class="portal-list-link active" href="#overview"><i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i><span>Vue globale</span></a>
+<a class="portal-list-link" href="#branches"><i data-lucide="building-2" style="width:18px;height:18px;"></i><span>Annexes</span></a>
+<a class="portal-list-link" href="#finance"><i data-lucide="wallet" style="width:18px;height:18px;"></i><span>Finance</span></a>
+<a class="portal-list-link" href="#alerts"><i data-lucide="triangle-alert" style="width:18px;height:18px;"></i><span>Alertes</span></a>
 {% endblock %}
 
-{% block content %}
-<div class="student-dashboard-page" x-data="dgDashboard()" x-init="init()">
-  <div class="student-stage">
-    <section class="student-shell">
-      {% include "portal/dg/partials/sidebar_dg.html" %}
-      <section class="student-main">
-        {% include "portal/dg/partials/topbar_dg.html" %}
-        <div class="student-content student-scroll" id="dashboardTop">
-          <div class="student-workspace">
-            <header class="student-workspace-head">
-              <div>
-                <p class="student-section-kicker" x-text="activeMeta.kicker"></p>
-                <h1 class="student-section-title text-[1.2rem]" x-text="activeMeta.title"></h1>
-                <p class="mt-1 text-sm text-[color:var(--muted)]" x-text="activeMeta.description"></p>
-              </div>
-              <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]" x-text="activeMeta.badge"></span>
-            </header>
-            <section x-show="activeSection === 'overview'" x-cloak class="student-workspace-panel">
-              <section id="overview" class="student-section">
-                <!-- Section Vue générale DG -->
-                <div class="student-card student-card-pad">Bienvenue sur le tableau de bord du Directeur Général.</div>
-              </section>
-            </section>
-            <section x-show="activeSection === 'kpi'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-              <section id="kpi">Indicateurs clés (KPI) à venir...</section>
-            </section>
-            <section x-show="activeSection === 'reports'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-              <section id="reports">Rapports et statistiques à venir...</section>
-            </section>
-            <section x-show="activeSection === 'users'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-              <section id="users">Gestion des utilisateurs à venir...</section>
-            </section>
-            <section x-show="activeSection === 'settings'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-              <section id="settings">Paramètres généraux à venir...</section>
-            </section>
-          </div>
-        </div>
-      </section>
-    </section>
+{% block topbar_actions %}
+<span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{{ total_branches }} annexes</span>
+<span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">Maj: {{ generated_at|date:"d/m/Y H:i" }}</span>
+{% endblock %}
+
+{% block dashboard_content %}
+<section id="overview" class="portal-card portal-hero">
+  <div class="portal-card-pad flex flex-col justify-between gap-4">
+    <div>
+      <p class="portal-section-kicker">Direction generale</p>
+      <h2 class="mt-2 text-2xl font-black text-slate-900 leading-tight">Pilotage global des annexes</h2>
+      <p class="mt-3 max-w-2xl text-sm text-slate-600">Vue consolidee pour organiser et superviser les annexes: activite academique, inscriptions, finances et alertes operationnelles.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% for module in module_cards %}
+      <span class="portal-pill">{{ module }}</span>
+      {% endfor %}
+    </div>
   </div>
-</div>
-<script>
-function dgDashboard() {
-  return {
-    darkMode: false,
-    sidebarCompact: false,
-    mobileMenu: false,
-    search: "",
-    activeNav: "Vue générale",
-    activeSection: "overview",
-    activeMeta: {
-      kicker: "Dashboard DG",
-      title: "Tableau de bord Directeur Général",
-      description: "Vue d'ensemble de l'établissement, indicateurs et actions globales.",
-      badge: "Vue générale"
-    },
-    navItems: [
-      { label: "Vue générale", icon: "layout-dashboard", target: "overview" },
-      { label: "Indicateurs", icon: "activity", target: "kpi" },
-      { label: "Rapports", icon: "bar-chart-2", target: "reports" },
-      { label: "Utilisateurs", icon: "users", target: "users" },
-      { label: "Paramètres", icon: "settings", target: "settings" }
-    ],
-    sectionMeta: [
-      { key: "overview", kicker: "Dashboard DG", title: "Tableau de bord Directeur Général", description: "Vue d'ensemble de l'établissement, indicateurs et actions globales.", badge: "Vue générale" },
-      { key: "kpi", kicker: "Indicateurs", title: "Indicateurs clés", description: "Suivi des KPI institutionnels.", badge: "KPI" },
-      { key: "reports", kicker: "Rapports", title: "Rapports et statistiques", description: "Accès aux rapports consolidés.", badge: "Rapports" },
-      { key: "users", kicker: "Utilisateurs", title: "Gestion des utilisateurs", description: "Gestion des accès et des rôles.", badge: "Utilisateurs" },
-      { key: "settings", kicker: "Paramètres", title: "Paramètres généraux", description: "Configuration de la plateforme.", badge: "Paramètres" }
-    ],
-    init() {
-      // Initialisation éventuelle
-    }
-  }
-}
-</script>
+  <div class="border-l border-slate-100 bg-slate-50 p-5">
+    <div class="grid grid-cols-2 gap-3">
+      <div class="portal-card portal-stat p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Etudiants</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_students|intcomma }}</p>
+      </div>
+      <div class="portal-card portal-stat p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Classes</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_classes|intcomma }}</p>
+      </div>
+      <div class="portal-card portal-stat p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Inscriptions actives</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_active_inscriptions|intcomma }}</p>
+      </div>
+      <div class="portal-card portal-stat p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Nouvelles candidatures (30j)</p>
+        <p class="mt-2 text-2xl font-black text-slate-900">{{ new_candidatures_30d|intcomma }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mt-4 portal-grid-two" id="finance">
+  <div class="portal-card portal-card-pad">
+    <p class="portal-section-kicker">Indicateurs transverses</p>
+    <h3 class="portal-section-title">Performance institutionnelle</h3>
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Revenus valides</p>
+        <p class="mt-2 text-xl font-black text-slate-900">{{ total_revenue|intcomma }} FCFA</p>
+      </article>
+      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Paiements valides</p>
+        <p class="mt-2 text-xl font-black text-slate-900">{{ total_validated_payments|intcomma }}</p>
+      </article>
+      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Staff actif</p>
+        <p class="mt-2 text-xl font-black text-slate-900">{{ total_staff|intcomma }}</p>
+      </article>
+      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4" id="alerts">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Alertes ouvertes</p>
+        <p class="mt-2 text-xl font-black {% if open_alerts > 0 %}text-rose-700{% else %}text-emerald-700{% endif %}">{{ open_alerts|intcomma }}</p>
+      </article>
+    </div>
+  </div>
+
+  <div class="portal-card portal-card-pad">
+    <p class="portal-section-kicker">Lecture hierarchique</p>
+    <h3 class="portal-section-title">Organisation par annexe</h3>
+    <p class="mt-3 text-sm text-slate-600">Chaque bloc annexe ci-dessous regroupe les indicateurs academiques, administratifs et financiers pour un pilotage decentralise.</p>
+  </div>
+</section>
+
+<section class="mt-4 space-y-4" id="branches">
+  {% for item in branch_summaries %}
+  <article class="portal-card portal-card-pad">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <p class="portal-section-kicker">Annexe</p>
+        <h3 class="portal-section-title">{{ item.branch.name }} ({{ item.branch.code }})</h3>
+        <p class="mt-1 text-sm text-slate-500">Responsable: {{ item.manager_name }}</p>
+      </div>
+      <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ item.branch.city|default:"-" }}</span>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Etudiants</p>
+        <p class="mt-1 text-lg font-black text-slate-900">{{ item.student_count|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Classes</p>
+        <p class="mt-1 text-lg font-black text-slate-900">{{ item.class_count|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Inscriptions actives</p>
+        <p class="mt-1 text-lg font-black text-slate-900">{{ item.active_inscription_count|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Candidatures</p>
+        <p class="mt-1 text-lg font-black text-slate-900">{{ item.candidature_count|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Acceptees</p>
+        <p class="mt-1 text-lg font-black text-emerald-700">{{ item.accepted_candidature_count|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Revenus</p>
+        <p class="mt-1 text-lg font-black text-slate-900">{{ item.revenue_total|intcomma }} FCFA</p>
+      </div>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 xl:grid-cols-3 gap-3">
+      <div class="rounded-xl border border-slate-100 p-3">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Classes les plus chargees</p>
+        <div class="mt-2 space-y-2">
+          {% for cls in item.top_classes %}
+          <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <span class="font-semibold">{{ cls.display_name }}</span>
+            <span class="text-slate-500"> - {{ cls.student_count|default:0 }} etudiants</span>
+          </div>
+          {% empty %}
+          <p class="text-sm text-slate-400">Aucune classe active.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-100 p-3">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Programmes dominants</p>
+        <div class="mt-2 space-y-2">
+          {% for programme in item.top_programmes %}
+          <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <span class="font-semibold">{{ programme.programme__title }}</span>
+            <span class="text-slate-500"> - {{ programme.total }} candidatures</span>
+          </div>
+          {% empty %}
+          <p class="text-sm text-slate-400">Aucune candidature enregistree.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-100 p-3">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Derniers paiements valides</p>
+        <div class="mt-2 space-y-2">
+          {% for payment in item.latest_payments %}
+          <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <span class="font-semibold">{{ payment.amount|intcomma }} FCFA</span>
+            <span class="text-slate-500"> - {{ payment.paid_at|date:"d/m H:i" }}</span>
+          </div>
+          {% empty %}
+          <p class="text-sm text-slate-400">Aucun paiement valide recent.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-3 flex flex-wrap gap-2 text-xs">
+      <span class="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-700">Depenses en attente: {{ item.pending_expense_count }}</span>
+      <span class="rounded-full {% if item.open_alert_count > 0 %}bg-rose-100 text-rose-700{% else %}bg-emerald-100 text-emerald-700{% endif %} px-3 py-1 font-bold">Alertes ouvertes: {{ item.open_alert_count }}</span>
+    </div>
+  </article>
+  {% empty %}
+  <div class="portal-card portal-card-pad">
+    <p class="text-sm text-slate-500">Aucune annexe active n'est disponible.</p>
+  </div>
+  {% endfor %}
+</section>
 {% endblock %}
 

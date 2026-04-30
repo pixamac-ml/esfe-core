@@ -176,12 +176,25 @@ def profile_detail(request):
     # Mise à jour de l'activité utilisateur
     Profile.objects.filter(pk=profile.pk).update(last_seen=timezone.now())
 
+    tab = (request.GET.get("tab") or "activity").strip().lower()
+    allowed_tabs = {"activity", "topics", "answers", "badges", "settings"}
+    active_tab = tab if tab in allowed_tabs else "activity"
+    initial_tab_url_map = {
+        "activity": "accounts:profile_activity",
+        "topics": "accounts:profile_topics",
+        "answers": "accounts:profile_answers",
+        "badges": "accounts:profile_badges",
+        "settings": "accounts:profile_settings",
+    }
+
     context = {
         "user_obj": user_obj,
         "profile": profile,
         "stats": stats,
         "recent_topics": recent_topics,
         "recent_answers": recent_answers,
+        "active_tab": active_tab,
+        "initial_tab_url_name": initial_tab_url_map[active_tab],
     }
 
     return render(
@@ -455,8 +468,10 @@ def profile_settings(request):
     Onglet Paramètres - Actions rapides.
     """
 
-    return render(
-        request,
-        "accounts/partials/profile_settings.html",
-        {}
-    )
+    if request.headers.get("HX-Request") == "true":
+        return render(
+            request,
+            "accounts/partials/profile_settings.html",
+            {}
+        )
+    return redirect(f"{reverse('accounts:profile')}?tab=settings")

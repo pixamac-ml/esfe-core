@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db.models import Count
+from django.db.models import Count, Q, Sum
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -11,11 +11,15 @@ from django.urls.exceptions import NoReverseMatch
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, LessonLog
+from admissions.models import Candidature
+from accounts.models import BranchExpense, Profile
 from academics.services.lesson_log_service import create_lesson_log, update_lesson_log
 from academics.services.schedule_service import get_director_schedule_overview
 from accounts.access import can_access, get_user_position, get_user_scope
 from accounts.dashboards.helpers import get_user_branch
 from branches.models import Branch
+from inscriptions.models import Inscription
+from payments.models import Payment
 from portal.permissions import get_post_login_portal_url
 from portal.services import build_it_dashboard_context, build_supervisor_dashboard_context
 from portal.services.it_support_service import (
@@ -25,6 +29,7 @@ from portal.services.it_support_service import (
     log_support_action,
 )
 from students.models import Student
+from students.models import AttendanceAlert
 from students.services.attendance_service import mark_student_attendance, mark_teacher_attendance
 from secretary.permissions import is_secretary
 
@@ -283,7 +288,9 @@ def portal_dashboard(request):
         return redirect("secretary:secretary_dashboard")
     if position == "admissions":
         return redirect("accounts:admissions_dashboard")
-    if position in {"director_of_studies", "executive_director", "super_admin"}:
+    if position in {"executive_director", "super_admin"}:
+        return dg_portal(request)
+    if position == "director_of_studies":
         return _render_director_dashboard(request)
     if position == "academic_supervisor":
         return _render_supervisor_dashboard(request)
@@ -981,7 +988,124 @@ def dg_portal(request):
     position = get_user_position(request.user)
     if position not in {"executive_director", "super_admin"}:
         return HttpResponseForbidden("Accès réservé au Directeur Général.")
-    return render(request, "portal/dg/dashboard.html", {
-        "page_title": "Dashboard Directeur Général",
-        "user_display_name": request.user.get_full_name() or request.user.username,
-    })
+    branches = list(
+        Branch.objects.filter(is_active=True)
+        .select_related("manager")
+        .order_by("name")
+    )
+    branch_ids = [branch.id for branch in branches]
+
+    active_students_qs = Student.objects.filter(
+        is_active=True,
+        inscription__candidature__branch_id__in=branch_ids,
+    )
+    active_classes_qs = AcademicClass.objects.filter(
+        is_active=True,
+        branch_id__in=branch_ids,
+    )
+    active_inscriptions_qs = Inscription.objects.filter(
+        status__in={"partial_paid", "active"},
+        candidature__branch_id__in=branch_ids,
+    )
+    validated_payments_qs = Payment.objects.filter(
+        status=Payment.STATUS_VALIDATED,
+        inscription__candidature__branch_id__in=branch_ids,
+    )
+    alerts_qs = AttendanceAlert.objects.filter(
+        is_resolved=False,
+        branch_id__in=branch_ids,
+    )
+
+    last_30_days = timezone.now() - timedelta(days=30)
+    new_candidatures_30d = Candidature.objects.filter(
+        submitted_at__gte=last_30_days,
+        branch_id__in=branch_ids,
+        is_deleted=False,
+    ).count()
+
+    branch_summaries = []
+    for branch in branches:
+        classes_for_branch = list(
+            AcademicClass.objects.filter(branch=branch, is_active=True)
+            .annotate(student_count=Count("enrollments", filter=Q(enrollments__is_active=True)))
+            .order_by("-student_count", "level", "programme__title")[:5]
+        )
+        top_programmes = list(
+            Candidature.objects.filter(branch=branch, is_deleted=False)
+            .values("programme__title")
+            .annotate(total=Count("id"))
+            .order_by("-total", "programme__title")[:3]
+        )
+        latest_payments = list(
+            Payment.objects.filter(
+                status=Payment.STATUS_VALIDATED,
+                inscription__candidature__branch=branch,
+            )
+            .select_related("inscription__candidature")
+            .order_by("-paid_at")[:5]
+        )
+
+        branch_summaries.append(
+            {
+                "branch": branch,
+                "manager_name": (
+                    branch.manager.get_full_name() or branch.manager.username
+                    if branch.manager
+                    else "Non assigne"
+                ),
+                "student_count": active_students_qs.filter(inscription__candidature__branch=branch).count(),
+                "class_count": active_classes_qs.filter(branch=branch).count(),
+                "active_inscription_count": active_inscriptions_qs.filter(candidature__branch=branch).count(),
+                "candidature_count": Candidature.objects.filter(branch=branch, is_deleted=False).count(),
+                "accepted_candidature_count": Candidature.objects.filter(
+                    branch=branch,
+                    status__in={"accepted", "accepted_with_reserve"},
+                    is_deleted=False,
+                ).count(),
+                "revenue_total": (
+                    validated_payments_qs.filter(inscription__candidature__branch=branch).aggregate(
+                        total=Sum("amount")
+                    )["total"]
+                    or 0
+                ),
+                "pending_expense_count": BranchExpense.objects.filter(
+                    branch=branch,
+                    status__in={BranchExpense.STATUS_SUBMITTED, BranchExpense.STATUS_APPROVED},
+                ).count(),
+                "open_alert_count": alerts_qs.filter(branch=branch).count(),
+                "top_classes": classes_for_branch,
+                "top_programmes": top_programmes,
+                "latest_payments": latest_payments,
+            }
+        )
+
+    context = _build_portal_context(
+        request,
+        page_title="Dashboard Directeur Général",
+        module_cards=[
+            "Pilotage multi-annexes",
+            "Vue hierarchisee par annexe",
+            "Performance academique et financiere",
+            "Alertes operationnelles",
+        ],
+    )
+    context.update(
+        {
+            "dashboard_kind": "Direction generale",
+            "total_branches": len(branches),
+            "total_students": active_students_qs.count(),
+            "total_classes": active_classes_qs.count(),
+            "total_active_inscriptions": active_inscriptions_qs.count(),
+            "total_staff": Profile.objects.filter(
+                user_type="staff",
+                employment_status="active",
+            ).count(),
+            "total_validated_payments": validated_payments_qs.count(),
+            "total_revenue": validated_payments_qs.aggregate(total=Sum("amount"))["total"] or 0,
+            "open_alerts": alerts_qs.count(),
+            "new_candidatures_30d": new_candidatures_30d,
+            "branch_summaries": branch_summaries,
+            "generated_at": timezone.now(),
+        }
+    )
+    return render(request, "portal/dg/dashboard.html", context)

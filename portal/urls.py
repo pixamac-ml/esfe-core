@@ -10,6 +10,7 @@ from portal.views import (
 from portal.views.admin_grades import excel_grade_view
 from portal.views.views import (
     admissions_portal,
+    dg_portal,
     director_portal,
     finance_portal,
     it_portal,
@@ -43,6 +44,7 @@ urlpatterns = [
     path("secretary/", secretary_portal, name="portal_secretary"),
     path("admissions/", admissions_portal, name="portal_admissions"),
     path("director/", director_portal, name="portal_director"),
+    path("dg/", dg_portal, name="portal_dg"),
     path("supervisor/", supervisor_portal, name="portal_supervisor"),
     path("supervisor/search/", supervisor_quick_search, name="supervisor_quick_search"),
     path(

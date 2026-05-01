@@ -1,11 +1,11 @@
 {% extends "portal/staff/dashboard_shell.html" %}
 
 {% block sidebar_nav %}
-<a class="portal-list-link active" href="#overview"><i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i><span>Accueil</span></a>
-<a class="portal-list-link" href="#grades"><i data-lucide="sheet" style="width:18px;height:18px;"></i><span>Notes</span></a>
-<a class="portal-list-link" href="#diagnostics"><i data-lucide="stethoscope" style="width:18px;height:18px;"></i><span>Diagnostic</span></a>
-<a class="portal-list-link" href="#accounts"><i data-lucide="shield-check" style="width:18px;height:18px;"></i><span>Comptes</span></a>
-<a class="portal-list-link" href="#health"><i data-lucide="activity" style="width:18px;height:18px;"></i><span>Sante</span></a>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'overview' || activeSection === '' }" @click="setSection('overview')"><i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i><span>Accueil</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'grades' }" @click="setSection('grades')"><i data-lucide="sheet" style="width:18px;height:18px;"></i><span>Notes</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'diagnostics' }" @click="setSection('diagnostics')"><i data-lucide="stethoscope" style="width:18px;height:18px;"></i><span>Diagnostic</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'accounts' }" @click="setSection('accounts')"><i data-lucide="shield-check" style="width:18px;height:18px;"></i><span>Comptes</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'health' }" @click="setSection('health')"><i data-lucide="activity" style="width:18px;height:18px;"></i><span>Sante</span></button>
 {% endblock %}
 
 {% block topbar_actions %}
@@ -15,20 +15,27 @@
 
 {% block dashboard_content %}
 <style>
+  .it-workspace {
+    width: 100%;
+    display: grid;
+    gap: 1rem;
+  }
+
   .it-module-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .it-module-tile {
     border: 1px solid var(--line);
-    border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    border-radius: 12px;
+    background: #ffffff;
     padding: 1rem;
     min-width: 0;
     cursor: pointer;
     transition: .18s ease;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
   }
 
   .it-module-tile:hover {
@@ -55,32 +62,34 @@
   .it-kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .it-kpi-card {
     border: 1px solid var(--line);
-    border-radius: 18px;
+    border-radius: 12px;
     background: white;
     padding: 1rem;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
   }
 
   .it-action-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .it-action-card {
     border: 1px solid var(--line);
-    border-radius: 18px;
+    border-radius: 12px;
     background: white;
     padding: 1rem;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
   }
 
   .it-panel-stack {
     display: grid;
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .it-mini-list {
@@ -90,7 +99,7 @@
 
   .it-mini-item {
     border: 1px solid var(--line);
-    border-radius: 16px;
+    border-radius: 12px;
     background: #fff;
     padding: 0.85rem 0.95rem;
   }
@@ -130,23 +139,16 @@
 {% endif %}
 
 <div
-  x-data="{
-    activeSection: window.location.hash ? window.location.hash.replace('#', '') : 'overview',
-    setSection(section) {
-      this.activeSection = section;
-      window.location.hash = section;
-    }
-  }"
-  @hashchange.window="activeSection = window.location.hash ? window.location.hash.replace('#', '') : 'overview'"
-  class="space-y-4"
+  x-init="if (!activeSection) activeSection = '{% if selected_class and selected_semester %}grades{% else %}overview{% endif %}'"
+  class="it-workspace"
 >
-  <section class="portal-card portal-card-pad">
+  <section x-show="activeSection === 'overview'" x-transition.opacity.duration.150ms class="portal-card portal-card-pad">
     <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
       <div>
         <p class="portal-section-kicker">Informaticien</p>
         <h2 class="mt-1 text-2xl font-black text-slate-900">Cockpit technique</h2>
       </div>
-      <div class="it-kpi-grid w-full xl:max-w-[720px]">
+      <div class="it-kpi-grid w-full">
         <div class="it-kpi-card">
           <p class="text-xs uppercase tracking-wide text-slate-400">Utilisateurs</p>
           <p class="mt-2 text-2xl font-black text-slate-900">{{ total_users }}</p>
@@ -167,7 +169,7 @@
     </div>
   </section>
 
-  <section class="it-module-grid">
+  <section x-show="activeSection === 'overview'" x-transition.opacity.duration.150ms class="it-module-grid">
     <button type="button" class="it-module-tile text-left" :class="{ 'active': activeSection === 'overview' }" @click="setSection('overview')">
       <div class="it-icon-wrap"><i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i></div>
       <p class="mt-4 text-sm font-black text-slate-900">Vue globale</p>
@@ -208,7 +210,7 @@
             </div>
           </div>
         </button>
-        <a href="{{ grades_dashboard_url }}" class="it-action-card block">
+        <button type="button" class="it-action-card text-left" @click="setSection('grades')">
           <div class="flex items-center gap-3">
             <div class="it-icon-wrap"><i data-lucide="file-spreadsheet" style="width:18px;height:18px;"></i></div>
             <div>
@@ -216,7 +218,7 @@
               <p class="text-xs text-slate-500">{{ grade_metrics.enrollments_without_grades }} inscription(s) sans notes</p>
             </div>
           </div>
-        </a>
+        </button>
         <button type="button" class="it-action-card text-left" @click="setSection('accounts')">
           <div class="flex items-center gap-3">
             <div class="it-icon-wrap"><i data-lucide="user-round-cog" style="width:18px;height:18px;"></i></div>
@@ -283,19 +285,16 @@
   </section>
 
   <section x-show="activeSection === 'grades'" x-transition.opacity.duration.150ms class="it-panel-stack" id="grades" style="display:none;">
-    <div class="portal-card portal-card-pad">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="portal-section-kicker">Module Notes</p>
-          <h3 class="portal-section-title">Gestion academique</h3>
-        </div>
-        <a href="{{ grades_dashboard_url }}" class="rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white">Ouvrir</a>
-      </div>
-      <div class="mt-4 it-kpi-grid">
-        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Classes</p><p class="mt-2 text-2xl font-black text-slate-900">{{ grade_metrics.active_classes }}</p></div>
-        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Semestres</p><p class="mt-2 text-2xl font-black text-slate-900">{{ grade_metrics.pending_semesters }}</p></div>
-        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Sans notes</p><p class="mt-2 text-2xl font-black text-slate-900">{{ grade_metrics.enrollments_without_grades }}</p></div>
-        <div class="it-kpi-card"><p class="text-xs uppercase tracking-wide text-slate-400">Lignes</p><p class="mt-2 text-2xl font-black text-slate-900">{{ grade_metrics.grade_entries }}</p></div>
+    <div
+      id="notes-workspace"
+      class="space-y-4"
+      hx-get="{% url 'accounts_portal:it_notes_workspace' %}{% if selected_class and selected_semester %}?class_id={{ selected_class.id }}&semester_id={{ selected_semester.id }}{% endif %}"
+      hx-trigger="load"
+      hx-target="#notes-workspace"
+      hx-swap="innerHTML"
+    >
+      <div class="portal-card portal-card-pad text-sm text-slate-500">
+        Chargement du workspace Notes...
       </div>
     </div>
   </section>

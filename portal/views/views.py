@@ -28,6 +28,7 @@ from portal.services.it_support_service import (
     get_scoped_staff_queryset,
     log_support_action,
 )
+from portal.views.it_grades_import import build_it_grade_selection_context
 from students.models import Student
 from students.models import AttendanceAlert
 from students.services.attendance_service import mark_student_attendance, mark_teacher_attendance
@@ -266,11 +267,33 @@ def _build_supervisor_dashboard_context_for_partials(request, *, branch):
 
 
 def _render_it_dashboard(request):
+    context = _build_it_dashboard_context(request)
+    context.update(
+        build_it_grade_selection_context(
+            request.user,
+            class_id=request.GET.get("class_id"),
+            semester_id=request.GET.get("semester_id"),
+        )
+    )
     return render(
         request,
-        "portal/staff/informaticien_dashboard.html",
-        _build_it_dashboard_context(request),
+        "portal/informaticien/dashboard.html",
+        context,
     )
+
+
+def _build_it_dashboard_context_for_request(request, overrides=None):
+    original_get = request.GET
+    if overrides:
+        merged = request.GET.copy()
+        for key, value in overrides.items():
+            if value:
+                merged[key] = value
+        request.GET = merged
+    try:
+        return _build_it_dashboard_context(request)
+    finally:
+        request.GET = original_get
 
 
 @login_required
@@ -432,6 +455,22 @@ def it_toggle_account(request):
         title="Compte mis a jour",
         message=f"Le compte {target_user.get_full_name() or target_user.username} est maintenant {'actif' if target_user.is_active else 'inactif'}.",
     )
+    if request.headers.get("HX-Request") == "true":
+        panel = request.POST.get("panel") or "diagnostics"
+        context = _build_it_dashboard_context_for_request(
+            request,
+            overrides={
+                "q": request.POST.get("q"),
+                "kind": request.POST.get("kind"),
+                "id": request.POST.get("id"),
+            },
+        )
+        template_name = (
+            "portal/informaticien/partials/accounts_panel.html"
+            if panel == "accounts"
+            else "portal/informaticien/partials/diagnostics_panel.html"
+        )
+        return render(request, template_name, context)
     return _redirect_it_dashboard(request)
 
 
@@ -469,7 +508,35 @@ def it_reset_password(request):
         message=f"Un mot de passe temporaire a ete genere pour {target_user.get_full_name() or target_user.username}.",
         password=temp_password,
     )
+    if request.headers.get("HX-Request") == "true":
+        panel = request.POST.get("panel") or "diagnostics"
+        context = _build_it_dashboard_context_for_request(
+            request,
+            overrides={
+                "q": request.POST.get("q"),
+                "kind": request.POST.get("kind"),
+                "id": request.POST.get("id"),
+            },
+        )
+        template_name = (
+            "portal/informaticien/partials/accounts_panel.html"
+            if panel == "accounts"
+            else "portal/informaticien/partials/diagnostics_panel.html"
+        )
+        return render(request, template_name, context)
     return _redirect_it_dashboard(request)
+
+
+@_position_required({"it_support"})
+def it_diagnostics_panel(request):
+    context = _build_it_dashboard_context(request)
+    return render(request, "portal/informaticien/partials/diagnostics_panel.html", context)
+
+
+@_position_required({"it_support"})
+def it_accounts_panel(request):
+    context = _build_it_dashboard_context(request)
+    return render(request, "portal/informaticien/partials/accounts_panel.html", context)
 
 
 @_position_required({"academic_supervisor"})
@@ -748,7 +815,7 @@ def supervisor_quick_search(request):
             is_active=True,
         )
         .filter(
-            Q(display_name__icontains=query)
+            Q(name__icontains=query)
             | Q(programme__title__icontains=query)
             | Q(level__icontains=query)
         )
@@ -765,7 +832,9 @@ def supervisor_quick_search(request):
             is_active=True,
         )
         .filter(
-            Q(academic_class__display_name__icontains=query)
+            Q(academic_class__name__icontains=query)
+            | Q(academic_class__programme__title__icontains=query)
+            | Q(academic_class__level__icontains=query)
             | Q(teacher__first_name__icontains=query)
             | Q(teacher__last_name__icontains=query)
             | Q(ec__title__icontains=query)
@@ -851,7 +920,7 @@ def _build_supervisor_class_detail_context(request, *, branch, class_id: int, we
     ecs = list(
         EC.objects.select_related("ue", "ue__semester")
         .filter(ue__semester__academic_class=academic_class)
-        .order_by("ue__semester__order", "ue__code", "title")[:250]
+        .order_by("ue__semester__number", "ue__code", "title")[:250]
     )
 
     teacher_q = (request.GET.get("teacher_q") or "").strip()
@@ -864,6 +933,41 @@ def _build_supervisor_class_detail_context(request, *, branch, class_id: int, we
         )
     teachers = list(teachers_qs.order_by("first_name", "last_name", "username")[:80])
 
+    week_events = (
+        AcademicScheduleEvent.objects.select_related("teacher", "ec", "academic_class")
+        .filter(
+            academic_class=academic_class,
+            branch=branch,
+            start_datetime__date__gte=schedule["week_start"],
+            start_datetime__date__lt=schedule["week_start"] + timedelta(days=7),
+            is_active=True,
+        )
+        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .order_by("start_datetime", "id")
+    )
+    subject_event_map = {}
+    for event in week_events:
+        subject_event_map.setdefault(
+            event.ec_id,
+            {
+                "teacher_name": event.teacher.get_full_name() or event.teacher.username,
+                "room": event.location or "Salle non precisee",
+                "event_count": 0,
+            },
+        )
+        subject_event_map[event.ec_id]["event_count"] += 1
+
+    subject_rows = [
+        {
+            "title": ec.title,
+            "ue_code": ec.ue.code,
+            "teacher_name": subject_event_map.get(ec.id, {}).get("teacher_name", "Non assigne"),
+            "room": subject_event_map.get(ec.id, {}).get("room", "A definir"),
+            "event_count": subject_event_map.get(ec.id, {}).get("event_count", 0),
+        }
+        for ec in ecs
+    ]
+
     return {
         "branch": branch,
         "academic_class": academic_class,
@@ -873,7 +977,24 @@ def _build_supervisor_class_detail_context(request, *, branch, class_id: int, we
         "next_week_start": next_week_start,
         "ecs": ecs,
         "teachers": teachers,
+        "subject_rows": subject_rows,
+        "student_count": len(students),
+        "scheduled_courses_count": week_events.count(),
     }
+
+
+def _parse_supervisor_planner_request(request):
+    branch = _resolve_academic_branch(request)
+    class_id_raw = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
+    week_start_raw = (request.GET.get("week_start") or request.POST.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+    class_id = int(class_id_raw) if class_id_raw.isdigit() else None
+    return branch, class_id, week_start
 
 
 @_position_required({"academic_supervisor"})
@@ -903,6 +1024,92 @@ def supervisor_class_detail(request, class_id: int):
     return render(
         request,
         "portal/staff/supervisor/partials/class_detail.html",
+        context,
+    )
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_planner_workspace(request):
+    branch, class_id, week_start = _parse_supervisor_planner_request(request)
+    if branch is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/planner_workspace.html",
+            {"toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}},
+        )
+    if class_id is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/planner_workspace.html",
+            {"branch": branch, "academic_class": None},
+        )
+
+    context = _build_supervisor_class_detail_context(
+        request,
+        branch=branch,
+        class_id=class_id,
+        week_start=week_start,
+    )
+    context["planner_intent"] = (request.GET.get("intent") or "create").strip() or "create"
+    return render(
+        request,
+        "portal/staff/supervisor/partials/planner_workspace.html",
+        context,
+    )
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_planner_hub(request):
+    branch, class_id, week_start = _parse_supervisor_planner_request(request)
+    if branch is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/planner_class_hub.html",
+            {"toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}},
+        )
+    if class_id is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/planner_class_hub.html",
+            {"branch": branch, "academic_class": None},
+        )
+    context = _build_supervisor_class_detail_context(
+        request,
+        branch=branch,
+        class_id=class_id,
+        week_start=week_start,
+    )
+    return render(
+        request,
+        "portal/staff/supervisor/partials/planner_class_hub.html",
+        context,
+    )
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_planner_view_workspace(request):
+    branch, class_id, week_start = _parse_supervisor_planner_request(request)
+    if branch is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/planner_view_workspace.html",
+            {"toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}},
+        )
+    if class_id is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/planner_view_workspace.html",
+            {"branch": branch, "academic_class": None},
+        )
+    context = _build_supervisor_class_detail_context(
+        request,
+        branch=branch,
+        class_id=class_id,
+        week_start=week_start,
+    )
+    return render(
+        request,
+        "portal/staff/supervisor/partials/planner_view_workspace.html",
         context,
     )
 
@@ -981,7 +1188,8 @@ def supervisor_create_schedule_event(request, class_id: int):
         week_start=week_start,
     )
     context["toast"] = toast
-    return render(request, "portal/staff/supervisor/partials/class_detail.html", context)
+    context["planner_intent"] = (request.POST.get("planner_intent") or "create").strip() or "create"
+    return render(request, "portal/staff/supervisor/partials/planner_workspace.html", context)
 
 @login_required
 def dg_portal(request):

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Surveillant Général — Création emploi du temps</title>
+
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'Segoe UI', 'Arial', 'sans-serif'],
+          },
+          boxShadow: {
+            soft: '0 18px 45px rgba(15, 23, 42, 0.08)',
+            card: '0 10px 30px rgba(15, 23, 42, 0.06)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    * { box-sizing: border-box; }
+    body { font-family: Inter, system-ui, sans-serif; }
+    [x-cloak] { display: none !important; }
+    .sidebar-gradient { background: linear-gradient(180deg, #062b46 0%, #0b3458 48%, #062b46 100%); }
+    .glass-card { background: rgba(255,255,255,.88); backdrop-filter: blur(18px); border: 1px solid rgba(226,232,240,.9); }
+    .dark .glass-card { background: rgba(15,23,42,.78); border-color: rgba(51,65,85,.85); }
+    .nav-active { background: linear-gradient(135deg,#2563eb,#4f46e5); color:#fff; box-shadow: 0 14px 24px rgba(37,99,235,.28); }
+    .scrollbar-thin::-webkit-scrollbar { width: 7px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(148,163,184,.45); border-radius:999px; }
+    .timetable-grid { grid-template-columns: 78px repeat(6, minmax(120px, 1fr)); }
+  </style>
+</head>
+
+<body class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+  <div x-data="timetableDashboard()" x-init="init()" x-cloak class="flex min-h-screen">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar-gradient fixed inset-y-0 left-0 z-40 flex flex-col text-white transition-all duration-300" :class="sidebarCollapsed ? 'w-[86px]' : 'w-[270px]'">
+      <div class="flex h-24 items-center gap-3 px-5">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+          <i data-lucide="shield" class="h-7 w-7"></i>
+        </div>
+        <div x-show="!sidebarCollapsed" x-transition>
+          <h1 class="text-lg font-extrabold tracking-tight">RÉSEAU D'ÉCOLES</h1>
+          <p class="text-sm font-extrabold tracking-wide">FÉLIX OUADBO</p>
+        </div>
+      </div>
+
+      <button type="button" @click="toggleSidebar()" class="absolute right-[-18px] top-7 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950">
+        <i data-lucide="chevrons-left" class="h-5 w-5 transition-transform" :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
+      </button>
+
+      <div class="mx-4 mb-4 rounded-2xl border border-white/10 bg-white/10 p-3">
+        <div class="flex items-center gap-3">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-700 font-bold">SG</div>
+          <div x-show="!sidebarCollapsed" x-transition>
+            <p class="text-sm font-bold">Suivi Général</p>
+            <p class="text-xs text-sky-100/70">Surveillant Général</p>
+          </div>
+          <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+        </div>
+      </div>
+
+      <nav class="flex-1 space-y-2 overflow-y-auto px-4 scrollbar-thin">
+        <template x-for="item in navItems" :key="item.label">
+          <a href="#" class="flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10" :class="item.active ? 'nav-active' : ''">
+            <i :data-lucide="item.icon" class="h-5 w-5 shrink-0"></i>
+            <span x-show="!sidebarCollapsed" x-transition x-text="item.label"></span>
+            <i x-show="!sidebarCollapsed" data-lucide="chevron-right" class="ml-auto h-4 w-4 opacity-60"></i>
+          </a>
+        </template>
+      </nav>
+
+      <div class="p-4">
+        <button type="button" @click="toggleSidebar()" class="flex w-full items-center justify-center gap-3 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold hover:bg-white/15">
+          <i data-lucide="chevron-left" class="h-5 w-5" :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Réduire le menu</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="min-h-screen flex-1 transition-all duration-300" :class="sidebarCollapsed ? 'ml-[86px]' : 'ml-[270px]'">
+      <div class="mx-auto max-w-[1560px] px-6 py-6 lg:px-8">
+
+        <!-- TOPBAR -->
+        <header class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <div class="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <span>Emplois du temps</span>
+              <i data-lucide="chevron-right" class="h-4 w-4"></i>
+              <span class="text-slate-900 dark:text-slate-100">Nouveau</span>
+            </div>
+            <h2 class="text-3xl font-extrabold tracking-tight">Création d'emploi du temps 📅</h2>
+            <p class="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">Créez, prévisualisez et publiez l'emploi du temps d'une classe.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" class="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900">
+              <i data-lucide="bell" class="h-5 w-5"></i>
+              <span class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">12</span>
+            </button>
+            <button type="button" @click="toggleDarkMode()" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900">
+              <i x-show="!darkMode" data-lucide="moon" class="h-5 w-5"></i>
+              <i x-show="darkMode" data-lucide="sun" class="h-5 w-5"></i>
+            </button>
+            <div class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-right shadow-card dark:border-slate-800 dark:bg-slate-900">
+              <p class="text-xs font-bold text-slate-500 dark:text-slate-400">Mar. 27 Mai 2025</p>
+              <p class="text-xl font-extrabold text-blue-600 dark:text-blue-400">15:49</p>
+            </div>
+          </div>
+        </header>
+
+        <!-- MAIN WORKSPACE -->
+        <section class="grid grid-cols-1 gap-6 2xl:grid-cols-[430px_1fr]">
+          <!-- FORM -->
+          <div class="glass-card rounded-3xl p-6 shadow-card">
+            <h3 class="mb-5 text-lg font-extrabold">Informations générales</h3>
+
+            <div class="space-y-5">
+              <label class="block">
+                <span class="mb-2 block text-sm font-bold">Classe <span class="text-red-500">*</span></span>
+                <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900">
+                  <option>L1 Informatique - Groupe A</option>
+                  <option>L2 Informatique - Groupe B</option>
+                  <option>Terminale Sciences</option>
+                </select>
+              </label>
+
+              <div class="grid grid-cols-2 gap-4">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-bold">Année académique <span class="text-red-500">*</span></span>
+                  <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900">
+                    <option>2024 - 2025</option>
+                  </select>
+                </label>
+                <label class="block">
+                  <span class="mb-2 block text-sm font-bold">Période <span class="text-red-500">*</span></span>
+                  <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900">
+                    <option>Semestre 2</option>
+                    <option>Semestre 1</option>
+                    <option>Examen</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-bold">Date de début <span class="text-red-500">*</span></span>
+                  <input type="text" value="27/05/2025" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900" />
+                </label>
+                <label class="block">
+                  <span class="mb-2 block text-sm font-bold">Date de fin <span class="text-red-500">*</span></span>
+                  <input type="text" value="31/08/2025" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900" />
+                </label>
+              </div>
+
+              <div>
+                <span class="mb-3 block text-sm font-bold">Type d'emploi du temps</span>
+                <div class="flex gap-3">
+                  <label class="flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
+                    <input type="radio" checked /> Hebdomadaire
+                  </label>
+                  <label class="flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">
+                    <input type="radio" /> Personnalisé
+                  </label>
+                </div>
+              </div>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-bold">Statut</span>
+                <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900">
+                  <option>Brouillon</option>
+                  <option>Publié</option>
+                </select>
+              </label>
+
+              <div>
+                <span class="mb-3 block text-sm font-bold">Options</span>
+                <div class="grid grid-cols-2 gap-3 text-sm font-semibold">
+                  <label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded" /> Inclure les pauses</label>
+                  <label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded" /> Afficher les salles</label>
+                  <label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded" /> Afficher enseignants</label>
+                  <label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded" /> Éviter conflits</label>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 pt-2">
+                <button type="button" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold shadow-card dark:border-slate-700 dark:bg-slate-900">
+                  Réinitialiser
+                </button>
+                <button type="button" class="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-600/25">
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TIMETABLE PREVIEW -->
+          <div class="glass-card overflow-hidden rounded-3xl p-6 shadow-card">
+            <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <h3 class="text-lg font-extrabold">Aperçu de l'emploi du temps</h3>
+              <div class="flex flex-wrap gap-3">
+                <button class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900"><i data-lucide="printer" class="mr-2 inline h-4 w-4"></i> Imprimer</button>
+                <button class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900"><i data-lucide="eye" class="mr-2 inline h-4 w-4"></i> Prévisualiser</button>
+                <button class="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-extrabold text-white"><i data-lucide="send" class="mr-2 inline h-4 w-4"></i> Publier</button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+              <div class="min-w-[980px]">
+                <div class="timetable-grid grid bg-slate-50 text-center text-sm font-extrabold dark:bg-slate-900">
+                  <div class="border-r border-slate-200 p-4 dark:border-slate-800">Heure</div>
+                  <template x-for="day in days" :key="day"><div class="border-r border-slate-200 p-4 last:border-r-0 dark:border-slate-800" x-text="day"></div></template>
+                </div>
+
+                <template x-for="slot in timetable" :key="slot.time">
+                  <div class="timetable-grid grid border-t border-slate-200 dark:border-slate-800">
+                    <div class="flex items-center justify-center border-r border-slate-200 p-3 text-center text-sm font-bold text-slate-500 dark:border-slate-800 dark:text-slate-400" x-html="slot.time"></div>
+                    <template x-for="course in slot.courses" :key="course.day + course.name">
+                      <div class="border-r border-slate-200 p-1.5 last:border-r-0 dark:border-slate-800">
+                        <template x-if="course.name">
+                          <div class="min-h-[86px] rounded-xl p-3 text-center" :class="course.bg">
+                            <p class="text-xs font-extrabold" x-text="course.name"></p>
+                            <p class="mt-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300" x-text="course.teacher"></p>
+                            <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400" x-text="course.room"></p>
+                          </div>
+                        </template>
+                        <template x-if="!course.name">
+                          <div class="flex min-h-[86px] items-center justify-center rounded-xl text-slate-400">—</div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- BOTTOM GRID -->
+        <section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.15fr_310px]">
+          <div class="glass-card rounded-3xl p-6 shadow-card">
+            <div class="mb-4 flex items-center justify-between">
+              <h3 class="text-lg font-extrabold">Calendrier des semaines</h3>
+              <div class="flex gap-2">
+                <button class="rounded-xl border border-slate-200 p-2 dark:border-slate-700"><i data-lucide="chevron-left" class="h-4 w-4"></i></button>
+                <button class="rounded-xl border border-slate-200 px-5 py-2 text-sm font-bold dark:border-slate-700">Juin 2025</button>
+                <button class="rounded-xl border border-slate-200 p-2 dark:border-slate-700"><i data-lucide="chevron-right" class="h-4 w-4"></i></button>
+              </div>
+            </div>
+            <div class="grid grid-cols-7 overflow-hidden rounded-2xl border border-slate-200 text-center text-sm dark:border-slate-800">
+              <template x-for="d in calendarDays" :key="d.label"><div class="border-b border-r border-slate-200 p-3 font-extrabold last:border-r-0 dark:border-slate-800" x-text="d.label"></div></template>
+              <template x-for="n in calendarNumbers" :key="n.id"><div class="border-r border-t border-slate-100 p-3 font-bold last:border-r-0 dark:border-slate-800" :class="n.active ? 'bg-blue-600 text-white rounded-xl m-1' : n.muted ? 'text-slate-300' : ''" x-text="n.value"></div></template>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-3xl p-6 shadow-card">
+            <div class="mb-4 flex items-center justify-between">
+              <h3 class="text-lg font-extrabold">Gestion des matières</h3>
+              <button class="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-extrabold text-white"><i data-lucide="plus" class="mr-2 inline h-4 w-4"></i>Ajouter une matière</button>
+            </div>
+            <div class="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr><th class="p-4">Matière</th><th>Enseignant</th><th>Salle</th><th class="text-center">Actions</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                  <template x-for="subject in subjects" :key="subject.name">
+                    <tr class="font-semibold">
+                      <td class="p-4" x-text="subject.name"></td>
+                      <td x-text="subject.teacher"></td>
+                      <td x-text="subject.room"></td>
+                      <td class="text-center">
+                        <button class="mr-2 rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/50"><i data-lucide="pencil" class="h-4 w-4"></i></button>
+                        <button class="rounded-lg bg-red-50 p-2 text-red-600 dark:bg-red-950/50"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-3xl p-6 shadow-card">
+            <h3 class="mb-4 text-lg font-extrabold">Actions rapides</h3>
+            <div class="space-y-3">
+              <template x-for="action in actions" :key="action.label">
+                <button class="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" :class="action.danger ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-950/30' : ''">
+                  <i :data-lucide="action.icon" class="h-5 w-5" :class="action.color"></i>
+                  <span x-text="action.label"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function timetableDashboard() {
+      return {
+        sidebarCollapsed: false,
+        darkMode: false,
+        navItems: [
+          { label: 'Tableau de bord', icon: 'home', active: false },
+          { label: 'Écoles', icon: 'building-2', active: false },
+          { label: 'Classes', icon: 'school', active: false },
+          { label: 'Utilisateurs', icon: 'users', active: false },
+          { label: 'Étudiants', icon: 'graduation-cap', active: false },
+          { label: 'Emplois du temps', icon: 'calendar-days', active: true },
+          { label: 'Examens', icon: 'file-check-2', active: false },
+          { label: 'Absences', icon: 'user-x', active: false },
+          { label: 'Salles & Ressources', icon: 'door-open', active: false },
+          { label: 'Notes', icon: 'clipboard-list', active: false },
+          { label: 'Communications', icon: 'messages-square', active: false },
+          { label: 'Rapports', icon: 'bar-chart-3', active: false },
+          { label: 'Paramètres', icon: 'settings', active: false },
+        ],
+        days: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
+        timetable: [
+          { time: '07:30<br>09:00', courses: [
+            { day:'lun', name:'Algorithmique', teacher:'Pr. Jean M.', room:'Salle Info 1', bg:'bg-green-50 text-slate-800 dark:bg-green-950/40 dark:text-green-100' },
+            { day:'mar', name:'Bases de données', teacher:'Dr. Nadia K.', room:'Salle A102', bg:'bg-amber-50 text-slate-800 dark:bg-amber-950/40 dark:text-amber-100' },
+            { day:'mer', name:'Programmation C', teacher:'Pr. Serge B.', room:'Salle Info 1', bg:'bg-blue-50 text-slate-800 dark:bg-blue-950/40 dark:text-blue-100' },
+            { day:'jeu', name:'Mathématiques', teacher:'Dr. Claire D.', room:'Salle A104', bg:'bg-red-50 text-slate-800 dark:bg-red-950/40 dark:text-red-100' },
+            { day:'ven', name:'Anglais technique', teacher:'Mr. David Z.', room:'Salle Langue 2', bg:'bg-emerald-50 text-slate-800 dark:bg-emerald-950/40 dark:text-emerald-100' },
+            { day:'sam', name:'', teacher:'', room:'', bg:'' },
+          ]},
+          { time: '09:15<br>10:45', courses: [
+            { day:'lun', name:'Réseaux', teacher:'Dr. Patrick T.', room:'Salle A103', bg:'bg-violet-50 dark:bg-violet-950/40 dark:text-violet-100' },
+            { day:'mar', name:'Mathématiques', teacher:'Dr. Claire D.', room:'Salle A104', bg:'bg-red-50 dark:bg-red-950/40 dark:text-red-100' },
+            { day:'mer', name:'Algorithmique', teacher:'Pr. Jean M.', room:'Salle Info 1', bg:'bg-green-50 dark:bg-green-950/40 dark:text-green-100' },
+            { day:'jeu', name:'Bases de données', teacher:'Dr. Nadia K.', room:'Salle A102', bg:'bg-amber-50 dark:bg-amber-950/40 dark:text-amber-100' },
+            { day:'ven', name:'Programmation C', teacher:'Pr. Serge B.', room:'Salle Info 1', bg:'bg-blue-50 dark:bg-blue-950/40 dark:text-blue-100' },
+            { day:'sam', name:'', teacher:'', room:'', bg:'' },
+          ]},
+          { time: '10:45<br>11:00', courses: [
+            { day:'pause1', name:'Pause', teacher:'', room:'', bg:'bg-orange-50 dark:bg-orange-950/40' },
+            { day:'pause2', name:'Pause', teacher:'', room:'', bg:'bg-orange-50 dark:bg-orange-950/40' },
+            { day:'pause3', name:'Pause', teacher:'', room:'', bg:'bg-orange-50 dark:bg-orange-950/40' },
+            { day:'pause4', name:'Pause', teacher:'', room:'', bg:'bg-orange-50 dark:bg-orange-950/40' },
+            { day:'pause5', name:'Pause', teacher:'', room:'', bg:'bg-orange-50 dark:bg-orange-950/40' },
+            { day:'pause6', name:'Pause', teacher:'', room:'', bg:'bg-orange-50 dark:bg-orange-950/40' },
+          ]},
+          { time: '11:00<br>12:30', courses: [
+            { day:'lun2', name:'Bases de données', teacher:'Dr. Nadia K.', room:'Salle A102', bg:'bg-amber-50 dark:bg-amber-950/40 dark:text-amber-100' },
+            { day:'mar2', name:'Réseaux', teacher:'Dr. Patrick T.', room:'Salle A103', bg:'bg-violet-50 dark:bg-violet-950/40 dark:text-violet-100' },
+            { day:'mer2', name:'Anglais technique', teacher:'Mr. David Z.', room:'Salle Langue 2', bg:'bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-100' },
+            { day:'jeu2', name:'Programmation C', teacher:'Pr. Serge B.', room:'Salle Info 1', bg:'bg-blue-50 dark:bg-blue-950/40 dark:text-blue-100' },
+            { day:'ven2', name:'Mathématiques', teacher:'Dr. Claire D.', room:'Salle A104', bg:'bg-red-50 dark:bg-red-950/40 dark:text-red-100' },
+            { day:'sam2', name:'', teacher:'', room:'', bg:'' },
+          ]},
+          { time: '13:30<br>15:00', courses: [
+            { day:'lun3', name:'Mathématiques', teacher:'Dr. Claire D.', room:'Salle A104', bg:'bg-red-50 dark:bg-red-950/40 dark:text-red-100' },
+            { day:'mar3', name:'Algorithmique', teacher:'Pr. Jean M.', room:'Salle Info 1', bg:'bg-green-50 dark:bg-green-950/40 dark:text-green-100' },
+            { day:'mer3', name:'Réseaux', teacher:'Dr. Patrick T.', room:'Salle A103', bg:'bg-violet-50 dark:bg-violet-950/40 dark:text-violet-100' },
+            { day:'jeu3', name:'Anglais technique', teacher:'Mr. David Z.', room:'Salle Langue 2', bg:'bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-100' },
+            { day:'ven3', name:'Bases de données', teacher:'Dr. Nadia K.', room:'Salle A102', bg:'bg-amber-50 dark:bg-amber-950/40 dark:text-amber-100' },
+            { day:'sam3', name:'', teacher:'', room:'', bg:'' },
+          ]},
+          { time: '15:15<br>16:45', courses: [
+            { day:'lun4', name:'Anglais technique', teacher:'Mr. David Z.', room:'Salle Langue 2', bg:'bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-100' },
+            { day:'mar4', name:'Programmation C', teacher:'Pr. Serge B.', room:'Salle Info 1', bg:'bg-blue-50 dark:bg-blue-950/40 dark:text-blue-100' },
+            { day:'mer4', name:'Mathématiques', teacher:'Dr. Claire D.', room:'Salle A104', bg:'bg-red-50 dark:bg-red-950/40 dark:text-red-100' },
+            { day:'jeu4', name:'Réseaux', teacher:'Dr. Patrick T.', room:'Salle A103', bg:'bg-violet-50 dark:bg-violet-950/40 dark:text-violet-100' },
+            { day:'ven4', name:'Algorithmique', teacher:'Pr. Jean M.', room:'Salle Info 1', bg:'bg-green-50 dark:bg-green-950/40 dark:text-green-100' },
+            { day:'sam4', name:'', teacher:'', room:'', bg:'' },
+          ]},
+          { time: '17:00<br>18:30', courses: [
+            { day:'lun5', name:'', teacher:'', room:'', bg:'' },
+            { day:'mar5', name:'', teacher:'', room:'', bg:'' },
+            { day:'mer5', name:'', teacher:'', room:'', bg:'' },
+            { day:'jeu5', name:'', teacher:'', room:'', bg:'' },
+            { day:'ven5', name:'', teacher:'', room:'', bg:'' },
+            { day:'sam5', name:'', teacher:'', room:'', bg:'' },
+          ]},
+        ],
+        calendarDays: [{label:'Lun'}, {label:'Mar'}, {label:'Mer'}, {label:'Jeu'}, {label:'Ven'}, {label:'Sam'}, {label:'Dim'}],
+        calendarNumbers: Array.from({ length: 42 }, (_, i) => {
+          const values = [26,27,28,29,30,31,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,1,2,3,4,5,6];
+          return { id: i, value: values[i], active: values[i] === 27 && i > 20, muted: i < 6 || i > 35 };
+        }),
+        subjects: [
+          { name:'Algorithmique', teacher:'Pr. Jean Martin', room:'Salle Info 1' },
+          { name:'Bases de données', teacher:'Dr. Nadia Koné', room:'Salle A102' },
+          { name:'Programmation C', teacher:'Pr. Serge Bamba', room:'Salle Info 1' },
+          { name:'Mathématiques', teacher:'Dr. Claire Diarra', room:'Salle A104' },
+          { name:'Réseaux', teacher:'Dr. Patrick Traoré', room:'Salle A103' },
+          { name:'Anglais technique', teacher:'Mr. David Zongo', room:'Salle Langue 2' },
+        ],
+        actions: [
+          { label:'Dupliquer la semaine', icon:'copy', color:'text-blue-600' },
+          { label:'Importer un modèle', icon:'upload', color:'text-blue-600' },
+          { label:'Vérifier les conflits', icon:'triangle-alert', color:'text-orange-600' },
+          { label:'Exporter (PDF)', icon:'file-down', color:'text-blue-600' },
+          { label:'Exporter (Excel)', icon:'file-spreadsheet', color:'text-green-600' },
+          { label:"Supprimer l'emploi du temps", icon:'trash-2', color:'text-red-600', danger:true },
+        ],
+        init() { this.applyTheme(); this.$nextTick(() => this.renderIcons()); },
+        toggleSidebar() { this.sidebarCollapsed = !this.sidebarCollapsed; this.$nextTick(() => this.renderIcons()); },
+        toggleDarkMode() { this.darkMode = !this.darkMode; this.applyTheme(); this.$nextTick(() => this.renderIcons()); },
+        applyTheme() { document.documentElement.classList.toggle('dark', this.darkMode); },
+        renderIcons() { if (window.lucide) window.lucide.createIcons(); }
+      }
+    }
+  </script>
+</body>
+</html>

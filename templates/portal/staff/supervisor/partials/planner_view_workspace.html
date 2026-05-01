@@ -1,0 +1,66 @@
+{% if toast %}
+<div class="rounded-2xl border {% if toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-rose-200 bg-rose-50 text-rose-800{% endif %} px-4 py-3 text-sm font-semibold">
+  {{ toast.message }}
+</div>
+{% endif %}
+
+{% if academic_class %}
+<section class="space-y-6">
+  <div class="glass-card rounded-3xl p-6 shadow-card">
+    <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-blue-600 dark:text-blue-400">Etape 3 · Consultation</p>
+        <h3 class="mt-2 text-2xl font-extrabold">Emploi du temps de {{ academic_class.display_name }}</h3>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Affichage lecture seule de la semaine active, avec retour instantane aux actions de classe.</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button
+          type="button"
+          class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900"
+          hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+          hx-target="#supervisor-planner-workspace"
+          hx-swap="innerHTML"
+        >
+          Retour aux actions
+        </button>
+        <button
+          type="button"
+          class="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-extrabold text-white"
+          hx-get="{% url 'accounts_portal:supervisor_planner_workspace' %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=add_course"
+          hx-target="#supervisor-planner-workspace"
+          hx-swap="innerHTML"
+        >
+          Ajouter un cours
+        </button>
+      </div>
+    </div>
+
+    <div class="mb-5 grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Semaine active</p>
+        <p class="mt-2 text-lg font-extrabold">{{ schedule.week_start|date:"d/m/Y" }}</p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Cours programmes</p>
+        <p class="mt-2 text-3xl font-extrabold">{{ scheduled_courses_count }}</p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Enseignants</p>
+        <p class="mt-2 text-3xl font-extrabold">{{ teachers|length }}</p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">EC</p>
+        <p class="mt-2 text-3xl font-extrabold">{{ subject_rows|length }}</p>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 scrollbar-thin">
+      {% include "portal/staff/supervisor/partials/schedule_week_grid.html" %}
+    </div>
+  </div>
+</section>
+{% else %}
+<div class="glass-card rounded-3xl p-8 text-center text-sm text-slate-500 shadow-card">
+  Aucune classe selectionnee.
+</div>
+{% endif %}

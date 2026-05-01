@@ -623,6 +623,52 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Gestion des notes")
 
+	def test_it_dashboard_keeps_notes_module_inside_dashboard(self):
+		it_user = self._create_user("portal_it_notes_inline", position="it_support")
+		academic_year, academic_class, _ec = self._create_academic_class_bundle("L1IT")
+		semester = academic_class.semesters.get(number=1)
+		self.client.force_login(it_user)
+
+		response = self.client.get(
+			reverse("accounts_portal:portal_dashboard"),
+			{"class_id": academic_class.id, "semester_id": semester.id},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Workspace Notes")
+		self.assertContains(
+			response,
+			f'hx-get="{reverse("accounts_portal:it_notes_workspace")}?class_id={academic_class.id}&amp;semester_id={semester.id}"',
+			html=False,
+		)
+
+	def test_it_notes_workspace_returns_filters_only_before_selection(self):
+		it_user = self._create_user("portal_it_notes_workspace", position="it_support")
+		self.client.force_login(it_user)
+
+		response = self.client.get(reverse("accounts_portal:it_notes_workspace"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Workspace Notes")
+		self.assertContains(response, "Choisir une classe")
+		self.assertNotContains(response, "Maquette unique de reference")
+
+	def test_it_notes_grid_htmx_returns_shared_maquette(self):
+		it_user = self._create_user("portal_it_notes_grid", position="it_support")
+		academic_year, academic_class, _ec = self._create_academic_class_bundle("L2IT")
+		semester = academic_class.semesters.get(number=1)
+		self.client.force_login(it_user)
+
+		response = self.client.get(
+			reverse("accounts_portal:it_notes_grid"),
+			{"class_id": academic_class.id, "semester_id": semester.id},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Gestion des notes")
+		self.assertContains(response, f"Semestre {semester.number}")
+
 	def test_it_dashboard_can_toggle_scoped_staff_account(self):
 		it_user = self._create_user("portal_it_toggle", position="it_support")
 		target_user = self._create_user("portal_staff_target", position="secretary")

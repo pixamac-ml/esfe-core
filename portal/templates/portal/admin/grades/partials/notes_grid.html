@@ -1,0 +1,435 @@
+<div class="notes-grid" data-grid-key="{{ academic_class.id }}-{{ semester.id }}">
+  <style>
+    .notes-grid{
+      --bg:#f4f7fb;
+      --panel:#ffffff;
+      --line:#d9e2ef;
+      --line-dark:#b9c8de;
+      --text:#1e293b;
+      --muted:#64748b;
+      --primary:#1d4ed8;
+      --primary-soft:#dbeafe;
+      --warning:#fff7da;
+      --shadow:0 10px 30px rgba(15, 23, 42, 0.08);
+      --radius:16px;
+      color:var(--text);
+    }
+
+    .notes-grid *{box-sizing:border-box}
+    .notes-grid .main{display:flex;flex-direction:column;gap:18px}
+    .notes-grid .btn{
+      border:1px solid var(--line-dark);
+      background:#fff;
+      color:var(--text);
+      padding:11px 15px;
+      border-radius:12px;
+      font-size:14px;
+      cursor:pointer;
+      text-decoration:none;
+    }
+    .notes-grid .btn:hover{transform:translateY(-1px)}
+    .notes-grid .btn.primary{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:bold}
+    .notes-grid .btn.primary:hover{background:#1d4ed8;border-color:#1d4ed8}
+    .notes-grid .btn.soft{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
+    .notes-grid .btn.soft:hover{background:#bfdbfe}
+    .notes-grid .btn.disabled,
+    .notes-grid .session-pill.disabled,
+    .notes-grid .toolbar-btn.disabled{opacity:.45;pointer-events:none;cursor:not-allowed;box-shadow:none;transform:none}
+    .notes-grid .session-switch{display:flex;gap:8px;flex-wrap:wrap}
+    .notes-grid .session-pill{
+      display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line-dark);
+      background:#fff;color:var(--text);border-radius:999px;padding:8px 10px;text-decoration:none;font-size:13px;font-weight:bold
+    }
+    .notes-grid .session-pill.active{background:var(--primary);border-color:var(--primary);color:#fff}
+    .notes-grid .sheet-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:var(--shadow)}
+    .notes-grid .sheet-card{border-radius:12px;box-shadow:0 4px 12px rgba(15, 23, 42, .08)}
+    .notes-grid .sheet-head{
+      background:linear-gradient(to right, #f8fbff, #eef4ff);padding:16px 18px;border-bottom:1px solid var(--line);
+      display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap
+    }
+    .notes-grid .sheet-head h3{margin:0;font-size:20px}
+    .notes-grid .sheet-head p{margin:6px 0 0;font-size:13px;color:var(--muted)}
+    .notes-grid .sheet-meta{display:flex;gap:8px;flex-wrap:wrap}
+    .notes-grid .meta-chip{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;border-radius:999px;padding:7px 10px;font-weight:bold}
+    .notes-grid .status-chip{border-color:#cbd5e1;background:#f8fafc;color:#334155}
+    .notes-grid .sheet-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start}
+    .notes-grid .sheet-summary h3{margin:0;font-size:24px;line-height:1.1;font-weight:900}
+    .notes-grid .sheet-summary p{margin:8px 0 0;font-size:14px;color:var(--muted)}
+    .notes-grid .table-wrap{
+      overflow-x:auto;
+      overflow-y:auto;
+      max-width:100%;
+      max-height:min(72vh, 980px);
+      border-top:1px solid var(--line);
+      background:
+        linear-gradient(to right, rgba(244,247,251,0.98), rgba(244,247,251,0)) 0 0 / 34px 100% no-repeat;
+    }
+    .notes-grid .action-toolbar{
+      display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:16px;padding:14px 18px;
+      border-bottom:1px solid var(--line);background:#fff;flex-wrap:wrap
+    }
+    .notes-grid .toolbar-info{color:var(--muted);font-size:13px}
+    .notes-grid .toolbar-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .notes-grid .toolbar-btn{
+      display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 14px;border-radius:10px;
+      border:1px solid var(--line-dark);background:#fff;color:var(--text);text-decoration:none;font-size:13px;font-weight:bold;cursor:pointer;transition:all .18s ease
+    }
+    .notes-grid .toolbar-btn:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(15, 23, 42, 0.08)}
+    .notes-grid .toolbar-btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+    .notes-grid .toolbar-btn.primary:hover{background:#1d4ed8;border-color:#1d4ed8}
+    .notes-grid .toolbar-btn.soft{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
+    .notes-grid .toolbar-btn.soft:hover{background:#bfdbfe}
+    .notes-grid .toolbar-btn.dark{background:#0f172a;border-color:#0f172a;color:#fff}
+    .notes-grid .file-input{
+      max-width:240px;
+      border:1px solid var(--line-dark);
+      background:#fff;
+      color:var(--muted);
+      padding:8px 10px;
+      border-radius:10px;
+      font-size:12px;
+    }
+    .notes-grid .checkboxCol{width:42px;min-width:42px;max-width:42px;background:#fff;position:sticky;left:0;z-index:4}
+    .notes-grid .numCol{left:42px;z-index:3}
+    .notes-grid .nameCol{left:78px}
+    .notes-grid .student-check{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
+    .notes-grid table{border-collapse:collapse;min-width:2400px;width:max-content;background:#fff}
+    .notes-grid th,.notes-grid td{
+      border:1px solid var(--line);padding:8px 10px;text-align:center;font-size:12px;white-space:nowrap;vertical-align:middle;font-variant-numeric:tabular-nums
+    }
+    .notes-grid th{
+      position:sticky;
+      top:0;
+      z-index:5;
+      background:#eef3ff;
+      font-weight:bold;
+      box-shadow:0 1px 0 var(--line);
+    }
+    .notes-grid .block{background:#dbeafe;color:#17306b;font-weight:bold}
+    .notes-grid .unit{background:#ede9fe;color:#4c1d95;font-weight:bold}
+    .notes-grid .semester{background:#f1f5f9;font-weight:bold}
+    .notes-grid .nameCol{min-width:240px;text-align:left;font-weight:bold;background:#fff;position:sticky;z-index:6}
+    .notes-grid .numCol{min-width:52px;background:#fff;position:sticky}
+    .notes-grid .leftLabel{background:#f8fafc;font-weight:bold}
+    .notes-grid .v{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;line-height:1;min-width:30px}
+    .notes-grid .score-input{width:68px;text-align:center;border:1px solid var(--line-dark);padding:7px 4px;border-radius:8px;background:#fff;font-size:13px;font-weight:bold;outline:none}
+    .notes-grid .score-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(29,78,216,.12)}
+    .notes-grid .score-input.is-saved{border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.14)}
+    .notes-grid .score-input.htmx-request{border-color:#1d4ed8;background:#eff6ff}
+    .notes-grid .cell-ok{background-color:#dcfce7}
+    .notes-grid .cell-bad{background-color:#fee2e2}
+    .notes-grid .cell-empty{background-color:#f1f5f9}
+    .notes-grid .cell-warn{background:var(--warning)}
+    .notes-grid .score-cell{width:118px;min-width:118px;max-width:118px;padding:6px 8px}
+    .notes-grid .metric-cell{width:82px;min-width:82px;max-width:82px;font-weight:bold}
+    .notes-grid .credit-cell{width:92px;min-width:92px;max-width:92px;font-weight:bold}
+    .notes-grid .score-stack{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:74px}
+    .notes-grid .score-meta{display:grid;grid-template-columns:repeat(auto-fit, minmax(0, 1fr));width:100%;gap:3px;color:#334155;font-size:10px;line-height:1.15}
+    .notes-grid .score-token{display:flex;flex-direction:column;gap:1px;border:1px solid rgba(148,163,184,.45);background:rgba(255,255,255,.7);border-radius:6px;padding:3px 2px}
+    .notes-grid .score-token.normal{border-color:#cbd5e1;background:#f8fafc}
+    .notes-grid .score-token.retake{border-color:#fdba74;background:#ffedd5}
+    .notes-grid .score-token.final{border-color:#86efac;background:#dcfce7}
+    .notes-grid .score-token-label{color:#64748b;font-size:9px;font-weight:bold;letter-spacing:.04em}
+    .notes-grid .score-token-value{color:#0f172a;font-weight:bold;font-size:10px}
+    .notes-grid .score-token.retake .score-token-label,.notes-grid .score-token.retake .score-token-value{color:#c2410c}
+    .notes-grid .score-token.final .score-token-label,.notes-grid .score-token.final .score-token-value{color:#15803d}
+    .notes-grid .retake-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:999px;background:#1d4ed8;color:#fff;font-size:10px;font-weight:bold}
+    .notes-grid .unit-summary{width:92px;min-width:92px;max-width:92px;font-weight:bold;color:#4c1d95}
+    .notes-grid .semester-result{width:112px;min-width:112px;max-width:112px;background:#f8fafc;font-weight:bold}
+    .notes-grid .semester-result .result-label{display:block;color:#64748b;font-size:10px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:2px}
+    .notes-grid .semester-result .result-value{display:block;color:#0f172a;font-size:15px;line-height:1.1}
+    .notes-grid .semester-result.credit-ok .result-value{color:#15803d}
+    .notes-grid .semester-result.credit-bad .result-value{color:#b91c1c}
+    .notes-grid .import-inline{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .notes-grid .import-inline input[type="file"]{max-width:260px}
+    .notes-grid .import-feedback{margin-top:10px;border:1px solid var(--line);border-radius:14px;background:#f8fafc;padding:12px 14px}
+    .notes-grid .import-feedback.hidden{display:none}
+    .notes-grid .import-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+    .notes-grid .import-kpi{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 12px}
+    .notes-grid .import-kpi p{margin:0}
+    .notes-grid .import-kpi .label{font-size:11px;color:var(--muted)}
+    .notes-grid .import-kpi .value{font-size:18px;font-weight:800;color:var(--text);margin-top:4px}
+    @media (max-width: 1200px){
+      .notes-grid .nameCol,.notes-grid .numCol{position:static}
+    }
+    @media (max-width: 700px){
+      .notes-grid .import-grid{grid-template-columns:1fr}
+    }
+  </style>
+
+  <div class="main">
+    <section class="sheet-card">
+      <div class="action-toolbar">
+        <div class="sheet-summary">
+          <div>
+            <h3>Gestion des notes</h3>
+            <p>{{ rows|length }} etudiant(s) affiches. Scroll horizontal et colonnes fixes actifs.</p>
+          </div>
+          <div class="sheet-meta">
+            <span class="meta-chip">{{ academic_class.display_name|default:academic_class }}</span>
+            <span class="meta-chip">Semestre {{ semester.number }}</span>
+            <span class="meta-chip">Session {{ active_session_label }}</span>
+            <span class="meta-chip status-chip">{{ workflow_badge.icon|safe }} {{ workflow_badge.label }}</span>
+          </div>
+        </div>
+        <div class="toolbar-actions">
+          <div class="session-switch">
+            {% if embedded_in_dashboard %}
+              <a
+                class="session-pill {% if active_session_type == 'normal' %}active{% endif %} {% if not workflow_permissions.can_enter_normal %}disabled{% endif %}"
+                {% if workflow_permissions.can_enter_normal %}
+                  hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session=normal"
+                  hx-target="#notes-grid-panel"
+                  hx-swap="innerHTML"
+                {% endif %}
+              >
+                Normale
+              </a>
+              <a
+                class="session-pill {% if active_session_type == 'retake' %}active{% endif %} {% if not workflow_permissions.can_enter_retake %}disabled{% endif %}"
+                {% if workflow_permissions.can_enter_retake %}
+                  hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session=retake"
+                  hx-target="#notes-grid-panel"
+                  hx-swap="innerHTML"
+                {% endif %}
+              >
+                Rattrapage
+              </a>
+            {% else %}
+              <a class="session-pill {% if active_session_type == 'normal' %}active{% endif %} {% if not workflow_permissions.can_enter_normal %}disabled{% endif %}" href="{% if workflow_permissions.can_enter_normal %}?session=normal{% else %}#{% endif %}">Normale</a>
+              <a class="session-pill {% if active_session_type == 'retake' %}active{% endif %} {% if not workflow_permissions.can_enter_retake %}disabled{% endif %}" href="{% if workflow_permissions.can_enter_retake %}?session=retake{% else %}#{% endif %}">Rattrapage</a>
+            {% endif %}
+          </div>
+          <a
+            class="toolbar-btn soft"
+            href="{% url 'academics:download_import_template' academic_class.id semester.id %}"
+          >
+            Telecharger le modele Excel
+          </a>
+          <form class="import-inline js-notes-import-form" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="class_id" value="{{ academic_class.id }}">
+            <input type="hidden" name="semester_id" value="{{ semester.id }}">
+            <input
+              type="file"
+              name="file"
+              accept=".xlsx"
+              required
+              class="file-input"
+            >
+            <button type="submit" class="toolbar-btn primary">Importer Excel</button>
+          </form>
+          <a href="{% url 'academics:export_class_reports' semester.id %}" class="toolbar-btn dark {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}">Exporter tous</a>
+          <a href="{% url 'academics:class_reports_overview' semester.id %}" class="toolbar-btn soft {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" target="_blank">Voir releve global</a>
+          <a href="{% url 'academics:annual_class_report' academic_class.id %}" class="toolbar-btn {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" target="_blank">Releve annuel</a>
+          <button
+            type="submit"
+            form="bulk-report-form"
+            class="toolbar-btn primary {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}"
+            {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}
+          >
+            Exporter selection
+          </button>
+          {% if first_enrollment and workflow_permissions.can_publish and publish_ready %}
+            <form method="POST" action="{% url 'accounts_portal:publish_semester' first_enrollment.id semester.id %}">
+              {% csrf_token %}
+              <button type="submit" class="toolbar-btn">Publier</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="import-feedback hidden js-import-result">
+        <p class="label">Resultat import</p>
+        <div class="import-grid">
+          <div class="import-kpi"><p class="label">Notes mises a jour</p><p class="value js-updated">0</p></div>
+          <div class="import-kpi"><p class="label">Cellules vides ignorees</p><p class="value js-empty">0</p></div>
+          <div class="import-kpi"><p class="label">Scores invalides</p><p class="value js-invalid">0</p></div>
+          <div class="import-kpi"><p class="label">Etudiants ignores</p><p class="value js-students">0</p></div>
+          <div class="import-kpi"><p class="label">Colonnes inconnues</p><p class="value js-cols">0</p></div>
+        </div>
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer;font-size:12px;font-weight:700;color:#334155;">Voir le JSON brut</summary>
+          <pre class="js-raw-json" style="margin-top:10px;white-space:pre-wrap;font-size:12px;color:#334155;"></pre>
+        </details>
+      </div>
+
+      <div class="import-feedback hidden js-import-error" style="border-color:#fecaca;background:#fef2f2;">
+        <p class="label" style="color:#b91c1c;">Erreur import</p>
+        <p class="js-error-message" style="margin:8px 0 0;color:#7f1d1d;"></p>
+      </div>
+
+      <form id="bulk-report-form" method="POST" action="{% url 'academics:export_selected_reports' semester.id %}">
+        {% csrf_token %}
+      </form>
+
+      <div class="table-wrap" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        <table>
+          <tr>
+            <th colspan="3">Etudiants</th>
+            {% for ue in ues %}
+              <th colspan="{{ ue.ecs.count|add:ue.ecs.count|add:ue.ecs.count|add:3 }}" class="block">
+                {{ ue.code }} - {{ ue.title }}
+              </th>
+            {% endfor %}
+            <th colspan="3" class="semester">RESULTAT DU SEMESTRE</th>
+            <th rowspan="4" class="semester">Actions</th>
+          </tr>
+
+          <tr>
+            <th colspan="3" class="v">Matieres</th>
+            {% for ue in ues %}
+              {% for ec in ue.ecs.all %}
+                <th colspan="3">{{ ec.title }}</th>
+              {% endfor %}
+              <th colspan="3" class="unit">Unite</th>
+            {% endfor %}
+            <th colspan="3" class="semester"></th>
+          </tr>
+
+          <tr>
+            <th colspan="3" class="leftLabel">Credits requis</th>
+            {% for ue in ues %}
+              {% for ec in ue.ecs.all %}
+                <th colspan="3">{{ ec.credit_required }}</th>
+              {% endfor %}
+              <th colspan="3" class="unit">{{ ue.credit_required }}</th>
+            {% endfor %}
+            <th colspan="3" class="semester">
+              {% for row in rows|slice:":1" %}
+                {{ row.semester_required_credits_display|default:"0,00" }}
+              {% empty %}
+                0,00
+              {% endfor %}
+            </th>
+          </tr>
+
+          <tr>
+            <th colspan="3" class="leftLabel">Coefficients</th>
+            {% for ue in ues %}
+              {% for ec in ue.ecs.all %}
+                <th colspan="3">{{ ec.coefficient }}</th>
+              {% endfor %}
+              <th colspan="3" class="unit">{{ ue.coefficient }}</th>
+            {% endfor %}
+            <th colspan="3" class="semester">
+              {% for row in rows|slice:":1" %}
+                {{ row.semester_total_coefficients_display|default:"0,00" }}
+              {% empty %}
+                0,00
+              {% endfor %}
+            </th>
+          </tr>
+
+          <tr>
+            <th class="checkboxCol">
+              <input type="checkbox" class="student-check" onclick="this.closest('.notes-grid').querySelectorAll('input[name=&quot;selected_students&quot;]').forEach(cb => cb.checked = this.checked)">
+            </th>
+            <th></th>
+            <th></th>
+            {% for ue in ues %}
+              {% for ec in ue.ecs.all %}
+                <th class="v">Note</th>
+                <th class="v">Note coef.</th>
+                <th class="v">Credits obtenus</th>
+              {% endfor %}
+              <th class="v unit">Note</th>
+              <th class="v unit">Note coef.</th>
+              <th class="v unit">Credits obtenus</th>
+            {% endfor %}
+            <th class="v semester">Moyenne</th>
+            <th class="v semester">Pourcentage</th>
+            <th class="v semester">Credits</th>
+          </tr>
+
+          {% for row in rows %}
+            {% include "portal/admin/grades/partials/excel_row.html" with row=row %}
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function() {
+      var root = document.currentScript.parentElement;
+      if (!root || root.dataset.importBound === '1') {
+        return;
+      }
+      root.dataset.importBound = '1';
+
+      var form = root.querySelector('.js-notes-import-form');
+      if (!form) {
+        return;
+      }
+
+      var resultBox = root.querySelector('.js-import-result');
+      var errorBox = root.querySelector('.js-import-error');
+
+      function setText(selector, value) {
+        var node = root.querySelector(selector);
+        if (node) {
+          node.textContent = value == null ? '0' : String(value);
+        }
+      }
+
+      function showError(message) {
+        if (resultBox) {
+          resultBox.classList.add('hidden');
+        }
+        if (errorBox) {
+          errorBox.classList.remove('hidden');
+        }
+        setText('.js-error-message', message);
+      }
+
+      function showResult(payload) {
+        if (errorBox) {
+          errorBox.classList.add('hidden');
+        }
+        if (resultBox) {
+          resultBox.classList.remove('hidden');
+        }
+        var result = payload && payload.result ? payload.result : {};
+        setText('.js-updated', result.updated);
+        setText('.js-empty', result.skipped_empty);
+        setText('.js-invalid', result.skipped_invalid_scores);
+        setText('.js-students', result.skipped_unknown_students);
+        setText('.js-cols', result.skipped_unknown_columns);
+        setText('.js-raw-json', JSON.stringify(payload, null, 2));
+      }
+
+      form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        try {
+          var fd = new FormData(form);
+          var resp = await fetch("{% url 'academics:upload_grades' %}", {
+            method: 'POST',
+            body: fd,
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+          });
+          var data = await resp.json().catch(function() { return null; });
+          if (!resp.ok || !data || data.ok !== true) {
+            var message = data && (data.error || data.errors)
+              ? (Array.isArray(data.error || data.errors) ? (data.error || data.errors).join('\n') : String(data.error || data.errors))
+              : 'Import echoue (HTTP ' + resp.status + ')';
+            showError(message);
+            return;
+          }
+          showResult(data);
+          {% if embedded_in_dashboard %}
+          if (window.htmx) {
+            window.htmx.ajax(
+              'GET',
+              "{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session={{ active_session_type }}",
+              '#notes-grid-panel'
+            );
+          }
+          {% endif %}
+        } catch (error) {
+          showError(error && error.message ? error.message : String(error));
+        }
+      });
+    })();
+  </script>
+</div>

@@ -1,0 +1,139 @@
+{% if support_feedback %}
+<section class="rounded-3xl border {% if support_feedback.level == 'success' %}border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/40{% else %}border-rose-200 bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/40{% endif %} px-5 py-4">
+  <p class="text-sm font-extrabold {% if support_feedback.level == 'success' %}text-emerald-700 dark:text-emerald-300{% else %}text-rose-700 dark:text-rose-300{% endif %}">{{ support_feedback.title }}</p>
+  <p class="mt-1 text-sm {% if support_feedback.level == 'success' %}text-emerald-900 dark:text-emerald-100{% else %}text-rose-900 dark:text-rose-100{% endif %}">{{ support_feedback.message }}</p>
+  {% if support_feedback.password %}
+  <p class="mt-3 rounded-2xl bg-white px-4 py-3 font-mono text-sm text-slate-900 dark:bg-slate-900 dark:text-slate-100">{{ support_feedback.password }}</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<div class="space-y-6">
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="glass-card rounded-3xl p-5 shadow-card"><p class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Inactifs</p><p class="mt-2 text-3xl font-extrabold">{{ access_metrics.inactive_accounts }}</p></div>
+    <div class="glass-card rounded-3xl p-5 shadow-card"><p class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Sans position</p><p class="mt-2 text-3xl font-extrabold">{{ access_metrics.staff_missing_position }}</p></div>
+    <div class="glass-card rounded-3xl p-5 shadow-card"><p class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Sans annexe</p><p class="mt-2 text-3xl font-extrabold">{{ access_metrics.staff_missing_branch }}</p></div>
+    <div class="glass-card rounded-3xl p-5 shadow-card"><p class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Sans code</p><p class="mt-2 text-3xl font-extrabold">{{ access_metrics.staff_missing_employee_code }}</p></div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_.85fr]">
+    <div class="panel-shell glass-card rounded-3xl p-6 shadow-card">
+      <div class="mb-5 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Comptes</p>
+          <h3 class="mt-2 text-2xl font-black">File d'actions staff</h3>
+        </div>
+        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">{{ staff_action_queue_count }}</span>
+      </div>
+      <div class="space-y-4">
+        {% for row in staff_action_queue %}
+        <div class="rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+          <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-extrabold">{{ row.user.get_full_name|default:row.user.username }}</p>
+              <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ row.user.username }} · {{ row.position_label }} · {{ row.branch_label }}</p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                {% for issue in row.issues %}
+                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">{{ issue }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-2 xl:w-[320px]">
+              <a
+                href="?q={{ row.user.username|urlencode }}&kind=staff&id={{ row.user.id }}#diagnostics"
+                hx-get="{% url 'accounts_portal:it_diagnostics_panel' %}?q={{ row.user.username|urlencode }}&kind=staff&id={{ row.user.id }}"
+                hx-target="#it-diagnostics-panel"
+                hx-swap="innerHTML"
+                @click="setSection('diagnostics')"
+                class="rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700"
+              >
+                Ouvrir la fiche
+              </a>
+              <form
+                method="post"
+                action="{% url 'accounts_portal:it_toggle_account' %}"
+                hx-post="{% url 'accounts_portal:it_toggle_account' %}"
+                hx-target="#it-accounts-panel"
+                hx-swap="innerHTML"
+              >
+                {% csrf_token %}
+                <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
+                <input type="hidden" name="q" value="{{ row.user.username }}">
+                <input type="hidden" name="kind" value="staff">
+                <input type="hidden" name="id" value="{{ row.user.id }}">
+                <input type="hidden" name="panel" value="accounts">
+                <button type="submit" class="w-full rounded-2xl {% if row.user.is_active %}bg-rose-600 hover:bg-rose-700{% else %}bg-emerald-600 hover:bg-emerald-700{% endif %} px-4 py-3 text-sm font-bold text-white transition">
+                  {% if row.user.is_active %}Desactiver{% else %}Activer{% endif %}
+                </button>
+              </form>
+              <form
+                method="post"
+                action="{% url 'accounts_portal:it_reset_password' %}"
+                hx-post="{% url 'accounts_portal:it_reset_password' %}"
+                hx-target="#it-accounts-panel"
+                hx-swap="innerHTML"
+                class="sm:col-span-2"
+              >
+                {% csrf_token %}
+                <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
+                <input type="hidden" name="q" value="{{ row.user.username }}">
+                <input type="hidden" name="kind" value="staff">
+                <input type="hidden" name="id" value="{{ row.user.id }}">
+                <input type="hidden" name="panel" value="accounts">
+                <button type="submit" class="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
+                  Reset mot de passe
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-sm text-slate-400">Aucun compte prioritaire a corriger.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel-shell glass-card rounded-3xl p-6 shadow-card">
+      <div class="mb-5">
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Recherche compte</p>
+        <h3 class="mt-2 text-2xl font-black">Acces rapide</h3>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Recherche staff ou utilisateur, puis bascule directement vers la fiche diagnostic.</p>
+      </div>
+      <form
+        method="get"
+        action="{% url 'accounts_portal:it_accounts_panel' %}"
+        hx-get="{% url 'accounts_portal:it_accounts_panel' %}"
+        hx-target="#it-accounts-panel"
+        hx-swap="innerHTML"
+        class="flex flex-col gap-3"
+      >
+        <input type="text" name="q" value="{{ support_search.query }}" placeholder="Username, email, code employe..." class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950">
+        <button type="submit" class="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700">Rechercher</button>
+      </form>
+      <div class="mt-5 space-y-3">
+        {% for item in support_search.staff %}
+        <div class="rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-extrabold">{{ item.get_full_name|default:item.username }}</p>
+              <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ item.username }} · {{ item.profile.employee_code|default:"Sans code" }}</p>
+            </div>
+            <a
+              href="?q={{ support_search.query|urlencode }}&kind=staff&id={{ item.id }}#diagnostics"
+              hx-get="{% url 'accounts_portal:it_diagnostics_panel' %}?q={{ support_search.query|urlencode }}&kind=staff&id={{ item.id }}"
+              hx-target="#it-diagnostics-panel"
+              hx-swap="innerHTML"
+              @click="setSection('diagnostics')"
+              class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"
+            >
+              Fiche
+            </a>
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-sm text-slate-400">Aucun resultat staff pour cette recherche.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>

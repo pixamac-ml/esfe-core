@@ -9,6 +9,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from core import views as core_views
 from core.sitemaps import build_sitemaps
+from portal.views.it_surveillance import surveillance_general_api_view
 
 
 # ==========================================================
@@ -29,6 +30,7 @@ urlpatterns = [
 
     # Admin Django (protégé par défaut)
     path("admin/", admin.site.urls),
+    path("surveillance/general/", surveillance_general_api_view, name="surveillance_general_api"),
     path("accounts/", include("accounts.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     path("portal/student-dashboard/", include("portal.student.urls")),

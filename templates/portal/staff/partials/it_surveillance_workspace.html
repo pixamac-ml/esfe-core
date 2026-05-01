@@ -1,0 +1,292 @@
+<div class="w-full min-w-0 space-y-4">
+  <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Workspace Surveillance</p>
+        <h3 class="mt-2 text-2xl font-black text-slate-900 dark:text-slate-100">Surveillance Générale</h3>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+          Supervise les absences, retards, incidents et le suivi étudiant sans quitter le dashboard.
+        </p>
+      </div>
+      <form id="surveillance-filters" class="grid w-full gap-4 xl:max-w-5xl xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_auto]">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Classe</label>
+          <select
+            name="class_id"
+            class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-950"
+            hx-get="{% url 'accounts_portal:it_surveillance_workspace' %}"
+            hx-target="#surveillance-workspace"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="#surveillance-filters"
+          >
+            <option value="">Toutes les classes</option>
+            {% for c in classes %}
+            <option value="{{ c.id }}" {% if selected_class and selected_class.id == c.id %}selected{% endif %}>{{ c.display_name }} - {{ c.academic_year.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date</label>
+          <input
+            type="date"
+            name="date"
+            value="{{ selected_date|date:'Y-m-d' }}"
+            class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-950"
+            hx-get="{% url 'accounts_portal:it_surveillance_workspace' %}"
+            hx-target="#surveillance-workspace"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="#surveillance-filters"
+          >
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Statut</label>
+          <select
+            name="status"
+            class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-950"
+            hx-get="{% url 'accounts_portal:it_surveillance_workspace' %}"
+            hx-target="#surveillance-workspace"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="#surveillance-filters"
+          >
+            {% for item in status_filters %}
+            <option value="{{ item.value }}" {% if selected_status == item.value %}selected{% endif %}>{{ item.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button
+            type="button"
+            class="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
+            hx-get="{% url 'accounts_portal:it_surveillance_workspace' %}"
+            hx-target="#surveillance-workspace"
+            hx-swap="innerHTML"
+            hx-include="#surveillance-filters"
+          >
+            Actualiser
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid gap-4 xl:grid-cols-4">
+    <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+      <p class="text-xs font-black uppercase tracking-[0.24em] text-blue-500">Absents</p>
+      <p class="mt-3 text-3xl font-black text-slate-900 dark:text-slate-100">{{ absents_today }}</p>
+      <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Nombre d'absents pour la date sélectionnée</p>
+    </div>
+    <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+      <p class="text-xs font-black uppercase tracking-[0.24em] text-amber-500">Retards</p>
+      <p class="mt-3 text-3xl font-black text-slate-900 dark:text-slate-100">{{ late_today }}</p>
+      <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Retards enregistrés sur la journée</p>
+    </div>
+    <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+      <p class="text-xs font-black uppercase tracking-[0.24em] text-rose-500">Incidents non traités</p>
+      <p class="mt-3 text-3xl font-black text-slate-900 dark:text-slate-100">{{ incidents_pending }}</p>
+      <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Alertes d'assiduité en attente de traitement</p>
+    </div>
+    <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+      <p class="text-xs font-black uppercase tracking-[0.24em] text-emerald-500">Taux de présence</p>
+      <p class="mt-3 text-3xl font-black text-slate-900 dark:text-slate-100">{{ attendance_rate }}%</p>
+      <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Présents + retards sur le volume contrôlé</p>
+    </div>
+  </div>
+
+  <div class="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
+    <div class="space-y-4">
+      <div class="rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+        <div class="flex items-center justify-between border-b border-slate-200/70 px-5 py-4 dark:border-slate-800">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Présences étudiantes</p>
+            <h4 class="mt-1 text-lg font-black text-slate-900 dark:text-slate-100">Tableau principal</h4>
+          </div>
+          <span class="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ table_total }} ligne(s)</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="sticky top-0 z-10 bg-slate-50 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+              <tr>
+                <th class="px-4 py-3 text-left font-black uppercase tracking-wide">Nom étudiant</th>
+                <th class="px-4 py-3 text-left font-black uppercase tracking-wide">Classe</th>
+                <th class="px-4 py-3 text-left font-black uppercase tracking-wide">Statut</th>
+                <th class="px-4 py-3 text-left font-black uppercase tracking-wide">Heure</th>
+                <th class="px-4 py-3 text-right font-black uppercase tracking-wide">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+              {% for student in students %}
+              <tr class="bg-white hover:bg-slate-50 dark:bg-slate-900/70 dark:hover:bg-slate-900">
+                <td class="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{{ student.student_name }}</td>
+                <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ student.class_name }}</td>
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {% if student.status_code == 'absent' %}bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300{% elif student.status_code == 'late' %}bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300{% else %}bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300{% endif %}">{{ student.status }}</span>
+                </td>
+                <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ student.time|default:'--:--' }}</td>
+                <td class="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                    hx-get="{% url 'accounts_portal:it_surveillance_student_followup' student.student_id %}?{% if selected_class %}class_id={{ selected_class.id }}&{% endif %}date={{ selected_date|date:'Y-m-d' }}"
+                    hx-target="#surveillance-followup-panel"
+                    hx-swap="innerHTML"
+                  >
+                    {{ student.action_label }}
+                  </button>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">Aucune donnée de présence pour les filtres sélectionnés.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Discipline</p>
+            <h4 class="mt-1 text-lg font-black text-slate-900 dark:text-slate-100">Liste des incidents</h4>
+          </div>
+          <a href="{% url 'surveillance_general_api' %}?{% if selected_class %}class_id={{ selected_class.id }}&{% endif %}date={{ selected_date|date:'Y-m-d' }}&status={{ selected_status }}" target="_blank" class="inline-flex items-center rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">JSON</a>
+        </div>
+        <div class="mt-4 space-y-3">
+          {% for incident in incidents %}
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ incident.student_name }}</p>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ incident.description }}</p>
+              </div>
+              <div class="text-right">
+                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {% if incident.status_code == 'pending' %}bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300{% else %}bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300{% endif %}">{{ incident.status }}</span>
+                <p class="mt-1 text-xs font-semibold text-slate-400 dark:text-slate-500">{{ incident.type }} • {{ incident.created_at }}</p>
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
+            Aucun incident à afficher pour cette sélection.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div id="surveillance-followup-panel" class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Suivi étudiant</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900 dark:text-slate-100">Sélectionne un étudiant</h4>
+        <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">Utilise le bouton “Voir suivi” dans le tableau pour charger l’historique, les alertes et le profil d’assiduité.</p>
+      </div>
+
+      <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Suivi étudiant</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900 dark:text-slate-100">Étudiants à incidents fréquents</h4>
+        <div class="mt-4 space-y-3">
+          {% for item in frequent_students %}
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ item.student_name }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ item.matricule }}</p>
+              </div>
+              <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">{{ item.incidents }} incident(s)</span>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold">
+              <span class="rounded-full bg-rose-100 px-2.5 py-1 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{{ item.absences }} absence(s)</span>
+              <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">{{ item.lates }} retard(s)</span>
+            </div>
+            <ul class="mt-3 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+              {% for history in item.history %}
+              <li class="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 dark:bg-slate-900/80">
+                <span>{{ history.date }} • {{ history.classroom }}</span>
+                <span class="font-bold">{{ history.status }}</span>
+              </li>
+              {% empty %}
+              <li class="rounded-xl bg-white px-3 py-2 text-slate-400 dark:bg-slate-900/80">Aucun historique récent.</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% empty %}
+          <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
+            Aucun étudiant à risque détecté sur les 30 derniers jours.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid gap-4 xl:grid-cols-3">
+    <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+      <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Graphique</p>
+      <h4 class="mt-1 text-lg font-black text-slate-900 dark:text-slate-100">Évolution des absences</h4>
+      <div class="mt-4 h-[260px]"><canvas id="{{ chart_dom_id }}-line"></canvas></div>
+    </div>
+    <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+      <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Graphique</p>
+      <h4 class="mt-1 text-lg font-black text-slate-900 dark:text-slate-100">Répartition des incidents</h4>
+      <div class="mt-4 h-[260px]"><canvas id="{{ chart_dom_id }}-pie"></canvas></div>
+    </div>
+    <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+      <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Graphique</p>
+      <h4 class="mt-1 text-lg font-black text-slate-900 dark:text-slate-100">Absences par classe</h4>
+      <div class="mt-4 h-[260px]"><canvas id="{{ chart_dom_id }}-bar"></canvas></div>
+    </div>
+  </div>
+
+  <script id="{{ chart_dom_id }}" type="application/json">{{ charts_json|safe }}</script>
+  <script>
+    (function () {
+      const chartsSource = document.getElementById('{{ chart_dom_id }}');
+      if (!chartsSource || typeof Chart === 'undefined') {
+        return;
+      }
+      const payload = JSON.parse(chartsSource.textContent || '{}');
+      const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { usePointStyle: true, font: { weight: 'bold' } }
+          }
+        }
+      };
+
+      new Chart(document.getElementById('{{ chart_dom_id }}-line'), {
+        type: 'line',
+        data: payload.line,
+        options: {
+          ...commonOptions,
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+
+      new Chart(document.getElementById('{{ chart_dom_id }}-pie'), {
+        type: 'pie',
+        data: payload.pie,
+        options: commonOptions,
+      });
+
+      new Chart(document.getElementById('{{ chart_dom_id }}-bar'), {
+        type: 'bar',
+        data: payload.bar,
+        options: {
+          ...commonOptions,
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    })();
+  </script>
+</div>
+

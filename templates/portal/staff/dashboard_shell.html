@@ -42,10 +42,15 @@
 
   .portal-shell {
     display: grid;
-    grid-template-columns: 268px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
     min-height: 100vh;
     overflow: hidden;
     background: var(--surface);
+    transition: grid-template-columns .2s ease;
+  }
+
+  .portal-shell.portal-shell-collapsed {
+    grid-template-columns: 96px minmax(0, 1fr);
   }
 
   .portal-sidebar {
@@ -54,6 +59,11 @@
     overflow: hidden;
     color: white;
     background: linear-gradient(180deg, var(--sidebar-main), var(--school-primary-dark));
+    transition: grid-template-columns .2s ease, width .2s ease, transform .2s ease;
+  }
+
+  .portal-sidebar.portal-sidebar-collapsed {
+    grid-template-columns: 72px 0fr;
   }
 
   .portal-main {
@@ -81,21 +91,22 @@
     position: relative;
     z-index: 1;
     overflow: auto;
-    overflow-x: hidden;
-    padding: 0.9rem;
+    overflow-x: auto;
+    width: 100%;
+    padding: 1rem;
     display: block;
   }
 
   .portal-card {
     border: 1px solid var(--line);
-    border-radius: 14px;
-    background: var(--card);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
     min-width: 0;
   }
 
   .portal-card-pad {
-    padding: 0.85rem;
+    padding: 1rem;
   }
 
   .portal-hero {
@@ -120,7 +131,7 @@
   .portal-grid-two {
     display: grid;
     grid-template-columns: 1.05fr .95fr;
-    gap: 0.75rem;
+    gap: 1rem;
   }
 
   .portal-section-title {
@@ -144,19 +155,40 @@
     align-items: center;
     gap: .75rem;
     width: 100%;
-    border-radius: 14px;
-    padding: .85rem 1rem;
+    border-radius: 12px;
+    padding: .85rem .9rem;
     color: rgba(255,255,255,.92);
     background: rgba(255,255,255,.06);
+    transition: background .15s ease, transform .15s ease;
   }
 
   .portal-list-link:hover {
-    background: rgba(255,255,255,.12);
+    background: rgba(255,255,255,.14);
+    transform: translateX(1px);
   }
 
   .portal-list-link.active {
     background: rgba(255,255,255,.16);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+  }
+
+  .portal-sidebar.portal-sidebar-collapsed .portal-list-link {
+    justify-content: center;
+    padding-left: .75rem;
+    padding-right: .75rem;
+  }
+
+  .portal-sidebar.portal-sidebar-collapsed .portal-list-link span,
+  .portal-sidebar.portal-sidebar-collapsed h1,
+  .portal-sidebar.portal-sidebar-collapsed p,
+  .portal-sidebar.portal-sidebar-collapsed .text-xs,
+  .portal-sidebar.portal-sidebar-collapsed .text-sm {
+    display: none;
+  }
+
+  .portal-sidebar.portal-sidebar-collapsed nav {
+    display: grid;
+    justify-items: center;
   }
 
   .portal-stat {
@@ -169,6 +201,19 @@
     }
 
     .portal-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: 220px;
+      z-index: 80;
+      transform: translateX(-100%);
+      grid-template-columns: 1fr;
+    }
+
+    .portal-sidebar.portal-sidebar-mobile-open {
+      transform: translateX(0);
+    }
+
+    .portal-sidebar.portal-sidebar-collapsed {
       grid-template-columns: 1fr;
     }
 
@@ -181,15 +226,43 @@
 {% endblock %}
 
 {% block content %}
-<div class="portal-dashboard-page" x-data="{ userMenuOpen: false }">
+<div
+  class="portal-dashboard-page"
+  x-data="{
+    userMenuOpen: false,
+    sidebarCollapsed: false,
+    mobileSidebarOpen: false,
+    activeSection: window.location.hash ? window.location.hash.replace('#', '') : '',
+    setSection(section) {
+      this.activeSection = section;
+      window.location.hash = section;
+      this.mobileSidebarOpen = false;
+    }
+  }"
+  @hashchange.window="activeSection = window.location.hash ? window.location.hash.replace('#', '') : ''"
+>
   <div class="portal-stage">
-    <div class="portal-shell">
-      <aside class="portal-sidebar">
+    <div class="portal-shell" :class="{ 'portal-shell-collapsed': sidebarCollapsed }">
+      <aside
+        class="portal-sidebar"
+        :class="{
+          'portal-sidebar-collapsed': sidebarCollapsed,
+          'portal-sidebar-mobile-open': mobileSidebarOpen
+        }"
+      >
         <div class="bg-[var(--sidebar-rail)] px-3 py-4 flex flex-col items-center gap-3">
           <div class="h-12 w-12 rounded-2xl bg-white/10 grid place-items-center font-black text-lg">ES</div>
+          <button
+            type="button"
+            class="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-white/90 transition hover:bg-white/20"
+            @click="sidebarCollapsed = !sidebarCollapsed"
+          >
+            <i data-lucide="panel-left-close" x-show="!sidebarCollapsed" style="width:18px;height:18px;"></i>
+            <i data-lucide="panel-left-open" x-show="sidebarCollapsed" style="width:18px;height:18px;display:none;"></i>
+          </button>
         </div>
         <div class="px-4 py-4 flex flex-col min-w-0">
-          <div>
+          <div x-show="!sidebarCollapsed" x-transition.opacity.duration.150ms>
             <p class="text-xs font-bold uppercase tracking-[0.22em] text-white/55">Portal</p>
             <h1 class="mt-1 text-lg font-black text-white leading-tight">{{ page_title }}</h1>
             <p class="mt-2 text-sm text-white/70">{{ welcome_message }}</p>
@@ -198,7 +271,7 @@
             {% block sidebar_nav %}{% endblock %}
           </nav>
           <div class="mt-auto pt-6 space-y-3">
-            <div class="text-xs text-white/55">
+            <div class="text-xs text-white/55" x-show="!sidebarCollapsed" x-transition.opacity.duration.150ms>
               <p class="font-semibold text-white/80">{{ user_display_name }}</p>
               <p>{{ branch.name|default:"Acces global" }}</p>
             </div>
@@ -235,9 +308,25 @@
 
       <main class="portal-main">
         <header class="portal-topbar">
-          <div class="min-w-0">
+          <div class="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+              @click="sidebarCollapsed = !sidebarCollapsed"
+            >
+              <i data-lucide="panel-left" style="width:18px;height:18px;"></i>
+            </button>
+            <button
+              type="button"
+              class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 lg:hidden"
+              @click="mobileSidebarOpen = !mobileSidebarOpen"
+            >
+              <i data-lucide="menu" style="width:18px;height:18px;"></i>
+            </button>
+            <div class="min-w-0">
             <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{{ dashboard_kind|default:"Portail academique" }}</p>
             <p class="text-sm font-semibold text-slate-900 truncate">{{ page_title }}</p>
+            </div>
           </div>
           <div class="flex items-center gap-2">
             {% block topbar_actions %}{% endblock %}

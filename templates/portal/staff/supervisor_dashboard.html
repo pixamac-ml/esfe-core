@@ -1,256 +1,38 @@
-{% extends "portal/staff/dashboard_shell.html" %}
+{% extends "base.html" %}
+
+{% block public_navbar %}{% endblock %}
+{% block public_footer %}{% endblock %}
+{% block public_floating_widget %}{% endblock %}
+
+{% block title %}{{ page_title }}{% endblock %}
 
 {% block extra_head %}
-{{ block.super }}
-<style>
-  .supervisor-nav-button {
-    display: flex;
-    align-items: center;
-    gap: .75rem;
-    width: 100%;
-    border: 1px solid rgba(255,255,255,.06);
-    border-radius: 16px;
-    padding: .95rem 1rem;
-    color: rgba(255,255,255,.86);
-    background: rgba(255,255,255,.05);
-    transition: .2s ease;
-  }
-
-  .supervisor-nav-button:hover {
-    background: rgba(255,255,255,.12);
-    color: white;
-    transform: translateX(2px);
-  }
-
-  .supervisor-nav-button.is-active {
-    background: linear-gradient(135deg, rgba(29,181,176,.26), rgba(255,255,255,.16));
-    border-color: rgba(255,255,255,.18);
-    color: white;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
-  }
-
-  .supervisor-nav-meta {
-    display: block;
-    margin-top: .15rem;
-    font-size: .72rem;
-    color: rgba(255,255,255,.58);
-  }
-
-  .supervisor-panel {
-    display: none;
-  }
-
-  .supervisor-panel.is-active {
-    display: block;
-    animation: supervisorFade .18s ease-out;
-  }
-
-  .supervisor-shell-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(320px, .8fr);
-    gap: 1rem;
-  }
-
-  .supervisor-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: .8rem;
-  }
-
-  .supervisor-kpi-card {
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff, #f7fafc);
-    padding: 1rem;
-  }
-
-  .supervisor-mini-list {
-    display: grid;
-    gap: .7rem;
-  }
-
-  .supervisor-mini-item {
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: #f8fbfc;
-    padding: .9rem 1rem;
-  }
-
-  .supervisor-actions-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: .9rem;
-  }
-
-  .supervisor-form-card {
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff, #f8fbfc);
-    padding: 1rem;
-  }
-
-  .supervisor-form-card textarea,
-  .supervisor-form-card select,
-  .supervisor-form-card input {
-    width: 100%;
-    border: 1px solid #d7e2ea;
-    border-radius: 14px;
-    background: white;
-    padding: .72rem .85rem;
-    font-size: .92rem;
-    color: #123145;
-  }
-
-  .supervisor-form-card textarea {
-    min-height: 84px;
-    resize: vertical;
-  }
-
-  .supervisor-submit {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 14px;
-    padding: .78rem 1rem;
-    font-size: .87rem;
-    font-weight: 800;
-    color: white;
-  }
-
-  .supervisor-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
-    border-radius: 999px;
-    padding: .32rem .7rem;
-    font-size: .72rem;
-    font-weight: 800;
-  }
-
-  .supervisor-table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: white;
-  }
-
-  .supervisor-table {
-    width: 100%;
-    min-width: 880px;
-    border-collapse: collapse;
-  }
-
-  .supervisor-table th {
-    background: #f8fbfc;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    font-size: .7rem;
-    font-weight: 800;
-    text-align: left;
-    padding: .95rem 1rem;
-  }
-
-  .supervisor-table td {
-    padding: .95rem 1rem;
-    border-top: 1px solid #eef4f7;
-    font-size: .92rem;
-    color: #334155;
-  }
-
-  .supervisor-table tr:hover td {
-    background: #fbfdfe;
-  }
-
-  .supervisor-class-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .9rem;
-  }
-
-  .supervisor-alert-stack {
-    display: grid;
-    gap: .8rem;
-  }
-
-  .supervisor-alert-card {
-    border-radius: 18px;
-    padding: 1rem;
-    border: 1px solid var(--line);
-  }
-
-  .supervisor-panel-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-
-  .supervisor-empty {
-    border: 1px dashed #d7e2ea;
-    border-radius: 18px;
-    background: #f8fbfc;
-    padding: 2rem 1rem;
-    text-align: center;
-    color: #94a3b8;
-    font-size: .92rem;
-  }
-
-  @keyframes supervisorFade {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @media (max-width: 1200px) {
-    .supervisor-shell-grid,
-    .supervisor-actions-grid,
-    .supervisor-class-grid,
-    .supervisor-kpi-grid {
-      grid-template-columns: 1fr;
+<script>
+  window.tailwind = window.tailwind || {};
+  window.tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        boxShadow: {
+          soft: '0 18px 45px rgba(15, 23, 42, 0.08)',
+          card: '0 10px 30px rgba(15, 23, 42, 0.06)',
+        }
+      }
     }
-  }
-
-  .supervisor-indicator {
-    display: none;
-    font-size: .78rem;
-    font-weight: 700;
-    color: rgba(100, 116, 139, .95);
-  }
-
-  .htmx-request .supervisor-indicator {
-    display: inline-flex;
-  }
-
-  .supervisor-toast {
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: .9rem 1rem;
-    background: #ffffff;
-  }
-
-  .supervisor-toast.is-success {
-    border-color: rgba(16, 185, 129, .25);
-    background: rgba(16, 185, 129, .08);
-    color: #065f46;
-  }
-
-  .supervisor-toast.is-error {
-    border-color: rgba(244, 63, 94, .25);
-    background: rgba(244, 63, 94, .08);
-    color: #9f1239;
-  }
-
-  .supervisor-toast.is-info {
-    border-color: rgba(59, 130, 246, .25);
-    background: rgba(59, 130, 246, .08);
-    color: #1e3a8a;
-  }
-
-  .supervisor-search-wrap {
-    position: relative;
-    min-width: 320px;
-  }
-
+  };
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  [x-cloak] { display: none !important; }
+  .sidebar-gradient { background: linear-gradient(180deg, #062b46 0%, #0b3458 48%, #062b46 100%); }
+  .glass-card { background: rgba(255,255,255,.88); backdrop-filter: blur(18px); border: 1px solid rgba(226,232,240,.9); }
+  .dark .glass-card { background: rgba(15,23,42,.78); border-color: rgba(51,65,85,.85); }
+  .nav-active { background: linear-gradient(135deg,#2563eb,#4f46e5); color:#fff; box-shadow: 0 14px 24px rgba(37,99,235,.28); }
+  .scrollbar-thin::-webkit-scrollbar { width: 7px; height: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(148,163,184,.45); border-radius:999px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .dashboard-enter { animation: supervisorFade .22s ease-out; }
+  .supervisor-search-wrap { position: relative; min-width: 320px; }
   .supervisor-search-input {
     width: 100%;
     border: 1px solid rgba(148, 163, 184, 0.35);
@@ -260,7 +42,6 @@
     font-size: .9rem;
     color: #0f172a;
   }
-
   .supervisor-search-dropdown {
     position: absolute;
     top: calc(100% + .55rem);
@@ -276,271 +57,496 @@
     max-height: 420px;
     overflow: auto;
   }
-
-  .supervisor-search-dropdown.is-open {
-    display: block;
-    animation: supervisorFade .14s ease-out;
-  }
-
-  .supervisor-search-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .8rem;
-    border-radius: 14px;
-    padding: .7rem .75rem;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(248, 250, 252, 0.85);
-  }
-
-  .supervisor-search-empty {
-    border: 1px dashed rgba(148, 163, 184, 0.55);
-    border-radius: 16px;
-    padding: .85rem .85rem;
-    background: rgba(248, 250, 252, 0.8);
-  }
-
-  .supervisor-card {
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff, #f8fbfc);
-    padding: 1rem;
-  }
-
-  .supervisor-kpi-compact {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: .8rem;
-  }
-
-  .supervisor-kpi-compact .value {
-    font-size: 1.9rem;
-    font-weight: 900;
-    line-height: 1.1;
-  }
-
-  .supervisor-actions {
-    display: grid;
-    gap: .65rem;
-  }
-
-  .supervisor-action {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .9rem;
-    border-radius: 16px;
-    padding: .85rem 1rem;
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    background: rgba(248, 250, 252, 0.85);
-    transition: .15s ease;
-  }
-
-  .supervisor-action:hover {
-    background: rgba(241, 245, 249, 0.95);
-    transform: translateY(-1px);
-  }
-
-  .supervisor-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    border-radius: 999px;
-    padding: .35rem .75rem;
-    font-size: .75rem;
-    font-weight: 900;
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    background: rgba(248, 250, 252, 0.9);
-    color: #0f172a;
-  }
-
-  .supervisor-accordion {
-    border-radius: 18px;
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    background: rgba(255, 255, 255, 0.92);
-    overflow: hidden;
-  }
-
-  .supervisor-accordion button {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .9rem;
-    padding: .85rem 1rem;
-    font-weight: 900;
-    color: #0f172a;
-    background: rgba(248, 250, 252, 0.9);
-  }
-
-  .supervisor-accordion .content {
-    padding: 1rem;
-    background: #fff;
-  }
-
-  .supervisor-muted {
-    color: #64748b;
-    font-size: .86rem;
-    font-weight: 600;
-  }
-
-  @media (max-width: 1200px) {
-    .supervisor-kpi-compact {
-      grid-template-columns: 1fr;
-    }
+  .supervisor-search-dropdown.is-open { display: block; animation: supervisorFade .14s ease-out; }
+  .supervisor-indicator { display: none; font-size: .78rem; font-weight: 700; color: rgba(100, 116, 139, .95); }
+  .htmx-request .supervisor-indicator { display: inline-flex; }
+  .planner-kpi { border: 1px solid rgba(226,232,240,.9); border-radius: 18px; background: rgba(255,255,255,.82); padding: 1rem; }
+  .planner-action { display: flex; width: 100%; align-items: center; gap: .75rem; border-radius: 16px; border: 1px solid rgba(148,163,184,.18); background: rgba(248,250,252,.9); padding: .95rem 1rem; text-align: left; transition: .15s ease; }
+  .planner-action:hover { background: rgba(241,245,249,.98); transform: translateY(-1px); }
+  .planner-section-placeholder { border: 1px dashed rgba(148,163,184,.45); border-radius: 24px; background: rgba(248,250,252,.8); padding: 3rem 1.5rem; text-align: center; color: #64748b; }
+  @keyframes supervisorFade {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 </style>
 {% endblock %}
 
-{% block sidebar_nav %}
-<button type="button" class="supervisor-nav-button is-active" data-panel-target="overview">
-  <i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i>
-  <span>
-    <span class="font-bold">Vue generale</span>
-    <span class="supervisor-nav-meta">Synthese et priorites</span>
-  </span>
-</button>
-<button type="button" class="supervisor-nav-button" data-panel-target="attendance">
-  <i data-lucide="user-check" style="width:18px;height:18px;"></i>
-  <span>
-    <span class="font-bold">Presences</span>
-    <span class="supervisor-nav-meta">Etudiants et enseignants</span>
-  </span>
-</button>
-<button type="button" class="supervisor-nav-button" data-panel-target="courses">
-  <i data-lucide="book-open-check" style="width:18px;height:18px;"></i>
-  <span>
-    <span class="font-bold">Cours</span>
-    <span class="supervisor-nav-meta">Cahier de texte et suivi</span>
-  </span>
-</button>
-<button type="button" class="supervisor-nav-button" data-panel-target="classes">
-  <i data-lucide="users" style="width:18px;height:18px;"></i>
-  <span>
-    <span class="font-bold">Classes</span>
-    <span class="supervisor-nav-meta">Classes a surveiller</span>
-  </span>
-</button>
-<button type="button" class="supervisor-nav-button" data-panel-target="alerts">
-  <i data-lucide="triangle-alert" style="width:18px;height:18px;"></i>
-  <span>
-    <span class="font-bold">Alertes</span>
-    <span class="supervisor-nav-meta">Critiques et suivi</span>
-  </span>
-</button>
-{% endblock %}
+{% block content %}
+<div
+  x-data="supervisorPlannerDashboard()"
+  x-init="init()"
+  x-cloak
+  :class="{ 'dark': darkMode }"
+  class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+>
+  <div class="flex min-h-screen">
+    <aside class="sidebar-gradient fixed inset-y-0 left-0 z-40 flex flex-col text-white transition-all duration-300" :class="sidebarCollapsed ? 'w-[86px]' : 'w-[270px]'">
+      <div class="flex h-24 items-center gap-3 px-5">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+          <i data-lucide="shield" class="h-7 w-7"></i>
+        </div>
+        <div x-show="!sidebarCollapsed" x-transition>
+          <h1 class="text-lg font-extrabold tracking-tight">{{ branch.name|default:"Reseau d'ecoles" }}</h1>
+          <p class="text-sm font-extrabold tracking-wide">Surveillant General</p>
+        </div>
+      </div>
 
-{% block topbar_actions %}
-<div class="supervisor-search-wrap">
-  <input
-    id="supervisor-global-search"
-    class="supervisor-search-input"
-    type="search"
-    name="q"
-    placeholder="Rechercher (etudiant, classe, cours du jour)…"
-    autocomplete="off"
-    hx-get="{% url 'accounts_portal:supervisor_quick_search' %}"
-    hx-trigger="keyup changed delay:250ms"
-    hx-target="#supervisor-global-search-results"
-    hx-indicator="#supervisor-global-search-indicator"
-  >
-  <div id="supervisor-global-search-indicator" class="supervisor-indicator">Recherche…</div>
-  <div id="supervisor-global-search-results" class="supervisor-search-dropdown"></div>
+      <button type="button" @click="toggleSidebar()" class="absolute right-[-18px] top-7 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950">
+        <i data-lucide="chevrons-left" class="h-5 w-5 transition-transform" :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
+      </button>
+
+      <div class="mx-4 mb-4 rounded-2xl border border-white/10 bg-white/10 p-3">
+        <div class="flex items-center gap-3">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-700 font-bold">SG</div>
+          <div x-show="!sidebarCollapsed" x-transition class="min-w-0">
+            <p class="truncate text-sm font-bold">{{ user_display_name }}</p>
+            <p class="truncate text-xs text-sky-100/70">Creation emploi du temps</p>
+          </div>
+          <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+        </div>
+      </div>
+
+      <nav class="flex-1 space-y-2 overflow-y-auto px-4 scrollbar-thin">
+        <template x-for="item in navItems" :key="item.key">
+          <button
+            type="button"
+            @click="setSection(item.key)"
+            class="flex w-full items-center gap-4 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            :class="activeSection === item.key ? 'nav-active' : ''"
+          >
+            <i :data-lucide="item.icon" class="h-5 w-5 shrink-0"></i>
+            <span x-show="!sidebarCollapsed" x-transition x-text="item.label"></span>
+          </button>
+        </template>
+      </nav>
+
+      <div class="p-4">
+        <form method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="flex w-full items-center justify-center gap-3 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold hover:bg-white/15">
+            <i data-lucide="log-out" class="h-5 w-5"></i>
+            <span x-show="!sidebarCollapsed" x-transition>Deconnexion</span>
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <main class="min-h-screen flex-1 transition-all duration-300" :class="sidebarCollapsed ? 'ml-[86px]' : 'ml-[270px]'">
+      <div class="mx-auto max-w-[1560px] px-6 py-6 lg:px-8">
+        <header class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <div class="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <span>Emplois du temps</span>
+              <i data-lucide="chevron-right" class="h-4 w-4"></i>
+              <span class="text-slate-900 dark:text-slate-100" x-text="plannerClassLabel ? plannerClassLabel : 'Selection de classe'"></span>
+            </div>
+            <h2 class="text-3xl font-extrabold tracking-tight">Construction des emplois du temps</h2>
+            <p class="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">Selectionne d'abord une classe, puis ouvre son espace de creation pour planifier proprement la semaine.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="supervisor-search-wrap">
+              <input
+                id="supervisor-global-search"
+                class="supervisor-search-input"
+                type="search"
+                name="q"
+                placeholder="Rechercher (etudiant, classe, cours du jour)..."
+                autocomplete="off"
+                hx-get="{% url 'accounts_portal:supervisor_quick_search' %}"
+                hx-trigger="keyup changed delay:250ms"
+                hx-target="#supervisor-global-search-results"
+                hx-indicator="#supervisor-global-search-indicator"
+              >
+              <div id="supervisor-global-search-indicator" class="supervisor-indicator">Recherche...</div>
+              <div id="supervisor-global-search-results" class="supervisor-search-dropdown"></div>
+            </div>
+            <button type="button" @click="toggleDarkMode()" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900">
+              <i x-show="!darkMode" data-lucide="moon" class="h-5 w-5"></i>
+              <i x-show="darkMode" data-lucide="sun" class="h-5 w-5"></i>
+            </button>
+            <div class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-right shadow-card dark:border-slate-800 dark:bg-slate-900">
+              <p class="text-xs font-bold text-slate-500 dark:text-slate-400">{{ today|date:"d/m/Y" }}</p>
+              <p class="text-xl font-extrabold text-blue-600 dark:text-blue-400">{{ total_classes }} classes</p>
+            </div>
+          </div>
+        </header>
+
+        <section x-show="activeSection === 'planner'" x-transition.opacity.duration.150ms class="dashboard-enter">
+          {% if not selected_class_id %}
+          <div class="grid grid-cols-1 gap-6 2xl:grid-cols-[390px_1fr]">
+            <div class="glass-card rounded-3xl p-6 shadow-card">
+              <div class="mb-6">
+                <p class="text-xs font-black uppercase tracking-[0.24em] text-blue-600 dark:text-blue-400">Etape 1</p>
+                <h3 class="mt-2 text-xl font-extrabold">Choisir une classe</h3>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Le module commence par la classe cible. Le formulaire complet de creation n'apparait qu'apres cette selection.</p>
+              </div>
+
+              <form
+                id="planner-config-form"
+                class="space-y-5"
+                hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}"
+                hx-target="#supervisor-planner-workspace"
+                hx-swap="innerHTML"
+              >
+                <label class="block">
+                  <span class="mb-2 block text-sm font-bold">Classe <span class="text-red-500">*</span></span>
+                  <select id="planner-class-select" name="class_id" @change="setPlannerClass($event.target.value, $event.target.options[$event.target.selectedIndex].text)" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900">
+                    <option value="">Choisir une classe</option>
+                    {% for item in class_picker_items %}
+                    <option value="{{ item.id }}">{{ item.label }} - {{ item.programme_title }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="mb-2 block text-sm font-bold">Annee academique</span>
+                    <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none dark:border-slate-700 dark:bg-slate-900">
+                      {% for academic_class in classes %}
+                        {% ifchanged academic_class.academic_year.name %}
+                        <option>{{ academic_class.academic_year.name }}</option>
+                        {% endifchanged %}
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="mb-2 block text-sm font-bold">Semaine</span>
+                    <input id="planner-week-start" name="week_start" type="date" value="{{ week_start|date:'Y-m-d' }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900" />
+                  </label>
+                </div>
+
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
+                  <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Workflow</p>
+                  <div class="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p>1. Choisir la classe cible.</p>
+                    <p>2. Ouvrir son espace de planification.</p>
+                    <p>3. Construire ensuite les cours sur la grille.</p>
+                  </div>
+                </div>
+
+                <button type="submit" :disabled="!plannerClassId" :class="plannerClassId ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25' : 'bg-slate-200 text-slate-500 cursor-not-allowed dark:bg-slate-800 dark:text-slate-400'" class="w-full rounded-2xl px-4 py-3 text-sm font-extrabold">
+                  Ouvrir les actions de la classe
+                </button>
+              </form>
+            </div>
+
+            <div id="supervisor-planner-workspace" class="glass-card overflow-hidden rounded-3xl p-6 shadow-card">
+              <div class="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Point d'entree</p>
+                  <h3 class="mt-2 text-2xl font-extrabold">Classes disponibles</h3>
+                  <p class="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">La zone principale reste propre tant qu'aucune classe n'est ouverte. Elle sert d'abord de galerie de selection, puis elle bascule vers le planner de creation.</p>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-right dark:border-slate-700 dark:bg-slate-900">
+                  <p class="text-xs font-bold text-slate-500 dark:text-slate-400">Classes actives</p>
+                  <p class="text-2xl font-extrabold text-blue-600 dark:text-blue-400">{{ class_picker_items|length }}</p>
+                </div>
+              </div>
+
+              <div class="-mx-1 overflow-x-auto px-1 scrollbar-thin">
+                <div class="flex min-w-max gap-4">
+                {% for item in class_picker_items %}
+                <button
+                  type="button"
+                  @click="setPlannerClass('{{ item.id }}', '{{ item.label|escapejs }}')"
+                  hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ item.id }}&week_start={{ week_start|date:'Y-m-d' }}"
+                  hx-target="#supervisor-planner-workspace"
+                  hx-swap="innerHTML"
+                  class="group w-[320px] shrink-0 rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-900"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="truncate text-base font-extrabold text-slate-900 dark:text-slate-100">{{ item.label }}</p>
+                      <p class="mt-1 truncate text-sm font-medium text-slate-500 dark:text-slate-400">{{ item.programme_title }}</p>
+                    </div>
+                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ item.level }}</span>
+                  </div>
+                  <div class="mt-5 flex items-center justify-between">
+                    <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{{ item.student_count }} etudiants</span>
+                    <span class="text-sm font-extrabold text-slate-400 transition group-hover:text-blue-600 dark:group-hover:text-blue-400">Ouvrir</span>
+                  </div>
+                </button>
+                {% empty %}
+                <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                  Aucune classe active disponible pour cette annexe.
+                </div>
+                {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="grid grid-cols-1 gap-6 2xl:grid-cols-[430px_1fr]">
+            <div class="glass-card rounded-3xl p-6 shadow-card">
+              <div class="mb-5">
+                <p class="text-xs font-black uppercase tracking-[0.24em] text-blue-600 dark:text-blue-400">Etape 2</p>
+                <h3 class="mt-2 text-lg font-extrabold">Actions de la classe</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">La classe est choisie. Le panneau de droite propose d'abord les actions possibles avant d'ouvrir la creation.</p>
+              </div>
+
+              <form
+                id="planner-config-form"
+                class="space-y-5"
+                hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}"
+                hx-target="#supervisor-planner-workspace"
+                hx-swap="innerHTML"
+                hx-trigger="change delay:100ms from:#planner-class-select, change delay:100ms from:#planner-week-start"
+              >
+                <label class="block">
+                  <span class="mb-2 block text-sm font-bold">Classe <span class="text-red-500">*</span></span>
+                  <select id="planner-class-select" name="class_id" @change="setPlannerClass($event.target.value, $event.target.options[$event.target.selectedIndex].text)" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900">
+                    <option value="">Choisir une classe avant de creer</option>
+                    {% for item in class_picker_items %}
+                    <option value="{{ item.id }}" {% if item.id == selected_class_id %}selected{% endif %}>{{ item.label }} - {{ item.programme_title }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="mb-2 block text-sm font-bold">Annee academique</span>
+                    <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none dark:border-slate-700 dark:bg-slate-900">
+                      {% for academic_class in classes %}
+                        {% ifchanged academic_class.academic_year.name %}
+                        <option>{{ academic_class.academic_year.name }}</option>
+                        {% endifchanged %}
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="mb-2 block text-sm font-bold">Periode</span>
+                    <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none dark:border-slate-700 dark:bg-slate-900">
+                      <option>Semaine active</option>
+                      <option>Semestre 1</option>
+                      <option>Semestre 2</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="mb-2 block text-sm font-bold">Date de debut</span>
+                    <input id="planner-week-start" name="week_start" type="date" value="{{ week_start|date:'Y-m-d' }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900" />
+                  </label>
+                  <label class="block">
+                    <span class="mb-2 block text-sm font-bold">Date de fin</span>
+                    <input type="text" readonly value="{{ week_end|date:'d/m/Y' }}" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none dark:border-slate-700 dark:bg-slate-800" />
+                  </label>
+                </div>
+
+                <div>
+                  <span class="mb-3 block text-sm font-bold">Type d'emploi du temps</span>
+                  <div class="flex gap-3">
+                    <label class="flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
+                      <input type="radio" checked /> Hebdomadaire
+                    </label>
+                    <label class="flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">
+                      <input type="radio" /> Personnalise
+                    </label>
+                  </div>
+                </div>
+
+                <label class="block">
+                  <span class="mb-2 block text-sm font-bold">Statut</span>
+                  <select class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none dark:border-slate-700 dark:bg-slate-900">
+                    <option>Brouillon</option>
+                    <option>Publie</option>
+                  </select>
+                </label>
+
+                <div>
+                  <span class="mb-3 block text-sm font-bold">Options</span>
+                  <div class="grid grid-cols-2 gap-3 text-sm font-semibold">
+                    <label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded" /> Inclure les pauses</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded" /> Afficher les salles</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded" /> Afficher enseignants</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" checked class="h-4 w-4 rounded" /> Eviter conflits</label>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                  <button type="reset" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold shadow-card dark:border-slate-700 dark:bg-slate-900">
+                    Reinitialiser
+                  </button>
+                  <button type="submit" :disabled="!plannerClassId" :class="plannerClassId ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25' : 'bg-slate-200 text-slate-500 cursor-not-allowed dark:bg-slate-800 dark:text-slate-400'" class="rounded-2xl px-4 py-3 text-sm font-extrabold">
+                    Ouvrir les actions
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div
+              id="supervisor-planner-workspace"
+              class="space-y-6"
+              {% if selected_class_id %}
+              hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ selected_class_id }}&week_start={{ week_start|date:'Y-m-d' }}"
+              hx-trigger="load"
+              hx-target="#supervisor-planner-workspace"
+              hx-swap="innerHTML"
+              {% endif %}
+            >
+              {% if selected_class_id %}
+              <div class="glass-card rounded-3xl p-6 shadow-card text-sm text-slate-500">Chargement du workspace emploi du temps...</div>
+              {% else %}
+              <div class="glass-card rounded-3xl p-6 shadow-card">
+                <div class="mb-5 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 class="text-lg font-extrabold">Classes disponibles</h3>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Choisis une classe pour ouvrir son espace de planification.</p>
+                  </div>
+                  <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{{ class_picker_items|length }} classes</span>
+                </div>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {% for item in class_picker_items %}
+                  <button
+                    type="button"
+                    @click="setPlannerClass('{{ item.id }}', '{{ item.label|escapejs }}')"
+                    hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ item.id }}&week_start={{ week_start|date:'Y-m-d' }}"
+                    hx-target="#supervisor-planner-workspace"
+                    hx-swap="innerHTML"
+                    class="rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-900"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="truncate text-base font-extrabold text-slate-900 dark:text-slate-100">{{ item.label }}</p>
+                        <p class="mt-1 truncate text-sm font-medium text-slate-500 dark:text-slate-400">{{ item.programme_title }}</p>
+                      </div>
+                      <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ item.level }}</span>
+                    </div>
+                    <div class="mt-4 flex items-center justify-between text-sm">
+                      <span class="font-semibold text-slate-500 dark:text-slate-400">{{ item.student_count }} etudiants</span>
+                      <span class="font-extrabold text-blue-600 dark:text-blue-400">Ouvrir</span>
+                    </div>
+                  </button>
+                  {% empty %}
+                  <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                    Aucune classe active disponible pour cette annexe.
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </section>
+
+        <section x-show="activeSection === 'attendance'" x-transition.opacity.duration.150ms class="dashboard-enter">
+          {% include "portal/staff/supervisor/partials/panel_attendance.html" %}
+        </section>
+
+        <section x-show="activeSection === 'courses'" x-transition.opacity.duration.150ms class="dashboard-enter">
+          {% include "portal/staff/supervisor/partials/panel_courses.html" %}
+        </section>
+
+        <section x-show="activeSection === 'alerts'" x-transition.opacity.duration.150ms class="dashboard-enter">
+          {% include "portal/staff/supervisor/partials/panel_alerts.html" %}
+        </section>
+
+        <section x-show="activeSection === 'overview'" x-transition.opacity.duration.150ms class="dashboard-enter">
+          <div class="planner-section-placeholder">
+            <h3 class="text-lg font-extrabold text-slate-900 dark:text-slate-100">Section a enrichir</h3>
+            <p class="mt-2 text-sm">Le shell principal est maintenant celui de la maquette complete. Les autres modules seront rebranches proprement ensuite.</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
 </div>
-<span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{{ branch.name|default:"Acces global" }}</span>
-<span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">{{ today|date:"d/m/Y" }}</span>
-{% endblock %}
-
-{% block dashboard_content %}
-<section class="supervisor-panel is-active" data-panel="overview">
-  {% include "portal/staff/supervisor/partials/panel_overview.html" %}
-</section>
-
-<section class="supervisor-panel" data-panel="attendance">
-  {% include "portal/staff/supervisor/partials/panel_attendance.html" %}
-</section>
-
-<section class="supervisor-panel" data-panel="courses">
-  {% include "portal/staff/supervisor/partials/panel_courses.html" %}
-</section>
-
-<section class="supervisor-panel" data-panel="classes">
-  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
-</section>
-
-<section class="supervisor-panel" data-panel="alerts">
-  {% include "portal/staff/supervisor/partials/panel_alerts.html" %}
-</section>
 
 <script>
-  (function () {
-    const navButtons = Array.from(document.querySelectorAll("[data-panel-target]"));
-    const panels = Array.from(document.querySelectorAll("[data-panel]"));
-    if (!navButtons.length || !panels.length) {
-      return;
-    }
-
-    const allowed = new Set(panels.map((panel) => panel.dataset.panel));
-    const searchInput = document.getElementById("supervisor-global-search");
-    const searchDropdown = document.getElementById("supervisor-global-search-results");
-
-    function activatePanel(target, { pushHash = true } = {}) {
-      navButtons.forEach((button) => {
-        button.classList.toggle("is-active", button.dataset.panelTarget === target);
-      });
-      panels.forEach((panel) => {
-        panel.classList.toggle("is-active", panel.dataset.panel === target);
-      });
-      if (pushHash) {
-        history.replaceState(null, "", `#${target}`);
-      }
-    }
-
-    navButtons.forEach((button) => {
-      button.addEventListener("click", () => activatePanel(button.dataset.panelTarget));
-    });
-
-    function fromHash() {
-      const hash = (window.location.hash || "").replace("#", "").trim();
-      if (hash && allowed.has(hash)) {
-        return hash;
-      }
-      return "overview";
-    }
-
-    window.addEventListener("hashchange", () => {
-      activatePanel(fromHash(), { pushHash: false });
-    });
-
-    activatePanel(fromHash(), { pushHash: false });
-
-    if (searchInput && searchDropdown) {
-      const open = () => searchDropdown.classList.add("is-open");
-      const close = () => searchDropdown.classList.remove("is-open");
-
-      searchInput.addEventListener("focus", () => {
-        if ((searchInput.value || "").trim().length >= 2) {
-          open();
+  function supervisorPlannerDashboard() {
+    return {
+      sidebarCollapsed: false,
+      darkMode: false,
+      plannerClassId: {% if selected_class_id %}{{ selected_class_id }}{% else %}null{% endif %},
+      plannerClassLabel: "{{ selected_class_label|escapejs }}",
+      activeSection: window.location.hash ? window.location.hash.replace('#', '') : 'planner',
+      navItems: [
+        { key: 'overview', label: 'Tableau de bord', icon: 'home' },
+        { key: 'planner', label: 'Emplois du temps', icon: 'calendar-days' },
+        { key: 'attendance', label: 'Presences', icon: 'user-check' },
+        { key: 'courses', label: 'Cours', icon: 'book-open-check' },
+        { key: 'alerts', label: 'Alertes', icon: 'triangle-alert' },
+      ],
+      init() {
+        this.sidebarCollapsed = window.localStorage.getItem('supervisor_sidebar_collapsed') === '1';
+        this.darkMode = window.localStorage.getItem('supervisor_dark_mode') === '1';
+        const hash = (window.location.hash || '').replace('#', '').trim();
+        if (hash && this.navItems.some((item) => item.key === hash)) {
+          this.activeSection = hash;
         }
-      });
-
-      document.addEventListener("click", (event) => {
-        const target = event.target;
-        if (!(target instanceof Element)) return;
-        if (target.closest(".supervisor-search-wrap")) return;
-        close();
-      });
-
-      document.body.addEventListener("htmx:afterSwap", (event) => {
-        if (event && event.target === searchDropdown) {
-          if ((searchInput.value || "").trim().length >= 2) {
-            open();
-          } else {
-            close();
+        this.applyTheme();
+        this.$nextTick(() => {
+          this.renderIcons();
+          this.bindSearchDropdown();
+        });
+        window.addEventListener('hashchange', () => {
+          const nextHash = (window.location.hash || '').replace('#', '').trim();
+          if (nextHash && this.navItems.some((item) => item.key === nextHash)) {
+            this.activeSection = nextHash;
+            this.$nextTick(() => this.renderIcons());
           }
+        });
+        document.body.addEventListener('htmx:afterSwap', () => this.renderIcons());
+      },
+      setSection(section) {
+        this.activeSection = section;
+        window.location.hash = section;
+        this.$nextTick(() => this.renderIcons());
+      },
+      setPlannerClass(classId, classLabel) {
+        this.plannerClassId = classId ? Number(classId) : null;
+        this.plannerClassLabel = classLabel || '';
+        const select = document.getElementById('planner-class-select');
+        if (select && classId) {
+          select.value = String(classId);
         }
-      });
-    }
-  })();
+      },
+      toggleSidebar() {
+        this.sidebarCollapsed = !this.sidebarCollapsed;
+        window.localStorage.setItem('supervisor_sidebar_collapsed', this.sidebarCollapsed ? '1' : '0');
+        this.$nextTick(() => this.renderIcons());
+      },
+      toggleDarkMode() {
+        this.darkMode = !this.darkMode;
+        window.localStorage.setItem('supervisor_dark_mode', this.darkMode ? '1' : '0');
+        this.applyTheme();
+        this.$nextTick(() => this.renderIcons());
+      },
+      applyTheme() {
+        document.documentElement.classList.toggle('dark', this.darkMode);
+      },
+      renderIcons() {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      },
+      bindSearchDropdown() {
+        const searchInput = document.getElementById('supervisor-global-search');
+        const searchDropdown = document.getElementById('supervisor-global-search-results');
+        if (!searchInput || !searchDropdown) return;
+        const open = () => searchDropdown.classList.add('is-open');
+        const close = () => searchDropdown.classList.remove('is-open');
+        searchInput.addEventListener('focus', () => {
+          if ((searchInput.value || '').trim().length >= 2) open();
+        });
+        document.addEventListener('click', (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          if (target.closest('.supervisor-search-wrap')) return;
+          close();
+        });
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+          if (event && event.target === searchDropdown) {
+            if ((searchInput.value || '').trim().length >= 2) open();
+            else close();
+          }
+          this.renderIcons();
+        });
+      }
+    };
+  }
 </script>
 {% endblock %}

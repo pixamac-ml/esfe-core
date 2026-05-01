@@ -229,6 +229,15 @@ def build_supervisor_dashboard_context(request, *, branch, page_title, page_kick
         for academic_class in classes_qs[:40]
     ]
     default_class_id = class_picker_items[0]["id"] if class_picker_items else None
+    selected_class_id = None
+    selected_class_label = ""
+    selected_class_raw = (request.GET.get("class_id") or "").strip()
+    if selected_class_raw.isdigit():
+        selected_class_id = int(selected_class_raw)
+        for item in class_picker_items:
+            if item["id"] == selected_class_id:
+                selected_class_label = item["label"]
+                break
 
     week_events_qs = AcademicScheduleEvent.objects.select_related("academic_class", "teacher", "ec", "branch").filter(
         start_datetime__date__gte=week_start,
@@ -429,6 +438,8 @@ def build_supervisor_dashboard_context(request, *, branch, page_title, page_kick
         "supervisor_kpis": kpis,
         "class_picker_items": class_picker_items,
         "default_class_id": default_class_id,
+        "selected_class_id": selected_class_id,
+        "selected_class_label": selected_class_label,
         "today_attendance_total": len(today_student_attendances),
         "today_teacher_attendance_total": len(today_teacher_attendances),
         "daily_lesson_status": daily_lesson_status,

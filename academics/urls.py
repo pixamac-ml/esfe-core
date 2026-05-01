@@ -15,9 +15,20 @@ from .views import (
     student_year_report_view,
     teacher_lesson_logs_view,
 )
+from .views_import import download_template, upload_grades
 
 app_name = "academics"
 urlpatterns = [
+    path(
+        "imports/grades/template/<int:class_id>/<int:semester_id>/",
+        download_template,
+        name="download_import_template",
+    ),
+    path(
+        "imports/grades/upload/",
+        upload_grades,
+        name="upload_grades",
+    ),
     path(
         "reports/student/<int:student_id>/semester/<int:semester_id>/",
         student_semester_report_view,

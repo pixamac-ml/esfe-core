@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import Prefetch
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -10,7 +11,7 @@ from academics.services.grading import apply_ec_grade, compute_ec_status, resolv
 from academics.services.semester import compute_semester_result
 from academics.services.ue import compute_ue_result
 from academics.services.workflow import can_publish_semester, get_semester_permissions
-from accounts.access import can_access, get_user_scope
+from accounts.access import can_access, get_user_position, get_user_scope
 from secretary.permissions import is_secretary
 
 
@@ -176,6 +177,85 @@ def _get_workflow_badge(semester):
     }
 
 
+def _resolve_active_session_type(requested_session_type, workflow_permissions):
+    requested_session_type = (requested_session_type or "normal").strip().lower() or "normal"
+    if requested_session_type not in {"normal", "retake"}:
+        requested_session_type = "normal"
+    if requested_session_type == "retake" and not workflow_permissions["can_enter_retake"]:
+        return "normal"
+    if (
+        requested_session_type == "normal"
+        and not workflow_permissions["can_enter_normal"]
+        and workflow_permissions["can_enter_retake"]
+    ):
+        return "retake"
+    return requested_session_type
+
+
+def _get_notes_grid_ues(semester):
+    """Retourne la hiérarchie canonique UE -> EC utilisée par toute la maquette.
+
+    Important: les headers du template et les lignes étudiantes doivent dériver de la
+    même structure ordonnée, sinon les colspans se décalent et le bloc résultat semestre
+    se retrouve visuellement déplacé.
+    """
+
+    return list(
+        semester.ues.prefetch_related(
+            Prefetch(
+                "ecs",
+                queryset=EC.objects.order_by("id"),
+            )
+        ).order_by("id")
+    )
+
+
+def _build_notes_grid_context(*, academic_class, semester, requested_session_type):
+    workflow_permissions = get_semester_permissions(semester)
+    active_session_type = _resolve_active_session_type(requested_session_type, workflow_permissions)
+    active_session_label = "Rattrapage" if active_session_type == "retake" else "Normale"
+    first_enrollment = (
+        AcademicEnrollment.objects.filter(
+            academic_class=academic_class,
+            academic_year=academic_class.academic_year,
+            is_active=True,
+        )
+        .select_related("student__student_profile")
+        .order_by(
+            "student__student_profile__inscription__candidature__last_name",
+            "student__student_profile__inscription__candidature__first_name",
+        )
+        .first()
+    )
+    class_enrollments = list(_get_class_enrollments(academic_class, academic_class.academic_year))
+    ues = _get_notes_grid_ues(semester)
+    publish_ready = can_publish_semester(semester, class_enrollments)
+
+    rows = [
+        _build_excel_row(
+            enrollment=enr,
+            semester=semester,
+            ues=ues,
+            index=index,
+            active_session_type=active_session_type,
+        )
+        for index, enr in enumerate(class_enrollments, start=1)
+    ]
+
+    return {
+        "academic_class": academic_class,
+        "semester": semester,
+        "ues": ues,
+        "rows": rows,
+        "active_session_type": active_session_type,
+        "active_session_label": active_session_label,
+        "workflow_permissions": workflow_permissions,
+        "publish_ready": publish_ready,
+        "workflow_badge": _get_workflow_badge(semester),
+        "first_enrollment": first_enrollment,
+    }
+
+
 def _build_excel_row(enrollment, semester, ues, index, active_session_type="normal", updated_ec_id=None):
     threshold = resolve_threshold(enrollment)
     permissions = get_semester_permissions(semester)
@@ -193,12 +273,30 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
     }
 
     ue_blocks = []
+    ue_results_by_id = {
+        ue.id: compute_ue_result(ue, enrollment)
+        for ue in ues
+    }
+
     for ue in ues:
-        ue_result = compute_ue_result(ue, enrollment)
+        ue_result = ue_results_by_id[ue.id]
+        ue_rows_by_ec_id = {
+            item["ec"].id: item
+            for item in ue_result["rows"]
+        }
         ec_rows = []
 
-        for row in ue_result["rows"]:
-            grade = grades_by_ec_id.get(row["ec"].id)
+        # IMPORTANT: on itère sur la même hiérarchie EC que celle utilisée par le header.
+        # Ainsi, le nombre de cellules par UE reste strictement identique entre header et body.
+        for ec in ue.ecs.all():
+            row = ue_rows_by_ec_id.get(ec.id, {
+                "ec": ec,
+                "note_coefficient": Decimal("0.00"),
+                "credit_obtained": Decimal("0.00"),
+                "credit_required": ec.credit_required,
+                "is_validated": False,
+            })
+            grade = grades_by_ec_id.get(ec.id)
             edit_score = None
             final_score = None
             if grade:
@@ -342,7 +440,7 @@ def save_grade(request):
             else:
                 grade.save()
 
-    ues = list(semester.ues.prefetch_related("ecs__grades").order_by("id"))
+    ues = _get_notes_grid_ues(semester)
     compute_ue_result(ec.ue, enrollment)
     compute_semester_result(semester, enrollment)
 
@@ -430,45 +528,68 @@ def excel_grade_view(request, enrollment_id, semester_id):
     )
 
     academic_class = enrollment.academic_class
-    workflow_permissions = get_semester_permissions(semester)
-    requested_session_type = request.GET.get("session", "normal").strip().lower() or "normal"
-    if requested_session_type not in {"normal", "retake"}:
-        requested_session_type = "normal"
-    if requested_session_type == "retake" and not workflow_permissions["can_enter_retake"]:
-        active_session_type = "normal"
-    elif requested_session_type == "normal" and not workflow_permissions["can_enter_normal"] and workflow_permissions["can_enter_retake"]:
-        active_session_type = "retake"
-    else:
-        active_session_type = requested_session_type
-    active_session_label = "Rattrapage" if active_session_type == "retake" else "Normale"
-    class_enrollments = list(_get_class_enrollments(academic_class, enrollment.academic_year))
-    ues = list(semester.ues.prefetch_related("ecs__grades").order_by("id"))
-    publish_ready = can_publish_semester(semester, class_enrollments)
-
-    rows = [
-        _build_excel_row(
-            enrollment=enr,
-            semester=semester,
-            ues=ues,
-            index=index,
-            active_session_type=active_session_type,
-        )
-        for index, enr in enumerate(class_enrollments, start=1)
-    ]
+    context = _build_notes_grid_context(
+        academic_class=academic_class,
+        semester=semester,
+        requested_session_type=request.GET.get("session", "normal"),
+    )
 
     return render(
         request,
         "portal/admin/grades/excel_sheet.html",
         {
             "enrollment": enrollment,
-            "academic_class": academic_class,
-            "semester": semester,
-            "ues": ues,
-            "rows": rows,
-            "active_session_type": active_session_type,
-            "active_session_label": active_session_label,
-            "workflow_permissions": workflow_permissions,
-            "publish_ready": publish_ready,
-            "workflow_badge": _get_workflow_badge(semester),
+            **context,
         },
+    )
+
+
+@login_required
+def it_notes_grid_view(request):
+    if get_user_position(request.user) != "it_support":
+        return HttpResponseForbidden("Acces refuse.")
+
+    from portal.views.it_grades_import import build_it_grade_selection_context
+
+    selection_context = build_it_grade_selection_context(
+        request.user,
+        class_id=request.GET.get("class_id"),
+        semester_id=request.GET.get("semester_id"),
+    )
+    academic_class = selection_context["selected_class"]
+    semester = selection_context["selected_semester"]
+    if academic_class is None or semester is None:
+        return HttpResponse("Classe ou semestre invalide.", status=400)
+
+    context = _build_notes_grid_context(
+        academic_class=academic_class,
+        semester=semester,
+        requested_session_type=request.GET.get("session", "normal"),
+    )
+    return render(
+        request,
+        "portal/admin/grades/partials/notes_grid.html",
+        {
+            **context,
+            "embedded_in_dashboard": True,
+        },
+    )
+
+
+@login_required
+def it_notes_workspace_view(request):
+    if get_user_position(request.user) != "it_support":
+        return HttpResponseForbidden("Acces refuse.")
+
+    from portal.views.it_grades_import import build_it_grade_selection_context
+
+    selection_context = build_it_grade_selection_context(
+        request.user,
+        class_id=request.GET.get("class_id"),
+        semester_id=request.GET.get("semester_id"),
+    )
+    return render(
+        request,
+        "portal/staff/partials/it_notes_workspace.html",
+        selection_context,
     )

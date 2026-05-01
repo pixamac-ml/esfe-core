@@ -103,6 +103,10 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
     support_feedback = request.session.pop("it_support_feedback", None)
     search_results = search_support_entities(branch=branch, query=search_query)
     diagnostic_payload = build_diagnostic_payload(branch=branch, kind=selected_kind, object_id=selected_id) if selected_kind and selected_id else None
+    staff_action_queue = _build_staff_action_queue(
+        staff_users=staff_users,
+        limit=10,
+    )
 
     return {
         **base_context_builder(
@@ -136,8 +140,8 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
         "support_actions": [
             {
                 "title": "Gestion des notes",
-                "detail": "Acceder a la saisie, aux releves et aux tableaux complets existants.",
-                "href": reverse("accounts_portal:admin_grade_dashboard"),
+                "detail": "Ouvrir le workspace notes integre au dashboard informaticien.",
+                "href": f"{reverse('accounts_portal:portal_dashboard')}#grades",
             },
             {
                 "title": "Verifier les affectations",
@@ -152,7 +156,6 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
                 "detail": f"Score actuel {quality.get('score', 0)} avec {len(quality.get('warnings', []))} avertissement(s).",
             },
         ],
-        "grades_dashboard_url": reverse("accounts_portal:admin_grade_dashboard"),
         "grade_metrics": {
             "active_classes": active_classes.count(),
             "pending_semesters": pending_semesters.count(),
@@ -174,6 +177,13 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
             inscriptions_without_assignment=inscriptions_without_assignment,
             active_students_without_active_enrollment=active_students_without_active_enrollment,
         ),
+        "staff_action_queue": staff_action_queue,
+        "staff_action_queue_count": len(staff_action_queue),
+        "support_search_counts": {
+            "students": len(search_results["students"]),
+            "staff": len(search_results["staff"]),
+            "inscriptions": len(search_results["inscriptions"]),
+        },
         "support_feedback": support_feedback,
         "support_search": search_results,
         "diagnostic_payload": diagnostic_payload,
@@ -238,6 +248,9 @@ def _build_diagnostic_rows(*, inscriptions_without_assignment, active_students_w
                 "label": f"{candidature.first_name} {candidature.last_name}",
                 "issue": "Inscription sans affectation academique",
                 "context": f"{candidature.programme.title} - {candidature.branch.name}",
+                "kind": "inscription",
+                "object_id": inscription.id,
+                "query": f"{candidature.first_name} {candidature.last_name}",
             }
         )
     for student in active_students_without_active_enrollment.order_by("-created_at")[:4]:
@@ -246,6 +259,46 @@ def _build_diagnostic_rows(*, inscriptions_without_assignment, active_students_w
                 "label": student.full_name,
                 "issue": "Etudiant actif sans inscription academique active",
                 "context": f"{student.matricule} - {student.inscription.candidature.branch.name}",
+                "kind": "student",
+                "object_id": student.id,
+                "query": student.matricule or student.full_name,
             }
         )
     return rows[:6]
+
+
+def _build_staff_action_queue(*, staff_users, limit):
+    queue = []
+    queryset = (
+        staff_users.filter(
+            Q(is_active=False)
+            | Q(profile__position="")
+            | Q(profile__position__isnull=True)
+            | Q(profile__branch__isnull=True)
+            | Q(profile__employee_code="")
+            | Q(profile__employee_code__isnull=True)
+        )
+        .select_related("profile", "profile__branch")
+        .distinct()[:limit]
+    )
+    for user in queryset:
+        issues = []
+        profile = user.profile
+        if not user.is_active:
+            issues.append("Compte inactif")
+        if not profile.position:
+            issues.append("Position manquante")
+        if not profile.branch:
+            issues.append("Annexe manquante")
+        if not profile.employee_code:
+            issues.append("Code employe manquant")
+        queue.append(
+            {
+                "user": user,
+                "branch_label": profile.branch.name if profile.branch else "-",
+                "position_label": profile.get_position_display() or "-",
+                "employee_code": profile.employee_code or "-",
+                "issues": issues or ["Aucune incoherence critique detectee."],
+            }
+        )
+    return queue

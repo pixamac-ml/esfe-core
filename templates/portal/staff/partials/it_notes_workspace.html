@@ -1,0 +1,84 @@
+<div class="w-full min-w-0 space-y-4">
+  <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+    <div class="flex w-full flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Workspace Notes</p>
+        <h3 class="mt-2 text-2xl font-black text-slate-900 dark:text-slate-100">Saisie et controle academique</h3>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+          Selectionne une classe et un semestre. Le dashboard recharge uniquement l'espace de travail sans dupliquer la page.
+        </p>
+      </div>
+      <div class="grid w-full gap-4 xl:max-w-4xl xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_auto]">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Classe</label>
+          <select
+            name="class_id"
+            class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-950"
+            hx-get="{% url 'accounts_portal:it_notes_workspace' %}"
+            hx-target="#notes-workspace"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="[name='class_id']"
+          >
+            <option value="">Choisir une classe</option>
+            {% for c in classes %}
+            <option value="{{ c.id }}" {% if selected_class and selected_class.id == c.id %}selected{% endif %}>
+              {{ c.display_name }} - {{ c.academic_year.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Semestre</label>
+          <select
+            name="semester_id"
+            class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900 dark:focus:ring-blue-950"
+            {% if not selected_class %}disabled{% endif %}
+            hx-get="{% url 'accounts_portal:it_notes_workspace' %}"
+            hx-target="#notes-workspace"
+            hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="[name='class_id'],[name='semester_id']"
+          >
+            <option value="">Choisir un semestre</option>
+            {% for s in semesters %}
+            <option value="{{ s.id }}" {% if selected_semester and selected_semester.id == s.id %}selected{% endif %}>
+              S{{ s.number }} - {{ s.get_status_display }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex items-end">
+          {% if selected_class and selected_semester %}
+          <span class="inline-flex w-full items-center justify-center rounded-2xl bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+            Maquette chargee
+          </span>
+          {% else %}
+          <span class="inline-flex w-full items-center justify-center rounded-2xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            Selection requise
+          </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if selected_class and selected_semester %}
+  <div
+    id="notes-grid-panel"
+    hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ selected_class.id }}&semester_id={{ selected_semester.id }}"
+    hx-trigger="load"
+    hx-target="#notes-grid-panel"
+    hx-swap="innerHTML"
+    class="min-w-0 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 px-4 py-8 text-sm text-slate-500 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85 dark:text-slate-300"
+  >
+    Chargement de la maquette...
+  </div>
+  {% else %}
+  <div class="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
+    <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
+      Le module Notes n'affiche que les filtres, les actions et le tableau. Choisis d'abord une classe puis un semestre.
+    </div>
+  </div>
+  {% endif %}
+</div>

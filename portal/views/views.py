@@ -64,6 +64,7 @@ from portal.views.it_grades_import import build_it_grade_selection_context
 from students.models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance
 from students.services.attendance_service import (
     bulk_mark_student_attendance,
+    get_student_attendance_history,
     list_students_for_schedule_event,
     mark_student_attendance,
     mark_teacher_attendance,
@@ -267,7 +268,7 @@ def _user_initials(display_name: str) -> str:
 
 def _render_supervisor_dashboard(request):
     branch = _resolve_academic_branch(request)
-    _, class_picker_items, _ = get_supervisor_class_picker_bundle(branch=branch)
+    _, class_picker_items, classes_qs = get_supervisor_class_picker_bundle(branch=branch)
     selected_class_id = None
     selected_class_label = ""
     selected_class_raw = (request.GET.get("class_id") or "").strip()
@@ -287,6 +288,7 @@ def _render_supervisor_dashboard(request):
         "branch": branch,
         "today": timezone.localdate(),
         "class_picker_items": class_picker_items,
+        "total_classes": classes_qs.count() if branch else 0,
         "selected_class_id": selected_class_id,
         "selected_class_label": selected_class_label,
     }
@@ -317,18 +319,65 @@ def _parse_workflow_roll_date(request):
         return timezone.localdate()
 
 
+def _build_supervisor_schedule_section_context(*, branch, academic_class, week_start):
+    from academics.services.schedule_service import get_class_week_schedule
+    from academics.services.timetable_service import build_timetable_view_payload
+
+    schedule = get_class_week_schedule(academic_class, week_start)
+    summary = schedule.get("summary") or {}
+    day_event_counts = schedule.get("day_event_counts") or []
+    return {
+        "schedule": schedule,
+        "prev_week_start": schedule["week_start"] - timedelta(days=7),
+        "next_week_start": schedule["week_start"] + timedelta(days=7),
+        "schedule_week_total": len(schedule.get("events") or []),
+        "schedule_week_planned": summary.get("planned", 0),
+        "schedule_week_completed": summary.get("completed", 0),
+        "schedule_empty_days_count": len([item for item in day_event_counts if not item.get("has_events")]),
+        "timetable_view": build_timetable_view_payload(
+            branch=branch,
+            academic_class=academic_class,
+            week_start=schedule["week_start"],
+        ),
+    }
+
+
+def _build_supervisor_courses_section_context(request, *, branch, academic_class):
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    ecs = list(
+        EC.objects.select_related("ue", "ue__semester")
+        .filter(ue__semester__academic_class=academic_class)
+        .order_by("ue__semester__number", "ue__code", "title")[:250]
+    )
+    teacher_q = (request.GET.get("teacher_q") or "").strip()
+    teachers_qs = User.objects.filter(
+        is_active=True,
+        profile__branch=branch,
+        profile__position="teacher",
+    )
+    if teacher_q:
+        teachers_qs = teachers_qs.filter(
+            Q(first_name__icontains=teacher_q)
+            | Q(last_name__icontains=teacher_q)
+            | Q(username__icontains=teacher_q)
+        )
+    return {
+        "ecs": ecs,
+        "teachers": list(teachers_qs.order_by("first_name", "last_name", "username")[:80]),
+    }
+
+
 def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
     branch = _resolve_academic_branch(request)
     resolved_section = section or _parse_supervisor_section(request)
-    base_ctx = _build_supervisor_dashboard_context_for_partials(request, branch=branch)
-    class_picker_items = base_ctx.get("class_picker_items") or []
+    _, class_picker_items, _ = get_supervisor_class_picker_bundle(branch=branch)
 
     selected_class_id = None
     selected_class_raw = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
     if selected_class_raw.isdigit():
         selected_class_id = int(selected_class_raw)
-    elif base_ctx.get("selected_class_id"):
-        selected_class_id = base_ctx["selected_class_id"]
 
     selected_class = None
     if branch and selected_class_id:
@@ -347,15 +396,9 @@ def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
         "selected_class": selected_class,
         "selected_class_id": selected_class.id if selected_class else None,
         "selected_class_label": selected_class.display_name if selected_class else "",
-        "high_absence_classes": [
-            row for row in (base_ctx.get("class_watchlist") or []) if row.get("absent_count", 0) >= 3
-        ][:6],
-        "schedule_conflicts": [
-            item for item in (base_ctx.get("alerts") or []) if item.get("type") == "unresolved_conflict"
-        ][:6],
-        "unfollowed_classes": [
-            item for item in (base_ctx.get("alerts") or []) if item.get("type") == "class_without_events"
-        ][:6],
+        "high_absence_classes": [],
+        "schedule_conflicts": [],
+        "unfollowed_classes": [],
     }
     if toast:
         context["toast"] = toast
@@ -364,21 +407,32 @@ def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
         return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
 
     if resolved_section != "home" and selected_class is None:
-        context["requires_class_selection"] = True
+        # Verrouillage strict : pas de classe => on renvoie le workspace qui affichera uniquement le picker
         return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
 
     week_start = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
-    if selected_class and resolved_section in {"classes", "schedule", "courses", "students"}:
+    week_start_raw = (request.GET.get("week_start") or request.POST.get("week_start") or "").strip()
+    if week_start_raw:
         try:
-            class_ctx = _build_supervisor_class_detail_context(
-                request,
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    if selected_class and resolved_section == "schedule":
+        context.update(
+            _build_supervisor_schedule_section_context(
                 branch=branch,
-                class_id=selected_class.id,
+                academic_class=selected_class,
                 week_start=week_start,
             )
-            context.update(class_ctx)
-        except AcademicClass.DoesNotExist:
-            context["requires_class_selection"] = True
+        )
+    elif selected_class and resolved_section == "courses":
+        context.update(
+            _build_supervisor_courses_section_context(
+                request,
+                branch=branch,
+                academic_class=selected_class,
+            )
+        )
 
     if selected_class and resolved_section == "attendance":
         roll_date = _parse_workflow_roll_date(request)
@@ -445,6 +499,9 @@ def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
             }
         )
 
+        # Garantir la présence de (class_picker_items) pour le template strict.
+        # Les templates stricts n'affichent pas de blocs lourds si l'appel n'est pas possible.
+
     if selected_class and resolved_section == "students":
         query = (request.GET.get("q") or request.POST.get("q") or "").strip()
         students_qs = (
@@ -467,6 +524,16 @@ def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
             )
         context["students_list"] = list(students_qs[:200])
         context["student_query"] = query
+        today = timezone.localdate()
+        attendance_today = StudentAttendance.objects.filter(
+            branch=branch,
+            academic_class=selected_class,
+            date=today,
+        )
+        context["students_total_count"] = selected_class.enrollments.filter(is_active=True).count()
+        context["students_present_today"] = attendance_today.filter(status=StudentAttendance.STATUS_PRESENT).count()
+        context["students_absent_today"] = attendance_today.filter(status=StudentAttendance.STATUS_ABSENT).count()
+        context["students_late_today"] = attendance_today.filter(status=StudentAttendance.STATUS_LATE).count()
 
     return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
 
@@ -558,6 +625,7 @@ def supervisor_attendance_toggle_student(request):
                 "justification": attendance.justification,
             },
             "selected_event": schedule_event,
+            "roll_locked": is_roll_locked_for_event(branch=branch, event=schedule_event),
         },
     )
 
@@ -655,6 +723,7 @@ def supervisor_quick_course_create(request):
         if end_dt <= start_dt:
             raise ValidationError("L'heure de fin doit etre apres l'heure de debut.")
 
+        course_title = f"{ec.title} - {academic_class.display_name}"
         create_schedule_event(
             user=request.user,
             event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
@@ -664,7 +733,7 @@ def supervisor_quick_course_create(request):
             branch=branch,
             ec=ec,
             teacher=teacher,
-            title="",
+            title=course_title,
             description="",
             start_datetime=start_dt,
             end_datetime=end_dt,
@@ -680,7 +749,14 @@ def supervisor_quick_course_create(request):
         EC.DoesNotExist,
         User.DoesNotExist,
     ) as exc:
-        message = " ".join(getattr(exc, "messages", [])) if hasattr(exc, "messages") else str(exc)
+        if hasattr(exc, "message_dict"):
+            message = " ".join(
+                message
+                for messages in exc.message_dict.values()
+                for message in messages
+            )
+        else:
+            message = " ".join(getattr(exc, "messages", [])) if hasattr(exc, "messages") else str(exc)
         toast = {"level": "error", "message": message or "Impossible d'ajouter le cours."}
 
     return _render_supervisor_workflow_workspace(request, section=target_section, toast=toast)
@@ -711,10 +787,20 @@ def supervisor_student_drawer(request):
         .distinct()
         .first()
     )
+    history = get_student_attendance_history(student, branch=branch, limit=8) if student else []
+    active_alerts = (
+        AttendanceAlert.objects.filter(student=student, branch=branch, is_resolved=False).order_by("-triggered_at")
+        if student
+        else []
+    )
     return render(
         request,
         "portal/staff/supervisor/partials/student_drawer.html",
-        {"student": student},
+        {
+            "student": student,
+            "attendance_history": history,
+            "active_alerts": active_alerts,
+        },
     )
 
 

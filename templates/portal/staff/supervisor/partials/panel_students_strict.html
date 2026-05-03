@@ -1,0 +1,71 @@
+<div id="sg-students" class="space-y-4">
+  <div class="rounded-2xl border border-slate-200 bg-white p-5">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Étudiants</p>
+        <h2 class="mt-1 text-lg font-extrabold text-slate-900">Liste active et suivi assiduité</h2>
+      </div>
+      <form class="flex items-end gap-2"
+            hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}"
+            hx-target="#supervisor-workspace"
+            hx-swap="innerHTML"
+            hx-trigger="submit, keyup changed delay:250ms from:input[name='q']">
+        <input type="hidden" name="section" value="students">
+        <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+        <label class="text-xs font-bold text-slate-600">
+          Recherche
+          <input type="search" name="q" value="{{ student_query }}" placeholder="Nom, prénom, matricule…"
+                 class="mt-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">
+        </label>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid gap-3 md:grid-cols-4">
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Effectif</p>
+      <p class="mt-2 text-2xl font-black text-slate-900">{% if students_total_count is not None %}{{ students_total_count }}{% else %}{{ students_list|length }}{% endif %}</p>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Présents aujourd’hui</p>
+      <p class="mt-2 text-2xl font-black text-emerald-700">{{ students_present_today|default:0 }}</p>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Absents</p>
+      <p class="mt-2 text-2xl font-black text-rose-700">{{ students_absent_today|default:0 }}</p>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Retards</p>
+      <p class="mt-2 text-2xl font-black text-amber-700">{{ students_late_today|default:0 }}</p>
+    </div>
+  </div>
+
+  <div class="rounded-2xl border border-slate-200 bg-white">
+    <div class="border-b border-slate-200 p-4">
+      <p class="text-sm font-extrabold text-slate-900">{{ students_list|length }} étudiant(s)</p>
+    </div>
+    <div class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+      {% for student in students_list %}
+        <button type="button"
+                class="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-blue-200 hover:bg-blue-50/40"
+                hx-get="{% url 'accounts_portal:supervisor_student_drawer' %}?student_id={{ student.id }}&class_id={{ selected_class.id }}"
+                hx-target="#supervisor-drawer-content"
+                hx-swap="innerHTML"
+                hx-on="htmx:afterOnLoad: window.sgOpenDrawer && window.sgOpenDrawer()"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-extrabold text-slate-900">{{ student.full_name }}</p>
+              <p class="mt-1 text-xs font-semibold text-slate-500">{{ student.matricule }}</p>
+              <p class="mt-2 text-xs font-semibold text-slate-500">{{ student.programme_title }}</p>
+            </div>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700">Voir</span>
+          </div>
+        </button>
+      {% empty %}
+        <div class="p-5 text-sm font-semibold text-slate-600">Aucun étudiant trouvé.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+

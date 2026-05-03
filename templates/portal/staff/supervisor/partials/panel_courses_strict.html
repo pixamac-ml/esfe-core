@@ -1,0 +1,87 @@
+<div id="sg-courses" class="space-y-4">
+  {% if toast %}
+    <div class="rounded-2xl border {% if toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-900{% elif toast.level == 'error' %}border-rose-200 bg-rose-50 text-rose-900{% else %}border-slate-200 bg-slate-50 text-slate-900{% endif %} p-4">
+      <p class="text-sm font-extrabold">{{ toast.message }}</p>
+    </div>
+  {% endif %}
+
+  <div class="rounded-2xl border border-slate-200 bg-white p-5">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Cours</p>
+        <h2 class="mt-1 text-lg font-extrabold text-slate-900">Ajouter un cours (rapide)</h2>
+        <p class="mt-1 text-sm font-semibold text-slate-600">Formulaire inline · soumission HTMX.</p>
+      </div>
+    </div>
+
+    {% if ecs and teachers %}
+      <form class="mt-4 grid gap-3 md:grid-cols-3"
+            method="post"
+            hx-post="{% url 'accounts_portal:supervisor_quick_course_create' %}"
+            hx-target="#supervisor-workspace" hx-swap="innerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="courses">
+        <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+
+        <label class="text-xs font-bold text-slate-600">
+          Matière
+          <select name="ec_id" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">
+            <option value="">Choisir</option>
+            {% for ec in ecs %}
+              <option value="{{ ec.id }}">{{ ec.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="text-xs font-bold text-slate-600">
+          Enseignant
+          <select name="teacher_id" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">
+            <option value="">Choisir</option>
+            {% for t in teachers %}
+              <option value="{{ t.id }}">{{ t.get_full_name|default:t.username }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="text-xs font-bold text-slate-600">
+          Date
+          <input type="date" name="date" value="{{ today|date:'Y-m-d' }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
+        </label>
+
+        <label class="text-xs font-bold text-slate-600">
+          Heure début
+          <input type="time" name="start_time" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
+        </label>
+
+        <label class="text-xs font-bold text-slate-600">
+          Heure fin
+          <input type="time" name="end_time" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
+        </label>
+
+        <label class="text-xs font-bold text-slate-600">
+          Salle / lieu
+          <input type="text" name="location" placeholder="Ex: Salle A102" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">
+        </label>
+
+        <div class="md:col-span-3 flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700"
+            hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}"
+            hx-target="#supervisor-workspace"
+            hx-swap="innerHTML"
+          >Voir planning</button>
+          <button type="submit" class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white">Ajouter</button>
+        </div>
+      </form>
+    {% else %}
+      <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <p class="text-sm font-extrabold text-amber-900">Ajout cours indisponible</p>
+        <p class="mt-1 text-sm text-amber-800">Aucune matière ou enseignant disponible pour cette annexe/classe.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {# Si autre fonctionnalité cours (cahier de texte) n'est pas prête → on ne l'affiche pas ici #}
+</div>
+

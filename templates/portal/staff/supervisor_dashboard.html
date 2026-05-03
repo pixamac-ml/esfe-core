@@ -42,10 +42,10 @@
       <nav class="space-y-1 p-4">
         <button type="button" @click="go('home')" :class="btnClass('home')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Accueil</button>
         <button type="button" @click="go('classes')" :class="btnClass('classes')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Suivi des classes</button>
-        <button type="button" @click="go('attendance')" :class="btnClass('attendance')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Assiduite</button>
-        <button type="button" @click="go('schedule')" :class="btnClass('schedule')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Emploi du temps</button>
-        <button type="button" @click="go('courses')" :class="btnClass('courses')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Cours</button>
-        <button type="button" @click="go('students')" :class="btnClass('students')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Etudiants</button>
+        <button type="button" @click="go('attendance')" :disabled="!classId" :class="btnClass('attendance', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Assiduité</button>
+        <button type="button" @click="go('schedule')" :disabled="!classId" :class="btnClass('schedule', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Emploi du temps</button>
+        <button type="button" @click="go('courses')" :disabled="!classId" :class="btnClass('courses', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Cours</button>
+        <button type="button" @click="go('students')" :disabled="!classId" :class="btnClass('students', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Étudiants</button>
       </nav>
     </aside>
 
@@ -61,7 +61,19 @@
       </header>
 
       <section class="relative flex flex-1 overflow-hidden">
-        <div id="supervisor-workspace" class="sg-scroll flex-1 overflow-auto p-6"></div>
+        <div class="relative flex-1 overflow-hidden">
+          <div
+            x-show="loading"
+            x-transition.opacity
+            class="absolute inset-x-6 top-4 z-20 rounded-2xl border border-blue-100 bg-white/95 p-4 shadow-sm"
+          >
+            <div class="flex items-center gap-3">
+              <span class="h-3 w-3 animate-pulse rounded-full bg-blue-600"></span>
+              <span class="text-sm font-extrabold text-slate-700">Chargement du workspace...</span>
+            </div>
+          </div>
+          <div id="supervisor-workspace" class="sg-scroll h-full overflow-auto p-6"></div>
+        </div>
 
         <aside
           id="supervisor-drawer"
@@ -87,22 +99,46 @@
       section: 'home',
       classId: '{% if selected_class_id %}{{ selected_class_id }}{% endif %}',
       drawerOpen: false,
+      loading: false,
       init() {
+        document.body.addEventListener('htmx:beforeRequest', (event) => {
+          if (event.detail && event.detail.target && event.detail.target.id === 'supervisor-workspace') {
+            this.loading = true;
+          }
+        });
+        document.body.addEventListener('htmx:afterSettle', (event) => {
+          if (event.detail && event.detail.target && event.detail.target.id === 'supervisor-workspace') {
+            const selected = event.detail.target.querySelector('[data-selected-class-id]');
+            if (selected && selected.dataset.selectedClassId) {
+              this.classId = selected.dataset.selectedClassId;
+            }
+            this.loading = false;
+          }
+        });
+        document.body.addEventListener('htmx:responseError', () => { this.loading = false; });
         this.reload();
         window.sgOpenDrawer = () => { this.drawerOpen = true; };
       },
-      btnClass(section) {
+      btnClass(section, disabled=false) {
+        if (disabled) return 'opacity-40 cursor-not-allowed text-slate-300';
         return this.section === section
           ? 'bg-blue-600 text-white'
           : 'text-slate-300 hover:bg-slate-800';
       },
       go(section) {
-        this.section = section;
+        // Sélection de classe obligatoire (sauf home/classes)
+        const requiresClass = !['home', 'classes'].includes(section);
+        if (requiresClass && !this.classId) {
+          this.section = 'classes';
+        } else {
+          this.section = section;
+        }
         this.reload();
       },
       reload() {
         const params = new URLSearchParams({ section: this.section });
         if (this.classId) params.append('class_id', this.classId);
+        this.loading = true;
         htmx.ajax('GET', '{% url "accounts_portal:supervisor_workflow_workspace" %}?' + params.toString(), '#supervisor-workspace');
       }
     };

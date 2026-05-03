@@ -19,6 +19,24 @@ class Command(BaseCommand):
                     ("Anglais professionnel I", Decimal("3.00"), Decimal("2.00")),
                 ],
             },
+            {
+                "code": "UE104",
+                "title": "Methodes quantitatives",
+                "ecs": [
+                    ("Statistiques descriptives", Decimal("2.00"), Decimal("1.00")),
+                    ("Mathematiques financieres", Decimal("2.00"), Decimal("1.00")),
+                    ("Analyse de donnees", Decimal("2.00"), Decimal("1.00")),
+                ],
+            },
+            {
+                "code": "UE105",
+                "title": "Pratiques professionnelles",
+                "ecs": [
+                    ("Bureautique appliquee", Decimal("2.00"), Decimal("1.00")),
+                    ("Projet tutoriel I", Decimal("2.00"), Decimal("1.00")),
+                    ("Initiation a l entrepreneuriat", Decimal("2.00"), Decimal("1.00")),
+                ],
+            },
         ],
         2: [
             {
@@ -27,6 +45,24 @@ class Command(BaseCommand):
                 "ecs": [
                     ("Gestion des ressources humaines", Decimal("3.00"), Decimal("2.00")),
                     ("Communication professionnelle", Decimal("3.00"), Decimal("2.00")),
+                ],
+            },
+            {
+                "code": "UE204",
+                "title": "Gestion financiere et controle",
+                "ecs": [
+                    ("Comptabilite analytique", Decimal("2.00"), Decimal("1.00")),
+                    ("Budget et tresorerie", Decimal("2.00"), Decimal("1.00")),
+                    ("Controle interne", Decimal("2.00"), Decimal("1.00")),
+                ],
+            },
+            {
+                "code": "UE205",
+                "title": "Developpement professionnel",
+                "ecs": [
+                    ("Anglais professionnel II", Decimal("2.00"), Decimal("1.00")),
+                    ("Projet tutoriel II", Decimal("2.00"), Decimal("1.00")),
+                    ("Ethique et vie professionnelle", Decimal("2.00"), Decimal("1.00")),
                 ],
             },
         ],

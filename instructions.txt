@@ -1,202 +1,255 @@
-Tu dois corriger la STRUCTURE de la maquette des notes.
+Tu es un ingénieur Django senior.
 
-⚠️ Le problème n’est PAS esthétique, il est STRUCTUREL.
+MISSION :
+Construire le dashboard COMPLET du Directeur des Études pour une annexe académique.
 
----
+⚠️ IMPORTANT :
 
-# ❌ PROBLÈMES ACTUELS
-
-1. Les UE (Unités d’Enseignement) sont mal groupées
-2. Les colonnes ne respectent pas leur périmètre
-3. Les colspan sont incorrects
-4. Les headers ne correspondent pas aux colonnes
-5. Le sticky est mal géré (les cellules passent au-dessus des noms)
-6. Les sections "Résultat du semestre" sont mal positionnées
-7. Les lignes de séparation sont invisibles
+* Ce dashboard est stratégique (niveau management)
+* Ne pas faire un dashboard décoratif
+* Construire des WORKFLOWS réels
+* Tout filtrer par request.user.branch
+* Réutiliser les services existants (notes, résultats, classes, enseignants)
 
 ---
 
-# 🎯 OBJECTIF
+# 🎯 OBJECTIF GLOBAL
 
-Reconstruire une table STRUCTURÉE avec :
+Créer un dashboard qui permet de :
 
-* THEAD multi-niveaux correct
-* COLSPAN dynamiques corrects
-* ALIGNEMENT strict des colonnes
-* STICKY fonctionnel (priorité z-index)
-* SECTIONS bien regroupées (UE, Résultats)
+* piloter l’activité académique
+* gérer les enseignants
+* valider et publier les résultats
+* superviser les classes
 
----
-
-# 🧱 STRUCTURE OBLIGATOIRE DU THEAD
-
-Tu dois construire 3 niveaux :
-
-### NIVEAU 1 (groupes)
-
-* Étudiants
-* UE201 (colspan dynamique)
-* UE202 (colspan dynamique)
-* Résultat du semestre (colspan fixe)
+Un dashboard est un outil de pilotage décisionnel, pas un simple affichage ([Manager GO!][1])
 
 ---
 
-### NIVEAU 2 (matières)
+# 🧱 STRUCTURE SIDEBAR
 
-Chaque UE contient ses matières :
-
-Ex :
-
-UE201 →
-
-* Marketing
-* Comptabilité
-
-UE202 →
-
-* Droit
+* Accueil
+* Pilotage académique
+* Enseignants
+* Affectations
+* Résultats & Validation
+* Publications
 * Statistiques
+* Étudiants
+* Paramètres
 
 ---
 
-### NIVEAU 3 (colonnes internes)
+# 🏠 1. ACCUEIL (OBLIGATOIRE)
 
-Pour chaque matière :
+Afficher :
 
-* Note
-* Note coef
-* Crédits obtenus
+* message : "Que voulez-vous piloter aujourd’hui ?"
 
----
+Cartes :
 
-### ⚠️ TRÈS IMPORTANT
+* classes prêtes à publier
+* classes en cours
+* classes sans notes
+* enseignants non affectés
 
-👉 Les colspan doivent être calculés dynamiquement :
+Actions rapides :
 
-```python
-colspan = nombre_matieres * 3
-```
-
----
-
-# 📌 POSITIONNEMENT CRITIQUE
-
-### UE
-
-👉 doit couvrir TOUTES ses matières
-👉 ne doit JAMAIS se casser visuellement
+* Voir classes
+* Gérer enseignants
+* Valider résultats
 
 ---
 
-### RÉSULTAT DU SEMESTRE
+# 📊 2. PILOTAGE ACADÉMIQUE
 
-👉 doit être FIXE à droite
-👉 doit regrouper :
+⚠️ Écran principal
 
-* Moyenne
-* Pourcentage
-* Crédits
-* Actions (PDF)
+Afficher :
 
----
+* liste classes
 
-# 🎯 STICKY (CORRECTION OBLIGATOIRE)
+* état :
 
-Corriger le problème où les cellules passent AU-DESSUS des noms
+  * 🔴 pas de notes
+  * 🟡 en cours
+  * 🟢 prêt
 
-### RÈGLES :
+* progression (%)
 
-```css
-thead th {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: white;
-}
+Action :
 
-tbody td:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 30;
-  background: white;
-}
-```
-
-👉 Le nom étudiant DOIT être au-dessus de tout
+→ ouvrir classe
 
 ---
 
-# 📏 ALIGNEMENT TABLE
+# 👨‍🏫 3. ENSEIGNANTS
 
-Ajouter :
+Fonctions :
 
-```html
-<table class="min-w-max border-collapse">
-```
-
-Colonnes :
-
-```html
-<th class="min-w-[120px] text-center">
-<td class="min-w-[100px] text-center">
-```
+* créer enseignant
+* modifier profil
+* voir liste enseignants
+* filtrer par statut
 
 ---
 
-# 📐 GRID WRAPPER (IMPORTANT)
+# 📚 4. AFFECTATIONS
 
-Ne pas laisser la table casser la page :
+Workflow :
 
-```html
-<div class="overflow-x-auto overflow-y-auto max-h-[65vh]">
-```
+Classe → Cours (EC) → Enseignant
 
----
+Fonctions :
 
-# 🎨 LIGNES ET LISIBILITÉ
-
-Améliorer les séparations :
-
-* border-gray-300 minimum
-* ajouter border entre groupes UE
-* ajouter séparation forte avant "Résultat du semestre"
+* voir cours non affectés
+* assigner enseignant
+* modifier affectation
 
 ---
 
-# 🧪 TEST FINAL OBLIGATOIRE
+# 🔥 5. RÉSULTATS & VALIDATION (CRITIQUE)
 
-Vérifier :
+Workflow central :
 
-1. Les UE couvrent correctement leurs matières
-2. Aucun décalage horizontal
-3. Les headers correspondent aux colonnes
-4. Le scroll horizontal fonctionne
-5. Les noms restent visibles (sticky OK)
-6. Le bloc "Résultat du semestre" reste aligné à droite
-7. Les lignes sont lisibles
+Informaticien → calcul → Directeur valide → publication
+
+---
+
+## ÉTAPE 1
+
+Afficher classes :
+
+* prêtes
+* en cours
+* erreurs
+
+---
+
+## ÉTAPE 2
+
+Cliquer classe →
+
+Afficher :
+
+* maquette résultats (lecture seule)
+* anomalies
+
+---
+
+## ÉTAPE 3
+
+Actions :
+
+* Valider
+* Rejeter
+* Publier
+
+---
+
+⚠️ IMPORTANT
+
+* Ne pas recalculer
+* Utiliser données existantes
+
+---
+
+# 🧾 6. PUBLICATIONS
+
+Fonctions :
+
+* générer relevé par classe
+* générer relevé individuel
+* export PDF
+
+---
+
+# 📈 7. STATISTIQUES
+
+Afficher :
+
+* taux de réussite
+* classes faibles
+* performances enseignants
+
+⚠️ Pas de graphiques inutiles
+
+---
+
+# 👨‍🎓 8. ÉTUDIANTS
+
+Fonctions :
+
+* liste étudiants
+* recherche
+* voir résultats
+
+---
+
+# ⚙️ 9. PARAMÈTRES
+
+* profil
+* salaire
+* sécurité
+
+❌ Ne pas gérer logique académique ici
+
+---
+
+# 🧠 UX OBLIGATOIRE
+
+* workflow guidé
+* HTMX (pas reload)
+* drawer pour détails
+* aucun écran vide
+* aucune surcharge
+
+---
+
+# 🔒 SÉCURITÉ
+
+* filtrage par annexe obligatoire
+* aucune modification globale
 
 ---
 
 # 🚫 INTERDIT
 
-* Hardcoder les colspan
-* Mélanger logique et template
-* Laisser des colonnes flotter
-* Laisser un header mal aligné
+* afficher tout en même temps
+* mélange modules
+* actions sans workflow
+* pages longues inutiles
+
+---
+
+# 🧪 TEST FINAL
+
+Le Directeur doit pouvoir :
+
+1. voir les classes
+2. voir leur état
+3. ouvrir une classe
+4. analyser résultats
+5. valider
+6. publier
+7. générer PDF
+8. gérer enseignants
 
 ---
 
 # 🎯 LIVRABLE
 
-Une maquette :
+Un dashboard :
 
-* alignée
-* stable
-* lisible
-* scalable (fonctionne avec plusieurs UE)
-* professionnelle
+* stratégique
+* fluide
+* orienté décision
+* professionnel
 
 ---
 
-Corriger uniquement la STRUCTURE.
-Ne pas casser le reste.
+Corriger ou créer sans casser l’existant.
+Ne pas ajouter de modules inutiles.
+Construire un outil de pilotage réel.
+
+[1]: https://www.manager-go.com/finance/dossiers-methodes/guide-creation-tableau-de-bord?utm_source=chatgpt.com "Tableau de bord : définition, utilité... guide complet"

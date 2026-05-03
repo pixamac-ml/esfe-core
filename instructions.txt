@@ -1,255 +1,151 @@
-Tu es un ingénieur Django senior.
+Tu as mis en place une première base du dashboard Directeur des Études. Maintenant, il faut passer à la PHASE 2 : rendre les workflows vraiment exploitables.
 
-MISSION :
-Construire le dashboard COMPLET du Directeur des Études pour une annexe académique.
-
-⚠️ IMPORTANT :
-
-* Ce dashboard est stratégique (niveau management)
-* Ne pas faire un dashboard décoratif
-* Construire des WORKFLOWS réels
-* Tout filtrer par request.user.branch
-* Réutiliser les services existants (notes, résultats, classes, enseignants)
+Objectif :
+Ne pas refaire tout le dashboard. Polir et compléter uniquement les sections encore faibles.
 
 ---
 
-# 🎯 OBJECTIF GLOBAL
+# PRIORITÉ 1 — RÉSULTATS & VALIDATION
 
-Créer un dashboard qui permet de :
+Améliorer le détail lecture seule des résultats.
 
-* piloter l’activité académique
-* gérer les enseignants
-* valider et publier les résultats
-* superviser les classes
+Quand le Directeur ouvre une classe/semestre :
 
-Un dashboard est un outil de pilotage décisionnel, pas un simple affichage ([Manager GO!][1])
+* afficher les résultats en lecture seule
+* afficher les étudiants
+* afficher moyenne, crédits, statut
+* afficher anomalies éventuelles
+* afficher les actions :
 
----
+  * Valider
+  * Rejeter
+  * Publier
 
-# 🧱 STRUCTURE SIDEBAR
+Important :
 
-* Accueil
-* Pilotage académique
-* Enseignants
-* Affectations
-* Résultats & Validation
-* Publications
-* Statistiques
-* Étudiants
-* Paramètres
+* le Directeur ne saisit pas les notes
+* il ne recalcule pas
+* il valide/publie uniquement ce que l’informaticien a préparé
 
 ---
 
-# 🏠 1. ACCUEIL (OBLIGATOIRE)
+# PRIORITÉ 2 — REJET DES RÉSULTATS
+
+Le bouton “Rejeter” doit être fonctionnel.
+
+Workflow :
+
+Directeur ouvre résultats
+→ constate problème
+→ clique Rejeter
+→ saisit motif
+→ le semestre/classe retourne côté informaticien avec statut clair
 
 Afficher :
 
-* message : "Que voulez-vous piloter aujourd’hui ?"
-
-Cartes :
-
-* classes prêtes à publier
-* classes en cours
-* classes sans notes
-* enseignants non affectés
-
-Actions rapides :
-
-* Voir classes
-* Gérer enseignants
-* Valider résultats
+* motif du rejet
+* date
+* auteur
 
 ---
 
-# 📊 2. PILOTAGE ACADÉMIQUE
+# PRIORITÉ 3 — AFFECTATIONS ENSEIGNANTS
 
-⚠️ Écran principal
+Compléter la section Affectations.
 
-Afficher :
+Workflow :
 
-* liste classes
+Classe → EC/Cours → Enseignant
 
-* état :
+Fonctions :
 
-  * 🔴 pas de notes
-  * 🟡 en cours
-  * 🟢 prêt
+* afficher EC sans enseignant
+* assigner enseignant
+* modifier affectation
+* retirer affectation
 
-* progression (%)
-
-Action :
-
-→ ouvrir classe
+Tout filtrer par request.user.branch.
 
 ---
 
-# 👨‍🏫 3. ENSEIGNANTS
+# PRIORITÉ 4 — ENSEIGNANTS
+
+Améliorer la gestion enseignants.
 
 Fonctions :
 
 * créer enseignant
 * modifier profil
-* voir liste enseignants
-* filtrer par statut
+* voir détails dans drawer
+* voir cours/classes affectés
+* statut actif/inactif
+
+Ne pas mélanger avec gestion des comptes informaticien.
 
 ---
 
-# 📚 4. AFFECTATIONS
+# PRIORITÉ 5 — ÉTUDIANTS
 
-Workflow :
+Section étudiants :
 
-Classe → Cours (EC) → Enseignant
-
-Fonctions :
-
-* voir cours non affectés
-* assigner enseignant
-* modifier affectation
-
----
-
-# 🔥 5. RÉSULTATS & VALIDATION (CRITIQUE)
-
-Workflow central :
-
-Informaticien → calcul → Directeur valide → publication
-
----
-
-## ÉTAPE 1
-
-Afficher classes :
-
-* prêtes
-* en cours
-* erreurs
-
----
-
-## ÉTAPE 2
-
-Cliquer classe →
-
-Afficher :
-
-* maquette résultats (lecture seule)
-* anomalies
-
----
-
-## ÉTAPE 3
-
-Actions :
-
-* Valider
-* Rejeter
-* Publier
-
----
-
-⚠️ IMPORTANT
-
-* Ne pas recalculer
-* Utiliser données existantes
-
----
-
-# 🧾 6. PUBLICATIONS
-
-Fonctions :
-
-* générer relevé par classe
-* générer relevé individuel
-* export PDF
-
----
-
-# 📈 7. STATISTIQUES
-
-Afficher :
-
-* taux de réussite
-* classes faibles
-* performances enseignants
-
-⚠️ Pas de graphiques inutiles
-
----
-
-# 👨‍🎓 8. ÉTUDIANTS
-
-Fonctions :
-
-* liste étudiants
+* choisir classe
+* afficher liste étudiants
 * recherche
-* voir résultats
+* ouvrir fiche étudiant en drawer
+* voir résultats disponibles
+* voir relevés publiés
+
+Pas de modification académique sensible ici.
 
 ---
 
-# ⚙️ 9. PARAMÈTRES
+# PRIORITÉ 6 — PUBLICATIONS
 
-* profil
-* salaire
-* sécurité
+Améliorer publications :
 
-❌ Ne pas gérer logique académique ici
+* afficher uniquement semestres publiés
+* générer relevés par classe
+* générer relevé individuel
+* exporter PDF
+
+Si PDF pas prêt, masquer le bouton au lieu de laisser une action cassée.
 
 ---
 
-# 🧠 UX OBLIGATOIRE
+# UX OBLIGATOIRE
 
-* workflow guidé
-* HTMX (pas reload)
+* HTMX sans reload complet
 * drawer pour détails
+* aucun bouton mort
 * aucun écran vide
-* aucune surcharge
+* si action impossible : expliquer pourquoi
 
 ---
 
-# 🔒 SÉCURITÉ
+# SÉCURITÉ
 
-* filtrage par annexe obligatoire
-* aucune modification globale
+Tout filtrer par request.user.branch.
 
----
+Actions interdites :
 
-# 🚫 INTERDIT
-
-* afficher tout en même temps
-* mélange modules
-* actions sans workflow
-* pages longues inutiles
+* modifier notes
+* accéder autre annexe
+* recalculer résultats
 
 ---
 
-# 🧪 TEST FINAL
+# TEST FINAL
 
 Le Directeur doit pouvoir :
 
-1. voir les classes
-2. voir leur état
-3. ouvrir une classe
-4. analyser résultats
-5. valider
+1. ouvrir dashboard
+2. voir classes prêtes
+3. ouvrir résultats en lecture seule
+4. valider
+5. rejeter avec motif
 6. publier
-7. générer PDF
-8. gérer enseignants
+7. gérer affectations enseignants
+8. consulter étudiants
+9. générer relevés publiés
 
----
-
-# 🎯 LIVRABLE
-
-Un dashboard :
-
-* stratégique
-* fluide
-* orienté décision
-* professionnel
-
----
-
-Corriger ou créer sans casser l’existant.
-Ne pas ajouter de modules inutiles.
-Construire un outil de pilotage réel.
-
-[1]: https://www.manager-go.com/finance/dossiers-methodes/guide-creation-tableau-de-bord?utm_source=chatgpt.com "Tableau de bord : définition, utilité... guide complet"
+Ne pas refaire la base existante. Compléter proprement.

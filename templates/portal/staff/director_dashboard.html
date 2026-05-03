@@ -1,186 +1,431 @@
 {% extends "portal/staff/dashboard_shell.html" %}
 
 {% block sidebar_nav %}
-<a class="portal-list-link active" href="#overview"><i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i><span>Vue generale</span></a>
-<a class="portal-list-link" href="#programming"><i data-lucide="calendar-days" style="width:18px;height:18px;"></i><span>Programmation</span></a>
-<a class="portal-list-link" href="#classes"><i data-lucide="school" style="width:18px;height:18px;"></i><span>Classes</span></a>
-<a class="portal-list-link" href="#alerts"><i data-lucide="triangle-alert" style="width:18px;height:18px;"></i><span>Alertes</span></a>
+<button class="portal-list-link director-nav active" type="button" data-section="home"><i data-lucide="home" style="width:18px;height:18px;"></i><span>Accueil</span></button>
+<button class="portal-list-link director-nav" type="button" data-section="academic"><i data-lucide="school" style="width:18px;height:18px;"></i><span>Pilotage academique</span></button>
+<button class="portal-list-link director-nav" type="button" data-section="teachers"><i data-lucide="users" style="width:18px;height:18px;"></i><span>Enseignants</span></button>
+<button class="portal-list-link director-nav" type="button" data-section="assignments"><i data-lucide="book-open-check" style="width:18px;height:18px;"></i><span>Affectations</span></button>
+<button class="portal-list-link director-nav" type="button" data-section="results"><i data-lucide="badge-check" style="width:18px;height:18px;"></i><span>Resultats & validation</span></button>
+<button class="portal-list-link director-nav" type="button" data-section="publications"><i data-lucide="file-down" style="width:18px;height:18px;"></i><span>Publications</span></button>
+<button class="portal-list-link director-nav" type="button" data-section="stats"><i data-lucide="bar-chart-3" style="width:18px;height:18px;"></i><span>Statistiques</span></button>
+<button class="portal-list-link director-nav" type="button" data-section="students"><i data-lucide="graduation-cap" style="width:18px;height:18px;"></i><span>Etudiants</span></button>
+<button class="portal-list-link director-nav" type="button" data-section="settings"><i data-lucide="settings" style="width:18px;height:18px;"></i><span>Parametres</span></button>
 {% endblock %}
 
 {% block topbar_actions %}
-<span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{{ branch.name|default:"Vue globale" }}</span>
+<span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{{ branch.name|default:"Annexe non definie" }}</span>
 <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</span>
+<span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">{{ quality_score|default:0 }}/100</span>
 {% endblock %}
 
 {% block dashboard_content %}
-<section id="overview" class="portal-card portal-hero">
-  <div class="portal-card-pad flex flex-col justify-between gap-4">
-    <div>
-      <p class="portal-section-kicker">Direction des etudes</p>
-      <h2 class="mt-2 text-2xl font-black text-slate-900 leading-tight">Pilotage de la qualite academique et des charges</h2>
-      <p class="mt-3 max-w-2xl text-sm text-slate-600">Vue de direction pour suivre la qualite, la planification, les classes actives et les alertes de programmation.</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-      {% for module in module_cards %}
-      <span class="portal-pill">{{ module }}</span>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="border-l border-slate-100 bg-slate-50 p-5">
-    <div class="grid grid-cols-2 gap-3">
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Evenements</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ schedule_stats.total_events|default:0 }}</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Taux completion</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ schedule_stats.completion_rate|default:0 }}%</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Classes actives</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_classes }}</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Qualite</p>
-        <p class="mt-2 text-2xl font-black {% if quality.score >= 85 %}text-emerald-600{% elif quality.score >= 70 %}text-blue-600{% elif quality.score >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ quality.score|default:0 }}</p>
-      </div>
-    </div>
-  </div>
-</section>
+<style>
+  .director-page {
+    width: 100%;
+    display: grid;
+    gap: 1rem;
+  }
 
-<section class="mt-4 portal-grid-two">
-  <div class="space-y-4">
-    <div class="portal-card portal-card-pad">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="portal-section-kicker">Programmation</p>
-          <h3 class="portal-section-title" id="programming">Evenements de la semaine</h3>
-        </div>
-        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ current_week_events|length }} lignes</span>
-      </div>
-      <div class="mt-4 overflow-x-auto">
-        <table class="w-full min-w-[860px] divide-y divide-slate-100">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Horaire</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Annexe</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Classe</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Enseignant</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Etat</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            {% for event in current_week_events %}
-            <tr class="hover:bg-slate-50">
-              <td class="px-4 py-3 text-sm font-semibold text-slate-900">{{ event.start_datetime|date:"D d/m H:i" }}</td>
-              <td class="px-4 py-3 text-sm text-slate-700">{{ event.branch.name }}</td>
-              <td class="px-4 py-3 text-sm text-slate-700">{{ event.academic_class.display_name }}</td>
-              <td class="px-4 py-3 text-sm text-slate-700">{{ event.teacher.get_full_name|default:event.teacher.username }}</td>
-              <td class="px-4 py-3 text-sm">
-                <span class="rounded-full px-2.5 py-1 text-xs font-bold {% if event.status == 'completed' %}bg-emerald-100 text-emerald-700{% elif event.status == 'ongoing' %}bg-blue-100 text-blue-700{% elif event.status == 'planned' %}bg-amber-100 text-amber-700{% elif event.status == 'postponed' %}bg-violet-100 text-violet-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ event.get_status_display }}</span>
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-400">Aucun evenement programme pour cette periode.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+  .director-hero {
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+    gap: 1rem;
+  }
 
-    <div class="portal-card portal-card-pad" id="classes">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="portal-section-kicker">Classes</p>
-          <h3 class="portal-section-title">Structure academique</h3>
-        </div>
-        <span class="text-xs font-bold text-slate-500">{{ classes|length }} visibles</span>
-      </div>
-      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-        {% for academic_class in classes %}
-        <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="text-sm font-black text-slate-900">{{ academic_class.display_name }}</p>
-              <p class="mt-1 text-xs text-slate-500">{{ academic_class.branch.name }} - {{ academic_class.programme.title }}</p>
-            </div>
-            <span class="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600">{{ academic_class.student_count|default:0 }} etudiants</span>
-          </div>
-        </article>
-        {% empty %}
-        <p class="text-sm text-slate-400">Aucune classe a afficher.</p>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
+  .director-hero-copy {
+    display: grid;
+    gap: .85rem;
+    align-content: start;
+  }
 
-  <div class="space-y-4">
-    <div class="portal-card portal-card-pad">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="portal-section-kicker">Qualite</p>
-          <h3 class="portal-section-title">Radar academique</h3>
-        </div>
-        <span class="rounded-full px-3 py-1 text-xs font-bold {% if quality.status == 'excellent' %}bg-emerald-100 text-emerald-700{% elif quality.status == 'good' %}bg-blue-100 text-blue-700{% elif quality.status == 'medium' %}bg-amber-100 text-amber-700{% else %}bg-rose-100 text-rose-700{% endif %}">{{ quality.status|default:"indefini" }}</span>
-      </div>
-      <div class="mt-4 grid grid-cols-2 gap-3">
-        <div class="rounded-2xl bg-slate-50 p-4">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Completes</p>
-          <p class="mt-2 text-2xl font-black text-slate-900">{{ schedule_stats.completed_count|default:0 }}</p>
-        </div>
-        <div class="rounded-2xl bg-slate-50 p-4">
-          <p class="text-xs uppercase tracking-wide text-slate-400">Annulations</p>
-          <p class="mt-2 text-2xl font-black text-slate-900">{{ schedule_stats.cancelled_count|default:0 }}</p>
-        </div>
-      </div>
-      <div class="mt-4 space-y-2">
-        {% for warning in quality.warnings %}
-        <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ warning }}</div>
-        {% empty %}
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Qualite academique stable sur la periode.</div>
-        {% endfor %}
-      </div>
-    </div>
+  .director-hero-title {
+    font-size: 1.7rem;
+    line-height: 1.1;
+    font-weight: 950;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
 
-    <div class="portal-card portal-card-pad" id="alerts">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="portal-section-kicker">Alertes</p>
-          <h3 class="portal-section-title">Anomalies detectees</h3>
-        </div>
-        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ alerts|length }}</span>
-      </div>
-      <div class="mt-4 space-y-2">
-        {% for alert in alerts %}
-        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-          <p class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ alert.type }}</p>
-          <p class="mt-1 text-sm text-slate-700">{{ alert.message }}</p>
-        </div>
-        {% empty %}
-        <p class="text-sm text-slate-400">Aucune alerte critique sur la semaine.</p>
-        {% endfor %}
-      </div>
-    </div>
+  .director-hero-text {
+    max-width: 62ch;
+    font-size: .94rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
 
-    <div class="portal-card portal-card-pad">
+  .director-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+  }
+
+  .director-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    border-radius: 12px;
+    padding: .65rem 1rem;
+    font-size: .86rem;
+    font-weight: 900;
+    transition: .16s ease;
+  }
+
+  .director-btn-primary {
+    background: var(--school-primary);
+    color: white;
+  }
+
+  .director-btn-primary:hover {
+    background: #18455f;
+  }
+
+  .director-btn-secondary {
+    border: 1px solid var(--line);
+    background: white;
+    color: var(--text);
+  }
+
+  .director-btn-secondary:hover {
+    background: #f8fafc;
+  }
+
+  .director-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .85rem;
+  }
+
+  .director-kpi-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: white;
+    padding: .95rem;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+  }
+
+  .director-kpi-card p {
+    margin: 0;
+  }
+
+  .director-kpi-label {
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    font-size: .68rem;
+    font-weight: 800;
+    color: #64748b;
+  }
+
+  .director-kpi-value {
+    margin-top: .35rem;
+    font-size: 1.8rem;
+    line-height: 1;
+    font-weight: 950;
+    color: var(--text);
+  }
+
+  .director-shortcuts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+  }
+
+  .director-shortcut {
+    display: grid;
+    gap: .55rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: white;
+    padding: .95rem;
+    text-align: left;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+    transition: .16s ease;
+  }
+
+  .director-shortcut:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, .08);
+  }
+
+  .director-shortcut.active {
+    border-color: rgba(37, 99, 235, .25);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .12);
+    background: linear-gradient(180deg, #eff6ff, #ffffff);
+  }
+
+  .director-shortcut-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: #e0f2fe;
+    color: #0f172a;
+  }
+
+  .director-workflow-stack {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .director-workflow-band,
+  .director-workflow-card,
+  .director-workflow-empty,
+  .director-workflow-toast {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: white;
+    padding: 1rem;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+  }
+
+  .director-workflow-band {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-left-width: 6px;
+  }
+
+  .director-workflow-band h3 {
+    margin-top: .25rem;
+    font-size: 1.2rem;
+    font-weight: 950;
+    color: var(--text);
+  }
+
+  .director-workflow-band p,
+  .director-workflow-muted {
+    margin-top: .35rem;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .director-workflow-band span {
+    border-radius: 999px;
+    background: #eff6ff;
+    padding: .45rem .75rem;
+    color: #1d4ed8;
+    font-size: .78rem;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .director-workflow-band-home { border-left-color: #2563eb; }
+  .director-workflow-band-academic { border-left-color: #0ea5e9; }
+  .director-workflow-band-teachers { border-left-color: #8b5cf6; }
+  .director-workflow-band-assignments { border-left-color: #f59e0b; }
+  .director-workflow-band-results { border-left-color: #059669; }
+  .director-workflow-band-publications { border-left-color: #4f46e5; }
+  .director-workflow-band-stats { border-left-color: #0f766e; }
+  .director-workflow-band-students { border-left-color: #dc2626; }
+  .director-workflow-band-settings { border-left-color: #64748b; }
+
+  .director-workflow-split {
+    display: grid;
+    grid-template-columns: .95fr 1.05fr;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .director-workflow-list {
+    margin-top: .9rem;
+    display: grid;
+    gap: .65rem;
+  }
+
+  .director-workflow-list article {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: white;
+    padding: .9rem;
+  }
+
+  .director-workflow-list strong,
+  .director-workflow-list span {
+    display: block;
+  }
+
+  .director-workflow-list span {
+    margin-top: .2rem;
+    font-size: .82rem;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .director-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .director-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .director-empty {
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 1.2rem;
+    text-align: center;
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  @media (max-width: 1100px) {
+    .director-hero,
+    .director-workflow-split {
+      grid-template-columns: 1fr;
+    }
+
+    .director-shortcuts,
+    .director-grid-2,
+    .director-grid-3,
+    .director-kpi-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .director-shortcuts,
+    .director-grid-2,
+    .director-grid-3,
+    .director-kpi-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="director-page">
+  <section class="portal-card portal-card-pad director-hero">
+    <div class="director-hero-copy">
       <div>
-        <p class="portal-section-kicker">Charge</p>
-        <h3 class="portal-section-title">Top classes chargees</h3>
+        <p class="portal-section-kicker">Direction des etudes</p>
+        <h2 class="director-hero-title">Pilotage academique, validation et publication</h2>
+        <p class="director-hero-text mt-3">
+          Suivez les classes, les enseignants, les affectations et les resultats depuis un seul tableau de bord.
+          Les blocs ci-dessous sont relies aux donnees de l'annexe, sans double calcul inutile.
+        </p>
       </div>
-      <div class="mt-4 space-y-3">
-        {% for class_name, load in class_load_items %}
-        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-sm font-semibold text-slate-900">{{ class_name }}</span>
-            <span class="text-xs font-bold text-slate-500">{{ load.hours|floatformat:1 }} h</span>
-          </div>
-          <p class="mt-1 text-xs text-slate-500">{{ load.count }} cours planifies</p>
-        </div>
-        {% empty %}
-        <p class="text-sm text-slate-400">Aucune charge detectee.</p>
-        {% endfor %}
+      <div class="director-hero-actions">
+        <button type="button" class="director-btn director-btn-primary" data-director-section="results">Ouvrir les resultats</button>
+        <button type="button" class="director-btn director-btn-secondary" data-director-section="academic">Voir le pilotage</button>
+        <button type="button" class="director-btn director-btn-secondary" data-director-section="students">Gerer les classes</button>
+        <button type="button" class="director-btn director-btn-secondary" data-director-section="teachers">Controle enseignants</button>
       </div>
     </div>
+
+    <div class="director-kpi-grid">
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Classes actives</p>
+        <p class="director-kpi-value">{{ total_classes|default:0 }}</p>
+      </div>
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Semestres</p>
+        <p class="director-kpi-value">{{ total_semesters|default:0 }}</p>
+      </div>
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">A valider</p>
+        <p class="director-kpi-value">{{ ready_to_validate_count|default:0 }}</p>
+      </div>
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Qualite planning</p>
+        <p class="director-kpi-value {% if quality_score >= 85 %}text-emerald-600{% elif quality_score >= 70 %}text-blue-600{% elif quality_score >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ quality_score|default:0 }}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="director-shortcuts">
+    <button type="button" class="director-shortcut text-left" data-director-section="home">
+      <div class="director-shortcut-icon"><i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i></div>
+      <p class="text-sm font-black text-slate-900">Vue globale</p>
+      <p class="text-xs font-semibold text-slate-500">{{ home_alerts_count|default:0 }} alerte(s)</p>
+    </button>
+    <button type="button" class="director-shortcut text-left" data-director-section="academic">
+      <div class="director-shortcut-icon"><i data-lucide="school" style="width:20px;height:20px;"></i></div>
+      <p class="text-sm font-black text-slate-900">Pilotage academique</p>
+      <p class="text-xs font-semibold text-slate-500">{{ total_classes|default:0 }} classe(s)</p>
+    </button>
+    <button type="button" class="director-shortcut text-left" data-director-section="results">
+      <div class="director-shortcut-icon"><i data-lucide="badge-check" style="width:20px;height:20px;"></i></div>
+      <p class="text-sm font-black text-slate-900">Resultats</p>
+      <p class="text-xs font-semibold text-slate-500">{{ ready_to_validate_count|default:0 }} en attente</p>
+    </button>
+    <button type="button" class="director-shortcut text-left" data-director-section="students">
+      <div class="director-shortcut-icon"><i data-lucide="graduation-cap" style="width:20px;height:20px;"></i></div>
+      <p class="text-sm font-black text-slate-900">Etudiants</p>
+      <p class="text-xs font-semibold text-slate-500">Classes et listes</p>
+    </button>
+  </section>
+
+  <div class="relative">
+    <div id="director-loading" class="hidden mb-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">Chargement du workflow directeur...</div>
+    <div
+      id="director-workspace"
+      hx-get="{% url 'accounts_portal:director_workspace' %}?section=home"
+      hx-trigger="load"
+      hx-target="this"
+      hx-swap="innerHTML"
+    >
+    </div>
   </div>
-</section>
+</div>
+
+<script>
+  (function() {
+    function setActive(section) {
+      document.querySelectorAll('.director-nav, [data-director-section]').forEach(function(btn) {
+        if (!btn.dataset.section && !btn.dataset.directorSection) {
+          return;
+        }
+        var btnSection = btn.dataset.section || btn.dataset.directorSection;
+        btn.classList.toggle('active', btnSection === section);
+      });
+    }
+
+    function loadSection(section) {
+      setActive(section);
+      var url = "{% url 'accounts_portal:director_workspace' %}?section=" + encodeURIComponent(section);
+      if (window.htmx) {
+        htmx.ajax('GET', url, '#director-workspace');
+      }
+    }
+
+    document.querySelectorAll('.director-nav, [data-director-section]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var section = btn.dataset.section || btn.dataset.directorSection || 'home';
+        window.location.hash = section;
+        loadSection(section);
+      });
+    });
+
+    var initialSection = window.location.hash ? window.location.hash.replace('#', '') : 'home';
+    setActive(initialSection);
+
+    document.body.addEventListener('htmx:beforeRequest', function(event) {
+      if (event.detail && event.detail.target && event.detail.target.id === 'director-workspace') {
+        document.getElementById('director-loading').classList.remove('hidden');
+      }
+    });
+
+    document.body.addEventListener('htmx:afterSettle', function(event) {
+      if (event.detail && event.detail.target && event.detail.target.id === 'director-workspace') {
+        document.getElementById('director-loading').classList.add('hidden');
+      }
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    });
+  })();
+</script>
 {% endblock %}

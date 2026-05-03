@@ -1,0 +1,677 @@
+{% if toast %}
+  <div class="mb-4 rounded-2xl border p-4 {% if toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-900{% else %}border-rose-200 bg-rose-50 text-rose-900{% endif %}">
+    <p class="text-sm font-extrabold">{{ toast.message }}</p>
+  </div>
+{% endif %}
+
+{% if branch is None %}
+  <div class="director-workflow-empty">
+    Aucune annexe n'est rattachee a ce compte.
+  </div>
+{% elif section == "home" %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-home">
+      <div>
+        <p class="portal-section-kicker">Accueil</p>
+        <h3>Que faut-il piloter maintenant ?</h3>
+        <p>{{ branch.name|default:"Annexe" }} - suivi des resultats, du planning et des classes actives.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span>{{ home_alerts_count|default:0 }} alerte(s)</span>
+        <button type="button" class="director-btn director-btn-primary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=results" hx-target="#director-workspace" hx-swap="innerHTML">Ouvrir les resultats</button>
+      </div>
+    </div>
+
+    <div class="director-grid-2">
+      <section class="director-workflow-card">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="portal-section-kicker">Actions</p>
+            <h4 class="mt-1 text-lg font-black text-slate-900">Raccourcis operatoires</h4>
+          </div>
+        </div>
+        <div class="mt-4 grid gap-3 md:grid-cols-2">
+          <button type="button" class="director-shortcut text-left" hx-get="{% url 'accounts_portal:director_workspace' %}?section=academic" hx-target="#director-workspace" hx-swap="innerHTML">
+            <div class="director-shortcut-icon"><i data-lucide="school" style="width:18px;height:18px;"></i></div>
+            <p class="text-sm font-black text-slate-900">Pilotage academique</p>
+            <p class="text-xs font-semibold text-slate-500">{{ total_classes|default:0 }} classe(s)</p>
+          </button>
+          <button type="button" class="director-shortcut text-left" hx-get="{% url 'accounts_portal:director_workspace' %}?section=teachers" hx-target="#director-workspace" hx-swap="innerHTML">
+            <div class="director-shortcut-icon"><i data-lucide="users" style="width:18px;height:18px;"></i></div>
+            <p class="text-sm font-black text-slate-900">Enseignants</p>
+            <p class="text-xs font-semibold text-slate-500">{{ teachers_total|default:0 }} enseignant(s)</p>
+          </button>
+          <button type="button" class="director-shortcut text-left" hx-get="{% url 'accounts_portal:director_workspace' %}?section=students" hx-target="#director-workspace" hx-swap="innerHTML">
+            <div class="director-shortcut-icon"><i data-lucide="graduation-cap" style="width:18px;height:18px;"></i></div>
+            <p class="text-sm font-black text-slate-900">Etudiants</p>
+            <p class="text-xs font-semibold text-slate-500">Classes et listes</p>
+          </button>
+          <button type="button" class="director-shortcut text-left" hx-get="{% url 'accounts_portal:director_workspace' %}?section=stats" hx-target="#director-workspace" hx-swap="innerHTML">
+            <div class="director-shortcut-icon"><i data-lucide="bar-chart-3" style="width:18px;height:18px;"></i></div>
+            <p class="text-sm font-black text-slate-900">Statistiques</p>
+            <p class="text-xs font-semibold text-slate-500">{{ quality.score|default:0 }}/100</p>
+          </button>
+        </div>
+      </section>
+
+      <section class="director-workflow-card">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="portal-section-kicker">Semaine</p>
+            <h4 class="mt-1 text-lg font-black text-slate-900">Planning courant</h4>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=assignments&week_start={{ prev_week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">-1</button>
+            <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=assignments&week_start={{ next_week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">+1</button>
+          </div>
+        </div>
+        <div class="mt-4 director-workflow-list">
+          {% for event in upcoming_events %}
+            <article>
+              <div>
+                <strong>{{ event.start_time }} - {{ event.end_time }} | {{ event.class_name }}</strong>
+                <span>{{ event.title }} · {{ event.teacher_name }} · {{ event.location }}</span>
+              </div>
+              <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ event.status_label }}</span>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucun cours programme sur cette semaine.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="director-grid-2">
+      <section class="director-workflow-card">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="portal-section-kicker">Alertes</p>
+            <h4 class="mt-1 text-lg font-black text-slate-900">File de priorite</h4>
+          </div>
+        </div>
+        <div class="mt-4 director-workflow-list">
+          {% for alert in assignments_alerts %}
+            <article>
+              <div>
+                <strong>{{ alert.message }}</strong>
+                <span>{{ alert.type }}</span>
+              </div>
+              <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ alert.level }}</span>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucune alerte prioritaire dans l'annexe.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="director-workflow-card">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="portal-section-kicker">Journal</p>
+            <h4 class="mt-1 text-lg font-black text-slate-900">Activite recente</h4>
+          </div>
+        </div>
+        <div class="mt-4 director-workflow-list">
+          {% for log in recent_lesson_logs %}
+            <article>
+              <div>
+                <strong>{{ log.date|date:"d/m/Y" }} - {{ log.academic_class.display_name }}</strong>
+                <span>{{ log.ec.title }} · {{ log.teacher.get_full_name|default:log.teacher.username }} · {{ log.get_status_display }}</span>
+              </div>
+              <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ log.start_time|time:"H:i" }}</span>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucun cahier de texte recent pour cette annexe.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="director-grid-2">
+      <section class="director-workflow-card">
+        <p class="portal-section-kicker">Charges</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900">Classes les plus chargees</h4>
+        <div class="mt-4 director-workflow-list">
+          {% for label, item in class_load_items %}
+            <article>
+              <div>
+                <strong>{{ label }}</strong>
+                <span>{{ item.count }} cours · {{ item.hours|floatformat:1 }} h</span>
+              </div>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucune charge classe disponible.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="director-workflow-card">
+        <p class="portal-section-kicker">Charges</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900">Enseignants les plus charges</h4>
+        <div class="mt-4 director-workflow-list">
+          {% for label, item in teacher_load_items %}
+            <article>
+              <div>
+                <strong>{{ label }}</strong>
+                <span>{{ item.count }} cours · {{ item.hours|floatformat:1 }} h</span>
+              </div>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucune charge enseignant disponible.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </section>
+
+{% elif section == "academic" %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-academic">
+      <div>
+        <p class="portal-section-kicker">Pilotage academique</p>
+        <h3>Classes, semestres et progression</h3>
+        <p>Ouvrez une classe pour voir ses semestres, son emploi du temps et ses etudiants.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span>{{ total_classes|default:0 }} classe(s)</span>
+        <button type="button" class="director-btn director-btn-primary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=students{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}" hx-target="#director-workspace" hx-swap="innerHTML">Voir les etudiants</button>
+      </div>
+    </div>
+
+    <div class="director-workflow-split">
+      <section class="director-workflow-card">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="portal-section-kicker">Classes</p>
+            <h4 class="mt-1 text-lg font-black text-slate-900">Selection</h4>
+          </div>
+        </div>
+        <div class="mt-4 grid gap-3">
+          {% for item in class_cards %}
+            <button type="button" class="director-workflow-card text-left {% if selected_class and item.class.id == selected_class.id %}border-blue-200 bg-blue-50{% endif %}" hx-get="{% url 'accounts_portal:director_workspace' %}?section=academic&class_id={{ item.class.id }}&week_start={{ week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-black text-slate-900">{{ item.class.display_name }}</p>
+                  <p class="mt-1 text-xs font-semibold text-slate-500">{{ item.student_count }} etudiant(s) · {{ item.semester_count }} semestre(s)</p>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{{ item.progress }}%</span>
+              </div>
+              <div class="mt-3 grid grid-cols-3 gap-2 text-xs font-bold text-slate-600">
+                <span class="rounded-lg bg-emerald-50 px-2 py-2 text-center text-emerald-700">{{ item.ready_to_validate_count }} a valider</span>
+                <span class="rounded-lg bg-blue-50 px-2 py-2 text-center text-blue-700">{{ item.ready_to_publish_count }} a publier</span>
+                <span class="rounded-lg bg-slate-50 px-2 py-2 text-center text-slate-700">{{ item.published_count }} publie(s)</span>
+              </div>
+            </button>
+          {% empty %}
+            <div class="director-empty">Aucune classe active dans cette annexe.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="director-workflow-card">
+        {% if selected_class %}
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="portal-section-kicker">Classe active</p>
+              <h4 class="mt-1 text-lg font-black text-slate-900">{{ selected_class.display_name }}</h4>
+              <p class="mt-1 text-sm font-semibold text-slate-500">{{ selected_class_student_count }} etudiant(s) actifs</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=students&class_id={{ selected_class.id }}&week_start={{ week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">Etudiants</button>
+              <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=results&class_id={{ selected_class.id }}" hx-target="#director-workspace" hx-swap="innerHTML">Resultats</button>
+            </div>
+          </div>
+
+          <div class="mt-4 director-grid-3">
+            <div class="director-kpi-card">
+              <p class="director-kpi-label">Semestres relies</p>
+              <p class="director-kpi-value">{{ selected_class_rows|length }}</p>
+            </div>
+            <div class="director-kpi-card">
+              <p class="director-kpi-label">Cours semaine</p>
+              <p class="director-kpi-value">{{ selected_class_schedule.summary.planned|default:0 }}</p>
+            </div>
+            <div class="director-kpi-card">
+              <p class="director-kpi-label">Termines</p>
+              <p class="director-kpi-value">{{ selected_class_schedule.summary.completed|default:0 }}</p>
+            </div>
+          </div>
+
+          <div class="mt-4 director-grid-2">
+            <div class="director-workflow-card">
+              <p class="portal-section-kicker">Semestres</p>
+              <div class="mt-3 director-workflow-list">
+                {% for row in selected_class_rows %}
+                  <article>
+                    <div>
+                      <strong>S{{ row.semester.number }} - {{ row.state }}</strong>
+                      <span>{{ row.entered }}/{{ row.expected }} notes · {{ row.progress }}%</span>
+                    </div>
+                    <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=results&semester_id={{ row.semester.id }}" hx-target="#director-workspace" hx-swap="innerHTML">Ouvrir</button>
+                  </article>
+                {% empty %}
+                  <div class="director-empty">Aucun semestre rattache a cette classe.</div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="director-workflow-card">
+              <p class="portal-section-kicker">Emploi du temps</p>
+              <div class="mt-3 director-workflow-list">
+                {% for event in selected_class_schedule.events|slice:":6" %}
+                  <article>
+                    <div>
+                      <strong>{{ event.start_time }} - {{ event.end_time }}</strong>
+                      <span>{{ event.title }} · {{ event.teacher_name }} · {{ event.location }}</span>
+                    </div>
+                    <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ event.status_label }}</span>
+                  </article>
+                {% empty %}
+                  <div class="director-empty">Aucun cours sur la semaine pour cette classe.</div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div class="director-empty">Selectionnez une classe pour voir ses semestres et son planning.</div>
+        {% endif %}
+      </section>
+    </div>
+  </section>
+
+{% elif section == "teachers" %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-teachers">
+      <div>
+        <p class="portal-section-kicker">Enseignants</p>
+        <h3>Liste et charge de travail</h3>
+        <p>Controlez les charges et les comptes sans quitter le dashboard.</p>
+      </div>
+      <span>{{ teachers_total|default:0 }} enseignant(s)</span>
+    </div>
+
+    <div class="director-grid-3">
+      {% for item in teachers %}
+        <article class="director-workflow-card">
+          <p class="text-sm font-black text-slate-900">{{ item.label }}</p>
+          <p class="mt-1 text-xs font-semibold text-slate-500">{{ item.teacher.email|default:"Email non renseigne" }}</p>
+          <div class="mt-3 grid gap-2 text-xs font-bold text-slate-600">
+            <span class="rounded-lg bg-slate-50 px-3 py-2">{{ item.count }} cours planifie(s)</span>
+            <span class="rounded-lg bg-blue-50 px-3 py-2">{{ item.hours|floatformat:1 }} h cette semaine</span>
+            <span class="rounded-lg bg-emerald-50 px-3 py-2">{{ item.status_label|default:"Actif" }}</span>
+          </div>
+        </article>
+      {% empty %}
+        <div class="director-empty">Aucun enseignant dans cette annexe.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+{% elif section == "assignments" %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-assignments">
+      <div>
+        <p class="portal-section-kicker">Affectations</p>
+        <h3>Suivi de planning et de charge</h3>
+        <p>Reperez rapidement les points bloquants sur la semaine courante.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=assignments&week_start={{ prev_week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">Semaine -1</button>
+        <span>{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</span>
+        <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=assignments&week_start={{ next_week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">Semaine +1</button>
+      </div>
+    </div>
+
+    <div class="director-grid-2">
+      <section class="director-workflow-card">
+        <p class="portal-section-kicker">Alertes</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900">A corriger</h4>
+        <div class="mt-4 director-workflow-list">
+          {% for alert in assignments_alerts %}
+            <article>
+              <div>
+                <strong>{{ alert.message }}</strong>
+                <span>{{ alert.type }}</span>
+              </div>
+              <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ alert.level }}</span>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucune alerte de planning n'a ete detectee.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="director-workflow-card">
+        <p class="portal-section-kicker">Mise en charge</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900">Top classes et enseignants</h4>
+        <div class="mt-4 director-workflow-list">
+          {% for label, item in class_load_items %}
+            <article>
+              <div>
+                <strong>{{ label }}</strong>
+                <span>{{ item.count }} cours · {{ item.hours|floatformat:1 }} h</span>
+              </div>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucune charge classe disponible.</div>
+          {% endfor %}
+          {% for label, item in teacher_load_items %}
+            <article>
+              <div>
+                <strong>{{ label }}</strong>
+                <span>{{ item.count }} cours · {{ item.hours|floatformat:1 }} h</span>
+              </div>
+            </article>
+          {% empty %}
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <section class="director-workflow-card">
+      <p class="portal-section-kicker">Planning</p>
+      <h4 class="mt-1 text-lg font-black text-slate-900">Cours a venir</h4>
+      <div class="mt-4 director-workflow-list">
+        {% for event in upcoming_events %}
+          <article>
+            <div>
+              <strong>{{ event.start_time }} - {{ event.end_time }} | {{ event.class_name }}</strong>
+              <span>{{ event.title }} · {{ event.teacher_name }} · {{ event.location }}</span>
+            </div>
+            <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ event.status_label }}</span>
+          </article>
+        {% empty %}
+          <div class="director-empty">Aucun cours planifie.</div>
+        {% endfor %}
+      </div>
+    </section>
+  </section>
+
+{% elif section == "results" %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-results">
+      <div>
+        <p class="portal-section-kicker">Resultats & validation</p>
+        <h3>Semestres a traiter</h3>
+        <p>La validation bloque tant que toutes les notes ne sont pas posees.</p>
+      </div>
+      <span>{{ ready_to_validate|length }} prets</span>
+    </div>
+
+    <div class="director-workflow-split">
+      <aside class="director-workflow-card">
+        <p class="portal-section-kicker">File</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900">Semestres</h4>
+        <div class="mt-4 director-workflow-list">
+          {% for row in semester_rows %}
+            <button type="button" class="director-workflow-card text-left {% if selected_semester and row.semester.id == selected_semester.id %}border-emerald-200 bg-emerald-50{% endif %}" hx-get="{% url 'accounts_portal:director_workspace' %}?section=results&semester_id={{ row.semester.id }}" hx-target="#director-workspace" hx-swap="innerHTML">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <strong>{{ row.class.display_name }} · S{{ row.semester.number }}</strong>
+                  <span>{{ row.entered }}/{{ row.expected }} notes · {{ row.progress }}%</span>
+                </div>
+                <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ row.state }}</span>
+              </div>
+            </button>
+          {% empty %}
+            <div class="director-empty">Aucun semestre actif.</div>
+          {% endfor %}
+        </div>
+      </aside>
+
+      <main class="director-workflow-card">
+        {% if selected_semester_row %}
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="portal-section-kicker">Detail</p>
+              <h4 class="mt-1 text-lg font-black text-slate-900">{{ selected_semester.academic_class.display_name }} · Semestre {{ selected_semester.number }}</h4>
+              <p class="mt-1 text-sm font-semibold text-slate-500">{{ selected_semester_row.entered }}/{{ selected_semester_row.expected }} notes · {{ selected_semester.get_status_display }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace">
+                {% csrf_token %}
+                <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+                <input type="hidden" name="action" value="validate">
+                <button class="director-btn director-btn-primary {% if not selected_semester_row.can_validate %}opacity-40{% endif %}" {% if not selected_semester_row.can_validate %}disabled{% endif %}>Valider</button>
+              </form>
+              <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace">
+                {% csrf_token %}
+                <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+                <input type="hidden" name="action" value="publish">
+                <button class="director-btn director-btn-secondary {% if not selected_semester_row.can_publish %}opacity-40{% endif %}" {% if not selected_semester_row.can_publish %}disabled{% endif %}>Publier</button>
+              </form>
+              <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace">
+                {% csrf_token %}
+                <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+                <input type="hidden" name="action" value="reject">
+                <button class="director-btn director-btn-secondary border-rose-200 bg-rose-50 text-rose-700">Rejeter</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="mt-4 director-grid-3">
+            <div class="director-kpi-card">
+              <p class="director-kpi-label">Moyenne</p>
+              <p class="director-kpi-value">{{ selected_semester_row.progress }}%</p>
+            </div>
+            <div class="director-kpi-card">
+              <p class="director-kpi-label">Notes</p>
+              <p class="director-kpi-value">{{ selected_semester_row.entered }}</p>
+            </div>
+            <div class="director-kpi-card">
+              <p class="director-kpi-label">Credits</p>
+              <p class="director-kpi-value">{{ selected_semester.total_required_credits|default:0 }}</p>
+            </div>
+          </div>
+
+          <div class="mt-4 director-empty text-left">
+            Le relevé global devient accessible une fois le semestre publie.
+          </div>
+        {% else %}
+          <div class="director-empty">Selectionnez un semestre pour voir les actions de validation.</div>
+        {% endif %}
+      </main>
+    </div>
+  </section>
+
+{% elif section == "publications" %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-publications">
+      <div>
+        <p class="portal-section-kicker">Publications</p>
+        <h3>Releves publies</h3>
+        <p>Accedez aux releves des semestres deja publies.</p>
+      </div>
+      <span>{{ published|length }} publie(s)</span>
+    </div>
+
+    <div class="director-grid-2">
+      {% for row in semester_rows %}
+        {% if row.can_generate %}
+          <a class="director-workflow-card hover:bg-slate-50" href="{% url 'academics:class_reports_overview' row.semester.id %}" target="_blank">
+            <p class="text-sm font-black text-slate-900">{{ row.class.display_name }} · S{{ row.semester.number }}</p>
+            <p class="mt-1 text-xs font-semibold text-slate-500">Ouvrir le releve global</p>
+          </a>
+        {% endif %}
+      {% empty %}
+        <div class="director-empty">Aucune publication disponible.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+{% elif section == "stats" %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-stats">
+      <div>
+        <p class="portal-section-kicker">Statistiques</p>
+        <h3>Indicateurs utiles</h3>
+        <p>Vision rapide sur le volume et la qualite du planning.</p>
+      </div>
+      <span>{{ quality.score|default:0 }}/100</span>
+    </div>
+
+    <div class="director-grid-3">
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Planifies</p>
+        <p class="director-kpi-value">{{ schedule_stats.planned_count|default:0 }}</p>
+      </div>
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Termines</p>
+        <p class="director-kpi-value">{{ schedule_stats.completed_count|default:0 }}</p>
+      </div>
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Annules</p>
+        <p class="director-kpi-value">{{ schedule_stats.cancelled_count|default:0 }}</p>
+      </div>
+    </div>
+
+    <div class="director-grid-2">
+      <section class="director-workflow-card">
+        <p class="portal-section-kicker">Qualite</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900">Etat de la semaine</h4>
+        <div class="mt-4 director-workflow-list">
+          {% for warning in quality.warnings %}
+            <article>
+              <div>
+                <strong>Avertissement</strong>
+                <span>{{ warning }}</span>
+              </div>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucun avertissement actif.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="director-workflow-card">
+        <p class="portal-section-kicker">Journal</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900">Derniers cours traces</h4>
+        <div class="mt-4 director-workflow-list">
+          {% for log in recent_lesson_logs %}
+            <article>
+              <div>
+                <strong>{{ log.date|date:"d/m/Y" }} - {{ log.academic_class.display_name }}</strong>
+                <span>{{ log.ec.title }} · {{ log.get_status_display }}</span>
+              </div>
+            </article>
+          {% empty %}
+            <div class="director-empty">Aucune entree de cahier recente.</div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </section>
+
+{% elif section == "students" %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-students">
+      <div>
+        <p class="portal-section-kicker">Etudiants</p>
+        <h3>Classes et listes</h3>
+        <p>Selectionnez une classe pour ouvrir sa liste et son emploi du temps.</p>
+      </div>
+      {% if selected_class %}
+        <span>{{ selected_class_student_count }} etudiant(s)</span>
+      {% endif %}
+    </div>
+
+    <div class="director-workflow-card">
+      <form class="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]" method="get" hx-get="{% url 'accounts_portal:director_workspace' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+        <input type="hidden" name="section" value="students">
+        {% if selected_class %}
+          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+        {% endif %}
+        <input type="hidden" name="week_start" value="{{ week_start|date:'Y-m-d' }}">
+        <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+          Rechercher
+          <input type="text" name="student_q" value="{{ student_q }}" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none" placeholder="Nom, matricule, email">
+        </label>
+        <div class="flex items-end">
+          <button type="submit" class="director-btn director-btn-primary w-full">Filtrer</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="director-workflow-split">
+      <section class="director-workflow-card">
+        <p class="portal-section-kicker">Classes</p>
+        <div class="mt-4 grid gap-3">
+          {% for item in class_cards %}
+            <button type="button" class="director-workflow-card text-left {% if selected_class and item.class.id == selected_class.id %}border-blue-200 bg-blue-50{% endif %}" hx-get="{% url 'accounts_portal:director_workspace' %}?section=students&class_id={{ item.class.id }}&student_q={{ student_q|urlencode }}&week_start={{ week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <strong>{{ item.class.display_name }}</strong>
+                  <span>{{ item.student_count }} etudiant(s) · {{ item.semester_count }} semestre(s)</span>
+                </div>
+                <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ item.progress }}%</span>
+              </div>
+            </button>
+          {% empty %}
+            <div class="director-empty">Aucune classe disponible.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="director-workflow-card">
+        {% if selected_class %}
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="portal-section-kicker">Liste active</p>
+              <h4 class="mt-1 text-lg font-black text-slate-900">{{ selected_class.display_name }}</h4>
+              <p class="mt-1 text-sm font-semibold text-slate-500">{{ selected_class_student_count }} etudiant(s) trouves</p>
+            </div>
+            <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=academic&class_id={{ selected_class.id }}&week_start={{ week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">Voir la classe</button>
+          </div>
+
+          <div class="mt-4 director-workflow-list">
+            {% for enrollment in selected_class_students %}
+              <article>
+                <div>
+                  <strong>{{ enrollment.full_name }}</strong>
+                  <span>{{ enrollment.matricule }} · {{ enrollment.email }}</span>
+                </div>
+              <span class="rounded-full px-3 py-1 text-xs font-bold text-slate-700">{{ enrollment.is_enrolled|yesno:"Actif,Inactif" }}</span>
+            </article>
+            {% empty %}
+              <div class="director-empty">Aucun etudiant ne correspond a votre recherche.</div>
+            {% endfor %}
+          </div>
+
+          <div class="mt-4 director-workflow-card">
+            <p class="portal-section-kicker">Planning classe</p>
+            <div class="mt-3 director-workflow-list">
+              {% for event in selected_class_schedule.events|slice:":6" %}
+                <article>
+                  <div>
+                    <strong>{{ event.start_time }} - {{ event.end_time }}</strong>
+                    <span>{{ event.title }} · {{ event.teacher_name }} · {{ event.location }}</span>
+                  </div>
+                </article>
+              {% empty %}
+                <div class="director-empty">Aucun cours programme pour cette classe sur la semaine.</div>
+              {% endfor %}
+            </div>
+          </div>
+        {% else %}
+          <div class="director-empty">Selectionnez une classe pour afficher ses etudiants.</div>
+        {% endif %}
+      </section>
+    </div>
+  </section>
+
+{% else %}
+  <section class="director-workflow-stack">
+    <div class="director-workflow-band director-workflow-band-settings">
+      <div>
+        <p class="portal-section-kicker">Parametres</p>
+        <h3>Profil et perimetre</h3>
+        <p>Les parametres academiques restent controles ailleurs.</p>
+      </div>
+      <span>{{ branch.name|default:"Annexe" }}</span>
+    </div>
+
+    <div class="director-workflow-card">
+      <p class="text-sm font-semibold text-slate-600">Votre dashboard directeur reste concentre sur le pilotage de l'annexe, la validation des resultats et le suivi des classes.</p>
+    </div>
+  </section>
+{% endif %}

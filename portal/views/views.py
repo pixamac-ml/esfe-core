@@ -1,6 +1,9 @@
+from collections import defaultdict
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -16,7 +19,9 @@ from academics.models import (
     AcademicEnrollment,
     AcademicScheduleEvent,
     EC,
+    ECGrade,
     LessonLog,
+    Semester,
     WeeklyScheduleSlot,
 )
 from admissions.models import Candidature
@@ -25,11 +30,13 @@ from academics.services.lesson_log_service import create_lesson_log, update_less
 from academics.services.schedule_service import (
     create_weekly_schedule_slot,
     deactivate_weekly_schedule_slot,
+    get_class_week_schedule,
     get_director_schedule_overview,
     list_weekly_slots_for_class,
     serialize_weekly_slot_for_ui,
     update_weekly_schedule_slot,
 )
+from academics.services.workflow import can_publish_semester
 from academics.services.session_service import close_session, start_session
 from accounts.access import can_access, get_user_position, get_user_scope
 from accounts.dashboards.helpers import get_user_branch
@@ -237,24 +244,381 @@ def _position_required(expected_positions):
 
 
 def _render_director_dashboard(request):
-    context = _build_academic_dashboard_context(
-        request,
-        page_title="Dashboard Direction des Etudes",
-        page_kicker="Direction des etudes",
-        sidebar_links=[
-            {"label": "Vue generale", "href": "#overview"},
-            {"label": "Programmation", "href": "#programming"},
-            {"label": "Classes", "href": "#classes"},
-            {"label": "Alertes", "href": "#alerts"},
-        ],
-        highlight=[
-            "Qualite academique",
-            "Pilotage des classes",
-            "Suivi des enseignants",
-            "Alertes et planification",
-        ],
-    )
+    branch = _resolve_academic_branch(request)
+    today = timezone.localdate()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=7)
+    overview = get_director_schedule_overview(branch, week_start) if branch else {"stats": {}, "quality": {"score": 0, "warnings": []}, "alerts": [], "timetable": []}
+    context = {
+        **_build_portal_context(
+            request,
+            page_title="Dashboard Direction des Etudes",
+            module_cards=["Pilotage academique", "Resultats", "Enseignants"],
+        ),
+        "dashboard_kind": "Direction des etudes",
+        "branch": branch,
+        "today": today,
+        "week_start": week_start,
+        "week_end": week_end,
+        "quality_score": (overview.get("quality") or {}).get("score", 0),
+        "home_alerts_count": len(overview.get("alerts") or []),
+    }
     return render(request, "portal/staff/director_dashboard.html", context)
+
+
+def _parse_director_section(request, default="home"):
+    section = (request.GET.get("section") or request.POST.get("section") or default).strip().lower()
+    allowed = {
+        "home",
+        "academic",
+        "teachers",
+        "assignments",
+        "results",
+        "publications",
+        "stats",
+        "students",
+        "settings",
+    }
+    return section if section in allowed else default
+
+
+def _parse_director_week_start(request):
+    raw = (request.GET.get("week_start") or request.POST.get("week_start") or "").strip()
+    if raw:
+        try:
+            week_start = datetime.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+    else:
+        week_start = timezone.localdate()
+    return week_start - timedelta(days=week_start.weekday())
+
+
+def _director_classes_queryset(branch):
+    qs = AcademicClass.objects.select_related("programme", "branch", "academic_year").filter(is_active=True)
+    if branch:
+        qs = qs.filter(branch=branch)
+    return qs.annotate(student_count=Count("enrollments", filter=Q(enrollments__is_active=True))).order_by("level", "programme__title", "id")
+
+
+def _director_semester_rows(branch):
+    semesters = (
+        Semester.objects.select_related("academic_class", "academic_class__programme", "academic_class__branch")
+        .prefetch_related("ues__ecs")
+        .filter(academic_class__is_active=True)
+    )
+    if branch:
+        semesters = semesters.filter(academic_class__branch=branch)
+
+    enrollments_by_class = defaultdict(list)
+    if branch:
+        enrollments_qs = AcademicEnrollment.objects.select_related("academic_class", "academic_year").filter(branch=branch, is_active=True)
+    else:
+        enrollments_qs = AcademicEnrollment.objects.select_related("academic_class", "academic_year").filter(is_active=True)
+    for enrollment in enrollments_qs:
+        enrollments_by_class[enrollment.academic_class_id].append(enrollment)
+
+    rows = []
+    for semester in semesters.order_by("academic_class__level", "academic_class__programme__title", "number", "id"):
+        ec_ids = []
+        for ue in semester.ues.all():
+            for ec in ue.ecs.all():
+                ec_ids.append(ec.id)
+        ec_ids = list(dict.fromkeys(ec_ids))
+        enrollments = enrollments_by_class.get(semester.academic_class_id, [])
+        expected = len(ec_ids) * len(enrollments)
+        entered = (
+            ECGrade.objects.filter(enrollment__in=enrollments, ec_id__in=ec_ids, final_score__isnull=False).count()
+            if expected
+            else 0
+        )
+        progress = int((entered / expected) * 100) if expected else 0
+        ready = expected > 0 and entered >= expected
+        if semester.status == Semester.STATUS_PUBLISHED:
+            state = "publie"
+            tone = "emerald"
+        elif semester.status == Semester.STATUS_FINALIZED:
+            state = "pret_publication"
+            tone = "blue"
+        elif ready:
+            state = "pret_validation"
+            tone = "emerald"
+        elif entered:
+            state = "en_cours"
+            tone = "amber"
+        else:
+            state = "pas_de_notes"
+            tone = "rose"
+        rows.append({
+            "semester": semester,
+            "class": semester.academic_class,
+            "expected": expected,
+            "entered": entered,
+            "progress": progress,
+            "ready": ready,
+            "state": state,
+            "tone": tone,
+            "can_validate": ready and semester.status not in {Semester.STATUS_FINALIZED, Semester.STATUS_PUBLISHED},
+            "can_publish": semester.status == Semester.STATUS_FINALIZED,
+            "can_generate": semester.status == Semester.STATUS_PUBLISHED,
+        })
+    return rows
+
+
+def _build_director_workspace_context(request, *, toast=None):
+    branch = _resolve_academic_branch(request)
+    section = _parse_director_section(request)
+    week_start = _parse_director_week_start(request)
+    week_end = week_start + timedelta(days=7)
+    director_overview = get_director_schedule_overview(branch, week_start) if branch else {"stats": {}, "quality": {"score": 0, "warnings": []}, "alerts": [], "timetable": {"events": [], "summary": {}, "day_event_counts": []}}
+    schedule_stats = director_overview.get("stats") or {}
+    quality = director_overview.get("quality") or {"score": 0, "warnings": []}
+    alerts = director_overview.get("alerts") or []
+    timetable = director_overview.get("timetable") or {"events": [], "summary": {}, "day_event_counts": [], "empty_days": []}
+    class_rows = list(_director_classes_queryset(branch))
+    semester_rows = _director_semester_rows(branch)
+    User = get_user_model()
+    teachers = User.objects.select_related("profile").filter(is_active=True, profile__position="teacher")
+    if branch:
+        teachers = teachers.filter(profile__branch=branch)
+
+    semester_rows_by_class = defaultdict(list)
+    for row in semester_rows:
+        semester_rows_by_class[row["class"].id].append(row)
+
+    class_cards = []
+    for academic_class in class_rows:
+        rows = semester_rows_by_class.get(academic_class.id, [])
+        class_cards.append({
+            "class": academic_class,
+            "semester_count": len(rows),
+            "ready_to_validate_count": sum(1 for row in rows if row["can_validate"]),
+            "ready_to_publish_count": sum(1 for row in rows if row["can_publish"]),
+            "published_count": sum(1 for row in rows if row["can_generate"]),
+            "progress": int(sum(row["progress"] for row in rows) / len(rows)) if rows else 0,
+            "student_count": academic_class.student_count,
+            "rows": rows,
+        })
+
+    selected_class = None
+    raw_class = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
+    if raw_class.isdigit():
+        class_id = int(raw_class)
+        selected_class = next((item["class"] for item in class_cards if item["class"].id == class_id), None)
+    if selected_class is None and section in {"academic", "students"} and class_cards:
+        selected_class = class_cards[0]["class"]
+
+    selected_class_rows = semester_rows_by_class.get(getattr(selected_class, "id", None), []) if selected_class else []
+
+    student_q = (request.GET.get("student_q") or request.POST.get("student_q") or "").strip()
+    selected_class_students = []
+    selected_class_student_count = 0
+    selected_class_schedule = None
+    if selected_class is not None:
+        student_enrollments = (
+            AcademicEnrollment.objects.select_related(
+                "academic_class",
+                "academic_year",
+                "student",
+                "student__profile",
+                "student__student_profile",
+                "student__student_profile__inscription__candidature",
+            )
+            .filter(
+                academic_class=selected_class,
+                academic_year=selected_class.academic_year,
+                is_active=True,
+            )
+        )
+        if student_q:
+            student_enrollments = student_enrollments.filter(
+                Q(student__first_name__icontains=student_q)
+                | Q(student__last_name__icontains=student_q)
+                | Q(student__username__icontains=student_q)
+                | Q(student__profile__employee_code__icontains=student_q)
+                | Q(student__student_profile__matricule__icontains=student_q)
+                | Q(student__student_profile__inscription__candidature__first_name__icontains=student_q)
+                | Q(student__student_profile__inscription__candidature__last_name__icontains=student_q)
+            )
+        selected_class_student_count = student_enrollments.count()
+        for enrollment in student_enrollments.order_by(
+            "student__student_profile__inscription__candidature__last_name",
+            "student__student_profile__inscription__candidature__first_name",
+            "student__username",
+        )[:40]:
+            student_profile = getattr(enrollment.student, "student_profile", None)
+            selected_class_students.append({
+                "enrollment": enrollment,
+                "student": enrollment.student,
+                "full_name": getattr(student_profile, "full_name", "") or enrollment.student.get_full_name() or enrollment.student.username,
+                "matricule": getattr(student_profile, "matricule", "") or "Matricule absent",
+                "email": getattr(student_profile, "email", "") or enrollment.student.email or "Email absent",
+                "is_enrolled": bool(getattr(student_profile, "is_enrolled", False)),
+            })
+        selected_class_schedule = get_class_week_schedule(selected_class, week_start)
+
+    teacher_load_map = schedule_stats.get("teacher_load") or {}
+    class_load_map = schedule_stats.get("class_load") or {}
+    teacher_rows = []
+    for teacher in teachers.order_by("first_name", "last_name", "username")[:120]:
+        teacher_key = teacher.get_full_name() or teacher.username
+        load = teacher_load_map.get(teacher_key, {"count": 0, "hours": Decimal("0")})
+        teacher_rows.append({
+            "teacher": teacher,
+            "label": teacher_key,
+            "hours": load.get("hours", Decimal("0")),
+            "count": load.get("count", 0),
+            "status": getattr(getattr(teacher, "profile", None), "employment_status", "active"),
+            "status_label": getattr(getattr(teacher, "profile", None), "get_employment_status_display", lambda: "Actif")(),
+            "branch_name": getattr(getattr(teacher, "profile", None), "branch", None).name if getattr(getattr(teacher, "profile", None), "branch", None) else "",
+            "has_load": bool(load.get("count")),
+        })
+
+    class_load_items = sorted(
+        (class_load_map or {}).items(),
+        key=lambda item: (-item[1]["hours"], item[0]),
+    )[:5]
+    teacher_load_items = sorted(
+        (teacher_load_map or {}).items(),
+        key=lambda item: (-item[1]["hours"], item[0]),
+    )[:5]
+
+    selected_semester = None
+    selected_semester_row = None
+    raw_semester = (request.GET.get("semester_id") or request.POST.get("semester_id") or "").strip()
+    if raw_semester.isdigit():
+        selected_semester_row = next((row for row in semester_rows if row["semester"].id == int(raw_semester)), None)
+        if selected_semester_row:
+            selected_semester = selected_semester_row["semester"]
+    if selected_semester is None and section == "results" and semester_rows:
+        preferred = next((row for row in semester_rows if row["can_validate"]), semester_rows[0])
+        selected_semester_row = preferred
+        selected_semester = preferred["semester"]
+
+    ready_to_publish = [row for row in semester_rows if row["can_publish"]]
+    ready_to_validate = [row for row in semester_rows if row["can_validate"]]
+    in_progress = [row for row in semester_rows if row["state"] == "en_cours"]
+    without_notes = [row for row in semester_rows if row["state"] == "pas_de_notes"]
+    published = [row for row in semester_rows if row["can_generate"]]
+    assignments_alerts = [
+        alert
+        for alert in alerts
+        if alert.get("type") in {
+            "missing_teacher",
+            "missing_location",
+            "teacher_overload",
+            "high_cancellation_rate",
+            "unresolved_conflict",
+            "class_without_events",
+        }
+    ]
+    upcoming_events = list((timetable.get("events") or [])[:8])
+    recent_lesson_logs = []
+    if branch:
+        recent_lesson_logs = list(
+            LessonLog.objects.select_related(
+                "academic_class",
+                "ec",
+                "teacher",
+                "branch",
+            )
+            .filter(branch=branch)
+            .order_by("-date", "-start_time", "-id")[:8]
+        )
+
+    context = {
+        "branch": branch,
+        "section": section,
+        "week_start": week_start,
+        "week_end": week_end,
+        "prev_week_start": week_start - timedelta(days=7),
+        "next_week_start": week_start + timedelta(days=7),
+        "director_overview": director_overview,
+        "schedule_stats": schedule_stats,
+        "quality": quality,
+        "alerts": alerts,
+        "timetable": timetable,
+        "class_load_items": class_load_items,
+        "teacher_load_items": teacher_load_items,
+        "today": timezone.localdate(),
+        "classes": class_rows,
+        "class_cards": class_cards,
+        "total_classes": len(class_rows),
+        "total_semesters": len(semester_rows),
+        "semester_rows": semester_rows,
+        "ready_to_publish": ready_to_publish,
+        "ready_to_validate": ready_to_validate,
+        "in_progress": in_progress,
+        "without_notes": without_notes,
+        "published": published,
+        "ready_to_validate_count": len(ready_to_validate),
+        "published_count": len(published),
+        "teachers": teacher_rows,
+        "teachers_total": teachers.count(),
+        "teacher_unassigned_count": teachers.filter(teaching_schedule_events__isnull=True).distinct().count(),
+        "selected_semester": selected_semester,
+        "selected_semester_row": selected_semester_row,
+        "selected_class": selected_class,
+        "selected_class_rows": selected_class_rows,
+        "selected_class_students": selected_class_students,
+        "selected_class_student_count": selected_class_student_count,
+        "selected_class_schedule": selected_class_schedule,
+        "student_q": student_q,
+        "assignments_alerts": assignments_alerts,
+        "assignments_alerts_count": len(assignments_alerts),
+        "upcoming_events": upcoming_events,
+        "recent_lesson_logs": recent_lesson_logs,
+        "semester_rows_by_class": semester_rows_by_class,
+    }
+    if toast:
+        context["toast"] = toast
+    return context
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_workspace(request):
+    context = _build_director_workspace_context(request)
+    return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_results_action(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_academic_branch(request)
+    action = (request.POST.get("action") or "").strip()
+    toast = {"level": "error", "message": "Action impossible."}
+    try:
+        semester = Semester.objects.select_related("academic_class", "academic_class__branch").get(pk=request.POST.get("semester_id"))
+        if branch and semester.academic_class.branch_id != branch.id:
+            raise ValidationError("Action hors annexe refusee.")
+        enrollments = list(AcademicEnrollment.objects.filter(academic_class=semester.academic_class, academic_year=semester.academic_class.academic_year, is_active=True))
+        if action == "validate":
+            if not can_publish_semester(semester, enrollments):
+                raise ValidationError("Toutes les notes doivent etre renseignees avant validation.")
+            semester.status = Semester.STATUS_FINALIZED
+            semester.save(update_fields=["status"])
+            toast = {"level": "success", "message": "Resultats valides. Publication possible."}
+        elif action == "publish":
+            if semester.status != Semester.STATUS_FINALIZED:
+                raise ValidationError("Le semestre doit etre valide avant publication.")
+            semester.status = Semester.STATUS_PUBLISHED
+            semester.save(update_fields=["status"])
+            toast = {"level": "success", "message": "Resultats publies."}
+        elif action == "reject":
+            if semester.status == Semester.STATUS_PUBLISHED:
+                raise ValidationError("Un semestre publie ne peut pas etre rejete ici.")
+            semester.status = Semester.STATUS_NORMAL_ENTRY
+            semester.save(update_fields=["status"])
+            toast = {"level": "success", "message": "Resultats renvoyes en correction."}
+        else:
+            raise ValidationError("Action inconnue.")
+    except (Semester.DoesNotExist, ValidationError) as exc:
+        message = " ".join(getattr(exc, "messages", [])) if hasattr(exc, "messages") else str(exc)
+        toast = {"level": "error", "message": message or "Action impossible."}
+    context = _build_director_workspace_context(request, toast=toast)
+    context["section"] = "results"
+    return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
 def _user_initials(display_name: str) -> str:

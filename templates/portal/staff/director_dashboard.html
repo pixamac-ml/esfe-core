@@ -1,15 +1,15 @@
 {% extends "portal/staff/dashboard_shell.html" %}
 
 {% block sidebar_nav %}
-<button class="portal-list-link director-nav active" type="button" data-section="home"><i data-lucide="home" style="width:18px;height:18px;"></i><span>Accueil</span></button>
-<button class="portal-list-link director-nav" type="button" data-section="academic"><i data-lucide="school" style="width:18px;height:18px;"></i><span>Pilotage academique</span></button>
-<button class="portal-list-link director-nav" type="button" data-section="teachers"><i data-lucide="users" style="width:18px;height:18px;"></i><span>Enseignants</span></button>
-<button class="portal-list-link director-nav" type="button" data-section="assignments"><i data-lucide="book-open-check" style="width:18px;height:18px;"></i><span>Affectations</span></button>
-<button class="portal-list-link director-nav" type="button" data-section="results"><i data-lucide="badge-check" style="width:18px;height:18px;"></i><span>Resultats & validation</span></button>
-<button class="portal-list-link director-nav" type="button" data-section="publications"><i data-lucide="file-down" style="width:18px;height:18px;"></i><span>Publications</span></button>
-<button class="portal-list-link director-nav" type="button" data-section="stats"><i data-lucide="bar-chart-3" style="width:18px;height:18px;"></i><span>Statistiques</span></button>
-<button class="portal-list-link director-nav" type="button" data-section="students"><i data-lucide="graduation-cap" style="width:18px;height:18px;"></i><span>Etudiants</span></button>
-<button class="portal-list-link director-nav" type="button" data-section="settings"><i data-lucide="settings" style="width:18px;height:18px;"></i><span>Parametres</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'home' || activeSection === '' }" @click="setSection('home')"><i data-lucide="home" style="width:18px;height:18px;"></i><span>Accueil</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'academic' }" @click="setSection('academic')"><i data-lucide="school" style="width:18px;height:18px;"></i><span>Pilotage academique</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'teachers' }" @click="setSection('teachers')"><i data-lucide="users" style="width:18px;height:18px;"></i><span>Enseignants</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'assignments' }" @click="setSection('assignments')"><i data-lucide="book-open-check" style="width:18px;height:18px;"></i><span>Affectations</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'results' }" @click="setSection('results')"><i data-lucide="badge-check" style="width:18px;height:18px;"></i><span>Resultats & validation</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'publications' }" @click="setSection('publications')"><i data-lucide="file-down" style="width:18px;height:18px;"></i><span>Publications</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'stats' }" @click="setSection('stats')"><i data-lucide="bar-chart-3" style="width:18px;height:18px;"></i><span>Statistiques</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'students' }" @click="setSection('students')"><i data-lucide="graduation-cap" style="width:18px;height:18px;"></i><span>Etudiants</span></button>
+<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'settings' }" @click="setSection('settings')"><i data-lucide="settings" style="width:18px;height:18px;"></i><span>Parametres</span></button>
 {% endblock %}
 
 {% block topbar_actions %}
@@ -20,10 +20,50 @@
 
 {% block dashboard_content %}
 <style>
-  .director-page {
+  .director-workspace {
     width: 100%;
     display: grid;
     gap: 1rem;
+  }
+
+  /* Harmonisation visuelle avec le dashboard Informaticien */
+  .director-module-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .director-module-tile {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 1rem;
+    min-width: 0;
+    cursor: pointer;
+    transition: .18s ease;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+    text-align: left;
+  }
+
+  .director-module-tile:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
+  }
+
+  .director-module-tile.active {
+    border-color: rgba(37, 99, 235, .28);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .15);
+    background: linear-gradient(180deg, #eff6ff, #ffffff);
+  }
+
+  .director-icon-wrap {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: #e0f2fe;
+    color: #0f172a;
   }
 
   .director-hero {
@@ -304,7 +344,22 @@
       grid-template-columns: 1fr;
     }
   }
+
+  @media (max-width: 1100px) {
+    .director-module-grid,
+    .director-shortcuts {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .director-module-grid,
+    .director-shortcuts {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
+
 
 <div class="director-page">
   <section class="portal-card portal-card-pad director-hero">
@@ -383,49 +438,66 @@
 
 <script>
   (function() {
-    function setActive(section) {
-      document.querySelectorAll('.director-nav, [data-director-section]').forEach(function(btn) {
-        if (!btn.dataset.section && !btn.dataset.directorSection) {
-          return;
-        }
-        var btnSection = btn.dataset.section || btn.dataset.directorSection;
-        btn.classList.toggle('active', btnSection === section);
-      });
+    var URL_BASE = "{% url 'accounts_portal:director_workspace' %}";
+    var ALLOWED = {
+      home: true,
+      academic: true,
+      teachers: true,
+      assignments: true,
+      results: true,
+      publications: true,
+      stats: true,
+      students: true,
+      settings: true,
+    };
+
+    function normalize(section) {
+      if (!section) return 'home';
+      section = String(section).toLowerCase().trim();
+      return ALLOWED[section] ? section : 'home';
     }
 
-    function loadSection(section) {
-      setActive(section);
-      var url = "{% url 'accounts_portal:director_workspace' %}?section=" + encodeURIComponent(section);
+    function currentSectionFromHash() {
+      var raw = window.location.hash ? window.location.hash.replace('#', '') : '';
+      return normalize(raw);
+    }
+
+    function loadWorkspace(section) {
+      section = normalize(section);
+      var url = URL_BASE + "?section=" + encodeURIComponent(section);
       if (window.htmx) {
-        htmx.ajax('GET', url, '#director-workspace');
+        window.htmx.ajax('GET', url, '#director-workspace');
       }
     }
 
-    document.querySelectorAll('.director-nav, [data-director-section]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var section = btn.dataset.section || btn.dataset.directorSection || 'home';
-        window.location.hash = section;
-        loadSection(section);
-      });
-    });
-
-    var initialSection = window.location.hash ? window.location.hash.replace('#', '') : 'home';
-    setActive(initialSection);
-
+    // HTMX loading indicator + refresh lucide icons after swap
     document.body.addEventListener('htmx:beforeRequest', function(event) {
       if (event.detail && event.detail.target && event.detail.target.id === 'director-workspace') {
-        document.getElementById('director-loading').classList.remove('hidden');
+        var el = document.getElementById('director-loading');
+        if (el) el.classList.remove('hidden');
       }
     });
 
     document.body.addEventListener('htmx:afterSettle', function(event) {
       if (event.detail && event.detail.target && event.detail.target.id === 'director-workspace') {
-        document.getElementById('director-loading').classList.add('hidden');
+        var el = document.getElementById('director-loading');
+        if (el) el.classList.add('hidden');
       }
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
       }
     });
+
+    // Hash -> workspace (le shell Alpine met a jour le hash via setSection())
+    window.addEventListener('hashchange', function() {
+      loadWorkspace(currentSectionFromHash());
+    });
+
+    // Premier chargement: si hash deja present, on charge la section correspondante.
+    var initial = currentSectionFromHash();
+    if (window.location.hash) {
+      loadWorkspace(initial);
+    }
   })();
 </script>
 {% endblock %}

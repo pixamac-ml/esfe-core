@@ -21,6 +21,10 @@ class SupportAuditLog(models.Model):
     ACTION_EMAIL_UPDATED = "email_updated"
     ACTION_GRADE_UPDATED = "grade_updated"
     ACTION_GRADES_IMPORTED = "grades_imported"
+    ACTION_RESULTS_CALCULATED = "results_calculated"
+    ACTION_RESULTS_SENT = "results_sent_director"
+    ACTION_EXCEL_EXPORTED = "excel_exported"
+    ACTION_STUDENT_CARD_GENERATED = "student_card_generated"
     ACTION_BRANCH_SETTINGS_UPDATED = "branch_settings_updated"
 
     ACTION_CHOICES = [
@@ -38,6 +42,10 @@ class SupportAuditLog(models.Model):
         (ACTION_EMAIL_UPDATED, "Email corrige"),
         (ACTION_GRADE_UPDATED, "Note modifiee"),
         (ACTION_GRADES_IMPORTED, "Import notes"),
+        (ACTION_RESULTS_CALCULATED, "Resultats calcules"),
+        (ACTION_RESULTS_SENT, "Resultats envoyes direction"),
+        (ACTION_EXCEL_EXPORTED, "Export Excel"),
+        (ACTION_STUDENT_CARD_GENERATED, "Carte etudiant generee"),
         (ACTION_BRANCH_SETTINGS_UPDATED, "Parametres annexe modifies"),
     ]
 

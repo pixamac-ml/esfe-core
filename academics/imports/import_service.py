@@ -158,6 +158,8 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
                 return True
         return False
 
+    pending_updates: list[tuple[AcademicEnrollment, EC, Decimal]] = []
+
     for _idx, row in df.iterrows():
         excel_row_number = int(_idx) + 6
         nom = _normalize_text(row.get(nom_column))
@@ -211,16 +213,29 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
                 continue
             if score < Decimal("0") or score > Decimal("20"):
                 result.skipped_invalid_scores += 1
+                result.student_issues.append({
+                    "row_number": excel_row_number,
+                    "nom": display_nom,
+                    "prenom": display_prenom,
+                    "reason": "invalid_score",
+                    "message": f"Note invalide pour {ec.title}: {value}. La note doit etre comprise entre 0 et 20.",
+                })
                 continue
 
-            grade, _created = ECGrade.objects.update_or_create(
-                enrollment=enrollment,
-                ec=ec,
-                defaults={"normal_score": score},
-            )
-            apply_ec_grade(grade)
-            grade.save()
-            result.updated += 1
+            pending_updates.append((enrollment, ec, score))
+
+    if result.skipped_invalid_scores or result.skipped_unknown_students:
+        return result
+
+    for enrollment, ec, score in pending_updates:
+        grade, _created = ECGrade.objects.update_or_create(
+            enrollment=enrollment,
+            ec=ec,
+            defaults={"normal_score": score},
+        )
+        apply_ec_grade(grade)
+        grade.save()
+        result.updated += 1
 
     return result
 

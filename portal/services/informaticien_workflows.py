@@ -9,6 +9,7 @@ from django.urls import reverse
 
 from academics.imports.import_service import import_grades
 from academics.models import Language, Profession
+from portal.models import AccountSupportState
 from portal.models import BranchITSettings, SupportAuditLog, SupportTicket
 from portal.selectors.informaticien import (
     active_academic_year,
@@ -19,6 +20,7 @@ from portal.selectors.informaticien import (
     enrollments_without_grades_for_branch,
     support_tickets_for_branch,
 )
+from portal.services.notes_workflow import get_notes_state
 from portal.services.it_support_service import (
     assign_support_ticket,
     create_support_ticket,
@@ -32,6 +34,50 @@ class ImportFeedback:
     level: str
     message: str
     invalid_lines: list[dict]
+
+
+def build_home_context(*, branch):
+    classes = list(academic_classes_for_branch(branch=branch).filter(is_active=True)[:60])
+    incomplete_classes = []
+    calculable_classes = []
+    resume_target = None
+
+    for academic_class in classes:
+        for semester in academic_class.semesters.all().order_by("number"):
+            state = get_notes_state(academic_class=academic_class, semester=semester)
+            if state is None:
+                continue
+            query = f"?classe={academic_class.id}&semester={semester.id}"
+            item = {
+                "class": academic_class,
+                "semester": semester,
+                "state": state,
+                "url": f"{reverse('accounts_portal:it_notes_flow_workspace')}{query}",
+            }
+            if state.entered_grades and resume_target is None:
+                resume_target = item
+            if state.missing_grades and state.entered_grades:
+                incomplete_classes.append(item)
+            if state.code == "ready_to_calculate":
+                calculable_classes.append(item)
+
+    blocked_accounts = AccountSupportState.objects.select_related("user__profile").filter(
+        is_blocked=True,
+        user__profile__branch=branch,
+    )[:10]
+    import_errors = audit_logs_for_branch(branch=branch).filter(
+        action_type=SupportAuditLog.ACTION_GRADES_IMPORTED,
+        details__icontains="invalide",
+    )[:10]
+
+    return {
+        "branch": branch,
+        "resume_target": resume_target,
+        "incomplete_classes": incomplete_classes[:10],
+        "calculable_classes": calculable_classes[:10],
+        "blocked_accounts": list(blocked_accounts),
+        "import_errors": list(import_errors),
+    }
 
 
 def build_support_context(*, branch, status="", toast=None):
@@ -98,6 +144,7 @@ def import_notes_file(*, actor, branch, academic_class, semester, file):
         raise ValidationError("Le semestre ne correspond pas a la classe.")
 
     result = import_grades(file, academic_class, semester)
+    has_critical_errors = bool(result.skipped_invalid_scores or result.skipped_unknown_students)
     log_support_action(
         actor=actor,
         branch=branch,
@@ -105,9 +152,16 @@ def import_notes_file(*, actor, branch, academic_class, semester, file):
         target_label=f"Import notes {academic_class.display_name} S{semester.number}",
         details=f"{result.updated} note(s) importee(s), {len(result.student_issues)} ligne(s) invalide(s).",
     )
+    if has_critical_errors:
+        message = (
+            f"Import refuse: {len(result.student_issues)} erreur(s) critique(s). "
+            "Aucune note n'a ete inseree."
+        )
+    else:
+        message = f"{result.updated} note(s) importee(s). {len(result.student_issues)} ligne(s) invalide(s)."
     return ImportFeedback(
-        level="success" if result.updated else "error",
-        message=f"{result.updated} note(s) importee(s). {len(result.student_issues)} ligne(s) invalide(s).",
+        level="error" if has_critical_errors or not result.updated else "success",
+        message=message,
         invalid_lines=result.student_issues,
     )
 
@@ -160,6 +214,31 @@ def build_supervision_context(*, branch):
             "detail": f"{enrollment.student} - {enrollment.academic_class.display_name}",
             "action_label": "Corriger les notes",
             "action_url": f"{reverse('accounts_portal:it_notes_flow_workspace')}{query}",
+        })
+    calculated_not_sent = academic_classes_for_branch(branch=branch).filter(
+        semesters__status="FINALIZED",
+        is_active=True,
+    ).distinct()
+    for academic_class in calculated_not_sent[:30]:
+        semester = academic_class.semesters.filter(status="FINALIZED").order_by("number").first()
+        query = f"?classe={academic_class.id}"
+        if semester:
+            query += f"&semester={semester.id}"
+        alerts.append({
+            "level": "info",
+            "title": "Resultats calcules non envoyes",
+            "detail": academic_class.display_name,
+            "action_label": "Envoyer au Directeur",
+            "action_url": f"{reverse('accounts_portal:it_notes_flow_workspace')}{query}",
+        })
+    open_tickets = support_tickets_for_branch(branch=branch).exclude(status=SupportTicket.STATUS_RESOLVED)
+    for ticket in open_tickets[:30]:
+        alerts.append({
+            "level": "warning",
+            "title": "Ticket ouvert",
+            "detail": f"#{ticket.id} - {ticket.title}",
+            "action_label": "Traiter",
+            "action_url": reverse("accounts_portal:it_support_flow_workspace"),
         })
     return {
         "branch": branch,

@@ -348,6 +348,14 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
         })
 
     semester_result = compute_semester_result(semester, enrollment)
+    report_lock_reason = ""
+    if not permissions["can_generate_reports"]:
+        if semester.status == Semester.STATUS_FINALIZED:
+            report_lock_reason = "Releves disponibles apres publication par la direction."
+        elif permissions["can_publish"]:
+            report_lock_reason = "Publier le semestre pour activer les releves."
+        else:
+            report_lock_reason = f"Releves indisponibles: statut {semester.get_status_display()}."
 
     return {
         "index": index,
@@ -370,6 +378,7 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
         "active_session_type": active_session_type,
         "can_edit_current_session": can_edit_current_session,
         "can_generate_reports": permissions["can_generate_reports"],
+        "report_lock_reason": report_lock_reason,
         "updated_ec_id": updated_ec_id,
     }
 

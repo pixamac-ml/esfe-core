@@ -28,6 +28,7 @@
   .workflow-band, .workflow-progress, .workflow-actions, .workflow-table-shell, .workflow-empty, .workflow-toast {
     border: 1px solid #e2e8f0; border-radius: 18px; background: white; padding: 1.2rem; box-shadow: 0 10px 28px rgb(15 23 42 / .06);
   }
+  .workflow-table-shell { min-width: 0; overflow: hidden; }
   .dark .workflow-band, .dark .workflow-progress, .dark .workflow-actions, .dark .workflow-table-shell, .dark .workflow-empty, .dark .workflow-toast {
     border-color: #334155; background: #0f172a;
   }
@@ -58,6 +59,8 @@
   .workflow-btn-secondary { border: 1px solid #cbd5e1; background: white; color: #334155; }
   .dark .workflow-btn-secondary { border-color: #475569; background: #020617; color: #e2e8f0; }
   .workflow-grid-placeholder { margin-top: 1rem; overflow: auto; border-radius: 14px; border: 1px dashed #cbd5e1; padding: 1rem; color: #64748b; font-weight: 700; }
+  .notes-grid-shell { min-width: 0; max-width: 100%; overflow: hidden; }
+  .notes-grid-scroll { max-width: 100%; max-height: 70vh; overflow-x: auto; overflow-y: auto; }
   .workflow-list { margin-top: 1rem; display: grid; gap: .7rem; }
   .workflow-list article { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-radius: 14px; border: 1px solid #e2e8f0; padding: .9rem; }
   .workflow-list strong, .workflow-list span { display: block; }
@@ -131,15 +134,35 @@
             <p class="workflow-kicker" x-text="activeKicker()"></p>
             <h1 class="mt-1 text-3xl font-black tracking-tight" x-text="activeLabel()"></h1>
           </div>
-          <button type="button" class="workflow-btn workflow-btn-secondary" @click="toggleDarkMode()">
-            <i data-lucide="moon" class="mr-2 h-4 w-4"></i>
-            Theme
-          </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" class="workflow-btn workflow-btn-secondary" @click="toggleDarkMode()">
+              <i data-lucide="moon" class="mr-2 h-4 w-4"></i>
+              Theme
+            </button>
+            <div class="relative" @click.outside="profileOpen = false">
+              <button type="button" class="workflow-btn workflow-btn-secondary" @click="profileOpen = !profileOpen">
+                <span class="grid h-7 w-7 place-items-center rounded-full bg-blue-600 text-xs font-black text-white">
+                  {{ request.user.first_name|first|default:request.user.username|first|upper }}
+                </span>
+                <span>{{ request.user.get_full_name|default:request.user.username }}</span>
+              </button>
+              <div x-show="profileOpen" x-transition class="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_branch_settings_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" @click="profileOpen=false">Mon profil</button>
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_branch_settings_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" @click="profileOpen=false">Parametres</button>
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold text-slate-400">Ma carte staff</button>
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold text-slate-400">Mon salaire</button>
+                <form method="post" action="{% url 'accounts:logout' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="block w-full px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50">Deconnexion</button>
+                </form>
+              </div>
+            </div>
+          </div>
         </header>
 
         <section
           id="it-workspace"
-          hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}"
+          hx-get="{% url 'accounts_portal:it_home_workspace' %}"
           hx-trigger="load"
           hx-target="#it-workspace"
           hx-swap="innerHTML"
@@ -156,18 +179,16 @@
     return {
       collapsed: false,
       darkMode: false,
-      activeModule: 'notes',
+      profileOpen: false,
+      activeModule: 'home',
       modules: [
-        { key: 'notes', label: 'Gestion des notes', icon: 'file-spreadsheet', kicker: 'Classe -> Semestre -> Etat -> Action' },
-        { key: 'support', label: 'Support & incidents', icon: 'life-buoy', kicker: 'Ticket -> Prise en charge -> Resolution' },
-        { key: 'audit', label: 'Logs & audit', icon: 'history', kicker: 'Actions sensibles par annexe' },
+        { key: 'home', label: 'Accueil', icon: 'home', kicker: 'Actions rapides et priorites' },
+        { key: 'notes', label: 'Notes & Resultats', icon: 'file-spreadsheet', kicker: 'Classe -> Semestre -> Etat -> Action' },
         { key: 'import', label: 'Import / export', icon: 'upload-cloud', kicker: 'Excel notes et export classe' },
-        { key: 'structure', label: 'Structure academique', icon: 'building-2', kicker: 'Formations, classes, effectifs' },
-        { key: 'supervision', label: 'Supervision', icon: 'radar', kicker: 'Alertes actionnables' },
-        { key: 'accounts', label: 'Gestion des comptes', icon: 'shield-check', kicker: 'Utilisateur -> Etat compte -> Action' },
         { key: 'cards', label: 'Cartes etudiants', icon: 'badge', kicker: 'Classe -> Etudiant -> PDF' },
-        { key: 'settings', label: 'Parametres annexe', icon: 'settings', kicker: 'Seuils, branding, configuration' },
-        { key: 'me', label: 'Mon compte', icon: 'user-cog', kicker: 'Profil informaticien et preferences' },
+        { key: 'accounts', label: 'Utilisateurs', icon: 'shield-check', kicker: 'Utilisateur -> Etat compte -> Action' },
+        { key: 'support', label: 'Support', icon: 'life-buoy', kicker: 'Tickets de l annexe' },
+        { key: 'settings', label: 'Parametres', icon: 'settings', kicker: 'Profil, securite, apparence' },
       ],
       init() {
         this.collapsed = window.localStorage.getItem('it_flow_sidebar') === '1';
@@ -188,16 +209,13 @@
       openModule(moduleKey) {
         this.activeModule = moduleKey;
         const urls = {
+          home: "{% url 'accounts_portal:it_home_workspace' %}",
           notes: "{% url 'accounts_portal:it_notes_flow_workspace' %}",
-          support: "{% url 'accounts_portal:it_support_flow_workspace' %}",
-          audit: "{% url 'accounts_portal:it_audit_workspace' %}",
           import: "{% url 'accounts_portal:it_import_workspace' %}",
-          structure: "{% url 'accounts_portal:it_structure_workspace' %}",
-          supervision: "{% url 'accounts_portal:it_supervision_workspace' %}",
           accounts: "{% url 'accounts_portal:it_accounts_flow_workspace' %}",
           cards: "{% url 'accounts_portal:it_cards_workspace' %}",
+          support: "{% url 'accounts_portal:it_support_flow_workspace' %}",
           settings: "{% url 'accounts_portal:it_branch_settings_workspace' %}",
-          me: "{% url 'accounts_portal:it_my_account_workspace' %}",
         };
         if (window.htmx) {
           window.htmx.ajax('GET', urls[moduleKey], '#it-workspace');

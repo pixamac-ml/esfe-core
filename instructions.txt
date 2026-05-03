@@ -1,282 +1,202 @@
-Tu es un ingénieur Django senior. Le dashboard Informaticien est déjà fonctionnel mais encore insuffisant pour la production.
+Tu dois corriger la STRUCTURE de la maquette des notes.
 
-MISSION :
-Peaufiner et finaliser le dashboard Informaticien d’annexe pour le rendre réellement productif, intelligent, sécurisé et exploitable.
-
----
-
-# 1. NETTOYAGE PRODUIT
-
-Les modules Langues / Métiers ne sont pas prioritaires actuellement.
-
-À faire :
-
-* les retirer du dashboard principal ou les déplacer dans une zone “Paramètres avancés”
-* ne pas les mettre en avant dans le workflow informaticien
-* garder le code seulement s’il ne perturbe pas l’expérience
-
-Objectif :
-le dashboard doit se concentrer sur les tâches réelles de l’informaticien.
+⚠️ Le problème n’est PAS esthétique, il est STRUCTUREL.
 
 ---
 
-# 2. MAQUETTE DES NOTES EN DJANGO COMPONENTS
+# ❌ PROBLÈMES ACTUELS
 
-Refactorer la maquette des notes pour qu’elle soit construite avec Django Components réutilisables.
-
-Créer / améliorer :
-
-components/notes/
-
-* notes_workflow
-* notes_grid
-* notes_header
-* student_identity_column
-* ec_note_cell
-* semester_summary
-* notes_validation_panel
-* notes_anomaly_panel
-* notes_actions_bar
-
-Objectif :
-
-* garder le même style visuel
-* éviter les bugs de redimensionnement
-* rendre les cellules stables
-* rendre les inputs éditables
-* permettre la réutilisation dans d’autres dashboards
+1. Les UE (Unités d’Enseignement) sont mal groupées
+2. Les colonnes ne respectent pas leur périmètre
+3. Les colspan sont incorrects
+4. Les headers ne correspondent pas aux colonnes
+5. Le sticky est mal géré (les cellules passent au-dessus des noms)
+6. Les sections "Résultat du semestre" sont mal positionnées
+7. Les lignes de séparation sont invisibles
 
 ---
 
-# 3. FILTRAGE ANNEXE STRICT
+# 🎯 OBJECTIF
 
-Toutes les données utilisées dans la maquette doivent être filtrées par l’annexe de l’informaticien connecté.
+Reconstruire une table STRUCTURÉE avec :
 
-Règle obligatoire :
-
-branch = request.user.branch
-
-À appliquer sur :
-
-* classes
-* étudiants
-* AcademicEnrollment
-* notes
-* EC
-* UE
-* exports
-* imports
-* cartes étudiants
-* logs
-* support
-
-Interdiction :
-
-* aucune sélection manuelle d’annexe
-* aucune donnée hors annexe
-
-Ajouter des garde-fous backend :
-
-if object.branch != request.user.branch:
-return HttpResponseForbidden()
+* THEAD multi-niveaux correct
+* COLSPAN dynamiques corrects
+* ALIGNEMENT strict des colonnes
+* STICKY fonctionnel (priorité z-index)
+* SECTIONS bien regroupées (UE, Résultats)
 
 ---
 
-# 4. GÉNÉRATION DES RÉSULTATS
+# 🧱 STRUCTURE OBLIGATOIRE DU THEAD
 
-Actuellement la maquette bloque encore la génération des résultats.
+Tu dois construire 3 niveaux :
 
-À faire :
+### NIVEAU 1 (groupes)
 
-* analyser le workflow existant dans l’app académique
-* identifier les services de calcul déjà présents
-* brancher un bouton clair :
-  “Calculer / Générer les résultats”
-* afficher un état :
-  EMPTY
-  IN_PROGRESS
-  READY_TO_CALCULATE
-  CALCULATED
-  SENT_TO_DIRECTOR
-
-Le calcul doit :
-
-* utiliser les notes saisies
-* respecter UE / EC / coefficients / crédits
-* produire les moyennes
-* détecter les notes manquantes
-* empêcher la validation si données incomplètes
-
-Ne pas recréer un moteur de calcul si un moteur existe déjà.
-Réutiliser l’existant.
+* Étudiants
+* UE201 (colspan dynamique)
+* UE202 (colspan dynamique)
+* Résultat du semestre (colspan fixe)
 
 ---
 
-# 5. DASHBOARD INTELLIGENT
+### NIVEAU 2 (matières)
 
-Ajouter un vrai panneau d’intelligence métier.
+Chaque UE contient ses matières :
 
-Ce panneau doit afficher uniquement des alertes actionnables :
+Ex :
 
-* classes avec notes incomplètes
-* EC sans note
-* étudiants sans moyenne
-* résultats prêts à générer
-* résultats déjà générés
-* erreurs d’import
-* incohérences coefficient / crédit
-* classes sans effectif
-* notes hors plage
+UE201 →
 
-Chaque alerte doit proposer une action directe :
+* Marketing
+* Comptabilité
 
-* ouvrir la classe
-* corriger les notes
-* voir les anomalies
-* relancer calcul
-* exporter rapport
+UE202 →
 
-Pas de statistiques décoratives.
+* Droit
+* Statistiques
 
 ---
 
-# 6. IMPORT / EXPORT EXCEL
+### NIVEAU 3 (colonnes internes)
 
-Remplacer les exports CSV par Excel.
+Pour chaque matière :
 
-Utiliser openpyxl.
-
-Exports attendus :
-
-* notes par classe
-* notes par semestre
-* anomalies de notes
-* liste étudiants classe
-* état des résultats
-
-Imports attendus :
-
-* notes Excel
-* validation avant insertion
-* affichage lignes invalides
-* rapport d’import
-
-Interdiction :
-
-* CSV comme format principal
-* import silencieux sans rapport
+* Note
+* Note coef
+* Crédits obtenus
 
 ---
 
-# 7. CARTES ÉTUDIANTS PDF PROFESSIONNELLES
+### ⚠️ TRÈS IMPORTANT
 
-Améliorer la génération des cartes étudiants.
+👉 Les colspan doivent être calculés dynamiquement :
 
-Créer un vrai modèle professionnel de carte avec :
-
-Recto :
-
-* logo école
-* nom établissement
-* annexe
-* photo étudiant si disponible
-* nom complet
-* matricule
-* classe / formation
-* année académique
-* QR code ou code unique
-* date d’émission
-
-Verso :
-
-* informations utiles
-* consignes
-* signature/cachet
-* contacts école
-
-À faire :
-
-* créer template PDF propre
-* design professionnel
-* génération individuelle
-* génération par classe
-* filtrage annexe obligatoire
-
-Ne pas générer une carte basique avec seulement nom/prénom.
+```python
+colspan = nombre_matieres * 3
+```
 
 ---
 
-# 8. PRODUCTIVITÉ DU DASHBOARD
+# 📌 POSITIONNEMENT CRITIQUE
 
-Ajouter des actions rapides :
+### UE
 
-* ouvrir dernière classe travaillée
-* continuer saisie notes
-* voir résultats prêts
-* voir anomalies urgentes
-* générer cartes classe
-* exporter notes classe
-* ouvrir support urgent
-
-Objectif :
-quand l’informaticien entre, il sait immédiatement quoi faire.
+👉 doit couvrir TOUTES ses matières
+👉 ne doit JAMAIS se casser visuellement
 
 ---
 
-# 9. ARCHITECTURE À RESPECTER
+### RÉSULTAT DU SEMESTRE
 
-Respect strict :
+👉 doit être FIXE à droite
+👉 doit regrouper :
 
-views.py :
-
-* orchestration uniquement
-
-selectors.py :
-
-* requêtes DB
-
-services.py :
-
-* logique métier
-
-Django Components :
-
-* rendu UI réutilisable
-
-Templates :
-
-* aucun calcul métier
-
-HTMX :
-
-* interactions sans reload complet
+* Moyenne
+* Pourcentage
+* Crédits
+* Actions (PDF)
 
 ---
 
-# 10. PRIORITÉ D’EXÉCUTION
+# 🎯 STICKY (CORRECTION OBLIGATOIRE)
 
-Faire dans cet ordre :
+Corriger le problème où les cellules passent AU-DESSUS des noms
 
-1. Corriger / refactorer maquette notes en Django Components
-2. Brancher génération résultats
-3. Ajouter panneau intelligent d’anomalies
-4. Remplacer CSV par Excel
-5. Améliorer cartes étudiants PDF
-6. Nettoyer modules secondaires non prioritaires
+### RÈGLES :
+
+```css
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: white;
+}
+
+tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 30;
+  background: white;
+}
+```
+
+👉 Le nom étudiant DOIT être au-dessus de tout
 
 ---
 
-# RÉSULTAT ATTENDU
+# 📏 ALIGNEMENT TABLE
 
-Un dashboard Informaticien réellement productif :
+Ajouter :
 
-* maquette stable
-* saisie notes fiable
-* génération résultats fonctionnelle
-* exports Excel
-* cartes étudiants professionnelles
-* alertes intelligentes
-* sécurité annexe stricte
-* UX claire et opérationnelle
+```html
+<table class="min-w-max border-collapse">
+```
 
-Ne pas toucher à la partie inscriptions.
+Colonnes :
+
+```html
+<th class="min-w-[120px] text-center">
+<td class="min-w-[100px] text-center">
+```
+
+---
+
+# 📐 GRID WRAPPER (IMPORTANT)
+
+Ne pas laisser la table casser la page :
+
+```html
+<div class="overflow-x-auto overflow-y-auto max-h-[65vh]">
+```
+
+---
+
+# 🎨 LIGNES ET LISIBILITÉ
+
+Améliorer les séparations :
+
+* border-gray-300 minimum
+* ajouter border entre groupes UE
+* ajouter séparation forte avant "Résultat du semestre"
+
+---
+
+# 🧪 TEST FINAL OBLIGATOIRE
+
+Vérifier :
+
+1. Les UE couvrent correctement leurs matières
+2. Aucun décalage horizontal
+3. Les headers correspondent aux colonnes
+4. Le scroll horizontal fonctionne
+5. Les noms restent visibles (sticky OK)
+6. Le bloc "Résultat du semestre" reste aligné à droite
+7. Les lignes sont lisibles
+
+---
+
+# 🚫 INTERDIT
+
+* Hardcoder les colspan
+* Mélanger logique et template
+* Laisser des colonnes flotter
+* Laisser un header mal aligné
+
+---
+
+# 🎯 LIVRABLE
+
+Une maquette :
+
+* alignée
+* stable
+* lisible
+* scalable (fonctionne avec plusieurs UE)
+* professionnelle
+
+---
+
+Corriger uniquement la STRUCTURE.
+Ne pas casser le reste.

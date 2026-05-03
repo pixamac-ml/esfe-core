@@ -1,0 +1,82 @@
+<section class="workflow-stack">
+  <div class="workflow-band workflow-band-in_progress">
+    <div>
+      <p class="workflow-kicker">Accueil</p>
+      <h3>Que voulez-vous faire aujourd'hui ?</h3>
+      <p>{{ branch.name|default:"Annexe" }} - workflows operationnels du dashboard informaticien.</p>
+    </div>
+    {% if resume_target %}
+      <button class="workflow-btn workflow-btn-primary" hx-get="{{ resume_target.url }}" hx-target="#it-workspace" hx-swap="innerHTML">
+        Reprendre derniere classe
+      </button>
+    {% endif %}
+  </div>
+
+  <div class="workflow-actions">
+    <button class="workflow-btn workflow-btn-primary" hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">Saisir des notes</button>
+    <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_import_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">Importer Excel</button>
+    {% if calculable_classes %}
+      <button class="workflow-btn workflow-btn-secondary" hx-get="{{ calculable_classes.0.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Generer resultats</button>
+    {% else %}
+      <span class="workflow-muted">Aucune classe prete a calculer pour l'instant.</span>
+    {% endif %}
+    <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_cards_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">Generer cartes</button>
+  </div>
+
+  <div class="workflow-split">
+    <section class="workflow-table-shell">
+      <div class="workflow-table-head"><div><p class="workflow-kicker">Notes incompletes</p><h3>A traiter</h3></div></div>
+      <div class="workflow-list">
+        {% for item in incomplete_classes %}
+          <article>
+            <div><strong>{{ item.class.display_name }} - S{{ item.semester.number }}</strong><span>{{ item.state.missing_grades }} note(s) manquante(s)</span></div>
+            <button class="workflow-btn workflow-btn-secondary" hx-get="{{ item.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Ouvrir</button>
+          </article>
+        {% empty %}
+          <p class="workflow-muted">Aucune classe avec saisie incomplete.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="workflow-table-shell">
+      <div class="workflow-table-head"><div><p class="workflow-kicker">Resultats</p><h3>Prets a calculer</h3></div></div>
+      <div class="workflow-list">
+        {% for item in calculable_classes %}
+          <article>
+            <div><strong>{{ item.class.display_name }} - S{{ item.semester.number }}</strong><span>{{ item.state.entered_grades }}/{{ item.state.expected_grades }} notes</span></div>
+            <button class="workflow-btn workflow-btn-primary" hx-get="{{ item.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Calculer</button>
+          </article>
+        {% empty %}
+          <p class="workflow-muted">Aucun semestre complet non calcule.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="workflow-split">
+    <section class="workflow-table-shell">
+      <div class="workflow-table-head"><div><p class="workflow-kicker">Import Excel</p><h3>Erreurs recentes</h3></div></div>
+      <div class="workflow-list">
+        {% for log in import_errors %}
+          <article><div><strong>{{ log.target_label }}</strong><span>{{ log.details }}</span></div></article>
+        {% empty %}
+          <p class="workflow-muted">Aucune erreur d'import recente.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="workflow-table-shell">
+      <div class="workflow-table-head"><div><p class="workflow-kicker">Comptes</p><h3>Comptes bloques</h3></div></div>
+      <div class="workflow-list">
+        {% for state in blocked_accounts %}
+          <article>
+            <div><strong>{{ state.user.get_full_name|default:state.user.username }}</strong><span>{{ state.note|default:"Compte bloque" }}</span></div>
+            <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}?q={{ state.user.username }}" hx-target="#it-workspace" hx-swap="innerHTML">Gerer</button>
+          </article>
+        {% empty %}
+          <p class="workflow-muted">Aucun compte bloque dans l'annexe.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</section>

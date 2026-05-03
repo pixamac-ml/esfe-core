@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db.models import Count, Q, Sum
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.urls.exceptions import NoReverseMatch
@@ -61,7 +61,7 @@ from portal.services.it_support_service import (
 )
 from portal.models import SupportTicket
 from portal.views.it_grades_import import build_it_grade_selection_context
-from students.models import AttendanceAlert, AttendanceRollSheet, Student
+from students.models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance
 from students.services.attendance_service import (
     bulk_mark_student_attendance,
     list_students_for_schedule_event,
@@ -101,15 +101,7 @@ def _build_portal_context(request, *, page_title, module_cards):
 
 
 def _resolve_academic_branch(request):
-    branch = get_user_branch(request.user)
-    if branch:
-        return branch
-    return (
-        Branch.objects
-        .annotate(schedule_count=Count("schedule_events"))
-        .order_by("-schedule_count", "name")
-        .first()
-    )
+    return get_user_branch(request.user)
 
 
 def _build_academic_dashboard_context(request, *, page_title, page_kicker, sidebar_links, highlight):
@@ -274,26 +266,30 @@ def _user_initials(display_name: str) -> str:
 
 
 def _render_supervisor_dashboard(request):
-    context = build_supervisor_dashboard_context(
-        request,
-        branch=_resolve_academic_branch(request),
-        page_title="Dashboard Surveillant General",
-        page_kicker="Surveillance generale",
-        sidebar_links=[
-            {"label": "Vue generale", "href": "#overview"},
-            {"label": "Assiduite", "href": "#absences"},
-            {"label": "Cours", "href": "#courses"},
-            {"label": "Classes", "href": "#classes"},
-            {"label": "Alertes", "href": "#alerts"},
-        ],
-        highlight=[
-            "Presence et retards",
-            "Cours et cahier de texte",
-            "Classes a surveiller",
-            "Alertes terrain",
-        ],
-        base_context_builder=_build_portal_context,
-    )
+    branch = _resolve_academic_branch(request)
+    _, class_picker_items, _ = get_supervisor_class_picker_bundle(branch=branch)
+    selected_class_id = None
+    selected_class_label = ""
+    selected_class_raw = (request.GET.get("class_id") or "").strip()
+    if selected_class_raw.isdigit():
+        selected_class_id = int(selected_class_raw)
+        for item in class_picker_items:
+            if item["id"] == selected_class_id:
+                selected_class_label = item["label"]
+                break
+
+    context = {
+        **_build_portal_context(
+            request,
+            page_title="Dashboard Surveillant General",
+            module_cards=["Suivi des classes", "Assiduite", "Emploi du temps"],
+        ),
+        "branch": branch,
+        "today": timezone.localdate(),
+        "class_picker_items": class_picker_items,
+        "selected_class_id": selected_class_id,
+        "selected_class_label": selected_class_label,
+    }
     display_name = (
         context.get("user_display_name")
         or request.user.get_full_name()
@@ -303,6 +299,423 @@ def _render_supervisor_dashboard(request):
     context["user_initials"] = _user_initials(display_name)
     context["active_alerts_count"] = len(context.get("alerts") or [])
     return render(request, "portal/staff/supervisor_dashboard.html", context)
+
+
+def _parse_supervisor_section(request, default="home"):
+    section = (request.GET.get("section") or request.POST.get("section") or default).strip().lower()
+    allowed = {"home", "classes", "attendance", "schedule", "courses", "students"}
+    return section if section in allowed else default
+
+
+def _parse_workflow_roll_date(request):
+    raw = (request.GET.get("roll_date") or request.POST.get("roll_date") or "").strip()
+    if not raw:
+        return timezone.localdate()
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        return timezone.localdate()
+
+
+def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
+    branch = _resolve_academic_branch(request)
+    resolved_section = section or _parse_supervisor_section(request)
+    base_ctx = _build_supervisor_dashboard_context_for_partials(request, branch=branch)
+    class_picker_items = base_ctx.get("class_picker_items") or []
+
+    selected_class_id = None
+    selected_class_raw = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
+    if selected_class_raw.isdigit():
+        selected_class_id = int(selected_class_raw)
+    elif base_ctx.get("selected_class_id"):
+        selected_class_id = base_ctx["selected_class_id"]
+
+    selected_class = None
+    if branch and selected_class_id:
+        selected_class = (
+            AcademicClass.objects.select_related("programme", "academic_year", "branch")
+            .annotate(student_count=Count("enrollments", filter=Q(enrollments__is_active=True)))
+            .filter(branch=branch, is_active=True, pk=selected_class_id)
+            .first()
+        )
+
+    context = {
+        "branch": branch,
+        "section": resolved_section,
+        "today": timezone.localdate(),
+        "class_picker_items": class_picker_items,
+        "selected_class": selected_class,
+        "selected_class_id": selected_class.id if selected_class else None,
+        "selected_class_label": selected_class.display_name if selected_class else "",
+        "high_absence_classes": [
+            row for row in (base_ctx.get("class_watchlist") or []) if row.get("absent_count", 0) >= 3
+        ][:6],
+        "schedule_conflicts": [
+            item for item in (base_ctx.get("alerts") or []) if item.get("type") == "unresolved_conflict"
+        ][:6],
+        "unfollowed_classes": [
+            item for item in (base_ctx.get("alerts") or []) if item.get("type") == "class_without_events"
+        ][:6],
+    }
+    if toast:
+        context["toast"] = toast
+
+    if branch is None:
+        return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
+
+    if resolved_section != "home" and selected_class is None:
+        context["requires_class_selection"] = True
+        return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
+
+    week_start = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
+    if selected_class and resolved_section in {"classes", "schedule", "courses", "students"}:
+        try:
+            class_ctx = _build_supervisor_class_detail_context(
+                request,
+                branch=branch,
+                class_id=selected_class.id,
+                week_start=week_start,
+            )
+            context.update(class_ctx)
+        except AcademicClass.DoesNotExist:
+            context["requires_class_selection"] = True
+
+    if selected_class and resolved_section == "attendance":
+        roll_date = _parse_workflow_roll_date(request)
+        events = list(
+            AcademicScheduleEvent.objects.select_related("teacher", "ec", "academic_class")
+            .filter(
+                branch=branch,
+                academic_class=selected_class,
+                start_datetime__date=roll_date,
+                event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+                is_active=True,
+            )
+            .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+            .order_by("start_datetime", "id")
+        )
+        selected_event = None
+        selected_event_raw = (request.GET.get("schedule_event_id") or request.POST.get("schedule_event_id") or "").strip()
+        if selected_event_raw.isdigit():
+            selected_event = next((event for event in events if event.id == int(selected_event_raw)), None)
+        if selected_event is None and events:
+            selected_event = events[0]
+
+        rows = []
+        roll_locked = False
+        if selected_event:
+            roll_locked = is_roll_locked_for_event(branch=branch, event=selected_event)
+            roster = list_students_for_schedule_event(schedule_event=selected_event, branch=branch)
+            attendance_map = {
+                row.student_id: row
+                for row in StudentAttendance.objects.select_related("student")
+                .filter(branch=branch, schedule_event=selected_event)
+            }
+            for student in roster:
+                attendance = attendance_map.get(student.id)
+                status = attendance.status if attendance else StudentAttendance.STATUS_PRESENT
+                next_status = (
+                    StudentAttendance.STATUS_ABSENT
+                    if status == StudentAttendance.STATUS_PRESENT
+                    else StudentAttendance.STATUS_PRESENT
+                )
+                rows.append(
+                    {
+                        "student": student,
+                        "status": status,
+                        "next_status": next_status,
+                        "justification": attendance.justification if attendance else "",
+                    }
+                )
+
+        context.update(
+            {
+                "roll_date": roll_date,
+                "roll_date_iso": roll_date.isoformat(),
+                "attendance_events": events,
+                "selected_event": selected_event,
+                "attendance_rows": rows,
+                "roll_locked": roll_locked,
+                "attendance_workflow": build_attendance_workflow_payload(
+                    branch=branch,
+                    user=request.user,
+                    academic_class_id=selected_class.id,
+                    roll_date=roll_date,
+                ),
+            }
+        )
+
+    if selected_class and resolved_section == "students":
+        query = (request.GET.get("q") or request.POST.get("q") or "").strip()
+        students_qs = (
+            Student.objects.select_related("user", "inscription__candidature")
+            .filter(
+                inscription__candidature__branch=branch,
+                is_active=True,
+                user__academic_enrollments__academic_class=selected_class,
+                user__academic_enrollments__branch=branch,
+                user__academic_enrollments__is_active=True,
+            )
+            .distinct()
+            .order_by("inscription__candidature__last_name", "inscription__candidature__first_name", "matricule")
+        )
+        if query:
+            students_qs = students_qs.filter(
+                Q(inscription__candidature__last_name__icontains=query)
+                | Q(inscription__candidature__first_name__icontains=query)
+                | Q(matricule__icontains=query)
+            )
+        context["students_list"] = list(students_qs[:200])
+        context["student_query"] = query
+
+    return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_workflow_workspace(request):
+    return _render_supervisor_workflow_workspace(request)
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_attendance_toggle_student(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return HttpResponseBadRequest("Aucune annexe rattachee.")
+
+    raw_status = (request.POST.get("status") or "").strip()
+    if raw_status not in {StudentAttendance.STATUS_PRESENT, StudentAttendance.STATUS_ABSENT, StudentAttendance.STATUS_LATE}:
+        return HttpResponseBadRequest("Statut invalide.")
+
+    try:
+        schedule_event = (
+            AcademicScheduleEvent.objects.select_related("academic_class", "teacher", "ec", "branch")
+            .filter(
+                pk=request.POST.get("schedule_event_id"),
+                branch=branch,
+                event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+                is_active=True,
+            )
+            .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+            .get()
+        )
+        student = (
+            Student.objects.select_related("user", "inscription__candidature")
+            .filter(
+                pk=request.POST.get("student_id"),
+                inscription__candidature__branch=branch,
+                user__academic_enrollments__academic_class=schedule_event.academic_class,
+                user__academic_enrollments__branch=branch,
+                user__academic_enrollments__is_active=True,
+            )
+            .distinct()
+            .get()
+        )
+        roll_date = timezone.localtime(schedule_event.start_datetime).date()
+        assert_roll_allows_editing(
+            branch=branch,
+            academic_class_id=schedule_event.academic_class_id,
+            roll_date=roll_date,
+        )
+        result = mark_student_attendance(
+            student=student,
+            academic_class=schedule_event.academic_class,
+            schedule_event=schedule_event,
+            status=raw_status,
+            recorded_by=request.user,
+            branch=branch,
+            arrival_time=None,
+            justification=(request.POST.get("justification") or "").strip(),
+        )
+        touch_roll_after_bulk_save(
+            user=request.user,
+            branch=branch,
+            academic_class=schedule_event.academic_class,
+            roll_date=roll_date,
+            schedule_event=schedule_event,
+        )
+    except (AcademicScheduleEvent.DoesNotExist, Student.DoesNotExist):
+        return HttpResponseBadRequest("Selection invalide.")
+    except ValidationError as exc:
+        return HttpResponseBadRequest(" ".join(exc.messages))
+
+    attendance = result["attendance"]
+    next_status = (
+        StudentAttendance.STATUS_ABSENT
+        if attendance.status == StudentAttendance.STATUS_PRESENT
+        else StudentAttendance.STATUS_PRESENT
+    )
+    return render(
+        request,
+        "portal/staff/supervisor/partials/attendance_student_row.html",
+        {
+            "row": {
+                "student": student,
+                "status": attendance.status,
+                "next_status": next_status,
+                "justification": attendance.justification,
+            },
+            "selected_event": schedule_event,
+        },
+    )
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_workflow_roll_action(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+
+    branch = _resolve_academic_branch(request)
+    toast = None
+    if branch is None:
+        toast = {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}
+    else:
+        action = (request.POST.get("action") or "").strip()
+        try:
+            if action == "start":
+                class_id = int(request.POST.get("class_id") or 0)
+                roll_date = datetime.strptime((request.POST.get("roll_date") or "").strip(), "%Y-%m-%d").date()
+                raw_ev = (request.POST.get("schedule_event_id") or "").strip()
+                schedule_event_id = int(raw_ev) if raw_ev.isdigit() else None
+                start_daily_roll(
+                    user=request.user,
+                    branch=branch,
+                    academic_class_id=class_id,
+                    roll_date=roll_date,
+                    schedule_event_id=schedule_event_id,
+                )
+                toast = {"level": "success", "message": "Appel ouvert pour la seance."}
+            elif action == "validate":
+                sheet_id = int(request.POST.get("sheet_id") or 0)
+                sheet = AttendanceRollSheet.objects.get(pk=sheet_id, branch=branch)
+                validate_daily_roll(user=request.user, sheet=sheet)
+                toast = {"level": "success", "message": "Appel enregistre et valide."}
+            elif action == "reopen":
+                sheet_id = int(request.POST.get("sheet_id") or 0)
+                sheet = AttendanceRollSheet.objects.get(pk=sheet_id, branch=branch)
+                reopen_daily_roll(user=request.user, sheet=sheet)
+                toast = {"level": "success", "message": "Appel rouvert pour correction."}
+            else:
+                raise ValidationError("Action inconnue.")
+        except AttendanceRollSheet.DoesNotExist:
+            toast = {"level": "error", "message": "Feuille d'appel introuvable."}
+        except (TypeError, ValueError) as exc:
+            toast = {"level": "error", "message": str(exc) or "Donnees invalides."}
+        except ValidationError as exc:
+            toast = {"level": "error", "message": " ".join(exc.messages)}
+
+    return _render_supervisor_workflow_workspace(request, section="attendance", toast=toast)
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_quick_course_create(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return _render_supervisor_workflow_workspace(
+            request,
+            section="courses",
+            toast={"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."},
+        )
+
+    from django.contrib.auth import get_user_model
+    from academics.services.schedule_service import create_schedule_event
+
+    User = get_user_model()
+    target_section = (_parse_supervisor_section(request, default="courses") or "courses")
+
+    try:
+        class_id = int(request.POST.get("class_id") or 0)
+        academic_class = AcademicClass.objects.select_related("academic_year", "branch").get(
+            pk=class_id,
+            branch=branch,
+            is_active=True,
+        )
+        ec = EC.objects.select_related("ue", "ue__semester").get(
+            pk=request.POST.get("ec_id"),
+            ue__semester__academic_class=academic_class,
+        )
+        teacher = User.objects.get(
+            pk=request.POST.get("teacher_id"),
+            is_active=True,
+            profile__branch=branch,
+            profile__position="teacher",
+        )
+        date_value = (request.POST.get("date") or timezone.localdate().isoformat()).strip()
+        start_time = (request.POST.get("start_time") or "").strip()
+        end_time = (request.POST.get("end_time") or "").strip()
+        if not (date_value and start_time and end_time):
+            raise ValidationError("Date, heure debut et heure fin sont obligatoires.")
+        start_dt = timezone.make_aware(datetime.strptime(f"{date_value} {start_time}", "%Y-%m-%d %H:%M"))
+        end_dt = timezone.make_aware(datetime.strptime(f"{date_value} {end_time}", "%Y-%m-%d %H:%M"))
+        if end_dt <= start_dt:
+            raise ValidationError("L'heure de fin doit etre apres l'heure de debut.")
+
+        create_schedule_event(
+            user=request.user,
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            academic_class=academic_class,
+            academic_year=academic_class.academic_year,
+            branch=branch,
+            ec=ec,
+            teacher=teacher,
+            title="",
+            description="",
+            start_datetime=start_dt,
+            end_datetime=end_dt,
+            location=(request.POST.get("location") or "").strip(),
+            is_online=False,
+            is_active=True,
+        )
+        toast = {"level": "success", "message": "Cours ajoute a l'emploi du temps."}
+    except (
+        ValueError,
+        ValidationError,
+        AcademicClass.DoesNotExist,
+        EC.DoesNotExist,
+        User.DoesNotExist,
+    ) as exc:
+        message = " ".join(getattr(exc, "messages", [])) if hasattr(exc, "messages") else str(exc)
+        toast = {"level": "error", "message": message or "Impossible d'ajouter le cours."}
+
+    return _render_supervisor_workflow_workspace(request, section=target_section, toast=toast)
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_student_drawer(request):
+    branch = _resolve_academic_branch(request)
+    student_raw = (request.GET.get("student_id") or "").strip()
+    class_raw = (request.GET.get("class_id") or "").strip()
+    if branch is None or not student_raw.isdigit() or not class_raw.isdigit():
+        return render(
+            request,
+            "portal/staff/supervisor/partials/student_drawer.html",
+            {"student": None},
+        )
+
+    student = (
+        Student.objects.select_related("inscription__candidature", "user")
+        .filter(
+            pk=int(student_raw),
+            inscription__candidature__branch=branch,
+            user__academic_enrollments__academic_class_id=int(class_raw),
+            user__academic_enrollments__branch=branch,
+            user__academic_enrollments__is_active=True,
+            is_active=True,
+        )
+        .distinct()
+        .first()
+    )
+    return render(
+        request,
+        "portal/staff/supervisor/partials/student_drawer.html",
+        {"student": student},
+    )
 
 
 def _build_supervisor_dashboard_context_for_partials(request, *, branch):
@@ -1582,7 +1995,11 @@ def _build_supervisor_class_detail_context(request, *, branch, class_id: int, we
     )
 
     teacher_q = (request.GET.get("teacher_q") or "").strip()
-    teachers_qs = User.objects.filter(is_active=True)
+    teachers_qs = User.objects.filter(
+        is_active=True,
+        profile__branch=branch,
+        profile__position="teacher",
+    )
     if teacher_q:
         teachers_qs = teachers_qs.filter(
             Q(first_name__icontains=teacher_q)
@@ -2027,8 +2444,16 @@ def supervisor_create_schedule_event(request, class_id: int):
         branch=branch,
         is_active=True,
     )
-    ec = EC.objects.select_related("ue", "ue__semester").get(pk=request.POST.get("ec_id"))
-    teacher = User.objects.get(pk=request.POST.get("teacher_id"))
+    ec = EC.objects.select_related("ue", "ue__semester").get(
+        pk=request.POST.get("ec_id"),
+        ue__semester__academic_class=academic_class,
+    )
+    teacher = User.objects.get(
+        pk=request.POST.get("teacher_id"),
+        is_active=True,
+        profile__branch=branch,
+        profile__position="teacher",
+    )
 
     date_value = (request.POST.get("date") or "").strip()
     start_time = (request.POST.get("start_time") or "").strip()

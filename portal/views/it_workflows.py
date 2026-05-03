@@ -14,6 +14,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from academics.models import AcademicClass, Semester
+from academics.services.semester import compute_semester_result
 from accounts.access import get_user_position
 from accounts.dashboards.helpers import get_user_branch
 from portal.selectors import (
@@ -31,6 +32,7 @@ from portal.services.it_support_service import create_temp_password, log_support
 from portal.services.informaticien_workflows import (
     build_audit_context,
     build_catalog_context,
+    build_home_context,
     build_import_context,
     build_structure_context,
     build_supervision_context,
@@ -44,7 +46,7 @@ from portal.services.informaticien_workflows import (
     update_branch_settings,
 )
 from portal.selectors.informaticien import grade_entries_for_class, support_tickets_for_branch
-from portal.models import SupportTicket
+from portal.models import SupportAuditLog, SupportTicket
 from students.models import Student
 from portal.views.admin_grades import _build_notes_grid_context
 
@@ -123,6 +125,17 @@ def it_notes_flow_workspace(request):
 
 
 @login_required
+def it_home_workspace(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    return render(
+        request,
+        "portal/informaticien/workflows/home_workspace.html",
+        build_home_context(branch=get_user_branch(request.user)),
+    )
+
+
+@login_required
 def it_notes_workflow_action(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
@@ -132,13 +145,19 @@ def it_notes_workflow_action(request):
     context = _resolve_workflow_selection(request)
     toast = None
     try:
+        action = (request.POST.get("action") or "").strip()
         apply_notes_workflow_action(
             actor=request.user,
             academic_class=context["selected_class"],
             semester=context["selected_semester"],
-            action=(request.POST.get("action") or "").strip(),
+            action=action,
         )
-        toast = {"level": "success", "message": "Workflow notes mis a jour."}
+        messages = {
+            "verifier_notes": "Controle termine: aucune note manquante bloquante.",
+            "calculer_resultats": "Resultats calcules et journalises.",
+            "envoyer_direction": "Resultats marques comme envoyes au Directeur des Etudes.",
+        }
+        toast = {"level": "success", "message": messages.get(action, "Workflow notes mis a jour.")}
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages)}
 
@@ -333,23 +352,59 @@ def it_export_notes_excel(request):
         return HttpResponse("openpyxl doit etre installe pour exporter en Excel.", status=500)
     selection = _resolve_workflow_selection(request)
     academic_class = selection["selected_class"]
+    selected_semester = selection["selected_semester"]
     if academic_class is None:
         return HttpResponseForbidden("Classe obligatoire.")
 
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Notes classe"
-    sheet.append(["Classe", "Etudiant", "EC", "Session normale", "Rattrapage", "Note finale", "Valide"])
-    for grade in grade_entries_for_class(academic_class=academic_class).order_by("enrollment__student__username", "ec__title"):
+    sheet.append(["Classe", "Semestre", "Etudiant", "EC", "Coefficient", "Credits", "Session normale", "Rattrapage", "Note finale", "Valide"])
+    grades = grade_entries_for_class(academic_class=academic_class)
+    if selected_semester:
+        grades = grades.filter(ec__ue__semester=selected_semester)
+    for grade in grades.order_by("enrollment__student__username", "ec__ue__semester__number", "ec__title"):
         sheet.append([
             academic_class.display_name,
+            f"S{grade.ec.ue.semester.number}",
             grade.enrollment.student.get_full_name() or grade.enrollment.student.username,
             grade.ec.title,
+            grade.ec.coefficient,
+            grade.ec.credit_required,
             grade.normal_score,
             grade.retake_score,
-            grade.note,
+            grade.final_score,
             "oui" if grade.is_validated else "non",
         ])
+
+    anomalies = workbook.create_sheet("Anomalies")
+    anomalies.append(["Type", "Detail", "Action attendue"])
+    state = get_notes_state(academic_class=academic_class, semester=selected_semester) if selected_semester else None
+    if state:
+        for alert in state.technical_alerts:
+            anomalies.append(["Notes", alert, "Completer la grille puis verifier"])
+    if anomalies.max_row == 1:
+        anomalies.append(["Aucune", "Aucune anomalie bloquante detectee dans la selection.", "-"])
+
+    results = workbook.create_sheet("Resultats")
+    results.append(["Etudiant", "Semestre", "Moyenne", "Pourcentage", "Credits obtenus", "Credits requis", "Statut"])
+    if selected_semester:
+        enrollments = academic_class.enrollments.filter(is_active=True, academic_year=academic_class.academic_year).select_related("student")
+        for enrollment in enrollments:
+            summary = compute_semester_result(selected_semester, enrollment)
+            results.append([
+                enrollment.student.get_full_name() or enrollment.student.username,
+                f"S{selected_semester.number}",
+                summary["average"],
+                summary["percentage"],
+                summary["credit_obtained"],
+                summary["credit_required"],
+                state.label if state else "",
+            ])
+
+    for worksheet in workbook.worksheets:
+        for column in ("A", "B", "C", "D"):
+            worksheet.column_dimensions[column].width = 28
     for column in ("A", "B", "C"):
         sheet.column_dimensions[column].width = 28
     buffer = BytesIO()
@@ -360,6 +415,13 @@ def it_export_notes_excel(request):
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="notes-classe-{academic_class.id}.xlsx"'
+    log_support_action(
+        actor=request.user,
+        branch=get_user_branch(request.user),
+        action_type=SupportAuditLog.ACTION_EXCEL_EXPORTED,
+        target_label=f"Export notes {academic_class.display_name}",
+        details=f"Export Excel {'S' + str(selected_semester.number) if selected_semester else 'classe complete'}.",
+    )
     return response
 
 
@@ -583,6 +645,7 @@ def it_branch_settings_workspace(request):
         {
             "branch": branch,
             "settings": settings,
+            "profile": getattr(request.user, "profile", None),
         },
     )
 
@@ -638,6 +701,18 @@ def it_my_account_save(request):
     request.user.last_name = (request.POST.get("last_name") or "").strip()
     request.user.email = (request.POST.get("email") or "").strip().lower()
     request.user.save(update_fields=["first_name", "last_name", "email"])
+    if request.POST.get("return_settings"):
+        branch = get_user_branch(request.user)
+        return render(
+            request,
+            "portal/informaticien/workflows/branch_settings_workspace.html",
+            {
+                "branch": branch,
+                "settings": get_branch_settings(branch=branch),
+                "profile": getattr(request.user, "profile", None),
+                "toast": {"level": "success", "message": "Profil mis a jour."},
+            },
+        )
     return render(
         request,
         "portal/informaticien/workflows/my_account_workspace.html",
@@ -667,7 +742,19 @@ def it_student_card_pdf(request, student_id):
     _draw_student_card(pdf, student=student)
     pdf.save()
     buffer.seek(0)
-    return FileResponse(buffer, as_attachment=True, filename=f"carte-{student.matricule or student.id}.pdf")
+    log_support_action(
+        actor=request.user,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_STUDENT_CARD_GENERATED,
+        target_user=student.user,
+        target_label=f"Carte {student.matricule or student.id}",
+        details="Carte individuelle generee depuis le dashboard informaticien.",
+    )
+    return FileResponse(
+        buffer,
+        as_attachment=request.GET.get("preview") != "1",
+        filename=f"carte-{student.matricule or student.id}.pdf",
+    )
 
 
 @login_required
@@ -687,7 +774,18 @@ def it_class_cards_pdf(request):
         _draw_student_card(pdf, student=student, academic_class=academic_class)
     pdf.save()
     buffer.seek(0)
-    return FileResponse(buffer, as_attachment=True, filename=f"cartes-classe-{academic_class.id}.pdf")
+    log_support_action(
+        actor=request.user,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_STUDENT_CARD_GENERATED,
+        target_label=f"Cartes classe {academic_class.display_name}",
+        details=f"{students.count()} carte(s) generee(s).",
+    )
+    return FileResponse(
+        buffer,
+        as_attachment=request.GET.get("preview") != "1",
+        filename=f"cartes-classe-{academic_class.id}.pdf",
+    )
 
 
 def _draw_student_card(pdf, *, student, academic_class=None):

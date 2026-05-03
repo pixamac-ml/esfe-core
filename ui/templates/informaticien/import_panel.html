@@ -29,7 +29,10 @@
     <label>Fichier Excel <input type="file" name="file" accept=".xlsx,.xls" required></label>
     <label>Export notes
       {% if selected_class %}
-        <a class="workflow-btn workflow-btn-secondary" href="{% url 'accounts_portal:it_export_notes_excel' %}?class_id={{ selected_class.id }}">Exporter Excel</a>
+        {% if selected_semester %}
+          <a class="workflow-btn workflow-btn-secondary" href="{% url 'academics:download_import_template' selected_class.id selected_semester.id %}">Modele Excel</a>
+        {% endif %}
+        <a class="workflow-btn workflow-btn-secondary" href="{% url 'accounts_portal:it_export_notes_excel' %}?class_id={{ selected_class.id }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}">Exporter Excel</a>
       {% else %}
         <span class="workflow-muted">Selectionne une classe</span>
       {% endif %}

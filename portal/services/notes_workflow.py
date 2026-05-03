@@ -7,6 +7,9 @@ from django.db.models import Count, Q
 
 from academics.models import AcademicEnrollment, ECGrade, Semester
 from academics.services.semester import compute_semester_result
+from accounts.dashboards.helpers import get_user_branch
+from portal.models import SupportAuditLog
+from portal.services.it_support_service import log_support_action
 
 
 STATE_EMPTY = "empty"
@@ -17,6 +20,7 @@ STATE_SENT_TO_DIRECTOR = "sent_to_director"
 
 ACTION_START = "start_saisie"
 ACTION_CONTINUE = "continue_saisie"
+ACTION_VERIFY = "verifier_notes"
 ACTION_CALCULATE = "calculer_resultats"
 ACTION_SEND_TO_DIRECTOR = "envoyer_direction"
 
@@ -35,11 +39,11 @@ class NotesWorkflowState:
 
 
 STATE_LABELS = {
-    STATE_EMPTY: "EMPTY",
-    STATE_IN_PROGRESS: "IN_PROGRESS",
-    STATE_READY_TO_CALCULATE: "READY_TO_CALCULATE",
-    STATE_CALCULATED: "CALCULATED",
-    STATE_SENT_TO_DIRECTOR: "SENT_TO_DIRECTOR",
+    STATE_EMPTY: "Non commence",
+    STATE_IN_PROGRESS: "Saisie en cours",
+    STATE_READY_TO_CALCULATE: "Notes completes - resultats calculables",
+    STATE_CALCULATED: "Resultats calcules",
+    STATE_SENT_TO_DIRECTOR: "Publies par Directeur",
 }
 
 
@@ -81,7 +85,7 @@ def get_notes_state(*, academic_class, semester) -> NotesWorkflowState | None:
         STATE_IN_PROGRESS: "Des notes existent deja. Completer les cellules manquantes avant calcul.",
         STATE_READY_TO_CALCULATE: "Toutes les notes attendues sont renseignees. Les resultats peuvent etre generes.",
         STATE_CALCULATED: "Les moyennes et credits ont ete recalcules avec le moteur academique existant.",
-        STATE_SENT_TO_DIRECTOR: "Les resultats sont transmis au niveau direction.",
+        STATE_SENT_TO_DIRECTOR: "Les releves sont disponibles selon le statut publie du semestre.",
     }
     technical_alerts = []
     if not enrollment_count:
@@ -112,9 +116,11 @@ def get_available_actions(*, state: NotesWorkflowState | None):
             {"code": ACTION_START, "label": "Demarrer la saisie", "style": "primary"},
         ],
         STATE_IN_PROGRESS: [
+            {"code": ACTION_VERIFY, "label": "Verifier les notes", "style": "secondary"},
             {"code": ACTION_CONTINUE, "label": "Continuer la saisie", "style": "primary"},
         ],
         STATE_READY_TO_CALCULATE: [
+            {"code": ACTION_VERIFY, "label": "Verifier les notes", "style": "secondary"},
             {"code": ACTION_CALCULATE, "label": "Calculer / Generer les resultats", "style": "primary"},
         ],
         STATE_CALCULATED: [
@@ -142,6 +148,11 @@ def apply_notes_workflow_action(*, actor, academic_class, semester, action):
             semester.save(update_fields=["status"])
         return
 
+    if action == ACTION_VERIFY:
+        if state.missing_grades:
+            raise ValidationError(f"{state.missing_grades} note(s) manquante(s). Le calcul reste bloque.")
+        return
+
     if action == ACTION_CALCULATE:
         if state.code != STATE_READY_TO_CALCULATE:
             raise ValidationError("Toutes les notes doivent etre renseignees avant de generer les resultats.")
@@ -154,6 +165,13 @@ def apply_notes_workflow_action(*, actor, academic_class, semester, action):
             compute_semester_result(semester, enrollment)
         semester.status = Semester.STATUS_FINALIZED
         semester.save(update_fields=["status"])
+        log_support_action(
+            actor=actor,
+            branch=get_user_branch(actor),
+            action_type=SupportAuditLog.ACTION_RESULTS_CALCULATED,
+            target_label=f"Resultats {academic_class.display_name} S{semester.number}",
+            details=f"{enrollments.count()} etudiant(s) recalcules depuis le dashboard informaticien.",
+        )
         return
 
     if action == ACTION_SEND_TO_DIRECTOR:
@@ -161,6 +179,13 @@ def apply_notes_workflow_action(*, actor, academic_class, semester, action):
             raise ValidationError("Les resultats doivent etre calcules avant transmission.")
         semester.status = Semester.STATUS_PUBLISHED
         semester.save(update_fields=["status"])
+        log_support_action(
+            actor=actor,
+            branch=get_user_branch(actor),
+            action_type=SupportAuditLog.ACTION_RESULTS_SENT,
+            target_label=f"Transmission {academic_class.display_name} S{semester.number}",
+            details="Resultats marques comme envoyes au Directeur des Etudes.",
+        )
         return
 
     raise ValidationError("Action workflow inconnue.")

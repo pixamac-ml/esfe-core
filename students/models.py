@@ -343,6 +343,82 @@ class TeacherAttendance(models.Model):
         super().save(*args, **kwargs)
 
 
+class AttendanceRollSheet(models.Model):
+    """
+    Feuille d'appel journaliere par classe (workflow surveillant : brouillon / valide).
+    La saisie detaillee reste dans StudentAttendance (par seance).
+    """
+
+    STATUS_DRAFT = "draft"
+    STATUS_VALIDATED = "validated"
+
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "En cours"),
+        (STATUS_VALIDATED, "Valide"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="attendance_roll_sheets",
+        db_index=True,
+    )
+    academic_class = models.ForeignKey(
+        "academics.AcademicClass",
+        on_delete=models.CASCADE,
+        related_name="attendance_roll_sheets",
+    )
+    date = models.DateField(db_index=True)
+    schedule_event = models.ForeignKey(
+        "academics.AcademicScheduleEvent",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_roll_sheets",
+        help_text="Seance de reference pour la saisie groupee (optionnel).",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        db_index=True,
+    )
+    validated_at = models.DateTimeField(null=True, blank=True)
+    validated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="validated_attendance_roll_sheets",
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_attendance_roll_sheets",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date", "-updated_at"]
+        verbose_name = "Feuille d'appel (classe / jour)"
+        verbose_name_plural = "Feuilles d'appel (classe / jour)"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["branch", "academic_class", "date"],
+                name="students_unique_roll_sheet_branch_class_date",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["branch", "date", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.academic_class_id} — {self.date} ({self.get_status_display()})"
+
+
 class AttendanceAlert(models.Model):
     TYPE_ABSENCE_REPETITION = "absence_repetition"
     TYPE_LATE_REPETITION = "late_repetition"

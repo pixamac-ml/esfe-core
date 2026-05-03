@@ -1,0 +1,53 @@
+{% if roster_error %}
+<div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+  {{ roster_error }}
+</div>
+{% elif roll_locked %}
+<div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+  Feuille d'appel validée pour ce jour. Rouvrez-la dans le workflow ci-dessus pour modifier.
+</div>
+{% elif roster %}
+<form
+  method="post"
+  action="{% url 'accounts_portal:supervisor_bulk_attendance_save' %}"
+  hx-post="{% url 'accounts_portal:supervisor_bulk_attendance_save' %}"
+  hx-target="#supervisor-attendance-panel"
+  hx-swap="outerHTML"
+  class="supervisor-form-card space-y-3"
+>
+  {% csrf_token %}
+  <input type="hidden" name="schedule_event_id" value="{{ schedule_event.id }}" />
+  <input type="hidden" name="class_id" value="{{ schedule_event.academic_class_id }}" />
+  <input type="hidden" name="roll_date" value="{{ bulk_roll_date_iso }}" />
+  <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+      <thead class="bg-slate-50 text-xs font-bold uppercase text-slate-500 dark:bg-slate-900">
+        <tr>
+          <th class="px-3 py-2 text-left">Etudiant</th>
+          <th class="px-3 py-2 text-left">Matricule</th>
+          <th class="px-3 py-2 text-left">Presence</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
+        {% for student in roster %}
+        <tr>
+          <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">{{ student.full_name }}</td>
+          <td class="px-3 py-2 text-slate-600">{{ student.matricule }}</td>
+          <td class="px-3 py-2">
+            <select name="status_{{ student.id }}" class="w-full rounded-xl border border-slate-200 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900">
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="late">Retard</option>
+            </select>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="flex items-center justify-between gap-3">
+    <button type="submit" class="supervisor-submit bg-[var(--school-primary)]">Enregistrer la grille</button>
+    <div class="supervisor-indicator text-xs font-semibold text-slate-500">{% if roster|length %}{{ roster|length }} etudiants{% endif %}</div>
+  </div>
+</form>
+{% endif %}

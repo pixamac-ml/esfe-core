@@ -1,0 +1,175 @@
+{% if toast %}
+<div class="rounded-2xl border {% if toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-rose-200 bg-rose-50 text-rose-800{% endif %} px-4 py-3 text-sm font-semibold">
+  {{ toast.message }}
+</div>
+{% endif %}
+
+{% if academic_class %}
+<section class="space-y-6">
+  <div class="glass-card rounded-3xl p-6 shadow-card">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-violet-600 dark:text-violet-400">Grille recurrente</p>
+        <h3 class="mt-2 text-2xl font-extrabold text-slate-900 dark:text-slate-100">Creneaux hebdomadaires</h3>
+        <p class="mt-2 max-w-3xl text-sm text-slate-500 dark:text-slate-400">
+          {{ academic_class.display_name }} · {{ academic_class.programme.title }} — modele par jour de semaine (independant des cours dates dans la semaine courante).
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900"
+          hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+          hx-target="#supervisor-planner-workspace"
+          hx-swap="innerHTML"
+        >
+          Retour aux actions
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-5">
+    <div class="glass-card rounded-3xl p-6 shadow-card xl:col-span-3">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <h4 class="text-lg font-extrabold text-slate-900 dark:text-slate-100">Creneaux actifs</h4>
+        <span class="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-800 dark:bg-violet-950/50 dark:text-violet-300">{{ weekly_slot_rows|length }} ligne(s)</span>
+      </div>
+      <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+        <table class="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-800">
+          <thead class="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+            <tr>
+              <th class="px-4 py-3">Jour</th>
+              <th class="px-4 py-3">Horaires</th>
+              <th class="px-4 py-3">Matiere</th>
+              <th class="px-4 py-3">Enseignant</th>
+              <th class="px-4 py-3">Salle</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
+            {% for row in weekly_slot_rows %}
+            <tr class="align-middle {% if editing_slot and editing_slot.id == row.id %}bg-violet-50 dark:bg-violet-950/30{% endif %}">
+              <td class="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{{ row.weekday_label }}</td>
+              <td class="px-4 py-3 text-slate-700 dark:text-slate-300">{{ row.start_time }} – {{ row.end_time }}</td>
+              <td class="px-4 py-3 text-slate-800 dark:text-slate-200">{{ row.ec_title }}</td>
+              <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{{ row.teacher_name }}</td>
+              <td class="px-4 py-3 text-slate-600 dark:text-slate-400">{{ row.room|default:"—" }}</td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
+                    hx-get="{% url 'accounts_portal:supervisor_weekly_slots_workspace' academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&edit={{ row.id }}"
+                    hx-target="#supervisor-planner-workspace"
+                    hx-swap="innerHTML"
+                  >Modifier</button>
+                  <form
+                    method="post"
+                    action="{% url 'accounts_portal:supervisor_weekly_slot_save' academic_class.id %}"
+                    hx-post="{% url 'accounts_portal:supervisor_weekly_slot_save' academic_class.id %}"
+                    hx-target="#supervisor-planner-workspace"
+                    hx-swap="innerHTML"
+                    class="inline"
+                  >
+                    {% csrf_token %}
+                    <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+                    <input type="hidden" name="action" value="delete" />
+                    <input type="hidden" name="slot_id" value="{{ row.id }}" />
+                    <button type="submit" class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">Retirer</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">Aucun creneau hebdomadaire encore defini pour cette classe.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="glass-card rounded-3xl p-6 shadow-card xl:col-span-2">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h4 class="text-lg font-extrabold text-slate-900 dark:text-slate-100">
+          {% if editing_slot %}Modifier le creneau{% else %}Ajouter un creneau{% endif %}
+        </h4>
+        {% if editing_slot %}
+        <button
+          type="button"
+          class="text-xs font-bold text-violet-700 underline hover:no-underline dark:text-violet-300"
+          hx-get="{% url 'accounts_portal:supervisor_weekly_slots_workspace' academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}"
+          hx-target="#supervisor-planner-workspace"
+          hx-swap="innerHTML"
+        >Annuler l'edition</button>
+        {% endif %}
+      </div>
+
+      <form
+        method="post"
+        action="{% url 'accounts_portal:supervisor_weekly_slot_save' academic_class.id %}"
+        hx-post="{% url 'accounts_portal:supervisor_weekly_slot_save' academic_class.id %}"
+        hx-target="#supervisor-planner-workspace"
+        hx-swap="innerHTML"
+        class="space-y-4"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+        <input type="hidden" name="action" value="{% if editing_slot %}update{% else %}create{% endif %}" />
+        {% if editing_slot %}<input type="hidden" name="slot_id" value="{{ editing_slot.id }}" />{% endif %}
+
+        <div>
+          <label class="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300">Jour</label>
+          <select name="weekday" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-950">
+            {% for val, label in weekday_choices %}
+            <option value="{{ val }}" {% if editing_slot and editing_slot.weekday == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300">Debut</label>
+            <input name="start_time" type="time" required {% if editing_slot %}value="{{ editing_slot.start_time }}"{% endif %} class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-950" />
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300">Fin</label>
+            <input name="end_time" type="time" required {% if editing_slot %}value="{{ editing_slot.end_time }}"{% endif %} class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-950" />
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300">Matiere (EC)</label>
+          <select name="ec_id" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-950">
+            <option value="">Choisir…</option>
+            {% for ec in ecs %}
+            <option value="{{ ec.id }}" {% if editing_slot and editing_slot.ec_id == ec.id %}selected{% endif %}>{{ ec.ue.code }} — {{ ec.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300">Enseignant</label>
+          <select name="teacher_id" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-950">
+            <option value="">Choisir…</option>
+            {% for t in teachers %}
+            <option value="{{ t.id }}" {% if editing_slot and editing_slot.teacher_id == t.id %}selected{% endif %}>{{ t.get_full_name|default:t.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300">Salle</label>
+          <input name="room" type="text" value="{% if editing_slot %}{{ editing_slot.room }}{% endif %}" placeholder="Ex: A102" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-950" />
+        </div>
+
+        <button type="submit" class="w-full rounded-2xl bg-violet-600 py-3 text-sm font-extrabold text-white shadow-lg shadow-violet-600/25 hover:bg-violet-700">
+          {% if editing_slot %}Enregistrer les modifications{% else %}Creer le creneau{% endif %}
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endif %}

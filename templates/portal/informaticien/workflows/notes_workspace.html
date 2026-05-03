@@ -1,0 +1,54 @@
+{% load component_tags %}
+{% if toast %}
+<section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
+{% endif %}
+
+<form
+  class="workflow-context"
+  hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}"
+  hx-target="#it-workspace"
+  hx-swap="innerHTML"
+>
+  <label>
+    <span>Classe</span>
+    <select
+      name="classe"
+      hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}"
+      hx-target="#it-workspace"
+      hx-trigger="change"
+      hx-include="[name='classe'], [name='semester']"
+    >
+      <option value="">Choisir une classe</option>
+      {% for class_item in classes %}
+      <option value="{{ class_item.id }}" {% if selected_class and selected_class.id == class_item.id %}selected{% endif %}>
+        {{ class_item.display_name }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    <span>Semestre</span>
+    <select
+      name="semester"
+      hx-get="{% url 'accounts_portal:load_notes_workspace' %}"
+      hx-target="#notes-workspace"
+      hx-trigger="change"
+      hx-include="[name='classe'], [name='semester']"
+    >
+      <option value="">Choisir un semestre</option>
+      {% for semester in semesters %}
+      <option value="{{ semester.id }}" {% if selected_semester and selected_semester.id == semester.id %}selected{% endif %}>
+        Semestre {{ semester.number }} - {{ semester.get_status_display }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+{% if not selected_class or not selected_semester %}
+<div id="notes-workspace" class="workflow-grid-placeholder">
+  Selectionne une classe et un semestre pour afficher automatiquement la maquette des notes.
+</div>
+{% endif %}
+
+{% component "notes_workflow" academic_class=selected_class semester=selected_semester state=state actions=actions %}{% endcomponent %}

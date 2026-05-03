@@ -1,3 +1,4 @@
+{% load component_tags %}
 <div id="supervisor-attendance-panel" class="space-y-4">
   {% if toast %}
   <div class="supervisor-toast {% if toast.level == 'success' %}is-success{% elif toast.level == 'error' %}is-error{% else %}is-info{% endif %}">
@@ -5,30 +6,42 @@
   </div>
   {% endif %}
 
+  <div id="supervisor-attendance-workflow-wrap" class="dashboard-enter">
+  {% component "attendance_workflow" workflow=attendance_workflow class_picker_items=class_picker_items %}
+  {% endcomponent %}
+  </div>
+
   <article class="portal-card portal-card-pad" x-data="{ showStudent: false, showTeacher: false }">
     <div class="supervisor-panel-head">
       <div>
-        <p class="portal-section-kicker">Assiduite</p>
-        <h3 class="portal-section-title">Presences</h3>
+        <p class="portal-section-kicker">Saisie groupée</p>
+        <h3 class="portal-section-title">Feuille par séance</h3>
       </div>
-      <span class="supervisor-badge bg-slate-100 text-slate-700">{{ today|date:"d/m/Y" }}</span>
+      <span class="supervisor-badge bg-slate-100 text-slate-700">Feuille {{ roll_date|date:"d/m/Y" }}</span>
     </div>
-    <div class="mt-4 grid gap-3 lg:grid-cols-3">
-      <div class="supervisor-card">
-        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Saisies etudiants</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ today_attendance_total }}</p>
-        <p class="supervisor-muted">Dernieres saisies en bas.</p>
+
+    <div class="mt-4 rounded-2xl border border-dashed border-slate-200 p-4 dark:border-slate-700">
+      <p class="text-xs text-slate-500 dark:text-slate-400">Séances correspondant à la date sélectionnée dans le workflow ci-dessus.</p>
+      <div class="mt-3 flex flex-wrap items-end gap-3">
+        <label class="min-w-[240px] flex-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+          Séance
+          <select id="supervisor-bulk-event-select" name="schedule_event_id" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-700 dark:bg-slate-900">
+            <option value="">Choisir un cours</option>
+            {% for item in roll_course_action_options %}
+            <option value="{{ item.id }}">{{ item.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button
+          type="button"
+          class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          hx-get="{% url 'accounts_portal:supervisor_bulk_attendance_roster' %}"
+          hx-include="#supervisor-bulk-event-select"
+          hx-target="#supervisor-bulk-roster"
+          hx-swap="innerHTML"
+        >Charger la classe</button>
       </div>
-      <div class="supervisor-card">
-        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Saisies enseignants</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ today_teacher_attendance_total }}</p>
-        <p class="supervisor-muted">Absences impact cours.</p>
-      </div>
-      <div class="supervisor-card">
-        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Alertes actives</p>
-        <p class="mt-2 text-2xl font-black text-amber-600">{{ attendance_anomalies.active_absence_alerts_count|add:attendance_anomalies.active_late_alerts_count }}</p>
-        <p class="supervisor-muted">Absences/retards repetitifs.</p>
-      </div>
+      <div id="supervisor-bulk-roster" class="mt-4"></div>
     </div>
 
     <div class="mt-4 grid gap-3 lg:grid-cols-2">

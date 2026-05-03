@@ -1,0 +1,42 @@
+<section class="workflow-stack">
+  <div class="workflow-band workflow-band-in_progress">
+    <div>
+      <p class="workflow-kicker">Structure academique</p>
+      <h3>{{ branch.name|default:"Annexe" }}</h3>
+      <p>Lecture des formations, classes, effectifs et anomalies actionnables.</p>
+    </div>
+    <span>{{ active_year.name|default:"Annee non active" }}</span>
+  </div>
+
+  <div class="workflow-table-shell">
+    <div class="workflow-table-head"><h3>Classes et effectifs</h3></div>
+    <div class="workflow-list">
+      {% for class in classes %}
+        <article>
+          <div><strong>{{ class.display_name }}</strong><span>{{ class.programme.title }} - {{ class.effectif }} etudiant(s)</span></div>
+        </article>
+      {% empty %}
+        <section class="workflow-empty">Aucune classe dans cette annexe.</section>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="workflow-split">
+    <div class="workflow-table-shell">
+      <div class="workflow-table-head"><h3>Classes sans notes</h3></div>
+      <div class="workflow-list">
+        {% for class in classes_without_notes %}
+          <article><div><strong>{{ class.display_name }}</strong><span>{{ class.programme.title }}</span></div></article>
+        {% empty %}<section class="workflow-empty">Aucune anomalie.</section>{% endfor %}
+      </div>
+    </div>
+    <div class="workflow-table-shell">
+      <div class="workflow-table-head"><h3>EC sans enseignant</h3></div>
+      <div class="workflow-list">
+        {% for ec in ecs_without_teacher %}
+          <article><div><strong>{{ ec.title }}</strong><span>{{ ec.ue.semester.academic_class.display_name }}</span></div></article>
+        {% empty %}<section class="workflow-empty">Aucune anomalie.</section>{% endfor %}
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,25 @@
+<div class="workflow-list">
+  {% for alert in alerts %}
+    <article>
+      <div>
+        <strong>{{ alert.title }}</strong>
+        <span>{{ alert.detail }}</span>
+      </div>
+      {% if alert.action_url %}
+        <button
+          type="button"
+          class="workflow-btn workflow-btn-secondary"
+          hx-get="{{ alert.action_url }}"
+          hx-target="#it-workspace"
+          hx-swap="innerHTML"
+        >
+          {{ alert.action_label }}
+        </button>
+      {% else %}
+        <span>{{ alert.level }}</span>
+      {% endif %}
+    </article>
+  {% empty %}
+    <section class="workflow-empty">Aucune alerte actionnable detectee.</section>
+  {% endfor %}
+</div>

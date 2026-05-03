@@ -1,0 +1,29 @@
+<div class="toolbar-actions">
+  <div class="session-switch">
+    {% if embedded_in_dashboard %}
+      <a class="session-pill {% if active_session_type == 'normal' %}active{% endif %} {% if not workflow_permissions.can_enter_normal %}disabled{% endif %}" {% if workflow_permissions.can_enter_normal %}hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session=normal" hx-target="#notes-workspace" hx-swap="innerHTML"{% endif %}>Normale</a>
+      <a class="session-pill {% if active_session_type == 'retake' %}active{% endif %} {% if not workflow_permissions.can_enter_retake %}disabled{% endif %}" {% if workflow_permissions.can_enter_retake %}hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session=retake" hx-target="#notes-workspace" hx-swap="innerHTML"{% endif %}>Rattrapage</a>
+    {% else %}
+      <a class="session-pill {% if active_session_type == 'normal' %}active{% endif %} {% if not workflow_permissions.can_enter_normal %}disabled{% endif %}" href="{% if workflow_permissions.can_enter_normal %}?session=normal{% else %}#{% endif %}">Normale</a>
+      <a class="session-pill {% if active_session_type == 'retake' %}active{% endif %} {% if not workflow_permissions.can_enter_retake %}disabled{% endif %}" href="{% if workflow_permissions.can_enter_retake %}?session=retake{% else %}#{% endif %}">Rattrapage</a>
+    {% endif %}
+  </div>
+  <a class="toolbar-btn soft" href="{% url 'academics:download_import_template' academic_class.id semester.id %}">Telecharger le modele Excel</a>
+  <form class="import-inline js-notes-import-form" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="class_id" value="{{ academic_class.id }}">
+    <input type="hidden" name="semester_id" value="{{ semester.id }}">
+    <input type="file" name="file" accept=".xlsx" required class="file-input">
+    <button type="submit" class="toolbar-btn primary">Importer Excel</button>
+  </form>
+  <a href="{% url 'academics:export_class_reports' semester.id %}" class="toolbar-btn dark {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}">Exporter tous</a>
+  <a href="{% url 'academics:class_reports_overview' semester.id %}" class="toolbar-btn soft {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" target="_blank">Voir releve global</a>
+  <a href="{% url 'academics:annual_class_report' academic_class.id %}" class="toolbar-btn {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" target="_blank">Releve annuel</a>
+  <button type="submit" form="bulk-report-form" class="toolbar-btn primary {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}>Exporter selection</button>
+  {% if first_enrollment and workflow_permissions.can_publish and publish_ready %}
+    <form method="POST" action="{% url 'accounts_portal:publish_semester' first_enrollment.id semester.id %}">
+      {% csrf_token %}
+      <button type="submit" class="toolbar-btn">Publier</button>
+    </form>
+  {% endif %}
+</div>

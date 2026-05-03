@@ -7,15 +7,20 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>
   window.tailwind = window.tailwind || {};
   window.tailwind.config = {
     darkMode: 'class',
     theme: {
       extend: {
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
         boxShadow: {
           soft: '0 18px 45px rgba(15, 23, 42, 0.08)',
-          card: '0 10px 30px rgba(15, 23, 42, 0.06)',
+          card: '0 4px 24px rgba(15, 23, 42, 0.06)',
+          header: '0 1px 0 rgba(15, 23, 42, 0.06)',
         }
       }
     }
@@ -23,6 +28,156 @@
 </script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
+  :root {
+    --school-primary: #1e4f6f;
+    --school-secondary: #1db5b0;
+    --school-accent: #f39c12;
+  }
+  .portal-card {
+    border: 1px solid rgb(226 232 240);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+  }
+  .portal-card-pad { padding: 1rem; }
+  .supervisor-muted { color: rgb(100 116 139); font-size: 0.875rem; }
+  .supervisor-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    background: rgb(241 245 249);
+    color: rgb(51 65 85);
+  }
+  .supervisor-kpi-compact {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    min-width: min(420px, 100%);
+  }
+  .supervisor-kpi-compact .supervisor-card {
+    border-radius: 14px;
+    border: 1px solid rgb(226 232 240);
+    padding: 0.75rem 1rem;
+    background: rgb(248 250 252);
+  }
+  .supervisor-kpi-compact .value { font-size: 1.5rem; font-weight: 900; line-height: 1.2; }
+  .supervisor-shell-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 1024px) {
+    .supervisor-shell-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .supervisor-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .supervisor-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .supervisor-actions { display: grid; gap: 0.65rem; }
+  .supervisor-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 14px;
+    border: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .supervisor-action:hover { border-color: rgb(148 163 184); transform: translateY(-1px); }
+  .supervisor-accordion button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    font-weight: 700;
+    font-size: 0.875rem;
+  }
+  .supervisor-accordion .content { margin-top: 0.65rem; }
+  .supervisor-mini-item {
+    border-radius: 12px;
+    border: 1px solid rgb(241 245 249);
+    padding: 0.65rem 0.85rem;
+    background: rgb(255 255 255);
+  }
+  .supervisor-mini-list { display: grid; gap: 0.5rem; }
+  .supervisor-alert-stack { display: grid; gap: 0.65rem; }
+  .supervisor-alert-card {
+    border-radius: 14px;
+    border: 1px solid rgb(226 232 240);
+    padding: 0.85rem 1rem;
+  }
+  .supervisor-empty {
+    border-radius: 14px;
+    border: 1px dashed rgb(203 213 225);
+    padding: 1.25rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: rgb(100 116 139);
+  }
+  .supervisor-form-card {
+    border-radius: 14px;
+    border: 1px solid rgb(226 232 240);
+    padding: 1rem;
+    background: rgb(248 250 252);
+  }
+  .supervisor-form-card select,
+  .supervisor-form-card textarea,
+  .supervisor-form-card input[type="time"],
+  .supervisor-form-card input[type="search"] {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid rgb(226 232 240);
+    padding: 0.55rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  .supervisor-submit {
+    border: none;
+    border-radius: 12px;
+    padding: 0.55rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 800;
+    color: #fff;
+    cursor: pointer;
+  }
+  .supervisor-indicator { display: none; font-size: 0.75rem; color: rgb(100 116 139); }
+  .htmx-request .supervisor-indicator { display: inline-flex; }
+  .supervisor-toast {
+    border-radius: 14px;
+    padding: 0.85rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .supervisor-toast.is-success { background: rgb(240 253 244); border: 1px solid rgb(167 243 208); color: rgb(22 101 52); }
+  .supervisor-toast.is-error { background: rgb(255 241 242); border: 1px solid rgb(254 205 211); color: rgb(159 18 57); }
+  .dark .portal-card { background: rgb(15 23 42 / 0.92); border-color: rgb(51 65 85); }
+  .dark .supervisor-chip { background: rgb(30 41 59); color: rgb(226 232 240); }
+  .dark .supervisor-action,
+  .dark .supervisor-form-card,
+  .dark .supervisor-mini-item { background: rgb(15 23 42); border-color: rgb(51 65 85); }
+
   [x-cloak] { display: none !important; }
   .sidebar-gradient { background: linear-gradient(180deg, #062b46 0%, #0b3458 48%, #062b46 100%); }
   .glass-card { background: rgba(255,255,255,.88); backdrop-filter: blur(18px); border: 1px solid rgba(226,232,240,.9); }
@@ -80,78 +235,79 @@
   class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
 >
   <div class="flex min-h-screen">
-    <aside class="sidebar-gradient fixed inset-y-0 left-0 z-40 flex flex-col text-white transition-all duration-300" :class="sidebarCollapsed ? 'w-[86px]' : 'w-[270px]'">
-      <div class="flex h-24 items-center gap-3 px-5">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-          <i data-lucide="shield" class="h-7 w-7"></i>
+    <aside class="sidebar-gradient fixed inset-y-0 left-0 z-40 flex flex-col text-white transition-all duration-300" :class="sidebarCollapsed ? 'w-[88px]' : 'w-[272px]'">
+      <div class="flex h-20 items-center gap-3 border-b border-white/10 px-4">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25">
+          <i data-lucide="graduation-cap" class="h-5 w-5"></i>
         </div>
-        <div x-show="!sidebarCollapsed" x-transition>
-          <h1 class="text-lg font-extrabold tracking-tight">{{ branch.name|default:"Reseau d'ecoles" }}</h1>
-          <p class="text-sm font-extrabold tracking-wide">Surveillant General</p>
+        <div x-show="!sidebarCollapsed" x-transition class="min-w-0">
+          <p class="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100/85">Plateforme Academique</p>
+          <h1 class="truncate text-[15px] font-extrabold tracking-tight">{{ branch.name|default:"Annexe" }}</h1>
         </div>
       </div>
 
-      <button type="button" @click="toggleSidebar()" class="absolute right-[-18px] top-7 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950">
-        <i data-lucide="chevrons-left" class="h-5 w-5 transition-transform" :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
+      <button type="button" @click="toggleSidebar()" class="absolute right-[-16px] top-7 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950">
+        <i data-lucide="chevrons-left" class="h-4.5 w-4.5 transition-transform" :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
       </button>
 
-      <div class="mx-4 mb-4 rounded-2xl border border-white/10 bg-white/10 p-3">
+      <div class="mx-3 mt-3 rounded-2xl border border-white/10 bg-white/10 p-3">
         <div class="flex items-center gap-3">
-          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-700 font-bold">SG</div>
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800/70 text-sm font-extrabold">{{ user_initials|default:"SG" }}</div>
           <div x-show="!sidebarCollapsed" x-transition class="min-w-0">
             <p class="truncate text-sm font-bold">{{ user_display_name }}</p>
-            <p class="truncate text-xs text-sky-100/70">Creation emploi du temps</p>
+            <p class="truncate text-xs text-sky-100/75">Surveillant academique</p>
           </div>
-          <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
         </div>
       </div>
 
-      <nav class="flex-1 space-y-2 overflow-y-auto px-4 scrollbar-thin">
+      <nav class="flex-1 space-y-1.5 overflow-y-auto px-3 py-3 scrollbar-thin">
         <template x-for="item in navItems" :key="item.key">
           <button
             type="button"
             @click="setSection(item.key)"
-            class="flex w-full items-center gap-4 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            class="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold text-slate-200 transition hover:bg-white/10"
             :class="activeSection === item.key ? 'nav-active' : ''"
           >
-            <i :data-lucide="item.icon" class="h-5 w-5 shrink-0"></i>
+            <i :data-lucide="item.icon" class="h-4.5 w-4.5 shrink-0"></i>
             <span x-show="!sidebarCollapsed" x-transition x-text="item.label"></span>
           </button>
         </template>
       </nav>
 
-      <div class="p-4">
+      <div class="p-3">
         <form method="post" action="{% url 'accounts:logout' %}">
           {% csrf_token %}
-          <button type="submit" class="flex w-full items-center justify-center gap-3 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold hover:bg-white/15">
-            <i data-lucide="log-out" class="h-5 w-5"></i>
+          <button type="submit" class="flex w-full items-center justify-center gap-3 rounded-xl bg-white/10 px-3.5 py-2.5 text-sm font-bold hover:bg-white/15">
+            <i data-lucide="log-out" class="h-4.5 w-4.5"></i>
             <span x-show="!sidebarCollapsed" x-transition>Deconnexion</span>
           </button>
         </form>
       </div>
     </aside>
 
-    <main class="min-h-screen flex-1 transition-all duration-300" :class="sidebarCollapsed ? 'ml-[86px]' : 'ml-[270px]'">
-      <div class="mx-auto max-w-[1560px] px-6 py-6 lg:px-8">
-        <header class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <div class="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              <span>Emplois du temps</span>
-              <i data-lucide="chevron-right" class="h-4 w-4"></i>
-              <span class="text-slate-900 dark:text-slate-100" x-text="plannerClassLabel ? plannerClassLabel : 'Selection de classe'"></span>
+    <main class="min-h-screen flex-1 transition-all duration-300" :class="sidebarCollapsed ? 'ml-[88px]' : 'ml-[272px]'">
+      <div class="mx-auto max-w-[1640px] px-5 py-5 lg:px-7">
+        <header class="mb-6 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-card dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div class="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                <span>Dashboard surveillant</span>
+                <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                <span class="text-slate-800 dark:text-slate-200" x-text="plannerClassLabel ? plannerClassLabel : 'Annexe active'"></span>
+              </div>
+              <h2 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Pilotage pedagogique terrain</h2>
+              <p class="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">Suivi des cours, presences et progression en temps reel, avec workflow HTMX.</p>
             </div>
-            <h2 class="text-3xl font-extrabold tracking-tight">Construction des emplois du temps</h2>
-            <p class="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">Selectionne d'abord une classe, puis ouvre son espace de creation pour planifier proprement la semaine.</p>
-          </div>
 
-          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2.5">
             <div class="supervisor-search-wrap">
               <input
                 id="supervisor-global-search"
                 class="supervisor-search-input"
                 type="search"
                 name="q"
-                placeholder="Rechercher (etudiant, classe, cours du jour)..."
+                placeholder="Rechercher etudiant, classe, UE..."
                 autocomplete="off"
                 hx-get="{% url 'accounts_portal:supervisor_quick_search' %}"
                 hx-trigger="keyup changed delay:250ms"
@@ -161,13 +317,18 @@
               <div id="supervisor-global-search-indicator" class="supervisor-indicator">Recherche...</div>
               <div id="supervisor-global-search-results" class="supervisor-search-dropdown"></div>
             </div>
-            <button type="button" @click="toggleDarkMode()" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900">
-              <i x-show="!darkMode" data-lucide="moon" class="h-5 w-5"></i>
-              <i x-show="darkMode" data-lucide="sun" class="h-5 w-5"></i>
+            <button type="button" @click="toggleDarkMode()" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-950">
+              <i x-show="!darkMode" data-lucide="moon" class="h-4.5 w-4.5"></i>
+              <i x-show="darkMode" data-lucide="sun" class="h-4.5 w-4.5"></i>
             </button>
-            <div class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-right shadow-card dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-xs font-bold text-slate-500 dark:text-slate-400">{{ today|date:"d/m/Y" }}</p>
-              <p class="text-xl font-extrabold text-blue-600 dark:text-blue-400">{{ total_classes }} classes</p>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-right dark:border-slate-700 dark:bg-slate-950">
+              <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{{ today|date:"d/m/Y" }}</p>
+              <p class="text-sm font-extrabold text-blue-600 dark:text-blue-400">{{ total_classes }} classes</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-right dark:border-slate-700 dark:bg-slate-950">
+              <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Alertes</p>
+              <p class="text-sm font-extrabold text-rose-600 dark:text-rose-400">{{ active_alerts_count|default:0 }}</p>
+            </div>
             </div>
           </div>
         </header>
@@ -432,23 +593,13 @@
           {% endif %}
         </section>
 
-        <section x-show="activeSection === 'attendance'" x-transition.opacity.duration.150ms class="dashboard-enter">
+        <section x-show="activeSection === 'absences'" x-transition.opacity.duration.150ms class="dashboard-enter">
           {% include "portal/staff/supervisor/partials/panel_attendance.html" %}
         </section>
 
-        <section x-show="activeSection === 'courses'" x-transition.opacity.duration.150ms class="dashboard-enter">
-          {% include "portal/staff/supervisor/partials/panel_courses.html" %}
-        </section>
-
-        <section x-show="activeSection === 'alerts'" x-transition.opacity.duration.150ms class="dashboard-enter">
-          {% include "portal/staff/supervisor/partials/panel_alerts.html" %}
-        </section>
-
-        <section x-show="activeSection === 'overview'" x-transition.opacity.duration.150ms class="dashboard-enter">
-          <div class="planner-section-placeholder">
-            <h3 class="text-lg font-extrabold text-slate-900 dark:text-slate-100">Section a enrichir</h3>
-            <p class="mt-2 text-sm">Le shell principal est maintenant celui de la maquette complete. Les autres modules seront rebranches proprement ensuite.</p>
-          </div>
+        <section x-show="activeSection === 'overview'" x-transition.opacity.duration.150ms class="dashboard-enter space-y-6">
+          {% include "portal/staff/supervisor/partials/panel_overview.html" %}
+          {% include "portal/staff/supervisor/partials/panel_today.html" %}
         </section>
       </div>
     </main>
@@ -462,18 +613,21 @@
       darkMode: false,
       plannerClassId: {% if selected_class_id %}{{ selected_class_id }}{% else %}null{% endif %},
       plannerClassLabel: "{{ selected_class_label|escapejs }}",
-      activeSection: window.location.hash ? window.location.hash.replace('#', '') : 'planner',
+      activeSection: window.location.hash ? window.location.hash.replace('#', '') : 'overview',
       navItems: [
-        { key: 'overview', label: 'Tableau de bord', icon: 'home' },
-        { key: 'planner', label: 'Emplois du temps', icon: 'calendar-days' },
-        { key: 'attendance', label: 'Presences', icon: 'user-check' },
-        { key: 'courses', label: 'Cours', icon: 'book-open-check' },
-        { key: 'alerts', label: 'Alertes', icon: 'triangle-alert' },
+        { key: 'overview', label: 'Suivi global', icon: 'layout-dashboard' },
+        { key: 'absences', label: 'Assiduite', icon: 'user-check' },
+        { key: 'planner', label: 'Emploi du temps', icon: 'calendar-days' },
       ],
       init() {
         this.sidebarCollapsed = window.localStorage.getItem('supervisor_sidebar_collapsed') === '1';
         this.darkMode = window.localStorage.getItem('supervisor_dark_mode') === '1';
-        const hash = (window.location.hash || '').replace('#', '').trim();
+        let hash = (window.location.hash || '').replace('#', '').trim();
+        const legacy = { attendance: 'absences', courses: 'planner', alerts: 'overview' };
+        if (legacy[hash]) {
+          hash = legacy[hash];
+          window.location.hash = hash;
+        }
         if (hash && this.navItems.some((item) => item.key === hash)) {
           this.activeSection = hash;
         }
@@ -483,7 +637,13 @@
           this.bindSearchDropdown();
         });
         window.addEventListener('hashchange', () => {
-          const nextHash = (window.location.hash || '').replace('#', '').trim();
+          let nextHash = (window.location.hash || '').replace('#', '').trim();
+          const legacyMap = { attendance: 'absences', courses: 'planner', alerts: 'overview' };
+          if (legacyMap[nextHash]) {
+            nextHash = legacyMap[nextHash];
+            window.location.hash = nextHash;
+            return;
+          }
           if (nextHash && this.navItems.some((item) => item.key === nextHash)) {
             this.activeSection = nextHash;
             this.$nextTick(() => this.renderIcons());

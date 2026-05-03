@@ -1,0 +1,111 @@
+{% if not workflow %}
+<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
+  Sélectionnez une annexe et une classe pour afficher le workflow d'appel.
+</div>
+{% else %}
+<div class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <p class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Étape 1 — Sélection</p>
+      <p class="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">{{ workflow.class_name }}</p>
+    </div>
+    <div class="text-right">
+      <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Étape 2 — État</p>
+      <span class="mt-1 inline-flex rounded-full px-3 py-1 text-xs font-extrabold
+        {% if workflow.state == 'empty' %}bg-slate-100 text-slate-700{% elif workflow.state == 'in_progress' %}bg-amber-100 text-amber-900{% else %}bg-emerald-100 text-emerald-900{% endif %}">
+        {{ workflow.state_label }}
+      </span>
+    </div>
+  </div>
+
+  <form
+    class="flex flex-wrap items-end gap-3"
+    hx-get="{% url 'accounts_portal:supervisor_attendance_workflow_refresh' %}"
+    hx-target="#supervisor-attendance-workflow-wrap"
+    hx-swap="outerHTML"
+  >
+    <label class="min-w-[200px] flex-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+      Classe
+      <select name="class_id" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-600 dark:bg-slate-950">
+        {% for item in class_picker_items %}
+        <option value="{{ item.id }}" {% if item.id == workflow.academic_class_id %}selected{% endif %}>{{ item.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="min-w-[160px] text-xs font-bold text-slate-600 dark:text-slate-300">
+      Date
+      <input type="date" name="roll_date" value="{{ workflow.roll_date_iso }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-600 dark:bg-slate-950" />
+    </label>
+    <button type="submit" class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-extrabold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900">Actualiser</button>
+  </form>
+
+  {% if not workflow.has_courses_today %}
+  <p class="text-sm text-rose-600 dark:text-rose-400">Aucun cours planifié ce jour pour cette classe.</p>
+  {% endif %}
+
+  <div class="border-t border-slate-100 pt-4 dark:border-slate-800">
+    <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Étape 3 — Actions</p>
+    <div class="mt-3 flex flex-wrap gap-2">
+      {% if workflow.can_start %}
+      <form method="post" action="{% url 'accounts_portal:supervisor_attendance_roll_action' %}" class="flex flex-wrap items-end gap-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="start" />
+        <input type="hidden" name="class_id" value="{{ workflow.academic_class_id }}" />
+        <input type="hidden" name="roll_date" value="{{ workflow.roll_date_iso }}" />
+        {% if workflow.day_events|length > 1 %}
+        <label class="text-xs font-bold text-slate-600 dark:text-slate-300">
+          Séance
+          <select name="schedule_event_id" class="mt-1 block rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold dark:border-slate-600 dark:bg-slate-950">
+            {% for ev in workflow.day_events %}
+            <option value="{{ ev.id }}">{{ ev.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        <button type="submit" class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-blue-700"
+          hx-post="{% url 'accounts_portal:supervisor_attendance_roll_action' %}"
+          hx-target="#supervisor-attendance-panel"
+          hx-swap="outerHTML"
+          hx-include="closest form"
+        >Ouvrir la feuille</button>
+      </form>
+      {% endif %}
+
+      {% if workflow.can_validate %}
+      <form method="post" action="{% url 'accounts_portal:supervisor_attendance_roll_action' %}" class="inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="validate" />
+        <input type="hidden" name="class_id" value="{{ workflow.academic_class_id }}" />
+        <input type="hidden" name="roll_date" value="{{ workflow.roll_date_iso }}" />
+        <input type="hidden" name="sheet_id" value="{{ workflow.sheet_id }}" />
+        <button type="submit" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
+          hx-post="{% url 'accounts_portal:supervisor_attendance_roll_action' %}"
+          hx-target="#supervisor-attendance-panel"
+          hx-swap="outerHTML"
+          hx-include="closest form"
+        >Valider</button>
+      </form>
+      {% endif %}
+
+      {% if workflow.can_reopen %}
+      <form method="post" action="{% url 'accounts_portal:supervisor_attendance_roll_action' %}" class="inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reopen" />
+        <input type="hidden" name="class_id" value="{{ workflow.academic_class_id }}" />
+        <input type="hidden" name="roll_date" value="{{ workflow.roll_date_iso }}" />
+        <input type="hidden" name="sheet_id" value="{{ workflow.sheet_id }}" />
+        <button type="submit" class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-extrabold text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100"
+          hx-post="{% url 'accounts_portal:supervisor_attendance_roll_action' %}"
+          hx-target="#supervisor-attendance-panel"
+          hx-swap="outerHTML"
+          hx-include="closest form"
+        >Rouvrir</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if workflow.state == 'validated' and workflow.validated_at %}
+    <p class="mt-2 text-xs text-slate-500">Validée le {{ workflow.validated_at|date:"d/m/Y H:i" }}{% if workflow.validated_by %} — {{ workflow.validated_by }}{% endif %}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

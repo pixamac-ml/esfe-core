@@ -332,6 +332,59 @@ def get_class_attendance_summary(academic_class: AcademicClass, date):
     }
 
 
+def list_students_for_schedule_event(*, schedule_event: AcademicScheduleEvent | int, branch: Branch | int):
+    """Etudiants actifs inscrits dans la classe du cours (perimetre annexe)."""
+    branch = _normalize_branch(branch)
+    schedule_event = _normalize_schedule_event(schedule_event)
+    _ensure_schedule_event_scope(schedule_event=schedule_event, branch=branch)
+    academic_class = schedule_event.academic_class
+    return list(
+        Student.objects.select_related("user", "inscription__candidature")
+        .filter(
+            inscription__candidature__branch=branch,
+            is_active=True,
+            user__academic_enrollments__academic_class=academic_class,
+            user__academic_enrollments__branch=branch,
+            user__academic_enrollments__is_active=True,
+        )
+        .distinct()
+        .order_by("inscription__candidature__last_name", "inscription__candidature__first_name", "matricule")[:400]
+    )
+
+
+@transaction.atomic
+def bulk_mark_student_attendance(
+    *,
+    schedule_event: AcademicScheduleEvent | int,
+    academic_class: AcademicClass,
+    recorded_by: User,
+    branch: Branch | int,
+    rows: list[tuple[int, str]],
+):
+    """Saisie groupee : liste (student_id, status)."""
+    branch = _normalize_branch(branch)
+    schedule_event = _normalize_schedule_event(schedule_event)
+    results = []
+    for student_id, status in rows:
+        if not status:
+            continue
+        student = Student.objects.select_related("user", "inscription__candidature").get(
+            pk=student_id,
+            inscription__candidature__branch=branch,
+            is_active=True,
+        )
+        out = mark_student_attendance(
+            student=student,
+            academic_class=academic_class,
+            schedule_event=schedule_event,
+            status=status,
+            recorded_by=recorded_by,
+            branch=branch,
+        )
+        results.append(out["attendance"])
+    return {"attendances": results, "count": len(results)}
+
+
 def get_student_attendance_history(student: Student, *, branch: Branch | int | None = None, limit: int = 30):
     queryset = StudentAttendance.objects.select_related(
         "academic_class",

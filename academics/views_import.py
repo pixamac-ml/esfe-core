@@ -8,6 +8,17 @@ from django.views.decorators.http import require_GET, require_POST
 from academics.imports.import_service import import_grades
 from academics.imports.template_service import generate_import_template
 from academics.models import AcademicClass, Semester
+from accounts.access import get_user_position
+from accounts.dashboards.helpers import get_user_branch
+
+
+def _forbid_if_outside_it_branch(request, academic_class):
+    if get_user_position(request.user) != "it_support":
+        return None
+    branch = get_user_branch(request.user)
+    if branch is None or academic_class.branch_id != branch.id:
+        return JsonResponse({"ok": False, "error": "Action hors annexe refusee."}, status=403)
+    return None
 
 
 @login_required
@@ -16,7 +27,12 @@ def download_template(request, class_id: int, semester_id: int):
     """Téléchargement du template Excel dynamique (classe + semestre)."""
 
     academic_class = get_object_or_404(AcademicClass, pk=class_id)
+    forbidden = _forbid_if_outside_it_branch(request, academic_class)
+    if forbidden is not None:
+        return HttpResponse("Action hors annexe refusee.", status=403)
     semester = get_object_or_404(Semester.objects.select_related("academic_class"), pk=semester_id)
+    if semester.academic_class_id != academic_class.id:
+        return HttpResponse("Semestre hors classe.", status=400)
 
     output = generate_import_template(academic_class=academic_class, semester=semester)
 
@@ -56,7 +72,12 @@ def upload_grades(request):
         )
 
     academic_class = get_object_or_404(AcademicClass, pk=class_id)
+    forbidden = _forbid_if_outside_it_branch(request, academic_class)
+    if forbidden is not None:
+        return forbidden
     semester = get_object_or_404(Semester.objects.select_related("academic_class"), pk=semester_id)
+    if semester.academic_class_id != academic_class.id:
+        return JsonResponse({"ok": False, "error": "Semestre hors classe."}, status=400)
 
     try:
         result = import_grades(excel_file, academic_class=academic_class, semester=semester)

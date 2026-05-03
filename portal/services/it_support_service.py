@@ -11,7 +11,7 @@ from academics.models import AcademicEnrollment, ECGrade, Semester
 from accounts.access import get_user_annexe
 from inscriptions.models import Inscription
 from payments.models import Payment, PaymentAgent
-from portal.models import SupportAuditLog
+from portal.models import AccountSupportState, SupportAuditLog, SupportTicket, SupportTicketComment
 from students.models import Student
 
 
@@ -112,6 +112,129 @@ def get_recent_support_logs(*, branch, limit=8):
     return list(queryset.order_by("-created_at", "-id")[:limit])
 
 
+def get_support_ticket_queryset(*, branch, status=""):
+    queryset = SupportTicket.objects.select_related(
+        "branch",
+        "requester_user",
+        "student__user",
+        "student__inscription__candidature",
+        "inscription__candidature",
+        "assigned_to",
+        "created_by",
+    ).prefetch_related("comments")
+    if branch:
+        queryset = queryset.filter(branch=branch)
+    if status:
+        queryset = queryset.filter(status=status)
+    return queryset.order_by("-created_at", "-id")
+
+
+def get_support_ticket_metrics(*, branch):
+    queryset = get_support_ticket_queryset(branch=branch)
+    return {
+        "open": queryset.filter(status=SupportTicket.STATUS_OPEN).count(),
+        "in_progress": queryset.filter(status=SupportTicket.STATUS_IN_PROGRESS).count(),
+        "resolved": queryset.filter(status=SupportTicket.STATUS_RESOLVED).count(),
+        "critical": queryset.filter(priority=SupportTicket.PRIORITY_CRITICAL).exclude(
+            status__in=[SupportTicket.STATUS_RESOLVED, SupportTicket.STATUS_REJECTED]
+        ).count(),
+    }
+
+
+def create_support_ticket(
+    *,
+    actor,
+    branch,
+    title,
+    description="",
+    category=SupportTicket.CATEGORY_OTHER,
+    priority=SupportTicket.PRIORITY_NORMAL,
+    requester_user=None,
+    student=None,
+    inscription=None,
+):
+    title = (title or "").strip()
+    if not title:
+        raise ValueError("Le titre du ticket est obligatoire.")
+    ticket = SupportTicket.objects.create(
+        branch=branch,
+        title=title[:180],
+        description=(description or "").strip(),
+        category=category if category in dict(SupportTicket.CATEGORY_CHOICES) else SupportTicket.CATEGORY_OTHER,
+        priority=priority if priority in dict(SupportTicket.PRIORITY_CHOICES) else SupportTicket.PRIORITY_NORMAL,
+        requester_user=requester_user,
+        student=student,
+        inscription=inscription,
+        created_by=actor,
+    )
+    log_support_action(
+        actor=actor,
+        branch=branch,
+        action_type="ticket_created",
+        target_user=requester_user,
+        target_label=f"Ticket #{ticket.id}",
+        details=ticket.title,
+    )
+    return ticket
+
+
+def assign_support_ticket(*, actor, branch, ticket):
+    ticket.assigned_to = actor
+    if ticket.status == SupportTicket.STATUS_OPEN:
+        ticket.status = SupportTicket.STATUS_IN_PROGRESS
+    ticket.save(update_fields=["assigned_to", "status", "updated_at"])
+    log_support_action(
+        actor=actor,
+        branch=branch,
+        action_type="ticket_assigned",
+        target_user=ticket.requester_user,
+        target_label=f"Ticket #{ticket.id}",
+        details=ticket.title,
+    )
+    return ticket
+
+
+def update_support_ticket_status(*, actor, branch, ticket, status, resolution=""):
+    if status not in dict(SupportTicket.STATUS_CHOICES):
+        raise ValueError("Statut ticket invalide.")
+    ticket.status = status
+    if status in {SupportTicket.STATUS_RESOLVED, SupportTicket.STATUS_REJECTED}:
+        ticket.resolved_by = actor
+        ticket.resolved_at = timezone.now()
+        ticket.resolution = (resolution or ticket.resolution or "").strip()
+        update_fields = ["status", "resolved_by", "resolved_at", "resolution", "updated_at"]
+    else:
+        ticket.resolved_by = None
+        ticket.resolved_at = None
+        update_fields = ["status", "resolved_by", "resolved_at", "updated_at"]
+    ticket.save(update_fields=update_fields)
+    log_support_action(
+        actor=actor,
+        branch=branch,
+        action_type="ticket_status_changed",
+        target_user=ticket.requester_user,
+        target_label=f"Ticket #{ticket.id}",
+        details=f"{ticket.get_status_display()} - {ticket.title}",
+    )
+    return ticket
+
+
+def add_support_ticket_comment(*, actor, branch, ticket, body):
+    body = (body or "").strip()
+    if not body:
+        raise ValueError("Le commentaire est obligatoire.")
+    comment = SupportTicketComment.objects.create(ticket=ticket, author=actor, body=body)
+    log_support_action(
+        actor=actor,
+        branch=branch,
+        action_type="ticket_commented",
+        target_user=ticket.requester_user,
+        target_label=f"Ticket #{ticket.id}",
+        details=body[:255],
+    )
+    return comment
+
+
 def can_manage_user_in_branch(*, branch, target_user):
     if branch is None:
         return True
@@ -119,6 +242,87 @@ def can_manage_user_in_branch(*, branch, target_user):
     if student_profile is not None:
         return getattr(student_profile.inscription.candidature, "branch", None) == branch
     return get_user_annexe(target_user) == branch
+
+
+def get_account_support_state(user):
+    state, _created = AccountSupportState.objects.get_or_create(user=user)
+    return state
+
+
+def suspend_account(*, actor, branch, target_user, reason=""):
+    state = get_account_support_state(target_user)
+    state.is_suspended = True
+    state.note = (reason or state.note or "").strip()
+    state.updated_by = actor
+    state.save(update_fields=["is_suspended", "note", "updated_by", "updated_at"])
+    target_user.is_active = False
+    target_user.save(update_fields=["is_active"])
+    log_support_action(
+        actor=actor,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_ACCOUNT_SUSPENDED,
+        target_user=target_user,
+        target_label=target_user.get_full_name() or target_user.username,
+        details=state.note or "Suspension compte via dashboard IT.",
+    )
+    return state
+
+
+def reactivate_account(*, actor, branch, target_user):
+    state = get_account_support_state(target_user)
+    state.is_suspended = False
+    state.is_blocked = False
+    state.blocked_until = None
+    state.failed_login_count = 0
+    state.updated_by = actor
+    state.save(update_fields=["is_suspended", "is_blocked", "blocked_until", "failed_login_count", "updated_by", "updated_at"])
+    target_user.is_active = True
+    target_user.save(update_fields=["is_active"])
+    log_support_action(
+        actor=actor,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_ACCOUNT_REACTIVATED,
+        target_user=target_user,
+        target_label=target_user.get_full_name() or target_user.username,
+        details="Reactivation compte via dashboard IT.",
+    )
+    return state
+
+
+def unblock_account(*, actor, branch, target_user):
+    state = get_account_support_state(target_user)
+    state.is_blocked = False
+    state.blocked_until = None
+    state.failed_login_count = 0
+    state.updated_by = actor
+    state.save(update_fields=["is_blocked", "blocked_until", "failed_login_count", "updated_by", "updated_at"])
+    if not state.is_suspended and not target_user.is_active:
+        target_user.is_active = True
+        target_user.save(update_fields=["is_active"])
+    log_support_action(
+        actor=actor,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_ACCOUNT_UNBLOCKED,
+        target_user=target_user,
+        target_label=target_user.get_full_name() or target_user.username,
+        details="Deblocage compte via dashboard IT.",
+    )
+    return state
+
+
+def update_account_email(*, actor, branch, target_user, email):
+    previous_email = target_user.email or ""
+    target_user.email = (email or "").strip().lower()
+    target_user.save(update_fields=["email"])
+    log_support_action(
+        actor=actor,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_EMAIL_UPDATED,
+        target_user=target_user,
+        target_label=target_user.get_full_name() or target_user.username,
+        details=f"{previous_email or '-'} -> {target_user.email or '-'}",
+    )
+    return target_user
 
 
 def _build_student_diagnostic(*, branch, student_id):
@@ -146,6 +350,7 @@ def _build_student_diagnostic(*, branch, student_id):
         "subtitle": candidature.branch.name,
         "target_user_id": student.user_id,
         "account_active": student.user.is_active,
+        "support_state": get_account_support_state(student.user),
         "sections": [
             {
                 "title": "Identite et compte",
@@ -204,6 +409,7 @@ def _build_staff_diagnostic(*, branch, user_id):
         "subtitle": branch_label,
         "target_user_id": user.id,
         "account_active": user.is_active,
+        "support_state": get_account_support_state(user),
         "sections": [
             {
                 "title": "Compte et acces",
@@ -250,6 +456,7 @@ def _build_inscription_diagnostic(*, branch, inscription_id):
         "subtitle": inscription.candidature.branch.name,
         "target_user_id": student.user_id if student else None,
         "account_active": student.user.is_active if student else False,
+        "support_state": get_account_support_state(student.user) if student else None,
         "sections": [
             {
                 "title": "Dossier administratif",

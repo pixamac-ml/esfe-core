@@ -176,6 +176,59 @@
         <div class="rounded-2xl border border-slate-100 bg-white/70 p-5 dark:border-slate-800 dark:bg-slate-900/70">
           <p class="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Actions metier</p>
           <div class="mt-4 grid gap-3">
+            <div class="grid gap-2 sm:grid-cols-2">
+              {% if diagnostic_payload.support_state and diagnostic_payload.support_state.is_suspended %}
+              <form
+                method="post"
+                action="{% url 'accounts_portal:it_reactivate_account' %}"
+                hx-post="{% url 'accounts_portal:it_reactivate_account' %}"
+                hx-target="#it-diagnostics-panel"
+                hx-swap="innerHTML"
+              >
+                {% csrf_token %}
+                <input type="hidden" name="target_user_id" value="{{ diagnostic_payload.target_user_id }}">
+                <input type="hidden" name="q" value="{{ support_search.query }}">
+                <input type="hidden" name="kind" value="{{ diagnostic_payload.kind }}">
+                <input type="hidden" name="id" value="{{ request.GET.id }}">
+                <input type="hidden" name="panel" value="diagnostics">
+                <button type="submit" class="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700">Reactiver</button>
+              </form>
+              {% else %}
+              <form
+                method="post"
+                action="{% url 'accounts_portal:it_suspend_account' %}"
+                hx-post="{% url 'accounts_portal:it_suspend_account' %}"
+                hx-target="#it-diagnostics-panel"
+                hx-swap="innerHTML"
+              >
+                {% csrf_token %}
+                <input type="hidden" name="target_user_id" value="{{ diagnostic_payload.target_user_id }}">
+                <input type="hidden" name="q" value="{{ support_search.query }}">
+                <input type="hidden" name="kind" value="{{ diagnostic_payload.kind }}">
+                <input type="hidden" name="id" value="{{ request.GET.id }}">
+                <input type="hidden" name="panel" value="diagnostics">
+                <input type="hidden" name="reason" value="Suspension depuis la fiche diagnostic IT.">
+                <button type="submit" class="w-full rounded-2xl bg-amber-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-amber-700">Suspendre</button>
+              </form>
+              {% endif %}
+
+              <form
+                method="post"
+                action="{% url 'accounts_portal:it_unblock_account' %}"
+                hx-post="{% url 'accounts_portal:it_unblock_account' %}"
+                hx-target="#it-diagnostics-panel"
+                hx-swap="innerHTML"
+              >
+                {% csrf_token %}
+                <input type="hidden" name="target_user_id" value="{{ diagnostic_payload.target_user_id }}">
+                <input type="hidden" name="q" value="{{ support_search.query }}">
+                <input type="hidden" name="kind" value="{{ diagnostic_payload.kind }}">
+                <input type="hidden" name="id" value="{{ request.GET.id }}">
+                <input type="hidden" name="panel" value="diagnostics">
+                <button type="submit" class="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700">Debloquer</button>
+              </form>
+            </div>
+
             <form
               method="post"
               action="{% url 'accounts_portal:it_toggle_account' %}"
@@ -209,6 +262,30 @@
               <button type="submit" class="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
                 Reinitialiser le mot de passe
               </button>
+            </form>
+            <form
+              method="post"
+              action="{% url 'accounts_portal:it_update_account_email' %}"
+              hx-post="{% url 'accounts_portal:it_update_account_email' %}"
+              hx-target="#it-diagnostics-panel"
+              hx-swap="innerHTML"
+            >
+              {% csrf_token %}
+              <input type="hidden" name="target_user_id" value="{{ diagnostic_payload.target_user_id }}">
+              <input type="hidden" name="q" value="{{ support_search.query }}">
+              <input type="hidden" name="kind" value="{{ diagnostic_payload.kind }}">
+              <input type="hidden" name="id" value="{{ request.GET.id }}">
+              <input type="hidden" name="panel" value="diagnostics">
+              <div class="flex gap-2">
+                <input
+                  type="email"
+                  name="email"
+                  value="{% for section in diagnostic_payload.sections %}{% for label, value in section.rows %}{% if label == 'Email' %}{{ value }}{% endif %}{% endfor %}{% endfor %}"
+                  placeholder="Nouvel email"
+                  class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-950"
+                >
+                <button type="submit" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">Corriger</button>
+              </div>
             </form>
           </div>
         </div>

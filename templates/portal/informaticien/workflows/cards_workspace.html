@@ -1,0 +1,55 @@
+<form
+  class="workflow-context"
+  hx-get="{% url 'accounts_portal:it_cards_workspace' %}"
+  hx-target="#it-workspace"
+  hx-swap="innerHTML"
+>
+  <label>
+    <span>Classe</span>
+    <select name="class_id" hx-trigger="change" hx-get="{% url 'accounts_portal:it_cards_workspace' %}" hx-target="#it-workspace">
+      <option value="">Choisir une classe</option>
+      {% for class_item in classes %}
+      <option value="{{ class_item.id }}" {% if selected_class and selected_class.id == class_item.id %}selected{% endif %}>
+        {{ class_item.display_name }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<section class="workflow-stack">
+  <div class="workflow-band workflow-band-in_progress">
+    <div>
+      <p class="workflow-kicker">Cartes etudiants</p>
+      <h3>{% if selected_class %}{{ selected_class.display_name }}{% else %}Selection classe requise{% endif %}</h3>
+      <p>Filtre une classe, puis genere le PDF de carte pour chaque etudiant.</p>
+    </div>
+    {% if selected_class %}
+      <a class="workflow-btn workflow-btn-primary" href="{% url 'accounts_portal:it_class_cards_pdf' %}?class_id={{ selected_class.id }}">Generer la classe</a>
+    {% else %}
+      <span>{{ students|length }} etudiants</span>
+    {% endif %}
+  </div>
+
+  <div class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Generation PDF</p>
+        <h3>Liste etudiants</h3>
+      </div>
+    </div>
+    <div class="workflow-list">
+      {% for student in students %}
+      <article>
+        <div>
+          <strong>{{ student.full_name }}</strong>
+          <span>{{ student.matricule|default:"Sans matricule" }}</span>
+        </div>
+        <a class="workflow-btn workflow-btn-primary" href="{% url 'accounts_portal:it_student_card_pdf' student.id %}">Telecharger PDF</a>
+      </article>
+      {% empty %}
+      <p class="workflow-muted">Aucun etudiant a afficher pour cette selection.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>

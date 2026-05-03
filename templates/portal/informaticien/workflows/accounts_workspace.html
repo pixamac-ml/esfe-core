@@ -1,0 +1,72 @@
+{% if toast %}
+<section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
+{% endif %}
+
+<form
+  class="workflow-context"
+  hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}"
+  hx-target="#it-workspace"
+  hx-swap="innerHTML"
+>
+  <label>
+    <span>Recherche utilisateur</span>
+    <input name="q" value="{{ query }}" placeholder="Username ou email" hx-trigger="keyup changed delay:350ms" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-workspace" hx-include="[name='q']">
+  </label>
+</form>
+
+<section class="workflow-stack">
+  <div class="workflow-band workflow-band-in_progress">
+    <div>
+      <p class="workflow-kicker">Gestion des comptes</p>
+      <h3>Utilisateur -> Etat -> Action</h3>
+      <p>La liste est limitee a l'annexe courante. Chaque ligne expose uniquement les actions possibles sur le compte.</p>
+    </div>
+    <span>{{ branch.name|default:"Global" }}</span>
+  </div>
+
+  <div class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Comptes utilisateurs</p>
+        <h3>File de traitement</h3>
+      </div>
+    </div>
+    <div class="workflow-list">
+      {% for row in rows %}
+      <article>
+        <div>
+          <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
+          <span>{{ row.user.username }} - {{ row.account_state|title }}</span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="workflow-btn workflow-btn-secondary"
+            hx-get="{% url 'accounts_portal:it_user_modal' row.user.id %}"
+            hx-target="#it-modal"
+            hx-swap="innerHTML"
+          >
+            Voir / Modifier
+          </button>
+          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
+            <input type="hidden" name="action" value="toggle_active">
+            <button class="workflow-btn workflow-btn-secondary" type="submit">{% if row.user.is_active %}Desactiver{% else %}Activer{% endif %}</button>
+          </form>
+          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
+            <input type="hidden" name="action" value="reset_password">
+            <button class="workflow-btn workflow-btn-primary" type="submit">Reset password</button>
+          </form>
+        </div>
+      </article>
+      {% empty %}
+      <p class="workflow-muted">Aucun compte ne correspond a cette recherche.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<div id="it-modal"></div>

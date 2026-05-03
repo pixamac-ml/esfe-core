@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db.models import Count
 from django.utils import timezone
 
+from students.services.attendance_workflow import build_attendance_workflow_payload
+
 from academics.models import AcademicClass, AcademicScheduleEvent, LessonLog
+from academics.services.analytics_service import compute_branch_pedagogy_snapshot
 from academics.services.lesson_log_service import get_daily_lesson_status
 from academics.services.schedule_service import get_director_schedule_overview
+from academics.services.session_service import get_supervisor_today_course_rows
 from students.models import AttendanceAlert, Student, StudentAttendance, TeacherAttendance
 from students.services.attendance_service import get_branch_attendance_anomalies
 
@@ -21,6 +25,15 @@ ALERT_ORDER = {
     ALERT_LEVEL_WARNING: 1,
     ALERT_LEVEL_INFO: 2,
 }
+
+
+def build_supervisor_today_panel_context(*, branch, today=None):
+    """Bloc « Aujourd'hui » + synthese pedagogique (memes clefs pour page complete ou fragment HTMX)."""
+    today = today or timezone.localdate()
+    return {
+        "today_live_courses": get_supervisor_today_course_rows(branch=branch, target_date=today) if branch else [],
+        "pedagogy_snapshot": compute_branch_pedagogy_snapshot(branch=branch, days=30),
+    }
 
 
 def _build_alert(level, alert_type, message, *, target=None, action_label="A traiter"):
@@ -207,17 +220,11 @@ def _build_class_watchlist(*, classes, today, attendance_by_class, lesson_issues
     )
 
 
-def build_supervisor_dashboard_context(request, *, branch, page_title, page_kicker, sidebar_links, highlight, base_context_builder):
-    today = timezone.localdate()
-    week_start = today - timedelta(days=today.weekday())
-    week_end = week_start + timedelta(days=7)
-    overview = get_director_schedule_overview(branch, week_start) if branch else {"stats": {}, "quality": {"score": 0, "warnings": []}, "alerts": [], "timetable": []}
-
+def get_supervisor_class_picker_bundle(*, branch):
     classes_qs = AcademicClass.objects.select_related("programme", "academic_year", "branch").filter(is_active=True)
     if branch:
         classes_qs = classes_qs.filter(branch=branch)
     classes_qs = classes_qs.annotate(student_count=Count("enrollments")).order_by("level", "programme__title")
-    classes = list(classes_qs[:8])
     class_picker_items = [
         {
             "id": academic_class.id,
@@ -228,16 +235,58 @@ def build_supervisor_dashboard_context(request, *, branch, page_title, page_kick
         }
         for academic_class in classes_qs[:40]
     ]
+    classes = list(classes_qs[:8])
+    return classes, class_picker_items, classes_qs
+
+
+def build_supervisor_dashboard_context(request, *, branch, page_title, page_kicker, sidebar_links, highlight, base_context_builder):
+    today = timezone.localdate()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=7)
+    overview = get_director_schedule_overview(branch, week_start) if branch else {"stats": {}, "quality": {"score": 0, "warnings": []}, "alerts": [], "timetable": []}
+
+    classes, class_picker_items, classes_qs = get_supervisor_class_picker_bundle(branch=branch)
     default_class_id = class_picker_items[0]["id"] if class_picker_items else None
     selected_class_id = None
     selected_class_label = ""
-    selected_class_raw = (request.GET.get("class_id") or "").strip()
+    selected_class_raw = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
     if selected_class_raw.isdigit():
         selected_class_id = int(selected_class_raw)
         for item in class_picker_items:
             if item["id"] == selected_class_id:
                 selected_class_label = item["label"]
                 break
+
+    roll_date = today
+    roll_date_raw = (request.GET.get("roll_date") or request.POST.get("roll_date") or "").strip()
+    if roll_date_raw:
+        try:
+            roll_date = datetime.strptime(roll_date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            roll_date = today
+
+    academic_class_for_roll = selected_class_id or default_class_id
+    attendance_workflow = (
+        build_attendance_workflow_payload(
+            branch=branch,
+            user=request.user,
+            academic_class_id=academic_class_for_roll,
+            roll_date=roll_date,
+        )
+        if branch and academic_class_for_roll
+        else None
+    )
+
+    roll_course_events_qs = AcademicScheduleEvent.objects.select_related("academic_class", "teacher", "ec", "branch").filter(
+        start_datetime__date=roll_date,
+        event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+        is_active=True,
+    ).exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+    if branch:
+        roll_course_events_qs = roll_course_events_qs.filter(branch=branch)
+    if academic_class_for_roll:
+        roll_course_events_qs = roll_course_events_qs.filter(academic_class_id=academic_class_for_roll)
+    roll_course_action_options = _build_event_action_options(list(roll_course_events_qs.order_by("start_datetime", "id")))
 
     week_events_qs = AcademicScheduleEvent.objects.select_related("academic_class", "teacher", "ec", "branch").filter(
         start_datetime__date__gte=week_start,
@@ -404,6 +453,8 @@ def build_supervisor_dashboard_context(request, *, branch, page_title, page_kick
         "risk_students": risk_students_count,
     }
 
+    today_panel = build_supervisor_today_panel_context(branch=branch, today=today)
+
     return {
         **base_context_builder(
             request,
@@ -440,12 +491,15 @@ def build_supervisor_dashboard_context(request, *, branch, page_title, page_kick
         "default_class_id": default_class_id,
         "selected_class_id": selected_class_id,
         "selected_class_label": selected_class_label,
+        "roll_date": roll_date,
+        "attendance_workflow": attendance_workflow,
         "today_attendance_total": len(today_student_attendances),
         "today_teacher_attendance_total": len(today_teacher_attendances),
         "daily_lesson_status": daily_lesson_status,
         "attendance_anomalies": attendance_anomalies,
         "attention_actions": attention_actions,
         "course_action_options": _build_event_action_options(today_events),
+        "roll_course_action_options": roll_course_action_options,
         "teacher_action_options": _build_event_action_options(today_events),
         "student_action_options": _build_student_action_options(branch) if branch else [],
         "recent_student_attendances": [
@@ -457,4 +511,5 @@ def build_supervisor_dashboard_context(request, *, branch, page_title, page_kick
         "recent_lesson_logs": [
             _serialize_lesson_log_row(lesson_log) for lesson_log in today_lesson_logs[:6]
         ],
+        **today_panel,
     }

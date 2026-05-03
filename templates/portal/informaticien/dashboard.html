@@ -9,410 +9,142 @@
 {% block extra_head %}
 <script>
   window.tailwind = window.tailwind || {};
-  window.tailwind.config = {
-    darkMode: 'class',
-    theme: {
-      extend: {
-        boxShadow: {
-          soft: '0 18px 45px rgba(15, 23, 42, 0.08)',
-          card: '0 10px 30px rgba(15, 23, 42, 0.06)',
-        }
-      }
-    }
-  };
+  window.tailwind.config = { darkMode: 'class' };
 </script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   [x-cloak] { display: none !important; }
-  .dashboard-enter { animation: dashboardFade .28s ease; }
-  @keyframes dashboardFade {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+  .it-shell { min-height: 100vh; background: #f8fafc; color: #0f172a; }
+  .dark .it-shell { background: #020617; color: #e2e8f0; }
+  .it-sidebar { background: #082f49; color: white; }
+  .it-nav-btn { display: flex; width: 100%; align-items: center; gap: .85rem; border-radius: 14px; padding: .85rem 1rem; text-align: left; font-size: .9rem; font-weight: 800; color: rgb(226 232 240 / .86); transition: .16s ease; }
+  .it-nav-btn:hover { background: rgb(255 255 255 / .10); }
+  .it-nav-btn.active { background: #2563eb; color: white; }
+  .workflow-context { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+  .workflow-context label { display: grid; gap: .45rem; font-size: .78rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: #64748b; }
+  .workflow-context select, .workflow-context input { height: 46px; border-radius: 12px; border: 1px solid #cbd5e1; background: white; padding: 0 .9rem; color: #0f172a; font-size: .92rem; font-weight: 700; outline: none; }
+  .dark .workflow-context select, .dark .workflow-context input { border-color: #334155; background: #0f172a; color: #e2e8f0; }
+  .workflow-stack { display: grid; gap: 1rem; }
+  .workflow-band, .workflow-progress, .workflow-actions, .workflow-table-shell, .workflow-empty, .workflow-toast {
+    border: 1px solid #e2e8f0; border-radius: 18px; background: white; padding: 1.2rem; box-shadow: 0 10px 28px rgb(15 23 42 / .06);
   }
-
-  .sidebar-gradient {
-    background: linear-gradient(180deg, #082f49 0%, #0f3459 48%, #082f49 100%);
+  .dark .workflow-band, .dark .workflow-progress, .dark .workflow-actions, .dark .workflow-table-shell, .dark .workflow-empty, .dark .workflow-toast {
+    border-color: #334155; background: #0f172a;
   }
-
-  .glass-card {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(18px);
-    border: 1px solid rgba(226, 232, 240, 0.9);
+  .workflow-band { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-left-width: 6px; }
+  .workflow-band h3, .workflow-table-head h3 { margin-top: .25rem; font-size: 1.25rem; font-weight: 950; }
+  .workflow-band p, .workflow-progress p, .workflow-muted { margin-top: .35rem; color: #64748b; font-size: .9rem; font-weight: 600; }
+  .dark .workflow-band p, .dark .workflow-progress p, .dark .workflow-muted { color: #94a3b8; }
+  .workflow-band span { border-radius: 999px; background: #eff6ff; padding: .5rem .75rem; color: #1d4ed8; font-size: .78rem; font-weight: 900; white-space: nowrap; }
+  .workflow-band-empty { border-left-color: #64748b; }
+  .workflow-band-in_progress { border-left-color: #2563eb; }
+  .workflow-band-ready_to_calculate { border-left-color: #d97706; }
+  .workflow-band-calculated { border-left-color: #059669; }
+  .workflow-band-sent_to_director { border-left-color: #4f46e5; }
+  .workflow-band-ready_to_validate { border-left-color: #d97706; }
+  .workflow-band-validated { border-left-color: #059669; }
+  .workflow-band-transmitted { border-left-color: #4f46e5; }
+  .workflow-kicker { margin: 0; color: #2563eb !important; font-size: .72rem !important; font-weight: 950 !important; text-transform: uppercase; letter-spacing: .16em; }
+  .workflow-split { display: grid; grid-template-columns: .9fr 1.1fr; gap: 1rem; align-items: stretch; }
+  .workflow-progress-head, .workflow-table-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .workflow-progress-head span { font-size: .86rem; font-weight: 900; color: #334155; }
+  .dark .workflow-progress-head span { color: #cbd5e1; }
+  .workflow-progress-track { margin-top: .85rem; height: 10px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+  .workflow-progress-track div { height: 100%; border-radius: inherit; background: #2563eb; }
+  .workflow-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+  .workflow-btn { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; border-radius: 12px; padding: .65rem 1rem; font-size: .86rem; font-weight: 900; transition: .16s ease; }
+  .workflow-btn-primary { background: #2563eb; color: white; }
+  .workflow-btn-primary:hover { background: #1d4ed8; }
+  .workflow-btn-secondary { border: 1px solid #cbd5e1; background: white; color: #334155; }
+  .dark .workflow-btn-secondary { border-color: #475569; background: #020617; color: #e2e8f0; }
+  .workflow-grid-placeholder { margin-top: 1rem; overflow: auto; border-radius: 14px; border: 1px dashed #cbd5e1; padding: 1rem; color: #64748b; font-weight: 700; }
+  .workflow-list { margin-top: 1rem; display: grid; gap: .7rem; }
+  .workflow-list article { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-radius: 14px; border: 1px solid #e2e8f0; padding: .9rem; }
+  .workflow-list strong, .workflow-list span { display: block; }
+  .workflow-list span { margin-top: .2rem; color: #64748b; font-size: .82rem; font-weight: 700; }
+  .workflow-toast-success { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+  .workflow-toast-error { border-color: #fecdd3; background: #fff1f2; color: #be123c; }
+  @media (max-width: 900px) {
+    .workflow-context, .workflow-split { grid-template-columns: 1fr; }
   }
-
-  .dark .glass-card {
-    background: rgba(15, 23, 42, 0.8);
-    border-color: rgba(51, 65, 85, 0.9);
-  }
-
-  .nav-active {
-    background: linear-gradient(135deg, #2563eb, #4f46e5);
-    color: white;
-    box-shadow: 0 14px 24px rgba(37, 99, 235, 0.28);
-  }
-
-  .scrollbar-thin::-webkit-scrollbar { width: 7px; height: 8px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.45); border-radius: 999px; }
-  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .content-grid { align-items: start; }
-  .metric-copy { min-width: 0; }
-  .metric-copy p { overflow-wrap: anywhere; }
-  .panel-shell { min-width: 0; overflow: hidden; }
-  .panel-shell h3, .panel-shell p, .panel-shell span { overflow-wrap: anywhere; }
-  #htmx-progress {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #2563eb, #4f46e5);
-    z-index: 90;
-    opacity: 0;
-    transition: width .2s ease, opacity .2s ease;
-  }
-  #htmx-progress.active { width: 72%; opacity: 1; }
-  #htmx-progress.done { width: 100%; opacity: 0; }
-  .notes-shell table { min-width: 2400px; }
-  .notes-shell thead th { position: sticky; top: 0; z-index: 5; }
-  .notes-shell .nameCol, .notes-shell .numCol, .notes-shell .checkboxCol { position: sticky; background: white; z-index: 6; }
-  .notes-shell .checkboxCol { left: 0; }
-  .notes-shell .numCol { left: 42px; }
-  .notes-shell .nameCol { left: 94px; }
-  .dark .notes-shell .nameCol, .dark .notes-shell .numCol, .dark .notes-shell .checkboxCol { background: rgb(15, 23, 42); color: rgb(226, 232, 240); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div
-  x-data="itDashboardApp()"
+  x-data="itFlowDashboard()"
   x-init="init()"
   x-cloak
   :class="{ 'dark': darkMode }"
-  class="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100"
+  class="it-shell"
 >
-  <div id="htmx-progress"></div>
   <div class="flex min-h-screen">
-    <aside
-      class="sidebar-gradient fixed inset-y-0 left-0 z-40 flex flex-col text-white transition-all duration-300"
-      :class="sidebarCollapsed ? 'w-[86px]' : 'w-[270px]'"
-    >
-      <div class="flex h-24 items-center gap-3 px-5">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-          <i data-lucide="shield" class="h-7 w-7"></i>
+    <aside class="it-sidebar fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-200" :class="collapsed ? 'w-[82px]' : 'w-[280px]'">
+      <div class="flex h-20 items-center gap-3 px-4">
+        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15">
+          <i data-lucide="workflow" class="h-6 w-6"></i>
         </div>
-        <div x-show="!sidebarCollapsed" x-transition>
-          <h1 class="text-xl font-extrabold tracking-tight">{{ branch.name|default:"Support global" }}</h1>
-          <p class="text-xs font-semibold uppercase tracking-widest text-sky-100/80">Dashboard Informaticien</p>
+        <div x-show="!collapsed" x-transition class="min-w-0">
+          <p class="truncate text-base font-black">{{ branch.name|default:"Support global" }}</p>
+          <p class="truncate text-xs font-bold uppercase tracking-widest text-sky-100/70">Informaticien d'annexe</p>
         </div>
       </div>
 
       <button
         type="button"
+        class="absolute right-[-18px] top-6 grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950"
         @click="toggleSidebar()"
-        class="absolute right-[-18px] top-7 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950"
-        title="Reduire / agrandir"
+        title="Sidebar"
       >
-        <i data-lucide="chevrons-left" class="h-5 w-5 transition-transform" :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
+        <i data-lucide="panel-left-close" class="h-5 w-5" :class="collapsed ? 'rotate-180' : ''"></i>
       </button>
 
-      <nav class="mt-3 flex-1 space-y-2 overflow-y-auto px-4 scrollbar-thin">
-        <template x-for="item in navItems" :key="item.key">
+      <nav class="mt-4 flex-1 space-y-2 px-3">
+        <template x-for="module in modules" :key="module.key">
           <button
             type="button"
-            @click="setSection(item.key)"
-            class="group flex w-full items-center gap-4 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-            :class="activeSection === item.key ? 'nav-active' : ''"
+            class="it-nav-btn"
+            :class="activeModule === module.key ? 'active' : ''"
+            @click="openModule(module.key)"
           >
-            <i :data-lucide="item.icon" class="h-5 w-5 shrink-0"></i>
-            <span x-show="!sidebarCollapsed" x-transition x-text="item.label"></span>
+            <i :data-lucide="module.icon" class="h-5 w-5 shrink-0"></i>
+            <span x-show="!collapsed" x-transition x-text="module.label"></span>
           </button>
         </template>
       </nav>
 
-      <div class="space-y-3 p-4">
-        <div class="rounded-2xl border border-white/10 bg-white/10 p-3">
-          <div class="flex items-center gap-3">
-            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-sm font-bold">IT</div>
-            <div x-show="!sidebarCollapsed" x-transition class="min-w-0">
-              <p class="truncate text-sm font-bold">{{ user_display_name }}</p>
-              <p class="truncate text-xs text-sky-100/70">Support technique</p>
-            </div>
-          </div>
-        </div>
+      <div class="p-3">
         <form method="post" action="{% url 'accounts:logout' %}">
           {% csrf_token %}
-          <button
-            type="submit"
-            class="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15"
-          >
-            <i data-lucide="log-out" class="h-5 w-5 shrink-0"></i>
-            <span x-show="!sidebarCollapsed" x-transition>Deconnexion</span>
+          <button type="submit" class="it-nav-btn justify-center border border-white/10 bg-white/10">
+            <i data-lucide="log-out" class="h-5 w-5"></i>
+            <span x-show="!collapsed" x-transition>Deconnexion</span>
           </button>
         </form>
       </div>
     </aside>
 
-    <main class="min-h-screen flex-1 transition-all duration-300" :class="sidebarCollapsed ? 'ml-[86px]' : 'ml-[270px]'">
-      <div class="w-full px-4 py-6 lg:px-6">
-        <header class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <main class="min-h-screen flex-1 transition-all duration-200" :class="collapsed ? 'ml-[82px]' : 'ml-[280px]'">
+      <div class="mx-auto max-w-7xl px-5 py-6">
+        <header class="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 class="text-3xl font-extrabold tracking-tight">Dashboard Informaticien</h2>
-            <p class="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">Support technique, statistiques et workspace notes dynamique.</p>
+            <p class="workflow-kicker" x-text="activeKicker()"></p>
+            <h1 class="mt-1 text-3xl font-black tracking-tight" x-text="activeLabel()"></h1>
           </div>
-
-          <div class="flex flex-wrap items-center gap-3">
-            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-card dark:border-slate-800 dark:bg-slate-900">
-              {{ branch.name|default:"Support global" }}
-            </div>
-            <button type="button" @click="toggleDarkMode()" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900">
-              <i x-show="!darkMode" data-lucide="moon" class="h-5 w-5"></i>
-              <i x-show="darkMode" data-lucide="sun" class="h-5 w-5"></i>
-            </button>
-            <div class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-right shadow-card dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-xs font-bold text-slate-500 dark:text-slate-400">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</p>
-              <p class="text-xl font-extrabold text-blue-600 dark:text-blue-400">{{ total_users }} users</p>
-            </div>
-          </div>
+          <button type="button" class="workflow-btn workflow-btn-secondary" @click="toggleDarkMode()">
+            <i data-lucide="moon" class="mr-2 h-4 w-4"></i>
+            Theme
+          </button>
         </header>
 
-        {% if support_feedback %}
-        <section class="mb-6 rounded-3xl border {% if support_feedback.level == 'success' %}border-emerald-200 bg-emerald-50{% else %}border-rose-200 bg-rose-50{% endif %} px-5 py-4">
-          <p class="text-sm font-extrabold {% if support_feedback.level == 'success' %}text-emerald-700{% else %}text-rose-700{% endif %}">{{ support_feedback.title }}</p>
-          <p class="mt-1 text-sm {% if support_feedback.level == 'success' %}text-emerald-900{% else %}text-rose-900{% endif %}">{{ support_feedback.message }}</p>
-          {% if support_feedback.password %}
-          <p class="mt-2 rounded-2xl bg-white px-4 py-3 font-mono text-slate-900">{{ support_feedback.password }}</p>
-          {% endif %}
-        </section>
-        {% endif %}
-
-        <section x-show="activeSection === 'overview'" x-transition.opacity.duration.150ms class="space-y-6">
-          <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="glass-card rounded-3xl p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft">
-              <div class="flex items-center gap-4">
-                <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-50 dark:bg-blue-950/50">
-                  <i data-lucide="users" class="h-8 w-8 text-blue-600 dark:text-blue-300"></i>
-                </div>
-                <div class="metric-copy">
-                  <p class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Utilisateurs</p>
-                  <p class="mt-1 text-3xl font-extrabold">{{ total_users }}</p>
-                  <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Base globale</p>
-                </div>
-              </div>
-            </div>
-            <div class="glass-card rounded-3xl p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft">
-              <div class="flex items-center gap-4">
-                <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 dark:bg-emerald-950/50">
-                  <i data-lucide="user-check" class="h-8 w-8 text-emerald-600 dark:text-emerald-300"></i>
-                </div>
-                <div class="metric-copy">
-                  <p class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Staff actifs</p>
-                  <p class="mt-1 text-3xl font-extrabold">{{ total_active_staff }}</p>
-                  <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Comptes staff actifs</p>
-                </div>
-              </div>
-            </div>
-            <div class="glass-card rounded-3xl p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft">
-              <div class="flex items-center gap-4">
-                <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-50 dark:bg-violet-950/50">
-                  <i data-lucide="graduation-cap" class="h-8 w-8 text-violet-600 dark:text-violet-300"></i>
-                </div>
-                <div class="metric-copy">
-                  <p class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Etudiants</p>
-                  <p class="mt-1 text-3xl font-extrabold">{{ total_students }}</p>
-                  <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Population active</p>
-                </div>
-              </div>
-            </div>
-            <div class="glass-card rounded-3xl p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft">
-              <div class="flex items-center gap-4">
-                <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-orange-50 dark:bg-orange-950/50">
-                  <i data-lucide="activity" class="h-8 w-8 text-orange-600 dark:text-orange-300"></i>
-                </div>
-                <div class="metric-copy">
-                  <p class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Sante</p>
-                  <p class="mt-1 text-3xl font-extrabold">{{ quality.score|default:0 }}</p>
-                  <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{{ quality.status|default:"indefini" }}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <section class="content-grid grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_.95fr]">
-            <div class="space-y-6">
-              <div class="panel-shell glass-card rounded-3xl p-6 shadow-card">
-                <div class="mb-5 flex items-center justify-between">
-                  <h3 class="text-lg font-extrabold">Activites recentes</h3>
-                  <button type="button" @click="setSection('notes')" class="rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">Ouvrir les notes</button>
-                </div>
-                <div class="space-y-4">
-                  {% for log in recent_support_logs %}
-                  <div class="flex items-center gap-4 rounded-2xl p-2 transition hover:bg-slate-50 dark:hover:bg-slate-900">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950/50">
-                      <i data-lucide="history" class="h-5 w-5 text-blue-600"></i>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate text-sm font-extrabold">{{ log.get_action_type_display }}</p>
-                      <p class="truncate text-xs font-medium text-slate-500 dark:text-slate-400">{{ log.target_label|default:"Cible technique" }}</p>
-                    </div>
-                    <span class="text-xs font-bold text-slate-400">{{ log.created_at|date:"d/m H:i" }}</span>
-                  </div>
-                  {% empty %}
-                  <p class="text-sm text-slate-400">Aucune activite recente.</p>
-                  {% endfor %}
-                </div>
-              </div>
-
-              <div class="panel-shell glass-card rounded-3xl p-6 shadow-card">
-                <div class="mb-5 flex items-center justify-between">
-                  <h3 class="text-lg font-extrabold">Acces rapides</h3>
-                </div>
-                <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                  <button type="button" @click="setSection('notes')" class="group rounded-3xl border border-slate-100 bg-white/70 p-5 text-center transition hover:-translate-y-1 hover:shadow-soft dark:border-slate-800 dark:bg-slate-900/70">
-                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-50 dark:bg-blue-950/50">
-                      <i data-lucide="clipboard-list" class="h-8 w-8 text-blue-600"></i>
-                    </div>
-                    <p class="text-sm font-extrabold">Notes</p>
-                  </button>
-                  <button type="button" @click="setSection('diagnostics')" class="group rounded-3xl border border-slate-100 bg-white/70 p-5 text-center transition hover:-translate-y-1 hover:shadow-soft dark:border-slate-800 dark:bg-slate-900/70">
-                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 dark:bg-emerald-950/50">
-                      <i data-lucide="search-code" class="h-8 w-8 text-emerald-600"></i>
-                    </div>
-                    <p class="text-sm font-extrabold">Diagnostics</p>
-                  </button>
-                  <button type="button" @click="setSection('accounts')" class="group rounded-3xl border border-slate-100 bg-white/70 p-5 text-center transition hover:-translate-y-1 hover:shadow-soft dark:border-slate-800 dark:bg-slate-900/70">
-                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-50 dark:bg-violet-950/50">
-                      <i data-lucide="shield-check" class="h-8 w-8 text-violet-600"></i>
-                    </div>
-                    <p class="text-sm font-extrabold">Comptes</p>
-                  </button>
-                  <button type="button" @click="setSection('health')" class="group rounded-3xl border border-slate-100 bg-white/70 p-5 text-center transition hover:-translate-y-1 hover:shadow-soft dark:border-slate-800 dark:bg-slate-900/70">
-                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-orange-50 dark:bg-orange-950/50">
-                      <i data-lucide="heart-pulse" class="h-8 w-8 text-orange-600"></i>
-                    </div>
-                    <p class="text-sm font-extrabold">Sante</p>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="space-y-6">
-              <div class="panel-shell glass-card rounded-3xl p-6 shadow-card">
-                <div class="mb-5 flex items-center justify-between">
-                  <h3 class="text-lg font-extrabold">Alertes systeme</h3>
-                </div>
-                <div class="space-y-4">
-                  {% for alert in alerts %}
-                  <div class="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-950/50">
-                      <i data-lucide="triangle-alert" class="h-5 w-5 text-red-600"></i>
-                    </div>
-                    <div class="flex-1">
-                      <p class="text-sm font-extrabold">{{ alert.type|title }}</p>
-                      <p class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ alert.message }}</p>
-                    </div>
-                  </div>
-                  {% empty %}
-                  <p class="text-sm text-slate-400">Aucune alerte prioritaire.</p>
-                  {% endfor %}
-                </div>
-              </div>
-
-              <div class="panel-shell glass-card rounded-3xl p-6 shadow-card">
-                <h3 class="mb-5 text-lg font-extrabold">Classes et notes</h3>
-                <div class="space-y-3">
-                  <div class="flex items-center justify-between rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                    <span class="text-sm font-bold">Classes actives</span>
-                    <span class="text-sm font-extrabold">{{ grade_metrics.active_classes }}</span>
-                  </div>
-                  <div class="flex items-center justify-between rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                    <span class="text-sm font-bold">Semestres en cours</span>
-                    <span class="text-sm font-extrabold">{{ grade_metrics.pending_semesters }}</span>
-                  </div>
-                  <div class="flex items-center justify-between rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                    <span class="text-sm font-bold">Inscriptions sans notes</span>
-                    <span class="text-sm font-extrabold">{{ grade_metrics.enrollments_without_grades }}</span>
-                  </div>
-                  <div class="flex items-center justify-between rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                    <span class="text-sm font-bold">Lignes de notes</span>
-                    <span class="text-sm font-extrabold">{{ grade_metrics.grade_entries }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        </section>
-
-        <section x-show="activeSection === 'notes'" x-transition.opacity.duration.150ms class="notes-shell dashboard-enter space-y-4">
-          <div
-            id="notes-workspace"
-            class="space-y-4"
-            hx-get="{% url 'accounts_portal:it_notes_workspace' %}{% if selected_class and selected_semester %}?class_id={{ selected_class.id }}&semester_id={{ selected_semester.id }}{% endif %}"
-            hx-trigger="load"
-            hx-target="#notes-workspace"
-            hx-swap="innerHTML"
-          >
-            <div class="glass-card rounded-3xl p-6 shadow-card text-sm text-slate-500">Chargement du module notes...</div>
-          </div>
-        </section>
-
-        <section x-show="activeSection === 'diagnostics'" x-transition.opacity.duration.150ms class="dashboard-enter">
-          <div
-            id="it-diagnostics-panel"
-            class="space-y-6"
-            hx-get="{% url 'accounts_portal:it_diagnostics_panel' %}{% if support_search.query %}?q={{ support_search.query|urlencode }}{% if request.GET.kind %}&kind={{ request.GET.kind }}{% endif %}{% if request.GET.id %}&id={{ request.GET.id }}{% endif %}{% endif %}"
-            hx-trigger="load"
-            hx-target="#it-diagnostics-panel"
-            hx-swap="innerHTML"
-          >
-            <div class="glass-card rounded-3xl p-6 shadow-card text-sm text-slate-500">Chargement du panneau diagnostic...</div>
-          </div>
-        </section>
-
-        <section x-show="activeSection === 'accounts'" x-transition.opacity.duration.150ms class="dashboard-enter">
-          <div
-            id="it-accounts-panel"
-            class="space-y-6"
-            hx-get="{% url 'accounts_portal:it_accounts_panel' %}{% if support_search.query %}?q={{ support_search.query|urlencode }}{% endif %}"
-            hx-trigger="load"
-            hx-target="#it-accounts-panel"
-            hx-swap="innerHTML"
-          >
-            <div class="glass-card rounded-3xl p-6 shadow-card text-sm text-slate-500">Chargement du panneau comptes...</div>
-          </div>
-        </section>
-
-        <section x-show="activeSection === 'health'" x-transition.opacity.duration.150ms class="dashboard-enter space-y-6">
-          <div class="panel-shell glass-card rounded-3xl p-6 shadow-card">
-            <div class="flex items-center justify-between">
-              <h3 class="text-lg font-extrabold">Sante du portail</h3>
-              <span class="rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">{{ quality.status|default:"indefini" }}</span>
-            </div>
-            <div class="mt-4 space-y-3">
-              {% for warning in quality.warnings %}
-              <div class="rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">{{ warning }}</div>
-              {% empty %}
-              <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-emerald-700">Aucune anomalie critique detectee.</div>
-              {% endfor %}
-            </div>
-          </div>
-
-          <div class="panel-shell glass-card rounded-3xl p-6 shadow-card">
-            <h3 class="mb-4 text-lg font-extrabold">Evenements recents</h3>
-            <div class="space-y-3">
-              {% for event in recent_events %}
-              <div class="flex items-center justify-between rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                <div>
-                  <p class="text-sm font-extrabold">{{ event.academic_class.display_name }}</p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">{{ event.branch.name }} - {{ event.teacher.get_full_name|default:event.teacher.username }}</p>
-                </div>
-                <span class="text-xs font-bold text-slate-400">{{ event.updated_at|date:"d/m H:i" }}</span>
-              </div>
-              {% empty %}
-              <p class="text-sm text-slate-400">Aucun evenement recent.</p>
-              {% endfor %}
-            </div>
-          </div>
+        <section
+          id="it-workspace"
+          hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}"
+          hx-trigger="load"
+          hx-target="#it-workspace"
+          hx-swap="innerHTML"
+        >
+          <div class="workflow-empty">Chargement du workflow...</div>
         </section>
       </div>
     </main>
@@ -420,40 +152,65 @@
 </div>
 
 <script>
-  function itDashboardApp() {
+  function itFlowDashboard() {
     return {
-      sidebarCollapsed: false,
+      collapsed: false,
       darkMode: false,
-      activeSection: window.location.hash ? window.location.hash.replace('#', '') : '{% if request.GET.kind or request.GET.q %}diagnostics{% elif selected_class and selected_semester %}notes{% else %}overview{% endif %}',
-      navItems: [
-        { key: 'overview', label: 'Tableau de bord', icon: 'home' },
-        { key: 'notes', label: 'Notes', icon: 'clipboard-list' },
-        { key: 'diagnostics', label: 'Diagnostics', icon: 'search-code' },
-        { key: 'accounts', label: 'Comptes', icon: 'shield-check' },
-        { key: 'health', label: 'Maintenance', icon: 'wrench' },
+      activeModule: 'notes',
+      modules: [
+        { key: 'notes', label: 'Gestion des notes', icon: 'file-spreadsheet', kicker: 'Classe -> Semestre -> Etat -> Action' },
+        { key: 'support', label: 'Support & incidents', icon: 'life-buoy', kicker: 'Ticket -> Prise en charge -> Resolution' },
+        { key: 'audit', label: 'Logs & audit', icon: 'history', kicker: 'Actions sensibles par annexe' },
+        { key: 'import', label: 'Import / export', icon: 'upload-cloud', kicker: 'Excel notes et export classe' },
+        { key: 'structure', label: 'Structure academique', icon: 'building-2', kicker: 'Formations, classes, effectifs' },
+        { key: 'supervision', label: 'Supervision', icon: 'radar', kicker: 'Alertes actionnables' },
+        { key: 'accounts', label: 'Gestion des comptes', icon: 'shield-check', kicker: 'Utilisateur -> Etat compte -> Action' },
+        { key: 'cards', label: 'Cartes etudiants', icon: 'badge', kicker: 'Classe -> Etudiant -> PDF' },
+        { key: 'settings', label: 'Parametres annexe', icon: 'settings', kicker: 'Seuils, branding, configuration' },
+        { key: 'me', label: 'Mon compte', icon: 'user-cog', kicker: 'Profil informaticien et preferences' },
       ],
       init() {
-        this.sidebarCollapsed = window.localStorage.getItem('it_sidebar_collapsed') === '1';
-        this.darkMode = window.localStorage.getItem('it_dark_mode') === '1';
+        this.collapsed = window.localStorage.getItem('it_flow_sidebar') === '1';
+        this.darkMode = window.localStorage.getItem('it_flow_dark') === '1';
         this.applyTheme();
-        this.$nextTick(() => {
-          this.renderIcons();
-          this.bindHtmxProgress();
-        });
+        this.$nextTick(() => this.renderIcons());
+        document.body.addEventListener('htmx:afterSwap', () => this.renderIcons());
       },
-      setSection(section) {
-        this.activeSection = section;
-        window.location.hash = section;
+      currentModule() {
+        return this.modules.find((item) => item.key === this.activeModule) || this.modules[0];
+      },
+      activeLabel() {
+        return this.currentModule().label;
+      },
+      activeKicker() {
+        return this.currentModule().kicker;
+      },
+      openModule(moduleKey) {
+        this.activeModule = moduleKey;
+        const urls = {
+          notes: "{% url 'accounts_portal:it_notes_flow_workspace' %}",
+          support: "{% url 'accounts_portal:it_support_flow_workspace' %}",
+          audit: "{% url 'accounts_portal:it_audit_workspace' %}",
+          import: "{% url 'accounts_portal:it_import_workspace' %}",
+          structure: "{% url 'accounts_portal:it_structure_workspace' %}",
+          supervision: "{% url 'accounts_portal:it_supervision_workspace' %}",
+          accounts: "{% url 'accounts_portal:it_accounts_flow_workspace' %}",
+          cards: "{% url 'accounts_portal:it_cards_workspace' %}",
+          settings: "{% url 'accounts_portal:it_branch_settings_workspace' %}",
+          me: "{% url 'accounts_portal:it_my_account_workspace' %}",
+        };
+        if (window.htmx) {
+          window.htmx.ajax('GET', urls[moduleKey], '#it-workspace');
+        }
         this.$nextTick(() => this.renderIcons());
       },
       toggleSidebar() {
-        this.sidebarCollapsed = !this.sidebarCollapsed;
-        window.localStorage.setItem('it_sidebar_collapsed', this.sidebarCollapsed ? '1' : '0');
-        this.$nextTick(() => this.renderIcons());
+        this.collapsed = !this.collapsed;
+        window.localStorage.setItem('it_flow_sidebar', this.collapsed ? '1' : '0');
       },
       toggleDarkMode() {
         this.darkMode = !this.darkMode;
-        window.localStorage.setItem('it_dark_mode', this.darkMode ? '1' : '0');
+        window.localStorage.setItem('it_flow_dark', this.darkMode ? '1' : '0');
         this.applyTheme();
       },
       applyTheme() {
@@ -464,25 +221,6 @@
           window.lucide.createIcons();
         }
       },
-      bindHtmxProgress() {
-        if (!window.htmx || this._htmxBound) return;
-        this._htmxBound = true;
-        const progress = document.getElementById('htmx-progress');
-        if (!progress) return;
-        document.body.addEventListener('htmx:beforeRequest', function () {
-          progress.classList.remove('done');
-          progress.classList.add('active');
-        });
-        document.body.addEventListener('htmx:afterSwap', () => {
-          progress.classList.remove('active');
-          progress.classList.add('done');
-          this.renderIcons();
-        });
-        document.body.addEventListener('htmx:responseError', function () {
-          progress.classList.remove('active');
-          progress.classList.add('done');
-        });
-      }
     };
   }
 </script>

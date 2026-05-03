@@ -12,6 +12,9 @@ from academics.services.semester import compute_semester_result
 from academics.services.ue import compute_ue_result
 from academics.services.workflow import can_publish_semester, get_semester_permissions
 from accounts.access import can_access, get_user_position, get_user_scope
+from accounts.dashboards.helpers import get_user_branch
+from portal.services.it_support_service import log_support_action
+from portal.models import SupportAuditLog
 from secretary.permissions import is_secretary
 
 
@@ -376,7 +379,8 @@ def save_grade(request):
     if request.method != "POST":
         return HttpResponse("Methode non autorisee", status=405)
 
-    if not can_access(request.user, "view_portal", "dashboard"):
+    is_it_support = get_user_position(request.user) == "it_support"
+    if not can_access(request.user, "view_portal", "dashboard") and not is_it_support:
         return HttpResponseForbidden("Acces refuse.")
 
     enrollment_id = request.POST.get("enrollment_id")
@@ -390,7 +394,9 @@ def save_grade(request):
         AcademicEnrollment.objects.select_related(
             "student__student_profile__inscription__candidature",
             "academic_class",
+            "academic_class__branch",
             "academic_year",
+            "branch",
         ),
         pk=enrollment_id,
     )
@@ -399,6 +405,13 @@ def save_grade(request):
         pk=ec_id,
     )
     semester = ec.ue.semester
+    if is_it_support:
+        user_branch = get_user_branch(request.user)
+        if user_branch is None or enrollment.branch_id != user_branch.id or semester.academic_class.branch_id != user_branch.id:
+            return HttpResponseForbidden("Action hors annexe refusee.")
+    if ec.ue.semester.academic_class_id != enrollment.academic_class_id:
+        return HttpResponse("EC hors classe.", status=400)
+
     permissions = get_semester_permissions(semester)
     if session_type == "retake":
         if not permissions["can_enter_retake"]:
@@ -445,6 +458,15 @@ def save_grade(request):
     compute_semester_result(semester, enrollment)
 
     class_enrollments = list(_get_class_enrollments(enrollment.academic_class, enrollment.academic_year))
+    if is_it_support:
+        log_support_action(
+            actor=request.user,
+            branch=get_user_branch(request.user),
+            action_type=SupportAuditLog.ACTION_GRADE_UPDATED,
+            target_user=enrollment.student,
+            target_label=f"Note {ec.title} - {enrollment.academic_class.display_name}",
+            details=f"Modification note {session_type}.",
+        )
     enrollment_index = next(
         (idx for idx, item in enumerate(class_enrollments, start=1) if item.pk == enrollment.pk),
         1,

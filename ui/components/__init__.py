@@ -19,6 +19,27 @@ from .cards.formation_card.formation_card import FormationCard
 # Formation detail components
 from .formation_hero.formation_hero import FormationHero
 from .formation_overview.formation_overview import FormationOverview
+
+# Informaticien workflow components
+from .notes.notes_actions import NotesActions
+from .notes.notes_progress import NotesProgress
+from .notes.notes_grid import NotesGrid
+from .notes.notes_state import NotesState
+from .notes.notes_state_banner import NotesStateBanner
+from .notes.notes_table import NotesTable
+from .notes.notes_workflow import NotesWorkflow
+from .notes.notes_header import NotesHeader
+from .notes.student_identity_column import StudentIdentityColumn
+from .notes.ec_note_cell import ECNoteCell
+from .notes.semester_summary import SemesterSummary
+from .notes.notes_validation_panel import NotesValidationPanel
+from .notes.notes_anomaly_panel import NotesAnomalyPanel
+from .notes.notes_actions_bar import NotesActionsBar
+from .informaticien.audit_log_table import AuditLogTable
+from .informaticien.import_panel import ImportPanel
+from .informaticien.settings_panel import SettingsPanel
+from .informaticien.supervision_panel import SupervisionPanel
+from .informaticien.support_panel import SupportPanel
 from .formation_finance.formation_finance import FormationFinance
 from .formation_documents.formation_documents import FormationDocuments
 from .formation_trust_block.formation_trust_block import FormationTrustBlock
@@ -42,3 +63,7 @@ from .formation_learning_outcomes.formation_learning_outcomes import FormationLe
 from .formation_career_opportunities.formation_career_opportunities import FormationCareerOpportunities
 
 from .formation_overview.formation_overview import FormationOverview
+
+from .alerts_panel import AlertsPanel
+from .attendance_workflow import AttendanceWorkflow
+from .timetable_view import TimetableView

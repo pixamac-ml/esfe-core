@@ -1,7 +1,7 @@
 # students/admin.py
 
 from django.contrib import admin
-from .models import AttendanceAlert, Student, StudentAttendance, TeacherAttendance
+from .models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, TeacherAttendance
 
 
 @admin.register(Student)
@@ -36,6 +36,22 @@ class StudentAdmin(admin.ModelAdmin):
 
     def email(self, obj):
         return obj.user.email
+
+
+@admin.register(AttendanceRollSheet)
+class AttendanceRollSheetAdmin(admin.ModelAdmin):
+    list_display = (
+        "academic_class",
+        "date",
+        "status",
+        "branch",
+        "schedule_event",
+        "validated_at",
+        "updated_by",
+    )
+    list_filter = ("status", "date", "branch")
+    search_fields = ("academic_class__name", "academic_class__programme__title", "academic_class__level")
+    autocomplete_fields = ("branch", "academic_class", "schedule_event", "validated_by", "updated_by")
 
 
 @admin.register(StudentAttendance)

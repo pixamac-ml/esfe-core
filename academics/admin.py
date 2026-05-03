@@ -18,10 +18,27 @@ from .models import (
     AcademicScheduleChangeLog,
     AcademicScheduleExecutionLog,
     LessonLog,
+    WeeklyScheduleSlot,
+    Language,
+    Profession,
 )
 
 @admin.register(AcademicYear)
 class AcademicYearAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+
+
+@admin.register(Language)
+class LanguageAdmin(admin.ModelAdmin):
+    list_display = ("name", "code", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("name", "code")
+
+
+@admin.register(Profession)
+class ProfessionAdmin(admin.ModelAdmin):
     list_display = ("name", "is_active")
     list_filter = ("is_active",)
     search_fields = ("name",)
@@ -239,3 +256,20 @@ class LessonLogAdmin(admin.ModelAdmin):
         "created_by",
         "validated_by",
     )
+
+
+@admin.register(WeeklyScheduleSlot)
+class WeeklyScheduleSlotAdmin(admin.ModelAdmin):
+    list_display = (
+        "academic_class",
+        "weekday",
+        "start_time",
+        "end_time",
+        "ec",
+        "teacher",
+        "branch",
+        "is_active",
+    )
+    list_filter = ("branch", "academic_year", "weekday", "is_active")
+    search_fields = ("room", "academic_class__name", "ec__title", "teacher__username")
+    autocomplete_fields = ("academic_class", "ec", "teacher", "branch", "academic_year", "created_by")

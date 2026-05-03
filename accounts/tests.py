@@ -800,7 +800,7 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			f"{reverse('accounts_portal:portal_dashboard')}#attendance",
+			f"{reverse('accounts_portal:portal_dashboard')}#absences",
 			fetch_redirect_response=False,
 		)
 		attendance = StudentAttendance.objects.get(student=student, schedule_event=schedule_event)
@@ -826,7 +826,7 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			f"{reverse('accounts_portal:portal_dashboard')}#attendance",
+			f"{reverse('accounts_portal:portal_dashboard')}#absences",
 			fetch_redirect_response=False,
 		)
 		attendance = TeacherAttendance.objects.get(teacher=teacher, schedule_event=schedule_event)

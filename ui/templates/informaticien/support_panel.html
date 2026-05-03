@@ -1,0 +1,52 @@
+{% if toast %}
+<div class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</div>
+{% endif %}
+
+<form class="workflow-context" method="get" hx-get="{% url 'accounts_portal:it_support_flow_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+  <label>Statut
+    <select name="status" hx-trigger="change">
+      <option value="">Tous</option>
+      {% for value,label in status_choices %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<form class="workflow-table-shell" method="post" hx-post="{% url 'accounts_portal:it_support_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="create">
+  <div class="workflow-context">
+    <label>Titre <input name="title" required placeholder="Incident ou demande"></label>
+    <label>Description <input name="description" placeholder="Contexte utile"></label>
+  </div>
+  <button class="workflow-btn workflow-btn-primary" type="submit">Creer ticket</button>
+</form>
+
+<div class="workflow-list">
+  {% for ticket in tickets %}
+    <article>
+      <div>
+        <strong>#{{ ticket.id }} {{ ticket.title }}</strong>
+        <span>{{ ticket.get_status_display }} - {{ ticket.created_at|date:"d/m/Y H:i" }}{% if ticket.assigned_to %} - {{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.username }}{% endif %}</span>
+        {% if ticket.description %}<span>{{ ticket.description }}</span>{% endif %}
+      </div>
+      <div class="workflow-actions">
+        {% if ticket.status == "open" %}
+          <form method="post" hx-post="{% url 'accounts_portal:it_support_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+            {% csrf_token %}<input type="hidden" name="action" value="take"><input type="hidden" name="ticket_id" value="{{ ticket.id }}">
+            <button class="workflow-btn workflow-btn-secondary" type="submit">Prendre</button>
+          </form>
+        {% endif %}
+        {% if ticket.status != "resolved" %}
+          <form method="post" hx-post="{% url 'accounts_portal:it_support_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+            {% csrf_token %}<input type="hidden" name="action" value="resolve"><input type="hidden" name="ticket_id" value="{{ ticket.id }}">
+            <button class="workflow-btn workflow-btn-primary" type="submit">Resoudre</button>
+          </form>
+        {% endif %}
+      </div>
+    </article>
+  {% empty %}
+    <section class="workflow-empty">Aucun ticket pour cette annexe.</section>
+  {% endfor %}
+</div>

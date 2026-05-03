@@ -13,7 +13,9 @@ from inscriptions.models import Inscription
 from students.models import Student
 from portal.services.it_support_service import (
     build_diagnostic_payload,
+    get_account_support_state,
     get_recent_support_logs,
+    get_support_ticket_metrics,
     get_scoped_staff_queryset,
     search_support_entities,
 )
@@ -107,6 +109,7 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
         staff_users=staff_users,
         limit=10,
     )
+    support_ticket_metrics = get_support_ticket_metrics(branch=branch)
 
     return {
         **base_context_builder(
@@ -179,6 +182,7 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
         ),
         "staff_action_queue": staff_action_queue,
         "staff_action_queue_count": len(staff_action_queue),
+        "support_ticket_metrics": support_ticket_metrics,
         "support_search_counts": {
             "students": len(search_results["students"]),
             "staff": len(search_results["staff"]),
@@ -277,6 +281,8 @@ def _build_staff_action_queue(*, staff_users, limit):
             | Q(profile__branch__isnull=True)
             | Q(profile__employee_code="")
             | Q(profile__employee_code__isnull=True)
+            | Q(support_state__is_suspended=True)
+            | Q(support_state__is_blocked=True)
         )
         .select_related("profile", "profile__branch")
         .distinct()[:limit]
@@ -286,6 +292,11 @@ def _build_staff_action_queue(*, staff_users, limit):
         profile = user.profile
         if not user.is_active:
             issues.append("Compte inactif")
+        support_state = get_account_support_state(user)
+        if support_state.is_suspended:
+            issues.append("Compte suspendu")
+        if support_state.is_blocked:
+            issues.append("Compte bloque")
         if not profile.position:
             issues.append("Position manquante")
         if not profile.branch:
@@ -298,6 +309,7 @@ def _build_staff_action_queue(*, staff_users, limit):
                 "branch_label": profile.branch.name if profile.branch else "-",
                 "position_label": profile.get_position_display() or "-",
                 "employee_code": profile.employee_code or "-",
+                "support_state": support_state,
                 "issues": issues or ["Aucune incoherence critique detectee."],
             }
         )

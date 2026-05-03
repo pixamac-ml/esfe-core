@@ -8,6 +8,7 @@ from django.db import transaction
 from unidecode import unidecode
 
 from academics.models import AcademicClass, AcademicEnrollment, EC, ECGrade, Semester
+from academics.services.grading import apply_ec_grade
 
 
 @dataclass
@@ -212,11 +213,13 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
                 result.skipped_invalid_scores += 1
                 continue
 
-            ECGrade.objects.update_or_create(
+            grade, _created = ECGrade.objects.update_or_create(
                 enrollment=enrollment,
                 ec=ec,
                 defaults={"normal_score": score},
             )
+            apply_ec_grade(grade)
+            grade.save()
             result.updated += 1
 
     return result

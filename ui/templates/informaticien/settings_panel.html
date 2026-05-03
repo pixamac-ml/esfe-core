@@ -1,0 +1,14 @@
+{% if toast %}
+<div class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</div>
+{% endif %}
+<form class="workflow-table-shell" method="post" hx-post="{% url 'accounts_portal:it_branch_settings_save' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+  {% csrf_token %}
+  <div class="workflow-context">
+    <label>Seuil validation notes <input name="validation_threshold" type="number" step="0.01" min="0" max="20" value="{{ settings.validation_threshold }}"></label>
+    <label>Annee academique active <input name="active_academic_year" value="{{ settings.active_academic_year }}" placeholder="2025-2026"></label>
+  </div>
+  <label class="workflow-muted">Configuration locale
+    <textarea name="local_config" rows="5" style="width:100%;margin-top:.45rem;border:1px solid #cbd5e1;border-radius:12px;padding:.8rem;">{{ settings.local_config }}</textarea>
+  </label>
+  <button class="workflow-btn workflow-btn-primary" type="submit">Enregistrer</button>
+</form>

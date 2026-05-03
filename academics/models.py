@@ -14,6 +14,36 @@ from academics.services.semester import compute_semester_result
 from academics.services.ue import compute_ue_result
 
 
+class Language(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    code = models.CharField(max_length=20, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Langue"
+        verbose_name_plural = "Langues"
+
+    def __str__(self):
+        return self.name
+
+
+class Profession(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Metier"
+        verbose_name_plural = "Metiers"
+
+    def __str__(self):
+        return self.name
+
+
 class AcademicYear(models.Model):
     """
     Référence centrale des années académiques.
@@ -968,6 +998,98 @@ class LessonLog(models.Model):
         if self.status == self.STATUS_DONE and not (self.content or "").strip():
             errors["content"] = "Le contenu du cours est obligatoire quand le cours est marque comme fait."
 
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class WeeklyScheduleSlot(models.Model):
+    """
+    Grille hebdomadaire recurrente (jour + creneau horaire) pour une classe.
+    Les seances reelles datees restent materialisees via AcademicScheduleEvent.
+    """
+
+    WEEKDAY_CHOICES = [
+        (0, "Lundi"),
+        (1, "Mardi"),
+        (2, "Mercredi"),
+        (3, "Jeudi"),
+        (4, "Vendredi"),
+        (5, "Samedi"),
+        (6, "Dimanche"),
+    ]
+
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.CASCADE,
+        related_name="weekly_schedule_slots",
+    )
+    ec = models.ForeignKey(
+        EC,
+        on_delete=models.PROTECT,
+        related_name="weekly_schedule_slots",
+    )
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="weekly_teaching_slots",
+    )
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="weekly_schedule_slots",
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.PROTECT,
+        related_name="weekly_schedule_slots",
+    )
+    weekday = models.IntegerField(choices=WEEKDAY_CHOICES, db_index=True)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    room = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_weekly_schedule_slots",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["weekday", "start_time", "id"]
+        verbose_name = "Creneau hebdomadaire"
+        verbose_name_plural = "Creneaux hebdomadaires"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["academic_class", "weekday", "start_time"],
+                name="unique_weekly_slot_start_per_class_day",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["branch", "academic_year", "weekday"]),
+            models.Index(fields=["academic_class", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.academic_class} — {self.get_weekday_display()} {self.start_time}-{self.end_time}"
+
+    def clean(self):
+        errors = {}
+        if self.start_time and self.end_time and self.start_time >= self.end_time:
+            errors["end_time"] = "L'heure de fin doit etre posterieure au debut."
+        if self.academic_class_id and self.branch_id and self.academic_class.branch_id != self.branch_id:
+            errors["branch"] = "L'annexe ne correspond pas a la classe."
+        if self.academic_class_id and self.academic_year_id and self.academic_class.academic_year_id != self.academic_year_id:
+            errors["academic_year"] = "L'annee academique ne correspond pas a la classe."
+        if self.ec_id and self.academic_class_id and self.ec.ue.semester.academic_class_id != self.academic_class_id:
+            errors["ec"] = "L'EC ne correspond pas a la classe."
         if errors:
             raise ValidationError(errors)
 

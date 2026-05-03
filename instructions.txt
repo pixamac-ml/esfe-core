@@ -1,5 +1,282 @@
-› coupe le workflow en 3 partie. quand je clique sur la section emplois dutemps, je ne dois pas tomber directement dans le formulaire, mais plutot une listes de classes, de mon annexe,
-  donc des carrousels biens styler ensuite avoir le choix de soit juste voir l'emplois du temps ou crée un nouveaux, ou ajouter un cours à l'emplois du tmeps en cours ou porgrammer un
-  cour, ou choisir crée un nouvel emplois du temps et là, le dashboard pousse tout et privilégie la création d'un nouvel emplois du temps, avec le formulaire à coté et l'aperçu à
-  droite... tu vois un peut, ??? tout à la foie ce n'est pas bon... ok??? vas y maintenant tranquillement, et rapidement car je suis presser, crées des partials s'il faut et autre...
-  n'oublie pas la fluidité et l'instantaneté
+Tu es un ingénieur Django senior. Le dashboard Informaticien est déjà fonctionnel mais encore insuffisant pour la production.
+
+MISSION :
+Peaufiner et finaliser le dashboard Informaticien d’annexe pour le rendre réellement productif, intelligent, sécurisé et exploitable.
+
+---
+
+# 1. NETTOYAGE PRODUIT
+
+Les modules Langues / Métiers ne sont pas prioritaires actuellement.
+
+À faire :
+
+* les retirer du dashboard principal ou les déplacer dans une zone “Paramètres avancés”
+* ne pas les mettre en avant dans le workflow informaticien
+* garder le code seulement s’il ne perturbe pas l’expérience
+
+Objectif :
+le dashboard doit se concentrer sur les tâches réelles de l’informaticien.
+
+---
+
+# 2. MAQUETTE DES NOTES EN DJANGO COMPONENTS
+
+Refactorer la maquette des notes pour qu’elle soit construite avec Django Components réutilisables.
+
+Créer / améliorer :
+
+components/notes/
+
+* notes_workflow
+* notes_grid
+* notes_header
+* student_identity_column
+* ec_note_cell
+* semester_summary
+* notes_validation_panel
+* notes_anomaly_panel
+* notes_actions_bar
+
+Objectif :
+
+* garder le même style visuel
+* éviter les bugs de redimensionnement
+* rendre les cellules stables
+* rendre les inputs éditables
+* permettre la réutilisation dans d’autres dashboards
+
+---
+
+# 3. FILTRAGE ANNEXE STRICT
+
+Toutes les données utilisées dans la maquette doivent être filtrées par l’annexe de l’informaticien connecté.
+
+Règle obligatoire :
+
+branch = request.user.branch
+
+À appliquer sur :
+
+* classes
+* étudiants
+* AcademicEnrollment
+* notes
+* EC
+* UE
+* exports
+* imports
+* cartes étudiants
+* logs
+* support
+
+Interdiction :
+
+* aucune sélection manuelle d’annexe
+* aucune donnée hors annexe
+
+Ajouter des garde-fous backend :
+
+if object.branch != request.user.branch:
+return HttpResponseForbidden()
+
+---
+
+# 4. GÉNÉRATION DES RÉSULTATS
+
+Actuellement la maquette bloque encore la génération des résultats.
+
+À faire :
+
+* analyser le workflow existant dans l’app académique
+* identifier les services de calcul déjà présents
+* brancher un bouton clair :
+  “Calculer / Générer les résultats”
+* afficher un état :
+  EMPTY
+  IN_PROGRESS
+  READY_TO_CALCULATE
+  CALCULATED
+  SENT_TO_DIRECTOR
+
+Le calcul doit :
+
+* utiliser les notes saisies
+* respecter UE / EC / coefficients / crédits
+* produire les moyennes
+* détecter les notes manquantes
+* empêcher la validation si données incomplètes
+
+Ne pas recréer un moteur de calcul si un moteur existe déjà.
+Réutiliser l’existant.
+
+---
+
+# 5. DASHBOARD INTELLIGENT
+
+Ajouter un vrai panneau d’intelligence métier.
+
+Ce panneau doit afficher uniquement des alertes actionnables :
+
+* classes avec notes incomplètes
+* EC sans note
+* étudiants sans moyenne
+* résultats prêts à générer
+* résultats déjà générés
+* erreurs d’import
+* incohérences coefficient / crédit
+* classes sans effectif
+* notes hors plage
+
+Chaque alerte doit proposer une action directe :
+
+* ouvrir la classe
+* corriger les notes
+* voir les anomalies
+* relancer calcul
+* exporter rapport
+
+Pas de statistiques décoratives.
+
+---
+
+# 6. IMPORT / EXPORT EXCEL
+
+Remplacer les exports CSV par Excel.
+
+Utiliser openpyxl.
+
+Exports attendus :
+
+* notes par classe
+* notes par semestre
+* anomalies de notes
+* liste étudiants classe
+* état des résultats
+
+Imports attendus :
+
+* notes Excel
+* validation avant insertion
+* affichage lignes invalides
+* rapport d’import
+
+Interdiction :
+
+* CSV comme format principal
+* import silencieux sans rapport
+
+---
+
+# 7. CARTES ÉTUDIANTS PDF PROFESSIONNELLES
+
+Améliorer la génération des cartes étudiants.
+
+Créer un vrai modèle professionnel de carte avec :
+
+Recto :
+
+* logo école
+* nom établissement
+* annexe
+* photo étudiant si disponible
+* nom complet
+* matricule
+* classe / formation
+* année académique
+* QR code ou code unique
+* date d’émission
+
+Verso :
+
+* informations utiles
+* consignes
+* signature/cachet
+* contacts école
+
+À faire :
+
+* créer template PDF propre
+* design professionnel
+* génération individuelle
+* génération par classe
+* filtrage annexe obligatoire
+
+Ne pas générer une carte basique avec seulement nom/prénom.
+
+---
+
+# 8. PRODUCTIVITÉ DU DASHBOARD
+
+Ajouter des actions rapides :
+
+* ouvrir dernière classe travaillée
+* continuer saisie notes
+* voir résultats prêts
+* voir anomalies urgentes
+* générer cartes classe
+* exporter notes classe
+* ouvrir support urgent
+
+Objectif :
+quand l’informaticien entre, il sait immédiatement quoi faire.
+
+---
+
+# 9. ARCHITECTURE À RESPECTER
+
+Respect strict :
+
+views.py :
+
+* orchestration uniquement
+
+selectors.py :
+
+* requêtes DB
+
+services.py :
+
+* logique métier
+
+Django Components :
+
+* rendu UI réutilisable
+
+Templates :
+
+* aucun calcul métier
+
+HTMX :
+
+* interactions sans reload complet
+
+---
+
+# 10. PRIORITÉ D’EXÉCUTION
+
+Faire dans cet ordre :
+
+1. Corriger / refactorer maquette notes en Django Components
+2. Brancher génération résultats
+3. Ajouter panneau intelligent d’anomalies
+4. Remplacer CSV par Excel
+5. Améliorer cartes étudiants PDF
+6. Nettoyer modules secondaires non prioritaires
+
+---
+
+# RÉSULTAT ATTENDU
+
+Un dashboard Informaticien réellement productif :
+
+* maquette stable
+* saisie notes fiable
+* génération résultats fonctionnelle
+* exports Excel
+* cartes étudiants professionnelles
+* alertes intelligentes
+* sécurité annexe stricte
+* UX claire et opérationnelle
+
+Ne pas toucher à la partie inscriptions.

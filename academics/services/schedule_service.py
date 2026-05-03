@@ -14,6 +14,7 @@ from academics.models import (
     AcademicScheduleChangeLog,
     AcademicScheduleEvent,
     AcademicScheduleExecutionLog,
+    WeeklyScheduleSlot,
 )
 from portal.student.widgets.academics import get_student_academic_snapshot
 
@@ -846,3 +847,114 @@ def get_branch_activity_summary(branch, week_start):
         "alert_count": len(alerts),
         "alerts": alerts,
     }
+
+
+def _weekly_times_overlap(start_a: time, end_a: time, start_b: time, end_b: time) -> bool:
+    return start_a < end_b and end_a > start_b
+
+
+def serialize_weekly_slot_for_ui(slot: WeeklyScheduleSlot) -> dict:
+    """Representation dict pour formulaires / tableau surveillant (pas de logique template)."""
+    return {
+        "id": slot.id,
+        "weekday": slot.weekday,
+        "weekday_label": slot.get_weekday_display(),
+        "start_time": slot.start_time.strftime("%H:%M"),
+        "end_time": slot.end_time.strftime("%H:%M"),
+        "ec_id": slot.ec_id,
+        "ec_title": slot.ec.title,
+        "teacher_id": slot.teacher_id,
+        "teacher_name": slot.teacher.get_full_name() or slot.teacher.username,
+        "room": slot.room or "",
+        "is_active": slot.is_active,
+    }
+
+
+def list_weekly_slots_for_class(academic_class: AcademicClass, *, active_only: bool = True):
+    qs = WeeklyScheduleSlot.objects.select_related("ec", "teacher", "branch", "academic_year").filter(
+        academic_class=academic_class,
+        branch_id=academic_class.branch_id,
+    )
+    if active_only:
+        qs = qs.filter(is_active=True)
+    return list(qs.order_by("weekday", "start_time", "id"))
+
+
+@transaction.atomic
+def deactivate_weekly_schedule_slot(slot: WeeklyScheduleSlot):
+    slot.is_active = False
+    slot.save(update_fields=["is_active", "updated_at"])
+    return slot
+
+
+def detect_weekly_schedule_conflicts(
+    *,
+    academic_class,
+    weekday: int,
+    start_time: time,
+    end_time: time,
+    exclude_slot_id: int | None = None,
+):
+    qs = WeeklyScheduleSlot.objects.filter(academic_class=academic_class, weekday=weekday, is_active=True)
+    if exclude_slot_id:
+        qs = qs.exclude(pk=exclude_slot_id)
+    conflicts = []
+    for other in qs:
+        if _weekly_times_overlap(start_time, end_time, other.start_time, other.end_time):
+            conflicts.append(
+                {
+                    "type": "weekly_slot_overlap",
+                    "message": f"Creneau qui chevauche un creneau existant ({other.start_time}-{other.end_time}).",
+                    "slot_id": other.id,
+                }
+            )
+    return {"has_conflict": bool(conflicts), "conflicts": conflicts}
+
+
+@transaction.atomic
+def create_weekly_schedule_slot(*, user=None, **fields):
+    slot = WeeklyScheduleSlot(**fields)
+    if user is not None:
+        slot.created_by = user
+    slot.full_clean()
+    overlap = detect_weekly_schedule_conflicts(
+        academic_class=slot.academic_class,
+        weekday=slot.weekday,
+        start_time=slot.start_time,
+        end_time=slot.end_time,
+    )
+    if overlap["has_conflict"]:
+        raise ValidationError([item["message"] for item in overlap["conflicts"]])
+    slot.save()
+    return slot
+
+
+@transaction.atomic
+def update_weekly_schedule_slot(slot: WeeklyScheduleSlot, **changes):
+    for key, value in changes.items():
+        setattr(slot, key, value)
+    slot.full_clean()
+    overlap = detect_weekly_schedule_conflicts(
+        academic_class=slot.academic_class,
+        weekday=slot.weekday,
+        start_time=slot.start_time,
+        end_time=slot.end_time,
+        exclude_slot_id=slot.id,
+    )
+    if overlap["has_conflict"]:
+        raise ValidationError([item["message"] for item in overlap["conflicts"]])
+    slot.save()
+    return slot
+
+
+def create_schedule(*, user, **data):
+    """Alias fonctionnel de create_schedule_event (planification datee)."""
+    return create_schedule_event(user=user, **data)
+
+
+def update_schedule(event, *, user, **changes):
+    """Alias fonctionnel de update_schedule_event."""
+    return update_schedule_event(event, user=user, **changes)
+
+
+detect_conflicts = get_schedule_conflicts

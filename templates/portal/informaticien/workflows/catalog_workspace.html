@@ -1,0 +1,46 @@
+<section class="workflow-stack">
+  <div class="workflow-band workflow-band-in_progress">
+    <div>
+      <p class="workflow-kicker">Langues / metiers</p>
+      <h3>Referentiels academiques</h3>
+      <p>Gestion simple des langues et metiers utilises par les formulaires academiques.</p>
+    </div>
+    <span>CRUD simple</span>
+  </div>
+
+  {% if toast %}
+    <section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
+  {% endif %}
+
+  <div class="workflow-split">
+    <form class="workflow-table-shell" method="post" hx-post="{% url 'accounts_portal:it_catalog_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="kind" value="language">
+      <div class="workflow-context">
+        <label>Langue <input name="name" required></label>
+        <label>Code <input name="code" placeholder="fr"></label>
+      </div>
+      <button class="workflow-btn workflow-btn-primary" type="submit">Ajouter</button>
+      <div class="workflow-list">
+        {% for language in languages %}
+          <article><div><strong>{{ language.name }}</strong><span>{{ language.code|default:"-" }}</span></div></article>
+        {% empty %}<section class="workflow-empty">Aucune langue.</section>{% endfor %}
+      </div>
+    </form>
+
+    <form class="workflow-table-shell" method="post" hx-post="{% url 'accounts_portal:it_catalog_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="kind" value="profession">
+      <div class="workflow-context">
+        <label>Metier <input name="name" required></label>
+        <label>Description <input name="description"></label>
+      </div>
+      <button class="workflow-btn workflow-btn-primary" type="submit">Ajouter</button>
+      <div class="workflow-list">
+        {% for profession in professions %}
+          <article><div><strong>{{ profession.name }}</strong><span>{{ profession.description|default:"-" }}</span></div></article>
+        {% empty %}<section class="workflow-empty">Aucun metier.</section>{% endfor %}
+      </div>
+    </form>
+  </div>
+</section>

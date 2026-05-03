@@ -1,0 +1,50 @@
+{% if feedback %}
+<div class="workflow-toast workflow-toast-{{ feedback.level }}">{{ feedback.message }}</div>
+{% endif %}
+
+<form class="workflow-context" method="get" hx-get="{% url 'accounts_portal:it_import_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+  <label>Classe
+    <select name="class_id" hx-trigger="change">
+      <option value="">Selectionner</option>
+      {% for class in classes %}
+        <option value="{{ class.id }}" {% if selected_class and selected_class.id == class.id %}selected{% endif %}>{{ class.display_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Semestre
+    <select name="semester_id" hx-trigger="change" hx-include="[name='class_id']">
+      <option value="">Selectionner</option>
+      {% for semester in semesters %}
+        <option value="{{ semester.id }}" {% if selected_semester and selected_semester.id == semester.id %}selected{% endif %}>Semestre {{ semester.number }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<form class="workflow-table-shell" method="post" enctype="multipart/form-data" hx-post="{% url 'accounts_portal:it_import_upload' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+  {% csrf_token %}
+  <input type="hidden" name="class_id" value="{{ selected_class.id|default:'' }}">
+  <input type="hidden" name="semester_id" value="{{ selected_semester.id|default:'' }}">
+  <div class="workflow-context">
+    <label>Fichier Excel <input type="file" name="file" accept=".xlsx,.xls" required></label>
+    <label>Export notes
+      {% if selected_class %}
+        <a class="workflow-btn workflow-btn-secondary" href="{% url 'accounts_portal:it_export_notes_excel' %}?class_id={{ selected_class.id }}">Exporter Excel</a>
+      {% else %}
+        <span class="workflow-muted">Selectionne une classe</span>
+      {% endif %}
+    </label>
+  </div>
+  <button class="workflow-btn workflow-btn-primary" type="submit">Importer</button>
+</form>
+
+{% if feedback.invalid_lines %}
+<div class="workflow-table-shell">
+  <div class="workflow-table-head"><h3>Lignes invalides</h3></div>
+  <div class="workflow-list">
+    {% for line in feedback.invalid_lines %}
+      <article><div><strong>Ligne {{ line.row_number }}</strong><span>{{ line.nom }} {{ line.prenom }} - {{ line.message }}</span></div></article>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

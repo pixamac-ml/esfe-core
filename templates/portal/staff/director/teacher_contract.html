@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Contrat enseignant</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #0f172a; font-size: 13px; margin: 28px; }
+    h1, h2, h3, p { margin: 0; }
+    .header { border-bottom: 2px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 24px; }
+    .muted { color: #475569; }
+    .card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    ul { margin: 8px 0 0 18px; }
+    li { margin-bottom: 4px; }
+    .signature { margin-top: 48px; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Contrat pedagogique enseignant</h1>
+    <p class="muted">Ecole Superieure de Formation et d'Excellence{% if branch %} - {{ branch.name }}{% endif %}</p>
+  </div>
+
+  <div class="card">
+    <h2>{{ teacher.get_full_name|default:teacher.username }}</h2>
+    <p class="muted">Fonction : Enseignant</p>
+    <p class="muted">Email : {{ teacher.email }}</p>
+    <p class="muted">Date de debut : {{ contract_start|date:"d/m/Y" }}</p>
+    <p class="muted">Duree du contrat : {{ contract_duration }}</p>
+  </div>
+
+  <div class="card">
+    <h3>Classes affectees</h3>
+    <ul>
+      {% for label in class_labels %}
+        <li>{{ label }}</li>
+      {% empty %}
+        <li>Aucune classe precisee a la creation.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Matieres affectees</h3>
+    <ul>
+      {% for label in ec_labels %}
+        <li>{{ label }}</li>
+      {% empty %}
+        <li>Aucune matiere precisee a la creation.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="signature">
+    <div>
+      <p class="muted">Genere le {{ generated_at|date:"d/m/Y H:i" }}</p>
+    </div>
+    <div>
+      <p>Signature ecole</p>
+      <p class="muted">______________________</p>
+    </div>
+  </div>
+</body>
+</html>

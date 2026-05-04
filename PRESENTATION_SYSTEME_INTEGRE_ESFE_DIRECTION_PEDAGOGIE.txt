@@ -1,0 +1,633 @@
+================================================================================
+  ESFE — PRÉSENTATION DU SYSTÈME INTÉGRÉ DE GESTION
+  Document à l’intention de la direction administrative et du comité pédagogique
+  Version : 1.1 (enrichissement + audit « seuil de validation »)
+  Date : 2 mai 2026
+================================================================================
+
+1. CE QUE LE PROJET EST RÉELLEMENT
+----------------------------------
+Le projet ESFE n’est pas « un site web » isolé. Le site public est la porte
+d’entrée visible du public : il sert à l’image, à l’information et au
+recrutement. Derrière cette vitrine se trouve un SYSTÈME INTÉGRÉ DE GESTION
+qui enchaîne les opérations administratives, financières, pédagogiques et
+relationnelles dans une même base logique.
+
+En d’autres termes : une personne peut commencer par une simple visite du
+site, puis déclencher, à l’intérieur du même écosystème, des processus que
+les services internes traitent dans leurs espaces de travail (tableaux de
+bord, secrétariat, superadministration), jusqu’à la scolarité effective de
+l’étudiant et le suivi académique.
+
+2. POURQUOI CETTE DISTINCTION EST IMPORTANTE POUR LA DIRECTION
+--------------------------------------------------------------
+- Visibilité institutionnelle : le public voit l’offre, la crédibilité et les
+  contenus (pages publiques, actualités, blog, communauté).
+- Maîtrise opérationnelle : les équipes ne « reçoivent pas seulement des
+  e-mails » ; elles disposent de dossiers structurés, de statuts, de rôles et
+  de traçabilité.
+- Continuité du parcours : la même plateforme relie la candidature, l’inscription,
+  le paiement, la création du profil étudiant et, lorsque c’est le cas, l’entrée
+  dans le volet pédagogique (classes, emploi du temps, évaluations).
+- Pilotage : la direction peut s’appuyer sur des vues consolidées (multi-annexes,
+  indicateurs, alertes) plutôt que sur des tableurs dispersés.
+
+3. DU VISITEUR DU SITE AUX TABLEAUX DE BORD INTERNES (VUE D’ENSEMBLE)
+---------------------------------------------------------------------
+Étape A — Découverte (public)
+  Le visiteur consulte le site (accueil, formations, actualités, contact,
+  pages légales, etc.). C’est la partie « vitrine » gérée notamment par les
+  applications « core », « formations », « news », « blog », « community »
+  et la couche « ui » (composants d’interface).
+
+Étape B — Intention de candidater (public → métier admissions)
+  Le candidat initie une candidature en ligne. Les données et documents
+  alimentent le module « admissions ».
+
+Étape C — Traitement interne (services)
+  Les responsables admissions travaillent dans un espace dédié (flux HTMX /
+  dashboards dans « accounts », routage depuis « portal »). Les statuts de
+  dossier structurent la décision (acceptation, refus, complément, etc.).
+
+Étape D — Inscription administrative (métier inscriptions)
+  Une candidature validée peut donner lieu à une inscription formelle dans
+  « inscriptions », avec références et suivi d’état.
+
+Étape E — Paiements (métier payments)
+  Les paiements sont enregistrés et validés selon les règles métier ; le
+  système prévoit traçabilité (agents, sessions, reçus). La validation
+  financière est un maillon critique de la chaîne.
+
+Étape F — Étudiant actif (métier students + portail étudiant)
+  Après validation des étapes requises, un profil étudiant peut être créé ou
+  activé ; l’étudiant accède à un espace personnel (« portal » / routes
+  étudiant).
+
+Étape G — Scolarité et pédagogie (métier academics)
+  L’inscription administrative peut être reliée à une inscription académique
+  (« AcademicEnrollment » : pont explicite entre inscription administrative
+  et système de classes, semestres, emploi du temps, évaluations).
+
+Étape H — Engagement et communauté (optionnel mais intégré)
+  Le module « community » prolonge la relation au-delà du cours : discussions,
+  abonnements par domaine, notifications temps réel (WebSockets), et couche
+  de « gamification » (points, badges, classements).
+
+Ce scénario montre que le site n’est que le début du workflow : il ouvre la
+chaîne ; le cœur du système est la gestion et le pilotage internes.
+
+4. INVENTAIRE DES APPLICATIONS MÉTIER (APERÇU PAR BLOC)
+--------------------------------------------------------
+Les applications listées ci-dessous correspondent aux modules enregistrés
+dans la configuration Django du projet (INSTALLED_APPS) et aux routes racine.
+
+4.1 Fondation technique et interface
+  - config : paramètres globaux, base de données, sécurité, intégration ASGI.
+  - ui : composants d’interface réutilisables (cohérence visuelle du système).
+  - core : pages institutionnelles publiques, SEO, erreurs, légal, contact.
+
+4.2 Offre, territoire et scolarité « amont »
+  - formations : programmes, années, frais, documents requis (socle de
+    l’offre affichée et du dossier candidat).
+  - branches : annexes / campus (pivot territorial pour classes, planning,
+    paiements, pilotage).
+
+4.3 Chaîne administrative et financière
+  - admissions : candidatures et pièces jointes.
+  - inscriptions : dossiers d’inscription liés aux candidatures acceptées.
+  - payments : paiements, agents, sessions, validation et pièces justificatives.
+  - students : profil étudiant, lien avec utilisateur et inscription.
+
+4.4 Pédagogie et vie de classe
+  - academics : années académiques, classes, inscriptions académiques,
+    emploi du temps, séances, contenus d’enseignement (UE/EC), notes et
+    logique de validation ; services de calcul de résultats.
+  - students (volet vie scolaire) : éléments comme assiduité / alertes selon
+    les modèles et services présents dans le projet.
+
+4.5 Gouvernance des accès et portails métiers
+  - accounts : utilisateurs, profils, rôles, positions métiers, groupes,
+    règles d’accès centralisées ; nombreux écrans métiers (admissions, finance,
+    exports, etc.).
+  - portal : PORTE D’ENTRÉE après connexion : selon la « position » de
+    l’utilisateur, redirection vers finance, admissions, secrétariat, direction
+    générale, direction des études, supervision académique, support IT,
+    enseignant, étudiant ou portail staff générique.
+  - superadmin : cockpit transversal d’administration (large couverture
+    fonctionnelle).
+  - secretary : secrétariat (registre, rendez-vous, visiteurs, tâches,
+    documents, messages — organisation du quotidien administratif).
+
+4.6 Contenus, communication et engagement
+  - blog, news : publication éditoriale et actualités institutionnelles.
+  - community : espace communautaire, notifications, gamification.
+
+4.7 Activité commerciale annexe (si activée métiers)
+  - shop : boutique en ligne (produits, commandes) — volet distinct de la
+    scolarité mais dans le même socle applicatif.
+
+5. COMMENT LES PARTIES DU SYSTÈME SE RELIENT (MODÈLE CONCEPTUEL)
+----------------------------------------------------------------
+Sans entrer dans le détail technique, la chaîne de données repose sur des
+liens forts entre entités :
+
+  Branche (campus) ←→ Programme / Formation
+       ↓
+  Candidature (admissions) — rattachement programme + branche
+       ↓
+  Inscription (inscriptions) — prolongement du dossier candidat validé
+       ↓
+  Paiements (payments) — état financier de l’inscription
+       ↓
+  Étudiant (students) — identité scolaire et compte utilisateur
+       ↓
+  Inscription académique (academics) — ancrage dans une classe, une année,
+       un programme, avec emploi du temps et évaluations
+
+Cette continuité est le fondement de l’argument « système intégré » : on évite
+les ruptures entre « site », « service admissions », « finance » et « pédagogie ».
+
+6. TABLEAUX DE BORD ET MÉTIERS : QUI VOIT QUOI ?
+------------------------------------------------
+Le système distingue les utilisateurs par POSITION MÉTIER (champ profil) et
+par règles d’accès (groupes / rôles). Après connexion, le module « portal »
+oriente chacun vers l’espace pertinent. Exemples de routage observés dans
+le code :
+
+  - finance_manager, payment_agent → tableau de bord finance
+  - secretary → tableau de bord secrétariat
+  - admissions → tableau de bord admissions
+  - executive_director, super_admin → espace direction générale (dg_portal)
+  - director_of_studies → tableau de bord « direction des études »
+    (vision académique : classes, semaine, charge, qualité/alertes)
+  - academic_supervisor → tableau de bord supervision (contrôle pédagogique
+    opérationnel, présences enseignants, suivi de séances)
+  - it_support → espace support informatique (gestion d’accès, opérations
+    support selon les services du projet)
+  - étudiant → portail étudiant dédié
+  - enseignant → portail enseignant (cartes modules : cours, évaluations,
+    documents, classes)
+  - autres profils « staff » → portail staff générique avec liens vers les
+    briques métiers (gestion étudiants, documents, admissions, finance,
+    secrétariat, supervision)
+
+Message clé pour le comité : la pédagogie n’est pas un module « à côté » du
+site. Elle est branchée sur la même base que l’administratif, ce qui permet
+d’aligner effectifs, emploi du temps et résultats avec la réalité des
+inscriptions.
+
+7. « GRATIFICATION » ET ENGAGEMENT (COMMUNAUTÉ)
+-----------------------------------------------
+Le module « community » inclut une couche de motivation et de reconnaissance :
+
+  - Points d’expérience (XP) attribués selon des actions configurables.
+  - Badges définissables et attribués aux utilisateurs.
+  - Historique des gains de points et classements par période / domaine.
+
+Cette dimension ne remplace pas la pédagogie formelle, mais renforce
+l’engagement, la visibilité des contributions et la rétention au sein de
+l’écosystème numérique de l’établissement.
+
+8. INTÉRÊT POUR LA DIRECTION ADMINISTRATIVE
+-------------------------------------------
+- Une seule plateforme pour enchaîner recrutement, dossiers, finance et
+  statut étudiant.
+- Meilleure traçabilité : moins de dossiers « perdus » entre services.
+- Préparation multi-annexes : le référentiel « branches » structure le
+  territoire et les écrans de pilotage.
+- Séparation des responsabilités : chaque métier dispose d’outils adaptés,
+  sans forcément exposer l’intégralité du système à tous les utilisateurs.
+
+9. INTÉRÊT POUR LE COMITÉ PÉDAGOGIQUE
+-------------------------------------
+- Visibilité sur la structure réelle des classes et des parcours (programme,
+  niveau, année académique). Le seuil de validation par classe est un champ
+  métier dans la base ; son édition « grand public » dans l’interface de
+  gestion des notes n’existait pas au moment de la vérification du code
+  (voir section 11 — audit détaillé).
+- Lien explicite entre inscription administrative et présence en classe
+  (inscription académique).
+- Outils de pilotage de l’emploi du temps et du déroulé des séances ; suivi
+  lié aux enseignants et aux contenus (services et modèles « academics »).
+- Capacité à objectiver la charge (enseignants, classes) et à identifier des
+  alertes ou anomalies dans l’organisation (indicateurs présents côté
+  direction des études / supervision selon les profils).
+
+10. EN RÉSUMÉ : POURQUOI CE SYSTÈME EST UN « LEVIER » INSTITUTIONNEL
+---------------------------------------------------------------------
+Parce qu’il transforme une visite sur le site en données structurées, puis en
+actions internes contrôlées, puis en présence pédagogique suivie — avec des
+rôles clairs et une gouvernance centralisée (superadmin) complétée par des
+portails métiers.
+
+Le site est la vitrine ; le système intégré est l’outil de gestion et de
+pilotage qui donne à la direction et au comité pédagogique une lecture
+cohérente de la même réalité : les étudiants, les classes, les ressources et
+les résultats.
+
+
+================================================================================
+11. AUDIT « SEUIL DE VALIDATION » (CE QUI EXISTE DÉJÀ DANS LE CODE)
+================================================================================
+
+Contexte métier
+---------------
+Le « seuil de validation » est la note plancher (ou référence) utilisée pour
+décider si un étudiant valide une unité d’enseignement, un semestre, etc.,
+selon les règles implémentées dans les services de calcul. Dans la
+documentation fonctionnelle ou la présentation, on peut parler de paramètre
+pédagogique par classe : en pratique, dans ce dépôt, il est stocké au
+niveau de l’entité « classe académique » (AcademicClass), pas au niveau du
+semestre pris isolément.
+
+Ce qui est DÉJÀ en place (confirmé dans le code)
+-------------------------------------------------
+1) Modèle de données
+   - Fichier : academics/models.py
+   - Champ : AcademicClass.validation_threshold (Decimal, nullable)
+   - Contraintes métier : valeur > 0 et ≤ 20 si renseignée ; sinon le calcul
+     peut s’appuyer sur d’autres règles.
+
+2) Résolution du seuil au moment du calcul des notes
+   - Fichier : academics/services/grading.py — fonction resolve_threshold()
+   - Ordre de priorité documenté dans le code :
+     a) Si validation_threshold est défini sur la classe → ce seuil l’emporte.
+     b) Sinon, fallback selon study_level (DEF → 10, BAC/LICENCE/MASTER → 12).
+     c) Sinon, défaut global 10.
+   - Conséquence : une fois la classe correctement renseignée, tout le
+     pipeline qui appelle resolve_threshold() hérite du bon seuil.
+
+3) Utilisation dans le calcul de résultats de semestre
+   - Fichier : academics/services/semester.py
+   - Le semestre référence la classe (Semester.academic_class) ; le seuil
+     effectivement utilisé dans certains calculs passe par la classe.
+
+4) Interface « Gestion des notes » (portail super administrateur)
+   - Fichiers : portal/views/admin_grades.py, templates sous
+     portal/templates/portal/admin/grades/
+   - Rôle : liste des inscriptions académiques, ouverture par étudiant,
+     affichage des semestres (numéro, crédits, moyenne), saisie des notes
+     (HTMX + vue tableur).
+   - Vérification : aucune mention de « seuil », « threshold » ou
+     « validation » dans les templates de ce dossier — donc pas de réglage
+     visuel ni d’indicateur du seuil appliqué dans cet écran.
+
+5) Administration Django standard (/admin/)
+   - Fichier : academics/admin.py — AcademicClassAdmin
+   - list_display ne montre pas validation_threshold, mais l’admin Django
+     expose en principe tous les champs du modèle sur le formulaire de
+     modification d’une classe (sauf exclusion explicite — ici il n’y en a
+     pas). Donc un superutilisateur technique peut souvent régler le seuil
+     via /admin/academics/academicclass/ — ce n’est pas le même public que
+     la direction pédagogique qui attend un écran métier clair.
+
+Ce qui MANQUE pour votre vision « réglage en direct par la direction »
+-----------------------------------------------------------------------
+- Un panneau métier visible dans le portail (direction des études / comité /
+  superadmin pédagogique) qui :
+  * affiche le seuil effectif (explicite sur la classe ou dérivé du niveau) ;
+  * permet de le modifier par classe / année / programme / branche ;
+  * journalise qui a changé quoi et quand ;
+  * optionnel : recalcule ou signale les impacts sur les résultats déjà
+    publiés.
+- Une intégration dans la zone « semestre » si vous souhaitez un seuil
+  différent par semestre (aujourd’hui le modèle privilégie la classe).
+
+Conclusion courte pour la réunion
+---------------------------------
+Le moteur de calcul SAIT utiliser un seuil par classe. L’interface actuelle
+« Gestion des notes » ne le paramètre pas et ne l’affiche pas. Pour un comité
+pédagogique, il faut donc soit passer par l’admin technique, soit prévoir
+l’évolution décrite en section 12.
+
+
+================================================================================
+12. PLAN PROPOSÉ — PARAMÉTRAGE DU SEUIL (PRÊT À IMPLÉMENTER)
+================================================================================
+
+Objectif produit
+----------------
+Permettre à un profil autorisé (ex. directeur des études, superadmin, ou
+rôle « pédagogie » dédié) de définir le seuil de validation par classe (et
+éventuellement par semestre si le métier l’exige), avec retour visuel immédiat
+et traçabilité.
+
+Phase A — Cadrage métier (atelier court)
+----------------------------------------
+- Valider l’unité de paramétrage : classe uniquement (aligné sur le modèle
+  actuel) ou classe + semestre (nécessite évolution du schéma).
+- Valider les valeurs autorisées (ex. 10,00 / 12,00 / personnalisé dans
+  [0,20]).
+- Valider le comportement si des notes sont déjà saisies ou publiées :
+  recalcul automatique, brouillon, ou blocage avec message.
+
+Phase B — Modèle de données (si besoin au-delà de la classe)
+-----------------------------------------------------------
+Option B1 (recommandée en premier — sans migration lourde)
+  - Continuer à utiliser AcademicClass.validation_threshold uniquement.
+  - Ajouter un champ « source » optionnel en base ou en cache métier si vous
+    voulez distinguer « seuil explicite » vs « seuil hérité du niveau »
+    (peut aussi être calculé à l’affichage sans nouveau champ).
+
+Option B2 (si le comité impose un seuil par semestre)
+  - Ajouter Semester.validation_threshold (nullable) avec même logique de
+    priorité : semestre > classe > study_level > défaut.
+  - Migration Django + mise à jour de resolve_threshold() pour accepter le
+    contexte semestre.
+
+Phase C — API métier / services
+-------------------------------
+- Centraliser la lecture du seuil dans un seul endroit (déjà presque le cas
+  avec resolve_threshold ; étendre si Option B2).
+- Ajouter une fonction « get_effective_threshold_display(enrollment, semester) »
+  pour l’UI (montre 12,00 avec mention « hérité du niveau Licence » si le
+  champ classe est vide).
+
+Phase D — Interface utilisateur
+--------------------------------
+Emplacement possible 1 — Panneau « Classes académiques » dans superadmin ou
+portail direction des études :
+  - Liste filtrable : année, branche, programme, niveau (L1, M1…).
+  - Colonne « Seuil effectif » + badge « explicite / hérité ».
+  - Clic → formulaire ou inline HTMX pour modifier validation_threshold.
+
+Emplacement possible 2 — Dans l’écran « Gestion des notes » existant :
+  - Bandeau contextuel au-dessus du tableau de notes : « Classe : … | Seuil
+    appliqué : … | [Modifier] » réservé aux profils autorisés.
+  - Évite de disperser la configuration loin de la saisie.
+
+« Switcher » ou curseur
+-----------------------
+- Un interrupteur peut servir à basculer entre deux politiques prédéfinies
+  (ex. mode 10 / mode 12) pour une classe donnée, en écrivant la valeur dans
+  validation_threshold.
+- Un champ numérique permet les cas hors standard (décimal).
+- Toujours afficher la valeur effective après enregistrement.
+
+Phase E — Permissions et audit
+--------------------------------
+- Restreindre la modification aux positions : director_of_studies,
+  executive_director, super_admin (à affiner selon votre gouvernance).
+- Journal : table simple AcademicSettingLog ou réutilisation d’un mécanisme
+  existant si le projet en a un pour les changements sensibles.
+
+Phase F — Tests et recette
+---------------------------
+- Tests unitaires : resolve_threshold avec toutes les combinaisons
+  (seuil renseigné, vide + study_level, vide sans study_level).
+- Tests d’intégration : modification du seuil puis recalcul d’un semestre
+  sur un jeu de notes de démonstration.
+- Recette utilisateur : scénario « comité décide 12 pour la L3 filière X ».
+
+Livrables attendus
+------------------
+- Écran(s) de paramétrage + permissions.
+- Affichage du seuil dans la zone semestre / notes.
+- Documentation interne une page pour le secrétariat pédagogique.
+
+
+================================================================================
+13. VUE « ACTEURS » : QUI FAIT QUOI, AU QUOTIDIEN ?
+================================================================================
+
+Visiteur / futur candidat
+-------------------------
+- Découvre l’offre, lit les contenus, compare les formations, contacte
+  l’école, puis éventuellement dépose une candidature en ligne. Il ne voit
+  pas les outils internes ; il ne fait qu’amorcer la chaîne de données.
+
+Agent admissions
+----------------
+- Suit les dossiers, demande des compléments, fait avancer les statuts jusqu’à
+  une décision. Son travail alimente directement la possibilité d’ouvrir une
+  inscription administrative propre.
+
+Agent finance
+-------------
+- Rattache les paiements aux inscriptions, valide les encaissements, émet ou
+  vérifie les reçus. C’est le verrou qui aligne la réalité financière avec
+  le droit à la scolarité.
+
+Secrétariat
+-----------
+- Gère le quotidien : registre, rendez-vous, visiteurs, tâches, documents
+  reçus ou délivrés. C’est la « colonne vertébrale » administrative qui
+  complète les modules admissions/finance sans les remplacer.
+
+Direction des études / pédagogie
+--------------------------------
+- Voit les classes, le calendrier, la charge, la qualité de déroulement des
+  séances (selon les écrans et permissions). C’est le public naturel pour
+  valider les règles de validation, les seuils, et la cohérence des
+  parcours.
+
+Enseignant
+----------
+- Accède à un portail avec les briques « cours, évaluations, documents,
+  classes » : il vit dans la partie production pédagogique du système, pas
+  dans la vitrine publique.
+
+Étudiant inscrit
+----------------
+- Consulte son espace : progression, contenus, résultats selon ce qui est
+  publié. Il est le bénéficiaire final de la chaîne complète.
+
+Superadministration
+-------------------
+- Coordonne la configuration transverse : utilisateurs, contenus, branches,
+  modules larges. C’est le niveau « gouvernance système », distinct du seul
+  rôle pédagogique mais peut le recouvrir selon les personnes.
+
+
+================================================================================
+14. DÉTAIL DU SOUS-SYSTÈME PÉDAGOGIQUE (LANGAGE COMITÉ)
+================================================================================
+
+Année académique
+----------------
+- Référentiel temporel (ex. 2025-2026). Une seule année « active » est
+  autorisée à la fois dans la logique métier du modèle — cela évite les
+  incohérences de rattachement.
+
+Classe académique
+-----------------
+- Lie programme + branche + année + niveau (L1, M1…). C’est le contenant
+  dans lequel vivent les semestres, les UE, les EC et l’emploi du temps.
+- Porte le study_level (DEF, BAC, LICENCE, MASTER) qui sert de filet de
+  sécurité pour le seuil si le champ validation_threshold n’est pas rempli.
+
+Semestre
+--------
+- Subdivision de la classe (typiquement S1 / S2) avec crédits requis. Les UE
+  sont rattachées à un semestre ; les notes saisies le sont dans ce cadre.
+
+UE et EC
+--------
+- UE : unité d’enseignement (structure du programme).
+- EC : élément constitutif, plus fin, porteur de coefficient et de crédits
+  attendus pour la validation.
+
+Notes et validation
+-------------------
+- Les notes sont associées à l’inscription académique et aux EC.
+- Les services calculent agrégations (UE, semestre) en s’appuyant sur le seuil
+  résolu pour la classe (voir section 11).
+
+Passage administratif → académique
+----------------------------------
+- AcademicEnrollment fait le lien entre l’inscription administrative
+  (inscriptions) et la « place » de l’étudiant dans une classe concrète.
+  Sans ce lien, on a un payeur ou un dossier ; avec ce lien, on a un
+  apprenant inscrit dans un parcours structuré.
+
+
+================================================================================
+15. ESPACE « GESTION DES NOTES » (SUPERADMIN) — RÔLE DANS L’ÉCOSYSTÈME
+================================================================================
+
+Ce n’est pas le site public ; c’est un outil interne d’administration des
+résultats. Après connexion, un super administrateur peut être redirigé vers
+/portal/admin/grades/ (logique présente dans portal/views/admin_grades.py).
+
+Fonctions observées
+-------------------
+- Liste des étudiants inscrits académiquement avec accès aux résultats par
+  semestre.
+- Actions : ouvrir le détail semestre, saisie rapide via HTMX, tableau type
+  tableur pour saisie complète, lien vers relevé annuel.
+- Services sous-jacents : compute_semester_result, apply_ec_grade,
+  compute_ue_result, règles de publication de semestre (workflow).
+
+Ce que ce module n’était pas encore (au moment de l’audit)
+---------------------------------------------------------
+- Un centre de paramétrage pédagogique (seuil, coefficients par politique,
+  règles d’arrondi institutionnelles) visible pour le comité. D’où l’intérêt
+  du plan section 12.
+
+
+================================================================================
+16. SUPPORT INFORMATIQUE ET « SURVEILLANCE » (APERÇU)
+================================================================================
+
+Le projet prévoit des vues et services orientés support (it_support) et des
+API de type surveillance (ex. route surveillance/general/ à la racine). Ces
+éléments servent à la gouvernance technique et au diagnostic — ils ne
+remplacent pas le comité pédagogique mais permettent à l’établissement de
+garder le système sous contrôle lorsque le volume d’utilisateurs augmente.
+
+Pour une présentation institutionnelle, retenir : « le système prévoit une
+couche d’exploitation et de supervision, distincte des fonctions métier
+pédagogiques, mais connectée aux mêmes données ».
+
+
+================================================================================
+17. COMMUNAUTÉ, NOTIFICATIONS, « GAMIFICATION » — LIEN AVEC LA PÉDAGOGIE
+================================================================================
+
+La communauté n’est pas un simple forum : elle s’appuie sur des catégories
+(domaines), des abonnements, des fils de discussion, et un module de points /
+badges / classements (fichiers community/models_gamification.py et admin
+associé).
+
+Intérêt pour l’institution
+--------------------------
+- Favorise l’engagement des étudiants en dehors des séances présentielles.
+- Renforce la visibilité des pairs et des mentors (effet réseau).
+- Peut soutenir des campagnes de communication (orientation, santé, vie
+  associative) sans multiplier les outils.
+
+Limite utile à rappeler en comité
+---------------------------------
+- La validation académique officielle reste portée par le module academics ;
+  la communauté est complémentaire, pas substitut du barème et des jurys.
+
+
+================================================================================
+18. BOUTIQUE (SHOP) — PÉRIMÈTRE À CLARIFIER EN GOUVERNANCE
+================================================================================
+
+Le module shop permet une activité commerciale (produits, commandes) dans le
+même socle technique. Pour une direction, le message prudent est : « même
+plateforme, périmètre métier distinct de la scolarité » — sauf si
+l’établissement décide explicitement d’intégrer certains frais ou packs dans
+une politique unifiée (ce qui serait alors un choix organisationnel, pas une
+obligation technique).
+
+
+================================================================================
+19. MESSAGES CLÉS POUR UNE PRÉSENTATION ORALE (15 MINUTES)
+================================================================================
+
+1) « Nous ne présentons pas un site : nous présentons un système de gestion
+   intégré dont le site n’est que l’entrée publique. »
+
+2) « Une candidature n’est pas une fin : c’est le début d’un dossier qui
+   traverse admissions, finance, scolarité, puis pédagogie. »
+
+3) « Chaque métier a son tableau de bord ; personne n’est obligé de voir tout
+   le système pour travailler efficacement. »
+
+4) « La pédagogie est structurée : classes, semestres, UE, notes, emploi du
+   temps — reliés à la même inscription étudiant. »
+
+5) « Les règles de validation sont informatisées ; elles doivent être
+   paramétrables et lisibles pour le comité — c’est un chantier identifié
+   si l’on veut éviter la dépendance à l’admin technique. »
+
+6) « La conformité et l’image passent aussi par les contenus publics et
+   légaux, mais la valeur durable est opérationnelle : moins de friction entre
+   services, plus de traçabilité. »
+
+
+================================================================================
+20. RISQUES ET MITIGATIONS (LANGAGE DIRECTION)
+================================================================================
+
+Risque : confusion entre vitrine et outil de gestion
+  Mitigation : formation courte par rôle + démonstration du portail après
+  login.
+
+Risque : paramètres pédagogiques modifiés sans traçabilité
+  Mitigation : journalisation + rôles dédiés (section 12).
+
+Risque : dépendance à quelques comptes techniques
+  Mitigation : procédure de passation, comptes nominatifs, double contrôle
+  des accès superadmin.
+
+Risque : attentes irréalistes sur la communauté
+  Mitigation : animation humaine ; la plateforme ne remplace pas la vie
+  d’établissement.
+
+
+================================================================================
+21. ANNEXES SUGGÉRÉES (POUR VERSION PDF / POWERPOINT)
+================================================================================
+
+- Schéma unique « de la visite au diplôme en cours de route » (une page).
+- Capture : portail admissions (liste de dossiers).
+- Capture : portail finance (validation paiement).
+- Capture : portail étudiant (aperçu).
+- Capture : gestion des notes (liste étudiants + semestres).
+- Capture : direction des études (emploi du temps / charge) si disponible en
+  démo.
+- Tableau des positions métiers → URL d’atterrissage après connexion.
+
+
+================================================================================
+22. SUITE RECOMMANDÉE POUR VOTRE ÉQUIPE
+================================================================================
+
+1) Valider avec le comité pédagogique le périmètre du paramétrage du seuil
+   (classe vs semestre) — section 12 phase A.
+2) Décider de l’emplacement UI (panneau classes vs bandeau dans gestion des
+   notes) — section 12 phase D.
+3) Planifier le développement et la recette sur une classe pilote.
+4) Mettre à jour ce document avec captures réelles et chiffres (effectifs,
+   délais moyens de traitement des dossiers).
+
+
+================================================================================
+  Fin du document — version enrichie (v1.1)
+  Prochaine révision : ajouter captures d’écran, chiffres, et résultat du
+  chantier « seuil de validation » une fois implémenté.
+================================================================================

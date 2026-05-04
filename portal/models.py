@@ -3,7 +3,14 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import models
 
+from academics.models import AcademicClass, EC
 from branches.models import Branch
+
+
+def teacher_document_upload_path(instance, filename):
+    teacher_id = instance.teacher_id or "unknown"
+    branch_id = instance.branch_id or "unknown"
+    return f"portal/teachers/{branch_id}/{teacher_id}/{filename}"
 
 
 class SupportAuditLog(models.Model):
@@ -279,3 +286,205 @@ class BranchITSettings(models.Model):
 
     def __str__(self):
         return f"Parametres IT - {self.branch}"
+
+
+class DirectorTeacherAssignment(models.Model):
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="director_teacher_assignments",
+        db_index=True,
+    )
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="director_teacher_assignments",
+        db_index=True,
+    )
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.CASCADE,
+        related_name="director_teacher_assignments",
+        null=True,
+        blank=True,
+    )
+    ec = models.ForeignKey(
+        EC,
+        on_delete=models.CASCADE,
+        related_name="director_teacher_assignments",
+        null=True,
+        blank=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_director_teacher_assignments",
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["teacher__last_name", "teacher__first_name", "id"]
+        verbose_name = "Affectation enseignant direction"
+        verbose_name_plural = "Affectations enseignants direction"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["teacher", "academic_class", "ec"],
+                name="portal_unique_director_teacher_assignment",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["branch", "teacher"]),
+            models.Index(fields=["branch", "academic_class"]),
+            models.Index(fields=["branch", "ec"]),
+        ]
+
+    def __str__(self):
+        class_label = self.academic_class.display_name if self.academic_class_id else "Sans classe"
+        ec_label = self.ec.title if self.ec_id else "Sans matiere"
+        return f"{self.teacher} - {class_label} - {ec_label}"
+
+
+class TeacherDocument(models.Model):
+    DOCUMENT_ID = "id"
+    DOCUMENT_DIPLOMA = "diploma"
+    DOCUMENT_CV = "cv"
+    DOCUMENT_CONTRACT = "contract"
+    DOCUMENT_OTHER = "other"
+    DOCUMENT_CHOICES = [
+        (DOCUMENT_ID, "Piece d'identite"),
+        (DOCUMENT_DIPLOMA, "Diplome"),
+        (DOCUMENT_CV, "CV"),
+        (DOCUMENT_CONTRACT, "Contrat"),
+        (DOCUMENT_OTHER, "Autre"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="teacher_documents",
+        db_index=True,
+    )
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="teacher_documents",
+        db_index=True,
+    )
+    document_type = models.CharField(max_length=30, choices=DOCUMENT_CHOICES, default=DOCUMENT_OTHER, db_index=True)
+    file = models.FileField(upload_to=teacher_document_upload_path)
+    note = models.CharField(max_length=255, blank=True)
+    is_verified = models.BooleanField(default=False, db_index=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_teacher_documents",
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_teacher_documents",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Document enseignant"
+        verbose_name_plural = "Documents enseignants"
+        indexes = [
+            models.Index(fields=["branch", "teacher"]),
+            models.Index(fields=["branch", "document_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.teacher} - {self.get_document_type_display()}"
+
+
+def transfer_attachment_upload_path(instance, filename):
+    branch_id = instance.branch_id or "unknown"
+    return f"portal/transfers/{branch_id}/{filename}"
+
+
+class TransferRequest(models.Model):
+    TYPE_CLASS = "class"
+    TYPE_SCHOOL = "school"
+    TYPE_CHOICES = [
+        (TYPE_CLASS, "Transfert de classe"),
+        (TYPE_SCHOOL, "Transfert d'ecole"),
+    ]
+
+    STATUS_DRAFT = "draft"
+    STATUS_SUBMITTED = "submitted"
+    STATUS_VALIDATED = "validated"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_SUBMITTED, "Soumis"),
+        (STATUS_VALIDATED, "Valide"),
+        (STATUS_REJECTED, "Rejete"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="transfer_requests",
+        db_index=True,
+    )
+    enrollment = models.ForeignKey(
+        "academics.AcademicEnrollment",
+        on_delete=models.CASCADE,
+        related_name="transfer_requests",
+    )
+    transfer_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_CLASS, db_index=True)
+    source_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="outgoing_transfer_requests",
+    )
+    target_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="incoming_transfer_requests",
+        null=True,
+        blank=True,
+    )
+    target_school_name = models.CharField(max_length=180, blank=True)
+    reason = models.TextField(blank=True)
+    attachment = models.FileField(upload_to=transfer_attachment_upload_path, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_SUBMITTED, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_transfer_requests",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_transfer_requests",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Demande de transfert"
+        verbose_name_plural = "Demandes de transfert"
+        indexes = [
+            models.Index(fields=["branch", "status"]),
+            models.Index(fields=["branch", "transfer_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_transfer_type_display()} - {self.enrollment}"

@@ -1,151 +1,167 @@
-Tu as mis en place une première base du dashboard Directeur des Études. Maintenant, il faut passer à la PHASE 2 : rendre les workflows vraiment exploitables.
-
-Objectif :
-Ne pas refaire tout le dashboard. Polir et compléter uniquement les sections encore faibles.
+OBJECTIF : Implémenter une UX professionnelle type WhatsApp Web avec panneau latéral dynamique (Split View)
 
 ---
 
-# PRIORITÉ 1 — RÉSULTATS & VALIDATION
+## ❌ PROBLÈME ACTUEL
 
-Améliorer le détail lecture seule des résultats.
+Le dashboard fonctionne en navigation classique :
 
-Quand le Directeur ouvre une classe/semestre :
+* changement de page
+* perte de contexte utilisateur
+* UX rigide
 
-* afficher les résultats en lecture seule
-* afficher les étudiants
-* afficher moyenne, crédits, statut
-* afficher anomalies éventuelles
-* afficher les actions :
-
-  * Valider
-  * Rejeter
-  * Publier
-
-Important :
-
-* le Directeur ne saisit pas les notes
-* il ne recalcule pas
-* il valide/publie uniquement ce que l’informaticien a préparé
+Cela est inacceptable pour une plateforme métier.
 
 ---
 
-# PRIORITÉ 2 — REJET DES RÉSULTATS
+## 🎯 OBJECTIF UX
 
-Le bouton “Rejeter” doit être fonctionnel.
+Mettre en place un système :
 
-Workflow :
+👉 INLINE LIST + PANEL LATÉRAL DYNAMIQUE
 
-Directeur ouvre résultats
-→ constate problème
-→ clique Rejeter
-→ saisit motif
-→ le semestre/classe retourne côté informaticien avec statut clair
+Inspiré de :
 
-Afficher :
-
-* motif du rejet
-* date
-* auteur
+* WhatsApp Web
+* Notion
+* Linear
+* outils SaaS modernes
 
 ---
 
-# PRIORITÉ 3 — AFFECTATIONS ENSEIGNANTS
+## 🧱 COMPORTEMENT ATTENDU
 
-Compléter la section Affectations.
+### 1. ÉTAT NORMAL
 
-Workflow :
+Afficher les données en inline list :
 
-Classe → EC/Cours → Enseignant
-
-Fonctions :
-
-* afficher EC sans enseignant
-* assigner enseignant
-* modifier affectation
-* retirer affectation
-
-Tout filtrer par request.user.branch.
+* classes
+* enseignants
+* étudiants
 
 ---
 
-# PRIORITÉ 4 — ENSEIGNANTS
+### 2. ACTION UTILISATEUR
 
-Améliorer la gestion enseignants.
+Quand l'utilisateur clique sur une ligne ou un bouton :
 
-Fonctions :
+❌ NE PAS REDIRIGER
+❌ NE PAS CHARGER UNE NOUVELLE PAGE
 
-* créer enseignant
-* modifier profil
-* voir détails dans drawer
-* voir cours/classes affectés
-* statut actif/inactif
-
-Ne pas mélanger avec gestion des comptes informaticien.
+✅ OUVRIR UN PANEL À DROITE
 
 ---
 
-# PRIORITÉ 5 — ÉTUDIANTS
+### 3. PANEL LATÉRAL
 
-Section étudiants :
+Implémenter un composant :
 
-* choisir classe
-* afficher liste étudiants
-* recherche
-* ouvrir fiche étudiant en drawer
-* voir résultats disponibles
-* voir relevés publiés
-
-Pas de modification académique sensible ici.
+* position : fixed right
+* largeur : 30% à 40%
+* hauteur : 100%
+* scroll indépendant
 
 ---
 
-# PRIORITÉ 6 — PUBLICATIONS
+### 4. ADAPTATION DU LAYOUT
 
-Améliorer publications :
+Quand le panel s’ouvre :
 
-* afficher uniquement semestres publiés
-* générer relevés par classe
-* générer relevé individuel
-* exporter PDF
-
-Si PDF pas prêt, masquer le bouton au lieu de laisser une action cassée.
+* contenu principal → passe à 60-70%
+* panel → prend 30-40%
+* transition fluide
 
 ---
 
-# UX OBLIGATOIRE
+### 5. CONTENU DU PANEL
 
-* HTMX sans reload complet
-* drawer pour détails
-* aucun bouton mort
-* aucun écran vide
-* si action impossible : expliquer pourquoi
+Dynamique selon contexte :
+
+EXEMPLES :
+
+Classe :
+
+* liste étudiants
+* résultats
+* planning
+* actions
+
+Enseignant :
+
+* classes
+* matières
+* charge
+* actions
+
+Étudiant :
+
+* dossier
+* résultats
+* actions
 
 ---
 
-# SÉCURITÉ
+### 6. TECHNIQUE (IMPORTANT)
 
-Tout filtrer par request.user.branch.
+Utiliser :
 
-Actions interdites :
-
-* modifier notes
-* accéder autre annexe
-* recalculer résultats
+* HTMX pour charger contenu dynamique
+* Alpine.js pour gestion état (open/close panel)
+* Tailwind pour layout
 
 ---
 
-# TEST FINAL
+### 7. STRUCTURE À CRÉER
 
-Le Directeur doit pouvoir :
+Créer un composant global :
 
-1. ouvrir dashboard
-2. voir classes prêtes
-3. ouvrir résultats en lecture seule
-4. valider
-5. rejeter avec motif
-6. publier
-7. gérer affectations enseignants
-8. consulter étudiants
-9. générer relevés publiés
+* components/ui/side_panel.html
 
-Ne pas refaire la base existante. Compléter proprement.
+Avec :
+
+* slot contenu
+* animation
+* fermeture
+
+---
+
+### 8. INTERACTIONS
+
+* clic → hx-get vers panel
+* panel injecte contenu
+* bouton fermer → hide panel
+
+---
+
+### 9. ANIMATION
+
+Ajouter transition :
+
+* translate-x
+* opacity
+* duration 200-300ms
+
+---
+
+## ❌ INTERDIT
+
+* redirection full page
+* modals lourds
+* duplication de layout
+* perte de contexte
+
+---
+
+## ✅ RÉSULTAT ATTENDU
+
+Une UX fluide :
+
+* rapide
+* moderne
+* professionnelle
+* orientée action
+
+---
+
+C'est une PRIORITÉ UX.
+Tout le dashboard doit fonctionner sur ce pattern.

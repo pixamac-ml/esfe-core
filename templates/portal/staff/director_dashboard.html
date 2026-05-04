@@ -1,225 +1,62 @@
-{% extends "portal/staff/dashboard_shell.html" %}
+{% extends "base.html" %}
 
-{% block sidebar_nav %}
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'home' || activeSection === '' }" @click="setSection('home')"><i data-lucide="home" style="width:18px;height:18px;"></i><span>Accueil</span></button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'academic' }" @click="setSection('academic')"><i data-lucide="school" style="width:18px;height:18px;"></i><span>Pilotage academique</span></button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'teachers' }" @click="setSection('teachers')"><i data-lucide="users" style="width:18px;height:18px;"></i><span>Enseignants</span></button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'assignments' }" @click="setSection('assignments')"><i data-lucide="book-open-check" style="width:18px;height:18px;"></i><span>Affectations</span></button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'results' }" @click="setSection('results')"><i data-lucide="badge-check" style="width:18px;height:18px;"></i><span>Resultats & validation</span></button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'publications' }" @click="setSection('publications')"><i data-lucide="file-down" style="width:18px;height:18px;"></i><span>Publications</span></button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'stats' }" @click="setSection('stats')"><i data-lucide="bar-chart-3" style="width:18px;height:18px;"></i><span>Statistiques</span></button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'students' }" @click="setSection('students')"><i data-lucide="graduation-cap" style="width:18px;height:18px;"></i><span>Etudiants</span></button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'settings' }" @click="setSection('settings')"><i data-lucide="settings" style="width:18px;height:18px;"></i><span>Parametres</span></button>
-{% endblock %}
+{% block public_navbar %}{% endblock %}
+{% block public_footer %}{% endblock %}
+{% block public_floating_widget %}{% endblock %}
 
-{% block topbar_actions %}
-<span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{{ branch.name|default:"Annexe non definie" }}</span>
-<span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</span>
-<span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">{{ quality_score|default:0 }}/100</span>
-{% endblock %}
+{% block title %}Dashboard Direction des Etudes{% endblock %}
 
-{% block dashboard_content %}
+{% block extra_head %}
+<script>
+  window.tailwind = window.tailwind || {};
+  window.tailwind.config = { darkMode: 'class' };
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  .director-workspace {
-    width: 100%;
-    display: grid;
-    gap: 1rem;
-  }
-
-  /* Harmonisation visuelle avec le dashboard Informaticien */
-  .director-module-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .director-module-tile {
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: #ffffff;
-    padding: 1rem;
-    min-width: 0;
-    cursor: pointer;
-    transition: .18s ease;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
-    text-align: left;
-  }
-
-  .director-module-tile:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
-  }
-
-  .director-module-tile.active {
-    border-color: rgba(37, 99, 235, .28);
-    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .15);
-    background: linear-gradient(180deg, #eff6ff, #ffffff);
-  }
-
-  .director-icon-wrap {
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    background: #e0f2fe;
-    color: #0f172a;
-  }
-
-  .director-hero {
-    overflow: hidden;
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
-    gap: 1rem;
-  }
-
-  .director-hero-copy {
-    display: grid;
-    gap: .85rem;
-    align-content: start;
-  }
-
-  .director-hero-title {
-    font-size: 1.7rem;
-    line-height: 1.1;
-    font-weight: 950;
-    letter-spacing: -0.03em;
-    color: var(--text);
-  }
-
-  .director-hero-text {
-    max-width: 62ch;
-    font-size: .94rem;
-    font-weight: 600;
-    color: var(--muted);
-  }
-
-  .director-hero-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .75rem;
-  }
-
-  .director-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 42px;
-    border-radius: 12px;
-    padding: .65rem 1rem;
-    font-size: .86rem;
-    font-weight: 900;
-    transition: .16s ease;
-  }
-
-  .director-btn-primary {
-    background: var(--school-primary);
-    color: white;
-  }
-
-  .director-btn-primary:hover {
-    background: #18455f;
-  }
-
-  .director-btn-secondary {
-    border: 1px solid var(--line);
+  [x-cloak] { display: none !important; }
+  .de-shell { min-height: 100vh; background: #f8fafc; color: #0f172a; }
+  .dark .de-shell { background: #020617; color: #e2e8f0; }
+  .de-sidebar { background: #082f49; color: white; }
+  .de-nav-btn { display: flex; width: 100%; align-items: center; gap: .85rem; border-radius: 14px; padding: .85rem 1rem; text-align: left; font-size: .9rem; font-weight: 800; color: rgb(226 232 240 / .86); transition: .16s ease; }
+  .de-nav-btn:hover { background: rgb(255 255 255 / .10); }
+  .de-nav-btn.active { background: #2563eb; color: white; }
+  .de-glass { background: rgba(255,255,255,.86); backdrop-filter: blur(18px); border: 1px solid rgba(226,232,240,.85); }
+  .dark .de-glass { background: rgba(15,23,42,.78); border-color: rgba(51,65,85,.8); }
+  .de-chip { display: inline-flex; align-items: center; gap: .5rem; min-height: 42px; border-radius: 12px; padding: .65rem .9rem; border: 1px solid #cbd5e1; background: white; color: #334155; font-size: .86rem; font-weight: 900; }
+  .dark .de-chip { border-color: #475569; background: #0f172a; color: #e2e8f0; }
+  .de-chip-accent { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+  .dark .de-chip-accent { border-color: #166534; background: #052e16; color: #bbf7d0; }
+  .de-empty {
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
     background: white;
-    color: var(--text);
+    padding: 1.2rem;
+    box-shadow: 0 10px 28px rgb(15 23 42 / .06);
   }
-
-  .director-btn-secondary:hover {
-    background: #f8fafc;
+  .dark .de-empty {
+    border-color: #334155;
+    background: #0f172a;
   }
-
-  .director-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .85rem;
-  }
-
-  .director-kpi-card {
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: white;
-    padding: .95rem;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
-  }
-
-  .director-kpi-card p {
-    margin: 0;
-  }
-
-  .director-kpi-label {
-    text-transform: uppercase;
-    letter-spacing: .14em;
-    font-size: .68rem;
-    font-weight: 800;
-    color: #64748b;
-  }
-
-  .director-kpi-value {
-    margin-top: .35rem;
-    font-size: 1.8rem;
-    line-height: 1;
-    font-weight: 950;
-    color: var(--text);
-  }
-
-  .director-shortcuts {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: .75rem;
-  }
-
-  .director-shortcut {
-    display: grid;
-    gap: .55rem;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: white;
-    padding: .95rem;
-    text-align: left;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
-    transition: .16s ease;
-  }
-
-  .director-shortcut:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 10px 22px rgba(15, 23, 42, .08);
-  }
-
-  .director-shortcut.active {
-    border-color: rgba(37, 99, 235, .25);
-    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .12);
-    background: linear-gradient(180deg, #eff6ff, #ffffff);
-  }
-
-  .director-shortcut-icon {
-    display: grid;
-    place-items: center;
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-    background: #e0f2fe;
-    color: #0f172a;
-  }
-
-  .director-workflow-stack {
-    display: grid;
-    gap: 1rem;
-  }
-
+  .director-workflow-stack { display: grid; gap: 1rem; }
+  .director-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .director-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  .director-workflow-split { display: grid; grid-template-columns: .9fr 1.1fr; gap: 1rem; align-items: start; }
   .director-workflow-band,
   .director-workflow-card,
-  .director-workflow-empty,
-  .director-workflow-toast {
-    border: 1px solid var(--line);
-    border-radius: 12px;
+  .director-workflow-empty {
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
     background: white;
-    padding: 1rem;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+    padding: 1.2rem;
+    box-shadow: 0 10px 28px rgb(15 23 42 / .06);
   }
-
+  .dark .director-workflow-band,
+  .dark .director-workflow-card,
+  .dark .director-workflow-empty {
+    border-color: #334155;
+    background: #0f172a;
+  }
   .director-workflow-band {
     display: flex;
     align-items: center;
@@ -227,32 +64,29 @@
     gap: 1rem;
     border-left-width: 6px;
   }
-
   .director-workflow-band h3 {
     margin-top: .25rem;
-    font-size: 1.2rem;
+    font-size: 1.25rem;
     font-weight: 950;
-    color: var(--text);
+    color: #0f172a;
   }
-
-  .director-workflow-band p,
-  .director-workflow-muted {
+  .dark .director-workflow-band h3 { color: #e2e8f0; }
+  .director-workflow-band p {
     margin-top: .35rem;
+    color: #64748b;
     font-size: .9rem;
     font-weight: 600;
-    color: var(--muted);
   }
-
+  .dark .director-workflow-band p { color: #94a3b8; }
   .director-workflow-band span {
     border-radius: 999px;
     background: #eff6ff;
-    padding: .45rem .75rem;
+    padding: .5rem .75rem;
     color: #1d4ed8;
     font-size: .78rem;
     font-weight: 900;
     white-space: nowrap;
   }
-
   .director-workflow-band-home { border-left-color: #2563eb; }
   .director-workflow-band-academic { border-left-color: #0ea5e9; }
   .director-workflow-band-teachers { border-left-color: #8b5cf6; }
@@ -262,242 +96,557 @@
   .director-workflow-band-stats { border-left-color: #0f766e; }
   .director-workflow-band-students { border-left-color: #dc2626; }
   .director-workflow-band-settings { border-left-color: #64748b; }
-
-  .director-workflow-split {
-    display: grid;
-    grid-template-columns: .95fr 1.05fr;
-    gap: 1rem;
-    align-items: stretch;
+  .director-kpi-card {
+    border: 1px solid #dbe3ee;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    padding: 1rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
   }
-
-  .director-workflow-list {
-    margin-top: .9rem;
-    display: grid;
-    gap: .65rem;
+  .dark .director-kpi-card {
+    border-color: #334155;
+    background: linear-gradient(180deg, #0f172a, #111827);
   }
-
+  .director-kpi-label {
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: #94a3b8;
+  }
+  .director-kpi-value {
+    margin-top: .45rem;
+    font-size: 1.9rem;
+    line-height: 1;
+    font-weight: 950;
+    color: #0f172a;
+  }
+  .dark .director-kpi-value { color: #f8fafc; }
+  .director-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    border-radius: 14px;
+    padding: .72rem 1rem;
+    font-size: .88rem;
+    font-weight: 900;
+    transition: .16s ease;
+    box-shadow: 0 8px 20px rgb(15 23 42 / .08);
+  }
+  .director-btn:hover { transform: translateY(-1px); }
+  .director-btn-primary {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    border: 0;
+    box-shadow: 0 14px 24px rgba(37, 99, 235, .25);
+  }
+  .director-btn-secondary {
+    border: 1px solid #cbd5e1;
+    background: white;
+    color: #334155;
+  }
+  .dark .director-btn-secondary {
+    border-color: #475569;
+    background: #020617;
+    color: #e2e8f0;
+  }
+  .director-shortcut {
+    display: grid;
+    gap: .55rem;
+    border: 1px solid #dbe3ee;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    padding: 1rem;
+    text-align: left;
+    transition: .16s ease;
+    box-shadow: 0 10px 24px rgb(15 23 42 / .05);
+  }
+  .director-shortcut:hover,
+  .director-workflow-card button:hover,
+  .director-workflow-card a:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 30px rgb(15 23 42 / .08);
+  }
+  .dark .director-shortcut { border-color: #334155; background: #0f172a; }
+  .director-shortcut-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+  .director-workflow-list { margin-top: 1rem; display: grid; gap: .75rem; }
   .director-workflow-list article {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: white;
-    padding: .9rem;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: .95rem;
+    background: rgba(248,250,252,.88);
   }
-
+  .dark .director-workflow-list article {
+    border-color: #334155;
+    background: rgba(15,23,42,.86);
+  }
   .director-workflow-list strong,
-  .director-workflow-list span {
-    display: block;
-  }
-
+  .director-workflow-list span { display: block; }
+  .director-workflow-list strong { color: #0f172a; font-weight: 900; }
+  .dark .director-workflow-list strong { color: #f8fafc; }
   .director-workflow-list span {
     margin-top: .2rem;
+    color: #64748b;
     font-size: .82rem;
     font-weight: 700;
-    color: var(--muted);
   }
-
-  .director-grid-2 {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .director-grid-3 {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
+  .dark .director-workflow-list span { color: #94a3b8; }
   .director-empty {
-    border: 1px dashed var(--line);
-    border-radius: 12px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 16px;
     background: #f8fafc;
     padding: 1.2rem;
     text-align: center;
     font-size: .9rem;
     font-weight: 700;
-    color: var(--muted);
+    color: #64748b;
   }
-
-  @media (max-width: 1100px) {
-    .director-hero,
-    .director-workflow-split {
-      grid-template-columns: 1fr;
-    }
-
-    .director-shortcuts,
+  .dark .director-empty {
+    border-color: #334155;
+    background: #0b1220;
+    color: #94a3b8;
+  }
+  .director-workflow-card table { border-collapse: separate; border-spacing: 0; }
+  .director-workflow-card thead th {
+    background: #f8fafc;
+    color: #64748b;
+    font-weight: 900;
+  }
+  .dark .director-workflow-card thead th {
+    background: #111827;
+    color: #94a3b8;
+  }
+  .director-workflow-card tbody tr:hover { background: rgba(37,99,235,.03); }
+  .dark .director-workflow-card tbody tr:hover { background: rgba(59,130,246,.06); }
+  .director-inline-table { width: 100%; border-collapse: collapse; }
+  .director-inline-table th,
+  .director-inline-table td { padding: .85rem .75rem; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+  .dark .director-inline-table th,
+  .dark .director-inline-table td { border-color: #334155; }
+  .director-inline-table th { font-size: .72rem; text-transform: uppercase; letter-spacing: .14em; color: #64748b; font-weight: 900; }
+  .dark .director-inline-table th { color: #94a3b8; }
+  .director-inline-actions { display: flex; flex-wrap: wrap; gap: .45rem; justify-content: flex-end; }
+  .director-preview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+    gap: 1.1rem;
+    align-items: start;
+  }
+  .director-drawer-backdrop { display: none; }
+  .director-drawer {
+    position: sticky;
+    top: 1rem;
+    height: auto;
+    width: 100%;
+    background: white;
+    border: 1px solid #dbe3ee;
+    border-radius: 24px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, .10);
+    padding: 1.25rem;
+  }
+  .dark .director-drawer {
+    background: #020617;
+    border-color: #334155;
+  }
+  @media (max-width: 1024px) {
     .director-grid-2,
     .director-grid-3,
-    .director-kpi-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-  }
-
-  @media (max-width: 720px) {
-    .director-shortcuts,
-    .director-grid-2,
-    .director-grid-3,
-    .director-kpi-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 1100px) {
-    .director-module-grid,
-    .director-shortcuts {
-      grid-template-columns: 1fr 1fr;
-    }
-  }
-
-  @media (max-width: 720px) {
-    .director-module-grid,
-    .director-shortcuts {
-      grid-template-columns: 1fr;
-    }
+    .director-workflow-split,
+    .director-preview-grid { grid-template-columns: 1fr; }
+    .director-drawer { position: relative; top: 0; }
   }
 </style>
+{% endblock %}
 
+{% block content %}
+<div
+  x-data="directorFlowDashboard()"
+  x-init="init()"
+  x-cloak
+  :class="{ 'dark': darkMode }"
+  class="de-shell"
+>
+  <div class="flex min-h-screen">
+    <aside class="de-sidebar fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-200" :class="collapsed ? 'w-[82px]' : 'w-[280px]'">
+      <div class="flex h-20 items-center gap-3 px-4">
+        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15">
+          <i data-lucide="briefcase-business" class="h-6 w-6"></i>
+        </div>
+        <div x-show="!collapsed" x-transition class="min-w-0">
+          <p class="truncate text-base font-black">{{ branch.name|default:"Direction des etudes" }}</p>
+          <p class="truncate text-xs font-bold uppercase tracking-widest text-sky-100/70">Directeur des etudes</p>
+        </div>
+      </div>
 
-<div class="director-page">
-  <section class="portal-card portal-card-pad director-hero">
-    <div class="director-hero-copy">
-      <div>
-        <p class="portal-section-kicker">Direction des etudes</p>
-        <h2 class="director-hero-title">Pilotage academique, validation et publication</h2>
-        <p class="director-hero-text mt-3">
-          Suivez les classes, les enseignants, les affectations et les resultats depuis un seul tableau de bord.
-          Les blocs ci-dessous sont relies aux donnees de l'annexe, sans double calcul inutile.
-        </p>
-      </div>
-      <div class="director-hero-actions">
-        <button type="button" class="director-btn director-btn-primary" data-director-section="results">Ouvrir les resultats</button>
-        <button type="button" class="director-btn director-btn-secondary" data-director-section="academic">Voir le pilotage</button>
-        <button type="button" class="director-btn director-btn-secondary" data-director-section="students">Gerer les classes</button>
-        <button type="button" class="director-btn director-btn-secondary" data-director-section="teachers">Controle enseignants</button>
-      </div>
-    </div>
+      <button
+        type="button"
+        class="absolute right-[-18px] top-6 grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950"
+        @click="toggleSidebar()"
+        title="Sidebar"
+      >
+        <i data-lucide="panel-left-close" class="h-5 w-5" :class="collapsed ? 'rotate-180' : ''"></i>
+      </button>
 
-    <div class="director-kpi-grid">
-      <div class="director-kpi-card">
-        <p class="director-kpi-label">Classes actives</p>
-        <p class="director-kpi-value">{{ total_classes|default:0 }}</p>
-      </div>
-      <div class="director-kpi-card">
-        <p class="director-kpi-label">Semestres</p>
-        <p class="director-kpi-value">{{ total_semesters|default:0 }}</p>
-      </div>
-      <div class="director-kpi-card">
-        <p class="director-kpi-label">A valider</p>
-        <p class="director-kpi-value">{{ ready_to_validate_count|default:0 }}</p>
-      </div>
-      <div class="director-kpi-card">
-        <p class="director-kpi-label">Qualite planning</p>
-        <p class="director-kpi-value {% if quality_score >= 85 %}text-emerald-600{% elif quality_score >= 70 %}text-blue-600{% elif quality_score >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ quality_score|default:0 }}</p>
-      </div>
-    </div>
-  </section>
+      <nav class="mt-4 flex-1 space-y-2 px-3">
+        <template x-for="module in modules" :key="module.key">
+          <button
+            type="button"
+            class="de-nav-btn"
+            :class="activeModule === module.key ? 'active' : ''"
+            @click="openModule(module.key)"
+          >
+            <i :data-lucide="module.icon" class="h-5 w-5 shrink-0"></i>
+            <span x-show="!collapsed" x-transition x-text="module.label"></span>
+          </button>
+        </template>
+      </nav>
 
-  <section class="director-shortcuts">
-    <button type="button" class="director-shortcut text-left" data-director-section="home">
-      <div class="director-shortcut-icon"><i data-lucide="layout-dashboard" style="width:20px;height:20px;"></i></div>
-      <p class="text-sm font-black text-slate-900">Vue globale</p>
-      <p class="text-xs font-semibold text-slate-500">{{ home_alerts_count|default:0 }} alerte(s)</p>
-    </button>
-    <button type="button" class="director-shortcut text-left" data-director-section="academic">
-      <div class="director-shortcut-icon"><i data-lucide="school" style="width:20px;height:20px;"></i></div>
-      <p class="text-sm font-black text-slate-900">Pilotage academique</p>
-      <p class="text-xs font-semibold text-slate-500">{{ total_classes|default:0 }} classe(s)</p>
-    </button>
-    <button type="button" class="director-shortcut text-left" data-director-section="results">
-      <div class="director-shortcut-icon"><i data-lucide="badge-check" style="width:20px;height:20px;"></i></div>
-      <p class="text-sm font-black text-slate-900">Resultats</p>
-      <p class="text-xs font-semibold text-slate-500">{{ ready_to_validate_count|default:0 }} en attente</p>
-    </button>
-    <button type="button" class="director-shortcut text-left" data-director-section="students">
-      <div class="director-shortcut-icon"><i data-lucide="graduation-cap" style="width:20px;height:20px;"></i></div>
-      <p class="text-sm font-black text-slate-900">Etudiants</p>
-      <p class="text-xs font-semibold text-slate-500">Classes et listes</p>
-    </button>
-  </section>
+      <div class="p-3">
+        <form method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="de-nav-btn justify-center border border-white/10 bg-white/10">
+            <i data-lucide="log-out" class="h-5 w-5"></i>
+            <span x-show="!collapsed" x-transition>Deconnexion</span>
+          </button>
+        </form>
+      </div>
+    </aside>
 
-  <div class="relative">
-    <div id="director-loading" class="hidden mb-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">Chargement du workflow directeur...</div>
-    <div
-      id="director-workspace"
-      hx-get="{% url 'accounts_portal:director_workspace' %}?section=home"
-      hx-trigger="load"
-      hx-target="this"
-      hx-swap="innerHTML"
-    >
-    </div>
+    <main class="min-h-screen flex-1 transition-all duration-200" :class="collapsed ? 'ml-[82px]' : 'ml-[280px]'">
+      <div class="mx-auto max-w-7xl px-5 py-6">
+        <header class="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p class="text-[0.72rem] font-black uppercase tracking-[0.16em] text-blue-600" x-text="activeKicker()"></p>
+            <h1 class="mt-1 text-3xl font-black tracking-tight" x-text="activeLabel()"></h1>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" class="de-chip" @click="toggleDarkMode()">
+              <i data-lucide="moon" class="h-4 w-4"></i>
+              Theme
+            </button>
+            <div class="de-chip">
+              <i data-lucide="building-2" class="h-4 w-4"></i>
+              <span>{{ branch.name|default:"Annexe non definie" }}</span>
+            </div>
+            <div class="de-chip de-chip-accent">
+              <i data-lucide="badge-check" class="h-4 w-4"></i>
+              <span>{{ ready_to_validate_count|default:0 }} a valider</span>
+            </div>
+            <div class="relative" @click.outside="profileOpen = false">
+              <button type="button" class="de-chip" @click="profileOpen = !profileOpen">
+                <span class="grid h-7 w-7 place-items-center rounded-full bg-blue-600 text-xs font-black text-white">
+                  {{ request.user.first_name|first|default:request.user.username|first|upper }}
+                </span>
+                <span>{{ request.user.get_full_name|default:request.user.username }}</span>
+              </button>
+              <div x-show="profileOpen" x-transition class="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold text-slate-400">Mon profil</button>
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold text-slate-400">Parametres</button>
+                <form method="post" action="{% url 'accounts:logout' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="block w-full px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50">Deconnexion</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section x-show="activeModule === 'home'" x-transition class="mb-6 space-y-6">
+          <section class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            <template x-for="stat in stats" :key="stat.label">
+              <div class="de-glass rounded-3xl p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5">
+                <div class="flex items-center gap-4">
+                  <div class="flex h-16 w-16 items-center justify-center rounded-3xl" :class="stat.bg">
+                    <i :data-lucide="stat.icon" class="h-8 w-8" :class="stat.color"></i>
+                  </div>
+                  <div>
+                    <p class="text-xs font-extrabold uppercase tracking-wider text-slate-400" x-text="stat.label"></p>
+                    <p class="mt-1 text-3xl font-extrabold" x-text="stat.value"></p>
+                    <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400" x-text="stat.sub"></p>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </section>
+
+          <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_.9fr]">
+            <div class="space-y-6">
+              <div class="de-glass rounded-3xl p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                <div class="mb-5 flex items-center justify-between">
+                  <h3 class="text-lg font-extrabold">Vue workflow des semestres</h3>
+                  <button type="button" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold dark:border-slate-700">{{ branch.name|default:"Annexe" }}</button>
+                </div>
+                <div class="h-[300px]"><canvas id="directorLineChart"></canvas></div>
+              </div>
+
+              <div class="de-glass rounded-3xl p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                <div class="mb-5 flex items-center justify-between">
+                  <h3 class="text-lg font-extrabold">Acces rapides</h3>
+                  <button type="button" class="rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">Actions</button>
+                </div>
+                <div class="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-4">
+                  <template x-for="action in quickActions" :key="action.label">
+                    <button type="button" @click="openModule(action.key)" class="rounded-3xl border border-slate-100 bg-white/70 p-5 text-center transition hover:-translate-y-1 dark:border-slate-800 dark:bg-slate-900/70">
+                      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl" :class="action.bg">
+                        <i :data-lucide="action.icon" class="h-8 w-8" :class="action.color"></i>
+                      </div>
+                      <p class="text-sm font-extrabold" x-text="action.label"></p>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-6">
+              <div class="de-glass rounded-3xl p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                <h3 class="mb-5 text-lg font-extrabold">Repartition par etat</h3>
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-[250px_1fr] xl:grid-cols-1 2xl:grid-cols-[250px_1fr]">
+                  <div class="h-[250px]"><canvas id="directorDonutChart"></canvas></div>
+                  <div class="space-y-4">
+                    <template x-for="level in levels" :key="level.name">
+                      <div class="flex items-center gap-3">
+                        <span class="h-3 w-3 rounded-full" :class="level.dot"></span>
+                        <span class="flex-1 text-sm font-bold" x-text="level.name"></span>
+                        <span class="text-sm font-extrabold" x-text="level.value"></span>
+                        <span class="w-16 text-right text-sm text-slate-400" x-text="level.percent"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <div class="de-glass rounded-3xl p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+                <div class="mb-5 flex items-center justify-between">
+                  <h3 class="text-lg font-extrabold">Alertes prioritaires</h3>
+                  <button type="button" class="rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">{{ assignments_alerts_count|default:0 }} alerte(s)</button>
+                </div>
+                <div class="space-y-4">
+                  <template x-for="alert in alerts" :key="alert.title">
+                    <div class="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                      <div class="flex h-12 w-12 items-center justify-center rounded-2xl" :class="alert.bg">
+                        <i :data-lucide="alert.icon" class="h-5 w-5" :class="alert.color"></i>
+                      </div>
+                      <div class="flex-1">
+                        <p class="text-sm font-extrabold" x-text="alert.title"></p>
+                        <p class="text-xs font-medium text-slate-500 dark:text-slate-400" x-text="alert.sub"></p>
+                      </div>
+                      <span class="text-xs font-bold text-slate-400" x-text="alert.time"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section x-show="activeModule !== 'home'" x-transition>
+          <section
+            id="director-workspace"
+            class="mt-6"
+          >
+            <div class="de-empty">Selectionnez une section pour charger le workflow.</div>
+          </section>
+        </section>
+      </div>
+    </main>
   </div>
 </div>
 
 <script>
-  (function() {
-    var URL_BASE = "{% url 'accounts_portal:director_workspace' %}";
-    var ALLOWED = {
-      home: true,
-      academic: true,
-      teachers: true,
-      assignments: true,
-      results: true,
-      publications: true,
-      stats: true,
-      students: true,
-      settings: true,
+  function directorFlowDashboard() {
+    return {
+      collapsed: false,
+      darkMode: false,
+      profileOpen: false,
+      activeModule: 'home',
+      lineChart: null,
+      donutChart: null,
+      modules: [
+        { key: 'home', label: 'Accueil pilotage', icon: 'home', kicker: 'Vue globale, priorites et acces rapides' },
+        { key: 'operations', label: 'Classes', icon: 'square-mouse-pointer', kicker: 'Choisir une classe puis lancer une action precise' },
+        { key: 'academic', label: 'Planning classe', icon: 'school', kicker: 'Voir la semaine, les semestres et la situation d une classe' },
+        { key: 'teachers', label: 'Enseignants', icon: 'users', kicker: 'Creer, affecter et suivre les enseignants' },
+        { key: 'assignments', label: 'Affectations', icon: 'calendar-days', kicker: 'Couverture, alertes et arbitrages de planning' },
+        { key: 'students', label: 'Listes etudiants', icon: 'graduation-cap', kicker: 'Ouvrir une liste, filtrer et lancer une action' },
+        { key: 'results', label: 'Evaluations & resultats', icon: 'badge-check', kicker: 'Classe -> Semestre -> Controle -> Decision' },
+        { key: 'documents', label: 'Dossiers & transferts', icon: 'folder-kanban', kicker: 'Pieces enseignant, contrats et transferts etudiants' },
+        { key: 'publications', label: 'Releves & publications', icon: 'file-check-2', kicker: 'Editions et diffusion officielle' },
+        { key: 'stats', label: 'Statistiques de pilotage', icon: 'bar-chart-3', kicker: 'Volume, qualite, alertes et tendances' },
+        { key: 'settings', label: 'Parametres', icon: 'settings', kicker: 'Profil, perimetre et configuration du poste' },
+      ],
+      stats: [
+        { label: 'Classes', value: '{{ total_classes|default:0|escapejs }}', sub: 'Classes actives', icon: 'building-2', bg: 'bg-blue-50 dark:bg-blue-950/50', color: 'text-blue-600 dark:text-blue-300' },
+        { label: 'Semestres', value: '{{ total_semesters|default:0|escapejs }}', sub: 'Semestres suivis', icon: 'calendar-days', bg: 'bg-emerald-50 dark:bg-emerald-950/50', color: 'text-emerald-600 dark:text-emerald-300' },
+        { label: 'A valider', value: '{{ ready_to_validate_count|default:0|escapejs }}', sub: 'Decisions en attente', icon: 'badge-check', bg: 'bg-violet-50 dark:bg-violet-950/50', color: 'text-violet-600 dark:text-violet-300' },
+        { label: 'Publies', value: '{{ published_count|default:0|escapejs }}', sub: 'Semestres publies', icon: 'file-check-2', bg: 'bg-orange-50 dark:bg-orange-950/50', color: 'text-orange-600 dark:text-orange-300' },
+      ],
+      alerts: [
+        {% for alert in assignments_alerts|slice:":4" %}
+        { title: '{{ alert.message|default:"Alerte"|escapejs }}', sub: '{{ alert.type|default:"Suivi"|escapejs }}', time: '{{ alert.level|default:"info"|escapejs }}', icon: 'triangle-alert', bg: 'bg-orange-50 dark:bg-orange-950/50', color: 'text-orange-600' }{% if not forloop.last %},{% endif %}
+        {% empty %}
+        { title: 'Aucune alerte prioritaire', sub: '{{ branch.name|default:"Annexe"|escapejs }}', time: 'OK', icon: 'circle-check-big', bg: 'bg-emerald-50 dark:bg-emerald-950/50', color: 'text-emerald-600' }
+        {% endfor %}
+      ],
+      levels: [
+        { name: 'Pretes', value: '{{ results_class_queues.ready|length|default:0|escapejs }}', percent: '', dot: 'bg-blue-500' },
+        { name: 'En cours', value: '{{ results_class_queues.in_progress|length|default:0|escapejs }}', percent: '', dot: 'bg-indigo-400' },
+        { name: 'Rejetees', value: '{{ results_class_queues.rejected|length|default:0|escapejs }}', percent: '', dot: 'bg-orange-400' },
+        { name: 'Publies', value: '{{ published_count|default:0|escapejs }}', percent: '', dot: 'bg-rose-400' },
+      ],
+      quickActions: [
+        { key: 'operations', label: 'Classes', icon: 'square-mouse-pointer', bg: 'bg-sky-50 dark:bg-sky-950/50', color: 'text-sky-600' },
+        { key: 'results', label: 'Resultats', icon: 'badge-check', bg: 'bg-blue-50 dark:bg-blue-950/50', color: 'text-blue-600' },
+        { key: 'academic', label: 'Classes', icon: 'school', bg: 'bg-emerald-50 dark:bg-emerald-950/50', color: 'text-emerald-600' },
+        { key: 'teachers', label: 'Enseignants', icon: 'users', bg: 'bg-violet-50 dark:bg-violet-950/50', color: 'text-violet-600' },
+        { key: 'publications', label: 'Publications', icon: 'database', bg: 'bg-green-50 dark:bg-green-950/50', color: 'text-green-600' },
+      ],
+      init() {
+        this.collapsed = window.localStorage.getItem('director_flow_sidebar') === '1';
+        this.darkMode = window.localStorage.getItem('director_flow_dark') === '1';
+        this.applyTheme();
+        this.levels = this.levels.map((item) => {
+          const total = Math.max(parseInt('{{ total_classes|default:0|escapejs }}', 10) || 0, 1);
+          const rawValue = parseInt(item.value, 10) || 0;
+          return {
+            ...item,
+            percent: total > 0 ? ((rawValue / total) * 100).toFixed(1) + '%' : '0%'
+          };
+        });
+        this.$nextTick(() => {
+          this.renderIcons();
+          this.buildCharts();
+        });
+        document.body.addEventListener('htmx:afterSwap', () => this.renderIcons());
+      },
+      currentModule() {
+        return this.modules.find((item) => item.key === this.activeModule) || this.modules[0];
+      },
+      activeLabel() {
+        return this.currentModule().label;
+      },
+      activeKicker() {
+        return this.currentModule().kicker;
+      },
+      openModule(moduleKey) {
+        this.activeModule = moduleKey;
+        if (moduleKey === 'home') {
+          return;
+        }
+        const url = '{% url "accounts_portal:director_workspace" %}?section=' + encodeURIComponent(moduleKey);
+        if (window.htmx) {
+          window.htmx.ajax('GET', url, '#director-workspace');
+        }
+        this.$nextTick(() => this.renderIcons());
+      },
+      toggleSidebar() {
+        this.collapsed = !this.collapsed;
+        window.localStorage.setItem('director_flow_sidebar', this.collapsed ? '1' : '0');
+      },
+      toggleDarkMode() {
+        this.darkMode = !this.darkMode;
+        window.localStorage.setItem('director_flow_dark', this.darkMode ? '1' : '0');
+        this.applyTheme();
+        this.refreshCharts();
+      },
+      applyTheme() {
+        document.documentElement.classList.toggle('dark', this.darkMode);
+      },
+      renderIcons() {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      },
+      refreshCharts() {
+        window.setTimeout(() => {
+          if (this.lineChart) this.lineChart.destroy();
+          if (this.donutChart) this.donutChart.destroy();
+          this.buildCharts();
+          this.renderIcons();
+        }, 80);
+      },
+      buildCharts() {
+        if (!window.Chart) return;
+
+        const isDark = document.documentElement.classList.contains('dark');
+        const gridColor = isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(148, 163, 184, 0.22)';
+        const textColor = isDark ? '#cbd5e1' : '#64748b';
+
+        const lineCanvas = document.getElementById('directorLineChart');
+        const donutCanvas = document.getElementById('directorDonutChart');
+
+        if (lineCanvas) {
+          this.lineChart = new Chart(lineCanvas, {
+            type: 'line',
+            data: {
+              labels: ['Sans notes', 'En cours', 'A valider', 'A publier', 'Publies'],
+              datasets: [{
+                label: 'Semestres',
+                data: [
+                  parseInt('{{ without_notes|length|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ in_progress|length|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ ready_to_validate_count|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ ready_to_publish|length|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ published_count|default:0|escapejs }}', 10) || 0
+                ],
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                fill: true,
+                tension: 0.42,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', padding: 12, cornerRadius: 12 } },
+              scales: {
+                y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, font: { weight: 600 } } },
+                x: { grid: { display: false }, ticks: { color: textColor, font: { weight: 600 } } }
+              }
+            }
+          });
+        }
+
+        if (donutCanvas) {
+          this.donutChart = new Chart(donutCanvas, {
+            type: 'doughnut',
+            data: {
+              labels: ['Pretes', 'En cours', 'Rejetees', 'Publies'],
+              datasets: [{
+                data: [
+                  parseInt('{{ results_class_queues.ready|length|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ results_class_queues.in_progress|length|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ results_class_queues.rejected|length|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ published_count|default:0|escapejs }}', 10) || 0
+                ],
+                backgroundColor: ['#3b82f6', '#6366f1', '#fb923c', '#fb7185'],
+                borderWidth: 0,
+                cutout: '68%'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', padding: 12, cornerRadius: 12 } }
+            }
+          });
+        }
+      },
     };
-
-    function normalize(section) {
-      if (!section) return 'home';
-      section = String(section).toLowerCase().trim();
-      return ALLOWED[section] ? section : 'home';
-    }
-
-    function currentSectionFromHash() {
-      var raw = window.location.hash ? window.location.hash.replace('#', '') : '';
-      return normalize(raw);
-    }
-
-    function loadWorkspace(section) {
-      section = normalize(section);
-      var url = URL_BASE + "?section=" + encodeURIComponent(section);
-      if (window.htmx) {
-        window.htmx.ajax('GET', url, '#director-workspace');
-      }
-    }
-
-    // HTMX loading indicator + refresh lucide icons after swap
-    document.body.addEventListener('htmx:beforeRequest', function(event) {
-      if (event.detail && event.detail.target && event.detail.target.id === 'director-workspace') {
-        var el = document.getElementById('director-loading');
-        if (el) el.classList.remove('hidden');
-      }
-    });
-
-    document.body.addEventListener('htmx:afterSettle', function(event) {
-      if (event.detail && event.detail.target && event.detail.target.id === 'director-workspace') {
-        var el = document.getElementById('director-loading');
-        if (el) el.classList.add('hidden');
-      }
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-      }
-    });
-
-    // Hash -> workspace (le shell Alpine met a jour le hash via setSection())
-    window.addEventListener('hashchange', function() {
-      loadWorkspace(currentSectionFromHash());
-    });
-
-    // Premier chargement: si hash deja present, on charge la section correspondante.
-    var initial = currentSectionFromHash();
-    if (window.location.hash) {
-      loadWorkspace(initial);
-    }
-  })();
+  }
 </script>
 {% endblock %}

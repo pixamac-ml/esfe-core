@@ -23,6 +23,7 @@ urlpatterns = [
     path("appointment/<int:pk>/complete/", views.appointment_complete, name="appointment_complete"),
     path("visitor/", views.visitor_list, name="visitor_list"),
     path("visitor/create/", views.visitor_create, name="visitor_create"),
+    path("visitor/<int:pk>/complete/", views.visitor_complete, name="visitor_complete"),
     path("document-receipt/", views.document_receipt_list, name="document_receipt_list"),
     path("document-receipt/create/", views.document_receipt_create, name="document_receipt_create"),
     path("document-receipt/<int:pk>/archive/", views.document_receipt_archive, name="document_receipt_archive"),

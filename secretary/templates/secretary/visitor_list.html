@@ -9,7 +9,7 @@
             <h1>Journal des visiteurs</h1>
             <p class="help-text">Historisation des visites et suivi des entrees encore ouvertes.</p>
         </div>
-        <a class="btn btn-primary" href="{% url 'secretary:visitor_create' %}">Nouvelle visite</a>
+        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">Nouvelle visite</button>
     </div>
 
     <form method="get" class="filters">
@@ -31,6 +31,7 @@
                 <th>Arrivee</th>
                 <th>Depart</th>
                 <th>Statut</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -44,9 +45,19 @@
                     <td>{{ visitor.arrived_at|date:"d/m/Y H:i" }}</td>
                     <td>{{ visitor.departed_at|date:"d/m/Y H:i"|default:"-" }}</td>
                     <td><span class="badge">{{ visitor.get_status_display }}</span></td>
+                    <td>
+                        {% if visitor.status != "completed" %}
+                            <form method="post" hx-post="{% url 'secretary:visitor_complete' visitor.id %}" hx-target="body" hx-swap="none">
+                                {% csrf_token %}
+                                <button class="btn" type="submit">Cloturer</button>
+                            </form>
+                        {% else %}
+                            <span class="help-text">Aucune action</span>
+                        {% endif %}
+                    </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="5">Aucune visite.</td></tr>
+                <tr><td colspan="6">Aucune visite.</td></tr>
             {% endfor %}
         </tbody>
     </table>

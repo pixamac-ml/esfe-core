@@ -239,34 +239,79 @@
   .director-inline-table th { font-size: .72rem; text-transform: uppercase; letter-spacing: .14em; color: #64748b; font-weight: 900; }
   .dark .director-inline-table th { color: #94a3b8; }
   .director-inline-actions { display: flex; flex-wrap: wrap; gap: .45rem; justify-content: flex-end; }
-  .director-preview-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-    gap: 1.1rem;
-    align-items: start;
+  .director-preview-grid { display: grid; grid-template-columns: 1fr; gap: 1.1rem; align-items: start; }
+  .director-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(15, 23, 42, .28);
   }
-  .director-drawer-backdrop { display: none; }
-  .director-drawer {
-    position: sticky;
-    top: 1rem;
-    height: auto;
-    width: 100%;
-    background: white;
+  .director-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgba(15, 23, 42, .52);
+  }
+  .director-modal-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+  }
+  .director-modal-panel {
+    width: min(92vw, 980px);
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
     border: 1px solid #dbe3ee;
-    border-radius: 24px;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, .10);
+    border-radius: 28px;
+    background: #fff;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+  }
+  .dark .director-modal-panel {
+    border-color: #334155;
+    background: #0f172a;
+  }
+  .director-global-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 60;
+    height: 100vh;
+    width: 35vw;
+    max-width: 600px;
+    border-left: 1px solid #dbe3ee;
+    background: #fff;
+    box-shadow: -18px 0 40px rgba(15, 23, 42, .12);
+    transition: transform .3s ease, opacity .3s ease;
+  }
+  .dark .director-global-drawer {
+    border-color: #334155;
+    background: #020617;
+  }
+  .director-drawer-body {
+    height: calc(100% - 4.25rem);
+    overflow-y: auto;
     padding: 1.25rem;
   }
-  .dark .director-drawer {
-    background: #020617;
-    border-color: #334155;
+  .director-workspace-shell {
+    transition: padding-right .3s ease;
   }
   @media (max-width: 1024px) {
     .director-grid-2,
     .director-grid-3,
     .director-workflow-split,
     .director-preview-grid { grid-template-columns: 1fr; }
-    .director-drawer { position: relative; top: 0; }
+    .director-global-drawer {
+      width: 100%;
+      max-width: 100%;
+      animation: directorPanelIn .24s ease;
+    }
+  }
+  @keyframes directorPanelIn {
+    from { transform: translateX(18px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
   }
 </style>
 {% endblock %}
@@ -275,10 +320,11 @@
 <div
   x-data="directorFlowDashboard()"
   x-init="init()"
-  x-cloak
-  :class="{ 'dark': darkMode }"
-  class="de-shell"
->
+  @keydown.escape.window="closeDrawer(); closeModal()"
+    x-cloak
+    :class="{ 'dark': darkMode }"
+    class="de-shell"
+  >
   <div class="flex min-h-screen">
     <aside class="de-sidebar fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-200" :class="collapsed ? 'w-[82px]' : 'w-[280px]'">
       <div class="flex h-20 items-center gap-3 px-4">
@@ -452,16 +498,70 @@
           </section>
         </section>
 
-        <section x-show="activeModule !== 'home'" x-transition>
-          <section
-            id="director-workspace"
-            class="mt-6"
-          >
-            <div class="de-empty">Selectionnez une section pour charger le workflow.</div>
+        <section x-show="activeModule !== 'home'" x-transition class="relative">
+          <section class="director-workspace-shell relative mt-6 min-h-[60vh] overflow-hidden" :class="drawerOpen ? 'xl:pr-[35vw]' : ''">
+            <div id="director-workspace" class="relative z-10 h-full overflow-auto transition-all duration-200">
+              <div class="de-empty">Selectionnez une section pour charger le workflow.</div>
+            </div>
           </section>
         </section>
       </div>
     </main>
+  </div>
+
+  <button
+    type="button"
+    x-show="drawerOpen"
+    x-transition.opacity.duration.200ms
+    @click="closeDrawer()"
+    class="director-drawer-backdrop"
+    aria-label="Fermer le panneau"
+  ></button>
+
+  <aside
+    id="director-drawer"
+    x-show="drawerOpen"
+    x-transition:enter="transition-transform duration-300 ease-out"
+    x-transition:enter-start="translate-x-full opacity-0"
+    x-transition:enter-end="translate-x-0 opacity-100"
+    x-transition:leave="transition-transform duration-300 ease-in"
+    x-transition:leave-start="translate-x-0 opacity-100"
+    x-transition:leave-end="translate-x-full opacity-0"
+    class="director-global-drawer"
+  >
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+      <h3 class="text-lg font-extrabold">Details</h3>
+      <button type="button" @click="closeDrawer()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold dark:border-slate-700">Fermer</button>
+    </div>
+    <div id="director-drawer-content" class="director-drawer-body text-sm text-slate-600">
+      <p class="text-sm font-semibold text-slate-500">Selectionnez un element pour afficher les details.</p>
+    </div>
+  </aside>
+
+  <button
+    type="button"
+    x-show="modalOpen"
+    x-transition.opacity.duration.200ms
+    @click="closeModal()"
+    class="director-modal-backdrop"
+    aria-label="Fermer la fenetre"
+  ></button>
+
+  <div
+    id="director-modal"
+    x-show="modalOpen"
+    x-transition.opacity.duration.200ms
+    class="director-modal-shell"
+  >
+    <section class="director-modal-panel">
+      <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+        <h3 class="text-lg font-extrabold">Formulaire</h3>
+        <button type="button" @click="closeModal()" class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-bold dark:border-slate-700">Fermer</button>
+      </div>
+      <div id="director-modal-content" class="p-5 text-sm text-slate-600">
+        <p class="text-sm font-semibold text-slate-500">Selectionnez une action pour ouvrir le formulaire.</p>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -471,6 +571,8 @@
       collapsed: false,
       darkMode: false,
       profileOpen: false,
+      drawerOpen: false,
+      modalOpen: false,
       activeModule: 'home',
       lineChart: null,
       donutChart: null,
@@ -530,6 +632,11 @@
           this.buildCharts();
         });
         document.body.addEventListener('htmx:afterSwap', () => this.renderIcons());
+        window.deOpenDrawer = () => { this.drawerOpen = true; };
+        window.deCloseDrawer = () => { this.closeDrawer(); };
+        window.deOpenModal = () => { this.modalOpen = true; };
+        window.deCloseModal = () => { this.closeModal(); };
+        document.body.addEventListener('director-modal-close', () => this.closeModal());
       },
       currentModule() {
         return this.modules.find((item) => item.key === this.activeModule) || this.modules[0];
@@ -542,6 +649,8 @@
       },
       openModule(moduleKey) {
         this.activeModule = moduleKey;
+        this.closeDrawer();
+        this.closeModal();
         if (moduleKey === 'home') {
           return;
         }
@@ -550,6 +659,20 @@
           window.htmx.ajax('GET', url, '#director-workspace');
         }
         this.$nextTick(() => this.renderIcons());
+      },
+      closeDrawer() {
+        this.drawerOpen = false;
+        const body = document.getElementById('director-drawer-content');
+        if (body) {
+          body.innerHTML = '<p class="text-sm font-semibold text-slate-500">Selectionnez un element pour afficher les details.</p>';
+        }
+      },
+      closeModal() {
+        this.modalOpen = false;
+        const body = document.getElementById('director-modal-content');
+        if (body) {
+          body.innerHTML = '<p class="text-sm font-semibold text-slate-500">Selectionnez une action pour ouvrir le formulaire.</p>';
+        }
       },
       toggleSidebar() {
         this.collapsed = !this.collapsed;

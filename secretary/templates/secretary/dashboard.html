@@ -3,185 +3,391 @@
 {% block title %}Dashboard Secretariat{% endblock %}
 
 {% block content %}
-<section id="dashboard" class="page-header">
-    <div>
-        <h1>Dashboard du secretariat</h1>
-        <p class="help-text">Outil operationnel relie aux donnees reelles du projet.</p>
+<div x-data="secretaryDashboard()" x-init="init()" class="space-y-6">
+  <section class="glass-card secretary-section secretary-section-blue rounded-3xl p-6 shadow-card">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div class="max-w-3xl">
+        <p class="secretary-kicker">Accueil opérationnel</p>
+        <h3 class="mt-1 text-2xl font-extrabold tracking-tight">Secrétariat</h3>
+        <p class="mt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+          Une vue courte pour traiter les flux du jour, garder la trace et ouvrir les formulaires sans quitter le poste.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button type="button" class="secretary-btn secretary-btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+          Nouvelle visite
+        </button>
+        <button type="button" class="secretary-btn secretary-btn-primary" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+          Nouveau rendez-vous
+        </button>
+        <button type="button" class="secretary-btn secretary-btn-primary" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+          Recevoir pièce
+        </button>
+      </div>
     </div>
-</section>
+  </section>
 
-<section class="quick-actions panel">
-    <a class="btn btn-primary" href="#students">Rechercher etudiant</a>
-    <a class="btn btn-primary" href="{% url 'secretary:visitor_create' %}">Enregistrer visite</a>
-    <a class="btn btn-primary" href="{% url 'secretary:appointment_create' %}">Creer rendez-vous</a>
-    <a class="btn btn-primary" href="{% url 'secretary:registry_create' %}">Ajouter registre</a>
-    <a class="btn btn-primary" href="{% url 'secretary:document_receipt_create' %}">Recevoir document</a>
-    <a class="btn btn-primary" href="{% url 'secretary:task_create' %}">Creer tache</a>
-    <button
-        class="btn"
-        hx-get="{% url 'secretary:htmx_auto_assign' %}"
-        hx-target="#auto-assign-result"
-        hx-swap="innerHTML"
-        type="button"
-    >
-        Lancer affectation automatique
-    </button>
-</section>
-
-<div id="auto-assign-result"></div>
-
-<section class="grid grid-stats">
-    <article class="stat-card"><span>Etudiants actifs</span><strong>{{ students_count }}</strong></article>
-    <article class="stat-card"><span>Rendez-vous aujourd'hui</span><strong>{{ appointments_today }}</strong></article>
-    <article class="stat-card"><span>Visites aujourd'hui</span><strong>{{ visits_today }}</strong></article>
-    <article class="stat-card"><span>Visites ouvertes</span><strong>{{ active_visits }}</strong></article>
-    <article class="stat-card"><span>Taches en attente</span><strong>{{ pending_tasks }}</strong></article>
-    <article class="stat-card"><span>Messages non lus</span><strong>{{ messages_count }}</strong></article>
-</section>
-
-<section id="students" class="panel">
-    <div class="page-header"><h2>Etudiants</h2></div>
-    <input
-        type="text"
-        class="secretary-input"
-        placeholder="Matricule, nom, email..."
-        hx-get="{% url 'secretary:htmx_student_results' %}"
-        hx-trigger="keyup changed delay:400ms"
-        hx-target="#student-results"
-        hx-swap="innerHTML"
-        name="q"
-    >
-    <div id="student-results" class="mt-4">
-        {% include "secretary/partials/student_results.html" with students=student_results query=student_query %}
-    </div>
-</section>
-
-<section id="classes" class="panel">
-    <div class="page-header"><h2>Classes</h2></div>
-    <input
-        type="text"
-        class="secretary-input"
-        placeholder="Classe, niveau, programme, annee..."
-        hx-get="{% url 'secretary:htmx_class_results' %}"
-        hx-trigger="keyup changed delay:400ms"
-        hx-target="#class-results"
-        hx-swap="innerHTML"
-        name="q"
-    >
-    <div id="class-results" class="mt-4">
-        {% include "secretary/partials/class_results.html" with classes="" query="" %}
-    </div>
-</section>
-
-<section class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-    <article id="registry" class="panel">
-        <div class="page-header"><h3>Registre</h3><a class="btn" href="{% url 'secretary:registry_list' %}">Voir tout</a></div>
-        <input
-            type="text"
-            class="secretary-input"
-            placeholder="Recherche registre..."
-            hx-get="{% url 'secretary:htmx_registry_results' %}"
-            hx-trigger="keyup changed delay:400ms"
-            hx-target="#registry-results"
-            hx-swap="innerHTML"
-            name="q"
-        >
-        <div id="registry-results" class="mt-4">
-            {% include "secretary/partials/registry_results.html" with entries=recent_registry query="" %}
+  <section class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <template x-for="stat in stats" :key="stat.label">
+      <div class="glass-card rounded-3xl p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft" :class="stat.cardClass">
+        <div class="flex items-center gap-4">
+          <div class="flex h-16 w-16 items-center justify-center rounded-3xl" :class="stat.bg">
+            <i :data-lucide="stat.icon" class="h-8 w-8" :class="stat.color"></i>
+          </div>
+          <div>
+            <p class="text-xs font-extrabold uppercase tracking-wider text-slate-400" x-text="stat.label"></p>
+            <p class="mt-1 text-3xl font-extrabold" x-text="stat.value"></p>
+            <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400" x-text="stat.sub"></p>
+          </div>
         </div>
-    </article>
+      </div>
+    </template>
+  </section>
 
-    <article id="appointments" class="panel">
-        <div class="page-header"><h3>Rendez-vous</h3><a class="btn" href="{% url 'secretary:appointment_list' %}">Voir tout</a></div>
-        <input
-            type="text"
-            class="secretary-input"
-            placeholder="Recherche rendez-vous..."
-            hx-get="{% url 'secretary:htmx_appointment_results' %}"
-            hx-trigger="keyup changed delay:400ms"
-            hx-target="#appointment-results"
-            hx-swap="innerHTML"
-            name="q"
-        >
-        <div id="appointment-results" class="mt-4">
-            {% include "secretary/partials/appointment_results.html" with appointments="" query="" %}
-        </div>
-    </article>
-    
-    <article id="documents" class="panel">
-        <div class="page-header"><h3>Documents</h3><a class="btn" href="{% url 'secretary:document_receipt_list' %}">Voir tout</a></div>
-        <input
-            type="text"
-            class="secretary-input"
-            placeholder="Recherche documents..."
-            hx-get="{% url 'secretary:htmx_document_results' %}"
-            hx-trigger="keyup changed delay:400ms"
-            hx-target="#document-results"
-            hx-swap="innerHTML"
-            name="q"
-        >
-        <div id="document-results" class="mt-4">
-            {% include "secretary/partials/document_results.html" with receipts=recent_documents query="" %}
-        </div>
-    </article>
-
-    <article id="tasks" class="panel">
-        <div class="page-header"><h3>Taches</h3><a class="btn" href="{% url 'secretary:task_list' %}">Voir tout</a></div>
-        <input
-            type="text"
-            class="secretary-input"
-            placeholder="Recherche taches..."
-            hx-get="{% url 'secretary:htmx_task_results' %}"
-            hx-trigger="keyup changed delay:400ms"
-            hx-target="#task-results"
-            hx-swap="innerHTML"
-            name="q"
-        >
-        <div id="task-results" class="mt-4">
-            {% include "secretary/partials/task_results.html" with tasks="" query="" %}
-        </div>
-    </article>
-</section>
-
-<section id="archives" class="panel">
-    <div class="page-header"><h2>Archives</h2></div>
-    <p class="help-text">Les entrees archivees sont conservees en base. Les listes principales affichent par defaut les donnees actives.</p>
-</section>
-
-<section id="messages" class="panel" x-data="{ open: false }">
-    <div class="page-header">
+  <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_.9fr]">
+    <article class="glass-card secretary-section secretary-section-cyan rounded-3xl p-6 shadow-card">
+      <div class="mb-5 flex items-center justify-between">
         <div>
-            <h2>Messages et notifications</h2>
-            <p class="help-text">Adaptation du systeme existant `community` sans recreer de chat parallele.</p>
+          <p class="secretary-kicker">Flux du jour</p>
+          <h3 class="mt-1 text-lg font-extrabold">Files à traiter</h3>
         </div>
-        <button class="btn btn-primary" type="button" @click="open = !open">Ouvrir messages</button>
-    </div>
-    <div class="message-list">
-        {% for notification in notifications %}
-            <div class="message">
-                <strong>{{ notification.get_actor_display_name }}</strong><br>
-                <span class="help-text">{{ notification.get_notification_type_display }} | {{ notification.created_at|date:"d/m/Y H:i" }}</span>
+        <span class="secretary-badge">{{ pending_registry_count|add:pending_documents_count|add:pending_tasks|add:active_visits }} à traiter</span>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Registre</h4>
+          <ul class="space-y-3">
+            {% for entry in pending_registry_rows %}
+              <li class="secretary-list-row">
+                <div class="min-w-0 flex-1">
+                  <strong class="block truncate text-sm font-extrabold">{{ entry.title }}</strong>
+                  <span class="block truncate text-xs font-medium text-slate-500">{{ entry.entry_type }} | {{ entry.get_status_display }} | {{ entry.created_at|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  {% if entry.status != "completed" %}
+                    <form method="post" hx-post="{% url 'secretary:registry_mark_processed' entry.id %}" hx-target="body" hx-swap="none">
+                      {% csrf_token %}
+                      <button class="secretary-btn secretary-btn-primary" type="submit">Traiter</button>
+                    </form>
+                  {% endif %}
+                  {% if not entry.is_archived %}
+                    <form method="post" hx-post="{% url 'secretary:registry_archive' entry.id %}" hx-target="body" hx-swap="none">
+                      {% csrf_token %}
+                      <button class="secretary-btn secretary-btn-secondary" type="submit">Archiver</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </li>
+            {% empty %}
+              <li class="secretary-list-row"><span class="secretary-muted">Aucune entrée de registre à traiter.</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Documents</h4>
+          <ul class="space-y-3">
+            {% for document in pending_documents_rows %}
+              <li class="secretary-list-row">
+                <div class="min-w-0 flex-1">
+                  <strong class="block truncate text-sm font-extrabold">{{ document.title }}</strong>
+                  <span class="block truncate text-xs font-medium text-slate-500">{{ document.submitted_by_name }} | {{ document.get_status_display }} | {{ document.received_at|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  {% if document.file %}
+                    <a class="secretary-btn secretary-btn-secondary" href="{{ document.file.url }}" target="_blank" rel="noopener">Fichier</a>
+                  {% endif %}
+                  {% if not document.is_archived %}
+                    <form method="post" hx-post="{% url 'secretary:document_receipt_archive' document.id %}" hx-target="body" hx-swap="none">
+                      {% csrf_token %}
+                      <button class="secretary-btn secretary-btn-primary" type="submit">Archiver</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </li>
+            {% empty %}
+              <li class="secretary-list-row"><span class="secretary-muted">Aucun document en attente.</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Rendez-vous</h4>
+          <ul class="space-y-3">
+            {% for appointment in today_appointments_rows %}
+              <li class="secretary-list-row">
+                <div class="min-w-0 flex-1">
+                  <strong class="block truncate text-sm font-extrabold">{{ appointment.title }}</strong>
+                  <span class="block truncate text-xs font-medium text-slate-500">{{ appointment.person_name }} | {{ appointment.scheduled_at|date:"d/m/Y H:i" }} | {{ appointment.get_status_display }}</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  {% if appointment.status != "completed" %}
+                    <form method="post" hx-post="{% url 'secretary:appointment_complete' appointment.id %}" hx-target="body" hx-swap="none">
+                      {% csrf_token %}
+                      <button class="secretary-btn secretary-btn-primary" type="submit">Clôturer</button>
+                    </form>
+                  {% endif %}
+                  <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:appointment_list' %}">Liste</a>
+                </div>
+              </li>
+            {% empty %}
+              <li class="secretary-list-row"><span class="secretary-muted">Aucun rendez-vous prévu aujourd’hui.</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Visites</h4>
+          <ul class="space-y-3">
+            {% for visit in open_visits_rows %}
+              <li class="secretary-list-row">
+                <div class="min-w-0 flex-1">
+                  <strong class="block truncate text-sm font-extrabold">{{ visit.full_name }}</strong>
+                  <span class="block truncate text-xs font-medium text-slate-500">{{ visit.reason|default:"-" }} | {{ visit.arrived_at|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <form method="post" hx-post="{% url 'secretary:visitor_complete' visit.id %}" hx-target="body" hx-swap="none">
+                    {% csrf_token %}
+                    <button class="secretary-btn secretary-btn-primary" type="submit">Clôturer</button>
+                  </form>
+                  <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:visitor_list' %}">Liste</a>
+                </div>
+              </li>
+            {% empty %}
+              <li class="secretary-list-row"><span class="secretary-muted">Aucune visite ouverte.</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Tâches</h4>
+          <ul class="space-y-3">
+            {% for task in pending_tasks_rows %}
+              <li class="secretary-list-row">
+                <div class="min-w-0 flex-1">
+                  <strong class="block truncate text-sm font-extrabold">{{ task.title }}</strong>
+                  <span class="block truncate text-xs font-medium text-slate-500">{{ task.get_priority_display }} | {{ task.get_status_display }} | {{ task.due_date|date:"d/m/Y"|default:"-" }}</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  {% if task.status != "completed" %}
+                    <form method="post" hx-post="{% url 'secretary:task_complete' task.id %}" hx-target="body" hx-swap="none">
+                      {% csrf_token %}
+                      <button class="secretary-btn secretary-btn-primary" type="submit">Terminer</button>
+                    </form>
+                  {% endif %}
+                  <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:task_list' %}">Liste</a>
+                </div>
+              </li>
+            {% empty %}
+              <li class="secretary-list-row"><span class="secretary-muted">Aucune tâche prioritaire.</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <aside class="space-y-6">
+      <section class="glass-card secretary-section secretary-section-amber rounded-3xl p-6 shadow-card">
+        <div class="mb-5 flex items-center justify-between">
+          <div>
+            <p class="secretary-kicker">Actions utiles</p>
+            <h3 class="mt-1 text-lg font-extrabold">Bureau du jour</h3>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <button type="button" class="secretary-btn secretary-btn-primary w-full justify-start" hx-get="{% url 'secretary:registry_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            Nouvelle entrée
+          </button>
+          <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:task_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            Nouvelle tâche
+          </button>
+          <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            Nouveau RDV
+          </button>
+          <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            Recevoir pièce
+          </button>
+        </div>
+      </section>
+
+      <section class="glass-card secretary-section secretary-section-emerald rounded-3xl p-6 shadow-card">
+        <div class="mb-5 flex items-center justify-between">
+          <div>
+            <p class="secretary-kicker">Campagne</p>
+            <h3 class="mt-1 text-lg font-extrabold">Admissions</h3>
+          </div>
+          <a href="{% url 'secretary:document_receipt_list' %}" class="secretary-btn secretary-btn-secondary">Pièces</a>
+        </div>
+        <div class="space-y-3">
+          <div class="secretary-list-row">
+            <div>
+              <strong class="block text-sm font-extrabold">Réception des dossiers</strong>
+              <span class="block text-xs font-medium text-slate-500">Enregistrer et rattacher l’étudiant sans doublon.</span>
             </div>
-        {% empty %}
-            <div class="message">Aucune notification recente.</div>
-        {% endfor %}
+          </div>
+          <div class="secretary-list-row">
+            <div>
+              <strong class="block text-sm font-extrabold">Vérification des pièces</strong>
+              <span class="block text-xs font-medium text-slate-500">Contrôler la complétude avant transmission.</span>
+            </div>
+          </div>
+          <div class="secretary-list-row">
+            <div>
+              <strong class="block text-sm font-extrabold">Passerelle admissions</strong>
+              <span class="block text-xs font-medium text-slate-500">Partager les mêmes dossiers avec le tunnel de candidature.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass-card secretary-section secretary-section-slate rounded-3xl p-6 shadow-card">
+        <div class="mb-5 flex items-center justify-between">
+          <div>
+            <p class="secretary-kicker">Navigation</p>
+            <h3 class="mt-1 text-lg font-extrabold">Accès aux listes</h3>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:registry_list' %}">Registre</a>
+          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:appointment_list' %}">Rendez-vous</a>
+          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:visitor_list' %}">Visites</a>
+          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:task_list' %}">Tâches</a>
+          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:document_receipt_list' %}">Documents</a>
+          <a class="secretary-btn secretary-btn-secondary" href="#messages">Messages</a>
+        </div>
+      </section>
+    </aside>
+  </section>
+
+  <section id="messages" class="glass-card secretary-section secretary-section-cyan rounded-3xl p-6 shadow-card" x-data="{ open: false }">
+    <div class="mb-5 flex items-center justify-between">
+      <div>
+        <p class="secretary-kicker">Messages</p>
+        <h3 class="mt-1 text-lg font-extrabold">Notifications récentes</h3>
+      </div>
+      <button class="secretary-btn secretary-btn-primary" type="button" @click="open = !open">Ouvrir messages</button>
+    </div>
+    <div class="space-y-3">
+      {% for notification in notifications|slice:":4" %}
+        <div class="secretary-list-row">
+          <div>
+            <strong class="block text-sm font-extrabold">{{ notification.get_actor_display_name }}</strong>
+            <span class="block text-xs font-medium text-slate-500">{{ notification.get_notification_type_display }} | {{ notification.created_at|date:"d/m/Y H:i" }}</span>
+          </div>
+        </div>
+      {% empty %}
+        <div class="secretary-list-row"><span class="secretary-muted">Aucune notification récente.</span></div>
+      {% endfor %}
     </div>
 
-    <div class="drawer" x-show="open" x-transition>
-        <div class="panel chat-bubble">
-            <div class="page-header">
-                <h3>Messages recents</h3>
-                <button class="btn" type="button" @click="open = false">Fermer</button>
-            </div>
-            <div
-                hx-get="{% url 'secretary:htmx_messages_panel' %}"
-                hx-trigger="load"
-                hx-target="this"
-                hx-swap="innerHTML"
-            >
-                Chargement...
-            </div>
+    <div class="fixed bottom-5 right-5 z-40 w-[360px] max-w-[calc(100vw-2rem)]" x-show="open" x-transition>
+      <div class="glass-card rounded-3xl p-5 shadow-card">
+        <div class="mb-4 flex items-center justify-between">
+          <h4 class="text-base font-extrabold">Messages récents</h4>
+          <button class="secretary-btn secretary-btn-secondary" type="button" @click="open = false">Fermer</button>
         </div>
+        <div hx-get="{% url 'secretary:htmx_messages_panel' %}" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+          Chargement...
+        </div>
+      </div>
     </div>
-</section>
+  </section>
+</div>
+
+<script>
+  function secretaryDashboard() {
+    return {
+      lineChart: null,
+      donutChart: null,
+      stats: [
+        { label: 'Registre', value: '{{ pending_registry_count|default:0|escapejs }}', sub: 'En attente', icon: 'book-copy', bg: 'bg-sky-50 dark:bg-sky-950/50', color: 'text-sky-600 dark:text-sky-300', cardClass: 'stat-card-accent-blue' },
+        { label: 'Documents', value: '{{ pending_documents_count|default:0|escapejs }}', sub: 'À classer', icon: 'file-signature', bg: 'bg-amber-50 dark:bg-amber-950/50', color: 'text-amber-600 dark:text-amber-300', cardClass: 'stat-card-accent-amber' },
+        { label: 'Rendez-vous', value: '{{ appointments_today|default:0|escapejs }}', sub: 'Du jour', icon: 'calendar-check-2', bg: 'bg-emerald-50 dark:bg-emerald-950/50', color: 'text-emerald-600 dark:text-emerald-300', cardClass: 'stat-card-accent-emerald' },
+        { label: 'Visites', value: '{{ active_visits|default:0|escapejs }}', sub: 'Ouvertes', icon: 'user-round-search', bg: 'bg-violet-50 dark:bg-violet-950/50', color: 'text-violet-600 dark:text-violet-300', cardClass: 'stat-card-accent-violet' },
+      ],
+      init() {
+        this.$nextTick(() => {
+          this.renderIcons();
+          this.buildCharts();
+        });
+        document.body.addEventListener('htmx:afterSwap', () => this.renderIcons());
+      },
+      renderIcons() {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      },
+      buildCharts() {
+        if (!window.Chart) return;
+
+        const isDark = document.documentElement.classList.contains('dark');
+        const gridColor = isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(148, 163, 184, 0.22)';
+        const textColor = isDark ? '#cbd5e1' : '#64748b';
+
+        const lineCanvas = document.getElementById('secretaryLineChart');
+        const donutCanvas = document.getElementById('secretaryDonutChart');
+
+        if (lineCanvas) {
+          this.lineChart = new Chart(lineCanvas, {
+            type: 'line',
+            data: {
+              labels: ['Ouverture', 'Matin', 'Midi', 'Après-midi', 'Soir'],
+              datasets: [{
+                label: 'Flux',
+                data: [
+                  parseInt('{{ appointments_today|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ visits_today|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ active_visits|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ pending_tasks|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ messages_count|default:0|escapejs }}', 10) || 0
+                ],
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                fill: true,
+                tension: 0.42,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', padding: 12, cornerRadius: 12 } },
+              scales: {
+                y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, font: { weight: 600 } } },
+                x: { grid: { display: false }, ticks: { color: textColor, font: { weight: 600 } } }
+              }
+            }
+          });
+        }
+
+        if (donutCanvas) {
+          this.donutChart = new Chart(donutCanvas, {
+            type: 'doughnut',
+            data: {
+              labels: ['Documents', 'Rendez-vous', 'Visites', 'Tâches'],
+              datasets: [{
+                data: [
+                  parseInt('{{ pending_documents_count|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ appointments_today|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ active_visits|default:0|escapejs }}', 10) || 0,
+                  parseInt('{{ pending_tasks|default:0|escapejs }}', 10) || 0
+                ],
+                backgroundColor: ['#2563eb', '#0ea5e9', '#14b8a6', '#f59e0b'],
+                borderWidth: 0,
+                cutout: '68%'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', padding: 12, cornerRadius: 12 } }
+            }
+          });
+        }
+      }
+    };
+  }
+</script>
 {% endblock %}

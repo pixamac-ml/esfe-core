@@ -9,7 +9,7 @@
             <h1>Registre administratif</h1>
             <p class="help-text">Suivi traceable des demandes et dossiers.</p>
         </div>
-        <a class="btn btn-primary" href="{% url 'secretary:registry_create' %}">Nouvelle entree</a>
+        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">Nouvelle entree</button>
     </div>
 
     <form method="get" class="filters">
@@ -46,10 +46,16 @@
                     <td>
                         <div class="actions">
                             {% if entry.status != "completed" %}
-                                <a class="btn" href="{% url 'secretary:registry_mark_processed' entry.id %}">Marquer traite</a>
+                                <form method="post" hx-post="{% url 'secretary:registry_mark_processed' entry.id %}" hx-target="body" hx-swap="none">
+                                    {% csrf_token %}
+                                    <button class="btn" type="submit">Marquer traite</button>
+                                </form>
                             {% endif %}
                             {% if not entry.is_archived %}
-                                <a class="btn btn-danger" href="{% url 'secretary:registry_archive' entry.id %}">Archiver</a>
+                                <form method="post" hx-post="{% url 'secretary:registry_archive' entry.id %}" hx-target="body" hx-swap="none">
+                                    {% csrf_token %}
+                                    <button class="btn btn-danger" type="submit">Archiver</button>
+                                </form>
                             {% endif %}
                         </div>
                     </td>

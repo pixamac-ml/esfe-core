@@ -1,0 +1,63 @@
+<div class="grid gap-4">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <p class="portal-section-kicker">Creation</p>
+      <h3 class="mt-1 text-xl font-black text-slate-900">Nouvel enseignant</h3>
+      <p class="mt-1 text-sm font-semibold text-slate-500">Le compte, les affectations et le contrat sont créés ensemble.</p>
+    </div>
+    <button type="button" class="director-btn director-btn-secondary" onclick="window.deCloseModal && window.deCloseModal()">Fermer</button>
+  </div>
+
+  <form class="grid gap-4" method="post" hx-post="{% url 'accounts_portal:director_teacher_create' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+    {% csrf_token %}
+    <div class="director-grid-3">
+      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Nom
+        <input type="text" name="last_name" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none" required>
+      </label>
+      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Prenom
+        <input type="text" name="first_name" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none" required>
+      </label>
+      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Email
+        <input type="email" name="email" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none" required>
+      </label>
+    </div>
+
+    <div class="director-grid-2">
+      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Telephone
+        <input type="text" name="phone" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none" placeholder="+223 ...">
+      </label>
+      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Specialite
+        <input type="text" name="specialty" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none" placeholder="Sciences infirmieres, anglais...">
+      </label>
+    </div>
+
+    <div class="director-grid-2">
+      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Classes à affecter
+        <select name="class_ids" multiple class="min-h-[180px] rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+          {% for academic_class in teacher_form_classes %}
+            <option value="{{ academic_class.id }}">{{ academic_class.display_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Matières à affecter
+        <select name="ec_ids" multiple class="min-h-[180px] rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+          {% for ec in teacher_form_ecs %}
+            <option value="{{ ec.id }}">{{ ec.title }} - {{ ec.ue.semester.academic_class.display_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="submit" class="director-btn director-btn-primary">Créer l'enseignant</button>
+      <span class="text-xs font-semibold text-slate-500">Le compte, les accès et le contrat sont générés automatiquement.</span>
+    </div>
+  </form>
+</div>

@@ -7,8 +7,10 @@ from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, 
 from .selectors import (
     get_active_students,
     get_active_visits_queryset,
+    get_documents_queryset,
     get_recent_documents_queryset,
     get_recent_registry_entries,
+    get_registry_queryset,
     search_classes,
     get_student_active_enrollment,
     get_student_snapshot_queryset,
@@ -231,6 +233,20 @@ def get_secretary_dashboard_data(user):
     today_visits = get_today_visits()
     active_visits = get_active_visits()
     pending_tasks = get_pending_tasks()
+    pending_registry_rows = get_registry_queryset(
+        {
+            "status": RegistryEntry.STATUS_PENDING,
+            "archived": False,
+            "active_only": True,
+        }
+    )[:5]
+    pending_documents_rows = get_documents_queryset(
+        {
+            "status": DocumentReceipt.STATUS_PENDING,
+            "archived": False,
+            "active_only": True,
+        }
+    )[:5]
 
     return {
         "students_count": active_students.count(),
@@ -238,6 +254,26 @@ def get_secretary_dashboard_data(user):
         "visits_today": today_visits.count(),
         "active_visits": active_visits.count(),
         "pending_tasks": pending_tasks.count(),
+        "pending_registry_count": get_registry_queryset(
+            {
+                "status": RegistryEntry.STATUS_PENDING,
+                "archived": False,
+                "active_only": True,
+            }
+        ).count(),
+        "pending_documents_count": get_documents_queryset(
+            {
+                "status": DocumentReceipt.STATUS_PENDING,
+                "archived": False,
+                "active_only": True,
+            }
+        ).count(),
+        "today_appointments_rows": today_appointments[:5],
+        "today_visits_rows": today_visits[:5],
+        "open_visits_rows": active_visits[:5],
+        "pending_tasks_rows": pending_tasks[:5],
+        "pending_registry_rows": pending_registry_rows,
+        "pending_documents_rows": pending_documents_rows,
         "recent_registry": get_recent_registry_entries(limit=5),
         "recent_documents": get_recent_documents(limit=5),
         "messages_count": get_secretary_unread_messages(user),

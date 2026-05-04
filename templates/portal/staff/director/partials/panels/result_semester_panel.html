@@ -1,0 +1,101 @@
+<div class="space-y-4">
+  <div class="grid gap-3 md:grid-cols-3">
+    <div class="director-kpi-card">
+      <p class="director-kpi-label">Semestre</p>
+      <p class="director-kpi-value text-base">{{ selected_semester.number }}</p>
+    </div>
+    <div class="director-kpi-card">
+      <p class="director-kpi-label">Notes saisies</p>
+      <p class="director-kpi-value text-base">{{ selected_semester_row.entered }}/{{ selected_semester_row.expected }}</p>
+    </div>
+    <div class="director-kpi-card">
+      <p class="director-kpi-label">Etat</p>
+      <p class="director-kpi-value text-base">{{ selected_semester.get_status_display }}</p>
+    </div>
+  </div>
+
+  <div class="director-workflow-card">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p class="portal-section-kicker">Decision directe</p>
+        <h4 class="mt-1 text-lg font-black text-slate-900">{{ result_panel_title }}</h4>
+        <p class="mt-1 text-sm font-semibold text-slate-500">{{ result_panel_subtitle }}</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on="htmx:afterRequest: window.deCloseDrawer && window.deCloseDrawer()">
+          {% csrf_token %}
+          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+          <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+          <input type="hidden" name="action" value="validate">
+          <button class="director-btn director-btn-primary {% if not selected_semester_row.can_validate %}opacity-40{% endif %}" {% if not selected_semester_row.can_validate %}disabled{% endif %}>Valider</button>
+        </form>
+        <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on="htmx:afterRequest: window.deCloseDrawer && window.deCloseDrawer()">
+          {% csrf_token %}
+          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+          <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+          <input type="hidden" name="action" value="reject">
+          <button class="director-btn director-btn-secondary border-rose-200 bg-rose-50 text-rose-700">Rejeter</button>
+        </form>
+        <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on="htmx:afterRequest: window.deCloseDrawer && window.deCloseDrawer()">
+          {% csrf_token %}
+          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+          <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+          <input type="hidden" name="action" value="publish">
+          <button class="director-btn director-btn-secondary {% if not selected_semester_row.can_publish %}opacity-40{% endif %}" {% if not selected_semester_row.can_publish %}disabled{% endif %}>Publier</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% if selected_class_rows %}
+    <div class="director-workflow-card">
+      <p class="portal-section-kicker">Autres semestres de la classe</p>
+      <div class="mt-4 flex flex-wrap gap-2">
+        {% for row in selected_class_rows %}
+          <button type="button" class="rounded-full border px-3 py-2 text-xs font-bold transition {% if selected_semester_row and row.semester.id == selected_semester_row.semester.id %}border-blue-300 bg-blue-50 text-blue-700{% else %}border-slate-200 bg-white text-slate-700 hover:bg-slate-50{% endif %}" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=result&class_id={{ selected_class.id }}&semester_id={{ row.semester.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.deOpenDrawer && window.deOpenDrawer()">
+            S{{ row.semester.number }} - {{ row.state }}
+          </button>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if result_summary %}
+    <div class="grid gap-3 md:grid-cols-4">
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Etudiants</p>
+        <p class="director-kpi-value">{{ result_summary.student_count }}</p>
+      </div>
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Complets</p>
+        <p class="director-kpi-value">{{ result_summary.completed_students }}</p>
+      </div>
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Bloques</p>
+        <p class="director-kpi-value">{{ result_summary.blocked_students }}</p>
+      </div>
+      <div class="director-kpi-card">
+        <p class="director-kpi-label">Moyenne classe</p>
+        <p class="director-kpi-value">{{ result_summary.class_average }}</p>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="director-workflow-card">
+    <p class="portal-section-kicker">Signaux</p>
+    <h4 class="mt-1 text-lg font-black text-slate-900">Points a traiter</h4>
+    <div class="mt-4 director-workflow-list">
+      {% for anomaly in result_anomalies %}
+        <article>
+          <div>
+            <strong>{{ anomaly.student }}</strong>
+            <span>{{ anomaly.message }}</span>
+          </div>
+          <span class="rounded-full px-3 py-1 text-xs font-bold {% if anomaly.level == 'blocking' %}bg-rose-50 text-rose-700{% else %}bg-amber-50 text-amber-700{% endif %}">{{ anomaly.level }}</span>
+        </article>
+      {% empty %}
+        <div class="director-empty">Aucune anomalie detectee sur ce semestre.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

@@ -507,14 +507,12 @@ def _build_director_workspace_context(request, *, toast=None):
     teacher_load_map = schedule_stats.get("teacher_load") or {}
     class_load_map = schedule_stats.get("class_load") or {}
     teacher_q = (request.GET.get("teacher_q") or request.POST.get("teacher_q") or "").strip()
-    teacher_form_open = (request.GET.get("teacher_form") or request.POST.get("teacher_form") or "").strip() in {"1", "true", "open"}
     teacher_context = build_director_teacher_assignment_context(
         branch=branch,
         schedule_stats=schedule_stats,
         teacher_q=teacher_q,
     )
     teacher_rows = teacher_context["teacher_rows"]
-    teacher_creation = request.session.pop("director_teacher_creation", None)
 
     class_load_items = sorted(
         (class_load_map or {}).items(),
@@ -752,8 +750,6 @@ def _build_director_workspace_context(request, *, toast=None):
         "teacher_unassigned_count": teacher_context["teacher_unassigned_count"],
         "teacher_assigned_count": teacher_context["teachers_total"] - teacher_context["teacher_unassigned_count"],
         "teacher_q": teacher_q,
-        "teacher_form_open": teacher_form_open or bool(teacher_creation),
-        "teacher_creation": teacher_creation,
         "teacher_form_classes": class_rows,
         "teacher_form_ecs": teacher_form_ecs,
         "selected_semester": selected_semester,
@@ -764,8 +760,23 @@ def _build_director_workspace_context(request, *, toast=None):
         "selected_class_student_count": selected_class_student_count,
         "selected_class_schedule": selected_class_schedule,
         "selected_student_entry": selected_student_entry,
+        "result_panel_title": (
+            f"{selected_class.display_name} · Semestre {selected_semester.number}"
+            if selected_class is not None and selected_semester is not None
+            else "Validation semestre"
+        ),
+        "result_panel_subtitle": (
+            f"{selected_semester_row['entered']}/{selected_semester_row['expected']} notes · {selected_semester.get_status_display()}"
+            if selected_semester_row is not None and selected_semester is not None
+            else "Verifier les anomalies puis decider."
+        ),
         "operation_class_rows": classroom_ops_context["operation_class_rows"],
         "selected_operation_class": classroom_ops_context["selected_operation_class"],
+        "selected_operation_class_id": (
+            classroom_ops_context["selected_operation_class"]["class"].id
+            if classroom_ops_context["selected_operation_class"]
+            else None
+        ),
         "student_q": student_q,
         "assignments_alerts": assignments_alerts,
         "assignments_alerts_count": len(assignments_alerts),
@@ -785,6 +796,11 @@ def _build_director_workspace_context(request, *, toast=None):
         "result_table_rows": result_table_rows,
         "result_anomalies": result_anomalies,
         "result_summary": result_summary,
+        "student_panel_subtitle": (
+            f"{selected_student_entry['matricule']} · {selected_student_entry['email']}"
+            if selected_student_entry is not None
+            else "Fiche etudiant"
+        ),
     }
     if toast:
         context["toast"] = toast
@@ -795,6 +811,43 @@ def _build_director_workspace_context(request, *, toast=None):
 def director_workspace(request):
     context = _build_director_workspace_context(request)
     return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_drawer(request):
+    panel = (request.GET.get("panel") or "").strip().lower()
+    section_map = {
+        "operation": "operations",
+        "result": "results",
+        "student": "students",
+    }
+    template_map = {
+        "operation": "portal/staff/director/partials/drawers/operation_drawer.html",
+        "result": "portal/staff/director/partials/drawers/result_drawer.html",
+        "student": "portal/staff/director/partials/drawers/student_drawer.html",
+    }
+    section = section_map.get(panel)
+    template_name = template_map.get(panel)
+    if not section or not template_name:
+        return HttpResponseBadRequest("Panneau introuvable.")
+
+    original_get = request.GET
+    params = request.GET.copy()
+    params["section"] = section
+    request.GET = params
+    try:
+        context = _build_director_workspace_context(request)
+    finally:
+        request.GET = original_get
+
+    if panel == "operation" and not context.get("selected_operation_class"):
+        return HttpResponseBadRequest("Classe introuvable.")
+    if panel == "result" and not context.get("selected_semester_row"):
+        return HttpResponseBadRequest("Semestre introuvable.")
+    if panel == "student" and not context.get("selected_student_entry"):
+        return HttpResponseBadRequest("Etudiant introuvable.")
+
+    return render(request, template_name, context)
 
 
 @_position_required({"director_of_studies", "executive_director", "super_admin"})
@@ -848,12 +901,24 @@ def director_results_action(request):
 
 @_position_required({"director_of_studies", "executive_director", "super_admin"})
 def director_teacher_create(request):
+    branch = _resolve_academic_branch(request)
+    base_context = _build_director_workspace_context(request)
+
+    if request.method == "GET":
+        return render(
+            request,
+            "portal/staff/director/modals/teacher_create_modal.html",
+            {
+                **base_context,
+                "teacher_form_classes": base_context.get("teacher_form_classes", []),
+                "teacher_form_ecs": base_context.get("teacher_form_ecs", []),
+            },
+        )
+
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
     toast = {"level": "error", "message": "Creation impossible."}
-    request.session.pop("director_teacher_creation", None)
 
     try:
         validate_email((request.POST.get("email") or "").strip())
@@ -869,22 +934,22 @@ def director_teacher_create(request):
             },
             request.user,
         )
-        request.session["director_teacher_creation"] = {
-            "teacher_id": creation.teacher.id,
-            "teacher_name": creation.teacher.get_full_name() or creation.teacher.username,
-            "username": creation.username,
-            "password": creation.password,
-            "class_labels": creation.class_labels,
-            "ec_labels": creation.ec_labels,
-            "email_sent": creation.email_sent,
-        }
         toast = {"level": "success", "message": "Enseignant cree, affecte et acces generes."}
+        response = render(
+            request,
+            "portal/staff/director/partials/workspace.html",
+            {
+                **_build_director_workspace_context(request, toast=toast),
+                "section": "teachers",
+            },
+        )
+        response["HX-Trigger"] = "director-modal-close"
+        return response
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Creation impossible."}
 
     context = _build_director_workspace_context(request, toast=toast)
     context["section"] = "teachers"
-    context["teacher_form_open"] = True
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
@@ -914,12 +979,27 @@ def director_teacher_contract_download(request, teacher_id: int):
 
 @_position_required({"director_of_studies", "executive_director", "super_admin"})
 def director_teacher_document_upload(request):
+    base_context = _build_director_workspace_context(request)
+    teacher_id_raw = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
+    teacher_id = int(teacher_id_raw) if teacher_id_raw.isdigit() else None
+
+    if request.method == "GET":
+        return render(
+            request,
+            "portal/staff/director/modals/teacher_document_upload_modal.html",
+            {
+                **base_context,
+                "selected_document_teacher": next(
+                    (teacher for teacher in base_context.get("document_teacher_rows", []) if teacher.id == teacher_id),
+                    base_context.get("selected_document_teacher"),
+                ),
+                "teacher_document_type_choices": base_context.get("teacher_document_type_choices", []),
+            },
+        )
     if request.method != "POST":
         return _deny_portal_access(request)
 
     toast = {"level": "error", "message": "Upload impossible."}
-    teacher_id_raw = (request.POST.get("teacher_id") or "").strip()
-    teacher_id = int(teacher_id_raw) if teacher_id_raw.isdigit() else None
 
     try:
         if teacher_id is None:
@@ -932,6 +1012,16 @@ def director_teacher_document_upload(request):
             note=request.POST.get("note"),
         )
         toast = {"level": "success", "message": "Piece enseignant televersee."}
+        response = render(
+            request,
+            "portal/staff/director/partials/workspace.html",
+            {
+                **_build_director_workspace_context(request, toast=toast),
+                "section": "documents",
+            },
+        )
+        response["HX-Trigger"] = "director-modal-close"
+        return response
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Upload impossible."}
 
@@ -942,6 +1032,18 @@ def director_teacher_document_upload(request):
 
 @_position_required({"director_of_studies", "executive_director", "super_admin"})
 def director_transfer_create(request):
+    base_context = _build_director_workspace_context(request)
+    if request.method == "GET":
+        return render(
+            request,
+            "portal/staff/director/modals/transfer_create_modal.html",
+            {
+                **base_context,
+                "transfer_enrollments": base_context.get("transfer_enrollments", []),
+                "transfer_target_classes": base_context.get("transfer_target_classes", []),
+                "transfer_type_choices": base_context.get("transfer_type_choices", []),
+            },
+        )
     if request.method != "POST":
         return _deny_portal_access(request)
 
@@ -961,6 +1063,16 @@ def director_transfer_create(request):
             attachment=request.FILES.get("attachment"),
         )
         toast = {"level": "success", "message": "Demande de transfert enregistree."}
+        response = render(
+            request,
+            "portal/staff/director/partials/workspace.html",
+            {
+                **_build_director_workspace_context(request, toast=toast),
+                "section": "documents",
+            },
+        )
+        response["HX-Trigger"] = "director-modal-close"
+        return response
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Creation du transfert impossible."}
 

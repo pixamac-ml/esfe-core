@@ -1,262 +1,580 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Secretariat{% endblock %}</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <style>
-        :root {
-            --bg: #f4f7fb;
-            --surface: #ffffff;
-            --line: #d7dfeb;
-            --text: #132033;
-            --muted: #5c6b82;
-            --accent: #0f766e;
-            --accent-soft: #dff5f2;
-            --danger: #b42318;
-            --warning: #b54708;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Secretariat{% endblock %}</title>
+
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'Segoe UI', 'Arial', 'sans-serif'],
+          },
+          boxShadow: {
+            soft: '0 18px 45px rgba(15, 23, 42, 0.08)',
+            card: '0 10px 30px rgba(15, 23, 42, 0.06)',
+          }
         }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: "Segoe UI", sans-serif;
-            background: linear-gradient(180deg, #eef4fb 0%, var(--bg) 100%);
-            color: var(--text);
-        }
-        .layout {
-            max-width: 1180px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-        .topbar, .panel, .stat-card {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: 16px;
-            box-shadow: 0 14px 35px rgba(17, 24, 39, 0.06);
-        }
-        .topbar {
-            display: flex;
-            gap: 12px;
-            justify-content: space-between;
-            align-items: center;
-            padding: 18px 22px;
-            margin-bottom: 22px;
-        }
-        .nav {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .tabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin: 0 0 20px;
-        }
-        .tab-link {
-            padding: 10px 14px;
-            border-radius: 999px;
-            background: #fff;
-            border: 1px solid var(--line);
-            text-decoration: none;
-            color: var(--text);
-            font-weight: 600;
-        }
-        .nav a, .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 10px 14px;
-            border-radius: 10px;
-            border: 1px solid var(--line);
-            background: #fff;
-            color: var(--text);
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .btn-primary {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: #fff;
-        }
-        .btn-danger {
-            color: var(--danger);
-        }
-        .panel {
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 18px;
-        }
-        .page-header h1, .page-header h2, .page-header h3 {
-            margin: 0;
-        }
-        .grid {
-            display: grid;
-            gap: 16px;
-        }
-        .grid-stats {
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            margin-bottom: 20px;
-        }
-        .stat-card {
-            padding: 18px;
-        }
-        .stat-card strong {
-            display: block;
-            font-size: 30px;
-            margin-top: 8px;
-        }
-        .filters {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px;
-            margin-bottom: 18px;
-        }
-        .secretary-input {
-            width: 100%;
-            border: 1px solid var(--line);
-            border-radius: 10px;
-            padding: 10px 12px;
-            background: #fff;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            text-align: left;
-            padding: 12px 10px;
-            border-bottom: 1px solid #ebf0f6;
-            vertical-align: top;
-        }
-        th {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: var(--muted);
-        }
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 5px 10px;
-            border-radius: 999px;
-            background: var(--accent-soft);
-            color: var(--accent);
-            font-size: 12px;
-            font-weight: 700;
-        }
-        .actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .list-inline {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            display: grid;
-            gap: 10px;
-        }
-        .list-inline li {
-            border: 1px solid #edf2f7;
-            border-radius: 12px;
-            padding: 12px;
-            background: #fbfdff;
-        }
-        .pagination {
-            display: flex;
-            gap: 8px;
-            margin-top: 16px;
-            align-items: center;
-        }
-        .message-list {
-            display: grid;
-            gap: 10px;
-        }
-        .message {
-            padding: 12px;
-            border-radius: 12px;
-            border: 1px solid #edf2f7;
-            background: #fcfdff;
-        }
-        .chat-bubble {
-            background: #f7fbff;
-            border-left: 4px solid var(--accent);
-        }
-        .help-text {
-            color: var(--muted);
-            font-size: 14px;
-            margin-top: 6px;
-        }
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-            gap: 12px;
-        }
-        .drawer {
-            position: fixed;
-            right: 16px;
-            bottom: 16px;
-            width: min(360px, calc(100vw - 32px));
-            z-index: 40;
-        }
-        @media (max-width: 720px) {
-            .layout { padding: 16px; }
-            .topbar, .page-header { flex-direction: column; align-items: flex-start; }
-            table, thead, tbody, tr, th, td { display: block; }
-            thead { display: none; }
-            td { padding: 8px 0; }
-        }
-    </style>
+      }
+    };
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    * { box-sizing: border-box; }
+    body { font-family: Inter, system-ui, sans-serif; }
+    [x-cloak] { display: none !important; }
+
+    .sidebar-gradient {
+      background: linear-gradient(180deg, #082f49 0%, #0f3459 48%, #082f49 100%);
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(226, 232, 240, 0.85);
+    }
+
+    .dark .glass-card {
+      background: rgba(15, 23, 42, 0.82);
+      border-color: rgba(51, 65, 85, 0.8);
+    }
+
+    .nav-active {
+      background: linear-gradient(135deg, #0ea5e9, #14b8a6);
+      color: white;
+      box-shadow: 0 14px 24px rgba(14, 165, 233, 0.24);
+    }
+
+    .scrollbar-thin::-webkit-scrollbar { width: 7px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.45); border-radius: 999px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+
+    .secretary-shell {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(14, 165, 233, 0.10), transparent 24%),
+        linear-gradient(180deg, #f8fafc 0%, #eef4fb 100%);
+    }
+
+    .dark .secretary-shell {
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 24%),
+        linear-gradient(180deg, #020617 0%, #0f172a 100%);
+    }
+
+    .secretary-list-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      background: rgba(255, 255, 255, 0.76);
+      border-radius: 18px;
+      padding: 14px 16px;
+    }
+
+    .dark .secretary-list-row {
+      border-color: rgba(51, 65, 85, 0.85);
+      background: rgba(15, 23, 42, 0.76);
+    }
+
+    .secretary-kicker {
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 0.72rem;
+      font-weight: 900;
+      color: #2563eb;
+    }
+
+    .secretary-muted {
+      color: #64748b;
+    }
+
+    .dark .secretary-muted,
+    .dark .help-text {
+      color: #94a3b8;
+    }
+
+    .secretary-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-height: 44px;
+      border-radius: 14px;
+      padding: 0.72rem 1rem;
+      font-size: 0.88rem;
+      font-weight: 900;
+      transition: 0.16s ease;
+      border: 1px solid transparent;
+    }
+
+    .secretary-btn:hover { transform: translateY(-1px); }
+    .secretary-btn-primary {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      box-shadow: 0 14px 24px rgba(37, 99, 235, 0.22);
+    }
+    .secretary-btn-secondary {
+      border-color: #cbd5e1;
+      background: white;
+      color: #334155;
+    }
+    .dark .secretary-btn-secondary {
+      border-color: #475569;
+      background: #020617;
+      color: #e2e8f0;
+    }
+
+    .secretary-input {
+      width: 100%;
+      border: 1px solid #d7dfeb;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.96);
+      color: #132033;
+      outline: none;
+    }
+    .dark .secretary-input {
+      border-color: #475569;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .secretary-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-height: 38px;
+      border-radius: 999px;
+      padding: 0.45rem 0.8rem;
+      border: 1px solid #dbe3ee;
+      background: white;
+      color: #334155;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .secretary-panel {
+      border: 1px solid #e2e8f0;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    .dark .secretary-panel {
+      border-color: #334155;
+      background: rgba(15,23,42,0.82);
+    }
+
+    .secretary-section {
+      border-top: 4px solid #2563eb;
+    }
+    .secretary-section-blue { border-top-color: #2563eb; }
+    .secretary-section-cyan { border-top-color: #0ea5e9; }
+    .secretary-section-teal { border-top-color: #14b8a6; }
+    .secretary-section-violet { border-top-color: #8b5cf6; }
+    .secretary-section-amber { border-top-color: #f59e0b; }
+    .secretary-section-emerald { border-top-color: #10b981; }
+    .secretary-section-rose { border-top-color: #f43f5e; }
+    .secretary-section-slate { border-top-color: #64748b; }
+
+    .panel {
+      border: 1px solid #e2e8f0;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .dark .panel {
+      border-color: #334155;
+      background: rgba(15,23,42,0.82);
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid-stats {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      border: 1px solid #dbe3ee;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
+      padding: 18px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+    }
+
+    .dark .stat-card {
+      border-color: #334155;
+      background: linear-gradient(180deg, #0f172a, #111827);
+    }
+
+    .stat-card strong {
+      display: block;
+      font-size: 30px;
+      margin-top: 8px;
+    }
+
+    .stat-card span {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #64748b;
+      font-weight: 800;
+    }
+
+    .stat-card-accent-blue { border-top: 4px solid #2563eb; }
+    .stat-card-accent-cyan { border-top: 4px solid #0ea5e9; }
+    .stat-card-accent-teal { border-top: 4px solid #14b8a6; }
+    .stat-card-accent-violet { border-top: 4px solid #8b5cf6; }
+    .stat-card-accent-amber { border-top: 4px solid #f59e0b; }
+    .stat-card-accent-emerald { border-top: 4px solid #10b981; }
+    .stat-card-accent-rose { border-top: 4px solid #f43f5e; }
+    .stat-card-accent-slate { border-top: 4px solid #64748b; }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .help-text {
+      color: #64748b;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge-amber { background: #fef3c7; color: #b45309; }
+    .badge-emerald { background: #d1fae5; color: #047857; }
+    .badge-violet { background: #ede9fe; color: #6d28d9; }
+    .badge-rose { background: #ffe4e6; color: #be123c; }
+    .badge-slate { background: #e2e8f0; color: #334155; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .list-inline {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .list-inline li {
+      border: 1px solid #edf2f7;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fbfdff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .dark .list-inline li {
+      border-color: #334155;
+      background: rgba(15,23,42,0.76);
+    }
+
+    .message-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .message {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #edf2f7;
+      background: #fcfdff;
+    }
+
+    .dark .message {
+      border-color: #334155;
+      background: rgba(15,23,42,0.76);
+    }
+
+    .secretary-list-row .text-slate-500 {
+      color: #64748b !important;
+    }
+
+    .dark .secretary-list-row .text-slate-500 {
+      color: #94a3b8 !important;
+    }
+
+    .pagination {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .secretary-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      background: rgba(15, 23, 42, 0.55);
+    }
+    .secretary-modal-shell {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+    }
+    .secretary-modal-panel {
+      width: min(92vw, 920px);
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      border-radius: 28px;
+      border: 1px solid #dbe3ee;
+      background: #fff;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.26);
+    }
+    .dark .secretary-modal-panel {
+      border-color: #334155;
+      background: #0f172a;
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
 </head>
-<body>
-<div class="layout">
-    <div class="topbar">
-        <div>
-            <strong>Secretariat</strong><br>
-            <span class="help-text">Gestion administrative, suivi et coordination</span>
+<body x-data="secretaryShell()" x-init="init()" @keydown.escape.window="closeModal()" x-cloak class="secretary-shell">
+  <div class="flex min-h-screen">
+    <aside class="sidebar-gradient fixed inset-y-0 left-0 z-40 flex flex-col text-white transition-all duration-300" :class="sidebarCollapsed ? 'w-[86px]' : 'w-[270px]'">
+      <div class="flex h-24 items-center gap-3 px-5">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+          <i data-lucide="clipboard-list" class="h-7 w-7"></i>
         </div>
-        <nav class="nav">
-            <a href="{% url 'secretary:secretary_dashboard' %}">Dashboard</a>
-            <a href="{% url 'secretary:registry_list' %}">Registre</a>
-            <a href="{% url 'secretary:appointment_list' %}">Rendez-vous</a>
-            <a href="{% url 'secretary:visitor_list' %}">Visiteurs</a>
-            <a href="{% url 'secretary:document_receipt_list' %}">Documents</a>
-            <a href="{% url 'secretary:task_list' %}">Taches</a>
-        </nav>
-    </div>
+        <div x-show="!sidebarCollapsed" x-transition>
+          <h1 class="text-xl font-extrabold tracking-tight">Secrétariat</h1>
+          <p class="text-xs font-semibold uppercase tracking-widest text-sky-100/80">Poste opérationnel</p>
+        </div>
+      </div>
 
-    <div class="tabs">
-        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#dashboard">Dashboard</a>
-        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#students">Etudiants</a>
-        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#classes">Classes</a>
-        <a class="tab-link" href="{% url 'secretary:registry_list' %}">Registre</a>
-        <a class="tab-link" href="{% url 'secretary:appointment_list' %}">Rendez-vous</a>
-        <a class="tab-link" href="{% url 'secretary:visitor_list' %}">Visiteurs</a>
-        <a class="tab-link" href="{% url 'secretary:document_receipt_list' %}">Documents</a>
-        <a class="tab-link" href="{% url 'secretary:task_list' %}">Taches</a>
-        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#archives">Archives</a>
-        <a class="tab-link" href="{% url 'secretary:secretary_dashboard' %}#messages">Messages</a>
-    </div>
+      <button
+        type="button"
+        @click="toggleSidebar()"
+        class="absolute right-[-18px] top-7 flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950"
+        title="Réduire / agrandir"
+      >
+        <i data-lucide="chevrons-left" class="h-5 w-5 transition-transform" :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
+      </button>
 
-    {% if messages %}
-        <div class="panel">
+      <nav class="mt-3 flex-1 space-y-2 overflow-y-auto px-4 scrollbar-thin">
+        <a href="{% url 'secretary:secretary_dashboard' %}" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="home" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Dashboard</span>
+        </a>
+        <a href="{% url 'secretary:secretary_dashboard' %}#students" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="graduation-cap" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Étudiants</span>
+        </a>
+        <a href="{% url 'secretary:secretary_dashboard' %}#classes" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="school" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Classes</span>
+        </a>
+        <a href="{% url 'secretary:registry_list' %}" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="book-copy" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Registre</span>
+        </a>
+        <a href="{% url 'secretary:appointment_list' %}" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="calendar-check-2" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Rendez-vous</span>
+        </a>
+        <a href="{% url 'secretary:visitor_list' %}" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="user-round-search" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Visiteurs</span>
+        </a>
+        <a href="{% url 'secretary:document_receipt_list' %}" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="file-signature" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Documents</span>
+        </a>
+        <a href="{% url 'secretary:task_list' %}" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="list-todo" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Tâches</span>
+        </a>
+        <a href="{% url 'secretary:secretary_dashboard' %}#admissions" class="group flex items-center gap-4 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <i data-lucide="handshake" class="h-5 w-5 shrink-0"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Admissions</span>
+        </a>
+      </nav>
+
+      <div class="space-y-3 p-4">
+        <div class="rounded-2xl border border-white/10 bg-white/10 p-3">
+          <div class="flex items-center gap-3">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-600 text-sm font-bold">
+              {{ request.user.first_name|first|default:request.user.username|first|upper }}
+            </div>
+            <div x-show="!sidebarCollapsed" x-transition class="min-w-0">
+              <p class="truncate text-sm font-bold">{{ request.user.get_full_name|default:request.user.username }}</p>
+              <p class="truncate text-xs text-sky-100/70">Secrétaire</p>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          @click="toggleSidebar()"
+          class="flex w-full items-center justify-center gap-3 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold transition hover:bg-white/15"
+        >
+          <i data-lucide="chevron-left" class="h-5 w-5" :class="sidebarCollapsed ? 'rotate-180' : ''"></i>
+          <span x-show="!sidebarCollapsed" x-transition>Réduire le menu</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="min-h-screen flex-1 transition-all duration-300" :class="sidebarCollapsed ? 'ml-[86px]' : 'ml-[270px]'">
+      <div class="mx-auto max-w-[1480px] px-6 py-6 lg:px-8">
+        <header class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 class="text-3xl font-extrabold tracking-tight">Secrétariat</h2>
+            <p class="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">Accueil opérationnel, liste compacte et actions directes.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" class="secretary-badge bg-white dark:bg-slate-900" @click="toggleDarkMode()">
+              <i x-show="!darkMode" data-lucide="moon" class="h-4 w-4"></i>
+              <i x-show="darkMode" data-lucide="sun" class="h-4 w-4"></i>
+              Thème
+            </button>
+            <div class="secretary-badge">
+              <i data-lucide="building-2" class="h-4 w-4"></i>
+              <span>{{ request.user.profile.branch.name|default:"Annexe non définie" }}</span>
+            </div>
+            <div class="secretary-badge">
+              <i data-lucide="bell" class="h-4 w-4"></i>
+              <span>{{ messages_count|default:0 }} à traiter</span>
+            </div>
+            <div class="secretary-badge">
+              <span class="grid h-7 w-7 place-items-center rounded-full bg-cyan-600 text-xs font-black text-white">
+                {{ request.user.first_name|first|default:request.user.username|first|upper }}
+              </span>
+              <span>{{ request.user.get_full_name|default:request.user.username }}</span>
+            </div>
+          </div>
+        </header>
+
+        {% if messages %}
+          <section class="mb-6 space-y-3">
             {% for message in messages %}
-                <div>{{ message }}</div>
+              <div class="secretary-panel px-4 py-3 text-sm font-semibold">
+                {{ message }}
+              </div>
             {% endfor %}
-        </div>
-    {% endif %}
+          </section>
+        {% endif %}
 
-    {% block content %}{% endblock %}
-</div>
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <button
+    type="button"
+    x-show="modalOpen"
+    x-transition.opacity.duration.200ms
+    class="secretary-modal-backdrop"
+    aria-label="Fermer la fenêtre"
+    @click="closeModal()"
+  ></button>
+
+  <div id="secretary-modal" x-show="modalOpen" x-transition.opacity.duration.200ms class="secretary-modal-shell" x-cloak>
+    <section class="secretary-modal-panel">
+      <div id="secretary-modal-content" class="p-5 text-sm text-slate-600 dark:text-slate-300">
+        <p class="text-sm font-semibold text-slate-500">Sélectionnez une action pour ouvrir le formulaire.</p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    function secretaryShell() {
+      return {
+        sidebarCollapsed: false,
+        darkMode: false,
+        modalOpen: false,
+        init() {
+          this.applyTheme();
+          window.sgOpenModal = () => { this.modalOpen = true; };
+          window.sgCloseModal = () => { this.closeModal(); };
+          document.body.addEventListener('secretary-modal-close', () => this.closeModal());
+          document.body.addEventListener('secretary-dashboard-refresh', () => window.location.reload());
+          this.renderIcons();
+        },
+        toggleSidebar() {
+          this.sidebarCollapsed = !this.sidebarCollapsed;
+          this.renderIcons();
+        },
+        toggleDarkMode() {
+          this.darkMode = !this.darkMode;
+          this.applyTheme();
+          this.renderIcons();
+        },
+        applyTheme() {
+          document.documentElement.classList.toggle('dark', this.darkMode);
+        },
+        renderIcons() {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
+        },
+        closeModal() {
+          this.modalOpen = false;
+          const content = document.getElementById('secretary-modal-content');
+          if (content) {
+            content.innerHTML = '<p class="text-sm font-semibold text-slate-500">Sélectionnez une action pour ouvrir le formulaire.</p>';
+          }
+        }
+      };
+    }
+  </script>
 </body>
 </html>

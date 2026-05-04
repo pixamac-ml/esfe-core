@@ -1,0 +1,65 @@
+<div class="mt-4 flex flex-wrap gap-2">
+  <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=students&class_id={{ selected_class.id }}&week_start={{ week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">Liste etudiants</button>
+  <button type="button" class="director-btn director-btn-primary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=results&class_id={{ selected_class.id }}" hx-target="#director-workspace" hx-swap="innerHTML">Traiter les resultats</button>
+  <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=academic&class_id={{ selected_class.id }}&week_start={{ week_start|date:'Y-m-d' }}" hx-target="#director-workspace" hx-swap="innerHTML">Voir le planning</button>
+</div>
+
+<div class="mt-5 overflow-x-auto">
+  <table class="director-inline-table">
+    <thead>
+      <tr>
+        <th>Semestre</th>
+        <th>Etat</th>
+        <th>Notes</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in selected_operation_class.semester_rows %}
+        <tr>
+          <td class="font-black text-slate-900">S{{ row.semester.number }}</td>
+          <td class="text-sm font-semibold text-slate-600">{{ row.state }}</td>
+          <td class="text-sm font-semibold text-slate-600">{{ row.entered }}/{{ row.expected }} · {{ row.progress }}%</td>
+          <td>
+            <div class="director-inline-actions">
+              <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?section=results&class_id={{ selected_class.id }}&semester_id={{ row.semester.id }}" hx-target="#director-workspace" hx-swap="innerHTML">Traiter</button>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="4" class="py-6 text-center text-sm font-semibold text-slate-500">Aucun semestre actif pour cette classe.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-5 overflow-x-auto">
+  <table class="director-inline-table">
+    <thead>
+      <tr>
+        <th>Horaire</th>
+        <th>Cours</th>
+        <th>Enseignant</th>
+        <th>Salle</th>
+        <th>Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in selected_operation_class.weekly_events %}
+        <tr>
+          <td class="font-semibold text-slate-700">{{ event.start_time }} - {{ event.end_time }}</td>
+          <td class="font-semibold text-slate-900">{{ event.title }}</td>
+          <td class="text-sm font-semibold text-slate-600">{{ event.teacher_name }}</td>
+          <td class="text-sm font-semibold text-slate-600">{{ event.location }}</td>
+          <td><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{{ event.status_label }}</span></td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="py-6 text-center text-sm font-semibold text-slate-500">Aucun cours programme sur la semaine.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

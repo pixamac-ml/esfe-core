@@ -3,6 +3,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
+from accounts.dashboards.helpers import get_user_branch
 from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
 from .selectors import (
     get_active_students,
@@ -50,6 +51,17 @@ def create_registry_entry(*, created_by, **data):
 
 
 @transaction.atomic
+def start_registry_entry_processing(entry):
+    if entry.is_archived:
+        raise ValidationError("Une entree archivee ne peut pas etre reprise.")
+    if entry.status == RegistryEntry.STATUS_PENDING:
+        entry.status = RegistryEntry.STATUS_IN_PROGRESS
+    elif entry.status == RegistryEntry.STATUS_COMPLETED:
+        raise ValidationError("Cette entree a deja ete traitee.")
+    return _clean_instance(entry)
+
+
+@transaction.atomic
 def update_registry_entry(entry, **data):
     for field, value in data.items():
         setattr(entry, field, value)
@@ -58,12 +70,16 @@ def update_registry_entry(entry, **data):
 
 @transaction.atomic
 def mark_registry_processed(entry):
+    if entry.is_archived:
+        raise ValidationError("Une entree archivee ne peut pas etre validee.")
     entry.status = RegistryEntry.STATUS_COMPLETED
     return _clean_instance(entry)
 
 
 @transaction.atomic
 def archive_registry_entry(entry):
+    if entry.is_archived:
+        raise ValidationError("Cette entree est deja archivee.")
     entry.is_archived = True
     entry.is_active = False
     if entry.status == RegistryEntry.STATUS_IN_PROGRESS:
@@ -87,6 +103,8 @@ def register_visitor(*, created_by, **data):
 
 @transaction.atomic
 def close_visit(visitor, departed_at=None):
+    if visitor.is_archived:
+        raise ValidationError("Une visite archivee ne peut pas etre cloturee.")
     if visitor.departed_at:
         raise ValidationError("Cette visite est deja cloturee.")
 
@@ -114,6 +132,15 @@ def create_appointment(*, created_by, **data):
 
 @transaction.atomic
 def validate_appointment(appointment):
+    return start_appointment_processing(appointment)
+
+
+@transaction.atomic
+def start_appointment_processing(appointment):
+    if appointment.is_archived:
+        raise ValidationError("Un rendez-vous archive ne peut pas etre repris.")
+    if appointment.status == Appointment.STATUS_COMPLETED:
+        raise ValidationError("Ce rendez-vous est deja termine.")
     appointment.status = Appointment.STATUS_IN_PROGRESS
     return _clean_instance(appointment)
 
@@ -135,6 +162,10 @@ def get_today_appointments():
 
 @transaction.atomic
 def complete_appointment(appointment):
+    if appointment.is_archived:
+        raise ValidationError("Un rendez-vous archive ne peut pas etre complete.")
+    if appointment.status == Appointment.STATUS_COMPLETED:
+        raise ValidationError("Ce rendez-vous est deja termine.")
     appointment.status = Appointment.STATUS_COMPLETED
     return _clean_instance(appointment)
 
@@ -146,7 +177,20 @@ def register_document(*, received_by, **data):
 
 
 @transaction.atomic
+def start_document_processing(document):
+    if document.is_archived:
+        raise ValidationError("Un document archive ne peut pas etre repris.")
+    if document.status == DocumentReceipt.STATUS_PENDING:
+        document.status = DocumentReceipt.STATUS_IN_PROGRESS
+    elif document.status == DocumentReceipt.STATUS_COMPLETED:
+        raise ValidationError("Ce document a deja ete traite.")
+    return _clean_instance(document)
+
+
+@transaction.atomic
 def archive_document(document):
+    if document.is_archived:
+        raise ValidationError("Ce document est deja archive.")
     document.is_archived = True
     document.is_active = False
     if document.status == DocumentReceipt.STATUS_IN_PROGRESS:
@@ -171,7 +215,17 @@ def create_task(*, created_by, **data):
 
 
 @transaction.atomic
+def start_task_processing(task, user):
+    assign_task(task, user)
+    if task.status == SecretaryTask.STATUS_PENDING:
+        task.status = SecretaryTask.STATUS_IN_PROGRESS
+    return _clean_instance(task)
+
+
+@transaction.atomic
 def assign_task(task, user):
+    if task.is_archived:
+        raise ValidationError("Une tache archivee ne peut pas etre reprise.")
     task.assigned_to = user
     if task.status == SecretaryTask.STATUS_PENDING:
         task.status = SecretaryTask.STATUS_IN_PROGRESS
@@ -180,6 +234,10 @@ def assign_task(task, user):
 
 @transaction.atomic
 def complete_task(task):
+    if task.is_archived:
+        raise ValidationError("Une tache archivee ne peut pas etre terminee.")
+    if task.status == SecretaryTask.STATUS_COMPLETED:
+        raise ValidationError("Cette tache est deja terminee.")
     task.status = SecretaryTask.STATUS_COMPLETED
     return _clean_instance(task)
 
@@ -195,25 +253,26 @@ def get_pending_tasks():
     ).order_by("due_date", "-created_at")
 
 
-def search_students(query):
-    return search_students_queryset(query)
+def search_students(query, *, user=None, branch=None):
+    return search_students_queryset(query, user=user, branch=branch)
 
 
-def search_academic_classes(query):
-    return search_classes(query)
+def search_academic_classes(query, *, user=None, branch=None):
+    return search_classes(query, user=user, branch=branch)
 
 
-def get_student_snapshot(student_id):
-    student = get_object_or_404(get_student_snapshot_queryset(student_id))
+def get_student_snapshot(student_id, *, user=None, branch=None):
+    student = get_object_or_404(get_student_snapshot_queryset(student_id, user=user, branch=branch))
     enrollment = get_student_active_enrollment(student)
-    candidature = student.inscription.candidature
+    inscription = getattr(student, "inscription", None)
+    candidature = getattr(inscription, "candidature", None)
     return {
         "student_id": student.id,
         "full_name": student.full_name,
         "matricule": student.matricule,
         "email": student.email,
-        "programme": getattr(candidature.programme, "title", ""),
-        "branch": getattr(candidature.branch, "name", ""),
+        "programme": getattr(getattr(candidature, "programme", None), "title", ""),
+        "branch": getattr(getattr(candidature, "branch", None), "name", ""),
         "academic_class": str(getattr(enrollment, "academic_class", "") or ""),
         "academic_year": str(getattr(enrollment, "academic_year", "") or ""),
         "registry_entries_count": student.registry_entries.filter(is_archived=False).count(),
@@ -228,27 +287,33 @@ def get_student_snapshot(student_id):
 
 
 def get_secretary_dashboard_data(user):
-    active_students = get_active_students()
-    today_appointments = get_today_appointments()
-    today_visits = get_today_visits()
-    active_visits = get_active_visits()
-    pending_tasks = get_pending_tasks()
+    branch = get_user_branch(user)
+    active_students = get_active_students(user=user, branch=branch)
+    today_appointments = get_today_appointments(user=user, branch=branch)
+    today_visits = get_today_visits(user=user, branch=branch)
+    active_visits = get_active_visits(user=user, branch=branch)
+    pending_tasks = get_pending_tasks(user=user, branch=branch)
     pending_registry_rows = get_registry_queryset(
         {
             "status": RegistryEntry.STATUS_PENDING,
             "archived": False,
             "active_only": True,
-        }
+        },
+        user=user,
+        branch=branch,
     )[:5]
     pending_documents_rows = get_documents_queryset(
         {
             "status": DocumentReceipt.STATUS_PENDING,
             "archived": False,
             "active_only": True,
-        }
+        },
+        user=user,
+        branch=branch,
     )[:5]
 
     return {
+        "branch": branch,
         "students_count": active_students.count(),
         "appointments_today": today_appointments.count(),
         "visits_today": today_visits.count(),
@@ -259,14 +324,18 @@ def get_secretary_dashboard_data(user):
                 "status": RegistryEntry.STATUS_PENDING,
                 "archived": False,
                 "active_only": True,
-            }
+            },
+            user=user,
+            branch=branch,
         ).count(),
         "pending_documents_count": get_documents_queryset(
             {
                 "status": DocumentReceipt.STATUS_PENDING,
                 "archived": False,
                 "active_only": True,
-            }
+            },
+            user=user,
+            branch=branch,
         ).count(),
         "today_appointments_rows": today_appointments[:5],
         "today_visits_rows": today_visits[:5],
@@ -274,8 +343,8 @@ def get_secretary_dashboard_data(user):
         "pending_tasks_rows": pending_tasks[:5],
         "pending_registry_rows": pending_registry_rows,
         "pending_documents_rows": pending_documents_rows,
-        "recent_registry": get_recent_registry_entries(limit=5),
-        "recent_documents": get_recent_documents(limit=5),
+        "recent_registry": get_recent_registry_entries(limit=5, user=user, branch=branch),
+        "recent_documents": get_recent_documents(limit=5, user=user, branch=branch),
         "messages_count": get_secretary_unread_messages(user),
         "recent_messages": get_secretary_recent_messages(user, limit=5),
         "notifications": get_secretary_notifications(user, limit=5),

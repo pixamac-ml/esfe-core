@@ -45,6 +45,12 @@
                     <td>{{ entry.created_at|date:"d/m/Y H:i" }}</td>
                     <td>
                         <div class="actions">
+                            {% if entry.status == "pending" %}
+                                <form method="post" hx-post="{% url 'secretary:registry_start' entry.id %}" hx-target="body" hx-swap="none">
+                                    {% csrf_token %}
+                                    <button class="btn" type="submit">Prendre en charge</button>
+                                </form>
+                            {% endif %}
                             {% if entry.status != "completed" %}
                                 <form method="post" hx-post="{% url 'secretary:registry_mark_processed' entry.id %}" hx-target="body" hx-swap="none">
                                     {% csrf_token %}

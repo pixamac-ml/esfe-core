@@ -1,10 +1,22 @@
 from django import forms
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
+from accounts.dashboards.helpers import get_user_branch, is_global_viewer
+from .selectors import get_active_students, get_documents_queryset, get_registry_queryset
 from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
+
+User = get_user_model()
 
 
 class SecretaryBaseForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
+        self.branch = kwargs.pop("branch", None) or get_user_branch(self.user)
+        super().__init__(*args, **kwargs)
+        self._apply_widget_classes()
+        self._apply_scope()
+
     def _apply_widget_classes(self):
         for name, field in self.fields.items():
             widget = field.widget
@@ -15,12 +27,36 @@ class SecretaryBaseForm(forms.ModelForm):
             if field.required:
                 widget.attrs.setdefault("required", "required")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._apply_widget_classes()
+    def _branch_user_queryset(self):
+        if self.branch:
+            return User.objects.filter(profile__branch=self.branch).distinct()
+        if self.user and not is_global_viewer(self.user):
+            return User.objects.none()
+        return User.objects.all()
+
+    def _student_queryset(self):
+        if self.branch:
+            return get_active_students(branch=self.branch, user=self.user)
+        if self.user and not is_global_viewer(self.user):
+            return get_active_students(user=self.user)
+        return get_active_students(user=self.user)
+
+    def _registry_queryset(self):
+        if self.branch:
+            return get_registry_queryset(branch=self.branch, user=self.user)
+        if self.user and not is_global_viewer(self.user):
+            return get_registry_queryset(user=self.user)
+        return get_registry_queryset(user=self.user)
+
+    def _apply_scope(self):
+        pass
 
 
 class RegistryEntryForm(SecretaryBaseForm):
+    def _apply_scope(self):
+        self.fields["related_student"].queryset = self._student_queryset()
+        self.fields["related_staff"].queryset = self._branch_user_queryset()
+
     class Meta:
         model = RegistryEntry
         fields = [
@@ -34,6 +70,11 @@ class RegistryEntryForm(SecretaryBaseForm):
 
 
 class AppointmentForm(SecretaryBaseForm):
+    def _apply_scope(self):
+        self.fields["related_student"].queryset = self._student_queryset()
+        self.fields["assigned_to"].queryset = self._branch_user_queryset()
+        self.fields["related_staff"].queryset = self._branch_user_queryset()
+
     scheduled_at = forms.DateTimeField(
         input_formats=["%Y-%m-%dT%H:%M"],
         widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
@@ -63,6 +104,10 @@ class AppointmentForm(SecretaryBaseForm):
 
 
 class VisitorLogForm(SecretaryBaseForm):
+    def _apply_scope(self):
+        self.fields["related_student"].queryset = self._student_queryset()
+        self.fields["related_staff"].queryset = self._branch_user_queryset()
+
     arrived_at = forms.DateTimeField(
         input_formats=["%Y-%m-%dT%H:%M"],
         widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
@@ -100,6 +145,10 @@ class VisitorLogForm(SecretaryBaseForm):
 
 
 class DocumentReceiptForm(SecretaryBaseForm):
+    def _apply_scope(self):
+        self.fields["related_student"].queryset = self._student_queryset()
+        self.fields["related_registry"].queryset = self._registry_queryset()
+
     class Meta:
         model = DocumentReceipt
         fields = [
@@ -115,6 +164,10 @@ class DocumentReceiptForm(SecretaryBaseForm):
 
 
 class SecretaryTaskForm(SecretaryBaseForm):
+    def _apply_scope(self):
+        self.fields["assigned_to"].queryset = self._branch_user_queryset()
+        self.fields["related_student"].queryset = self._student_queryset()
+
     class Meta:
         model = SecretaryTask
         fields = [

@@ -45,6 +45,12 @@
                     <td><span class="badge">{{ receipt.get_status_display }}</span></td>
                     <td>
                         <div class="actions">
+                            {% if receipt.status == "pending" %}
+                                <form method="post" hx-post="{% url 'secretary:document_receipt_start' receipt.id %}" hx-target="body" hx-swap="none">
+                                    {% csrf_token %}
+                                    <button class="btn" type="submit">Prendre en charge</button>
+                                </form>
+                            {% endif %}
                             {% if receipt.file %}<a class="btn" href="{{ receipt.file.url }}" target="_blank" rel="noopener">Fichier</a>{% endif %}
                             {% if not receipt.is_archived %}
                                 <form method="post" hx-post="{% url 'secretary:document_receipt_archive' receipt.id %}" hx-target="body" hx-swap="none">

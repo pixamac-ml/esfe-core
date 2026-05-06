@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
+from accounts.dashboards.helpers import get_user_branch
 from academics.models import AcademicClass
 from .forms import (
     AppointmentForm,
@@ -32,6 +33,10 @@ from .services import (
     create_appointment,
     create_registry_entry,
     create_task,
+    start_appointment_processing,
+    start_document_processing,
+    start_registry_entry_processing,
+    start_task_processing,
     get_secretary_dashboard_data,
     get_secretary_recent_messages,
     get_student_snapshot,
@@ -147,6 +152,19 @@ def registry_mark_processed(request, pk):
     entry = get_object_or_404(RegistryEntry, pk=pk)
     mark_registry_processed(entry)
     messages.success(request, "Entree marquee comme traitee.")
+    if _is_htmx(request):
+        return _refresh_response()
+    return redirect("secretary:registry_list")
+
+
+@login_required
+def registry_start(request, pk):
+    ensure_secretary_access(request.user)
+    if request.method != "POST":
+        return redirect("secretary:registry_list")
+    entry = get_object_or_404(RegistryEntry, pk=pk)
+    start_registry_entry_processing(entry)
+    messages.success(request, "Entree prise en charge.")
     if _is_htmx(request):
         return _refresh_response()
     return redirect("secretary:registry_list")
@@ -317,6 +335,19 @@ def document_receipt_archive(request, pk):
 
 
 @login_required
+def document_receipt_start(request, pk):
+    ensure_secretary_access(request.user)
+    if request.method != "POST":
+        return redirect("secretary:document_receipt_list")
+    document = get_object_or_404(DocumentReceipt, pk=pk)
+    start_document_processing(document)
+    messages.success(request, "Document pris en charge.")
+    if _is_htmx(request):
+        return _refresh_response()
+    return redirect("secretary:document_receipt_list")
+
+
+@login_required
 def task_list(request):
     ensure_secretary_access(request.user)
     queryset = get_tasks_queryset(_common_filters(request))
@@ -361,6 +392,19 @@ def task_complete(request, pk):
     task = get_object_or_404(SecretaryTask, pk=pk)
     complete_task(task)
     messages.success(request, "Tache marquee comme terminee.")
+    if _is_htmx(request):
+        return _refresh_response()
+    return redirect("secretary:task_list")
+
+
+@login_required
+def task_start(request, pk):
+    ensure_secretary_access(request.user)
+    if request.method != "POST":
+        return redirect("secretary:task_list")
+    task = get_object_or_404(SecretaryTask, pk=pk)
+    start_task_processing(task, request.user)
+    messages.success(request, "Tache prise en charge.")
     if _is_htmx(request):
         return _refresh_response()
     return redirect("secretary:task_list")

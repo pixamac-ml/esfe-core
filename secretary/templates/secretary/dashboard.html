@@ -65,6 +65,12 @@
                   <span class="block truncate text-xs font-medium text-slate-500">{{ entry.entry_type }} | {{ entry.get_status_display }} | {{ entry.created_at|date:"d/m/Y H:i" }}</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                  {% if entry.status == "pending" %}
+                    <form method="post" hx-post="{% url 'secretary:registry_start' entry.id %}" hx-target="body" hx-swap="none">
+                      {% csrf_token %}
+                      <button class="secretary-btn secretary-btn-secondary" type="submit">Prendre en charge</button>
+                    </form>
+                  {% endif %}
                   {% if entry.status != "completed" %}
                     <form method="post" hx-post="{% url 'secretary:registry_mark_processed' entry.id %}" hx-target="body" hx-swap="none">
                       {% csrf_token %}
@@ -95,6 +101,12 @@
                   <span class="block truncate text-xs font-medium text-slate-500">{{ document.submitted_by_name }} | {{ document.get_status_display }} | {{ document.received_at|date:"d/m/Y H:i" }}</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                  {% if document.status == "pending" %}
+                    <form method="post" hx-post="{% url 'secretary:document_receipt_start' document.id %}" hx-target="body" hx-swap="none">
+                      {% csrf_token %}
+                      <button class="secretary-btn secretary-btn-secondary" type="submit">Prendre en charge</button>
+                    </form>
+                  {% endif %}
                   {% if document.file %}
                     <a class="secretary-btn secretary-btn-secondary" href="{{ document.file.url }}" target="_blank" rel="noopener">Fichier</a>
                   {% endif %}
@@ -170,6 +182,12 @@
                   <span class="block truncate text-xs font-medium text-slate-500">{{ task.get_priority_display }} | {{ task.get_status_display }} | {{ task.due_date|date:"d/m/Y"|default:"-" }}</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                  {% if task.status == "pending" %}
+                    <form method="post" hx-post="{% url 'secretary:task_start' task.id %}" hx-target="body" hx-swap="none">
+                      {% csrf_token %}
+                      <button class="secretary-btn secretary-btn-secondary" type="submit">Prendre en charge</button>
+                    </form>
+                  {% endif %}
                   {% if task.status != "completed" %}
                     <form method="post" hx-post="{% url 'secretary:task_complete' task.id %}" hx-target="body" hx-swap="none">
                       {% csrf_token %}
@@ -197,13 +215,13 @@
         </div>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button type="button" class="secretary-btn secretary-btn-primary w-full justify-start" hx-get="{% url 'secretary:registry_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            Nouvelle entrée
+            Saisir registre
           </button>
           <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:task_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            Nouvelle tâche
+            Créer tâche
           </button>
           <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            Nouveau RDV
+            Programmer RDV
           </button>
           <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
             Recevoir pièce
@@ -250,7 +268,7 @@
         </div>
         <div class="grid grid-cols-2 gap-3">
           <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:registry_list' %}">Registre</a>
-          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:appointment_list' %}">Rendez-vous</a>
+          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:appointment_list' %}">RDV</a>
           <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:visitor_list' %}">Visites</a>
           <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:task_list' %}">Tâches</a>
           <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:document_receipt_list' %}">Documents</a>

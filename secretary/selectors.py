@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 
+from accounts.dashboards.helpers import get_user_branch, is_global_viewer
 from academics.models import AcademicClass, AcademicEnrollment
 from community.models import Notification
 from students.models import Student
@@ -30,13 +31,40 @@ def _apply_common_filters(queryset, filters):
     return queryset, q
 
 
-def get_registry_queryset(filters=None):
+def _resolve_scope(*, user=None, branch=None):
+    resolved_branch = branch or (get_user_branch(user) if user else None)
+    global_viewer = bool(user and is_global_viewer(user))
+    return resolved_branch, global_viewer
+
+
+def _apply_branch_scope(queryset, *, user=None, branch=None, branch_filter=None):
+    resolved_branch, global_viewer = _resolve_scope(user=user, branch=branch)
+    if global_viewer:
+        return queryset
+    if resolved_branch is None:
+        return queryset.none()
+    if branch_filter is None:
+        return queryset.filter(branch=resolved_branch)
+    return queryset.filter(branch_filter(resolved_branch))
+
+
+def get_registry_queryset(filters=None, *, user=None, branch=None):
     queryset = RegistryEntry.objects.select_related(
         "created_by",
         "related_student__user",
         "related_staff",
     )
     queryset, q = _apply_common_filters(queryset, filters)
+    queryset = _apply_branch_scope(
+        queryset,
+        user=user,
+        branch=branch,
+        branch_filter=lambda resolved_branch: (
+            Q(related_student__inscription__candidature__branch=resolved_branch)
+            | Q(created_by__profile__branch=resolved_branch)
+            | Q(related_staff__profile__branch=resolved_branch)
+        ),
+    )
     if q:
         queryset = queryset.filter(
             Q(title__icontains=q)
@@ -45,10 +73,10 @@ def get_registry_queryset(filters=None):
             | Q(related_student__matricule__icontains=q)
             | Q(related_student__user__username__icontains=q)
         )
-    return queryset
+    return queryset.distinct()
 
 
-def get_appointments_queryset(filters=None):
+def get_appointments_queryset(filters=None, *, user=None, branch=None):
     queryset = Appointment.objects.select_related(
         "created_by",
         "assigned_to",
@@ -56,6 +84,17 @@ def get_appointments_queryset(filters=None):
         "related_staff",
     )
     queryset, q = _apply_common_filters(queryset, filters)
+    queryset = _apply_branch_scope(
+        queryset,
+        user=user,
+        branch=branch,
+        branch_filter=lambda resolved_branch: (
+            Q(related_student__inscription__candidature__branch=resolved_branch)
+            | Q(created_by__profile__branch=resolved_branch)
+            | Q(assigned_to__profile__branch=resolved_branch)
+            | Q(related_staff__profile__branch=resolved_branch)
+        ),
+    )
     if q:
         queryset = queryset.filter(
             Q(title__icontains=q)
@@ -74,16 +113,26 @@ def get_appointments_queryset(filters=None):
     if date_to:
         queryset = queryset.filter(scheduled_at__date__lte=date_to)
 
-    return queryset
+    return queryset.distinct()
 
 
-def get_visits_queryset(filters=None):
+def get_visits_queryset(filters=None, *, user=None, branch=None):
     queryset = VisitorLog.objects.select_related(
         "created_by",
         "related_student__user",
         "related_staff",
     )
     queryset, q = _apply_common_filters(queryset, filters)
+    queryset = _apply_branch_scope(
+        queryset,
+        user=user,
+        branch=branch,
+        branch_filter=lambda resolved_branch: (
+            Q(related_student__inscription__candidature__branch=resolved_branch)
+            | Q(created_by__profile__branch=resolved_branch)
+            | Q(related_staff__profile__branch=resolved_branch)
+        ),
+    )
     if q:
         queryset = queryset.filter(
             Q(full_name__icontains=q)
@@ -91,16 +140,26 @@ def get_visits_queryset(filters=None):
             | Q(reason__icontains=q)
             | Q(related_student__matricule__icontains=q)
         )
-    return queryset
+    return queryset.distinct()
 
 
-def get_documents_queryset(filters=None):
+def get_documents_queryset(filters=None, *, user=None, branch=None):
     queryset = DocumentReceipt.objects.select_related(
         "received_by",
         "related_student__user",
         "related_registry",
     )
     queryset, q = _apply_common_filters(queryset, filters)
+    queryset = _apply_branch_scope(
+        queryset,
+        user=user,
+        branch=branch,
+        branch_filter=lambda resolved_branch: (
+            Q(related_student__inscription__candidature__branch=resolved_branch)
+            | Q(received_by__profile__branch=resolved_branch)
+            | Q(related_registry__related_student__inscription__candidature__branch=resolved_branch)
+        ),
+    )
     if q:
         queryset = queryset.filter(
             Q(title__icontains=q)
@@ -109,16 +168,26 @@ def get_documents_queryset(filters=None):
             | Q(related_student__matricule__icontains=q)
             | Q(related_registry__title__icontains=q)
         )
-    return queryset
+    return queryset.distinct()
 
 
-def get_tasks_queryset(filters=None):
+def get_tasks_queryset(filters=None, *, user=None, branch=None):
     queryset = SecretaryTask.objects.select_related(
         "assigned_to",
         "created_by",
         "related_student__user",
     )
     queryset, q = _apply_common_filters(queryset, filters)
+    queryset = _apply_branch_scope(
+        queryset,
+        user=user,
+        branch=branch,
+        branch_filter=lambda resolved_branch: (
+            Q(related_student__inscription__candidature__branch=resolved_branch)
+            | Q(created_by__profile__branch=resolved_branch)
+            | Q(assigned_to__profile__branch=resolved_branch)
+        ),
+    )
     if q:
         queryset = queryset.filter(
             Q(title__icontains=q)
@@ -127,29 +196,41 @@ def get_tasks_queryset(filters=None):
             | Q(related_student__matricule__icontains=q)
             | Q(assigned_to__username__icontains=q)
         )
-    return queryset
+    return queryset.distinct()
 
 
-def get_active_students():
-    return Student.objects.select_related(
+def get_active_students(*, user=None, branch=None):
+    queryset = Student.objects.select_related(
         "user",
         "inscription__candidature__programme",
         "inscription__candidature__branch",
     ).filter(is_active=True)
+    resolved_branch, global_viewer = _resolve_scope(user=user, branch=branch)
+    if not global_viewer:
+        if resolved_branch is None:
+            return queryset.none()
+        queryset = queryset.filter(inscription__candidature__branch=resolved_branch)
+    return queryset
 
 
-def get_students_by_class(academic_class):
-    return Student.objects.select_related(
+def get_students_by_class(academic_class, *, user=None, branch=None):
+    queryset = Student.objects.select_related(
         "user",
         "inscription__candidature__programme",
     ).filter(
         academic_enrollments__academic_class=academic_class,
         academic_enrollments__is_active=True,
     )
+    resolved_branch, global_viewer = _resolve_scope(user=user, branch=branch)
+    if not global_viewer:
+        if resolved_branch is None:
+            return queryset.none()
+        queryset = queryset.filter(inscription__candidature__branch=resolved_branch)
+    return queryset.distinct()
 
 
-def search_students(query):
-    queryset = get_active_students()
+def search_students(query, *, user=None, branch=None):
+    queryset = get_active_students(user=user, branch=branch)
     if not query:
         return queryset.none()
     return queryset.filter(
@@ -161,12 +242,17 @@ def search_students(query):
     )
 
 
-def search_classes(query):
+def search_classes(query, *, user=None, branch=None):
     queryset = AcademicClass.objects.select_related(
         "programme",
         "branch",
         "academic_year",
     ).filter(is_active=True)
+    resolved_branch, global_viewer = _resolve_scope(user=user, branch=branch)
+    if not global_viewer:
+        if resolved_branch is None:
+            return queryset.none()
+        queryset = queryset.filter(branch=resolved_branch)
     if not query:
         return queryset.none()
     return queryset.filter(
@@ -178,8 +264,8 @@ def search_classes(query):
     )
 
 
-def get_student_snapshot_queryset(student_id):
-    return Student.objects.select_related(
+def get_student_snapshot_queryset(student_id, *, user=None, branch=None):
+    queryset = Student.objects.select_related(
         "user",
         "inscription__candidature__programme",
         "inscription__candidature__branch",
@@ -191,19 +277,27 @@ def get_student_snapshot_queryset(student_id):
         "secretary_tasks",
         "user__academic_enrollments__academic_class__academic_year",
     ).filter(id=student_id)
+    resolved_branch, global_viewer = _resolve_scope(user=user, branch=branch)
+    if not global_viewer:
+        if resolved_branch is None:
+            return queryset.none()
+        queryset = queryset.filter(inscription__candidature__branch=resolved_branch)
+    return queryset
 
 
-def get_recent_registry_entries(limit=5):
-    return get_registry_queryset({"archived": False})[:limit]
+def get_recent_registry_entries(limit=5, *, user=None, branch=None):
+    return get_registry_queryset({"archived": False}, user=user, branch=branch)[:limit]
 
 
-def get_pending_tasks(limit=None):
+def get_pending_tasks(limit=None, *, user=None, branch=None):
     queryset = get_tasks_queryset(
         {
             "status": SecretaryTask.STATUS_PENDING,
             "archived": False,
             "active_only": True,
-        }
+        },
+        user=user,
+        branch=branch,
     )
     if limit:
         return queryset[:limit]
@@ -222,27 +316,33 @@ def get_unread_messages_count(user):
     return Notification.objects.filter(user=user, is_read=False).count()
 
 
-def get_today_appointments_queryset():
-    return get_appointments_queryset({"date_from": timezone.localdate(), "date_to": timezone.localdate()})
+def get_today_appointments_queryset(*, user=None, branch=None):
+    return get_appointments_queryset(
+        {"date_from": timezone.localdate(), "date_to": timezone.localdate()},
+        user=user,
+        branch=branch,
+    )
 
 
-def get_today_visits_queryset():
+def get_today_visits_queryset(*, user=None, branch=None):
     today = timezone.localdate()
-    return get_visits_queryset({}).filter(arrived_at__date=today)
+    return get_visits_queryset({}, user=user, branch=branch).filter(arrived_at__date=today)
 
 
-def get_active_visits_queryset():
+def get_active_visits_queryset(*, user=None, branch=None):
     return get_visits_queryset(
         {
             "status": VisitorLog.STATUS_IN_PROGRESS,
             "archived": False,
             "active_only": True,
-        }
+        },
+        user=user,
+        branch=branch,
     )
 
 
-def get_recent_documents_queryset(limit=5):
-    return get_documents_queryset({"archived": False})[:limit]
+def get_recent_documents_queryset(limit=5, *, user=None, branch=None):
+    return get_documents_queryset({"archived": False}, user=user, branch=branch)[:limit]
 
 
 def get_student_active_enrollment(student):

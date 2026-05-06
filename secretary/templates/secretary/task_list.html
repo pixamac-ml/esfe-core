@@ -44,14 +44,22 @@
                     <td>{{ task.due_date|date:"d/m/Y"|default:"-" }}</td>
                     <td><span class="badge">{{ task.get_status_display }}</span></td>
                     <td>
-                        {% if task.status != "completed" %}
-                            <form method="post" hx-post="{% url 'secretary:task_complete' task.id %}" hx-target="body" hx-swap="none">
-                                {% csrf_token %}
-                                <button class="btn" type="submit">Terminer</button>
-                            </form>
-                        {% else %}
-                            <span class="help-text">Aucune action</span>
-                        {% endif %}
+                        <div class="actions">
+                            {% if task.status == "pending" %}
+                                <form method="post" hx-post="{% url 'secretary:task_start' task.id %}" hx-target="body" hx-swap="none">
+                                    {% csrf_token %}
+                                    <button class="btn" type="submit">Prendre en charge</button>
+                                </form>
+                            {% endif %}
+                            {% if task.status != "completed" %}
+                                <form method="post" hx-post="{% url 'secretary:task_complete' task.id %}" hx-target="body" hx-swap="none">
+                                    {% csrf_token %}
+                                    <button class="btn" type="submit">Terminer</button>
+                                </form>
+                            {% else %}
+                                <span class="help-text">Aucune action</span>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
             {% empty %}

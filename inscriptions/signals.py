@@ -10,11 +10,12 @@ Fonctions :
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.db import transaction
+from django.contrib.auth import get_user_model
 
+from communication.models import CommunicationNotification
+from communication.services import NotificationService
 from .models import Inscription, StatusHistory
-from core.models import Notification
 from students.services import create_student_after_first_payment
-from admissions.emails import send_notification_email
 
 
 # ==========================================================
@@ -83,6 +84,10 @@ STATUS_TITLES = {
 }
 
 
+def _get_inscription_user(email):
+    return get_user_model().objects.filter(email__iexact=email).first()
+
+
 # ==========================================================
 # CREATION NOTIFICATION
 # ==========================================================
@@ -112,17 +117,36 @@ def create_inscription_notification(inscription, previous_status, new_status):
         f"Votre statut d'inscription est maintenant : {new_status}"
     )
 
-    notification = Notification.objects.create(
-        recipient_email=recipient_email,
-        recipient_name=recipient_name,
-        notification_type=notification_type,
+    recipient_user = _get_inscription_user(recipient_email)
+    channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+    if recipient_user:
+        channels = [
+            CommunicationNotification.CHANNEL_IN_APP,
+            CommunicationNotification.CHANNEL_WEBSOCKET,
+            CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+        ]
+    event, _created_notifications = NotificationService.notify_user(
+        recipient=recipient_user,
+        actor=None,
+        event_type=notification_type,
         title=title,
-        message=message,
-        related_inscription=inscription,
-        related_candidature=candidature,
+        body=message,
+        source_app="inscriptions",
+        channels=tuple(channels),
+        metadata={
+            "recipient_email": recipient_email,
+            "recipient_name": recipient_name,
+            "url": "/inscriptions/",
+            "html_template": "emails/notification_candidature.html",
+            "context": {
+                "recipient_name": recipient_name,
+                "message": message,
+                "dashboard_url": "/inscriptions/",
+                "reference": getattr(inscription, "reference", ""),
+            },
+        },
     )
-    transaction.on_commit(lambda nid=notification.id: send_notification_email(nid))
-    return notification
+    return event
 
 
 # ==========================================================

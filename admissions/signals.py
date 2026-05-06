@@ -5,19 +5,12 @@ Signaux pour les notifications automatiques lors des changements de statut
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from django.utils import timezone
-from django.db import transaction
+from django.contrib.auth import get_user_model
 
 from admissions.models import Candidature
-from core.models import Notification, StatusHistory
-from admissions.emails import send_notification_email
-from admissions.services.emails import (
-    send_application_accepted_email,
-    send_application_under_review_email,
-    send_application_accepted_with_reserve_email,
-    send_application_rejected_email,
-    send_application_to_complete_email,
-)
+from communication.models import CommunicationNotification
+from communication.services import NotificationService
+from core.models import StatusHistory
 
 # ==========================================================
 # MESSAGES PAR TYPE DE NOTIFICATION
@@ -55,29 +48,13 @@ NOTIFICATION_MESSAGES = {
 }
 
 
-STATUS_EMAIL_SENDERS = {
-    "candidature_under_review": send_application_under_review_email,
-    "candidature_to_complete": send_application_to_complete_email,
-    "candidature_accepted": send_application_accepted_email,
-    "candidature_accepted_with_reserve": send_application_accepted_with_reserve_email,
-    "candidature_rejected": send_application_rejected_email,
-}
+def _get_candidate_user(email):
+    return get_user_model().objects.filter(email__iexact=email).first()
 
 
 def _queue_candidature_email(*, candidature_id, notification_id, notification_type):
-    """Envoie l'email approprié après commit: premium pour les statuts métiers, générique sinon."""
-    sender = STATUS_EMAIL_SENDERS.get(notification_type)
-
-    if sender:
-        def _send_business_email():
-            candidature = Candidature.objects.select_related("programme").filter(pk=candidature_id).first()
-            if candidature:
-                sender(candidature)
-
-        transaction.on_commit(_send_business_email)
-        return
-
-    transaction.on_commit(lambda nid=notification_id: send_notification_email(nid))
+    """Migration progressive: l'envoi transactionnel est pilote par communication/."""
+    return None
 
 
 # ==========================================================
@@ -95,22 +72,45 @@ def create_status_notification(candidature, notification_type):
     # CORRIGE: utiliser last_name et first_name au lieu de full_name
     recipient_name = f"{candidature.last_name} {candidature.first_name}"
 
-    notification = Notification.objects.create(
-        recipient_email=candidature.email,
-        recipient_name=recipient_name,
-        notification_type=notification_type,
+    recipient_user = _get_candidate_user(candidature.email)
+    channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+    if recipient_user:
+        channels = [
+            CommunicationNotification.CHANNEL_IN_APP,
+            CommunicationNotification.CHANNEL_WEBSOCKET,
+            CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+        ]
+    event, created_notifications = NotificationService.notify_user(
+        recipient=recipient_user,
+        actor=None,
+        event_type=notification_type,
         title=data["title"],
-        message=data["message"],
-        related_candidature=candidature,
+        body=data["message"],
+        source_app="admissions",
+        channels=tuple(channels),
+        metadata={
+            "recipient_email": candidature.email,
+            "recipient_name": recipient_name,
+            "url": "/candidature/",
+            "html_template": "emails/notification_candidature.html",
+            "context": {
+                "recipient_name": recipient_name,
+                "message": data["message"],
+                "candidate_reference": getattr(candidature, "reference", ""),
+                "programme_name": getattr(getattr(candidature, "programme", None), "title", ""),
+                "dashboard_url": "/candidature/",
+                "reference": getattr(candidature, "reference", ""),
+            },
+        },
     )
 
     _queue_candidature_email(
         candidature_id=candidature.pk,
-        notification_id=notification.pk,
+        notification_id=created_notifications[0].pk if created_notifications else None,
         notification_type=notification_type,
     )
 
-    return notification
+    return event
 
 
 def create_status_history(candidature, old_status, new_status, changed_by=None, comment=""):
@@ -220,15 +220,36 @@ def check_documents_after_status_change(sender, instance, created, **kwargs):
                 # CORRIGE: utiliser last_name et first_name au lieu de full_name
                 recipient_name = f"{instance.last_name} {instance.first_name}"
 
-                notification = Notification.objects.create(
-                    recipient_email=instance.email,
-                    recipient_name=recipient_name,
-                    notification_type="document_missing",
+                recipient_user = _get_candidate_user(instance.email)
+                channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+                if recipient_user:
+                    channels = [
+                        CommunicationNotification.CHANNEL_IN_APP,
+                        CommunicationNotification.CHANNEL_WEBSOCKET,
+                        CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+                    ]
+                NotificationService.notify_user(
+                    recipient=recipient_user,
+                    actor=None,
+                    event_type="document_missing",
                     title="Document manquant",
-                    message=message,
-                    related_candidature=instance,
-                    email_sent=True,
-                    sent_at=timezone.now(),
+                    body=message,
+                    source_app="admissions",
+                    channels=tuple(channels),
+                    metadata={
+                        "recipient_email": instance.email,
+                        "recipient_name": recipient_name,
+                        "url": "/candidature/",
+                        "html_template": "emails/notification_candidature.html",
+                        "context": {
+                            "recipient_name": recipient_name,
+                            "message": message,
+                            "candidate_reference": getattr(instance, "reference", ""),
+                            "programme_name": getattr(getattr(instance, "programme", None), "title", ""),
+                            "dashboard_url": "/candidature/",
+                            "reference": getattr(instance, "reference", ""),
+                        },
+                    },
                 )
 
                 # Mettre a jour automatiquement le statut

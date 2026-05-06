@@ -10,12 +10,12 @@ from django.utils.html import strip_tags
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q
-from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.utils import OperationalError, ProgrammingError
 from django.urls import NoReverseMatch, reverse
+from communication.services import EmailService
 
 # PDF
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
@@ -537,33 +537,29 @@ def contact_view(request):
             contact_message.user_agent = request.META.get("HTTP_USER_AGENT", "")
             contact_message.save()
 
-            # Email interne
-            internal_html = render_to_string(
-                "emails/contact_internal.html",
-                {"message_obj": contact_message}
-            )
-            internal_email = EmailMultiAlternatives(
+            EmailService.send_transactional(
                 subject=f"[CONTACT] {contact_message.get_subject_display()}",
-                body=strip_tags(internal_html),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[settings.DEFAULT_FROM_EMAIL],
+                recipient_email=settings.DEFAULT_FROM_EMAIL,
+                source_app="core",
+                event_type="contact_internal",
+                html_template="emails/contact_internal.html",
+                context={"message_obj": contact_message},
+                dispatch_on_commit=False,
+                legacy_source="core.contact_view",
+                legacy_object_id=getattr(contact_message, "pk", ""),
             )
-            internal_email.attach_alternative(internal_html, "text/html")
-            internal_email.send()
 
-            # Email utilisateur
-            user_html = render_to_string(
-                "emails/contact_received.html",
-                {"message_obj": contact_message}
+            EmailService.send_transactional(
+                subject="Votre demande a bien ete recue",
+                recipient_email=contact_message.email,
+                source_app="core",
+                event_type="contact_received",
+                html_template="emails/contact_received.html",
+                context={"message_obj": contact_message},
+                dispatch_on_commit=False,
+                legacy_source="core.contact_view",
+                legacy_object_id=getattr(contact_message, "pk", ""),
             )
-            user_email = EmailMultiAlternatives(
-                subject="Votre demande a bien été reçue",
-                body=strip_tags(user_html),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[contact_message.email],
-            )
-            user_email.attach_alternative(user_html, "text/html")
-            user_email.send()
 
             return render(
                 request,

@@ -4,7 +4,7 @@ from django.db.models import Prefetch
 from formations.models import Cycle, Programme
 from news.models import Category as NewsCategory
 from blog.models import Category as BlogCategory
-from community.models import Notification
+from communication.selectors import get_user_unread_count
 
 
 @component.register("navbar")
@@ -46,10 +46,7 @@ class Navbar(component.Component):
         unread_notification_count = 0
         user = getattr(request, "user", None)
         if getattr(user, "is_authenticated", False):
-            unread_notification_count = Notification.objects.filter(
-                user=user,
-                is_read=False
-            ).count()
+            unread_notification_count = get_user_unread_count(user)
 
         return {
             "cycles": cycles,

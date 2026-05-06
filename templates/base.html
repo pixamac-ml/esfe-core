@@ -756,7 +756,7 @@ main {
       try {
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
         const socket = new WebSocket(
-          protocol + "://" + window.location.host + "/ws/notifications/"
+          protocol + "://" + window.location.host + "/ws/communication/notifications/"
         );
 
         socket.onmessage = function(e) {
@@ -776,9 +776,19 @@ main {
             }
           }
 
-          // Refresh dropdown content via HTMX listeners in navbar.
+          if (typeof data.unread_count !== "number") {
+            const badge = document.getElementById("unread-notification-count");
+            if (badge) {
+              const current = Number.parseInt(badge.textContent || "0", 10) || 0;
+              const next = current + 1;
+              badge.classList.remove("hidden");
+              badge.classList.add("flex");
+              badge.textContent = next > 9 ? "9+" : String(next);
+            }
+          }
+
           document.body.dispatchEvent(
-            new CustomEvent("community:notification", { detail: data })
+            new CustomEvent("communication:notification", { detail: data })
           );
         };
 

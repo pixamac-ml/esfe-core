@@ -52,6 +52,7 @@ urlpatterns = [
     path("", include("core.urls")),
     path("academics/", include("academics.urls")),
     path("community/", include("community.urls")),
+    path("communication/", include(("communication.urls", "communication"), namespace="communication")),
     path("ckeditor5/", include("django_ckeditor_5.urls")),
 ]
 

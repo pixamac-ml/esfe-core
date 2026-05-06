@@ -8,6 +8,14 @@ from django.utils import timezone
 from core.models import Institution
 
 
+def get_formatted_from_email():
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@esfe-mali.org")
+    from_name = getattr(settings, "EMAIL_FROM_NAME", "").strip()
+    if from_name:
+        return f"{from_name} <{from_email}>"
+    return from_email
+
+
 def get_email_branding_context():
     """Construit un contexte d'identite ecole pour tous les emails."""
     institution = Institution.objects.first()
@@ -64,7 +72,7 @@ def send_templated_email(*, subject, recipient, text_template=None, html_templat
     message = EmailMultiAlternatives(
         subject=subject,
         body=text_body,
-        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@esfe-mali.org"),
+        from_email=get_formatted_from_email(),
         to=[recipient],
     )
 

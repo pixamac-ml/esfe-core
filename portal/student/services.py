@@ -3,8 +3,7 @@ from django.core.cache import cache
 
 from academics.models import EC, ECContent, StudentContentProgress
 from academics.services.schedule_service import get_student_week_schedule
-from community.models import Notification as CommunityNotification
-from core.models import Notification as CoreNotification
+from communication.selectors import get_user_notifications
 from news.models import Event
 from payments.models import Payment
 from .profile_service import get_profile_data
@@ -173,38 +172,15 @@ def get_student_messages(student):
     if cached is not None:
         return cached
 
-    email = getattr(student, "email", "")
-    core_items = list(
-        CoreNotification.objects.filter(recipient_email=email)
-        .order_by("-created_at")
-        .values("title", "message", "created_at")[:3]
-    )
-    if core_items:
-        payload = [
-            {
-                "name": item["title"],
-                "text": item["message"][:90] + ("..." if len(item["message"]) > 90 else ""),
-                "time": item["created_at"].strftime("%d/%m"),
-                "avatar": "",
-            }
-            for item in core_items
-        ]
-        cache.set(cache_key, payload, 30)
-        return payload
-
-    community_items = (
-        CommunityNotification.objects.select_related("actor")
-        .filter(user=student.user)
-        .order_by("-created_at")[:3]
-    )
+    communication_items = list(get_user_notifications(student.user, limit=3))
     payload = [
         {
-            "name": item.actor.get_full_name() or item.actor.username,
-            "text": item.get_notification_type_display(),
+            "name": item.title,
+            "text": item.body[:90] + ("..." if len(item.body) > 90 else ""),
             "time": item.created_at.strftime("%d/%m"),
             "avatar": "",
         }
-        for item in community_items
+        for item in communication_items
     ]
     cache.set(cache_key, payload, 30)
     return payload

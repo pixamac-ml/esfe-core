@@ -5,11 +5,11 @@ from django.db.models import Count
 from django.utils import timezone
 
 from admissions.emails import send_notification_email
-from core.models import Notification
+from communication.models import CommunicationNotification
 
 
 class Command(BaseCommand):
-    help = "Audit/reprise des notifications email en attente (report, send, mark-sent)."
+    help = "Audit/reprise des notifications email centralisees en attente (report, send, mark-sent)."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -49,10 +49,17 @@ class Command(BaseCommand):
         limit = options.get("limit")
         confirmed = options.get("yes", False)
 
-        qs = Notification.objects.filter(email_sent=False).order_by("created_at")
+        qs = CommunicationNotification.objects.filter(
+            channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+            status__in=[
+                CommunicationNotification.STATUS_PENDING,
+                CommunicationNotification.STATUS_QUEUED,
+                CommunicationNotification.STATUS_FAILED,
+            ],
+        ).order_by("created_at")
 
         if selected_types:
-            qs = qs.filter(notification_type__in=selected_types)
+            qs = qs.filter(event_type__in=selected_types)
 
         if older_than_days is not None:
             if older_than_days < 0:
@@ -72,13 +79,13 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE(f"Notifications ciblees: {total}"))
 
         grouped = (
-            Notification.objects.filter(pk__in=[n.pk for n in notifications])
-            .values("notification_type")
+            CommunicationNotification.objects.filter(pk__in=[n.pk for n in notifications])
+            .values("event_type")
             .annotate(total=Count("id"))
             .order_by("-total")
         )
         for row in grouped:
-            self.stdout.write(f" - {row['notification_type']}: {row['total']}")
+            self.stdout.write(f" - {row['event_type']}: {row['total']}")
 
         if action == "report":
             return
@@ -101,10 +108,10 @@ class Command(BaseCommand):
 
         if action == "mark-sent":
             ids = [n.pk for n in notifications]
-            updated = Notification.objects.filter(pk__in=ids).update(
-                email_sent=True,
+            updated = CommunicationNotification.objects.filter(pk__in=ids).update(
+                status=CommunicationNotification.STATUS_SENT,
                 sent_at=timezone.now(),
             )
-            self.stdout.write(self.style.SUCCESS(f"Marques email_sent=True: {updated}"))
+            self.stdout.write(self.style.SUCCESS(f"Marquees status=sent: {updated}"))
             return
 

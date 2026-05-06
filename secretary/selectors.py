@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from accounts.dashboards.helpers import get_user_branch, is_global_viewer
 from academics.models import AcademicClass, AcademicEnrollment
-from community.models import Notification
+from communication.selectors import get_user_notifications, get_user_unread_count
 from students.models import Student
 
 from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
@@ -305,15 +305,15 @@ def get_pending_tasks(limit=None, *, user=None, branch=None):
 
 
 def get_secretary_notifications(user, limit=10):
-    return Notification.objects.select_related("actor", "topic", "answer").filter(user=user)[:limit]
+    return get_user_notifications(user, limit=limit)
 
 
 def get_user_messages(user, limit=20):
-    return Notification.objects.select_related("actor", "topic", "answer").filter(user=user)[:limit]
+    return get_user_notifications(user, limit=limit)
 
 
 def get_unread_messages_count(user):
-    return Notification.objects.filter(user=user, is_read=False).count()
+    return get_user_unread_count(user)
 
 
 def get_today_appointments_queryset(*, user=None, branch=None):

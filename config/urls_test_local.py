@@ -18,6 +18,7 @@ urlpatterns = [
     path("academics/", include("academics.urls")),
     path("actualites/", include("news.urls", namespace="news")),
     path("superadmin/", include("superadmin.urls")),
+    path("communication/", include(("communication.urls", "communication"), namespace="communication")),
     path("sitemap.xml", sitemap, {"sitemaps": build_sitemaps()}, name="sitemap_xml"),
     path("community/", include("community.urls")),
     path("ckeditor5/", include("django_ckeditor_5.urls")),

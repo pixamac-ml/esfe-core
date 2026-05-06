@@ -1,5 +1,6 @@
 # superadmin/views/dashboard.py
-# Dashboard principal, widgets, préférences cockpit, quick actions, notifications
+# DEPRECATED: squelette historique non branche sur le dashboard officiel.
+# La version active est consolidee dans superadmin/views.py.
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import user_passes_test
@@ -11,7 +12,7 @@ from django.db.models import Q, Exists, OuterRef, Sum, Count, F, Value, IntegerF
 
 from formations.models import Programme, Cycle
 from admissions.models import Candidature
-from core.models import ContactMessage, Notification
+from core.models import ContactMessage
 from inscriptions.models import Inscription
 from payments.models import Payment, CashPaymentSession
 from students.models import Student

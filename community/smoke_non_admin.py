@@ -4,7 +4,8 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from community.models import Category, Topic, Answer, Notification
+from communication.models import CommunicationNotification
+from community.models import Category, Topic, Answer
 from community.services.notifications import create_notification
 
 User = get_user_model()
@@ -84,20 +85,32 @@ with override_settings(ALLOWED_HOSTS=["testserver", "127.0.0.1", "localhost"]):
     print("ACCEPTED_ANSWER_MATCH", created_topic.accepted_answer_id == created_answer.id)
 
     # 5) Notifications checks
-    notif_for_auteur = Notification.objects.filter(
-        user=auteur,
-        topic=created_topic,
-        notification_type="new_answer",
+    communication_notif_for_auteur = CommunicationNotification.objects.filter(
+        recipient=auteur,
+        event_type="community_new_answer",
     ).count()
-    notif_for_member = Notification.objects.filter(
-        user=membre,
-        topic=created_topic,
-        notification_type="accepted_answer",
+    communication_notif_for_member = CommunicationNotification.objects.filter(
+        recipient=membre,
+        event_type="community_accepted_answer",
     ).count()
-    print("NOTIF_NEW_ANSWER_FOR_AUTEUR", notif_for_auteur)
-    print("NOTIF_ACCEPTED_FOR_MEMBER", notif_for_member)
-    print("UNREAD_AUTEUR", Notification.objects.filter(user=auteur, is_read=False).count())
-    print("UNREAD_MEMBER", Notification.objects.filter(user=membre, is_read=False).count())
+    print("COMM_NOTIF_NEW_ANSWER_FOR_AUTEUR", communication_notif_for_auteur)
+    print("COMM_NOTIF_ACCEPTED_FOR_MEMBER", communication_notif_for_member)
+    print(
+        "COMM_UNREAD_AUTEUR",
+        CommunicationNotification.objects.filter(
+            recipient=auteur,
+            channel=CommunicationNotification.CHANNEL_IN_APP,
+            read_at__isnull=True,
+        ).count(),
+    )
+    print(
+        "COMM_UNREAD_MEMBER",
+        CommunicationNotification.objects.filter(
+            recipient=membre,
+            channel=CommunicationNotification.CHANNEL_IN_APP,
+            read_at__isnull=True,
+        ).count(),
+    )
 
     # 6) Email smoke-test with unique topic to avoid deduplication constraint
     email_topic, _ = Topic.objects.get_or_create(
@@ -119,7 +132,10 @@ with override_settings(ALLOWED_HOSTS=["testserver", "127.0.0.1", "localhost"]):
             send_email=True,
         )
         print("EMAIL_NOTIFICATION_CREATED", bool(notif_email))
-        print("EMAIL_SENT_FLAG", bool(notif_email and notif_email.email_sent))
+        print(
+            "EMAIL_NOTIFICATION_STATUS",
+            getattr(notif_email, "status", None),
+        )
 
 print("SMOKE_TEST_DONE")
 

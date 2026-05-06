@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     # UI / Core
     "ui.apps.UiConfig",
     "core.apps.CoreConfig",
+    "communication.apps.CommunicationConfig",
 
     # ✅ CKEditor 5 (UNIQUEMENT celui-ci)
     "django_ckeditor_5",
@@ -263,8 +264,11 @@ EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False").strip().lower() in {"1", "tr
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@esfe-mali.org")
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "ESFE Core")
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "20"))
 EMAIL_LOCAL_HOSTNAME = os.getenv("EMAIL_LOCAL_HOSTNAME", "localhost")
+COMMUNICATION_EMAIL_PROVIDER = os.getenv("COMMUNICATION_EMAIL_PROVIDER", "brevo")
+COMMUNICATION_EMAIL_PROVIDER_MODE = os.getenv("COMMUNICATION_EMAIL_PROVIDER_MODE", "smtp")
 
 # ==================================================
 # AUTH REDIRECTS

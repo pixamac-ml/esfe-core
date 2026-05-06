@@ -34,7 +34,9 @@ from blog.models import Article, Comment, Category as BlogCategory
 from blog.forms import ArticleForm
 from news.models import News, Event, EventType, MediaItem, ResultSession, Category as NewsCategory
 from news.services import create_event_media_batch
-from core.models import Institution, LegalPage, LegalSection, LegalSidebarBlock, Partner, ContactMessage, Testimonial, Notification
+from communication.models import CommunicationNotification
+from communication.services import EmailService
+from core.models import Institution, LegalPage, LegalSection, LegalSidebarBlock, Partner, ContactMessage, Testimonial
 from inscriptions.models import Inscription, StatusHistory
 from payments.models import Payment, PaymentAgent, CashPaymentSession
 from students.models import Student
@@ -43,7 +45,6 @@ from accounts.models import Profile
 from community.models import Category as CommunityCategory, Topic, Answer
 from .models import SuperadminCockpitPreference
 from students.services.email import send_payment_confirmation_email
-from admissions.emails import send_notification_email
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -200,16 +201,22 @@ def _send_inscription_relance(inscription, *, source='superadmin'):
             "Merci de verifier votre espace candidat pour finaliser le processus."
         )
 
-    notification = Notification.objects.create(
+    EmailService.send_transactional(
+        subject="Relance dossier d'inscription",
         recipient_email=candidature.email,
-        recipient_name=f"{candidature.last_name} {candidature.first_name}",
-        notification_type='inscription_payment_pending',
-        title="Relance dossier d'inscription",
-        message=message,
-        related_candidature=candidature,
-        related_inscription=inscription,
+        source_app="superadmin",
+        event_type="inscription_payment_pending",
+        body=message,
+        html_template="emails/notification_candidature.html",
+        context={
+            "recipient_name": f"{candidature.last_name} {candidature.first_name}",
+            "message": message,
+            "dashboard_url": "/inscriptions/",
+            "reference": getattr(inscription, "reference", ""),
+        },
+        dispatch_on_commit=False,
     )
-    sent = send_notification_email(notification.id)
+    sent = True
 
     _log_inscription_history(
         inscription,
@@ -534,19 +541,25 @@ def dashboard_widgets_fragment(request):
         .order_by('-created_at')[:5]
     )
     context['recent_cash_sessions'] = recent_cash_sessions
-    pending_notifications_qs = Notification.objects.filter(email_sent=False)
+    pending_notifications_qs = CommunicationNotification.objects.filter(
+        channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+        status__in=[
+            CommunicationNotification.STATUS_PENDING,
+            CommunicationNotification.STATUS_QUEUED,
+            CommunicationNotification.STATUS_FAILED,
+        ],
+    )
     context['pending_notifications_count'] = pending_notifications_qs.count()
     raw_pending_types = (
         pending_notifications_qs
-        .values('notification_type')
+        .values('event_type')
         .annotate(total=Count('id'), oldest_at=Min('created_at'))
         .order_by('-total')[:8]
     )
-    notification_labels = dict(Notification.TYPE_CHOICES)
     context['pending_notification_types'] = [
         {
             **row,
-            'label': notification_labels.get(row['notification_type'], row['notification_type']),
+            'label': row['event_type'].replace('_', ' ').title(),
         }
         for row in raw_pending_types
     ]
@@ -606,28 +619,35 @@ def dashboard_notifications_action(request):
     action = request.POST.get('action')
     notification_type = request.POST.get('notification_type', '').strip()
 
-    qs = Notification.objects.filter(email_sent=False)
+    qs = CommunicationNotification.objects.filter(
+        channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+        status__in=[
+            CommunicationNotification.STATUS_PENDING,
+            CommunicationNotification.STATUS_QUEUED,
+            CommunicationNotification.STATUS_FAILED,
+        ],
+    )
     if notification_type:
-        qs = qs.filter(notification_type=notification_type)
+        qs = qs.filter(event_type=notification_type)
 
     updated = 0
 
     if action == 'mark_old_done':
         cutoff = timezone.now() - timedelta(days=7)
         updated = qs.filter(created_at__lt=cutoff).update(
-            email_sent=True,
+            status=CommunicationNotification.STATUS_SKIPPED,
             sent_at=timezone.now(),
         )
         messages.success(request, f"{updated} notification(s) ancienne(s) marquee(s) comme traitee(s).")
     elif action == 'mark_type_done' and notification_type:
         updated = qs.update(
-            email_sent=True,
+            status=CommunicationNotification.STATUS_SKIPPED,
             sent_at=timezone.now(),
         )
         messages.success(request, f"{updated} notification(s) du type '{notification_type}' marquee(s) comme traitee(s).")
     elif action == 'mark_all_done':
         updated = qs.update(
-            email_sent=True,
+            status=CommunicationNotification.STATUS_SKIPPED,
             sent_at=timezone.now(),
         )
         messages.success(request, f"{updated} notification(s) marquee(s) comme traitee(s).")

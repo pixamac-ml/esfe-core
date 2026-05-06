@@ -5,7 +5,6 @@ from django.contrib import messages
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
@@ -13,6 +12,7 @@ from django.utils import timezone
 from django.db import connection
 from django.db.utils import OperationalError, ProgrammingError
 from django.shortcuts import redirect
+from communication.services import EmailService
 
 from .models import (
     Institution,
@@ -787,16 +787,17 @@ class ContactMessageAdmin(admin.ModelAdmin):
                 "contact_email": settings.DEFAULT_FROM_EMAIL,
                 "reply_date": timezone.now(),
             }
-            html_content = render_to_string("emails/contact_reply.html", context)
-            text_content = strip_tags(html_content)
-            email = EmailMultiAlternatives(
-                subject=f"[ESFé] Réponse à votre demande - {obj.get_subject_display()}",
-                body=text_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[obj.email],
+            EmailService.send_transactional(
+                subject=f"[ESFE] Reponse a votre demande - {obj.get_subject_display()}",
+                recipient_email=obj.email,
+                source_app="core_admin",
+                event_type="contact_reply",
+                html_template="emails/contact_reply.html",
+                context=context,
+                dispatch_on_commit=False,
+                legacy_source="core.admin.contact_reply",
+                legacy_object_id=getattr(obj, "pk", ""),
             )
-            email.attach_alternative(html_content, "text/html")
-            email.send(fail_silently=False)
             obj.status = "answered"
             obj.answered_at = timezone.now()
             messages.success(request, "✔ Réponse envoyée avec succès.")

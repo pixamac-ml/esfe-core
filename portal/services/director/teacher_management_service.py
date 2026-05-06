@@ -5,7 +5,6 @@ from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -13,6 +12,7 @@ from django.utils.text import slugify
 
 from academics.models import AcademicClass, EC
 from accounts.dashboards.helpers import get_user_branch
+from communication.services import EmailService
 from portal.models import DirectorTeacherAssignment
 from portal.services.it_support_service import create_temp_password, log_support_action
 
@@ -168,23 +168,33 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
         class_labels = list(dict.fromkeys(item.academic_class.display_name for item in assignments if item.academic_class_id))
         ec_labels = list(dict.fromkeys(item.ec.title for item in assignments if item.ec_id))
 
-    send_payload = (
-        "Votre compte enseignant ESFE a ete cree.\n"
-        f"Identifiant: {username}\n"
-        f"Mot de passe temporaire: {password}\n"
-        f"Annexe: {branch.name}\n"
-    )
     email_sent = False
     try:
-        email_sent = bool(
-            send_mail(
-                subject="Acces enseignant ESFE",
-                message=send_payload,
-                from_email=None,
-                recipient_list=[email],
-                fail_silently=True,
-            )
+        EmailService.send_transactional(
+            subject="Acces enseignant ESFE",
+            recipient=teacher,
+            recipient_email=email,
+            actor=user,
+            source_app="portal",
+            event_type="teacher_account_created",
+            body=(
+                "Votre compte enseignant ESFE a ete cree.\n"
+                f"Identifiant: {username}\n"
+                f"Mot de passe temporaire: {password}\n"
+                f"Annexe: {branch.name}\n"
+            ),
+            context={
+                "message": (
+                    f"Votre compte enseignant ESFE est actif. "
+                    f"Identifiant: {username}. Mot de passe temporaire: {password}. "
+                    f"Annexe: {branch.name}."
+                )
+            },
+            dispatch_on_commit=False,
+            legacy_source="portal.teacher_management",
+            legacy_object_id=getattr(teacher, "pk", ""),
         )
+        email_sent = True
     except Exception:
         email_sent = False
 

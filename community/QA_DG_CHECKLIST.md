@@ -5,9 +5,9 @@ Valider que le module `community` est stable, cohérent et prêt pour démonstra
 
 ## Pré-vol
 ```powershell
-python -u "C:\Users\WORK\PycharmProjects\esfe\manage.py" check
-python -u "C:\Users\WORK\PycharmProjects\esfe\manage.py" migrate
-python -u "C:\Users\WORK\PycharmProjects\esfe\manage.py" runserver
+python manage.py check
+python manage.py migrate
+python manage.py runserver
 ```
 
 ## Cas de test obligatoires
@@ -16,11 +16,10 @@ python -u "C:\Users\WORK\PycharmProjects\esfe\manage.py" runserver
 - [ ] Voter une réponse -> score mis à jour sans erreur.
 - [ ] Accepter une réponse -> badge solution visible et cohérent.
 - [ ] Signaler un contenu -> formulaire `community/report.html` fonctionnel.
-- [ ] Vérifier `community/notifications.html` -> filtres et pagination opérationnels.
+- [ ] Vérifier le centre `communication/notifications.html` -> listing et compteur cohérents.
 - [ ] Marquer une notification comme lue -> état + compteur non lu synchronisés.
-- [ ] Supprimer une notification -> carte retirée + compteur cohérent.
 - [ ] Cliquer "Tout marquer lu" -> compteur à 0 + badge navbar mis à jour.
-- [ ] Vérifier websocket notif (badge navbar se met à jour à l'arrivée d'une nouvelle notif).
+- [ ] Vérifier websocket notif centralisé (badge navbar mis à jour à l'arrivée d'une nouvelle notif).
 
 ## Tests emails
 - [ ] Déclencher une notification avec envoi email (`send_email=True`).
@@ -34,6 +33,6 @@ python -u "C:\Users\WORK\PycharmProjects\esfe\manage.py" runserver
 ## Notes de capture DG
 - Capture 1: Listing discussions + recherche + tri.
 - Capture 2: Détail sujet avec réponse HTMX et vote.
-- Capture 3: Notifications page + badge navbar avant/après action.
+- Capture 3: Centre de notifications + badge navbar avant/après action.
 - Capture 4: Profil public avec onglets activité/réponses/sujets/badges.
 

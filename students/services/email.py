@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from core.emailing import send_templated_email
+from communication.services import EmailService
 
 
 def send_student_credentials_email(*, student, raw_password):
@@ -18,13 +18,18 @@ def send_student_credentials_email(*, student, raw_password):
         "reference": inscription.public_token,
     }
 
-    send_templated_email(
+    EmailService.send_transactional(
         subject=subject,
-        recipient=user.email,
-        text_template="emails/student_welcome.txt",
+        recipient=user,
+        recipient_email=user.email,
+        source_app="students",
+        event_type="student_welcome_credentials",
         html_template="emails/student_welcome.html",
+        text_template="emails/student_welcome.txt",
         context=context,
-        fail_silently=False,
+        dispatch_on_commit=False,
+        legacy_source="students.send_student_credentials_email",
+        legacy_object_id=getattr(student, "pk", ""),
     )
 
 
@@ -53,11 +58,16 @@ def send_payment_confirmation_email(*, payment):
         "reference": payment.reference or payment.pk,
     }
 
-    send_templated_email(
+    EmailService.send_transactional(
         subject=subject,
-        recipient=candidature.email,
-        text_template="emails/payment_confirmation.txt",
+        recipient=getattr(student, "user", None),
+        recipient_email=candidature.email,
+        source_app="payments",
+        event_type="payment_confirmation",
         html_template="emails/payment_confirmation.html",
+        text_template="emails/payment_confirmation.txt",
         context=context,
-        fail_silently=False,
+        dispatch_on_commit=False,
+        legacy_source="students.send_payment_confirmation_email",
+        legacy_object_id=getattr(payment, "pk", ""),
     )

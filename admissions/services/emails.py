@@ -1,6 +1,4 @@
-from django.core.mail import send_mail
-
-from core.emailing import send_templated_email
+from communication.services import EmailService
 
 
 # ======================================================
@@ -11,25 +9,18 @@ def send_institutional_email(subject, template, context, recipient):
     """
     Envoi d'un email institutionnel HTML + texte.
     """
-
-    try:
-        return send_templated_email(
-            subject=subject,
-            recipient=recipient,
-            html_template=template,
-            context=context,
-            fail_silently=False,
-        )
-    except Exception:
-        # Fallback text si le template HTML a un souci.
-        send_mail(
-            subject=subject,
-            message=context.get("fallback_message", "Notification institutionnelle."),
-            from_email=None,
-            recipient_list=[recipient],
-            fail_silently=False,
-        )
-        return True
+    return EmailService.send_transactional(
+        subject=subject,
+        recipient_email=recipient,
+        source_app="admissions",
+        event_type="admissions_transactional_email",
+        body=context.get("fallback_message", "Notification institutionnelle."),
+        html_template=template,
+        context=context,
+        dispatch_on_commit=False,
+        legacy_source="admissions.services.emails",
+        legacy_object_id=context.get("candidature_reference", ""),
+    )
 
 
 # ======================================================

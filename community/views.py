@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.template.loader import render_to_string
 from django.db.models import Prefetch, Count, F, Q
 from django.views.decorators.http import require_POST
@@ -13,8 +13,13 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from .forms import TopicForm, ReportForm
-from .models import Topic, Category, Answer, Vote, TopicView, Tag, Notification, Report
-from community.services.notifications import create_notification
+from .models import Topic, Category, Answer, Vote, TopicView, Tag, Report
+from community.services.notifications import (
+    create_notification,
+    notify_accepted_answer,
+    notify_new_answer,
+    notify_reply_to_reply,
+)
 from community.services.gamification import GamificationService
 from community.models_gamification import GamificationProfile, UserBadge
 
@@ -369,58 +374,13 @@ def add_answer(request, slug):
         last_activity_at=timezone.now()
     )
 
-    # NOTIFICATIONS
-    if topic.author != request.user:
-        try:
-            create_notification(
-                user=topic.author,
-                actor=request.user,
-                topic=topic,
-                answer=answer,
-                notification_type="new_answer",
-                send_email=False
-            )
-        except Exception as exc:
-            logger.exception("Echec notification nouvelle reponse auteur topic=%s: %s", topic.id, exc)
-
     try:
-        previous_responders = (
-            Answer.objects
-            .filter(topic=topic, is_deleted=False)
-            .exclude(author=request.user)
-            .exclude(author=topic.author)
-            .values_list("author_id", flat=True)
-            .distinct()
-        )
-
-        for responder_id in previous_responders:
-            existing_notification = Notification.objects.filter(
-                user_id=responder_id,
-                actor=request.user,
-                topic=topic,
-                answer=answer,
-                notification_type="new_answer"
-            ).exists()
-
-            if not existing_notification:
-                try:
-                    create_notification(
-                        user_id=responder_id,
-                        actor=request.user,
-                        topic=topic,
-                        answer=answer,
-                        notification_type="new_answer",
-                        send_email=False
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "Echec notification responder_id=%s topic=%s: %s",
-                        responder_id,
-                        topic.id,
-                        exc,
-                    )
+        if parent:
+            notify_reply_to_reply(parent, answer)
+        else:
+            notify_new_answer(topic, answer)
     except Exception as exc:
-        logger.exception("Echec boucle notifications reponse topic=%s: %s", topic.id, exc)
+        logger.exception("Echec notifications reponse topic=%s answer=%s: %s", topic.id, answer.id, exc)
 
     # Préchargement auteur pour template
     answer = (
@@ -917,131 +877,6 @@ def leaderboard(request):
 
 
 # =====================================================
-# NOTIFICATIONS
-# =====================================================
-@login_required
-def notifications(request):
-
-    notification_type = request.GET.get("type", "")
-    is_read = request.GET.get("is_read", "")
-
-    notifications_qs = (
-        Notification.objects
-        .filter(user=request.user)
-        .select_related("actor", "topic", "topic__category", "answer", "answer__author")
-    )
-
-    if notification_type:
-        notifications_qs = notifications_qs.filter(notification_type=notification_type)
-
-    if is_read == "true":
-        notifications_qs = notifications_qs.filter(is_read=True)
-    elif is_read == "false":
-        notifications_qs = notifications_qs.filter(is_read=False)
-
-    paginator = Paginator(notifications_qs, 20)
-    page = request.GET.get("page", 1)
-
-    try:
-        notifications_page = paginator.page(page)
-    except PageNotAnInteger:
-        notifications_page = paginator.page(1)
-    except EmptyPage:
-        notifications_page = paginator.page(paginator.num_pages)
-
-    unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
-    total_count = Notification.objects.filter(user=request.user).count()
-
-
-    if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "community/partials/notifications_list.html",
-            {"notifications": notifications_page, "page_obj": notifications_page}
-        )
-
-    return render(request, "community/notifications.html", {
-        "notifications": notifications_page,
-        "page_obj": notifications_page,
-        "unread_count": unread_count,
-        "total_count": total_count,
-        "current_type": notification_type,
-        "current_is_read": is_read,
-    })
-
-
-@login_required
-def notifications_partial(request):
-    notifications = (
-        Notification.objects
-        .filter(user=request.user)
-        .select_related("actor", "topic", "topic__category", "answer")
-        .order_by("-created_at")[:7]
-    )
-
-    unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
-
-    return render(
-        request,
-        "community/partials/notifications_dropdown.html",
-        {"notifications": notifications, "unread_count": unread_count}
-    )
-
-
-@login_required
-@require_POST
-def mark_notification_read(request, pk):
-    notification = get_object_or_404(Notification, pk=pk, user=request.user)
-    notification.mark_as_read()
-
-    if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "community/partials/notification_item.html",
-            {"notification": notification}
-        )
-
-    return HttpResponse(status=204)
-
-
-@login_required
-@require_POST
-def mark_all_notifications_read(request):
-    Notification.objects.filter(user=request.user, is_read=False).update(
-        is_read=True,
-        read_at=timezone.now()
-    )
-
-    if request.headers.get("HX-Request"):
-        return HttpResponse("")
-
-    messages.success(request, "Toutes les notifications ont été marquées comme lues.")
-    return redirect("community:notifications")
-
-
-@login_required
-@require_POST
-def delete_notification(request, pk):
-    notification = get_object_or_404(Notification, pk=pk, user=request.user)
-    notification.delete()
-
-    if request.headers.get("HX-Request"):
-        return HttpResponse("")
-
-    return HttpResponse(status=204)
-
-
-@login_required
-def notifications_unread_count(request):
-    count = Notification.objects.filter(user=request.user, is_read=False).count()
-
-    if request.headers.get("HX-Request"):
-        return HttpResponse(f'<span id="unread-count">{count}</span>')
-
-    return JsonResponse({"unread_count": count})
-
-
-# =====================================================
 # ACCEPTER UNE RÉPONSE COMME SOLUTION
 # =====================================================
 @login_required
@@ -1078,7 +913,6 @@ def accept_answer(request, answer_id):
         # Notification
         if answer.author != request.user:
             try:
-                from community.services.notifications import notify_accepted_answer
                 notify_accepted_answer(topic, answer)
             except Exception as exc:
                 logger.exception("Echec notification accepted_answer topic=%s answer=%s: %s", topic.id, answer.id, exc)

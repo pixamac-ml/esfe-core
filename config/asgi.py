@@ -18,7 +18,9 @@ django_asgi_app = get_asgi_application()
 if os.getenv("ENABLE_WEBSOCKETS", "True").strip().lower() in {"1", "true", "yes", "on"}:
 	from channels.auth import AuthMiddlewareStack
 	from channels.routing import ProtocolTypeRouter, URLRouter
-	from community.routing import websocket_urlpatterns
+	from communication.realtime.routing import websocket_urlpatterns as communication_websocket_urlpatterns
+
+	websocket_urlpatterns = [*communication_websocket_urlpatterns]
 
 	application = ProtocolTypeRouter(
 		{

@@ -1,8 +1,14 @@
+import logging
+
 from django.conf import settings
 
 from core.emailing import send_templated_email
 
 from .base import BaseEmailProvider, ProviderResult
+from communication.services.template_registry import resolve_email_configuration
+
+
+logger = logging.getLogger(__name__)
 
 
 class BrevoEmailProvider(BaseEmailProvider):
@@ -19,22 +25,31 @@ class BrevoEmailProvider(BaseEmailProvider):
         if not recipient:
             return ProviderResult(status="skipped", provider=self.provider_name)
 
-        template_name = notification.metadata.get("html_template") or "emails/base_communication.html"
+        resolved_email = resolve_email_configuration(
+            event_type=notification.event_type,
+            title=notification.title,
+            body=notification.body,
+            metadata=notification.metadata,
+        )
         context = {
-            "title": notification.title,
-            "message": notification.body,
             "notification": notification,
-            **notification.metadata.get("context", {}),
+            **resolved_email["context"],
         }
 
-        # This keeps Brevo isolated behind a provider boundary. SMTP is the
-        # default transport until API credentials/templates are wired in.
+        logger.info(
+            "Envoi email transactionnel event=%s template=%s recipient=%s",
+            notification.event_type,
+            resolved_email["html_template"] or resolved_email["text_template"] or "fallback_text",
+            recipient,
+        )
         send_templated_email(
             subject=notification.title,
             recipient=recipient,
-            text_template=notification.metadata.get("text_template"),
-            html_template=template_name,
+            text_template=resolved_email["text_template"],
+            html_template=resolved_email["html_template"],
             context=context,
+            attachments=resolved_email["attachments"],
+            fallback_text=resolved_email["fallback_text"],
             fail_silently=False,
         )
         return ProviderResult(status="sent", provider=self.provider_name)

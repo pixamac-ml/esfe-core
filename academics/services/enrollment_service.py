@@ -1,25 +1,26 @@
 import logging
 
-from academics.models import AcademicClass, AcademicEnrollment, AcademicYear
+from django.db import transaction
+
+from academics.models import AcademicEnrollment
+from academics.services.academic_context_resolver import (
+    LEGACY_ENTRY_YEAR_TO_LEVEL,
+    resolve_academic_context,
+)
 
 
 logger = logging.getLogger(__name__)
 
 
-ENTRY_YEAR_TO_LEVEL = {
-    1: "L1",
-    2: "L2",
-    3: "L3",
-    4: "M1",
-    5: "M2",
-}
+ENTRY_YEAR_TO_LEVEL = LEGACY_ENTRY_YEAR_TO_LEVEL
 
 
-def _build_result(status, enrollment=None, reason=None):
+def _build_result(status, enrollment=None, reason=None, context=None):
     return {
         "status": status,
         "enrollment": enrollment,
         "reason": reason,
+        "context": context or {},
     }
 
 
@@ -60,100 +61,34 @@ def assign_student_academic_enrollment(inscription):
         )
         return _build_result("already_assigned", enrollment=enrollment)
 
-    programme = candidature.programme
-    branch = candidature.branch
-    academic_year_name = str(candidature.academic_year or "").strip()
-    entry_year = candidature.entry_year
-
-    if not programme:
+    resolution = resolve_academic_context(candidature=candidature)
+    if resolution["status"] != "resolved":
         logger.warning(
-            "Affectation academique manuelle requise: programme absent pour inscription=%s",
+            "Provisioning academique manuel requis inscription=%s status=%s reason=%s year=%s level=%s",
             inscription.pk,
+            resolution["status"],
+            resolution["reason"],
+            resolution["academic_year_name"],
+            resolution["resolved_level"],
         )
-        return _build_result("manual_required_missing_data", reason="missing_programme")
-
-    if not branch:
-        logger.warning(
-            "Affectation academique manuelle requise: annexe absente pour inscription=%s",
-            inscription.pk,
+        return _build_result(
+            resolution["status"],
+            reason=resolution["reason"],
+            context=resolution,
         )
-        return _build_result("manual_required_missing_data", reason="missing_branch")
 
-    if not academic_year_name:
-        logger.warning(
-            "Affectation academique manuelle requise: annee academique absente pour inscription=%s",
-            inscription.pk,
-        )
-        return _build_result("manual_required_missing_data", reason="missing_academic_year")
-
-    if entry_year in (None, ""):
-        logger.warning(
-            "Affectation academique manuelle requise: niveau d'entree absent pour inscription=%s",
-            inscription.pk,
-        )
-        return _build_result("manual_required_missing_data", reason="missing_entry_level")
-
-    academic_year = AcademicYear.objects.filter(name=academic_year_name).first()
-    if not academic_year:
-        logger.warning(
-            "AcademicYear introuvable pour inscription=%s, value=%s",
-            inscription.pk,
-            academic_year_name,
-        )
-        return _build_result("manual_required_missing_data", reason="academic_year_not_found")
-
-    level = ENTRY_YEAR_TO_LEVEL.get(entry_year)
-    if not level:
-        logger.warning(
-            "Niveau introuvable pour inscription=%s, entry_year=%s",
-            inscription.pk,
-            entry_year,
-        )
-        return _build_result("manual_required_missing_data", reason="level_not_resolved")
-
-    class_queryset = AcademicClass.objects.filter(
-        programme=programme,
-        branch=branch,
-        academic_year=academic_year,
-        level=level,
-        is_active=True,
-    )
-    match_count = class_queryset.count()
-
-    if match_count == 0:
-        logger.warning(
-            "Aucune classe academique pour inscription=%s, programme=%s, branch=%s, year=%s, level=%s",
-            inscription.pk,
-            programme.pk,
-            branch.pk,
-            academic_year.pk,
-            level,
-        )
-        return _build_result("manual_required_no_class", reason="academic_class_not_found")
-
-    if match_count > 1:
-        logger.warning(
-            "Plusieurs classes academiques pour inscription=%s, programme=%s, branch=%s, year=%s, level=%s",
-            inscription.pk,
-            programme.pk,
-            branch.pk,
-            academic_year.pk,
-            level,
-        )
-        return _build_result("manual_required_ambiguous", reason="multiple_academic_classes")
-
-    academic_class = class_queryset.first()
     try:
-        enrollment, created = AcademicEnrollment.objects.get_or_create(
-            inscription=inscription,
-            defaults={
-                "student": student.user,
-                "programme": programme,
-                "branch": branch,
-                "academic_year": academic_year,
-                "academic_class": academic_class,
-            },
-        )
+        with transaction.atomic():
+            enrollment, created = AcademicEnrollment.objects.get_or_create(
+                inscription=inscription,
+                defaults={
+                    "student": student.user,
+                    "programme": resolution["programme"],
+                    "branch": resolution["branch"],
+                    "academic_year": resolution["academic_year"],
+                    "academic_class": resolution["academic_class"],
+                },
+            )
     except Exception:
         logger.exception(
             "Erreur metier lors de la creation AcademicEnrollment pour inscription=%s",
@@ -163,9 +98,11 @@ def assign_student_academic_enrollment(inscription):
 
     if created:
         logger.info(
-            "AcademicEnrollment cree pour inscription=%s, class=%s",
+            "AcademicEnrollment cree pour inscription=%s, class=%s, year=%s, level=%s",
             inscription.pk,
-            academic_class.pk,
+            resolution["academic_class"].pk,
+            resolution["academic_year_name"],
+            resolution["resolved_level"],
         )
         status = "assigned"
     else:
@@ -176,4 +113,4 @@ def assign_student_academic_enrollment(inscription):
         )
         status = "already_assigned"
 
-    return _build_result(status, enrollment=enrollment)
+    return _build_result(status, enrollment=enrollment, context=resolution)

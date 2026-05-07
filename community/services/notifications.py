@@ -11,6 +11,7 @@ from django.conf import settings
 
 from communication.models import CommunicationNotification
 from communication.services import NotificationService
+from communication.services.channel_policy import resolve_channel_policy
 
 
 def create_notification(
@@ -61,16 +62,14 @@ def create_notification(
         if existing:
             return None
 
-    channels = [
+    default_channels = [
         CommunicationNotification.CHANNEL_IN_APP,
         CommunicationNotification.CHANNEL_WEBSOCKET,
     ]
     if send_email and user.email:
-        channels.append(CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL)
         metadata = {
             **metadata,
             "recipient_email": user.email,
-            "html_template": "emails/base_communication.html",
             "context": {
                 "message": _build_email_content(
                     recipient=user,
@@ -82,6 +81,14 @@ def create_notification(
                 ),
             },
         }
+        default_channels.append(CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL)
+
+    policy = resolve_channel_policy(
+        event_type,
+        default_channels=default_channels,
+        default_priority=CommunicationNotification.PRIORITY_NORMAL,
+        metadata=metadata,
+    )
 
     _event, created_notifications = NotificationService.notify_user(
         recipient=user,
@@ -90,8 +97,9 @@ def create_notification(
         title=title,
         body=body,
         source_app="community",
-        channels=tuple(channels),
-        metadata=metadata,
+        channels=policy["channels"],
+        priority=policy["priority"],
+        metadata=policy["metadata"],
         dispatch_on_commit=False,
     )
     return created_notifications[0] if created_notifications else None

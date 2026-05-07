@@ -223,7 +223,7 @@ class StudentCreationWorkflowTests(TestCase):
         self.assertEqual(result["student"].pk, student.pk)
         self.assertFalse(result["created"])
         self.assertEqual(student.user.profile.role, "student")
-        self.assertEqual(result["academic_enrollment"]["status"], "manual_required_no_class")
+        self.assertEqual(result["academic_enrollment"]["status"], "manual_required_missing_class")
 
     def test_manual_academic_enrollment_allowed_after_first_validated_payment(self):
         self._create_validated_payment(25000)
@@ -266,7 +266,7 @@ class StudentCreationWorkflowTests(TestCase):
         self.assertEqual(result["academic_enrollment"]["status"], "already_assigned")
         self.assertEqual(result["academic_enrollment"]["enrollment"].academic_class, academic_class)
 
-    def test_service_returns_manual_required_missing_data_when_year_unresolved(self):
+    def test_service_returns_manual_required_missing_year_when_year_unresolved(self):
         self.candidature.academic_year = "2029-2030"
         self.candidature.save(update_fields=["academic_year"])
         self._create_validated_payment(25000)
@@ -274,8 +274,29 @@ class StudentCreationWorkflowTests(TestCase):
         result = create_student_after_first_payment(self.inscription)
 
         self.assertIsNotNone(result)
-        self.assertEqual(result["academic_enrollment"]["status"], "manual_required_missing_data")
+        self.assertEqual(result["academic_enrollment"]["status"], "manual_required_missing_year")
         self.assertEqual(result["academic_enrollment"]["reason"], "academic_year_not_found")
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_service_normalizes_legacy_academic_year_string_before_assignment(self, send_credentials, send_confirmation):
+        AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            is_active=True,
+        )
+        self.candidature.academic_year = "2025 / 2026"
+        self.candidature.save(update_fields=["academic_year"])
+
+        self._create_validated_payment(25000)
+
+        enrollment = AcademicEnrollment.objects.select_related("academic_year").get(inscription=self.inscription)
+        self.assertEqual(enrollment.academic_year, self.academic_year)
+        send_credentials.assert_called_once()
+        send_confirmation.assert_not_called()
 
     def test_backfill_creates_missing_student_and_assigns_role(self):
         self._create_validated_payment(25000)

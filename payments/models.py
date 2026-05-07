@@ -17,6 +17,7 @@ from students.services.email import (
     send_student_credentials_email,
     send_payment_confirmation_email
 )
+from payments.services.workflows import run_first_payment_validated_workflow
 
 import secrets
 import random
@@ -377,3 +378,8 @@ class Payment(models.Model):
         else:
 
             send_payment_confirmation_email(payment=self)
+
+        run_first_payment_validated_workflow(
+            payment=self,
+            student_result=result,
+        )

@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from admissions.models import Candidature
 from branches.models import Branch
+from communication.models import CommunicationNotification
 from formations.models import Cycle, Diploma, Filiere, Programme, ProgrammeRequiredDocument, RequiredDocument
 
 
@@ -104,3 +105,37 @@ class AdmissionTunnelValidationTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Cette adresse email est deja utilisee pour cette formation cette annee")
 		self.assertEqual(Candidature.objects.count(), 1)
+
+	def test_accepted_status_uses_premium_admissions_template_metadata(self):
+		candidature = Candidature.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year="2026-2027",
+			entry_year=1,
+			first_name="Awa",
+			last_name="Traore",
+			birth_date="2002-05-20",
+			birth_place="Bamako",
+			gender="female",
+			phone="+22370000000",
+			email="awa.accepted@example.com",
+			city="Bamako",
+			country="Mali",
+			status="submitted",
+		)
+
+		candidature.status = "accepted"
+		candidature.save(update_fields=["status"])
+
+		notification = CommunicationNotification.objects.filter(
+			event_type="candidature_accepted",
+			channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+		).latest("created_at")
+
+		self.assertEqual(notification.metadata["template_key"], "candidature_accepted")
+		self.assertEqual(notification.metadata["programme_name"], self.programme.title)
+		self.assertEqual(notification.metadata["academic_year"], "2026-2027")
+		self.assertEqual(
+			notification.metadata["context"]["candidate_name"],
+			candidature.full_name,
+		)

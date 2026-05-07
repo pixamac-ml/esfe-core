@@ -1,21 +1,290 @@
-ConnectionError sur /admissions/s-inscrire/master-en-epidemiologie/
-Error 22 connecting to 127.0.0.1:6379. Le système distant a refusé la connexion réseau.
-Méthode de demande :	POST
-URL de demande :	http://127.0.0.1:8000/admissions/s-inscrire/master-en-epidemiologie/
-Version Django :	6.0.1
-Type d’exception :	ConnectionError
-Valeur d’exception :	
-Error 22 connecting to 127.0.0.1:6379. Le système distant a refusé la connexion réseau.
-Emplacement d’exception :	C : \Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\redis\asyncio\connection.py, ligne 348, en connect_check_health
-Élevé pendant :	admissions.views.apply_to_programme
-Exécutable Python :	C : \Users\WORK\PycharmProjects\esfe-core\.venv\Scripts\python.exe
-Version Python :	3.12.10
-Chemin Python :	
-['C:\\Users\\WORK\\PycharmProjects\\esfe-core',
- 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip',
- 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\DLLs',
- 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\Lib',
- 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312',
- 'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv',
- 'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv\\Lib\\site-packages']
-Temps serveur :	Mercredi, 06 mai 2026 15:41:44 +0000
+MISSION CRITIQUE — INDUSTRIALISATION SÉCURISÉE DU STUDENT ACADEMIC PROVISIONING SYSTEM
+PROJET : ESFE CORE
+
+IMPORTANT :
+Cette mission doit être exécutée avec une extrême prudence.
+
+OBJECTIF ABSOLU :
+Renforcer et fiabiliser le provisioning académique automatique EXISTANT sans casser l’architecture actuelle du projet.
+
+NE PAS :
+
+* reconstruire le domaine académique,
+* recréer les modèles principaux,
+* ajouter des champs massifs inutiles,
+* dupliquer niveau/classe partout,
+* casser les dashboards existants,
+* casser les workflows payments/admissions,
+* modifier brutalement les relations métier existantes.
+
+Le rapport d’audit a confirmé que :
+
+* `AcademicClass` joue déjà le rôle de niveau académique contextualisé,
+* `AcademicEnrollment` est déjà la vraie liaison académique officielle,
+* le pipeline métier existe déjà,
+* le vrai problème est la fiabilisation de la résolution académique automatique.
+
+===========================================================
+MISSION PRINCIPALE
+==================
+
+Transformer le provisioning académique actuel en workflow enterprise robuste, stable, supervisable et fiable.
+
+Le système doit garantir que :
+
+Quand FIRST_PAYMENT_VALIDATED est exécuté :
+
+* User est créé,
+* Student est créé,
+* ET l’étudiant est automatiquement lié correctement à :
+
+  * sa formation,
+  * son cycle,
+  * son niveau contextualisé,
+  * sa classe académique,
+  * son année académique,
+  * son dashboard contextualisé,
+  * ses futurs cours/UE/EC/emplois du temps.
+
+SANS intervention humaine si les données académiques existent correctement.
+
+===========================================================
+RÈGLES ABSOLUES
+===============
+
+1. NE PAS CASSER LE PROJET
+
+* préserver compatibilité maximale,
+* préserver workflows existants,
+* préserver dashboards existants,
+* préserver logique notes/résultats,
+* préserver logique finance,
+* préserver communication/.
+
+2. NE PAS REFAIRE LE DOMAINE
+
+NE PAS :
+
+* créer un nouveau système parallèle,
+* remplacer AcademicEnrollment,
+* remplacer AcademicClass,
+* dupliquer les relations académiques.
+
+3. UTILISER L’ARCHITECTURE EXISTANTE
+
+Conserver :
+
+* AcademicEnrollment comme pivot officiel,
+* AcademicClass comme contexte académique opérationnel,
+* communication/ comme noyau notification/email/realtime,
+* services.py pour logique métier,
+* selectors.py pour lectures DB.
+
+===========================================================
+PHASE 1 — ANALYSE DES POINTS FRAGILES
+=====================================
+
+Identifier précisément :
+
+1. tous les endroits où :
+
+   * AcademicEnrollment peut échouer,
+   * la classe académique peut ne pas être résolue,
+   * le niveau peut être ambigu,
+   * l’année académique peut être incohérente.
+
+2. les workflows pouvant créer :
+
+   * étudiants sans contexte académique,
+   * dashboards vides,
+   * cours non contextualisés,
+   * emplois du temps absents.
+
+3. les endroits où :
+
+   * plusieurs points d’entrée tentent le provisioning,
+   * plusieurs services tentent la même liaison.
+
+===========================================================
+PHASE 2 — CENTRALISATION DE LA RÉSOLUTION ACADÉMIQUE
+====================================================
+
+Créer un vrai service officiel centralisé de résolution académique.
+
+Exemple attendu :
+
+academics/services/academic_context_resolver.py
+
+Objectif :
+Transformer :
+
+* candidature,
+* programme,
+* branch,
+* entry_year,
+* academic_year,
+
+en :
+
+* cycle,
+* resolved_level,
+* academic_class,
+* academic_year object,
+* contexte académique complet.
+
+IMPORTANT :
+Toute la logique de résolution doit devenir CENTRALISÉE.
+
+===========================================================
+PHASE 3 — FIABILISATION DU MAPPING NIVEAU
+=========================================
+
+Le mapping actuel `ENTRY_YEAR_TO_LEVEL` existe déjà mais reste fragile.
+
+OBJECTIF :
+Le renforcer proprement sans casser le système actuel.
+
+Prévoir :
+
+* validation métier,
+* cas spéciaux,
+* cycles atypiques,
+* gestion future des passerelles,
+* gestion future redoublements,
+* gestion future réorientations.
+
+IMPORTANT :
+Conserver compatibilité avec l’existant.
+
+===========================================================
+PHASE 4 — NORMALISATION ACADEMIC YEAR
+=====================================
+
+Le rapport a identifié une incohérence :
+
+* `Candidature.academic_year` = string legacy
+* `AcademicEnrollment.academic_year` = FK normalisée
+
+OBJECTIF :
+Préparer une normalisation progressive et sécurisée.
+
+IMPORTANT :
+
+* pas de migration destructrice,
+* compatibilité legacy,
+* fallback propre,
+* résolution robuste.
+
+===========================================================
+PHASE 5 — HARDENING DU PROVISIONING
+===================================
+
+Le provisioning doit devenir :
+
+* transactionnel,
+* idempotent,
+* supervisable,
+* after_commit safe,
+* retry safe,
+* observable.
+
+Ajouter :
+
+* logs explicites,
+* statuts de résolution,
+* erreurs métier supervisables,
+* audit provisioning,
+* traces claires.
+
+IMPORTANT :
+Ne jamais laisser un échec silencieux.
+
+===========================================================
+PHASE 6 — GESTION DES CAS AMBIGUS
+=================================
+
+Prévoir explicitement les cas :
+
+* aucune classe trouvée,
+* plusieurs classes trouvées,
+* année académique absente,
+* mapping niveau impossible,
+* programme incomplet.
+
+Dans ces cas :
+
+* ne pas casser le provisioning principal,
+* mais créer un état supervisable clair.
+
+Exemples :
+
+* manual_required_missing_class
+* manual_required_ambiguous_level
+* manual_required_missing_year
+
+===========================================================
+PHASE 7 — DASHBOARDS CONTEXTUALISÉS
+===================================
+
+Une fois AcademicEnrollment validé :
+le dashboard étudiant doit immédiatement recevoir :
+
+* ses cours,
+* ses UE,
+* ses EC,
+* ses emplois du temps,
+* ses notifications,
+* ses paiements,
+* ses ressources,
+* ses enseignants,
+* ses modules pédagogiques.
+
+IMPORTANT :
+Le filtrage doit continuer à dépendre de :
+AcademicEnrollment + AcademicClass.
+
+===========================================================
+PHASE 8 — VALIDATION COMPLÈTE
+=============================
+
+Tester :
+
+1. candidature acceptée
+2. inscription créée
+3. premier paiement validé
+4. création user
+5. création student
+6. résolution académique
+7. création AcademicEnrollment
+8. dashboard contextualisé
+9. accès cours
+10. accès timetable
+11. notifications
+12. emails onboarding
+
+Tester aussi :
+
+* cas ambigus,
+* absence de classe,
+* absence AcademicYear,
+* conflits niveaux.
+
+===========================================================
+LIVRABLE FINAL
+==============
+
+Produire :
+
+1. rapport complet des modifications
+2. workflow final détaillé
+3. services créés/modifiés
+4. stratégie de résolution académique
+5. gestion des cas ambigus
+6. validations ajoutées
+7. logs ajoutés
+8. tests exécutés
+9. résultat manage.py check
+10. résultat tests complets
+
+OBJECTIF FINAL :
+Obtenir un STUDENT ACADEMIC PROVISIONING SYSTEM robuste, cohérent, centralisé, sécurisé et parfaitement aligné avec l’architecture métier actuelle de ESFE Core.

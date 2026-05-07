@@ -1,11 +1,16 @@
 from urllib.parse import urljoin
+import logging
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone
 
 from core.models import Institution
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_formatted_from_email():
@@ -48,7 +53,17 @@ def get_email_branding_context():
     }
 
 
-def send_templated_email(*, subject, recipient, text_template=None, html_template=None, context=None, fail_silently=False):
+def send_templated_email(
+    *,
+    subject,
+    recipient,
+    text_template=None,
+    html_template=None,
+    context=None,
+    attachments=None,
+    fallback_text="",
+    fail_silently=False,
+):
     """Envoi standardise texte + HTML avec contexte institutionnel."""
     if not recipient:
         return False
@@ -62,12 +77,24 @@ def send_templated_email(*, subject, recipient, text_template=None, html_templat
     html_body = ""
 
     if text_template:
-        text_body = render_to_string(text_template, merged_context)
+        try:
+            text_body = render_to_string(text_template, merged_context)
+        except TemplateDoesNotExist:
+            logger.warning("Template texte introuvable: %s", text_template)
+        except Exception:
+            logger.exception("Echec rendu template texte: %s", text_template)
     if html_template:
-        html_body = render_to_string(html_template, merged_context)
+        try:
+            html_body = render_to_string(html_template, merged_context)
+        except TemplateDoesNotExist:
+            logger.warning("Template HTML introuvable: %s", html_template)
+        except Exception:
+            logger.exception("Echec rendu template HTML: %s", html_template)
 
     if not text_body and html_body:
-        text_body = "Veuillez consulter la version HTML de cet email."
+        text_body = fallback_text or "Veuillez consulter la version HTML de cet email."
+    elif not text_body:
+        text_body = fallback_text or ""
 
     message = EmailMultiAlternatives(
         subject=subject,
@@ -78,6 +105,22 @@ def send_templated_email(*, subject, recipient, text_template=None, html_templat
 
     if html_body:
         message.attach_alternative(html_body, "text/html")
+
+    for attachment in attachments or []:
+        path = attachment.get("path")
+        if not path:
+            continue
+        try:
+            with open(path, "rb") as file_obj:
+                message.attach(
+                    attachment.get("name") or path.split("/")[-1].split("\\")[-1],
+                    file_obj.read(),
+                    attachment.get("mimetype") or "application/octet-stream",
+                )
+        except FileNotFoundError:
+            logger.warning("Piece jointe email introuvable: %s", path)
+        except Exception:
+            logger.exception("Echec attachement email: %s", path)
 
     message.send(fail_silently=fail_silently)
     return True

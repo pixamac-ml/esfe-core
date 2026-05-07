@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model
 
 from communication.models import CommunicationNotification
 from communication.services import NotificationService
+from communication.services.channel_policy import resolve_channel_policy
 from .models import Inscription, StatusHistory
 from students.services import create_student_after_first_payment
 
@@ -118,13 +119,37 @@ def create_inscription_notification(inscription, previous_status, new_status):
     )
 
     recipient_user = _get_inscription_user(recipient_email)
-    channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+    default_channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
     if recipient_user:
-        channels = [
+        default_channels = [
             CommunicationNotification.CHANNEL_IN_APP,
-            CommunicationNotification.CHANNEL_WEBSOCKET,
             CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
         ]
+    policy = resolve_channel_policy(
+        notification_type,
+        default_channels=default_channels,
+        default_priority=CommunicationNotification.PRIORITY_NORMAL,
+        metadata={
+            "recipient_email": recipient_email,
+            "recipient_name": recipient_name,
+            "candidate_name": candidature.full_name,
+            "first_name": candidature.first_name,
+            "candidate_reference": getattr(candidature, "reference", ""),
+            "academic_year": getattr(candidature, "academic_year", ""),
+            "branch_name": getattr(getattr(candidature, "branch", None), "name", ""),
+            "url": "/inscriptions/",
+            "context": {
+                "recipient_name": recipient_name,
+                "message": message,
+                "dashboard_url": "/inscriptions/",
+                "reference": getattr(inscription, "reference", ""),
+                "candidate_name": candidature.full_name,
+                "first_name": candidature.first_name,
+                "academic_year": getattr(candidature, "academic_year", ""),
+                "branch_name": getattr(getattr(candidature, "branch", None), "name", ""),
+            },
+        },
+    )
     event, _created_notifications = NotificationService.notify_user(
         recipient=recipient_user,
         actor=None,
@@ -132,19 +157,9 @@ def create_inscription_notification(inscription, previous_status, new_status):
         title=title,
         body=message,
         source_app="inscriptions",
-        channels=tuple(channels),
-        metadata={
-            "recipient_email": recipient_email,
-            "recipient_name": recipient_name,
-            "url": "/inscriptions/",
-            "html_template": "emails/notification_candidature.html",
-            "context": {
-                "recipient_name": recipient_name,
-                "message": message,
-                "dashboard_url": "/inscriptions/",
-                "reference": getattr(inscription, "reference", ""),
-            },
-        },
+        channels=policy["channels"],
+        priority=policy["priority"],
+        metadata=policy["metadata"],
     )
     return event
 

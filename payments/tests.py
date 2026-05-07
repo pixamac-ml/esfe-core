@@ -4,9 +4,11 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from accounts.models import BranchCashMovement
 from accounts.models import Profile
 from admissions.models import Candidature
 from branches.models import Branch
+from communication.models import CommunicationNotification
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
 from payments.models import CashPaymentSession, Payment, PaymentAgent
@@ -169,5 +171,82 @@ class StudentPaymentViewTests(TestCase):
         self.assertEqual(self.inscription.status, Inscription.STATUS_PARTIAL)
         student = Student.objects.select_related("user__profile").get(inscription=self.inscription)
         self.assertEqual(student.user.profile.role, "student")
+        send_credentials.assert_called_once()
+        send_confirmation.assert_not_called()
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_first_validated_payment_creates_cash_history_and_official_notifications(self, send_credentials, send_confirmation):
+        finance_user = User.objects.create_user(
+            username="finance_workflow",
+            password="pass1234",
+            is_staff=True,
+        )
+        finance_profile = finance_user.profile
+        finance_profile.role = "finance"
+        finance_profile.branch = self.branch
+        finance_profile.save(update_fields=["role", "branch", "updated_at"])
+
+        manager_user = User.objects.create_user(
+            username="manager_workflow",
+            password="pass1234",
+            is_staff=True,
+        )
+        manager_profile = manager_user.profile
+        manager_profile.position = "branch_manager"
+        manager_profile.branch = self.branch
+        manager_profile.save(update_fields=["position", "branch", "updated_at"])
+
+        superadmin_user = User.objects.create_user(
+            username="superadmin_workflow",
+            password="pass1234",
+            is_staff=True,
+        )
+        superadmin_profile = superadmin_user.profile
+        superadmin_profile.role = "superadmin"
+        superadmin_profile.position = "super_admin"
+        superadmin_profile.save(update_fields=["role", "position", "updated_at"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            payment = Payment.objects.create(
+                inscription=self.inscription,
+                amount=25000,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+
+        student = Student.objects.select_related("user").get(inscription=self.inscription)
+        movement = BranchCashMovement.objects.get(
+            branch=self.branch,
+            source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+            source_reference=payment.reference,
+        )
+
+        self.assertEqual(movement.amount, payment.amount)
+        self.assertEqual(movement.receipt_number, payment.receipt_number)
+        self.assertEqual(
+            set(
+                CommunicationNotification.objects.filter(
+                    recipient=student.user,
+                    channel=CommunicationNotification.CHANNEL_IN_APP,
+                ).values_list("event_type", flat=True)
+            ),
+            {
+                "payment_validated",
+            },
+        )
+        self.assertEqual(
+            CommunicationNotification.objects.filter(
+                event_type="first_payment_validated_staff",
+                channel=CommunicationNotification.CHANNEL_IN_APP,
+            ).count(),
+            2,
+        )
+        self.assertFalse(
+            CommunicationNotification.objects.filter(
+                recipient=student.user,
+                channel=CommunicationNotification.CHANNEL_WEBSOCKET,
+            ).exists()
+        )
         send_credentials.assert_called_once()
         send_confirmation.assert_not_called()

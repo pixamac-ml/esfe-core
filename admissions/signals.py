@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from admissions.models import Candidature
 from communication.models import CommunicationNotification
 from communication.services import NotificationService
+from communication.services.channel_policy import resolve_channel_policy
 from core.models import StatusHistory
 
 # ==========================================================
@@ -73,13 +74,45 @@ def create_status_notification(candidature, notification_type):
     recipient_name = f"{candidature.last_name} {candidature.first_name}"
 
     recipient_user = _get_candidate_user(candidature.email)
-    channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+    default_channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
     if recipient_user:
-        channels = [
+        default_channels = [
             CommunicationNotification.CHANNEL_IN_APP,
-            CommunicationNotification.CHANNEL_WEBSOCKET,
             CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
         ]
+    policy = resolve_channel_policy(
+        notification_type,
+        default_channels=default_channels,
+        default_priority=CommunicationNotification.PRIORITY_NORMAL,
+        metadata={
+            "recipient_email": candidature.email,
+            "recipient_name": recipient_name,
+            "candidate_name": candidature.full_name,
+            "first_name": candidature.first_name,
+            "candidate_reference": getattr(candidature, "reference", ""),
+            "programme": getattr(getattr(candidature, "programme", None), "title", ""),
+            "programme_name": getattr(getattr(candidature, "programme", None), "title", ""),
+            "academic_year": getattr(candidature, "academic_year", ""),
+            "branch_name": getattr(getattr(candidature, "branch", None), "name", ""),
+            "support_email": "contact@esfe-mali.org",
+            "template_key": notification_type,
+            "url": "/candidature/",
+            "context": {
+                "recipient_name": recipient_name,
+                "message": data["message"],
+                "candidate_reference": getattr(candidature, "reference", ""),
+                "programme_name": getattr(getattr(candidature, "programme", None), "title", ""),
+                "programme": getattr(getattr(candidature, "programme", None), "title", ""),
+                "academic_year": getattr(candidature, "academic_year", ""),
+                "branch_name": getattr(getattr(candidature, "branch", None), "name", ""),
+                "first_name": candidature.first_name,
+                "candidate_name": candidature.full_name,
+                "dashboard_url": "/candidature/",
+                "login_url": "/candidature/",
+                "reference": getattr(candidature, "reference", ""),
+            },
+        },
+    )
     event, created_notifications = NotificationService.notify_user(
         recipient=recipient_user,
         actor=None,
@@ -87,21 +120,9 @@ def create_status_notification(candidature, notification_type):
         title=data["title"],
         body=data["message"],
         source_app="admissions",
-        channels=tuple(channels),
-        metadata={
-            "recipient_email": candidature.email,
-            "recipient_name": recipient_name,
-            "url": "/candidature/",
-            "html_template": "emails/notification_candidature.html",
-            "context": {
-                "recipient_name": recipient_name,
-                "message": data["message"],
-                "candidate_reference": getattr(candidature, "reference", ""),
-                "programme_name": getattr(getattr(candidature, "programme", None), "title", ""),
-                "dashboard_url": "/candidature/",
-                "reference": getattr(candidature, "reference", ""),
-            },
-        },
+        channels=policy["channels"],
+        priority=policy["priority"],
+        metadata=policy["metadata"],
     )
 
     _queue_candidature_email(
@@ -221,13 +242,51 @@ def check_documents_after_status_change(sender, instance, created, **kwargs):
                 recipient_name = f"{instance.last_name} {instance.first_name}"
 
                 recipient_user = _get_candidate_user(instance.email)
-                channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+                default_channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
                 if recipient_user:
-                    channels = [
+                    default_channels = [
                         CommunicationNotification.CHANNEL_IN_APP,
-                        CommunicationNotification.CHANNEL_WEBSOCKET,
                         CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
                     ]
+                policy = resolve_channel_policy(
+                    "document_missing",
+                    default_channels=default_channels,
+                    default_priority=CommunicationNotification.PRIORITY_HIGH,
+                    metadata={
+                        "recipient_email": instance.email,
+                        "recipient_name": recipient_name,
+                        "candidate_name": instance.full_name,
+                        "first_name": instance.first_name,
+                        "candidate_reference": getattr(instance, "reference", ""),
+                        "programme": getattr(getattr(instance, "programme", None), "title", ""),
+                        "programme_name": getattr(getattr(instance, "programme", None), "title", ""),
+                        "academic_year": getattr(instance, "academic_year", ""),
+                        "branch_name": getattr(getattr(instance, "branch", None), "name", ""),
+                        "template_key": "document_missing",
+                        "support_email": "contact@esfe-mali.org",
+                        "missing_documents": missing_docs,
+                        "required_documents": missing_docs,
+                        "admin_comment": message,
+                        "url": "/candidature/",
+                        "context": {
+                            "recipient_name": recipient_name,
+                            "message": message,
+                            "candidate_reference": getattr(instance, "reference", ""),
+                            "programme_name": getattr(getattr(instance, "programme", None), "title", ""),
+                            "programme": getattr(getattr(instance, "programme", None), "title", ""),
+                            "academic_year": getattr(instance, "academic_year", ""),
+                            "branch_name": getattr(getattr(instance, "branch", None), "name", ""),
+                            "first_name": instance.first_name,
+                            "candidate_name": instance.full_name,
+                            "missing_documents": missing_docs,
+                            "required_documents": missing_docs,
+                            "admin_comment": message,
+                            "dashboard_url": "/candidature/",
+                            "login_url": "/candidature/",
+                            "reference": getattr(instance, "reference", ""),
+                        },
+                    },
+                )
                 NotificationService.notify_user(
                     recipient=recipient_user,
                     actor=None,
@@ -235,21 +294,9 @@ def check_documents_after_status_change(sender, instance, created, **kwargs):
                     title="Document manquant",
                     body=message,
                     source_app="admissions",
-                    channels=tuple(channels),
-                    metadata={
-                        "recipient_email": instance.email,
-                        "recipient_name": recipient_name,
-                        "url": "/candidature/",
-                        "html_template": "emails/notification_candidature.html",
-                        "context": {
-                            "recipient_name": recipient_name,
-                            "message": message,
-                            "candidate_reference": getattr(instance, "reference", ""),
-                            "programme_name": getattr(getattr(instance, "programme", None), "title", ""),
-                            "dashboard_url": "/candidature/",
-                            "reference": getattr(instance, "reference", ""),
-                        },
-                    },
+                    channels=policy["channels"],
+                    priority=policy["priority"],
+                    metadata=policy["metadata"],
                 )
 
                 # Mettre a jour automatiquement le statut

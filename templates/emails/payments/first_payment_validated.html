@@ -1,0 +1,83 @@
+{% extends "emails/base_communication.html" %}
+{% load humanize %}
+{% block email_title %}Paiement confirme - {{ institution_short_name|default:"ESFE" }}{% endblock %}
+{% block preheader %}Votre paiement a ete valide. Votre compte etudiant est en cours de creation.{% endblock %}
+{% block headline %}&#9989; Paiement valide avec succes{% endblock %}
+{% block content %}
+<p style="margin:0 0 6px;font-size:15px;line-height:1.8;color:#334155;">
+  Bonjour <strong style="color:#1e4f6f;">{% firstof recipient_first_name student_name candidate_name "Etudiant" %}</strong>,
+</p>
+<p style="margin:0 0 22px;font-size:15px;line-height:1.8;color:#334155;">
+  Nous confirmons la bonne reception et la validation de votre paiement par notre service financier.
+  Votre inscription est desormais activee.
+</p>
+<!-- SUCCESS BADGE -->
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px;">
+  <tr>
+    <td style="background:#dcfce7;border:1px solid #86efac;border-radius:20px;padding:6px 18px;">
+      <span style="color:#15803d;font-size:12px;font-weight:700;letter-spacing:.5px;">
+        &#10003; PAIEMENT CONFIRME
+      </span>
+    </td>
+  </tr>
+</table>
+<!-- PAYMENT SUMMARY -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+       style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:0 0 22px;">
+  <tr>
+    <td style="padding:18px 20px;">
+      <p style="margin:0 0 14px;font-size:14px;font-weight:700;color:#1e4f6f;">Resume du paiement</p>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;line-height:2.0;color:#334155;">
+        <tr>
+          <td style="padding:6px 0;border-bottom:1px solid #f1f5f9;color:#64748b;">Reference paiement</td>
+          <td style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-weight:600;text-align:right;">{% firstof payment.reference reference "-" %}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;border-bottom:1px solid #f1f5f9;color:#64748b;">Montant verse</td>
+          <td style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-weight:700;color:#16a34a;text-align:right;">
+            {% firstof payment.amount payment_amount "-" %} FCFA
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;border-bottom:1px solid #f1f5f9;color:#64748b;">Total inscription</td>
+          <td style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-weight:600;text-align:right;">{% firstof amount_due "-" %} FCFA</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;border-bottom:1px solid #f1f5f9;color:#64748b;">Total paye</td>
+          <td style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-weight:600;text-align:right;">{% firstof amount_paid "-" %} FCFA</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#64748b;">Solde restant</td>
+          <td style="padding:6px 0;font-weight:700;color:{% if balance and balance > 0 %}#dc2626{% else %}#16a34a{% endif %};text-align:right;">
+            {{ balance|intcomma|default:"0" }} FCFA
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<!-- ACCOUNT CREATION NOTICE -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+       style="background:#dbeafe;border:1px solid #93c5fd;border-left:4px solid #2563eb;border-radius:8px;margin:0 0 12px;">
+  <tr>
+    <td style="padding:14px 18px;font-size:13px;color:#1e3a8a;line-height:1.7;">
+      <strong>Information importante :</strong> Votre compte etudiant est en cours de creation.
+      Vous recevrez un second email contenant vos identifiants de connexion au portail etudiant.
+    </td>
+  </tr>
+</table>
+{% endblock %}
+{% block cta_button %}
+{% if public_link or receipt_url %}
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:28px auto 0;">
+  <tr>
+    <td align="center" style="background:#1e4f6f;border-radius:8px;">
+      <a href="{% firstof public_link receipt_url "#" %}"
+         style="display:inline-block;padding:13px 30px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:.3px;">
+        Acceder a mon dossier
+      </a>
+    </td>
+  </tr>
+</table>
+{% endif %}
+{% endblock %}

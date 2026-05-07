@@ -114,10 +114,6 @@ def validate_payment_htmx(request, payment_id):
             payment.paid_at = timezone.now()
             payment.save(update_fields=["status", "paid_at"])
 
-            # Mise à jour de l'inscription
-            if payment.inscription:
-                payment.inscription.update_financial_state()
-
         # Rendu du fragment validé
         html = render_to_string(
             "accounts/dashboard/partials/payment_validated.html",

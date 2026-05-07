@@ -1,5 +1,6 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -25,6 +26,7 @@ from academics.services.lesson_log_service import (
     get_teacher_lesson_logs,
     update_lesson_log,
 )
+from academics.services.academic_context_resolver import resolve_academic_context
 from academics.services.schedule_service import (
     cancel_schedule_event,
     complete_schedule_event,
@@ -47,6 +49,177 @@ from students.models import Student, TeacherAttendance
 
 
 User = get_user_model()
+
+
+class AcademicContextResolverTests(TestCase):
+    def setUp(self):
+        self.branch = Branch.objects.create(name="ESFE Resolver", code="RSV", slug="esfe-resolver")
+        self.licence_cycle = Cycle.objects.create(
+            name="Licence Resolver",
+            min_duration_years=3,
+            max_duration_years=3,
+        )
+        self.master_cycle = Cycle.objects.create(
+            name="Master Resolver",
+            min_duration_years=2,
+            max_duration_years=2,
+        )
+        self.diploma = Diploma.objects.create(name="Diplome Resolver", level="superieur")
+        self.filiere = Filiere.objects.create(name="Filiere Resolver")
+        self.licence_programme = Programme.objects.create(
+            title="Programme Licence Resolver",
+            filiere=self.filiere,
+            cycle=self.licence_cycle,
+            diploma_awarded=self.diploma,
+            duration_years=3,
+            short_description="Licence",
+            description="Licence",
+        )
+        self.master_programme = Programme.objects.create(
+            title="Programme Master Resolver",
+            filiere=self.filiere,
+            cycle=self.master_cycle,
+            diploma_awarded=self.diploma,
+            duration_years=2,
+            short_description="Master",
+            description="Master",
+        )
+        self.academic_year = AcademicYear.objects.create(
+            name="2030-2031",
+            start_date=date(2030, 10, 1),
+            end_date=date(2031, 7, 31),
+            is_active=True,
+        )
+
+    def test_resolve_academic_context_uses_cycle_specific_master_mapping(self):
+        academic_class = AcademicClass.objects.create(
+            programme=self.master_programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="M1",
+            study_level="MASTER",
+            is_active=True,
+        )
+        candidature = Candidature.objects.create(
+            programme=self.master_programme,
+            branch=self.branch,
+            academic_year="2030-2031",
+            entry_year=1,
+            first_name="Aminata",
+            last_name="Resolver",
+            birth_date=date(2000, 1, 1),
+            birth_place="Bamako",
+            gender="female",
+            phone="70030000",
+            email="aminata.resolver@example.com",
+            status="accepted",
+        )
+
+        result = resolve_academic_context(candidature=candidature)
+
+        self.assertEqual(result["status"], "resolved")
+        self.assertEqual(result["resolved_level"], "M1")
+        self.assertEqual(result["academic_class"], academic_class)
+
+    def test_resolve_academic_context_normalizes_legacy_year_format(self):
+        academic_class = AcademicClass.objects.create(
+            programme=self.licence_programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            is_active=True,
+        )
+        candidature = Candidature.objects.create(
+            programme=self.licence_programme,
+            branch=self.branch,
+            academic_year="2030 / 2031",
+            entry_year=1,
+            first_name="Moussa",
+            last_name="Normalizer",
+            birth_date=date(2001, 1, 1),
+            birth_place="Kayes",
+            gender="male",
+            phone="70030001",
+            email="moussa.normalizer@example.com",
+            status="accepted",
+        )
+
+        result = resolve_academic_context(candidature=candidature)
+
+        self.assertEqual(result["status"], "resolved")
+        self.assertEqual(result["academic_year"], self.academic_year)
+        self.assertEqual(result["academic_class"], academic_class)
+
+    def test_resolve_academic_context_returns_missing_class_status(self):
+        candidature = Candidature.objects.create(
+            programme=self.licence_programme,
+            branch=self.branch,
+            academic_year="2030-2031",
+            entry_year=1,
+            first_name="Fatou",
+            last_name="MissingClass",
+            birth_date=date(2001, 2, 1),
+            birth_place="Sikasso",
+            gender="female",
+            phone="70030002",
+            email="fatou.missing@example.com",
+            status="accepted",
+        )
+
+        result = resolve_academic_context(candidature=candidature)
+
+        self.assertEqual(result["status"], "manual_required_missing_class")
+        self.assertEqual(result["reason"], "academic_class_not_found")
+        self.assertEqual(result["resolved_level"], "L1")
+
+    def test_resolve_academic_context_returns_ambiguous_level_when_master_entry_year_invalid(self):
+        candidature = Candidature.objects.create(
+            programme=self.master_programme,
+            branch=self.branch,
+            academic_year="2030-2031",
+            entry_year=3,
+            first_name="Binta",
+            last_name="Ambiguous",
+            birth_date=date(2001, 3, 1),
+            birth_place="Segou",
+            gender="female",
+            phone="70030003",
+            email="binta.ambiguous@example.com",
+            status="accepted",
+        )
+
+        result = resolve_academic_context(candidature=candidature)
+
+        self.assertEqual(result["status"], "manual_required_ambiguous_level")
+        self.assertEqual(result["reason"], "unsupported_master_entry_year")
+
+    @patch("academics.services.academic_context_resolver.AcademicClass.objects.filter")
+    def test_resolve_academic_context_returns_ambiguous_level_when_multiple_classes_match(self, mock_filter):
+        mock_queryset = Mock()
+        mock_queryset.count.return_value = 2
+        mock_queryset.first.return_value = None
+        mock_filter.return_value = mock_queryset
+
+        candidature = Candidature.objects.create(
+            programme=self.licence_programme,
+            branch=self.branch,
+            academic_year="2030-2031",
+            entry_year=1,
+            first_name="Ibrahima",
+            last_name="Duplicate",
+            birth_date=date(2001, 4, 1),
+            birth_place="Gao",
+            gender="male",
+            phone="70030004",
+            email="ibrahima.duplicate@example.com",
+            status="accepted",
+        )
+
+        result = resolve_academic_context(candidature=candidature)
+
+        self.assertEqual(result["status"], "manual_required_ambiguous_level")
+        self.assertEqual(result["reason"], "multiple_academic_classes")
 
 
 class AcademicScheduleServiceTests(TestCase):

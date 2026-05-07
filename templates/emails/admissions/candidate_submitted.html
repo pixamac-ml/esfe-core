@@ -1,0 +1,82 @@
+{% extends "emails/base_communication.html" %}
+{% block email_title %}Candidature enregistree - {{ institution_short_name|default:"ESFE" }}{% endblock %}
+{% block preheader %}Votre candidature a bien ete deposee et est en cours de traitement.{% endblock %}
+{% block headline %}Votre candidature a bien ete deposee{% endblock %}
+{% block content %}
+<p style="margin:0 0 6px;font-size:15px;line-height:1.8;color:#334155;">
+  Bonjour <strong style="color:#1e4f6f;">{% firstof first_name candidate_name recipient_name "Candidat" %}</strong>,
+</p>
+<p style="margin:0 0 22px;font-size:15px;line-height:1.8;color:#334155;">
+  Nous avons bien recu votre dossier de candidature. Notre equipe admissions en assurera
+  la verification dans les meilleurs delais.
+</p>
+<!-- STATUS BADGE -->
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px;">
+  <tr>
+    <td style="background:#dbeafe;border:1px solid #93c5fd;border-radius:20px;padding:6px 16px;">
+      <span style="color:#1e40af;font-size:12px;font-weight:700;letter-spacing:.5px;">
+        &#9679; EN COURS DE TRAITEMENT
+      </span>
+    </td>
+  </tr>
+</table>
+<!-- INFO CARD -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+       style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:0 0 24px;">
+  <tr>
+    <td style="padding:18px 20px;font-size:14px;color:#334155;line-height:2.0;">
+      <strong>Reference dossier :</strong> {% firstof candidature_reference candidate_reference "-" %}<br>
+      <strong>Programme :</strong> {% firstof programme programme_name "-" %}<br>
+      <strong>Annee academique :</strong> {% firstof academic_year "-" %}
+    </td>
+  </tr>
+</table>
+<!-- STEPS -->
+<p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#1e4f6f;">Prochaines etapes :</p>
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+  <tr>
+    <td style="padding:5px 0;">
+      <table cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="width:28px;height:28px;min-width:28px;background:#1db5b0;border-radius:50%;text-align:center;vertical-align:middle;font-weight:700;color:#fff;font-size:13px;line-height:28px;">1</td>
+          <td style="padding-left:12px;font-size:14px;color:#334155;line-height:1.6;">Reception et verification administrative de votre dossier</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:5px 0;">
+      <table cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="width:28px;height:28px;min-width:28px;background:#cbd5e1;border-radius:50%;text-align:center;vertical-align:middle;font-weight:700;color:#fff;font-size:13px;line-height:28px;">2</td>
+          <td style="padding-left:12px;font-size:14px;color:#64748b;line-height:1.6;">Examen pedagogique du dossier par notre equipe</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:5px 0;">
+      <table cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="width:28px;height:28px;min-width:28px;background:#cbd5e1;border-radius:50%;text-align:center;vertical-align:middle;font-weight:700;color:#fff;font-size:13px;line-height:28px;">3</td>
+          <td style="padding-left:12px;font-size:14px;color:#64748b;line-height:1.6;">Decision d'admission communiquee par email</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{% endblock %}
+{% block cta_button %}
+{% if dashboard_url or login_url %}
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:28px auto 0;">
+  <tr>
+    <td align="center" style="background-color:#1e4f6f;border-radius:8px;">
+      <a href="{% firstof dashboard_url login_url "#" %}"
+         style="display:inline-block;padding:13px 30px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:.3px;">
+        Suivre mon dossier
+      </a>
+    </td>
+  </tr>
+</table>
+{% endif %}
+{% endblock %}

@@ -16,11 +16,29 @@
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
+        <form
+          method="post"
+          action="{% url 'accounts_portal:supervisor_week_materialize' academic_class.id %}"
+          hx-post="{% url 'accounts_portal:supervisor_week_materialize' academic_class.id %}"
+          hx-target="#supervisor-workspace"
+          hx-swap="innerHTML"
+          class="inline"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+          <button
+            type="submit"
+            class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700"
+            title="Crée les cours datés de la semaine à partir des créneaux hebdomadaires"
+          >
+            Générer la semaine (cours)
+          </button>
+        </form>
         <button
           type="button"
           class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900"
           hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
-          hx-target="#supervisor-planner-workspace"
+          hx-target="#supervisor-workspace"
           hx-swap="innerHTML"
         >
           Retour aux actions
@@ -61,14 +79,14 @@
                     type="button"
                     class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-900"
                     hx-get="{% url 'accounts_portal:supervisor_weekly_slots_workspace' academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&edit={{ row.id }}"
-                    hx-target="#supervisor-planner-workspace"
+                    hx-target="#supervisor-workspace"
                     hx-swap="innerHTML"
                   >Modifier</button>
                   <form
                     method="post"
                     action="{% url 'accounts_portal:supervisor_weekly_slot_save' academic_class.id %}"
                     hx-post="{% url 'accounts_portal:supervisor_weekly_slot_save' academic_class.id %}"
-                    hx-target="#supervisor-planner-workspace"
+                    hx-target="#supervisor-workspace"
                     hx-swap="innerHTML"
                     class="inline"
                   >
@@ -101,7 +119,7 @@
           type="button"
           class="text-xs font-bold text-violet-700 underline hover:no-underline dark:text-violet-300"
           hx-get="{% url 'accounts_portal:supervisor_weekly_slots_workspace' academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}"
-          hx-target="#supervisor-planner-workspace"
+          hx-target="#supervisor-workspace"
           hx-swap="innerHTML"
         >Annuler l'edition</button>
         {% endif %}
@@ -111,7 +129,7 @@
         method="post"
         action="{% url 'accounts_portal:supervisor_weekly_slot_save' academic_class.id %}"
         hx-post="{% url 'accounts_portal:supervisor_weekly_slot_save' academic_class.id %}"
-        hx-target="#supervisor-planner-workspace"
+        hx-target="#supervisor-workspace"
         hx-swap="innerHTML"
         class="space-y-4"
       >

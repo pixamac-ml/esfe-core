@@ -947,6 +947,83 @@ def update_weekly_schedule_slot(slot: WeeklyScheduleSlot, **changes):
     return slot
 
 
+def materialize_week_events_from_weekly_slots(*, user, academic_class: AcademicClass, week_start):
+    """
+    Génère les cours datés de la semaine (AcademicScheduleEvent) à partir des
+    créneaux hebdomadaires (WeeklyScheduleSlot) de la classe.
+
+    Objectif: permettre au Surveillant Général de construire une semaine "proprement"
+    et garantir que l'emploi du temps étudiant (basé sur AcademicScheduleEvent)
+    affiche bien les cours.
+    """
+    normalized_week_start = _normalize_week_start(week_start)
+    branch = academic_class.branch
+    slots = list_weekly_slots_for_class(academic_class, active_only=True)
+    if not slots:
+        return {"created": 0, "skipped_existing": 0, "week_start": normalized_week_start}
+
+    week_start_dt = timezone.make_aware(datetime.combine(normalized_week_start, time.min))
+    week_end_dt = week_start_dt + timedelta(days=7)
+    existing_events = list(
+        AcademicScheduleEvent.objects.filter(
+            academic_class=academic_class,
+            branch=branch,
+            start_datetime__gte=week_start_dt,
+            start_datetime__lt=week_end_dt,
+            is_active=True,
+        ).exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+    )
+    existing_keys = {
+        (
+            timezone.localtime(ev.start_datetime).date().isoformat(),
+            timezone.localtime(ev.start_datetime).time().strftime("%H:%M"),
+            timezone.localtime(ev.end_datetime).time().strftime("%H:%M"),
+            ev.ec_id,
+            ev.teacher_id,
+        )
+        for ev in existing_events
+    }
+
+    created = 0
+    skipped = 0
+    for slot in slots:
+        slot_date = normalized_week_start + timedelta(days=int(slot.weekday))
+        start_dt = timezone.make_aware(datetime.combine(slot_date, slot.start_time))
+        end_dt = timezone.make_aware(datetime.combine(slot_date, slot.end_time))
+        key = (
+            slot_date.isoformat(),
+            slot.start_time.strftime("%H:%M"),
+            slot.end_time.strftime("%H:%M"),
+            slot.ec_id,
+            slot.teacher_id,
+        )
+        if key in existing_keys:
+            skipped += 1
+            continue
+        title = f"{slot.ec.title} - {academic_class.display_name}"
+        create_schedule_event(
+            user=user,
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            academic_class=academic_class,
+            academic_year=academic_class.academic_year,
+            branch=branch,
+            ec=slot.ec,
+            teacher=slot.teacher,
+            title=title,
+            description="",
+            start_datetime=start_dt,
+            end_datetime=end_dt,
+            location=slot.room or "",
+            is_online=False,
+            is_active=True,
+        )
+        existing_keys.add(key)
+        created += 1
+
+    return {"created": created, "skipped_existing": skipped, "week_start": normalized_week_start}
+
+
 def create_schedule(*, user, **data):
     """Alias fonctionnel de create_schedule_event (planification datee)."""
     return create_schedule_event(user=user, **data)

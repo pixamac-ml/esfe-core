@@ -1,87 +1,179 @@
-<div class="mb-5 flex items-start justify-between gap-3">
+<div class="student-inline-head">
   <div>
     <p class="student-section-kicker">Cours</p>
-    <h3 class="mt-1 student-section-title">Matieres et contenus</h3>
+    <h3 class="student-section-title">Matieres et contenus</h3>
   </div>
-  <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-extrabold text-[color:var(--muted)]">
-    {{ courses|length }} element{{ courses|length|pluralize }}
-  </span>
+  <div class="flex items-center gap-2">
+    <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-1.5 text-[11px] font-extrabold text-[color:var(--muted)]">
+      {{ courses|length }} element{{ courses|length|pluralize }}
+    </span>
+    <button type="button" @click="goToSection('courses', 'Mes cours')" class="rounded-full border border-[color:var(--line)] bg-white px-3 py-1.5 text-[11px] font-extrabold text-[color:var(--school-primary)]">
+      Voir tout
+    </button>
+  </div>
 </div>
 
 {% if courses %}
-  <div class="grid gap-3 xl:grid-cols-2">
+  <div
+    class="student-course-list"
+    x-data="{
+      coursesData: parseDashboardData('student-courses-data', []),
+      semesterFilter: 'all',
+      page: 0,
+      pageSize: 4,
+      availableSemesters: [],
+      init() {
+        this.availableSemesters = Array.from(new Set(this.coursesData.map(c => String(c.semester)))).sort((a, b) => Number(a) - Number(b));
+      },
+      semesterProgress(semester) {
+        const scoped = this.coursesData.filter(c => String(c.semester) === String(semester));
+        if (!scoped.length) return 0;
+        const done = scoped.filter(c => Number(c.progress || 0) >= 100).length;
+        return Math.round((done / scoped.length) * 100);
+      },
+      isSemesterUnlocked(semester) {
+        const sem = Number(semester);
+        if (!Number.isFinite(sem) || sem <= 1) return true;
+        for (let prev = 1; prev < sem; prev += 1) {
+          if (this.semesterProgress(prev) < 100) {
+            return false;
+          }
+        }
+        return true;
+      },
+      filteredIndexes() {
+        const indexes = [];
+        this.coursesData.forEach((course, idx) => {
+          const sem = String(course.semester);
+          if (!this.isSemesterUnlocked(sem)) return;
+          if (this.semesterFilter !== 'all' && this.semesterFilter !== sem) return;
+          indexes.push(idx);
+        });
+        return indexes;
+      },
+      pageCount() {
+        return Math.max(1, Math.ceil(this.filteredIndexes().length / this.pageSize));
+      },
+      setSemesterFilter(value) {
+        if (value !== 'all' && !this.isSemesterUnlocked(value)) return;
+        this.semesterFilter = value;
+        this.page = 0;
+      },
+      isVisible(idx) {
+        const indexes = this.filteredIndexes();
+        const row = indexes.indexOf(idx);
+        if (row < 0) return false;
+        return row >= this.page * this.pageSize && row < (this.page + 1) * this.pageSize;
+      },
+      next() {
+        if (this.page < this.pageCount() - 1) this.page += 1;
+      },
+      prev() {
+        if (this.page > 0) this.page -= 1;
+      }
+    }"
+  >
+    <div class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-2">
+      <button
+        type="button"
+        class="rounded-lg border border-[color:var(--line)] px-2.5 py-1 text-[11px] font-extrabold"
+        :class="semesterFilter === 'all' ? 'bg-[color:var(--school-primary)] text-white border-transparent' : 'bg-[color:var(--card)] text-[color:var(--text)]'"
+        @click="setSemesterFilter('all')"
+      >
+        Tous les semestres
+      </button>
+      <template x-for="sem in availableSemesters" :key="sem">
+        <div class="inline-flex items-center gap-1.5">
+          <button
+            type="button"
+            class="rounded-lg border border-[color:var(--line)] px-2.5 py-1 text-[11px] font-extrabold"
+            :class="semesterFilter === sem ? 'bg-[color:var(--school-primary)] text-white border-transparent' : (isSemesterUnlocked(sem) ? 'bg-[color:var(--card)] text-[color:var(--text)]' : 'bg-[color:var(--surface-2)] text-[color:var(--muted-2)] cursor-not-allowed')"
+            :disabled="!isSemesterUnlocked(sem)"
+            @click="setSemesterFilter(sem)"
+            :title="isSemesterUnlocked(sem) ? ('Filtrer sur le semestre ' + sem) : ('Semestre ' + sem + ' verrouille: terminez les semestres precedents')"
+          >
+            <span x-text="'Semestre ' + sem"></span>
+          </button>
+          <span
+            x-show="!isSemesterUnlocked(sem)"
+            x-cloak
+            class="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-700"
+          >
+            Verrouille
+          </span>
+        </div>
+      </template>
+    </div>
+
     {% for course in courses %}
-      <article class="overflow-hidden rounded-xl border border-[color:var(--line)] bg-[color:var(--card)]" x-data="{ previewOpen: false }">
-        <div class="flex items-center justify-between border-b border-[color:var(--line)] bg-[color:var(--card-soft)] px-4 py-3">
+      <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3" x-data="{ previewOpen: false }" x-show="isVisible({{ forloop.counter0 }})" x-cloak>
+        <div class="student-course-row">
           <div class="flex min-w-0 items-center gap-3">
             <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
               <i data-lucide="{{ course.icon }}" style="width:18px;height:18px;"></i>
             </div>
             <div class="min-w-0">
               <h4 class="truncate text-sm font-black tracking-tight text-[color:var(--text)]">{{ course.title }}</h4>
-              <p class="truncate text-xs font-bold uppercase tracking-wide text-[color:var(--muted-2)]">S{{ course.semester }} · {{ course.code }}</p>
+              <p class="truncate text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted-2)]">S{{ course.semester }} · {{ course.code }}{% if course.ue %} · {{ course.ue }}{% endif %}</p>
             </div>
           </div>
-          <span class="ml-3 shrink-0 rounded-full bg-[color:var(--school-primary-soft)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--school-primary)]">{{ course.progress }}%</span>
-        </div>
 
-        <div class="p-4">
-          <div class="flex items-center justify-between gap-3 text-sm text-[color:var(--muted)]">
-            <p class="truncate">{{ course.teacher }}</p>
-            <span class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted-2)]">{{ course.content_count }} contenu{{ course.content_count|pluralize }}</span>
+          <div class="min-w-0">
+            <p class="truncate text-sm font-semibold text-[color:var(--text)]">{{ course.teacher }}</p>
+            <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">{{ course.content_count }} contenu{{ course.content_count|pluralize }}</span>
           </div>
 
-          <div class="mt-3">
-            <div class="mb-2 flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--muted)]">
+          <div class="student-course-progress">
+            <div class="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--muted)]">
               <span>Progression</span>
-              <button type="button" @click="openCourseDetail('{% url 'portal_student:ec_detail' course.id %}', '{{ course.title|escapejs }}')" class="text-[color:var(--school-primary)]">
-                Ouvrir
-              </button>
+              <span>{{ course.progress }}%</span>
             </div>
-            <div class="h-2 overflow-hidden rounded-full bg-[color:var(--surface-2)]">
-              <div class="h-full rounded-full bg-gradient-to-r from-[color:var(--school-primary)] to-[color:var(--school-secondary)]" style="width: {{ course.progress }}%"></div>
-            </div>
+            <progress class="student-mini-meter" max="100" value="{{ course.progress }}"></progress>
           </div>
 
-          <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[color:var(--line)] pt-3">
+          <div class="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
-              class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-xs font-bold text-[color:var(--text)]"
+              class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-[11px] font-bold text-[color:var(--text)]"
               @click="previewOpen = !previewOpen"
               :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': previewOpen }"
             >
               <span x-text="previewOpen ? 'Masquer l\\'aperçu' : 'Aperçu'"></span>
             </button>
-            <button type="button" @click="openCourseDetail('{% url 'portal_student:ec_detail' course.id %}', '{{ course.title|escapejs }}')" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-600">
-              Voir le contenu
-            </button>
-          </div>
-
-          <div x-show="previewOpen" x-cloak class="mt-3" id="ecPreviewWrap{{ course.id }}">
-            <div
-              id="ecPreview{{ course.id }}"
-              class="student-scroll"
-              data-preview-loaded="0"
-              hx-get="{% url 'portal_student:ec_preview' course.id %}"
-              hx-trigger="revealed"
-              hx-target="this"
-              hx-swap="innerHTML"
-            >
-              <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-4 text-sm text-[color:var(--muted)]">
-                Chargement de l'aperçu...
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-3 flex items-center justify-between gap-3 border-t border-[color:var(--line)] pt-3">
-            <span class="text-xs text-[color:var(--muted)]">Consultation integree</span>
-            <button type="button" @click="openCourseDetail('{% url 'portal_student:ec_detail' course.id %}', '{{ course.title|escapejs }}')" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-600">
+            <button type="button" @click="openCourseDetail('{% url 'portal_student:ec_detail' course.id %}', '{{ course.title|escapejs }}')" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-[11px] font-bold text-white transition hover:bg-primary-600">
               Voir le contenu
             </button>
           </div>
         </div>
+
+        <div x-show="previewOpen" x-cloak class="mt-3" id="ecPreviewWrap{{ course.id }}">
+          <div
+            id="ecPreview{{ course.id }}"
+            class="student-scroll"
+            data-preview-loaded="0"
+            hx-get="{% url 'portal_student:ec_preview' course.id %}"
+            hx-trigger="revealed"
+            hx-target="this"
+            hx-swap="innerHTML"
+          >
+            <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-4 text-sm text-[color:var(--muted)]">
+              Chargement de l'aperçu...
+            </div>
+          </div>
+        </div>
       </article>
     {% endfor %}
+
+    <div
+      class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs text-[color:var(--muted)]"
+      x-show="filteredIndexes().length > pageSize"
+    >
+      <span>Page <strong x-text="page + 1"></strong> / <strong x-text="pageCount()"></strong></span>
+      <div class="flex items-center gap-2">
+        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="prev()" :disabled="page === 0">Precedent</button>
+        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="next()" :disabled="page >= pageCount() - 1">Suivant</button>
+      </div>
+    </div>
   </div>
 {% else %}
   <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">

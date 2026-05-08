@@ -18,6 +18,77 @@
                 </span>
             </div>
 
+            {% if candidature.status == 'submitted' or candidature.status == 'under_review' %}
+            <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-slate-400">Décision</p>
+                        <h3 class="text-lg font-semibold text-slate-900 mt-1">Traiter ce dossier</h3>
+                        <p class="text-sm text-slate-500 mt-1">Accepter, refuser avec motif, ou demander des compléments.</p>
+                    </div>
+                    <button
+                        hx-post="{% url 'accounts:htmx_candidature_accept' candidature.pk %}"
+                        hx-target="#manager-candidature-row-{{ candidature.pk }}"
+                        hx-swap="outerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        hx-confirm="Accepter cette candidature ?"
+                        hx-on::after-request="closeDashboardModal()"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                        <i class="fas fa-check"></i>
+                        Accepter
+                    </button>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <form
+                        hx-post="{% url 'accounts:htmx_candidature_to_complete' candidature.pk %}"
+                        hx-target="#manager-candidature-row-{{ candidature.pk }}"
+                        hx-swap="outerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        hx-confirm="Marquer comme « À compléter » ?"
+                        hx-on::after-request="closeDashboardModal()"
+                        class="rounded-2xl bg-white border border-amber-100 p-4 space-y-3">
+                        <p class="text-sm font-semibold text-slate-900">Demander des compléments</p>
+                        <textarea
+                            name="message"
+                            rows="3"
+                            placeholder="Ex: Merci d'ajouter la copie de la pièce d'identité et le dernier relevé..."
+                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-amber-100 focus:border-amber-400"
+                            required></textarea>
+                        <button
+                            type="submit"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition">
+                            <i class="fas fa-circle-exclamation"></i>
+                            Marquer « À compléter »
+                        </button>
+                    </form>
+
+                    <form
+                        hx-post="{% url 'accounts:htmx_candidature_reject' candidature.pk %}"
+                        hx-target="#manager-candidature-row-{{ candidature.pk }}"
+                        hx-swap="outerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        hx-confirm="Refuser cette candidature ?"
+                        hx-on::after-request="closeDashboardModal()"
+                        class="rounded-2xl bg-white border border-rose-100 p-4 space-y-3">
+                        <p class="text-sm font-semibold text-slate-900">Refuser avec motif</p>
+                        <textarea
+                            name="reason"
+                            rows="3"
+                            placeholder="Ex: Dossier incomplet malgré relances / conditions non remplies..."
+                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-rose-100 focus:border-rose-400"
+                            required></textarea>
+                        <button
+                            type="submit"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 transition">
+                            <i class="fas fa-times"></i>
+                            Refuser
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="rounded-2xl bg-slate-50 border border-slate-100 p-5 space-y-3">
                     <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Informations personnelles</h3>

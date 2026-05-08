@@ -15,6 +15,9 @@ from .views import (
     upload_settings_document,
     update_content_progress,
     ec_preview,
+    mark_message_read,
+    mark_all_messages_read,
+    mark_message_unread,
 )
 
 app_name = "portal_student"
@@ -28,6 +31,9 @@ urlpatterns = [
     path("notifications/", notifications_partial, name="notifications_partial"),
     path("partials/courses/", courses_partial, name="courses_partial"),
     path("partials/messages/", messages_partial, name="messages_partial"),
+    path("partials/messages/read-all/", mark_all_messages_read, name="mark_all_messages_read"),
+    path("partials/messages/<int:message_id>/read/", mark_message_read, name="mark_message_read"),
+    path("partials/messages/<int:message_id>/unread/", mark_message_unread, name="mark_message_unread"),
     path("partials/timetable/", timetable_partial, name="timetable_partial"),
     path("courses/", student_courses, name="student_courses"),
     path("courses/ec/<int:ec_id>/", ec_detail, name="ec_detail"),

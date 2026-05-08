@@ -1,9 +1,11 @@
 from django.db.models import Prefetch, Sum
 from django.core.cache import cache
+from django.utils import timezone
 
 from academics.models import EC, ECContent, StudentContentProgress
 from academics.services.schedule_service import get_student_week_schedule
 from communication.selectors import get_user_notifications
+from communication.models import CommunicationNotification
 from news.models import Event
 from payments.models import Payment
 from .profile_service import get_profile_data
@@ -142,6 +144,30 @@ def get_student_timetable(student):
     return get_student_week_schedule(student, None)
 
 
+def get_student_next_course(student):
+    timetable = get_student_timetable(student)
+    events = timetable.get("events", []) if isinstance(timetable, dict) else []
+    now = timezone.now()
+    active_statuses = {"planned", "ongoing", "postponed", "draft"}
+
+    for event in events:
+        start_at = event.get("start_datetime")
+        if not start_at:
+            continue
+        if event.get("status") not in active_statuses:
+            continue
+        if start_at >= now:
+            return {
+                "title": event.get("title") or "Cours",
+                "time_range": event.get("time_range") or "--:-- - --:--",
+                "weekday_label": event.get("weekday_label") or "",
+                "location": event.get("location") or "Salle non precisee",
+                "is_online": bool(event.get("is_online")),
+            }
+
+    return None
+
+
 def get_student_events(student):
     snapshot = get_student_academic_snapshot(student.user)
     branch = _get_student_branch(student, snapshot["academic_enrollment"])
@@ -167,23 +193,33 @@ def get_student_events(student):
 
 
 def get_student_messages(student):
-    cache_key = f"portal_student:messages:v1:user:{getattr(getattr(student, 'user', None), 'id', 'anon')}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    communication_items = list(get_user_notifications(student.user, limit=3))
+    communication_items = list(
+        get_user_notifications(
+            student.user,
+            limit=10,
+            channel=CommunicationNotification.CHANNEL_IN_APP,
+        )
+    )
     payload = [
         {
+            "id": item.id,
             "name": item.title,
             "text": item.body[:90] + ("..." if len(item.body) > 90 else ""),
             "time": item.created_at.strftime("%d/%m"),
             "avatar": "",
+            "is_read": bool(item.read_at),
         }
         for item in communication_items
     ]
-    cache.set(cache_key, payload, 30)
     return payload
+
+
+def get_student_unread_messages_count(student):
+    return CommunicationNotification.objects.filter(
+        recipient=student.user,
+        channel=CommunicationNotification.CHANNEL_IN_APP,
+        read_at__isnull=True,
+    ).count()
 
 
 def get_student_dashboard_data(user):
@@ -198,8 +234,10 @@ def get_student_dashboard_data(user):
             "courses": [],
             "teachers": [],
             "timetable": [],
+            "next_course": None,
             "events": [],
             "messages": [],
+            "unread_messages_count": 0,
             "stats": {
                 "average": "Non disponible",
                 "ranking": "Non disponible",
@@ -217,14 +255,17 @@ def get_student_dashboard_data(user):
             "subtitle": "Vue d'ensemble de votre parcours academique",
         }
 
+    timetable = get_student_timetable(student)
     return {
         "student": student,
         "enrollment": enrollment,
         "courses": get_student_courses(student),
         "teachers": get_student_teachers(student),
-        "timetable": get_student_timetable(student),
+        "timetable": timetable,
+        "next_course": get_student_next_course(student),
         "events": get_student_events(student),
         "messages": get_student_messages(student),
+        "unread_messages_count": get_student_unread_messages_count(student),
         "stats": get_student_stats(student),
         "academic_status": snapshot["academic_status"],
         "academic_status_message": snapshot["academic_status_message"],
@@ -256,8 +297,11 @@ def get_student_overview_data(user):
             "student": None,
             "enrollment": None,
             "courses": [],
+            "timetable": {},
+            "next_course": None,
             "events": [],
             "messages": [],
+            "unread_messages_count": 0,
             "stats": {
                 "average": "Non disponible",
                 "ranking": "Non disponible",
@@ -280,12 +324,16 @@ def get_student_overview_data(user):
         }
 
     # Overview: hero + stats + courses overview + profile + events
+    timetable = get_student_timetable(student)
     return {
         "student": student,
         "enrollment": enrollment,
         "courses": get_student_courses(student),
+        "timetable": timetable,
+        "next_course": get_student_next_course(student),
         "events": get_student_events(student),
         "messages": get_student_messages(student),
+        "unread_messages_count": get_student_unread_messages_count(student),
         "stats": get_student_stats(student),
         "academic_status": snapshot["academic_status"],
         "academic_status_message": snapshot["academic_status_message"],
@@ -311,7 +359,12 @@ def get_student_courses_context(user):
 def get_student_messages_context(user):
     snapshot = get_student_academic_snapshot(user)
     student = snapshot["student"]
-    return {"messages": get_student_messages(student) if student else []}
+    if not student:
+        return {"messages": [], "unread_messages_count": 0}
+    return {
+        "messages": get_student_messages(student),
+        "unread_messages_count": get_student_unread_messages_count(student),
+    }
 
 
 def get_student_timetable_context(user):

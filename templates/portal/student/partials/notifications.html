@@ -14,9 +14,19 @@
 </div>
 
 {% if items %}
-  <div class="grid gap-3">
+  <div
+    class="grid gap-3"
+    x-data="{
+      page: 0,
+      pageSize: 4,
+      total: {{ items|length }},
+      pageCount() { return Math.max(1, Math.ceil(this.total / this.pageSize)); },
+      next() { if (this.page < this.pageCount() - 1) this.page += 1; },
+      prev() { if (this.page > 0) this.page -= 1; }
+    }"
+  >
     {% for notif in items %}
-      <div class="flex items-start gap-3 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3.5">
+      <div class="flex items-start gap-3 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3.5" x-show="{{ forloop.counter0 }} >= page * pageSize && {{ forloop.counter0 }} < (page + 1) * pageSize" x-cloak>
         <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
           <i data-lucide="bell-ring" style="width:18px;height:18px;"></i>
         </div>
@@ -25,6 +35,14 @@
         </div>
       </div>
     {% endfor %}
+
+    <div class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--muted)]" x-show="total > pageSize">
+      <span>Page <strong x-text="page + 1"></strong> / <strong x-text="pageCount()"></strong></span>
+      <div class="flex items-center gap-2">
+        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-white px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="prev()" :disabled="page === 0">Precedent</button>
+        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-white px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="next()" :disabled="page >= pageCount() - 1">Suivant</button>
+      </div>
+    </div>
   </div>
 {% else %}
   <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">

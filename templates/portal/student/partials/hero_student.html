@@ -1,59 +1,124 @@
-<article class="student-card student-hero" data-aos="fade-up">
-  <div class="flex flex-col justify-center p-5">
-    <span class="student-pill">
-      <i data-lucide="graduation-cap" style="width:15px;height:15px;"></i>
-      Portail etudiant ESFE
-    </span>
-    <h2 class="mt-3 text-[1.55rem] font-black tracking-tight text-[color:var(--text)] sm:text-[1.8rem]">
-      Bonjour, {{ student.inscription.candidature.first_name|default:student.user.username }} !
-    </h2>
-    <p class="mt-2 text-xs font-extrabold uppercase tracking-[0.18em] text-[color:var(--school-primary)]">
-      Suivi academique centralise
-    </p>
-    <p class="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--muted)]">
-      Retrouvez vos cours, votre progression, votre emploi du temps et les ressources pedagogiques dans un espace unique.
-    </p>
-    {% if academic_year %}
-      <p class="mt-3 text-sm font-semibold text-[color:var(--muted)]">Annee academique : {{ academic_year.name }}</p>
-    {% endif %}
-    <div class="mt-4 flex flex-wrap gap-2">
-      <button type="button" @click="goToSection('courses', 'Mes cours')" class="rounded-xl bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-black text-white transition hover:bg-primary-600">
-        Continuer les cours
-      </button>
-      <button type="button" @click="goToSection('overview', 'Tableau de bord')" class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-4 py-2.5 text-sm font-black text-[color:var(--text)]">
-        Voir ma situation
+<article class="student-card student-card-pad" data-aos="fade-up">
+  <section class="mb-4 rounded-2xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4 sm:p-5">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <span class="student-pill">
+        <i data-lucide="graduation-cap" style="width:15px;height:15px;"></i>
+        ESFé Mali
+      </span>
+      <button
+        type="button"
+        @click="goToSection('courses', 'Mes cours')"
+        class="inline-flex items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--school-primary)]"
+      >
+        <i data-lucide="book-open-check" style="width:14px;height:14px;"></i>
+        Mes cours
       </button>
     </div>
-  </div>
 
-  <div class="relative min-h-[188px] overflow-hidden border-l border-[color:var(--line)] bg-[color:var(--card-soft)]">
-    <div class="grid h-full grid-rows-[auto_1fr] gap-3 p-4">
-      <div class="rounded-xl border border-[color:var(--line)] bg-white p-3.5">
-        <div class="flex items-center gap-3">
-          <i data-lucide="book-open-check" style="width:22px;height:22px;color:var(--school-primary);"></i>
-          <div>
-            <strong class="block text-sm text-[color:var(--text)]">{{ courses|length }} cours actifs</strong>
-            <span class="block text-xs text-[color:var(--muted)]">
-              {% if academic_status == "assigned" %}{{ academic_status_message }}{% else %}Completez votre affectation academique{% endif %}
-            </span>
+    <h2 class="text-[1.1rem] font-black tracking-tight text-[color:var(--text)] sm:text-[1.35rem]">
+      <span x-text="greetingLabel"></span>, {{ student.inscription.candidature.first_name|default:student.user.username }}
+    </h2>
+    <p class="mt-1 text-xs font-bold uppercase tracking-[0.15em] text-[color:var(--school-primary)]" x-text="greetingTone"></p>
+    <p class="mt-2 text-sm text-[color:var(--muted)]">
+      Accueil simple et rapide: voici vos actions principales.
+    </p>
+  </section>
+
+  <section class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] overflow-hidden">
+    <div class="student-hero-split">
+      <aside class="student-mini-calendar-panel p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <button
+            type="button"
+            @click="prevMiniMonth()"
+            class="grid h-7 w-7 place-items-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] text-[color:var(--muted)] transition hover:bg-[color:var(--surface-2)]"
+          >
+            <i data-lucide="chevron-left" style="width:14px;height:14px;"></i>
+          </button>
+          <strong class="text-sm font-black text-[color:var(--text)]" x-text="miniMonthLabel"></strong>
+          <button
+            type="button"
+            @click="nextMiniMonth()"
+            class="grid h-7 w-7 place-items-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] text-[color:var(--muted)] transition hover:bg-[color:var(--surface-2)]"
+          >
+            <i data-lucide="chevron-right" style="width:14px;height:14px;"></i>
+          </button>
+        </div>
+
+        <div class="student-mini-calendar-shell">
+          <div class="mb-2 student-mini-calendar-weekdays text-center">
+          <template x-for="w in miniWeekLabels" :key="w">
+            <span class="student-calendar-weekday" x-text="w"></span>
+          </template>
+          </div>
+
+          <div class="student-mini-calendar-days">
+            <template x-for="(d, idx) in miniMonthCells" :key="idx">
+              <div
+                class="student-calendar-day"
+                :class="{ 'is-today': d.isToday, 'is-outside': !d.isCurrentMonth }"
+              >
+                <span x-text="d.day"></span>
+              </div>
+            </template>
           </div>
         </div>
-      </div>
 
-      <div class="grid content-start gap-2">
-        <button type="button" @click="goToSection('schedule', 'Calendrier')" class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-white px-3 py-2.5 text-sm font-semibold text-[color:var(--text)] transition hover:border-primary-200">
-          <span>Calendrier</span>
-          <i data-lucide="calendar-days" style="width:16px;height:16px;"></i>
+        <button
+          type="button"
+          @click="goToSection('schedule', 'Calendrier')"
+          class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-extrabold text-[color:var(--school-primary)] transition hover:bg-[color:var(--surface-2)]"
+        >
+          <i data-lucide="calendar-days" style="width:14px;height:14px;"></i>
+          Ouvrir le calendrier
         </button>
-        <button type="button" @click="goToSection('messages', 'Messages')" class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-white px-3 py-2.5 text-sm font-semibold text-[color:var(--text)] transition hover:border-primary-200">
-          <span>Messages</span>
-          <i data-lucide="messages-square" style="width:16px;height:16px;"></i>
-        </button>
-        <button type="button" @click="goToSection('teachers', 'Encadrement')" class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-white px-3 py-2.5 text-sm font-semibold text-[color:var(--text)] transition hover:border-primary-200">
-          <span>Profil</span>
-          <i data-lucide="badge-check" style="width:16px;height:16px;"></i>
-        </button>
-      </div>
+      </aside>
+
+      <aside class="student-hero-right p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[color:var(--muted)]">Actions metier</p>
+            <h3 class="text-sm font-black text-[color:var(--text)]">Acces rapide</h3>
+          </div>
+          <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1 text-[10px] font-extrabold text-[color:var(--muted)]">Aujourd'hui</span>
+        </div>
+
+        <div class="mb-3 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-[10px] font-extrabold uppercase tracking-wide text-[color:var(--muted)]">Prochain cours</span>
+            <i data-lucide="clock-3" style="width:14px;height:14px;" class="text-[color:var(--school-primary)]"></i>
+          </div>
+          {% if next_course %}
+            <strong class="block truncate text-sm font-black text-[color:var(--text)]">{{ next_course.title }}</strong>
+            <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">{{ next_course.weekday_label }} · {{ next_course.time_range }}</p>
+            <p class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] bg-[color:var(--surface-2)] px-2 py-1 text-[11px] font-bold text-[color:var(--text)]">
+              <i data-lucide="{% if next_course.is_online %}video{% else %}map-pin{% endif %}" style="width:13px;height:13px;"></i>
+              {% if next_course.is_online %}Visio{% else %}Salle{% endif %}: {{ next_course.location }}
+            </p>
+          {% else %}
+            <p class="text-xs font-semibold text-[color:var(--muted)]">Aucun cours programme prochainement.</p>
+          {% endif %}
+        </div>
+
+        <div class="grid gap-2 sm:grid-cols-2">
+          <button type="button" @click="goToSection('courses', 'Mes cours')" class="inline-flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">
+            <span>Reprendre un cours</span>
+            <i data-lucide="book-open-check" style="width:15px;height:15px;"></i>
+          </button>
+          <button type="button" @click="goToSection('messages', 'Messages')" class="inline-flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">
+            <span>Voir mes messages</span>
+            <i data-lucide="messages-square" style="width:15px;height:15px;"></i>
+          </button>
+          <button type="button" @click="goToSection('academics', 'Academique')" class="inline-flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">
+            <span>Suivi academique</span>
+            <i data-lucide="graduation-cap" style="width:15px;height:15px;"></i>
+          </button>
+          <button type="button" @click="goToSection('finance', 'Finance')" class="inline-flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">
+            <span>Situation finance</span>
+            <i data-lucide="wallet" style="width:15px;height:15px;"></i>
+          </button>
+        </div>
+      </aside>
     </div>
-  </div>
+  </section>
 </article>

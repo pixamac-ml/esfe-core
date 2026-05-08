@@ -215,6 +215,67 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Bilan de periode</p>
+                    <h3 class="text-lg font-semibold text-slate-900 mt-1">Resultat rapide du mois</h3>
+                </div>
+                <span class="w-fit rounded-full px-3 py-1 text-xs font-semibold {% if period_summary.balance_after_commitments < 0 %}bg-rose-100 text-rose-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                    Apres engagements: {{ period_summary.balance_after_commitments|intcomma }} FCFA
+                </span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                <div class="p-6">
+                    <p class="text-sm font-semibold text-slate-900">Recettes</p>
+                    <p class="mt-3 text-3xl font-bold text-emerald-600">{{ period_summary.total_revenue|intcomma }}</p>
+                    <div class="mt-4 space-y-2 text-sm">
+                        <div class="flex justify-between gap-3"><span class="text-slate-500">Etudiants</span><span class="font-semibold text-slate-900">{{ period_summary.student_revenue|intcomma }}</span></div>
+                        <div class="flex justify-between gap-3"><span class="text-slate-500">Boutique</span><span class="font-semibold text-slate-900">{{ period_summary.shop_revenue|intcomma }}</span></div>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <p class="text-sm font-semibold text-slate-900">Charges payees</p>
+                    <p class="mt-3 text-3xl font-bold text-rose-600">{{ period_summary.charges_paid|intcomma }}</p>
+                    <div class="mt-4 space-y-2 text-sm">
+                        <div class="flex justify-between gap-3"><span class="text-slate-500">Depenses</span><span class="font-semibold text-slate-900">{{ period_summary.expenses_paid|intcomma }}</span></div>
+                        <div class="flex justify-between gap-3"><span class="text-slate-500">Salaires</span><span class="font-semibold text-slate-900">{{ period_summary.salary_paid|intcomma }}</span></div>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <p class="text-sm font-semibold text-slate-900">Position nette</p>
+                    <p class="mt-3 text-3xl font-bold {% if period_summary.net_result < 0 %}text-rose-600{% else %}text-primary{% endif %}">{{ period_summary.net_result|intcomma }}</p>
+                    <div class="mt-4 space-y-2 text-sm">
+                        <div class="flex justify-between gap-3"><span class="text-slate-500">Solde caisse</span><span class="font-semibold text-slate-900">{{ period_summary.estimated_cash|intcomma }}</span></div>
+                        <div class="flex justify-between gap-3"><span class="text-slate-500">Engagements</span><span class="font-semibold text-slate-900">{{ period_summary.commitments|intcomma }}</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Parcours demo</p>
+                    <h3 class="text-lg font-semibold text-slate-900 mt-1">Ce qu'il faut montrer</h3>
+                </div>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ period_summary.collection_rate }}% encaisse</span>
+            </div>
+            <div class="mt-5 space-y-3">
+                {% for step in demo_flow %}
+                <a href="{% url 'accounts:manager_dashboard' %}?section={{ step.section }}" class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 hover:border-primary/30 hover:bg-white transition">
+                    <span class="text-sm font-semibold text-slate-700">{{ forloop.counter }}. {{ step.label }}</span>
+                    <span class="min-w-10 rounded-lg px-2.5 py-1 text-center text-sm font-bold {% if step.tone == 'amber' %}bg-amber-100 text-amber-700{% elif step.tone == 'blue' %}bg-blue-100 text-blue-700{% elif step.tone == 'emerald' %}bg-emerald-100 text-emerald-700{% elif step.tone == 'rose' %}bg-rose-100 text-rose-700{% else %}bg-slate-200 text-slate-700{% endif %}">{{ step.value }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            <div class="mt-5 rounded-xl bg-primary/5 px-4 py-3 text-sm text-slate-600">
+                Conversion candidature: <span class="font-bold text-primary">{{ period_summary.candidature_conversion_rate }}%</span>. Objectif presentation: partir du dossier candidat et finir sur la caisse.
+            </div>
+        </div>
+    </div>
+
     <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -326,7 +387,7 @@
                                         {{ payment.get_status_display }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-sm text-slate-500">{{ payment.created_at|date:"H:i" }}</td>
+                                <td class="px-6 py-4 text-sm text-slate-500">{{ payment.paid_at|default:payment.created_at|date:"H:i" }}</td>
                             </tr>
                             {% empty %}
                             <tr><td colspan="5" class="px-6 py-10 text-center text-slate-400">Aucun paiement aujourd'hui.</td></tr>

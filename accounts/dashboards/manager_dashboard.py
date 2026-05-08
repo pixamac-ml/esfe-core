@@ -156,6 +156,13 @@ def _manager_context(request, active_section="overview"):
     inscriptions_with_balance = base_inscriptions.filter(
         status__in=[Inscription.STATUS_PARTIAL, Inscription.STATUS_AWAITING_PAYMENT]
     ).count()
+    inscription_amounts = base_inscriptions.aggregate(
+        due=Sum("amount_due"),
+        paid=Sum("amount_paid"),
+    )
+    total_amount_due = inscription_amounts["due"] or 0
+    total_amount_paid = inscription_amounts["paid"] or 0
+    collection_rate = round((total_amount_paid / total_amount_due) * 100) if total_amount_due else 0
 
     candidatures_pending = base_candidatures.filter(
         status__in=["submitted", "under_review"],
@@ -448,6 +455,61 @@ def _manager_context(request, active_section="overview"):
         branch_staff_user_ids=branch_staff_user_ids,
     )
     shop_context = get_manager_shop_context(branch)
+    shop_stats = shop_context.get("shop_stats", {})
+    shop_sales_month = shop_stats.get("month_sales", 0) or 0
+    period_revenue = total_month + shop_sales_month
+    period_paid_charges = cash_stats["expenses_paid_month"] + cash_stats["salary_paid_month"]
+    period_commitments = payroll_stats["remaining_total"] + expense_stats["pending_amount"]
+    period_net_result = period_revenue - period_paid_charges
+    period_balance_after_commitments = cash_stats["estimated_month_balance"] - period_commitments
+    candidature_total = candidature_stats["total"]
+    candidature_conversion_rate = round((candidatures_accepted / candidature_total) * 100) if candidature_total else 0
+    period_summary = {
+        "student_revenue": total_month,
+        "shop_revenue": shop_sales_month,
+        "total_revenue": period_revenue,
+        "expenses_paid": cash_stats["expenses_paid_month"],
+        "salary_paid": cash_stats["salary_paid_month"],
+        "charges_paid": period_paid_charges,
+        "net_result": period_net_result,
+        "estimated_cash": cash_stats["estimated_month_balance"],
+        "commitments": period_commitments,
+        "balance_after_commitments": period_balance_after_commitments,
+        "collection_rate": collection_rate,
+        "candidature_conversion_rate": candidature_conversion_rate,
+    }
+    demo_flow = [
+        {
+            "label": "Candidatures a traiter",
+            "value": candidatures_pending,
+            "section": "candidatures",
+            "tone": "amber",
+        },
+        {
+            "label": "Dossiers acceptes",
+            "value": candidatures_accepted,
+            "section": "candidatures",
+            "tone": "blue",
+        },
+        {
+            "label": "Inscriptions actives",
+            "value": inscriptions_active,
+            "section": "inscriptions",
+            "tone": "emerald",
+        },
+        {
+            "label": "Paiements en attente",
+            "value": pending_payments,
+            "section": "paiements",
+            "tone": "rose",
+        },
+        {
+            "label": "Mouvements de caisse",
+            "value": cash_stats["movements"],
+            "section": "caisse",
+            "tone": "slate",
+        },
+    ]
 
     quick_search = request.GET.get("q", "").strip()
     quick_results = {"candidatures": [], "inscriptions": [], "payments": []}
@@ -529,6 +591,8 @@ def _manager_context(request, active_section="overview"):
         "expense_categories": BranchExpense.CATEGORY_CHOICES,
         "cash_movements": cash_movements_page,
         "cash_stats": cash_stats,
+        "period_summary": period_summary,
+        "demo_flow": demo_flow,
         "cash_type": cash_type,
         "cash_source": cash_source,
         "cash_search": cash_search,

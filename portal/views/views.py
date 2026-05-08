@@ -83,7 +83,7 @@ from portal.services.it_support_service import (
 )
 from portal.models import SupportTicket
 from portal.views.it_grades_import import build_it_grade_selection_context
-from students.models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance
+from students.models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, StudentCase
 from students.services.attendance_service import (
     bulk_mark_student_attendance,
     get_student_attendance_history,
@@ -1154,6 +1154,15 @@ def _render_supervisor_dashboard(request):
                 selected_class_label = item["label"]
                 break
 
+    open_cases_count = 0
+    if branch:
+        open_cases_count = (
+            StudentCase.objects
+            .filter(branch=branch)
+            .exclude(status__in=[StudentCase.STATUS_RESOLU, StudentCase.STATUS_ESCALADE])
+            .count()
+        )
+
     context = {
         **_build_portal_context(
             request,
@@ -1166,6 +1175,7 @@ def _render_supervisor_dashboard(request):
         "total_classes": classes_qs.count() if branch else 0,
         "selected_class_id": selected_class_id,
         "selected_class_label": selected_class_label,
+        "open_cases_count": open_cases_count,
     }
     display_name = (
         context.get("user_display_name")
@@ -3381,6 +3391,58 @@ def supervisor_weekly_slot_save(request, class_id: int):
             },
         )
 
+    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_week_materialize(request, class_id: int):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/weekly_slots_workspace.html",
+            {"toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}, "academic_class": None},
+        )
+
+    week_start_raw = (request.POST.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+
+    from academics.services.schedule_service import materialize_week_events_from_weekly_slots
+
+    try:
+        academic_class = AcademicClass.objects.select_related("academic_year", "branch").get(
+            pk=class_id,
+            branch=branch,
+            is_active=True,
+        )
+        result = materialize_week_events_from_weekly_slots(
+            user=request.user,
+            academic_class=academic_class,
+            week_start=week_start,
+        )
+        toast = {
+            "level": "success",
+            "message": f"Semaine générée: {result['created']} cours créés ({result['skipped_existing']} déjà présents).",
+        }
+    except AcademicClass.DoesNotExist:
+        toast = {"level": "error", "message": "Classe introuvable pour cette annexe."}
+
+    context = _build_weekly_slots_workspace_context(
+        request,
+        branch=branch,
+        class_id=class_id,
+        week_start=week_start,
+        editing_slot_id=None,
+        toast=toast,
+    )
     return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
 
 

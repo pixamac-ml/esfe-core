@@ -7,11 +7,13 @@ from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from django.db.models import Prefetch
 from django.views.decorators.http import require_POST
 
 from academics.models import AcademicEnrollment, EC, ECChapter, ECContent, StudentContentProgress
+from communication.models import CommunicationNotification
 from portal.permissions import role_required
 
 from .services import (
@@ -272,6 +274,70 @@ def courses_partial(request):
 def messages_partial(request):
     context = get_student_messages_context(request.user)
     return render(request, "portal/student/partials/messages_student.html", context)
+
+
+@login_required
+@role_required("student")
+@require_POST
+def mark_message_read(request, message_id):
+    notification = get_object_or_404(
+        CommunicationNotification,
+        pk=message_id,
+        recipient=request.user,
+        channel=CommunicationNotification.CHANNEL_IN_APP,
+    )
+    if notification.read_at is None:
+        now = timezone.now()
+        notification.read_at = now
+        notification.status = CommunicationNotification.STATUS_READ
+        notification.save(update_fields=["read_at", "status", "updated_at"])
+
+    unread_count = CommunicationNotification.objects.filter(
+        recipient=request.user,
+        channel=CommunicationNotification.CHANNEL_IN_APP,
+        read_at__isnull=True,
+    ).count()
+    return JsonResponse({"ok": True, "unread_count": unread_count, "message_id": notification.id})
+
+
+@login_required
+@role_required("student")
+@require_POST
+def mark_all_messages_read(request):
+    now = timezone.now()
+    CommunicationNotification.objects.filter(
+        recipient=request.user,
+        channel=CommunicationNotification.CHANNEL_IN_APP,
+        read_at__isnull=True,
+    ).update(
+        read_at=now,
+        status=CommunicationNotification.STATUS_READ,
+        updated_at=now,
+    )
+    return JsonResponse({"ok": True, "unread_count": 0})
+
+
+@login_required
+@role_required("student")
+@require_POST
+def mark_message_unread(request, message_id):
+    notification = get_object_or_404(
+        CommunicationNotification,
+        pk=message_id,
+        recipient=request.user,
+        channel=CommunicationNotification.CHANNEL_IN_APP,
+    )
+    if notification.read_at is not None:
+        notification.read_at = None
+        notification.status = CommunicationNotification.STATUS_DELIVERED
+        notification.save(update_fields=["read_at", "status", "updated_at"])
+
+    unread_count = CommunicationNotification.objects.filter(
+        recipient=request.user,
+        channel=CommunicationNotification.CHANNEL_IN_APP,
+        read_at__isnull=True,
+    ).count()
+    return JsonResponse({"ok": True, "unread_count": unread_count, "message_id": notification.id})
 
 
 @login_required

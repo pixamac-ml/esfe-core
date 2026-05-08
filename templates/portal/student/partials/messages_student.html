@@ -11,22 +11,73 @@
     <span class="htmx-indicator">Actualisation...</span>
     <span>Actualiser</span>
   </button>
+  <button
+    type="button"
+    class="inline-flex items-center gap-2 rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--school-primary)]"
+    @click="markAllMessagesRead()"
+    x-show="unreadMessages > 0"
+    x-cloak
+  >
+    Tout marquer lu
+  </button>
 </div>
 
 {% if messages %}
-  <div class="grid gap-3">
+  <div
+    class="grid gap-3"
+    x-data="{
+      page: 0,
+      pageSize: 4,
+      total: {{ messages|length }},
+      pageCount() { return Math.max(1, Math.ceil(this.total / this.pageSize)); },
+      next() { if (this.page < this.pageCount() - 1) this.page += 1; },
+      prev() { if (this.page > 0) this.page -= 1; }
+    }"
+  >
     {% for message in messages %}
-      <div class="flex items-start gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3.5">
+      <div class="flex items-start gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3.5" :class="{ 'opacity-70': {{ message.is_read|yesno:'true,false' }} }" x-show="{{ forloop.counter0 }} >= page * pageSize && {{ forloop.counter0 }} < (page + 1) * pageSize" x-cloak>
         <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] font-black text-[color:var(--school-primary-dark)]">
           {{ message.name|slice:":1"|upper }}
         </div>
         <div class="min-w-0 flex-1">
-          <strong class="block truncate text-sm text-[color:var(--text)]">{{ message.name }}</strong>
+          <div class="flex items-center gap-2">
+            <strong class="block truncate text-sm text-[color:var(--text)]">{{ message.name }}</strong>
+            {% if not message.is_read %}
+              <span class="inline-flex rounded-full bg-red-600/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-600">non lu</span>
+            {% endif %}
+          </div>
           <span class="mt-1 block text-xs leading-5 text-[color:var(--muted)]">{{ message.text }}</span>
         </div>
-        <span class="shrink-0 text-[11px] font-extrabold text-[color:var(--muted-2)]">{{ message.time }}</span>
+        <div class="shrink-0 text-right">
+          <span class="block text-[11px] font-extrabold text-[color:var(--muted-2)]">{{ message.time }}</span>
+          {% if not message.is_read %}
+            <button
+              type="button"
+              class="mt-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2 py-1 text-[10px] font-extrabold text-[color:var(--school-primary)]"
+              @click="markMessageRead({{ message.id }})"
+            >
+              Marquer lu
+            </button>
+          {% else %}
+            <button
+              type="button"
+              class="mt-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2 py-1 text-[10px] font-extrabold text-[color:var(--muted)]"
+              @click="markMessageUnread({{ message.id }})"
+            >
+              Marquer non lu
+            </button>
+          {% endif %}
+        </div>
       </div>
     {% endfor %}
+
+    <div class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--muted)]" x-show="total > pageSize">
+      <span>Page <strong x-text="page + 1"></strong> / <strong x-text="pageCount()"></strong></span>
+      <div class="flex items-center gap-2">
+        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-white px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="prev()" :disabled="page === 0">Precedent</button>
+        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-white px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="next()" :disabled="page >= pageCount() - 1">Suivant</button>
+      </div>
+    </div>
   </div>
 {% else %}
   <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">

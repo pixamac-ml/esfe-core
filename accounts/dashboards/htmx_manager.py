@@ -162,7 +162,7 @@ def candidature_accept(request, pk):
 def candidature_reject(request, pk):
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
     candidature.status = "rejected"
-    candidature.rejection_reason = request.POST.get("reason", "")
+    candidature.rejection_reason = (request.POST.get("reason") or "").strip() or "Rejeté par le gestionnaire."
     candidature.reviewed_at = timezone.now()
     candidature.reviewed_by = request.user
     candidature.save(update_fields=["status", "rejection_reason", "reviewed_at", "reviewed_by"])
@@ -178,7 +178,7 @@ def candidature_reject(request, pk):
 def candidature_to_complete(request, pk):
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
     candidature.status = "to_complete"
-    candidature.completion_message = request.POST.get("message", "")
+    candidature.completion_message = (request.POST.get("message") or "").strip() or "Compléments demandés par le gestionnaire."
     candidature.reviewed_at = timezone.now()
     candidature.reviewed_by = request.user
     candidature.save(update_fields=["status", "completion_message", "reviewed_at", "reviewed_by"])

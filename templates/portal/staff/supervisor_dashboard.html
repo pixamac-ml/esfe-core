@@ -18,7 +18,7 @@
 {% block content %}
 <div x-data="supervisorFlow()" x-init="init()" x-cloak class="min-h-screen bg-slate-100 text-slate-900">
   <div class="flex min-h-screen">
-    <aside class="w-72 shrink-0 bg-slate-900 text-slate-100">
+      <aside class="flex w-72 shrink-0 flex-col bg-slate-900 text-slate-100">
       <div class="border-b border-slate-800 px-5 py-5">
         <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Surveillant General</p>
         <p class="mt-2 text-lg font-extrabold">{{ branch.name|default:"Annexe" }}</p>
@@ -39,17 +39,35 @@
         </select>
       </div>
 
-      <nav class="space-y-1 p-4">
-        <button type="button" @click="go('home')" :class="btnClass('home')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Accueil</button>
-        <button type="button" @click="go('classes')" :class="btnClass('classes')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Suivi des classes</button>
-        <button type="button" @click="go('attendance')" :disabled="!classId" :class="btnClass('attendance', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Assiduité</button>
-        <button type="button" @click="go('schedule')" :disabled="!classId" :class="btnClass('schedule', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Emploi du temps</button>
-        <button type="button" @click="go('courses')" :disabled="!classId" :class="btnClass('courses', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Cours</button>
-        <button type="button" @click="go('students')" :disabled="!classId" :class="btnClass('students', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Étudiants</button>
-        <button type="button" @click="go('cases')" :class="btnClass('cases')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">
-          ⚠ Cas à traiter
-          {% if open_cases_count %}<span class="ml-1 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black text-white">{{ open_cases_count }}</span>{% endif %}
-        </button>
+      <nav class="flex flex-1 flex-col justify-between p-4">
+        <div class="space-y-1">
+          <button type="button" @click="go('home')" :class="btnClass('home')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Accueil</button>
+          <button type="button" @click="go('classes')" :class="btnClass('classes')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Suivi des classes</button>
+          <button type="button" @click="go('attendance')" :disabled="!classId" :class="btnClass('attendance', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Assiduité</button>
+          <button type="button" @click="go('schedule')" :disabled="!classId" :class="btnClass('schedule', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Emploi du temps</button>
+          <button type="button" @click="go('courses')" :disabled="!classId" :class="btnClass('courses', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Cours</button>
+          <button type="button" @click="go('students')" :disabled="!classId" :class="btnClass('students', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Étudiants</button>
+          <button type="button" @click="go('cases')" :class="btnClass('cases')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">
+            ⚠ Cas à traiter
+            {% if open_cases_count %}<span class="ml-1 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black text-white">{{ open_cases_count }}</span>{% endif %}
+          </button>
+        </div>
+
+        <!-- Bouton de déconnexion -->
+        <div class="mt-4 border-t border-slate-700 pt-4">
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button
+              type="submit"
+              class="flex w-full items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-left text-sm font-bold text-white transition hover:bg-rose-700 active:scale-95"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+              Déconnexion
+            </button>
+          </form>
+        </div>
       </nav>
     </aside>
 

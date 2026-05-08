@@ -43,17 +43,25 @@
     min-height: 100vh;
     color: var(--text);
     background: linear-gradient(180deg, var(--bg-deep), var(--bg-deep-2));
+    font-family: Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   .student-dashboard-page.dark-preview {
     --surface: #111827;
     --surface-2: #172033;
     --card: #1f2937;
-    --card-soft: #273449;
-    --line: #344156;
+    --card-soft: #253246;
+    --line: #3b4a61;
     --text: #f9fafb;
-    --muted: #cbd5e1;
-    --muted-2: #94a3b8;
+    --muted: #d7e0ee;
+    --muted-2: #aebbd0;
+    --school-primary-soft: rgba(29, 181, 176, 0.2);
+    --school-secondary-soft: rgba(29, 181, 176, 0.22);
+    --school-accent-soft: rgba(243, 156, 18, 0.22);
   }
 
   .student-stage {
@@ -73,20 +81,39 @@
     transition: grid-template-columns .28s ease;
   }
 
-  .compact-sidebar .student-shell {
+  .sidebar-collapsed .student-shell {
     grid-template-columns: var(--sidebar-compact-width) minmax(0, 1fr);
   }
 
   .student-sidebar {
-    display: grid;
-    grid-template-columns: 72px 1fr;
+    display: block;
     overflow: hidden;
     color: white;
     background: linear-gradient(180deg, var(--sidebar-main), var(--school-primary-dark));
+    transition: width .24s ease;
   }
 
-  .compact-sidebar .student-sidebar {
-    grid-template-columns: 90px 0;
+  .student-sidebar .sidebar-collapsed-only {
+    display: none;
+  }
+
+  .sidebar-collapsed .student-sidebar .sidebar-expand-only {
+    display: none !important;
+  }
+
+  .sidebar-collapsed .student-sidebar .sidebar-collapsed-only {
+    display: grid;
+  }
+
+  .sidebar-collapsed .student-sidebar {
+    padding-left: .2rem;
+    padding-right: .2rem;
+  }
+
+  .sidebar-collapsed .student-sidebar .student-nav-item {
+    justify-content: center;
+    padding-left: .5rem;
+    padding-right: .5rem;
   }
 
   .student-main {
@@ -96,11 +123,13 @@
   }
 
   .student-topbar {
+    position: relative;
+    z-index: 120;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0 1rem;
+    padding: 0 0.85rem;
     border-bottom: 1px solid var(--line);
     background: rgba(255,255,255,.92);
     backdrop-filter: blur(14px);
@@ -111,29 +140,31 @@
   }
 
   .student-content {
+    position: relative;
+    z-index: 1;
     overflow: auto;
     overflow-x: hidden;
-    padding: 0.9rem;
+    padding: 0.7rem;
     display: block;
   }
 
   .student-card {
     border: 1px solid var(--line);
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--card);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .035);
     min-width: 0;
   }
 
   .student-card-pad {
-    padding: 0.85rem;
+    padding: 0.75rem;
   }
 
   .student-hero {
     overflow: hidden;
     display: grid;
-    grid-template-columns: minmax(0, 1.4fr) minmax(280px, .72fr);
-    min-height: 136px;
+    grid-template-columns: minmax(0, 1.45fr) minmax(280px, .85fr);
+    min-height: 0;
   }
 
   .student-pill {
@@ -169,6 +200,13 @@
     overflow-wrap: anywhere;
   }
 
+  .student-dashboard-page p,
+  .student-dashboard-page span,
+  .student-dashboard-page label,
+  .student-dashboard-page small {
+    color: inherit;
+  }
+
   .student-content img,
   .student-content video,
   .student-content iframe {
@@ -191,6 +229,188 @@
     min-width: 0;
   }
 
+  .student-inline-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .student-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 34px;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card-soft);
+    font-size: 0.74rem;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .student-inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+  }
+
+  .student-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 36px;
+    padding: 0.55rem 0.9rem;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    transition: .2s ease;
+  }
+
+  .student-metric-grid {
+    display: grid;
+    gap: 0.55rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-metric-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    padding: 0.75rem;
+  }
+
+  .student-inline-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .student-inline-list {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .student-data-row {
+    display: grid;
+    grid-template-columns: minmax(0, 120px) minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card-soft);
+    padding: 0.65rem 0.75rem;
+    font-size: 0.78rem;
+  }
+
+  .student-data-row-label {
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+  }
+
+  .student-course-list {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .student-course-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(150px, .75fr) minmax(180px, .9fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card-soft);
+    padding: 0.8rem;
+  }
+
+  .student-course-progress {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .student-mini-meter,
+  .student-progress-meter {
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .student-mini-meter {
+    height: 6px;
+  }
+
+  .student-progress-meter {
+    height: 8px;
+  }
+
+  .student-mini-meter::-webkit-progress-bar,
+  .student-progress-meter::-webkit-progress-bar {
+    background: var(--surface-2);
+    border-radius: 999px;
+  }
+
+  .student-mini-meter::-webkit-progress-value,
+  .student-progress-meter::-webkit-progress-value {
+    background: linear-gradient(90deg, var(--school-primary), var(--school-secondary));
+    border-radius: 999px;
+  }
+
+  .student-mini-meter::-moz-progress-bar,
+  .student-progress-meter::-moz-progress-bar {
+    background: linear-gradient(90deg, var(--school-primary), var(--school-secondary));
+    border-radius: 999px;
+  }
+
+  .student-event-list {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .student-event-row {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 0.7rem;
+    align-items: start;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card-soft);
+    padding: 0.7rem;
+  }
+
+  .student-stat-grid {
+    display: grid;
+    gap: 0.6rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .student-stat-pill {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card-soft);
+    padding: 0.7rem;
+    min-width: 0;
+  }
+
+  .student-progress-list {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .student-progress-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
   .student-workspace {
     display: grid;
     gap: 0.75rem;
@@ -198,10 +418,10 @@
 
   .student-workspace-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.25rem 0.15rem 0;
+    padding: 0.1rem 0.1rem 0;
   }
 
   .student-workspace-panel {
@@ -296,6 +516,132 @@
     overflow: hidden;
   }
 
+  .student-hero-split {
+    display: grid;
+    grid-template-columns: 380px minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .student-hero-right {
+    border-left: 1px solid var(--line);
+    background: var(--card-soft);
+  }
+
+  .student-mini-calendar-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .student-mini-calendar-shell {
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .student-mini-calendar-weekdays,
+  .student-mini-calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+
+  .student-calendar-weekday {
+    display: grid;
+    place-items: center;
+    min-height: 20px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-2);
+  }
+
+  .student-calendar-day {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    min-height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    font-size: 13px;
+    font-weight: 800;
+    transition: background-color .2s ease, color .2s ease, transform .2s ease;
+    color: var(--text);
+    box-sizing: border-box;
+  }
+
+  .student-calendar-day:hover {
+    background: var(--surface-2);
+    transform: translateY(-1px);
+  }
+
+  .student-calendar-day.is-outside {
+    background: transparent;
+    border-color: transparent;
+    color: var(--muted-2);
+    opacity: .7;
+  }
+
+  .student-calendar-day.is-today {
+    background: linear-gradient(135deg, var(--school-primary), var(--school-secondary));
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(17, 79, 111, .28);
+  }
+
+  .student-dashboard-page.dark-preview .student-topbar,
+  .student-dashboard-page.dark-preview .student-detail-topbar {
+    color: var(--text);
+  }
+
+  .student-dashboard-page.dark-preview .text-\[color\:var\(--muted\)\] {
+    color: var(--muted) !important;
+  }
+
+  .student-dashboard-page.dark-preview .text-\[color\:var\(--muted-2\)\] {
+    color: var(--muted-2) !important;
+  }
+
+  .student-dashboard-page.dark-preview .text-\[color\:var\(--text\)\] {
+    color: var(--text) !important;
+  }
+
+  .student-dashboard-page.dark-preview .border-\[color\:var\(--line\)\] {
+    border-color: var(--line) !important;
+  }
+
+  .student-dashboard-page.dark-preview .bg-\[color\:var\(--card-soft\)\] {
+    background-color: var(--card-soft) !important;
+  }
+
+  .student-dashboard-page.dark-preview .bg-\[color\:var\(--surface-2\)\] {
+    background-color: var(--surface-2) !important;
+  }
+
+  .student-dashboard-page.dark-preview .bg-white {
+    background-color: var(--card) !important;
+  }
+
+  .student-dashboard-page.dark-preview .text-white {
+    color: var(--text) !important;
+  }
+
+  .student-dashboard-page.dark-preview input,
+  .student-dashboard-page.dark-preview textarea,
+  .student-dashboard-page.dark-preview select {
+    color: var(--text);
+  }
+
+  .student-search-panel {
+    backdrop-filter: blur(8px);
+  }
+
+  .student-dashboard-page.dark-preview .student-search-item:hover {
+    background: var(--surface-2);
+  }
+
   .student-scroll::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -310,9 +656,30 @@
     .student-overview-grid {
       grid-template-columns: 1fr;
     }
+
+    .student-stat-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .student-course-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   @media (max-width: 991px) {
+    .student-hero-split {
+      grid-template-columns: 1fr;
+    }
+
+    .student-mini-calendar-shell {
+      max-width: 100%;
+    }
+
+    .student-hero-right {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+
     .student-shell {
       grid-template-columns: 1fr;
       min-height: auto;
@@ -345,6 +712,11 @@
     .student-overview-grid {
       grid-template-columns: 1fr;
     }
+
+    .student-stat-grid,
+    .student-metric-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 640px) {
@@ -358,6 +730,11 @@
 
     .student-content {
       gap: 0.65rem;
+    }
+
+    .student-data-row {
+      grid-template-columns: 1fr;
+      gap: 0.35rem;
     }
 
     .student-detail-shell {
@@ -387,6 +764,7 @@
 {{ courses|json_script:"student-courses-data" }}
 {{ events|json_script:"student-events-data" }}
 {{ messages|json_script:"student-messages-data" }}
+{{ unread_messages_count|json_script:"student-unread-count-data" }}
 {{ stats.mini_stats|json_script:"student-mini-stats-data" }}
 {{ stats.progress_bars|json_script:"student-progress-bars-data" }}
 
@@ -394,7 +772,7 @@
   x-data="studentDashboard()"
   x-init="init()"
   x-cloak
-  :class="{ 'dark-preview': darkMode, 'compact-sidebar': sidebarCompact }"
+  :class="{ 'dark-preview': darkMode, 'sidebar-collapsed': sidebarCollapsed && window.innerWidth >= 992 }"
   class="student-dashboard-page"
 >
   <div
@@ -452,36 +830,16 @@
             <header class="student-workspace-head">
               <div>
                 <p class="student-section-kicker" x-text="activeMeta.kicker"></p>
-                <h1 class="student-section-title text-[1.2rem]" x-text="activeMeta.title"></h1>
-                <p class="mt-1 text-sm text-[color:var(--muted)]" x-text="activeMeta.description"></p>
+                <h1 class="student-section-title text-[1.05rem]" x-text="activeMeta.title"></h1>
+                <p class="mt-1 text-xs sm:text-sm text-[color:var(--muted)]" x-text="activeMeta.description"></p>
               </div>
-              <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]" x-text="activeMeta.badge"></span>
+              <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]" x-text="activeMeta.badge"></span>
             </header>
 
             <section x-show="activeSection === 'overview'" x-cloak class="student-workspace-panel">
               <section id="overview" class="student-section">
                 {% include "portal/student/partials/hero_student.html" %}
               </section>
-
-              <div class="student-overview-grid">
-                <div class="student-overview-stack">
-                  <section id="progress" class="student-section">
-                    {% include "portal/student/partials/stats_student.html" %}
-                  </section>
-                  <section id="courses-overview" class="student-section student-card student-card-pad student-panel-frame-auto">
-                    {% include "portal/student/partials/courses_student.html" %}
-                  </section>
-                </div>
-
-                <aside class="student-overview-stack">
-                  <section id="profile" class="student-section student-card student-card-pad">
-                    {% include "portal/student/partials/profile.html" %}
-                  </section>
-                  <section id="events" class="student-section student-card student-card-pad">
-                    {% include "portal/student/partials/events_student.html" %}
-                  </section>
-                </aside>
-              </div>
             </section>
 
             <section x-show="activeSection === 'courses'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
@@ -601,6 +959,9 @@
 {% include "portal/student/partials/student_course_immersive_script.html" %}
 <script>
   const studentContentProgressUrlTemplate = "{% url 'portal_student:content_progress' 0 %}";
+  const studentMessageReadUrlTemplate = "{% url 'portal_student:mark_message_read' 0 %}";
+  const studentMessageUnreadUrlTemplate = "{% url 'portal_student:mark_message_unread' 0 %}";
+  const studentMessagesReadAllUrl = "{% url 'portal_student:mark_all_messages_read' %}";
 
   function getCsrfToken() {
     const match = document.cookie.match(/csrftoken=([^;]+)/);
@@ -708,9 +1069,12 @@
   function studentDashboard() {
     return {
       darkMode: false,
-      sidebarCompact: false,
+      sidebarCollapsed: false,
       mobileMenu: false,
       search: "",
+      searchOpen: false,
+      searchResults: [],
+      unreadMessages: 0,
       activeNav: "Tableau de bord",
       activeSection: "overview",
       courseDetailUrl: "",
@@ -718,8 +1082,8 @@
       activeMeta: {
         kicker: "Dashboard",
         title: "Tableau de bord etudiant",
-        description: "Vue d'ensemble de votre activite academique, de vos cours et de vos actions rapides.",
-        badge: "Vue generale"
+        description: "Accueil rapide avec les actions essentielles.",
+        badge: "Accueil"
       },
       navItems: [
         { label: "Tableau de bord", icon: "layout-dashboard", target: "overview" },
@@ -736,8 +1100,8 @@
           key: "overview",
           kicker: "Dashboard",
           title: "Tableau de bord etudiant",
-          description: "Vue d'ensemble de votre activite academique, de vos cours et de vos actions rapides.",
-          badge: "Vue generale"
+          description: "Accueil rapide avec les actions essentielles.",
+          badge: "Accueil"
         },
         {
           key: "courses",
@@ -794,22 +1158,33 @@
       timetable: [],
       upcoming: [],
       messages: [],
+      greetingLabel: "Bonjour",
+      greetingTone: "Bonne continuation",
+      miniMonthCursor: null,
+      miniMonthLabel: "",
+      miniWeekLabels: ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"],
+      miniMonthCells: [],
       miniStats: [],
       progressBars: [],
       init() {
         this.darkMode = localStorage.getItem("esfe_student_dark") === "1";
-        this.sidebarCompact = localStorage.getItem("esfe_student_sidebar") === "compact";
+        this.sidebarCollapsed = localStorage.getItem("esfe_student_sidebar_collapsed") === "1";
         this.courses = parseDashboardData("student-courses-data", []);
         this.upcoming = parseDashboardData("student-events-data", []);
         this.messages = parseDashboardData("student-messages-data", []);
+        this.unreadMessages = Number(parseDashboardData("student-unread-count-data", 0) || 0);
+        this.setGreetingByTime();
+        this.miniMonthCursor = new Date();
+        this.miniMonthCursor.setDate(1);
+        this.buildMiniMonth();
         this.miniStats = parseDashboardData("student-mini-stats-data", []);
         this.progressBars = parseDashboardData("student-progress-bars-data", []);
         this.$watch("darkMode", value => {
           localStorage.setItem("esfe_student_dark", value ? "1" : "0");
           setTimeout(() => window.lucide && lucide.createIcons(), 50);
         });
-        this.$watch("sidebarCompact", value => {
-          localStorage.setItem("esfe_student_sidebar", value ? "compact" : "full");
+        this.$watch("sidebarCollapsed", value => {
+          localStorage.setItem("esfe_student_sidebar_collapsed", value ? "1" : "0");
           setTimeout(() => window.lucide && lucide.createIcons(), 50);
         });
         window.addEventListener("resize", () => {
@@ -827,13 +1202,19 @@
             lucide.createIcons();
           }
         });
+        document.addEventListener("click", (event) => {
+          const topbar = event.target.closest(".student-topbar");
+          if (!topbar) {
+            this.searchOpen = false;
+          }
+        });
       },
       toggleSidebar() {
         if (window.innerWidth < 992) {
           this.mobileMenu = !this.mobileMenu;
           return;
         }
-        this.sidebarCompact = !this.sidebarCompact;
+        this.sidebarCollapsed = !this.sidebarCollapsed;
       },
       toggleDarkMode() {
         this.darkMode = !this.darkMode;
@@ -860,12 +1241,204 @@
       goToSection(target, label) {
         this.setActiveSection(target, label);
       },
+      goToMessages() {
+        this.goToSection("messages", "Messages");
+      },
+      buildSearchSnippet(text) {
+        if (!text) return "";
+        const compact = text.replace(/\s+/g, " ").trim();
+        return compact.length > 92 ? `${compact.slice(0, 92)}...` : compact;
+      },
+      sectionLabelByKey(sectionKey) {
+        const hit = this.navItems.find((item) => item.target === sectionKey);
+        return hit ? hit.label : "Section";
+      },
+      normalizeSearch(text) {
+        return (text || "").toString().toLowerCase();
+      },
+      performGlobalSearch() {
+        const query = this.normalizeSearch(this.search).trim();
+        if (query.length < 2) {
+          this.searchResults = [];
+          this.searchOpen = false;
+          return;
+        }
+        this.searchOpen = true;
+
+        // Charge les sections paresseuses pour que la recherche couvre tout le dashboard.
+        ["courses", "schedule", "messages", "academics", "finance", "settings"].forEach((key) => this.ensureSectionLoaded(key));
+
+        const results = [];
+        const pushResult = (scope, title, snippet, sectionKey, uniqueKey) => {
+          if (results.some((r) => r.id === uniqueKey)) return;
+          results.push({
+            id: uniqueKey,
+            scope,
+            title,
+            snippet: this.buildSearchSnippet(snippet),
+            sectionKey,
+          });
+        };
+
+        this.sectionMeta.forEach((meta) => {
+          const hay = this.normalizeSearch(`${meta.title} ${meta.description} ${meta.kicker}`);
+          if (hay.includes(query)) {
+            pushResult("Section", meta.title, meta.description, meta.key, `meta-${meta.key}`);
+          }
+        });
+
+        this.courses.forEach((course) => {
+          const hay = this.normalizeSearch(`${course.title} ${course.code} ${course.ue} ${course.teacher}`);
+          if (hay.includes(query)) {
+            pushResult("Cours", course.title, `Semestre ${course.semester} · ${course.code}`, "courses", `course-${course.id}`);
+          }
+        });
+
+        this.upcoming.forEach((event, idx) => {
+          const hay = this.normalizeSearch(`${event.title} ${event.desc} ${event.branch}`);
+          if (hay.includes(query)) {
+            pushResult("Calendrier", event.title, event.desc || "Evenement", "schedule", `event-${idx}-${event.title}`);
+          }
+        });
+
+        this.messages.forEach((msg) => {
+          const hay = this.normalizeSearch(`${msg.name} ${msg.text}`);
+          if (hay.includes(query)) {
+            pushResult("Messages", msg.name, msg.text, "messages", `message-${msg.id || msg.name}`);
+          }
+        });
+
+        [
+          { id: "overview", section: "overview" },
+          { id: "courses", section: "courses" },
+          { id: "schedule", section: "schedule" },
+          { id: "messages", section: "messages" },
+          { id: "academics", section: "academics" },
+          { id: "finance", section: "finance" },
+          { id: "notifications", section: "finance" },
+          { id: "settings", section: "settings" },
+        ].forEach((entry) => {
+          const node = document.getElementById(entry.id);
+          if (!node) return;
+          const text = (node.innerText || "").replace(/\s+/g, " ").trim();
+          if (!text) return;
+          if (this.normalizeSearch(text).includes(query)) {
+            pushResult(
+              "Contenu",
+              this.sectionLabelByKey(entry.section),
+              text,
+              entry.section,
+              `content-${entry.id}`
+            );
+          }
+        });
+
+        this.searchResults = results.slice(0, 12);
+      },
+      openSearchResult(result) {
+        this.searchOpen = false;
+        this.goToSection(result.sectionKey, this.sectionLabelByKey(result.sectionKey));
+      },
+      openFirstSearchResult() {
+        if (!this.searchResults.length) return;
+        this.openSearchResult(this.searchResults[0]);
+      },
+      async markMessageRead(messageId) {
+        const readUrl = studentMessageReadUrlTemplate.replace("/0/", `/${messageId}/`);
+        const response = await fetch(readUrl, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": getCsrfToken(),
+          },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        this.unreadMessages = Number(payload.unread_count || 0);
+        this.refreshSection("messages");
+      },
+      async markAllMessagesRead() {
+        const response = await fetch(studentMessagesReadAllUrl, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": getCsrfToken(),
+          },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        this.unreadMessages = Number(payload.unread_count || 0);
+        this.refreshSection("messages");
+      },
+      async markMessageUnread(messageId) {
+        const unreadUrl = studentMessageUnreadUrlTemplate.replace("/0/", `/${messageId}/`);
+        const response = await fetch(unreadUrl, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": getCsrfToken(),
+          },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        this.unreadMessages = Number(payload.unread_count || 0);
+        this.refreshSection("messages");
+      },
       refreshSection(elementId) {
         const el = document.getElementById(elementId);
         if (!el || !window.htmx) return;
         const url = el.dataset.sectionUrl;
         if (!url) return;
         window.htmx.ajax("GET", url, `#${elementId}`);
+      },
+      setGreetingByTime() {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) {
+          this.greetingLabel = "Bonjour";
+          this.greetingTone = "Belle matinee a vous";
+        } else if (hour >= 12 && hour < 18) {
+          this.greetingLabel = "Bon apres-midi";
+          this.greetingTone = "Continuez sur votre lancee";
+        } else if (hour >= 18 && hour < 22) {
+          this.greetingLabel = "Bonsoir";
+          this.greetingTone = "Bonne soiree d'etude";
+        } else {
+          this.greetingLabel = "Bonne nuit";
+          this.greetingTone = "Prenez un rythme serein";
+        }
+      },
+      buildMiniMonth() {
+        if (!this.miniMonthCursor) return;
+        const monthNames = ["Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin", "Juillet", "Aout", "Septembre", "Octobre", "Novembre", "Decembre"];
+        const year = this.miniMonthCursor.getFullYear();
+        const month = this.miniMonthCursor.getMonth();
+
+        const firstDay = new Date(year, month, 1);
+        let startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1));
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        this.miniMonthLabel = `${monthNames[month]} ${year}`;
+        this.miniMonthCells = Array.from({ length: 42 }).map((_, index) => {
+          const cellDate = new Date(startDate);
+          cellDate.setDate(startDate.getDate() + index);
+          const isCurrent = cellDate.getMonth() === month;
+          const isToday = cellDate.getTime() === today.getTime();
+          return {
+            day: cellDate.getDate(),
+            isCurrentMonth: isCurrent,
+            isToday: isToday,
+          };
+        });
+      },
+      prevMiniMonth() {
+        if (!this.miniMonthCursor) return;
+        this.miniMonthCursor = new Date(this.miniMonthCursor.getFullYear(), this.miniMonthCursor.getMonth() - 1, 1);
+        this.buildMiniMonth();
+      },
+      nextMiniMonth() {
+        if (!this.miniMonthCursor) return;
+        this.miniMonthCursor = new Date(this.miniMonthCursor.getFullYear(), this.miniMonthCursor.getMonth() + 1, 1);
+        this.buildMiniMonth();
       },
       ensureSectionLoaded(sectionKey) {
         const idsToLoad = [];

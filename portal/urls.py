@@ -103,6 +103,7 @@ from portal.views.views import (
     supervisor_session_close,
     supervisor_session_start,
     supervisor_student_drawer,
+    supervisor_week_materialize,
     supervisor_weekly_slot_save,
     supervisor_weekly_slots_workspace,
     supervisor_workflow_roll_action,
@@ -164,6 +165,11 @@ urlpatterns = [
         "supervisor/classes/<int:class_id>/weekly-slots/save/",
         supervisor_weekly_slot_save,
         name="supervisor_weekly_slot_save",
+    ),
+    path(
+        "supervisor/classes/<int:class_id>/weekly-slots/materialize/",
+        supervisor_week_materialize,
+        name="supervisor_week_materialize",
     ),
     path(
         "supervisor/classes/<int:class_id>/weekly-slots/",

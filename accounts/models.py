@@ -209,10 +209,10 @@ class PayrollEntry(models.Model):
     STATUS_PAID = "paid"
 
     STATUS_CHOICES = [
-        (STATUS_DRAFT, "Brouillon"),
-        (STATUS_READY, "Pret a payer"),
-        (STATUS_PARTIAL, "Paiement partiel"),
-        (STATUS_PAID, "Paye"),
+        (STATUS_DRAFT, "A verifier"),
+        (STATUS_READY, "Disponible a retirer"),
+        (STATUS_PARTIAL, "Retrait partiel"),
+        (STATUS_PAID, "Retire"),
     ]
 
     branch = models.ForeignKey(

@@ -1,100 +1,43 @@
-Analyse entièrement la configuration realtime/WebSocket du projet Django avant toute modification.
+(.venv) PS C:\Users\WORK\PycharmProjects\esfe-core> python manage.py runserver
+Watching for file changes with StatReloader
+Performing system checks...
 
-Objectif :
-Corriger proprement les erreurs suivantes sans casser l’existant :
+System check identified no issues (0 silenced).
+May 08, 2026 - 17:05:44
+Django version 6.0.1, using settings 'config.settings'
+Starting ASGI/Daphne version 4.2.1 development server at http://127.0.0.1:8000/
+Quit the server with CTRL-BREAK.
 
-* 404 sur `/ws/communication/notifications/`
-* erreurs HTTPS sur le serveur de développement Django
-* websocket notifications non connecté
-* fallback notifications actif mais websocket indisponible
+(process:17036): GLib-GIO-WARNING **: 17:05:45.768: Unexpectedly, UWP app `Microsoft.ScreenSketch_11.2601.12.0_x64__8wekyb3d8bbwe' (AUMId `Microsoft.ScreenSketch_8wekyb3d8bbwe!App') supports 29 extensions but has no verbs
 
-Contexte :
-Le projet utilise Django + Channels + système de communication interne centralisé.
-Les workflows principaux (admissions, emails, paiements, notifications classiques) fonctionnent déjà correctement.
-Le problème concerne uniquement la couche realtime websocket.
-
-IMPORTANT :
-
-* Ne pas casser les workflows admissions/paiements/emails déjà fonctionnels
-* Ne pas modifier brutalement le système de communication
-* Analyser avant toute modification
-* Respecter l’architecture existante
-* Préserver la compatibilité HTMX/AJAX existante
-* Ne pas introduire de complexité inutile
-* Priorité à la stabilité
-
-PHASE 1 — AUDIT COMPLET
-
-Analyser entièrement :
-
-* asgi.py
-* settings.py
-* communication/
-* communication/realtime/
-* communication/consumers/
-* communication/routing.py
-* templates utilisant websocket notifications
-* JavaScript websocket frontend
-* Channels configuration
-* Redis configuration éventuelle
-* middleware websocket
-* AuthMiddlewareStack
-* URLRouter
-* websocket_urlpatterns
-
-Identifier précisément :
-
-* pourquoi `/ws/communication/notifications/` retourne 404
-* si le consumer existe réellement
-* si les routes websocket sont bien enregistrées
-* si ASGI est réellement actif
-* si runserver utilise bien ASGI
-* si le frontend utilise `ws://` ou `wss://`
-* si le navigateur force HTTPS
-* si la logique fallback notifications est correcte
-
-PHASE 2 — CORRECTION PROPRE
-
-Corriger uniquement ce qui est nécessaire.
-
-Objectifs techniques :
-
-* websocket notifications fonctionnel
-* aucune erreur 404 websocket
-* compatibilité développement local HTTP
-* compatibilité future HTTPS production
-* gestion automatique ws/wss selon environnement
-* système stable et minimaliste
-
-Le frontend doit utiliser une logique dynamique :
-
-* `ws://` en développement HTTP
-* `wss://` en production HTTPS
-
-Vérifier aussi :
-
-* channels est installé correctement
-* ASGI_APPLICATION correct
-* routing websocket branché dans asgi.py
-* consumer notifications opérationnel
-* imports corrects
-* aucune boucle ou reconnect abusive
-
-PHASE 3 — VALIDATION
-
-Après correction :
-
-* vérifier que le serveur démarre sans erreur
-* vérifier connexion websocket réelle
-* vérifier réception notifications realtime
-* vérifier absence de 404 websocket
-* vérifier absence erreurs HTTPS sur localhost
-* vérifier que les admissions et emails fonctionnent toujours
-
-IMPORTANT :
-
-* produire un système propre et maintenable
-* éviter hacks temporaires
-* ne pas casser l’architecture métier existante
-* respecter séparation services/selectors/views
-* conserver une architecture professionnelle orientée production
+(process:17036): GLib-GIO-WARNING **: 17:05:45.778: Unexpectedly, UWP app `Clipchamp.Clipchamp_4.5.10520.0_x64__yxz26nhyzhsrt' (AUMId `Clipchamp.Clipchamp_yxz26nhyzhsrt!App') supports 41 extensions but has no verbs
+Not Found: /shop/moribabougou/
+HTTP GET /shop/moribabougou/ 404 [0.60, 127.0.0.1:65329]
+WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:51288]
+WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:51288]
+WebSocket DISCONNECT /ws/communication/notifications/ [127.0.0.1:51288]
+WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:55491]
+WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:55491]
+WebSocket DISCONNECT /ws/communication/notifications/ [127.0.0.1:55491]
+HTTP GET /accounts/manager/?section=boutique 200 [0.67, 127.0.0.1:60856]
+HTTP GET /static/public/css/main.css 200 [0.37, 127.0.0.1:60856]
+HTTP GET /static/core/css/esfe_theme.css 200 [0.38, 127.0.0.1:56955]
+HTTP GET /static/admin/css/widgets.css 200 [0.38, 127.0.0.1:58555]
+HTTP GET /media/shop/products/WhatsApp_Image_2026-05-01_at_10.58.42.jpeg 200 [0.39, 127.0.0.1:64433]
+HTTP GET /media/shop/products/FATEC-LOGO.gif 200 [0.40, 127.0.0.1:50731]
+HTTP GET /static/core/js/cookie_consent.js 200 [0.00, 127.0.0.1:64433]
+HTTP GET /static/admin/js/core.js 200 [0.01, 127.0.0.1:50731]
+HTTP GET /static/admin/js/SelectBox.js 200 [0.00, 127.0.0.1:64433]
+HTTP GET /static/admin/js/SelectFilter2.js 200 [0.00, 127.0.0.1:50731]
+HTTP GET /static/django-browser-reload/reload-listener.js 200 [0.01, 127.0.0.1:50731]
+WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:60733]
+WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:60733]
+404 fallback | Path=/favicon.ico
+Not Found: /favicon.ico
+HTTP GET /favicon.ico 404 [0.35, 127.0.0.1:64433]
+404 fallback | Path=/shop//
+Not Found: /shop//
+HTTP GET /shop// 404 [0.13, 127.0.0.1:64433]
+WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:54005]
+WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:54005]
+HTTP GET /communication/notifications/partial/ 200 [0.09, 127.0.0.1:64433]

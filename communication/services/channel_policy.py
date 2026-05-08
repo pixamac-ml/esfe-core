@@ -100,6 +100,26 @@ CHANNEL_POLICY_REGISTRY = {
         "channel_family": "finance_alert",
         "realtime_behavior": "silent",
     },
+    "salary_available": {
+        "audience": "staff_payroll",
+        "channels": (
+            CommunicationNotification.CHANNEL_IN_APP,
+            CommunicationNotification.CHANNEL_WEBSOCKET,
+        ),
+        "priority": CommunicationNotification.PRIORITY_HIGH,
+        "channel_family": "notification_in_app",
+        "realtime_behavior": "useful",
+    },
+    "shop_purchase_validated": {
+        "audience": "shop_buyer",
+        "channels": (
+            CommunicationNotification.CHANNEL_IN_APP,
+            CommunicationNotification.CHANNEL_WEBSOCKET,
+        ),
+        "priority": CommunicationNotification.PRIORITY_HIGH,
+        "channel_family": "notification_in_app",
+        "realtime_behavior": "useful",
+    },
     "community_new_topic": {
         "audience": "community_user",
         "channels": (

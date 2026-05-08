@@ -73,22 +73,25 @@
                         <label class="block text-sm font-medium text-slate-700 mb-2">Notes internes</label>
                         {{ payroll_form.notes }}
                     </div>
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        La fiche est d'abord pre-calculee puis verifiee. Quand vous la rendez disponible, l'employe est notifie dans son dashboard.
+                    </div>
                     <div class="flex flex-col sm:flex-row gap-3">
                         <button type="submit" name="submit_action" value="draft" class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
                             <i class="fas fa-save"></i>
-                            Enregistrer brouillon
+                            Enregistrer a verifier
                         </button>
                         <button type="submit" name="submit_action" value="ready" class="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition">
                             <i class="fas fa-badge-check"></i>
-                            Marquer prete
+                            Rendre disponible
                         </button>
                     </div>
                 </form>
 
                 <div class="rounded-3xl bg-slate-50 border border-slate-100 p-5 space-y-4">
                     <div>
-                        <p class="text-xs uppercase tracking-wide text-slate-400">Paiement salaire</p>
-                        <h3 class="text-lg font-semibold text-slate-900 mt-1">Enregistrer un versement</h3>
+                        <p class="text-xs uppercase tracking-wide text-slate-400">Retrait salaire</p>
+                        <h3 class="text-lg font-semibold text-slate-900 mt-1">Enregistrer le retrait effectif</h3>
                     </div>
                     {% if payroll_entry %}
                     <form
@@ -102,13 +105,14 @@
                             <input type="number" name="payment_amount" min="1" max="{{ payroll_entry.remaining_salary }}" value="{{ payroll_entry.remaining_salary }}" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required>
                         </div>
                         <div class="rounded-2xl bg-white border border-slate-200 p-4 text-sm text-slate-600 space-y-2">
+                            <div class="flex justify-between"><span>Disponible en caisse</span><span class="font-semibold text-slate-900">{{ available_cash_balance|intcomma }} FCFA</span></div>
                             <div class="flex justify-between"><span>Net du mois</span><span class="font-semibold text-slate-900">{{ payroll_entry.net_salary|intcomma }} FCFA</span></div>
                             <div class="flex justify-between"><span>Deja paye</span><span class="font-semibold text-slate-900">{{ payroll_entry.paid_amount|intcomma }} FCFA</span></div>
                             <div class="flex justify-between"><span>Reste</span><span class="font-semibold text-rose-600">{{ payroll_entry.remaining_salary|intcomma }} FCFA</span></div>
                         </div>
                         <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition">
                             <i class="fas fa-money-bill-wave"></i>
-                            Enregistrer le paiement
+                            Enregistrer le retrait
                         </button>
                     </form>
                     {% else %}
@@ -117,6 +121,35 @@
                     </div>
                     {% endif %}
                 </div>
+            </div>
+
+            <div class="rounded-3xl border border-amber-100 bg-amber-50 p-5 space-y-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wide text-amber-700">Cas particulier</p>
+                    <h3 class="text-lg font-semibold text-slate-900 mt-1">Accorder une avance sur salaire</h3>
+                    <p class="mt-1 text-sm text-slate-600">A utiliser avant disponibilite de la fiche. L'avance est deduite du net final via le champ `avances`.</p>
+                </div>
+                <form
+                    hx-post="{% url 'accounts:htmx_manager_salary_advance' employee_profile.user_id %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    class="space-y-4">
+                    <input type="hidden" name="period_month" value="{{ payroll_month|date:'Y-m-d' }}">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Montant de l'avance</label>
+                        <input type="number" name="advance_amount" min="1" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required>
+                    </div>
+                    <div class="rounded-2xl bg-white border border-slate-200 p-4 text-sm text-slate-600 space-y-2">
+                        <div class="flex justify-between"><span>Disponible en caisse</span><span class="font-semibold text-slate-900">{{ available_cash_balance|intcomma }} FCFA</span></div>
+                        <div class="flex justify-between"><span>Avances deja enregistrees</span><span class="font-semibold text-slate-900">{% if payroll_entry %}{{ payroll_entry.advances|intcomma }}{% else %}0{% endif %} FCFA</span></div>
+                        <div class="flex justify-between"><span>Condition</span><span class="font-semibold text-amber-700">Avant disponibilite uniquement</span></div>
+                    </div>
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white hover:bg-amber-600 transition">
+                        <i class="fas fa-hand-holding-dollar"></i>
+                        Accorder l'avance
+                    </button>
+                </form>
             </div>
         </div>
     </div>

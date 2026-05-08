@@ -26,6 +26,7 @@ class ShopProduct(models.Model):
 
     branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="shop_products", db_index=True)
     name = models.CharField(max_length=180)
+    image = models.ImageField(upload_to="shop/products/", null=True, blank=True)
     category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, db_index=True)
     description = models.TextField(blank=True)
     unit_price = models.PositiveBigIntegerField()
@@ -87,6 +88,14 @@ class ShopProductVariant(models.Model):
 
 
 class ShopOrder(models.Model):
+    BUYER_STUDENT = "student"
+    BUYER_WALK_IN = "walk_in"
+
+    BUYER_TYPE_CHOICES = [
+        (BUYER_STUDENT, "Etudiant"),
+        (BUYER_WALK_IN, "Vente comptoir"),
+    ]
+
     STATUS_DRAFT = "draft"
     STATUS_PENDING_PAYMENT = "pending_payment"
     STATUS_PAID = "paid"
@@ -104,12 +113,18 @@ class ShopOrder(models.Model):
     ]
 
     branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="shop_orders", db_index=True)
-    inscription = models.ForeignKey(Inscription, on_delete=models.PROTECT, related_name="shop_orders", db_index=True)
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="shop_orders")
+    inscription = models.ForeignKey(Inscription, on_delete=models.PROTECT, related_name="shop_orders", db_index=True, null=True, blank=True)
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="shop_orders", null=True, blank=True)
+    buyer_type = models.CharField(max_length=20, choices=BUYER_TYPE_CHOICES, default=BUYER_STUDENT, db_index=True)
+    customer_name = models.CharField(max_length=180, blank=True)
+    customer_email = models.EmailField(blank=True)
+    customer_phone = models.CharField(max_length=40, blank=True)
     reference = models.CharField(max_length=80, blank=True, db_index=True)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
     total_amount = models.PositiveBigIntegerField(default=0)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_shop_orders")
+    prepared_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="prepared_shop_orders")
+    prepared_at = models.DateTimeField(null=True, blank=True)
     delivered_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="delivered_shop_orders")
     delivered_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -124,6 +139,18 @@ class ShopOrder(models.Model):
 
     def __str__(self):
         return self.reference or f"Commande boutique #{self.pk}"
+
+    @property
+    def buyer_display(self):
+        if self.student_id:
+            return self.student.get_full_name() or self.student.username
+        return self.customer_name or "Client comptoir"
+
+    @property
+    def buyer_email(self):
+        if self.student_id:
+            return self.student.email
+        return self.customer_email
 
     def refresh_total(self, save=True):
         self.total_amount = sum(item.line_total for item in self.items.all())

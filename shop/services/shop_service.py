@@ -13,6 +13,8 @@ from reportlab.platypus import Table, TableStyle
 
 from accounts.models import BranchCashMovement
 from accounts.services.accounting_documents import create_cash_movement
+from communication.models import CommunicationNotification
+from communication.services import EmailService, NotificationService
 from shop.models import (
     ShopOrder,
     ShopOrderItem,
@@ -104,6 +106,7 @@ def get_required_shop_context(user):
 def create_student_required_order(user, product_ids, created_by=None):
     student = user.student_profile
     inscription = student.inscription
+    candidature = inscription.candidature
     branch = inscription.candidature.branch
     products = list(
         ShopProduct.objects
@@ -117,6 +120,9 @@ def create_student_required_order(user, product_ids, created_by=None):
             branch=branch,
             inscription=inscription,
             student=user,
+            buyer_type=ShopOrder.BUYER_STUDENT,
+            customer_name=candidature.full_name,
+            customer_email=candidature.email,
             reference=next_shop_reference(branch, ShopSequence.TYPE_ORDER),
             status=ShopOrder.STATUS_PENDING_PAYMENT,
             created_by=created_by or user,
@@ -134,6 +140,32 @@ def create_student_required_order(user, product_ids, created_by=None):
             )
         order.refresh_total()
     return order
+
+
+def create_counter_order(*, branch, product, quantity, payment_method, created_by, student=None, customer_name="", customer_email="", customer_phone=""):
+    with transaction.atomic():
+        order = ShopOrder.objects.create(
+            branch=branch,
+            inscription=getattr(getattr(student, "student_profile", None), "inscription", None),
+            student=student,
+            buyer_type=ShopOrder.BUYER_STUDENT if student else ShopOrder.BUYER_WALK_IN,
+            customer_name=(student.get_full_name() or student.username) if student else customer_name,
+            customer_email=getattr(student, "email", "") if student else customer_email,
+            customer_phone=customer_phone,
+            reference=next_shop_reference(branch, ShopSequence.TYPE_ORDER),
+            status=ShopOrder.STATUS_PENDING_PAYMENT,
+            created_by=created_by,
+        )
+        ShopOrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=quantity,
+            unit_price=product.unit_price,
+            is_required=product.is_required,
+        )
+        order.refresh_total()
+        payment = create_shop_payment(order, order.total_amount, payment_method, created_by, auto_validate=False)
+    return order, payment
 
 
 def render_shop_receipt_pdf(payment):
@@ -163,7 +195,7 @@ def render_shop_receipt_pdf(payment):
     pdf.drawRightString(width - margin - 8 * mm, y, payment.receipt_number or payment.reference)
     y -= 34
 
-    student_name = order.student.get_full_name() or order.student.username
+    student_name = order.buyer_display
     meta = [
         ["Commande", order.reference],
         ["Etudiant", student_name],
@@ -245,6 +277,8 @@ def validate_shop_payment(payment, user=None):
             notes=f"Encaissement boutique commande {order.reference}.",
             created_by=user or payment.created_by,
         )
+        if order.student_id:
+            notify_shop_purchase(order=order, payment=payment, actor=user or payment.created_by)
     return payment
 
 
@@ -260,6 +294,18 @@ def create_shop_payment(order, amount, method, user=None, *, auto_validate=False
     if auto_validate:
         payment = validate_shop_payment(payment, user=user)
     return payment
+
+
+def mark_order_ready(order, user):
+    with transaction.atomic():
+        order = ShopOrder.objects.select_for_update().get(pk=order.pk)
+        if order.status != ShopOrder.STATUS_PAID:
+            return order
+        order.status = ShopOrder.STATUS_READY
+        order.prepared_by = user
+        order.prepared_at = timezone.now()
+        order.save(update_fields=["status", "prepared_by", "prepared_at", "updated_at"])
+    return order
 
 
 def deliver_order(order, user):
@@ -308,6 +354,54 @@ def get_manager_shop_context(branch):
             "low_stock": sum(1 for product in products if product.is_low_stock),
             "pending_orders": ShopOrder.objects.filter(branch=branch, status=ShopOrder.STATUS_PENDING_PAYMENT).count(),
             "paid_not_delivered": ShopOrder.objects.filter(branch=branch, status=ShopOrder.STATUS_PAID).count(),
+            "ready_orders": ShopOrder.objects.filter(branch=branch, status=ShopOrder.STATUS_READY).count(),
             "month_sales": month_sales,
         },
     }
+
+
+def notify_shop_purchase(*, order, payment, actor=None):
+    title = "Achat boutique confirme"
+    body = (
+        f"Votre achat boutique {order.reference} a ete confirme pour un montant de {payment.amount} FCFA. "
+        "Votre recu est disponible."
+    )
+    if order.student_id:
+        NotificationService.notify_user(
+            recipient=order.student,
+            actor=actor,
+            event_type="shop_purchase_validated",
+            title=title,
+            body=body,
+            source_app="shop",
+            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            metadata={
+                "order_id": order.pk,
+                "payment_id": payment.pk,
+                "receipt_number": payment.receipt_number,
+                "branch_id": order.branch_id,
+            },
+            legacy_source="shop_order",
+            legacy_object_id=str(order.pk),
+        )
+    if order.buyer_email:
+        EmailService.send_transactional(
+            subject=title,
+            recipient=order.student if order.student_id else None,
+            recipient_email=order.buyer_email,
+            source_app="shop",
+            event_type="shop_purchase_validated_email",
+            html_template="emails/base_communication.html",
+            context={
+                "title": title,
+                "message": body,
+                "recipient_name": order.buyer_display,
+                "reference": order.reference,
+                "payment_reference": payment.reference,
+                "amount": payment.amount,
+                "branch_name": order.branch.name,
+            },
+            dispatch_on_commit=False,
+            legacy_source="shop_order",
+            legacy_object_id=str(order.pk),
+        )

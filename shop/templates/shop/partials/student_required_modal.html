@@ -13,16 +13,26 @@
         <i data-lucide="x" style="width:18px;height:18px;"></i>
       </button>
     </header>
-    <form method="post" action="{% url 'shop:student_create_required_order' %}" class="p-5">
+    <form method="post" action="/shop/student/order/create-required/" class="p-5">
       {% csrf_token %}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         {% for product in missing_required %}
-        <label class="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <label class="flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <input type="checkbox" name="product_ids" value="{{ product.id }}" checked class="mt-1 rounded border-slate-300 text-primary">
-          <span class="min-w-0">
-            <span class="block text-sm font-bold text-slate-900">{{ product.name }}</span>
-            <span class="block text-xs text-slate-500">{{ product.get_category_display }}{% if product.current_stock <= product.low_stock_threshold %} - stock limite{% endif %}</span>
-            <span class="mt-2 block text-sm font-semibold text-primary">{{ product.unit_price|intcomma }} FCFA</span>
+          <span class="flex gap-3 min-w-0">
+            <span class="h-16 w-16 overflow-hidden rounded-xl bg-white border border-slate-200 shrink-0 grid place-items-center">
+              {% if product.image %}
+              <img src="{{ product.image.url }}" alt="{{ product.name }}" class="h-full w-full object-cover">
+              {% else %}
+              <i data-lucide="package" style="width:22px;height:22px;" class="text-slate-300"></i>
+              {% endif %}
+            </span>
+            <span class="min-w-0">
+              <span class="block text-sm font-bold text-slate-900">{{ product.name }}</span>
+              <span class="block text-xs text-slate-500">{{ product.get_category_display }}{% if product.current_stock <= product.low_stock_threshold %} - stock limite{% endif %}</span>
+              <span class="mt-2 block text-sm text-slate-600">{{ product.description|default:"Article recommande pour votre parcours."|truncatechars:90 }}</span>
+              <span class="mt-2 block text-sm font-semibold text-primary">{{ product.unit_price|intcomma }} FCFA</span>
+            </span>
           </span>
         </label>
         {% endfor %}

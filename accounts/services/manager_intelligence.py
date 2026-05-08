@@ -4,6 +4,8 @@ from django.utils import timezone
 
 from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
 from accounts.services.accounting_documents import create_cash_movement
+from communication.models import CommunicationNotification
+from communication.services import NotificationService
 from inscriptions.models import Inscription
 from payments.models import Payment
 
@@ -21,6 +23,17 @@ def payment_cash_reference(payment):
 def payroll_cash_reference(payroll_entry, amount=None):
     suffix = f"-{amount}" if amount else ""
     return f"{PAYROLL_REFERENCE_PREFIX}{payroll_entry.pk}{suffix}"
+
+
+def get_branch_cash_balance(branch):
+    movements = BranchCashMovement.objects.filter(branch=branch)
+    cash_in = movements.filter(
+        movement_type=BranchCashMovement.TYPE_IN,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    cash_out = movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    return max(cash_in - cash_out, 0)
 
 
 def sync_student_payment_cash_movements(branch, user):
@@ -83,10 +96,10 @@ def prepare_missing_payroll_entries(branch, period_month, user):
                 "deductions": 0,
                 "advances": 0,
                 "paid_amount": 0,
-                "status": PayrollEntry.STATUS_READY,
+                "status": PayrollEntry.STATUS_DRAFT,
                 "created_by": user,
                 "updated_by": user,
-                "notes": "Paie preparee automatiquement depuis le profil employe.",
+                "notes": "Paie pre-calculee automatiquement depuis le profil employe.",
             },
         )
         if was_created:
@@ -94,8 +107,59 @@ def prepare_missing_payroll_entries(branch, period_month, user):
     return {"created": created, "skipped_without_salary": skipped_without_salary}
 
 
+def notify_salary_available(payroll_entry, actor):
+    existing_notification = CommunicationNotification.objects.filter(
+        recipient=payroll_entry.employee,
+        event_type="salary_available",
+        legacy_source="payroll_entry",
+        legacy_object_id=str(payroll_entry.pk),
+    ).exists()
+    if existing_notification:
+        return False
+    NotificationService.notify_user(
+        recipient=payroll_entry.employee,
+        actor=actor,
+        event_type="salary_available",
+        title="Salaire disponible",
+        body=(
+            f"Votre fiche de paie {payroll_entry.period_month:%m/%Y} est validee. "
+            "Vous pouvez passer pour le retrait selon la disponibilite caisse."
+        ),
+        source_app="accounts",
+        channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+        metadata={
+            "payroll_entry_id": payroll_entry.pk,
+            "branch_id": payroll_entry.branch_id,
+            "period_month": payroll_entry.period_month.isoformat(),
+        },
+        legacy_source="payroll_entry",
+        legacy_object_id=str(payroll_entry.pk),
+    )
+    return True
+
+
+def mark_ready_payroll_entries_available(branch, period_month, user):
+    entries = (
+        PayrollEntry.objects
+        .select_related("employee")
+        .filter(
+            branch=branch,
+            period_month=period_month,
+            status=PayrollEntry.STATUS_READY,
+        )
+    )
+    notified_count = 0
+    for entry in entries:
+        if entry.remaining_salary <= 0:
+            continue
+        if notify_salary_available(entry, user):
+            notified_count += 1
+    return {"ready_count": entries.count(), "notified_count": notified_count}
+
+
 def pay_ready_payroll_entries(branch, period_month, user):
     with transaction.atomic():
+        available_cash = get_branch_cash_balance(branch)
         entries = (
             PayrollEntry.objects
             .select_for_update()
@@ -112,6 +176,8 @@ def pay_ready_payroll_entries(branch, period_month, user):
             amount = entry.remaining_salary
             if amount <= 0:
                 continue
+            if available_cash < amount:
+                break
             entry.paid_amount += amount
             entry.updated_by = user
             entry.save()
@@ -126,9 +192,14 @@ def pay_ready_payroll_entries(branch, period_month, user):
                 notes=f"Paiement automatique de la paie {entry.period_month:%Y-%m}.",
                 created_by=user,
             )
+            available_cash -= amount
             paid_count += 1
             paid_amount += amount
-    return {"paid_count": paid_count, "paid_amount": paid_amount}
+    return {
+        "paid_count": paid_count,
+        "paid_amount": paid_amount,
+        "remaining_cash": available_cash,
+    }
 
 
 def build_manager_intelligence_context(
@@ -219,6 +290,11 @@ def build_manager_intelligence_context(
         alerts.append({
             "level": "danger",
             "message": "La caisse estimee ne couvre pas les salaires restants et depenses en attente.",
+        })
+    if ready_payroll_amount > cash_stats.get("available_balance", 0):
+        alerts.append({
+            "level": "warning",
+            "message": "La caisse disponible ne couvre pas toutes les fiches de paie deja disponibles.",
         })
     if expense_stats["pending_amount"] > cash_stats["estimated_month_balance"] and expense_stats["pending_amount"] > 0:
         alerts.append({

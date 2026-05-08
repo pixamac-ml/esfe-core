@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import OperationalError, ProgrammingError
 from django.db.models import Count, F, Q, Sum
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -10,8 +11,10 @@ from admissions.models import Candidature
 from accounts.forms import BranchCashMovementForm, BranchExpenseForm
 from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
 from accounts.services.manager_intelligence import build_manager_intelligence_context
-from shop.forms import ShopProductForm, ShopStockInForm
+from accounts.services.manager_intelligence import get_branch_cash_balance
+from shop.forms import ShopCounterOrderForm, ShopProductForm, ShopStockInForm
 from shop.services.shop_service import get_manager_shop_context
+from shop.views import get_branch_public_shop_identifier
 from inscriptions.models import Inscription
 from payments.models import CashPaymentSession, Payment, PaymentAgent
 from students.models import Student
@@ -379,6 +382,7 @@ def _manager_context(request, active_section="overview"):
         "out_month": cash_out_month,
         "net_month": cash_in_month - cash_out_month,
         "estimated_month_balance": cash_in_month - cash_out_month,
+        "available_balance": get_branch_cash_balance(branch),
         "student_receipts_month": total_month,
         "expenses_paid_month": expense_stats["paid_month_amount"],
         "salary_paid_month": salary_paid_month,
@@ -454,7 +458,29 @@ def _manager_context(request, active_section="overview"):
         cash_stats=cash_stats,
         branch_staff_user_ids=branch_staff_user_ids,
     )
-    shop_context = get_manager_shop_context(branch)
+    shop_context = {
+        "shop_products": [],
+        "shop_orders": [],
+        "shop_stats": {
+            "products": 0,
+            "required": 0,
+            "low_stock": 0,
+            "pending_orders": 0,
+            "paid_not_delivered": 0,
+            "ready_orders": 0,
+            "month_sales": 0,
+        },
+        "shop_error": "",
+    }
+    if active_section == "boutique":
+        try:
+            shop_context = get_manager_shop_context(branch)
+            shop_context.setdefault("shop_error", "")
+        except (ProgrammingError, OperationalError):
+            shop_context["shop_error"] = (
+                "Le module shop attend encore l'application de sa migration locale. "
+                "Les autres sections du dashboard restent utilisables."
+            )
     shop_stats = shop_context.get("shop_stats", {})
     shop_sales_month = shop_stats.get("month_sales", 0) or 0
     period_revenue = total_month + shop_sales_month
@@ -601,6 +627,8 @@ def _manager_context(request, active_section="overview"):
         "manager_intelligence": intelligence,
         "shop_product_form": ShopProductForm(),
         "shop_stock_form": ShopStockInForm(branch=branch),
+        "shop_counter_order_form": ShopCounterOrderForm(branch=branch),
+        "shop_public_identifier": get_branch_public_shop_identifier(branch),
         **shop_context,
         "manager_search": quick_search,
         "quick_results": quick_results,

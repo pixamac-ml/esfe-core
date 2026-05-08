@@ -389,6 +389,7 @@ urlpatterns = [
     # =============================================
     path("htmx/manager/salary/<int:pk>/detail/", salary_detail, name="htmx_manager_salary_detail"),
     path("htmx/manager/salary/<int:pk>/save/", salary_upsert, name="htmx_manager_salary_upsert"),
+    path("htmx/manager/salary/<int:pk>/advance/", salary_advance, name="htmx_manager_salary_advance"),
     path("htmx/manager/payroll/<int:pk>/pay/", salary_pay, name="htmx_manager_salary_pay"),
     path("htmx/manager/payroll/prepare-all/", salary_prepare_all, name="htmx_manager_salary_prepare_all"),
     path("htmx/manager/payroll/pay-ready-all/", salary_pay_ready_all, name="htmx_manager_salary_pay_ready_all"),

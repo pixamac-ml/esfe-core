@@ -24,6 +24,8 @@ from accounts.access import (
 	get_user_role,
 	get_user_scope,
 )
+from accounts.models import BranchCashMovement, PayrollEntry
+from communication.models import CommunicationNotification
 from portal.permissions import get_user_role as get_portal_user_role
 from portal.permissions import get_post_login_portal_url
 from portal.models import SupportAuditLog
@@ -279,6 +281,246 @@ class DashboardRedirectCompatibilityTests(TestCase):
 			reverse("accounts_portal:portal_secretary"),
 			fetch_redirect_response=False,
 		)
+
+
+class ManagerDashboardRegressionTests(TestCase):
+	def setUp(self):
+		self.branch = Branch.objects.create(
+			name="Annexe Gestion",
+			code="AGT",
+			slug="annexe-gestion",
+		)
+		self.user = USER_MANAGER.create_user(
+			username="manager_cash_view",
+			email="manager_cash_view@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		group, _ = Group.objects.get_or_create(name="gestionnaire")
+		self.user.groups.add(group)
+		profile = self.user.profile
+		profile.branch = self.branch
+		profile.save(update_fields=["branch", "updated_at"])
+		self.client.force_login(self.user)
+
+	def test_manager_cash_section_renders_when_movement_has_no_creator(self):
+		BranchCashMovement.objects.create(
+			branch=self.branch,
+			movement_type=BranchCashMovement.TYPE_IN,
+			source=BranchCashMovement.SOURCE_MANUAL,
+			amount=25000,
+			label="Regularisation caisse",
+			reference="CASH-REG-001",
+			created_by=None,
+		)
+
+		response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "caisse"})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Regularisation caisse")
+
+	def test_salary_ready_notifies_employee_dashboard(self):
+		employee = USER_MANAGER.create_user(
+			username="employee_payroll_ready",
+			email="employee_payroll_ready@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		employee_profile = employee.profile
+		employee_profile.branch = self.branch
+		employee_profile.salary_base = 90000
+		employee_profile.position = "secretary"
+		employee_profile.user_type = "staff"
+		employee_profile.save(update_fields=["branch", "salary_base", "position", "user_type", "updated_at"])
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_salary_upsert", args=[employee.id]),
+			{
+				"period_month": "2026-05-01",
+				"base_salary": "90000",
+				"allowances": "10000",
+				"deductions": "5000",
+				"advances": "0",
+				"notes": "Controle gestionnaire",
+				"submit_action": "ready",
+			},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		entry = PayrollEntry.objects.get(branch=self.branch, employee=employee, period_month="2026-05-01")
+		self.assertEqual(entry.status, PayrollEntry.STATUS_READY)
+		self.assertTrue(
+			CommunicationNotification.objects.filter(
+				recipient=employee,
+				event_type="salary_available",
+				legacy_source="payroll_entry",
+				legacy_object_id=str(entry.pk),
+			).exists()
+		)
+
+	def test_salary_payment_is_blocked_when_branch_cash_is_insufficient(self):
+		employee = USER_MANAGER.create_user(
+			username="employee_cash_blocked",
+			email="employee_cash_blocked@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		employee_profile = employee.profile
+		employee_profile.branch = self.branch
+		employee_profile.salary_base = 75000
+		employee_profile.position = "secretary"
+		employee_profile.user_type = "staff"
+		employee_profile.save(update_fields=["branch", "salary_base", "position", "user_type", "updated_at"])
+		entry = PayrollEntry.objects.create(
+			branch=self.branch,
+			employee=employee,
+			period_month="2026-05-01",
+			base_salary=75000,
+			status=PayrollEntry.STATUS_READY,
+			created_by=self.user,
+			updated_by=self.user,
+		)
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_salary_pay", args=[entry.id]),
+			{"payment_amount": "75000"},
+		)
+
+		self.assertEqual(response.status_code, 400)
+		entry.refresh_from_db()
+		self.assertEqual(entry.paid_amount, 0)
+
+	def test_salary_payment_creates_cash_outflow_when_cash_is_available(self):
+		employee = USER_MANAGER.create_user(
+			username="employee_cash_ok",
+			email="employee_cash_ok@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		employee_profile = employee.profile
+		employee_profile.branch = self.branch
+		employee_profile.salary_base = 60000
+		employee_profile.position = "secretary"
+		employee_profile.user_type = "staff"
+		employee_profile.save(update_fields=["branch", "salary_base", "position", "user_type", "updated_at"])
+		entry = PayrollEntry.objects.create(
+			branch=self.branch,
+			employee=employee,
+			period_month="2026-05-01",
+			base_salary=60000,
+			status=PayrollEntry.STATUS_READY,
+			created_by=self.user,
+			updated_by=self.user,
+		)
+		BranchCashMovement.objects.create(
+			branch=self.branch,
+			movement_type=BranchCashMovement.TYPE_IN,
+			source=BranchCashMovement.SOURCE_MANUAL,
+			amount=100000,
+			label="Approvisionnement caisse",
+			created_by=self.user,
+		)
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_salary_pay", args=[entry.id]),
+			{"payment_amount": "60000"},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		entry.refresh_from_db()
+		self.assertEqual(entry.paid_amount, 60000)
+		self.assertTrue(
+			BranchCashMovement.objects.filter(
+				branch=self.branch,
+				source=BranchCashMovement.SOURCE_PAYROLL,
+				movement_type=BranchCashMovement.TYPE_OUT,
+				source_reference__startswith="PAYROLL-",
+			).exists()
+		)
+
+	def test_salary_advance_updates_payroll_and_cash_before_availability(self):
+		employee = USER_MANAGER.create_user(
+			username="employee_advance_ok",
+			email="employee_advance_ok@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		employee_profile = employee.profile
+		employee_profile.branch = self.branch
+		employee_profile.salary_base = 80000
+		employee_profile.position = "secretary"
+		employee_profile.user_type = "staff"
+		employee_profile.save(update_fields=["branch", "salary_base", "position", "user_type", "updated_at"])
+		BranchCashMovement.objects.create(
+			branch=self.branch,
+			movement_type=BranchCashMovement.TYPE_IN,
+			source=BranchCashMovement.SOURCE_MANUAL,
+			amount=50000,
+			label="Approvisionnement avance",
+			created_by=self.user,
+		)
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_salary_advance", args=[employee.id]),
+			{
+				"period_month": "2026-05-01",
+				"advance_amount": "30000",
+			},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		entry = PayrollEntry.objects.get(branch=self.branch, employee=employee, period_month="2026-05-01")
+		self.assertEqual(entry.status, PayrollEntry.STATUS_DRAFT)
+		self.assertEqual(entry.advances, 30000)
+		self.assertTrue(
+			BranchCashMovement.objects.filter(
+				branch=self.branch,
+				source=BranchCashMovement.SOURCE_PAYROLL,
+				movement_type=BranchCashMovement.TYPE_OUT,
+				label__icontains="Avance salaire",
+			).exists()
+		)
+
+	def test_salary_advance_is_blocked_when_payroll_is_already_available(self):
+		employee = USER_MANAGER.create_user(
+			username="employee_advance_blocked",
+			email="employee_advance_blocked@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		employee_profile = employee.profile
+		employee_profile.branch = self.branch
+		employee_profile.salary_base = 65000
+		employee_profile.position = "secretary"
+		employee_profile.user_type = "staff"
+		employee_profile.save(update_fields=["branch", "salary_base", "position", "user_type", "updated_at"])
+		PayrollEntry.objects.create(
+			branch=self.branch,
+			employee=employee,
+			period_month="2026-05-01",
+			base_salary=65000,
+			status=PayrollEntry.STATUS_READY,
+			created_by=self.user,
+			updated_by=self.user,
+		)
+		BranchCashMovement.objects.create(
+			branch=self.branch,
+			movement_type=BranchCashMovement.TYPE_IN,
+			source=BranchCashMovement.SOURCE_MANUAL,
+			amount=50000,
+			label="Approvisionnement blocage",
+			created_by=self.user,
+		)
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_salary_advance", args=[employee.id]),
+			{
+				"period_month": "2026-05-01",
+				"advance_amount": "10000",
+			},
+		)
+
+		self.assertEqual(response.status_code, 400)
 
 
 class PortalPhaseOneTests(TestCase):

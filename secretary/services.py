@@ -12,6 +12,7 @@ from .selectors import (
     get_recent_documents_queryset,
     get_recent_registry_entries,
     get_registry_queryset,
+    get_tasks_queryset,
     search_classes,
     get_student_active_enrollment,
     get_student_snapshot_queryset,
@@ -113,12 +114,12 @@ def close_visit(visitor, departed_at=None):
     return _clean_instance(visitor)
 
 
-def get_active_visits():
-    return get_active_visits_queryset()
+def get_active_visits(*, user=None, branch=None):
+    return get_active_visits_queryset(user=user, branch=branch)
 
 
-def get_today_visits():
-    return get_today_visits_queryset()
+def get_today_visits(*, user=None, branch=None):
+    return get_today_visits_queryset(user=user, branch=branch)
 
 
 @transaction.atomic
@@ -156,8 +157,8 @@ def get_upcoming_appointments():
     ).order_by("scheduled_at")
 
 
-def get_today_appointments():
-    return get_today_appointments_queryset()
+def get_today_appointments(*, user=None, branch=None):
+    return get_today_appointments_queryset(user=user, branch=branch)
 
 
 @transaction.atomic
@@ -204,8 +205,8 @@ def link_document_to_registry(document, registry_entry):
     return _clean_instance(document)
 
 
-def get_recent_documents(limit=5):
-    return get_recent_documents_queryset(limit=limit)
+def get_recent_documents(limit=5, *, user=None, branch=None):
+    return get_recent_documents_queryset(limit=limit, user=user, branch=branch)
 
 
 @transaction.atomic
@@ -242,15 +243,17 @@ def complete_task(task):
     return _clean_instance(task)
 
 
-def get_pending_tasks():
-    return SecretaryTask.objects.select_related(
-        "assigned_to",
-        "related_student__user",
+def get_pending_tasks(*, user=None, branch=None):
+    return get_tasks_queryset(
+        {
+            "archived": False,
+            "active_only": True,
+        },
+        user=user,
+        branch=branch,
     ).filter(
         status__in=[SecretaryTask.STATUS_PENDING, SecretaryTask.STATUS_IN_PROGRESS],
-        is_archived=False,
-        is_active=True,
-    ).order_by("due_date", "-created_at")
+    )
 
 
 def search_students(query, *, user=None, branch=None):

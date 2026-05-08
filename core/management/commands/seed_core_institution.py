@@ -1,253 +1,238 @@
-from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group
+from django.core.management.base import BaseCommand
+
 from core.models import (
     Institution,
+    InstitutionPresentation,
+    InstitutionStat,
     LegalPage,
     LegalSection,
     LegalSidebarBlock,
-    InstitutionStat,
-    AboutSection
+    SiteConfiguration,
+    Value,
 )
 
 
 class Command(BaseCommand):
-    help = "Seed institutionnel complet ESFé"
+    help = "Seed institutionnel ESFé Mali (idempotent, core uniquement)"
 
     def handle(self, *args, **kwargs):
+        self.stdout.write(self.style.NOTICE("\n🏛️  Seed core institutionnel ESFé Mali..."))
 
-        # ======================================================
-        # GROUPES MÉTIERS OFFICIELS
-        # ======================================================
-
+        # Groupes utilises par les affectations automatiques des messages de contact.
         groups = [
-            "Direction Generale",
+            "Direction",
             "Secretaire Academique",
-            "Gestionnaire Administrative",
+            "Gestionnaire",
             "Responsable Qualite",
-            "Support Technique",
+            "Support",
         ]
-
         for name in groups:
             Group.objects.get_or_create(name=name)
 
-        # ======================================================
-        # INSTITUTION
-        # ======================================================
+        # Singleton Institution
+        institution = Institution.objects.first()
+        institution_defaults = {
+            "name": "École de Santé Félix Houphouët-Boigny Mali",
+            "short_name": "ESFé Mali",
+            "address": "Badalabougou, Bamako",
+            "city": "Bamako",
+            "country": "Mali",
+            "phone": "+223 20 00 00 00",
+            "email": "contact@esfe-mali.org",
+            "is_active": True,
+            "legal_status": "Établissement privé d'enseignement supérieur paramédical.",
+            "approval_number": "AGR-ESFE-MALI-2026",
+            "director_title": "Direction Générale",
+            "hosting_provider": "Infrastructure cloud sécurisée",
+            "hosting_location": "Afrique de l'Ouest",
+        }
+        if institution:
+            for key, value in institution_defaults.items():
+                setattr(institution, key, value)
+            institution.save()
+            self.stdout.write("   🔄 Institution mise à jour")
+        else:
+            Institution.objects.create(**institution_defaults)
+            self.stdout.write("   ✅ Institution créée")
 
-        Institution.objects.get_or_create(
-            name="École de Santé Félix Houphouët-Boigny",
-            defaults={
-                "short_name": "ESFé",
-                "address": "Moribabougou",
-                "city": "Bamako",
-                "country": "Mali",
-                "phone": "+223 XX XX XX XX",
-                "email": "contact@esfe.mali",
-                "legal_status": (
-                    "Établissement privé d’enseignement supérieur paramédical "
-                    "agréé par les autorités compétentes de la République du Mali."
-                ),
-                "approval_number": "N° AGR-ESFE-2026-001",
-                "director_title": "Direction Générale",
-                "hosting_provider": "Infrastructure Cloud Sécurisée",
-                "hosting_location": "Union Européenne"
-            }
-        )
+        # Singleton Presentation
+        presentation = InstitutionPresentation.objects.first()
+        presentation_defaults = {
+            "about_title": "À propos de notre institution",
+            "about_text": (
+                "<p>L'École de Santé Félix Houphouët-Boigny Mali forme des professionnels de "
+                "santé compétents, responsables et ancrés dans les réalités du terrain.</p>"
+            ),
+            "vision_title": "Notre Vision",
+            "vision_text": (
+                "Devenir une référence sous-régionale de la formation en sciences de la santé "
+                "grâce à l'excellence académique et l'innovation pédagogique."
+            ),
+            "mission_title": "Notre Mission",
+            "mission_text": (
+                "Former des talents capables de répondre efficacement aux enjeux sanitaires du Mali "
+                "et de la sous-région."
+            ),
+            "hero_title": "École de Santé Félix Houphouët-Boigny Mali",
+            "hero_subtitle": "Former les professionnels de santé de demain",
+            "cta_title": "Rejoignez ESFé Mali",
+            "cta_subtitle": "Lancez votre parcours académique dans un cadre d'excellence.",
+            "cta_button_text": "Candidater maintenant",
+            "cta_button_url": "/admissions/candidature/",
+        }
+        if presentation:
+            for key, value in presentation_defaults.items():
+                setattr(presentation, key, value)
+            presentation.save()
+            self.stdout.write("   🔄 Présentation institutionnelle mise à jour")
+        else:
+            InstitutionPresentation.objects.create(**presentation_defaults)
+            self.stdout.write("   ✅ Présentation institutionnelle créée")
 
-        # ======================================================
-        # STATISTIQUES INSTITUTIONNELLES
-        # ======================================================
+        # Singleton SiteConfiguration
+        site_configuration = SiteConfiguration.objects.first()
+        site_defaults = {
+            "home_hero_title": "ESFé Mali",
+            "home_hero_subtitle": "Former les cadres de la santé au Mali",
+            "about_vision_title": "Notre Vision",
+            "about_vision_text": (
+                "Construire un enseignement de santé moderne, inclusif et professionnalisant."
+            ),
+            "about_values_title": "Nos Valeurs",
+            "about_values_subtitle": "Excellence, intégrité, engagement, innovation.",
+            "smart_rocket_enabled": True,
+            "smart_rocket_title": "Assistant ESFé",
+            "smart_rocket_message": "Accédez rapidement aux informations clés d'ESFé Mali.",
+        }
+        if site_configuration:
+            for key, value in site_defaults.items():
+                setattr(site_configuration, key, value)
+            site_configuration.save()
+            self.stdout.write("   🔄 Configuration du site mise à jour")
+        else:
+            SiteConfiguration.objects.create(**site_defaults)
+            self.stdout.write("   ✅ Configuration du site créée")
 
-        stats = [
-            ("Étudiants formés depuis la création", 1850, "+"),
-            ("Taux d’insertion professionnelle", 94, "%"),
-            ("Laboratoires spécialisés", 4, ""),
-            ("Partenariats hospitaliers", 12, "+"),
-            ("Années d’excellence académique", 15, "+"),
+        # Valeurs (max 4 actives)
+        values_data = [
+            ("Excellence", "Nous visons la rigueur académique et professionnelle."),
+            ("Intégrité", "Nous agissons avec éthique, transparence et responsabilité."),
+            ("Engagement", "Nous accompagnons chaque étudiant vers la réussite."),
+            ("Innovation", "Nous intégrons des pratiques pédagogiques modernes."),
         ]
+        for idx, (title, description) in enumerate(values_data, start=1):
+            Value.objects.update_or_create(
+                title=title,
+                defaults={
+                    "description": description,
+                    "order": idx,
+                    "is_active": True,
+                    "icon": "fa-solid fa-circle-check",
+                },
+            )
 
-        for index, (label, value, suffix) in enumerate(stats):
-            InstitutionStat.objects.get_or_create(
+        # Statistiques
+        stats_data = [
+            ("Étudiants formés", 500, "+", "", 1),
+            ("Années d'expérience", 20, "+", "", 2),
+            ("Taux de réussite", 95, "%", "", 3),
+            ("Annexes", 3, "", "", 4),
+        ]
+        for label, value, suffix, prefix, order in stats_data:
+            InstitutionStat.objects.update_or_create(
                 label=label,
                 defaults={
                     "value": value,
                     "suffix": suffix,
-                    "order": index
-                }
+                    "prefix": prefix,
+                    "order": order,
+                    "is_active": True,
+                },
             )
 
-        # ======================================================
-        # MENTIONS LÉGALES (RÉDIGÉES SÉRIEUSEMENT)
-        # ======================================================
-
-        legal_page, _ = LegalPage.objects.get_or_create(
-            page_type="legal",
-            defaults={
+        legal_pages = {
+            "legal": {
                 "title": "Mentions légales",
                 "introduction": (
-                    "Le présent site est la propriété officielle de l’École de Santé "
-                    "Félix Houphouët-Boigny (ESFé), établissement d’enseignement "
-                    "supérieur paramédical situé à Moribabougou, Bamako, République du Mali."
+                    "<p>Le site est édité par l'École de Santé Félix Houphouët-Boigny Mali (ESFé Mali).</p>"
                 ),
-                "version": "1.0",
-                "status": "published"
-            }
-        )
-
-        LegalSection.objects.get_or_create(
-            page=legal_page,
-            title="Identification de l’établissement",
-            defaults={
-                "content": (
-                    "Dénomination : École de Santé Félix Houphouët-Boigny (ESFé). "
-                    "Statut : Établissement privé d’enseignement supérieur paramédical. "
-                    "Siège : Moribabougou, Bamako, Mali."
-                ),
-                "order": 1
-            }
-        )
-
-        LegalSection.objects.get_or_create(
-            page=legal_page,
-            title="Propriété intellectuelle",
-            defaults={
-                "content": (
-                    "L’ensemble des contenus publiés sur le site (textes, images, "
-                    "documents pédagogiques, éléments graphiques) est protégé par "
-                    "la législation en vigueur relative à la propriété intellectuelle."
-                ),
-                "order": 2
-            }
-        )
-
-        LegalSection.objects.get_or_create(
-            page=legal_page,
-            title="Responsabilité",
-            defaults={
-                "content": (
-                    "L’établissement s’efforce de fournir des informations fiables "
-                    "et régulièrement mises à jour. Toutefois, il ne saurait être tenu "
-                    "responsable d’éventuelles erreurs ou omissions."
-                ),
-                "order": 3
-            }
-        )
-
-        LegalSidebarBlock.objects.get_or_create(
-            page=legal_page,
-            title="Coordonnées officielles",
-            defaults={
-                "content": (
-                    "Adresse : Moribabougou, Bamako, Mali<br>"
-                    "Email : contact@esfe.mali<br>"
-                    "Téléphone : +223 XX XX XX XX"
-                ),
-                "order": 1
-            }
-        )
-
-        # ======================================================
-        # POLITIQUE DE CONFIDENTIALITÉ
-        # ======================================================
-
-        privacy_page, _ = LegalPage.objects.get_or_create(
-            page_type="privacy",
-            defaults={
+                "sections": [
+                    (
+                        "Identification de l'établissement",
+                        "<p>Nom officiel : École de Santé Félix Houphouët-Boigny Mali.</p>",
+                    ),
+                    (
+                        "Propriété intellectuelle",
+                        "<p>Les contenus du site sont protégés selon la réglementation en vigueur.</p>",
+                    ),
+                ],
+                "sidebar": [
+                    (
+                        "Contact officiel",
+                        "Adresse : Badalabougou, Bamako<br>Email : contact@esfe-mali.org",
+                    )
+                ],
+            },
+            "privacy": {
                 "title": "Politique de confidentialité",
-                "introduction": (
-                    "L’École de Santé Félix Houphouët-Boigny attache une importance "
-                    "majeure à la protection des données personnelles des candidats, "
-                    "étudiants et partenaires."
-                ),
-                "version": "1.0",
-                "status": "published"
-            }
-        )
+                "introduction": "<p>ESFé Mali protège les données personnelles des usagers.</p>",
+                "sections": [
+                    (
+                        "Données collectées",
+                        "<p>Les données sont collectées pour la gestion académique et administrative.</p>",
+                    ),
+                    (
+                        "Sécurité",
+                        "<p>Les accès sont limités aux personnels autorisés et tracés.</p>",
+                    ),
+                ],
+                "sidebar": [],
+            },
+            "terms": {
+                "title": "Conditions d'utilisation",
+                "introduction": "<p>L'utilisation du site implique l'acceptation des présentes conditions.</p>",
+                "sections": [
+                    (
+                        "Accès au service",
+                        "<p>Le service est disponible hors interruptions de maintenance planifiée.</p>",
+                    ),
+                ],
+                "sidebar": [],
+            },
+        }
 
-        LegalSection.objects.get_or_create(
-            page=privacy_page,
-            title="Données collectées",
-            defaults={
-                "content": (
-                    "Les données collectées via le site concernent principalement "
-                    "les candidatures académiques, les inscriptions administratives "
-                    "et les demandes d’information."
-                ),
-                "order": 1
-            }
-        )
-
-        LegalSection.objects.get_or_create(
-            page=privacy_page,
-            title="Sécurité des données",
-            defaults={
-                "content": (
-                    "Les données sont hébergées sur une infrastructure sécurisée "
-                    "et ne sont accessibles qu’aux personnels autorisés."
-                ),
-                "order": 2
-            }
-        )
-
-        # ======================================================
-        # CONDITIONS D’UTILISATION
-        # ======================================================
-
-        terms_page, _ = LegalPage.objects.get_or_create(
-            page_type="terms",
-            defaults={
-                "title": "Conditions d’utilisation",
-                "introduction": (
-                    "L’utilisation du site implique l’acceptation pleine et entière "
-                    "des présentes conditions."
-                ),
-                "version": "1.0",
-                "status": "published"
-            }
-        )
-
-        LegalSection.objects.get_or_create(
-            page=terms_page,
-            title="Accès au service",
-            defaults={
-                "content": (
-                    "Le site est accessible 24h/24, sauf interruption pour maintenance "
-                    "technique ou cas de force majeure."
-                ),
-                "order": 1
-            }
-        )
-
-        # ======================================================
-        # À PROPOS (DENSE ET CRÉDIBLE)
-        # ======================================================
-
-        about_sections = [
-            (
-                "Notre mission",
-                "Former des professionnels de santé compétents, éthiques et engagés, "
-                "capables de répondre aux défis sanitaires nationaux et internationaux."
-            ),
-            (
-                "Notre vision",
-                "Positionner l’ESFé comme une référence régionale en formation "
-                "paramédicale, reconnue pour son excellence académique et son innovation pédagogique."
-            ),
-            (
-                "Nos valeurs",
-                "Excellence académique, intégrité professionnelle, rigueur scientifique, "
-                "responsabilité sociale et innovation continue."
-            ),
-        ]
-
-        for index, (title, content) in enumerate(about_sections):
-            AboutSection.objects.get_or_create(
-                title=title,
+        for page_type, payload in legal_pages.items():
+            page, _ = LegalPage.objects.update_or_create(
+                page_type=page_type,
                 defaults={
-                    "content": content,
-                    "order": index,
-                    "is_active": True
-                }
+                    "title": payload["title"],
+                    "introduction": payload["introduction"],
+                    "version": "1.0",
+                    "status": "published",
+                },
             )
 
-        self.stdout.write(self.style.SUCCESS("ESFé institutionnel seeded with enriched data."))
+            for order, (title, content) in enumerate(payload["sections"], start=1):
+                LegalSection.objects.update_or_create(
+                    page=page,
+                    title=title,
+                    defaults={
+                        "content": content,
+                        "order": order,
+                        "is_active": True,
+                    },
+                )
+
+            for order, (title, content) in enumerate(payload["sidebar"], start=1):
+                LegalSidebarBlock.objects.update_or_create(
+                    page=page,
+                    title=title,
+                    defaults={
+                        "content": content,
+                        "order": order,
+                        "is_active": True,
+                    },
+                )
+
+        self.stdout.write(self.style.SUCCESS("\n✅ Seed core institutionnel terminé (core uniquement)."))

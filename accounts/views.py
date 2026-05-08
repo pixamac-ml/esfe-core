@@ -23,6 +23,7 @@ from branches.models import Branch
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from payments.models import Payment, PaymentAgent, CashPaymentSession
+from accounts.access import get_user_position
 from .dashboards.helpers import is_manager
 
 from .models import Profile
@@ -101,6 +102,9 @@ def dashboard_redirect(request):
 
     if is_manager(user):
         return redirect("accounts:manager_dashboard")
+
+    if get_user_position(user) == "secretary":
+        return redirect("accounts_portal:portal_secretary")
 
     if check_admissions_access(user):
         return redirect("accounts:admissions_dashboard")

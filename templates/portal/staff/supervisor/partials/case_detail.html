@@ -1,0 +1,73 @@
+{% comment %}Drawer : détail d'un cas de surveillance{% endcomment %}
+{% with p=case.priority %}
+<div class="space-y-5">
+
+  {# ── En-tête ── #}
+  <div>
+    <div class="flex flex-wrap gap-2 mb-2">
+      <span class="rounded-full px-3 py-1 text-xs font-bold
+        {% if p == 'critique' %}bg-rose-100 text-rose-700
+        {% elif p == 'urgente' %}bg-amber-100 text-amber-700
+        {% elif p == 'normale' %}bg-blue-100 text-blue-700
+        {% else %}bg-slate-100 text-slate-500{% endif %}">
+        {{ case.get_priority_display }}
+      </span>
+      <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+        {{ case.get_status_display }}
+      </span>
+    </div>
+    <h4 class="text-base font-extrabold text-slate-900">{{ case.title }}</h4>
+    <p class="mt-1 text-xs font-semibold text-slate-500">{{ case.get_case_type_display }}</p>
+    <p class="mt-1 text-xs text-slate-400">Étudiant : <span class="font-bold text-slate-700">{{ case.student.full_name }}</span> · {{ case.student.matricule }}</p>
+    <p class="mt-0.5 text-xs text-slate-400">Ouvert le {{ case.created_at|date:"d/m/Y" }} par {{ case.opened_by.get_full_name|default:case.opened_by.username }}</p>
+    {% if case.description %}
+    <p class="mt-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">{{ case.description }}</p>
+    {% endif %}
+  </div>
+
+  {# ── Changer le statut ── #}
+  <div class="rounded-2xl border border-slate-200 bg-white p-4">
+    <p class="mb-2 text-xs font-bold uppercase text-slate-500">Changer le statut</p>
+    <form hx-post="{% url 'accounts_portal:supervisor_case_update_status' case.id %}"
+          hx-target="#supervisor-drawer-content"
+          class="flex flex-wrap gap-2">
+      {% csrf_token %}
+      {% for val, label in status_choices %}
+      <button type="submit" name="status" value="{{ val }}"
+        class="rounded-xl border px-3 py-1.5 text-xs font-bold transition
+        {% if case.status == val %}bg-blue-600 text-white border-blue-600{% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+        {{ label }}
+      </button>
+      {% endfor %}
+    </form>
+  </div>
+
+  {# ── Notes internes ── #}
+  <div class="rounded-2xl border border-slate-200 bg-white p-4">
+    <p class="mb-3 text-xs font-bold uppercase text-slate-500">Notes internes ({{ case.notes.count }})</p>
+    <div class="space-y-2 mb-4 max-h-52 overflow-auto">
+      {% for note in case.notes.all %}
+      <div class="rounded-xl bg-slate-50 p-3">
+        <p class="text-[11px] font-bold text-slate-500">{{ note.author.get_full_name|default:note.author.username }} · {{ note.created_at|date:"d/m/Y H:i" }}</p>
+        <p class="mt-1 text-xs text-slate-700">{{ note.content }}</p>
+      </div>
+      {% empty %}
+      <p class="text-xs text-slate-400">Aucune note pour l'instant.</p>
+      {% endfor %}
+    </div>
+    <form hx-post="{% url 'accounts_portal:supervisor_case_add_note' case.id %}"
+          hx-target="#supervisor-drawer-content"
+          class="space-y-2">
+      {% csrf_token %}
+      <textarea name="content" rows="2" placeholder="Ajouter une note interne..."
+        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
+      <button type="submit"
+        class="w-full rounded-xl bg-slate-800 py-2 text-xs font-extrabold text-white hover:bg-slate-700">
+        Enregistrer la note
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endwith %}
+

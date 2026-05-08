@@ -107,7 +107,7 @@ def _build_portal_context(request, *, page_title, module_cards):
     scope = get_user_scope(request.user)
     user_display_name = request.user.get_full_name() or request.user.username
     try:
-        secretary_url = reverse("secretary:secretary_dashboard")
+        secretary_url = reverse("accounts_portal:portal_secretary")
     except NoReverseMatch:
         secretary_url = ""
 

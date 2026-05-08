@@ -14,6 +14,9 @@ def is_secretary(user):
 
     profile = getattr(user, "profile", None)
     profile_role = getattr(profile, "role", None)
+    profile_position = getattr(profile, "position", None)
+    if profile_position == "secretary":
+        return True
     if profile_role in {"secretary", "admissions"}:
         return True
 

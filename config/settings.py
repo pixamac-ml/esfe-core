@@ -8,6 +8,7 @@ import importlib.util
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # ==================================================
@@ -39,7 +40,7 @@ CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", BASE_URL)
 ALLOWED_HOSTS =['127.0.0.1','192.168.2.3','localhost']
 ENABLE_BROWSER_RELOAD = DEBUG and env_bool("ENABLE_BROWSER_RELOAD", True)
 ENABLE_WEBSOCKETS = env_bool("ENABLE_WEBSOCKETS", True)
-REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1").strip()
+REDIS_URL = os.getenv("REDIS_URL", "").strip()
 
 # ==================================================
 # APPLICATIONS
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
 
     # 🔥 django-components
     "django_components",
+    "daphne",
     "channels",
     # Django core
     "django.contrib.admin",
@@ -181,7 +183,9 @@ else:
 # DJANGO CHANNELS (WebSockets)
 # ==================================================
 
-if ENABLE_WEBSOCKETS and REDIS_URL:
+HAS_CHANNELS_REDIS = importlib.util.find_spec("channels_redis") is not None
+
+if ENABLE_WEBSOCKETS and REDIS_URL and HAS_CHANNELS_REDIS:
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -191,6 +195,11 @@ if ENABLE_WEBSOCKETS and REDIS_URL:
         }
     }
 else:
+    if ENABLE_WEBSOCKETS and REDIS_URL and not HAS_CHANNELS_REDIS and not DEBUG:
+        raise ImproperlyConfigured(
+            "REDIS_URL is configured but channels_redis is not installed. "
+            "Install channels_redis or unset REDIS_URL."
+        )
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels.layers.InMemoryChannelLayer",

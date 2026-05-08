@@ -1,125 +1,65 @@
 from django.core.management.base import BaseCommand
-from core.models import AboutSection
+
+from core.models import InstitutionPresentation, Value
 
 
 class Command(BaseCommand):
-    help = "Seed initial data for About page (new structure)"
+    help = "Seed des contenus About basés sur les modèles core actuels"
 
     def handle(self, *args, **kwargs):
-        self.stdout.write(self.style.WARNING("Seeding About page (new structure)..."))
+        self.stdout.write(self.style.NOTICE("\n📄 Mise à jour des contenus About..."))
 
-        # Nettoyage complet
-        AboutSection.objects.all().delete()
+        presentation = InstitutionPresentation.objects.first()
+        defaults = {
+            "about_title": "À propos de l'École de Santé Félix Houphouët-Boigny Mali",
+            "about_text": (
+                "<p>L'École de Santé Félix Houphouët-Boigny Mali (ESFé Mali) est un établissement "
+                "d'enseignement supérieur spécialisé dans les sciences de la santé.</p>"
+                "<p>Nos programmes sont structurés autour d'une pédagogie professionnalisante, "
+                "centrée sur les compétences cliniques, l'éthique et l'employabilité.</p>"
+            ),
+            "vision_title": "Vision & Engagement Académique",
+            "vision_text": (
+                "Être une référence de formation en sciences de la santé au Mali et dans la sous-région, "
+                "avec une approche orientée impact et qualité."
+            ),
+            "mission_title": "Mission",
+            "mission_text": (
+                "Former des professionnels de santé compétents, responsables et capables de répondre "
+                "aux enjeux sanitaires contemporains."
+            ),
+            "hero_title": "ESFé Mali",
+            "hero_subtitle": "Excellence académique et engagement pour la santé",
+            "cta_title": "Rejoignez une institution d'excellence",
+            "cta_subtitle": "Préparez votre avenir dans les métiers de la santé.",
+            "cta_button_text": "Découvrir les formations",
+            "cta_button_url": "/formations/",
+        }
 
-        sections_data = [
-            {
-                "section_key": "identity",
-                "title": "L’École de Santé Félix Houphouët-Boigny",
-                "subtitle": "École supérieure privée spécialisée dans les sciences de la santé",
-                "content": """
-<p>L’École de Santé Félix Houphouët-Boigny est une école supérieure privée spécialisée dans la formation paramédicale et scientifique au Mali.</p>
+        if presentation:
+            for key, value in defaults.items():
+                setattr(presentation, key, value)
+            presentation.save()
+            self.stdout.write("   🔄 InstitutionPresentation mise à jour")
+        else:
+            InstitutionPresentation.objects.create(**defaults)
+            self.stdout.write("   ✅ InstitutionPresentation créée")
 
-<p>À travers des formations structurées selon le système Licence-Master-Doctorat (LMD), l’école développe des compétences techniques, éthiques et professionnelles adaptées aux réalités hospitalières et communautaires.</p>
-
-<p>Créée par Décision N°2018-0000613 MESRS-SG du 13 avril 2018 et officiellement ouverte par Arrêté N°6093/MESRS-SG du 31 décembre 2021.</p>
-""",
-                "highlights": [
-                    "École supérieure privée reconnue par l’État",
-                    "Formations paramédicales conformes au système LMD",
-                    "Ancrage professionnel et terrain",
-                ],
-                "icon": "fa-solid fa-school",
-                "background": "white",
-                "order": 1,
-            },
-            {
-                "section_key": "vision",
-                "title": "Vision & Engagement Académique",
-                "subtitle": "",
-                "content": """
-<p>L’École place l’excellence académique et l’éthique professionnelle au cœur de son projet pédagogique.</p>
-
-<p>Elle œuvre pour le développement d’un capital humain qualifié, capable de répondre efficacement aux défis sanitaires contemporains.</p>
-""",
-                "highlights": [
-                    "Excellence académique",
-                    "Recherche appliquée",
-                    "Innovation pédagogique",
-                    "Transformation numérique",
-                ],
-                "icon": "fa-solid fa-heart-pulse",
-                "background": "light",
-                "order": 2,
-            },
-            {
-                "section_key": "governance",
-                "title": "Gouvernance & Assurance Qualité",
-                "subtitle": "",
-                "content": """
-<p>L’École évolue sous la gouvernance structurée de l’Université Privée Félix Houphouët-Boigny-Mali.</p>
-
-<p>Son organisation repose sur un Rectorat, une Direction Générale et des instances académiques garantissant rigueur et transparence.</p>
-""",
-                "icon": "fa-solid fa-sitemap",
-                "background": "white",
-                "order": 3,
-            },
-            {
-                "section_key": "infrastructure",
-                "title": "Infrastructures & Transformation Numérique",
-                "subtitle": "",
-                "content": """
-<ul>
-<li>Modernisation des salles et laboratoires</li>
-<li>Bibliothèque physique et numérique</li>
-<li>Plateformes numériques académiques</li>
-<li>Laboratoires virtuels</li>
-</ul>
-""",
-                "icon": "fa-solid fa-building-columns",
-                "background": "light",
-                "order": 4,
-            },
-            {
-                "section_key": "student_life",
-                "title": "Vie Estudiantine",
-                "subtitle": "",
-                "content": """
-<ul>
-<li>Association étudiante</li>
-<li>Activités culturelles et sportives</li>
-<li>Service médico-social</li>
-<li>Engagement communautaire</li>
-</ul>
-""",
-                "icon": "fa-solid fa-users",
-                "background": "white",
-                "order": 5,
-            },
-            {
-                "section_key": "network",
-                "title": "Annexes & Partenariats",
-                "subtitle": "",
-                "content": """
-<p>L’École s’appuie sur un réseau d’annexes stratégiques et de partenaires académiques nationaux et internationaux.</p>
-""",
-                "icon": "fa-solid fa-globe",
-                "background": "light",
-                "order": 6,
-            },
+        values_data = [
+            ("Excellence", "Rigueur académique et qualité de la formation."),
+            ("Innovation", "Amélioration continue des pratiques pédagogiques."),
+            ("Engagement", "Accompagnement personnalisé vers la réussite."),
+            ("Intégrité", "Éthique, transparence et responsabilité."),
         ]
-
-        for data in sections_data:
-            AboutSection.objects.create(
-                section_key=data["section_key"],
-                title=data["title"],
-                subtitle=data.get("subtitle"),
-                content=data.get("content"),
-                highlights=data.get("highlights"),
-                icon=data.get("icon"),
-                background=data.get("background"),
-                order=data.get("order"),
-                is_active=True,
+        for order, (title, description) in enumerate(values_data, start=1):
+            Value.objects.update_or_create(
+                title=title,
+                defaults={
+                    "description": description,
+                    "order": order,
+                    "is_active": True,
+                    "icon": "fa-solid fa-circle-check",
+                },
             )
 
-        self.stdout.write(self.style.SUCCESS("About page seeded successfully (new structure)."))
+        self.stdout.write(self.style.SUCCESS("\n✅ Seed About terminé (modèles core actuels)."))

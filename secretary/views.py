@@ -5,9 +5,9 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from accounts.dashboards.helpers import get_user_branch
-from academics.models import AcademicClass
 from .forms import (
     AppointmentForm,
     DocumentReceiptForm,
@@ -15,7 +15,6 @@ from .forms import (
     SecretaryTaskForm,
     VisitorLogForm,
 )
-from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
 from .permissions import ensure_secretary_access
 from .selectors import (
     get_appointments_queryset,
@@ -63,6 +62,10 @@ def _common_filters(request):
     }
 
 
+def _form_kwargs(request):
+    return {"user": request.user, "branch": get_user_branch(request.user)}
+
+
 def _is_htmx(request):
     return request.headers.get("HX-Request") == "true"
 
@@ -96,21 +99,21 @@ def secretary_dashboard(request):
     context = get_secretary_dashboard_data(request.user)
     context["student_query"] = request.GET.get("student_q", "").strip()
     if context["student_query"]:
-        context["student_results"] = search_students(context["student_query"])[:10]
+        context["student_results"] = search_students(context["student_query"], user=request.user)[:10]
     else:
         context["student_results"] = []
-    context["quick_registry_form"] = RegistryEntryForm()
-    context["quick_appointment_form"] = AppointmentForm()
-    context["quick_visitor_form"] = VisitorLogForm()
-    context["quick_document_form"] = DocumentReceiptForm()
-    context["quick_task_form"] = SecretaryTaskForm()
+    context["quick_registry_form"] = RegistryEntryForm(**_form_kwargs(request))
+    context["quick_appointment_form"] = AppointmentForm(**_form_kwargs(request))
+    context["quick_visitor_form"] = VisitorLogForm(**_form_kwargs(request))
+    context["quick_document_form"] = DocumentReceiptForm(**_form_kwargs(request))
+    context["quick_task_form"] = SecretaryTaskForm(**_form_kwargs(request))
     return render(request, "secretary/dashboard.html", context)
 
 
 @login_required
 def registry_list(request):
     ensure_secretary_access(request.user)
-    queryset = get_registry_queryset(_common_filters(request))
+    queryset = get_registry_queryset(_common_filters(request), user=request.user)
     return render(
         request,
         "secretary/registry_list.html",
@@ -124,7 +127,7 @@ def registry_list(request):
 @login_required
 def registry_create(request):
     ensure_secretary_access(request.user)
-    form = RegistryEntryForm(request.POST or None)
+    form = RegistryEntryForm(request.POST or None, **_form_kwargs(request))
     if request.method == "POST" and form.is_valid():
         create_registry_entry(created_by=request.user, **form.cleaned_data)
         messages.success(request, "Entree de registre enregistree.")
@@ -147,9 +150,10 @@ def registry_create(request):
 
 
 @login_required
+@require_POST
 def registry_mark_processed(request, pk):
     ensure_secretary_access(request.user)
-    entry = get_object_or_404(RegistryEntry, pk=pk)
+    entry = get_object_or_404(get_registry_queryset({"archived": False}, user=request.user), pk=pk)
     mark_registry_processed(entry)
     messages.success(request, "Entree marquee comme traitee.")
     if _is_htmx(request):
@@ -162,7 +166,7 @@ def registry_start(request, pk):
     ensure_secretary_access(request.user)
     if request.method != "POST":
         return redirect("secretary:registry_list")
-    entry = get_object_or_404(RegistryEntry, pk=pk)
+    entry = get_object_or_404(get_registry_queryset({"archived": False}, user=request.user), pk=pk)
     start_registry_entry_processing(entry)
     messages.success(request, "Entree prise en charge.")
     if _is_htmx(request):
@@ -171,9 +175,10 @@ def registry_start(request, pk):
 
 
 @login_required
+@require_POST
 def registry_archive(request, pk):
     ensure_secretary_access(request.user)
-    entry = get_object_or_404(RegistryEntry, pk=pk)
+    entry = get_object_or_404(get_registry_queryset({"archived": False}, user=request.user), pk=pk)
     archive_registry_entry(entry)
     messages.success(request, "Entree archivee.")
     if _is_htmx(request):
@@ -187,7 +192,7 @@ def appointment_list(request):
     filters = _common_filters(request)
     filters["date_from"] = request.GET.get("date_from") or None
     filters["date_to"] = request.GET.get("date_to") or None
-    queryset = get_appointments_queryset(filters)
+    queryset = get_appointments_queryset(filters, user=request.user)
     return render(
         request,
         "secretary/appointment_list.html",
@@ -201,7 +206,7 @@ def appointment_list(request):
 @login_required
 def appointment_create(request):
     ensure_secretary_access(request.user)
-    form = AppointmentForm(request.POST or None)
+    form = AppointmentForm(request.POST or None, **_form_kwargs(request))
     if request.method == "POST" and form.is_valid():
         create_appointment(created_by=request.user, **form.cleaned_data)
         messages.success(request, "Rendez-vous cree.")
@@ -224,9 +229,10 @@ def appointment_create(request):
 
 
 @login_required
+@require_POST
 def appointment_complete(request, pk):
     ensure_secretary_access(request.user)
-    appointment = get_object_or_404(Appointment, pk=pk)
+    appointment = get_object_or_404(get_appointments_queryset({"archived": False}, user=request.user), pk=pk)
     complete_appointment(appointment)
     messages.success(request, "Rendez-vous marque comme termine.")
     if _is_htmx(request):
@@ -237,7 +243,7 @@ def appointment_complete(request, pk):
 @login_required
 def visitor_list(request):
     ensure_secretary_access(request.user)
-    queryset = get_visits_queryset(_common_filters(request))
+    queryset = get_visits_queryset(_common_filters(request), user=request.user)
     return render(
         request,
         "secretary/visitor_list.html",
@@ -249,9 +255,10 @@ def visitor_list(request):
 
 
 @login_required
+@require_POST
 def visitor_complete(request, pk):
     ensure_secretary_access(request.user)
-    visitor = get_object_or_404(VisitorLog, pk=pk)
+    visitor = get_object_or_404(get_visits_queryset({"archived": False}, user=request.user), pk=pk)
     close_visit(visitor)
     messages.success(request, "Visite cloturee.")
     if _is_htmx(request):
@@ -262,7 +269,7 @@ def visitor_complete(request, pk):
 @login_required
 def visitor_create(request):
     ensure_secretary_access(request.user)
-    form = VisitorLogForm(request.POST or None)
+    form = VisitorLogForm(request.POST or None, **_form_kwargs(request))
     if request.method == "POST" and form.is_valid():
         register_visitor(created_by=request.user, **form.cleaned_data)
         messages.success(request, "Visite enregistree.")
@@ -287,7 +294,7 @@ def visitor_create(request):
 @login_required
 def document_receipt_list(request):
     ensure_secretary_access(request.user)
-    queryset = get_documents_queryset(_common_filters(request))
+    queryset = get_documents_queryset(_common_filters(request), user=request.user)
     return render(
         request,
         "secretary/document_receipt_list.html",
@@ -301,7 +308,7 @@ def document_receipt_list(request):
 @login_required
 def document_receipt_create(request):
     ensure_secretary_access(request.user)
-    form = DocumentReceiptForm(request.POST or None, request.FILES or None)
+    form = DocumentReceiptForm(request.POST or None, request.FILES or None, **_form_kwargs(request))
     if request.method == "POST" and form.is_valid():
         register_document(received_by=request.user, **form.cleaned_data)
         messages.success(request, "Document enregistre.")
@@ -324,9 +331,10 @@ def document_receipt_create(request):
 
 
 @login_required
+@require_POST
 def document_receipt_archive(request, pk):
     ensure_secretary_access(request.user)
-    document = get_object_or_404(DocumentReceipt, pk=pk)
+    document = get_object_or_404(get_documents_queryset({"archived": False}, user=request.user), pk=pk)
     archive_document(document)
     messages.success(request, "Document archive.")
     if _is_htmx(request):
@@ -339,7 +347,7 @@ def document_receipt_start(request, pk):
     ensure_secretary_access(request.user)
     if request.method != "POST":
         return redirect("secretary:document_receipt_list")
-    document = get_object_or_404(DocumentReceipt, pk=pk)
+    document = get_object_or_404(get_documents_queryset({"archived": False}, user=request.user), pk=pk)
     start_document_processing(document)
     messages.success(request, "Document pris en charge.")
     if _is_htmx(request):
@@ -350,7 +358,7 @@ def document_receipt_start(request, pk):
 @login_required
 def task_list(request):
     ensure_secretary_access(request.user)
-    queryset = get_tasks_queryset(_common_filters(request))
+    queryset = get_tasks_queryset(_common_filters(request), user=request.user)
     return render(
         request,
         "secretary/task_list.html",
@@ -364,7 +372,7 @@ def task_list(request):
 @login_required
 def task_create(request):
     ensure_secretary_access(request.user)
-    form = SecretaryTaskForm(request.POST or None)
+    form = SecretaryTaskForm(request.POST or None, **_form_kwargs(request))
     if request.method == "POST" and form.is_valid():
         create_task(created_by=request.user, **form.cleaned_data)
         messages.success(request, "Tache creee.")
@@ -387,9 +395,10 @@ def task_create(request):
 
 
 @login_required
+@require_POST
 def task_complete(request, pk):
     ensure_secretary_access(request.user)
-    task = get_object_or_404(SecretaryTask, pk=pk)
+    task = get_object_or_404(get_tasks_queryset({"archived": False}, user=request.user), pk=pk)
     complete_task(task)
     messages.success(request, "Tache marquee comme terminee.")
     if _is_htmx(request):
@@ -402,7 +411,7 @@ def task_start(request, pk):
     ensure_secretary_access(request.user)
     if request.method != "POST":
         return redirect("secretary:task_list")
-    task = get_object_or_404(SecretaryTask, pk=pk)
+    task = get_object_or_404(get_tasks_queryset({"archived": False}, user=request.user), pk=pk)
     start_task_processing(task, request.user)
     messages.success(request, "Tache prise en charge.")
     if _is_htmx(request):
@@ -413,14 +422,14 @@ def task_start(request, pk):
 @login_required
 def student_snapshot_view(request, student_id):
     ensure_secretary_access(request.user)
-    return JsonResponse(get_student_snapshot(student_id))
+    return JsonResponse(get_student_snapshot(student_id, user=request.user))
 
 
 @login_required
 def htmx_student_results(request):
     ensure_secretary_access(request.user)
     query = request.GET.get("q", "").strip()
-    students = search_students(query)[:12] if query else []
+    students = search_students(query, user=request.user)[:12] if query else []
     return render(
         request,
         "secretary/partials/student_results.html",
@@ -432,7 +441,7 @@ def htmx_student_results(request):
 def htmx_class_results(request):
     ensure_secretary_access(request.user)
     query = request.GET.get("q", "").strip()
-    classes = search_academic_classes(query)[:12] if query else []
+    classes = search_academic_classes(query, user=request.user)[:12] if query else []
     return render(
         request,
         "secretary/partials/class_results.html",
@@ -444,7 +453,7 @@ def htmx_class_results(request):
 def htmx_registry_results(request):
     ensure_secretary_access(request.user)
     filters = _common_filters(request)
-    entries = get_registry_queryset(filters)[:12]
+    entries = get_registry_queryset(filters, user=request.user)[:12]
     return render(
         request,
         "secretary/partials/registry_results.html",
@@ -456,7 +465,7 @@ def htmx_registry_results(request):
 def htmx_appointment_results(request):
     ensure_secretary_access(request.user)
     filters = _common_filters(request)
-    appointments = get_appointments_queryset(filters)[:12]
+    appointments = get_appointments_queryset(filters, user=request.user)[:12]
     return render(
         request,
         "secretary/partials/appointment_results.html",
@@ -468,7 +477,7 @@ def htmx_appointment_results(request):
 def htmx_document_results(request):
     ensure_secretary_access(request.user)
     filters = _common_filters(request)
-    receipts = get_documents_queryset(filters)[:12]
+    receipts = get_documents_queryset(filters, user=request.user)[:12]
     return render(
         request,
         "secretary/partials/document_results.html",
@@ -480,7 +489,7 @@ def htmx_document_results(request):
 def htmx_task_results(request):
     ensure_secretary_access(request.user)
     filters = _common_filters(request)
-    tasks = get_tasks_queryset(filters)[:12]
+    tasks = get_tasks_queryset(filters, user=request.user)[:12]
     return render(
         request,
         "secretary/partials/task_results.html",

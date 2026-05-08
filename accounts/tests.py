@@ -264,6 +264,22 @@ class DashboardRedirectCompatibilityTests(TestCase):
 			fetch_redirect_response=False,
 		)
 
+	def test_dashboard_redirect_sends_secretary_to_secretary_portal(self):
+		user = self._create_user(
+			"redirect_secretary",
+			position="secretary",
+			branch=self.branch,
+		)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("accounts:dashboard_redirect"))
+
+		self.assertRedirects(
+			response,
+			reverse("accounts_portal:portal_secretary"),
+			fetch_redirect_response=False,
+		)
+
 
 class PortalPhaseOneTests(TestCase):
 	def setUp(self):

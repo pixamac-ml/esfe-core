@@ -46,6 +46,10 @@
         <button type="button" @click="go('schedule')" :disabled="!classId" :class="btnClass('schedule', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Emploi du temps</button>
         <button type="button" @click="go('courses')" :disabled="!classId" :class="btnClass('courses', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Cours</button>
         <button type="button" @click="go('students')" :disabled="!classId" :class="btnClass('students', !classId)" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">Étudiants</button>
+        <button type="button" @click="go('cases')" :class="btnClass('cases')" class="w-full rounded-xl px-3 py-2 text-left text-sm font-bold">
+          ⚠ Cas à traiter
+          {% if open_cases_count %}<span class="ml-1 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black text-white">{{ open_cases_count }}</span>{% endif %}
+        </button>
       </nav>
     </aside>
 
@@ -127,7 +131,7 @@
       },
       go(section) {
         // Sélection de classe obligatoire (sauf home/classes)
-        const requiresClass = !['home', 'classes'].includes(section);
+        const requiresClass = !['home', 'classes', 'cases'].includes(section);
         if (requiresClass && !this.classId) {
           this.section = 'classes';
         } else {
@@ -136,6 +140,11 @@
         this.reload();
       },
       reload() {
+        if (this.section === 'cases') {
+          this.loading = true;
+          htmx.ajax('GET', '{% url "accounts_portal:supervisor_cases_workspace" %}', '#supervisor-workspace');
+          return;
+        }
         const params = new URLSearchParams({ section: this.section });
         if (this.classId) params.append('class_id', this.classId);
         this.loading = true;

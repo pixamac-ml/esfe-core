@@ -1,7 +1,7 @@
 # students/admin.py
 
 from django.contrib import admin
-from .models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, TeacherAttendance
+from .models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, TeacherAttendance, StudentCase, StudentCaseNote
 
 
 @admin.register(Student)
@@ -119,3 +119,24 @@ class AttendanceAlertAdmin(admin.ModelAdmin):
         "student__inscription__candidature__last_name",
     )
     autocomplete_fields = ("student", "branch")
+
+
+class StudentCaseNoteInline(admin.TabularInline):
+    model = StudentCaseNote
+    extra = 1
+    readonly_fields = ("author", "created_at")
+
+
+@admin.register(StudentCase)
+class StudentCaseAdmin(admin.ModelAdmin):
+    list_display = ("title", "student", "case_type", "priority", "status", "branch", "created_at")
+    list_filter = ("priority", "status", "case_type", "branch")
+    search_fields = (
+        "title",
+        "student__matricule",
+        "student__inscription__candidature__first_name",
+        "student__inscription__candidature__last_name",
+    )
+    readonly_fields = ("created_at", "updated_at", "resolved_at")
+    inlines = [StudentCaseNoteInline]
+

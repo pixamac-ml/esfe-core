@@ -43,6 +43,14 @@ from portal.views.it_workflows import (
     it_user_modal_save,
     load_notes_workspace,
 )
+from portal.views.supervisor_cases import (
+    supervisor_cases_workspace,
+    supervisor_case_detail,
+    supervisor_case_create,
+    supervisor_case_update_status,
+    supervisor_case_add_note,
+    supervisor_student_cases,
+)
 from portal.views.views import (
     admissions_portal,
     dg_portal,
@@ -282,6 +290,36 @@ urlpatterns = [
         "supervisor/attendance/roll-action/",
         supervisor_attendance_roll_action,
         name="supervisor_attendance_roll_action",
+    ),
+    path(
+        "supervisor/cases/",
+        supervisor_cases_workspace,
+        name="supervisor_cases_workspace",
+    ),
+    path(
+        "supervisor/cases/create/",
+        supervisor_case_create,
+        name="supervisor_case_create",
+    ),
+    path(
+        "supervisor/cases/<int:case_id>/",
+        supervisor_case_detail,
+        name="supervisor_case_detail",
+    ),
+    path(
+        "supervisor/cases/<int:case_id>/status/",
+        supervisor_case_update_status,
+        name="supervisor_case_update_status",
+    ),
+    path(
+        "supervisor/cases/<int:case_id>/notes/",
+        supervisor_case_add_note,
+        name="supervisor_case_add_note",
+    ),
+    path(
+        "supervisor/students/<int:student_id>/cases/",
+        supervisor_student_cases,
+        name="supervisor_student_cases",
     ),
     path("admin/grades/", admin_grade_dashboard, name="admin_grade_dashboard"),
     path("it/grades/grid/", it_notes_grid_view, name="it_notes_grid"),

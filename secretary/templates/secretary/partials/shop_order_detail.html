@@ -1,0 +1,71 @@
+{% load humanize %}
+<div class="space-y-5">
+  <div class="border-b border-slate-200 pb-4">
+    <p class="text-xs font-bold uppercase tracking-wide text-amber-600">Boutique</p>
+    <h3 class="mt-1 text-xl font-black text-slate-900">{{ order.reference|default:"Commande boutique" }}</h3>
+    <p class="mt-1 text-sm text-slate-500">
+      {{ order.inscription.candidature.full_name|default:order.buyer_display }} · {{ order.get_status_display }} · {{ order.branch.name }}
+    </p>
+  </div>
+
+  <div class="grid gap-3 sm:grid-cols-3">
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Total</p>
+      <p class="mt-1 text-lg font-black text-slate-900">{{ order.total_amount|intcomma }} FCFA</p>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Paye</p>
+      <p class="mt-1 text-lg font-black text-slate-900">{{ order.paid_amount|intcomma }} FCFA</p>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Reste</p>
+      <p class="mt-1 text-lg font-black {% if order.balance %}text-rose-600{% else %}text-emerald-600{% endif %}">
+        {{ order.balance|intcomma }} FCFA
+      </p>
+    </div>
+  </div>
+
+  <div class="space-y-3">
+    {% for item in order.items.all %}
+    <div class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-3">
+      <div class="min-w-0">
+        <p class="text-sm font-bold text-slate-900">
+          {{ item.product.name }}{% if item.variant %} - {{ item.variant.label }}{% endif %}
+        </p>
+        <p class="text-xs text-slate-500">Quantite {{ item.quantity }}</p>
+      </div>
+      <p class="text-sm font-bold text-slate-900">{{ item.line_total|intcomma }} FCFA</p>
+    </div>
+    {% empty %}
+    <p class="text-sm text-slate-500">Aucun article sur cette commande.</p>
+    {% endfor %}
+  </div>
+
+  <div class="space-y-2">
+    <h4 class="text-sm font-bold text-slate-900">Paiements</h4>
+    {% for payment in order.payments.all %}
+    <div class="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+      <span>{{ payment.reference|default:"Paiement en attente" }} - {{ payment.get_status_display }}</span>
+      {% if payment.receipt_pdf %}
+      <a href="/shop/payment/{{ payment.id }}/receipt/" class="font-semibold text-primary">Recu PDF</a>
+      {% endif %}
+    </div>
+    {% empty %}
+    <p class="text-sm text-slate-500">Aucun paiement enregistre.</p>
+    {% endfor %}
+  </div>
+
+  <div class="flex justify-end gap-2">
+    {% if order.status == "ready" %}
+    <form method="post" hx-post="{% url 'secretary:shop_order_deliver' order.pk %}" hx-target="body" hx-swap="none">
+      {% csrf_token %}
+      <button type="submit" class="secretary-btn secretary-btn-primary text-sm px-4 py-2 rounded-xl">
+        Marquer remise
+      </button>
+    </form>
+    {% endif %}
+    <button type="button" class="secretary-btn secretary-btn-secondary text-sm px-4 py-2 rounded-xl" onclick="window.sgCloseModal && window.sgCloseModal()">
+      Fermer
+    </button>
+  </div>
+</div>

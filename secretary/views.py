@@ -5,9 +5,11 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from accounts.dashboards.helpers import get_user_branch
+from shop.models import ShopOrder
+from shop.services.shop_service import deliver_order
 from .forms import (
     AppointmentForm,
     DocumentReceiptForm,
@@ -514,3 +516,40 @@ def htmx_auto_assign(request):
     return HttpResponse(
         '<div class="message">Affectation automatique prete pour integration metier future.</div>'
     )
+
+
+@login_required
+@require_GET
+def shop_order_detail(request, pk):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    order = get_object_or_404(
+        ShopOrder.objects.select_related(
+            "branch",
+            "inscription__candidature__programme",
+            "inscription__candidature__branch",
+            "prepared_by",
+            "delivered_by",
+        ).prefetch_related(
+            "items",
+            "items__product",
+            "items__variant",
+            "payments",
+        ),
+        pk=pk,
+        branch=branch,
+    )
+    return render(request, "secretary/partials/shop_order_detail.html", {"order": order})
+
+
+@login_required
+@require_POST
+def shop_order_deliver(request, pk):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    order = get_object_or_404(ShopOrder, pk=pk, branch=branch)
+    deliver_order(order, request.user)
+    messages.success(request, "Commande boutique remise.")
+    if _is_htmx(request):
+        return _refresh_response()
+    return redirect("secretary:secretary_dashboard")

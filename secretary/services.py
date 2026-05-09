@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -289,6 +290,43 @@ def get_student_snapshot(student_id, *, user=None, branch=None):
     }
 
 
+def get_academic_results(*, branch=None, limit=20):
+    from news.models import ResultSession
+
+    queryset = ResultSession.objects.filter(is_published=True).order_by("-annee_academique", "-created_at")
+    if branch is not None:
+        branch_name = (getattr(branch, "name", "") or "").strip()
+        branch_code = (getattr(branch, "code", "") or "").strip()
+        branch_filters = Q()
+        if branch_name:
+            branch_filters |= Q(annexe__iexact=branch_name) | Q(annexe__icontains=branch_name)
+        if branch_code:
+            branch_filters |= Q(annexe__iexact=branch_code) | Q(annexe__icontains=branch_code)
+        if branch_filters:
+            queryset = queryset.filter(branch_filters)
+    return queryset[:limit]
+
+
+def get_pending_shop_orders(*, branch=None, limit=10):
+    from shop.models import ShopOrder
+
+    queryset = (
+        ShopOrder.objects.select_related(
+            "branch",
+            "inscription__candidature__programme",
+            "inscription__candidature__branch",
+            "prepared_by",
+            "delivered_by",
+        )
+        .prefetch_related("items", "payments")
+        .filter(status__in=[ShopOrder.STATUS_PENDING_PAYMENT, ShopOrder.STATUS_READY])
+        .order_by("status", "-created_at")
+    )
+    if branch is not None:
+        queryset = queryset.filter(branch=branch)
+    return queryset[:limit]
+
+
 def get_secretary_dashboard_data(user):
     branch = get_user_branch(user)
     active_students = get_active_students(user=user, branch=branch)
@@ -348,6 +386,8 @@ def get_secretary_dashboard_data(user):
         "pending_documents_rows": pending_documents_rows,
         "recent_registry": get_recent_registry_entries(limit=5, user=user, branch=branch),
         "recent_documents": get_recent_documents(limit=5, user=user, branch=branch),
+        "academic_results": get_academic_results(branch=branch, limit=20),
+        "pending_shop_orders": get_pending_shop_orders(branch=branch, limit=10),
         "messages_count": get_secretary_unread_messages(user),
         "recent_messages": get_secretary_recent_messages(user, limit=5),
         "notifications": get_secretary_notifications(user, limit=5),

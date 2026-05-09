@@ -433,13 +433,16 @@
             </div>
             <div class="flex gap-2 shrink-0">
               {# Détail étudiant — URL existante dans shop/urls.py #}
-              <a href="{% url 'shop:student_order_detail' order.pk %}"
+              <button type="button"
+                 hx-get="{% url 'secretary:shop_order_detail' order.pk %}"
+                 hx-target="#secretary-modal-content" hx-swap="innerHTML"
+                 hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()"
                  class="secretary-btn secretary-btn-secondary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl">
                 Détail
-              </a>
+              </button>
               {# Livraison — uniquement si statut = ready #}
               {% if order.status == 'ready' %}
-              <form method="post" action="{% url 'shop:manager_order_deliver' order.pk %}">
+              <form method="post" hx-post="{% url 'secretary:shop_order_deliver' order.pk %}" hx-target="body" hx-swap="none">
                 {% csrf_token %}
                 <button type="submit"
                   class="secretary-btn secretary-btn-primary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl">

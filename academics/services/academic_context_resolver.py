@@ -1,7 +1,7 @@
 import logging
-import re
 
-from academics.models import AcademicClass, AcademicYear
+from academics.models import AcademicClass
+from academics.services.academic_years import resolve_academic_year_reference
 
 
 logger = logging.getLogger(__name__)
@@ -46,48 +46,14 @@ def _normalize_cycle_name(cycle):
     return str(getattr(cycle, "name", "") or "").strip().lower()
 
 
-def _canonicalize_academic_year_name(value):
-    raw_value = str(value or "").strip()
-    if not raw_value:
-        return ""
-
-    compact_value = raw_value.replace(" ", "")
-    if re.fullmatch(r"\d{4}[-/]\d{4}", compact_value):
-        return compact_value.replace("/", "-")
-
-    return raw_value
-
-
 def resolve_academic_year(academic_year_value):
-    academic_year_name = _canonicalize_academic_year_name(academic_year_value)
-    if not academic_year_name:
-        return _build_result(
-            "manual_required_missing_year",
-            reason="missing_academic_year",
-            academic_year_name="",
-        )
-
-    exact_match = AcademicYear.objects.filter(name=academic_year_name).first()
-    if exact_match:
-        return _build_result(
-            "resolved",
-            academic_year=exact_match,
-            academic_year_name=exact_match.name,
-        )
-
-    for candidate in AcademicYear.objects.all():
-        if _canonicalize_academic_year_name(candidate.name) == academic_year_name:
-            return _build_result(
-                "resolved",
-                academic_year=candidate,
-                academic_year_name=candidate.name,
-                warnings=["normalized_academic_year_lookup"],
-            )
-
+    result = resolve_academic_year_reference(academic_year_value)
     return _build_result(
-        "manual_required_missing_year",
-        reason="academic_year_not_found",
-        academic_year_name=academic_year_name,
+        result["status"],
+        reason=result["reason"],
+        academic_year=result["academic_year"],
+        academic_year_name=result["academic_year_name"],
+        warnings=result["warnings"],
     )
 
 

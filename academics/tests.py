@@ -221,6 +221,27 @@ class AcademicContextResolverTests(TestCase):
         self.assertEqual(result["status"], "manual_required_ambiguous_level")
         self.assertEqual(result["reason"], "multiple_academic_classes")
 
+    def test_resolve_academic_context_does_not_fallback_to_active_year_when_label_is_unknown(self):
+        candidature = Candidature.objects.create(
+            programme=self.licence_programme,
+            branch=self.branch,
+            academic_year="2034-2035",
+            entry_year=1,
+            first_name="Sans",
+            last_name="Fallback",
+            birth_date=date(2001, 4, 2),
+            birth_place="Gao",
+            gender="male",
+            phone="70030005",
+            email="sans.fallback@example.com",
+            status="accepted",
+        )
+
+        result = resolve_academic_context(candidature=candidature)
+
+        self.assertEqual(result["status"], "manual_required_missing_year")
+        self.assertEqual(result["reason"], "academic_year_not_found")
+
 
 class AcademicScheduleServiceTests(TestCase):
     def setUp(self):

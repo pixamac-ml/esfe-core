@@ -161,11 +161,10 @@
                                 
                                 {% if candidature.status == 'accepted' or candidature.status == 'accepted_with_reserve' %}
                                 {% if not candidature.inscription %}
-                                <button hx-post="{% url 'accounts:htmx_inscription_create' candidature.pk %}"
-                                        hx-target="#candidature-{{ candidature.pk }}"
-                                        hx-swap="afterend"
-                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                                        hx-confirm="Créer l'inscription pour ce candidat ?"
+                                <button hx-get="{% url 'accounts:htmx_inscription_positioning' candidature.pk %}"
+                                        hx-target="#modal-container"
+                                        hx-swap="innerHTML"
+                                        onclick="openDashboardModal()"
                                         class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors">
                                     Créer inscription
                                 </button>
@@ -208,4 +207,32 @@
         {% endif %}
     </div>
 </div>
+<div id="modal-container"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openDashboardModal() {
+    document.body.classList.add("overflow-hidden");
+}
+
+function closeDashboardModal() {
+    const container = document.getElementById("modal-container");
+    if (container) {
+        container.innerHTML = "";
+    }
+    document.body.classList.remove("overflow-hidden");
+}
+
+document.body.addEventListener("htmx:afterSwap", function (event) {
+    if (event.target && event.target.id === "modal-container" && event.target.innerHTML.trim()) {
+        openDashboardModal();
+    }
+});
+
+document.body.addEventListener("inscriptionCreated", function () {
+    closeDashboardModal();
+    window.location.reload();
+});
+</script>
 {% endblock %}

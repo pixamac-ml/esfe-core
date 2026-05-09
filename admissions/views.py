@@ -10,6 +10,7 @@ from django.templatetags.static import static
 
 from branches.models import Branch
 from formations.models import Programme
+from academics.services.academic_years import get_current_academic_year_name
 from .forms import CandidatureForm
 from .models import CandidatureDocument, Candidature
 
@@ -156,12 +157,36 @@ def admission_tunnel(request):
                     initial_step3_phase = "program"
                 initial_step = 3
             else:
-                academic_year_start = timezone.now().year
+                academic_year_name = get_current_academic_year_name()
+                if not academic_year_name:
+                    backend_error = "Aucune annee academique active n'est configuree."
+                    backend_error_step = 3
+                    backend_error_field = "formation_slug"
+                    initial_step = 3
+                    initial_step3_phase = "program"
+                    formation_cards = []
+                    return render(
+                        request,
+                        "admissions/tunnel.html",
+                        {
+                            "formation_cards": formation_cards,
+                            "selected_cycle": cycle_filter,
+                            "branches": branches,
+                            "initial_form_json": json.dumps(form_data),
+                            "initial_step": initial_step,
+                            "initial_step3_phase": initial_step3_phase,
+                            "backend_error": backend_error,
+                            "backend_errors_json": json.dumps(backend_errors),
+                            "backend_error_step": backend_error_step,
+                            "backend_error_field": backend_error_field,
+                        },
+                    )
+
                 entry_year = 4 if form_data["current_level"].lower() == "master" else 1
                 email_in_use = Candidature.objects.filter(
                     email__iexact=form_data["email"],
                     programme=programme,
-                    academic_year=f"{academic_year_start}-{academic_year_start + 1}",
+                    academic_year=academic_year_name,
                 ).exists()
                 if email_in_use:
                     backend_errors["email"] = "Cette adresse email est deja utilisee pour cette formation cette annee."
@@ -202,7 +227,7 @@ def admission_tunnel(request):
                         candidature = Candidature.objects.create(
                             programme=programme,
                             branch=branch,
-                            academic_year=f"{academic_year_start}-{academic_year_start + 1}",
+                            academic_year=academic_year_name,
                             entry_year=entry_year,
                             first_name=form_data["first_name"],
                             last_name=form_data["last_name"],
@@ -343,8 +368,25 @@ def apply_to_programme(request, slug):
             candidature.programme = programme
 
             # année académique actuelle
-            current_year = timezone.now().year
-            candidature.academic_year = f"{current_year}-{current_year + 1}"
+            current_academic_year_name = get_current_academic_year_name()
+            if not current_academic_year_name:
+                form.add_error(None, "Aucune annee academique active n'est configuree.")
+                messages.error(
+                    request,
+                    "Impossible d'enregistrer la candidature sans annee academique active configuree."
+                )
+                context = {
+                    "programme": programme,
+                    "form": form,
+                    "required_documents": required_documents,
+                    "lab_image": static("images/lab_students.png"),
+                }
+                return render(
+                    request,
+                    "admissions/apply.html",
+                    context
+                )
+            candidature.academic_year = current_academic_year_name
 
             # ==============================
             # VERIFICATION EMAIL EXISTANT

@@ -10,6 +10,8 @@ from django.views.decorators.http import require_GET, require_POST
 
 from django.db.models import Q
 
+from academics.models import AcademicClass
+from academics.services.academic_positioning import get_positioning_context, get_positioning_fee_for_level
 from admissions.models import Candidature
 from accounts.forms import BranchCashMovementForm, BranchExpenseForm, PayrollEntryForm
 from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
@@ -63,6 +65,21 @@ def get_current_agent(user, branch):
         .select_related("user", "branch")
         .filter(user=user, branch=branch, is_active=True)
         .first()
+    )
+
+
+def _render_manager_academic_positioning_modal(request, candidature, *, form_error="", selected_level="", selected_class_id=""):
+    return render(
+        request,
+        "accounts/dashboard/partials/academic_positioning_modal.html",
+        {
+            "candidature": candidature,
+            "positioning": get_positioning_context(candidature=candidature),
+            "form_error": form_error,
+            "selected_level": (selected_level or "").strip().upper(),
+            "selected_class_id": str(selected_class_id or "").strip(),
+            "submit_url_name": "accounts:htmx_inscription_create",
+        },
     )
 
 
@@ -225,6 +242,22 @@ def inscription_detail(request, pk):
 
 
 @manager_required
+@require_GET
+def inscription_positioning_modal(request, pk):
+    candidature = get_object_or_404(
+        Candidature,
+        pk=pk,
+        branch=request.branch,
+        status__in=["accepted", "accepted_with_reserve"],
+    )
+
+    if hasattr(candidature, "inscription"):
+        return HttpResponse("Inscription deja creee", status=400)
+
+    return _render_manager_academic_positioning_modal(request, candidature)
+
+
+@manager_required
 @require_POST
 def inscription_create(request, pk):
     candidature = get_object_or_404(
@@ -240,20 +273,58 @@ def inscription_create(request, pk):
             status=400,
         )
 
-    amount = candidature.programme.get_inscription_amount_for_year(candidature.entry_year) or 500000
-    inscription = Inscription.objects.create(
-        candidature=candidature,
-        amount_due=amount,
-        status=Inscription.STATUS_AWAITING_PAYMENT,
+    selected_level = request.POST.get("academic_level", "").strip().upper()
+    academic_class_id = request.POST.get("academic_class", "").strip()
+    academic_class = (
+        AcademicClass.objects.select_related("programme", "branch", "academic_year")
+        .filter(pk=academic_class_id)
+        .first()
     )
-    return render(
-        request,
-        "accounts/dashboard/partials/inscription_created.html",
-        {
-            "inscription": inscription,
-            "candidature": candidature,
-        },
+
+    if not academic_class:
+        return _render_manager_academic_positioning_modal(
+            request,
+            candidature,
+            form_error="Selectionnez une classe existante avant de creer l'inscription.",
+            selected_level=selected_level,
+            selected_class_id=academic_class_id,
+        )
+
+    amount = get_positioning_fee_for_level(candidature.programme, academic_class.level) or 0
+    if amount <= 0:
+        return _render_manager_academic_positioning_modal(
+            request,
+            candidature,
+            form_error="Aucun frais n'est configure pour ce niveau dans ce programme.",
+            selected_level=selected_level or academic_class.level,
+            selected_class_id=academic_class_id,
+        )
+
+    try:
+        from inscriptions.services import create_inscription_from_candidature
+
+        inscription = create_inscription_from_candidature(
+            candidature=candidature,
+            amount_due=amount,
+            academic_class=academic_class,
+            status=Inscription.STATUS_AWAITING_PAYMENT,
+        )
+    except Exception as e:
+        return _render_manager_academic_positioning_modal(
+            request,
+            candidature,
+            form_error=str(e),
+            selected_level=selected_level or getattr(academic_class, "level", ""),
+            selected_class_id=academic_class_id,
+        )
+
+    response = HttpResponse("")
+    response["HX-Trigger"] = (
+        '{"inscriptionCreated": {"candidature_id": %s, "inscription_id": %s}, '
+        '"showToast": {"message": "Inscription creee avec succes.", "type": "success"}}'
+        % (candidature.id, inscription.id)
     )
+    return response
 
 
 @manager_required

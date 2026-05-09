@@ -31,6 +31,7 @@ from .dashboards.htmx_admissions import (
     validate_document_htmx,
     set_candidature_under_review_htmx,
     set_candidature_to_complete_htmx,
+    inscription_positioning_modal_htmx,
     create_inscription_htmx,
     get_candidature_detail_htmx,
     get_inscription_detail_htmx,
@@ -198,6 +199,11 @@ urlpatterns = [
         name="set_candidature_to_complete_htmx"
     ),
     path(
+        "htmx/candidature/<int:candidature_id>/inscription-positioning/",
+        inscription_positioning_modal_htmx,
+        name="inscription_positioning_modal_htmx"
+    ),
+    path(
         "htmx/candidature/<int:candidature_id>/create-inscription/",
         create_inscription_htmx,
         name="create_inscription_htmx"
@@ -363,6 +369,7 @@ urlpatterns = [
     # HTMX ACTIONS - INSCRIPTIONS
     # =============================================
     path("htmx/manager/inscription/<int:pk>/detail/", inscription_detail, name="htmx_inscription_detail"),
+    path("htmx/manager/inscription/<int:pk>/positioning/", inscription_positioning_modal, name="htmx_inscription_positioning"),
     path("htmx/manager/inscription/<int:pk>/create/", inscription_create, name="htmx_inscription_create"),
 
     # =============================================

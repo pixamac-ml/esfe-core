@@ -1,0 +1,149 @@
+<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
+    <div class="relative w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div class="border-b border-slate-100 px-6 py-4">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-sky-600">Positionnement academique</p>
+                    <h2 class="mt-1 text-xl font-bold text-slate-900">Creer l'inscription de {{ candidature.full_name }}</h2>
+                    <p class="mt-1 text-sm text-slate-500">Le workflow continue seulement apres choix du niveau et de la classe.</p>
+                </div>
+                <button type="button" onclick="closeDashboardModal()" class="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="max-h-[78vh] overflow-y-auto px-6 py-5">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Candidat</p>
+                    <p class="mt-3 text-sm font-semibold text-slate-900">{{ candidature.full_name }}</p>
+                    <p class="mt-1 text-sm text-slate-600">{{ candidature.email }}</p>
+                    <p class="mt-1 text-sm text-slate-600">{{ candidature.phone }}</p>
+                </div>
+                <div class="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Contexte</p>
+                    <p class="mt-3 text-sm font-semibold text-slate-900">{{ candidature.programme.title }}</p>
+                    <p class="mt-1 text-sm text-slate-600">{{ candidature.branch.name }}</p>
+                    <p class="mt-1 text-sm text-slate-600">{{ positioning.academic_year_name|default:candidature.academic_year }}</p>
+                </div>
+            </div>
+
+            {% if form_error %}
+            <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {{ form_error }}
+            </div>
+            {% endif %}
+
+            {% if positioning.error_message %}
+            <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {{ positioning.error_message }}
+            </div>
+            {% else %}
+            <form
+                method="post"
+                hx-post="{% url submit_url_name candidature.id %}"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                class="mt-5 space-y-5"
+            >
+                {% csrf_token %}
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                        <label for="academic-level-{{ candidature.id }}" class="mb-2 block text-sm font-medium text-slate-700">Niveau academique</label>
+                        <select
+                            id="academic-level-{{ candidature.id }}"
+                            name="academic_level"
+                            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm"
+                        >
+                            <option value="">Choisir un niveau</option>
+                            {% for level in positioning.available_levels %}
+                            <option value="{{ level }}" {% if selected_level == level %}selected{% endif %}>{{ level }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="academic-class-{{ candidature.id }}" class="mb-2 block text-sm font-medium text-slate-700">Classe existante</label>
+                        <select
+                            id="academic-class-{{ candidature.id }}"
+                            name="academic_class"
+                            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm"
+                            required
+                        >
+                            <option value="">Choisir une classe</option>
+                            {% for academic_class in positioning.available_classes %}
+                            <option
+                                value="{{ academic_class.id }}"
+                                data-level="{{ academic_class.level|upper }}"
+                                data-fee="{{ academic_class.positioning_fee|default:'' }}"
+                                {% if selected_class_id == academic_class.id|stringformat:"s" %}selected{% endif %}
+                            >
+                                {{ academic_class.display_name|default:academic_class.level }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Impact workflow</p>
+                    <p class="mt-2 text-sm text-slate-700">La classe choisie sera injectee dans l'inscription, puis reutilisee pour la creation etudiante et l'enrollment academique.</p>
+                    <p id="academic-fee-{{ candidature.id }}" class="mt-2 text-sm font-semibold text-emerald-800"></p>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="closeDashboardModal()" class="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50">Annuler</button>
+                    <button type="submit" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">Valider et creer l'inscription</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const candidatureId = "{{ candidature.id }}";
+    const levelSelect = document.getElementById(`academic-level-${candidatureId}`);
+    const classSelect = document.getElementById(`academic-class-${candidatureId}`);
+    const feeNode = document.getElementById(`academic-fee-${candidatureId}`);
+    if (!levelSelect || !classSelect) return;
+
+    const baseOptions = Array.from(classSelect.querySelectorAll("option")).map((option) => option.cloneNode(true));
+    const initialClassId = "{{ selected_class_id|escapejs }}";
+
+    const syncOptions = () => {
+        const level = (levelSelect.value || "").toUpperCase();
+        const previousValue = classSelect.value || initialClassId;
+        classSelect.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Choisir une classe";
+        classSelect.appendChild(placeholder);
+
+        baseOptions.forEach((option) => {
+            if (!option.value) return;
+            const optionLevel = (option.dataset.level || "").toUpperCase();
+            if (level && optionLevel !== level) return;
+            classSelect.appendChild(option.cloneNode(true));
+        });
+
+        if (previousValue) {
+            classSelect.value = previousValue;
+        }
+        if (classSelect.value && classSelect.selectedOptions.length) {
+            const fee = classSelect.selectedOptions[0].dataset.fee || "";
+            feeNode.textContent = fee ? `Frais calcules pour ce niveau: ${fee} FCFA` : "";
+            return;
+        }
+        feeNode.textContent = "";
+    };
+
+    levelSelect.addEventListener("change", syncOptions);
+    classSelect.addEventListener("change", syncOptions);
+    syncOptions();
+})();
+</script>

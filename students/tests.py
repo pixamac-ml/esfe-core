@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.urls import reverse
 
 from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, Semester, UE
+from academics.services.academic_years import get_current_academic_year_name
 from admissions.models import Candidature
 from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
@@ -297,6 +298,9 @@ class StudentCreationWorkflowTests(TestCase):
         self.assertEqual(enrollment.academic_year, self.academic_year)
         send_credentials.assert_called_once()
         send_confirmation.assert_not_called()
+
+    def test_active_academic_year_name_service_returns_the_unique_active_year(self):
+        self.assertEqual(get_current_academic_year_name(), "2025-2026")
 
     def test_backfill_creates_missing_student_and_assigns_role(self):
         self._create_validated_payment(25000)

@@ -722,9 +722,9 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    <button hx-post="{% url 'accounts:create_inscription_htmx' cand.id %}"
-                            hx-target="#accepted-card-{{ cand.id }}" hx-swap="outerHTML"
-                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    <button hx-get="{% url 'accounts:inscription_positioning_modal_htmx' cand.id %}"
+                            hx-target="#modal-container" hx-swap="innerHTML"
+                            onclick="openDashboardModal()"
                             class="flex-1 px-4 py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2"
                             style="background-color: rgba(29, 181, 176, 0.1); color: #1db5b0;">
                         <i class="fas fa-plus"></i>Créer inscription
@@ -779,9 +779,9 @@
                         </td>
                         <td class="py-4">
                             <div class="flex items-center gap-2">
-                                <button hx-post="{% url 'accounts:create_inscription_htmx' cand.id %}"
-                                        hx-target="#accepted-row-{{ cand.id }}" hx-swap="outerHTML"
-                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                <button hx-get="{% url 'accounts:inscription_positioning_modal_htmx' cand.id %}"
+                                        hx-target="#modal-container" hx-swap="innerHTML"
+                                        onclick="openDashboardModal()"
                                         class="px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
                                         style="background-color: rgba(29, 181, 176, 0.1); color: #1db5b0;">
                                     <i class="fas fa-plus"></i>Créer inscription
@@ -868,6 +868,8 @@
     </div>
 </div>
 
+<div id="modal-container"></div>
+
 <!-- ================= SCRIPTS ================= -->
 <script>
 // ========== MODAL FUNCTIONS ==========
@@ -914,6 +916,18 @@ function closeModal(modalId) {
     document.body.style.overflow = '';
 }
 
+function openDashboardModal() {
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDashboardModal() {
+    const container = document.getElementById('modal-container');
+    if (container) {
+        container.innerHTML = '';
+    }
+    document.body.style.overflow = '';
+}
+
 // Close modals with Escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
@@ -931,6 +945,17 @@ document.addEventListener('keydown', function(e) {
             if (e.target === this) closeModal(id);
         });
     }
+});
+
+document.body.addEventListener('htmx:afterSwap', function (event) {
+    if (event.target && event.target.id === 'modal-container' && event.target.innerHTML.trim()) {
+        openDashboardModal();
+    }
+});
+
+document.body.addEventListener('inscriptionCreated', function () {
+    closeDashboardModal();
+    window.location.reload();
 });
 
 // ========== BULK ACTIONS ==========

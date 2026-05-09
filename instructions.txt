@@ -1,43 +1,237 @@
-(.venv) PS C:\Users\WORK\PycharmProjects\esfe-core> python manage.py runserver
-Watching for file changes with StatReloader
-Performing system checks...
+Analyse entièrement le système de gestion des années académiques avant toute modification.
 
-System check identified no issues (0 silenced).
-May 08, 2026 - 17:05:44
-Django version 6.0.1, using settings 'config.settings'
-Starting ASGI/Daphne version 4.2.1 development server at http://127.0.0.1:8000/
-Quit the server with CTRL-BREAK.
+IMPORTANT :
 
-(process:17036): GLib-GIO-WARNING **: 17:05:45.768: Unexpectedly, UWP app `Microsoft.ScreenSketch_11.2601.12.0_x64__8wekyb3d8bbwe' (AUMId `Microsoft.ScreenSketch_8wekyb3d8bbwe!App') supports 29 extensions but has no verbs
+* Ne pas appliquer de correctif superficiel.
+* Ne pas patcher localement uniquement le modal.
+* Identifier la vraie source d’incohérence.
+* Stabiliser définitivement le système des années académiques dans tout le projet.
 
-(process:17036): GLib-GIO-WARNING **: 17:05:45.778: Unexpectedly, UWP app `Clipchamp.Clipchamp_4.5.10520.0_x64__yxz26nhyzhsrt' (AUMId `Clipchamp.Clipchamp_yxz26nhyzhsrt!App') supports 41 extensions but has no verbs
-Not Found: /shop/moribabougou/
-HTTP GET /shop/moribabougou/ 404 [0.60, 127.0.0.1:65329]
-WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:51288]
-WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:51288]
-WebSocket DISCONNECT /ws/communication/notifications/ [127.0.0.1:51288]
-WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:55491]
-WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:55491]
-WebSocket DISCONNECT /ws/communication/notifications/ [127.0.0.1:55491]
-HTTP GET /accounts/manager/?section=boutique 200 [0.67, 127.0.0.1:60856]
-HTTP GET /static/public/css/main.css 200 [0.37, 127.0.0.1:60856]
-HTTP GET /static/core/css/esfe_theme.css 200 [0.38, 127.0.0.1:56955]
-HTTP GET /static/admin/css/widgets.css 200 [0.38, 127.0.0.1:58555]
-HTTP GET /media/shop/products/WhatsApp_Image_2026-05-01_at_10.58.42.jpeg 200 [0.39, 127.0.0.1:64433]
-HTTP GET /media/shop/products/FATEC-LOGO.gif 200 [0.40, 127.0.0.1:50731]
-HTTP GET /static/core/js/cookie_consent.js 200 [0.00, 127.0.0.1:64433]
-HTTP GET /static/admin/js/core.js 200 [0.01, 127.0.0.1:50731]
-HTTP GET /static/admin/js/SelectBox.js 200 [0.00, 127.0.0.1:64433]
-HTTP GET /static/admin/js/SelectFilter2.js 200 [0.00, 127.0.0.1:50731]
-HTTP GET /static/django-browser-reload/reload-listener.js 200 [0.01, 127.0.0.1:50731]
-WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:60733]
-WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:60733]
-404 fallback | Path=/favicon.ico
-Not Found: /favicon.ico
-HTTP GET /favicon.ico 404 [0.35, 127.0.0.1:64433]
-404 fallback | Path=/shop//
-Not Found: /shop//
-HTTP GET /shop// 404 [0.13, 127.0.0.1:64433]
-WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:54005]
-WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:54005]
-HTTP GET /communication/notifications/partial/ 200 [0.09, 127.0.0.1:64433]
+PROBLÈME ACTUEL
+
+Le modal de positionnement académique fonctionne désormais correctement au niveau :
+
+* sélection classe,
+* sélection niveau,
+* workflow inscription.
+
+MAIS une incohérence persiste :
+
+```text
+"La classe académique ne correspond pas à l'année académique."
+```
+
+Cela signifie que plusieurs systèmes d’année académique coexistent encore dans le projet.
+
+Le problème semble venir d’un conflit entre :
+
+* l’année académique stockée dans academics,
+* l’année académique utilisée dans les formulaires,
+* l’année académique utilisée dans inscriptions/admissions,
+* l’année académique utilisée dans l’affectation académique.
+
+Le système semble parfois :
+
+* créer avec une année,
+* puis comparer avec une autre,
+* ou utiliser plusieurs sources différentes.
+
+OBJECTIF PRINCIPAL
+
+Créer UNE SEULE source de vérité pour l’année académique dans tout le projet.
+
+Aucune duplication.
+Aucune logique contradictoire.
+Aucune année académique implicite.
+
+──────────────────────────────
+PHASE 1 — AUDIT GLOBAL
+──────────────────────────────
+
+Analyser entièrement :
+
+* academics
+* admissions
+* inscriptions
+* students
+* portal
+* payments
+* superadmin
+
+Identifier précisément :
+
+* tous les modèles utilisant academic_year,
+* toutes les ForeignKey AcademicYear,
+* tous les CharField représentant une année académique,
+* tous les defaults automatiques,
+* tous les services injectant une année académique,
+* tous les formulaires manipulant une année académique,
+* tous les selectors filtrant une année académique,
+* tous les signaux utilisant academic_year,
+* tous les workflows de création étudiant/enrollment.
+
+IMPORTANT :
+Identifier les endroits où :
+
+* une année académique string est utilisée,
+* une année académique FK est utilisée,
+* une année académique implicite est utilisée.
+
+Produire une cartographie complète avant modification.
+
+──────────────────────────────
+PHASE 2 — IDENTIFIER LE VRAI CONFLIT
+──────────────────────────────
+
+Identifier pourquoi :
+
+```text
+"La classe académique ne correspond pas à l'année académique."
+```
+
+apparaît encore.
+
+Vérifier notamment :
+
+* création inscription,
+* modal positionnement académique,
+* récupération AcademicClass,
+* AcademicEnrollment,
+* resolver académique,
+* classes créées,
+* année académique active,
+* année académique courante,
+* données legacy.
+
+Vérifier aussi :
+
+* mismatch entre IDs,
+* mismatch entre strings,
+* mismatch entre objets,
+* mismatch entre années actives.
+
+──────────────────────────────
+PHASE 3 — CENTRALISATION
+──────────────────────────────
+
+Créer un système centralisé et stable.
+
+Le projet doit avoir :
+
+* une seule logique d’année académique,
+* une seule source de récupération,
+* une seule méthode de résolution.
+
+Créer si nécessaire :
+
+```python
+get_current_academic_year()
+```
+
+ou :
+
+```python
+AcademicYearResolver
+```
+
+Tous les services doivent passer par cette couche.
+
+INTERDICTION :
+
+* hardcode,
+* fallback implicite dangereux,
+* string magique,
+* duplication.
+
+──────────────────────────────
+PHASE 4 — NORMALISATION
+──────────────────────────────
+
+Uniformiser tout le projet.
+
+IMPORTANT :
+Éviter absolument :
+
+* academic_year string dans certains modules,
+* AcademicYear FK ailleurs,
+* comparaisons hybrides.
+
+Le projet doit utiliser une logique cohérente partout.
+
+Vérifier :
+
+* migrations,
+* contraintes,
+* validators,
+* clean(),
+* services,
+* selectors,
+* signaux.
+
+──────────────────────────────
+PHASE 5 — POSITIONNEMENT ACADÉMIQUE
+──────────────────────────────
+
+Le nouveau workflow de positionnement académique doit devenir stable.
+
+Quand la gestionnaire choisit :
+
+* niveau,
+* classe,
+
+le système doit :
+
+* vérifier correctement l’année académique,
+* comparer correctement les objets,
+* injecter correctement l’année académique dans l’inscription,
+* réutiliser cette même année partout.
+
+Aucune incohérence.
+
+──────────────────────────────
+PHASE 6 — COMPATIBILITÉ EXISTANT
+──────────────────────────────
+
+IMPORTANT :
+Ne pas casser :
+
+* tunnel admissions,
+* inscriptions existantes,
+* paiements,
+* création étudiant,
+* dashboards,
+* enrollment,
+* notes,
+* emplois du temps,
+* bulletins,
+* workflows existants.
+
+Le correctif doit être :
+
+* centralisé,
+* stable,
+* rétrocompatible.
+
+──────────────────────────────
+PHASE 7 — ROBUSTESSE
+──────────────────────────────
+
+Ajouter :
+
+* logs propres,
+* validations explicites,
+* erreurs compréhensibles,
+* protections contre mismatch.
+
+Le système doit devenir institutionnel et fiable.
+
+OBJECTIF FINAL
+
+Après implémentation :
+
+* une seule année académique réelle,
+* aucune incohérence,
+* aucune erreur de comparaison,
+* aucune confusion entre classes et années,
+* workflow inscription totalement stable,
+* affectation académique fiable.

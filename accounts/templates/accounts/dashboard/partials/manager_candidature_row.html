@@ -54,11 +54,10 @@
 
             {% if candidature.status == 'accepted' or candidature.status == 'accepted_with_reserve' %}
             {% if not candidature.inscription %}
-            <button hx-post="{% url 'accounts:htmx_inscription_create' candidature.pk %}"
-                    hx-target="#manager-candidature-row-{{ candidature.pk }}"
-                    hx-swap="afterend"
-                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                    hx-confirm="Creer l'inscription pour ce candidat ?"
+            <button hx-get="{% url 'accounts:htmx_inscription_positioning' candidature.pk %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    onclick="openDashboardModal()"
                     class="px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary-light transition">
                 Creer inscription
             </button>

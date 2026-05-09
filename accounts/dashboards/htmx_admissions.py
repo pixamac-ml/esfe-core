@@ -18,6 +18,8 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Q, Count
 
+from academics.models import AcademicClass
+from academics.services.academic_positioning import get_positioning_context, get_positioning_fee_for_level
 from admissions.models import Candidature, CandidatureDocument
 from inscriptions.models import Inscription
 from inscriptions.services import create_inscription_from_candidature
@@ -60,6 +62,23 @@ def htmx_admissions_required(view_func):
         return view_func(request, *args, **kwargs)
 
     return wrapper
+
+
+def _render_academic_positioning_modal(request, candidature, *, form_error="", selected_level="", selected_class_id=""):
+    positioning = get_positioning_context(candidature=candidature)
+    html = render_to_string(
+        "accounts/dashboard/partials/academic_positioning_modal.html",
+        {
+            "candidature": candidature,
+            "positioning": positioning,
+            "form_error": form_error,
+            "selected_level": (selected_level or "").strip().upper(),
+            "selected_class_id": str(selected_class_id or "").strip(),
+            "submit_url_name": "accounts:create_inscription_htmx",
+        },
+        request=request,
+    )
+    return HttpResponse(html)
 
 
 # ==========================================================
@@ -343,6 +362,20 @@ def validate_document_htmx(request, document_id):
 # CRÉATION INSCRIPTION
 # ==========================================================
 
+@require_GET
+@htmx_admissions_required
+def inscription_positioning_modal_htmx(request, candidature_id):
+    candidature = get_object_or_404(
+        get_base_queryset(request.user, "candidature"),
+        id=candidature_id,
+        status__in=["accepted", "accepted_with_reserve"],
+    )
+
+    if hasattr(candidature, "inscription"):
+        return HttpResponse("Inscription deja creee", status=400)
+
+    return _render_academic_positioning_modal(request, candidature)
+
 
 @require_POST
 @htmx_admissions_required
@@ -402,6 +435,77 @@ def create_inscription_htmx(request, candidature_id):
 # ==========================================================
 # DÉTAIL CANDIDATURE
 # ==========================================================
+
+@require_POST
+@htmx_admissions_required
+def create_positioned_inscription_htmx(request, candidature_id):
+    candidature = get_object_or_404(
+        get_base_queryset(request.user, "candidature"),
+        id=candidature_id,
+        status__in=["accepted", "accepted_with_reserve"],
+    )
+
+    if hasattr(candidature, "inscription"):
+        return HttpResponse("Inscription deja creee", status=400)
+
+    selected_level = request.POST.get("academic_level", "").strip().upper()
+    academic_class_id = request.POST.get("academic_class", "").strip()
+    academic_class = (
+        AcademicClass.objects.select_related("programme", "branch", "academic_year")
+        .filter(pk=academic_class_id)
+        .first()
+    )
+
+    if not academic_class:
+        return _render_academic_positioning_modal(
+            request,
+            candidature,
+            form_error="Selectionnez une classe existante avant de creer l'inscription.",
+            selected_level=selected_level,
+            selected_class_id=academic_class_id,
+        )
+
+    amount_due = get_positioning_fee_for_level(candidature.programme, academic_class.level)
+    if amount_due <= 0:
+        return _render_academic_positioning_modal(
+            request,
+            candidature,
+            form_error="Aucun frais n'est configure pour ce niveau dans ce programme.",
+            selected_level=selected_level or academic_class.level,
+            selected_class_id=academic_class_id,
+        )
+
+    try:
+        inscription = create_inscription_from_candidature(
+            candidature=candidature,
+            amount_due=amount_due,
+            academic_class=academic_class,
+        )
+    except Exception as e:
+        return _render_academic_positioning_modal(
+            request,
+            candidature,
+            form_error=str(e),
+            selected_level=selected_level or getattr(academic_class, "level", ""),
+            selected_class_id=academic_class_id,
+        )
+
+    response = HttpResponse("")
+    response["HX-Trigger"] = json.dumps({
+        "inscriptionCreated": {
+            "candidature_id": candidature.id,
+            "inscription_id": inscription.id,
+        },
+        "showToast": {
+            "message": "Inscription creee avec succes.",
+            "type": "success",
+        }
+    })
+    return response
+
+
+create_inscription_htmx = create_positioned_inscription_htmx
+
 
 @require_GET
 @htmx_admissions_required

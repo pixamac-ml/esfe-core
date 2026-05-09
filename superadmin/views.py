@@ -42,6 +42,13 @@ from payments.models import Payment, PaymentAgent, CashPaymentSession
 from students.models import Student
 from branches.models import Branch
 from accounts.models import Profile
+from academics.models import AcademicClass
+from academics.services.academic_years import (
+    canonicalize_academic_year_name,
+    get_current_academic_year_name,
+    resolve_academic_year_reference,
+)
+from academics.services.academic_positioning import get_positioning_context, get_positioning_fee_for_level
 from community.models import Category as CommunityCategory, Topic, Answer
 from .models import SuperadminCockpitPreference
 from students.services.email import send_payment_confirmation_email
@@ -1060,11 +1067,16 @@ def candidature_create(request):
         phone = request.POST.get('phone', '').strip()
         programme_id = request.POST.get('programme')
         branch_id = request.POST.get('branch')
-        academic_year = request.POST.get('academic_year', '').strip()
+        academic_year = canonicalize_academic_year_name(request.POST.get('academic_year', '').strip())
 
         required_fields = [first_name, last_name, email, phone, programme_id, branch_id, academic_year]
         if not all(required_fields):
             messages.error(request, 'Veuillez remplir tous les champs obligatoires.')
+            return redirect('superadmin:candidature_create')
+
+        year_resolution = resolve_academic_year_reference(academic_year)
+        if year_resolution["status"] != "resolved":
+            messages.error(request, "L'annee academique saisie n'existe pas dans le referentiel academic.")
             return redirect('superadmin:candidature_create')
 
         candidature = Candidature.objects.create(
@@ -1074,7 +1086,7 @@ def candidature_create(request):
             phone=phone,
             programme_id=programme_id,
             branch_id=branch_id,
-            academic_year=academic_year,
+            academic_year=year_resolution["academic_year_name"],
             birth_date=request.POST.get('birth_date'),
             birth_place=request.POST.get('birth_place', ''),
             gender=request.POST.get('gender', 'male'),
@@ -1094,6 +1106,7 @@ def candidature_create(request):
         'programmes': Programme.objects.only('id', 'title').order_by('title'),
         'branches': Branch.objects.only('id', 'name').order_by('name'),
         'status_choices': Candidature.STATUS_CHOICES,
+        'default_academic_year': get_current_academic_year_name(),
     }
     return render(request, 'superadmin/candidatures/form.html', context)
 
@@ -1159,11 +1172,18 @@ def candidature_status(request, pk):
 def candidature_edit(request, pk):
     candidature = get_object_or_404(Candidature.objects.select_related('programme', 'branch'), pk=pk)
     if request.method == 'POST':
+        academic_year = canonicalize_academic_year_name(
+            request.POST.get('academic_year', candidature.academic_year)
+        )
+        year_resolution = resolve_academic_year_reference(academic_year)
+        if year_resolution["status"] != "resolved":
+            messages.error(request, "L'annee academique saisie n'existe pas dans le referentiel academic.")
+            return redirect('superadmin:candidature_edit', pk=candidature.pk)
         candidature.first_name = request.POST.get('first_name', candidature.first_name)
         candidature.last_name = request.POST.get('last_name', candidature.last_name)
         candidature.email = request.POST.get('email', candidature.email)
         candidature.phone = request.POST.get('phone', candidature.phone)
-        candidature.academic_year = request.POST.get('academic_year', candidature.academic_year)
+        candidature.academic_year = year_resolution["academic_year_name"]
         candidature.branch_id = request.POST.get('branch') or candidature.branch_id
         candidature.programme_id = request.POST.get('programme') or candidature.programme_id
         candidature.status = request.POST.get('status', candidature.status)
@@ -1382,6 +1402,7 @@ def inscription_create(request):
         candidature_id = request.POST.get('candidature')
         amount_due = request.POST.get('amount_due')
         status = request.POST.get('status', Inscription.STATUS_CREATED)
+        academic_class_id = request.POST.get('academic_class')
 
         if not candidature_id:
             messages.error(request, "Candidature requise.")
@@ -1389,26 +1410,33 @@ def inscription_create(request):
 
         candidature = get_object_or_404(Candidature, pk=candidature_id)
 
-        # Vérifier si inscription existe déjà
         if hasattr(candidature, "inscription"):
-            messages.error(request, "Une inscription existe déjà pour cette candidature.")
+            messages.error(request, "Une inscription existe deja pour cette candidature.")
             return redirect('superadmin:candidature_detail', pk=candidature_id)
 
-        # Vérifier que la candidature est acceptée
+        # Verifier que la candidature est acceptee
         if candidature.status not in ["accepted", "accepted_with_reserve"]:
-            messages.error(request, "La candidature doit être acceptée pour créer une inscription.")
+            messages.error(request, "La candidature doit etre acceptee pour creer une inscription.")
             return redirect('superadmin:candidature_detail', pk=candidature_id)
 
-        # Utiliser le montant fourni ou calculer
-        if not amount_due:
-            amount_due = candidature.programme.get_inscription_amount_for_year(candidature.entry_year)
-            if amount_due == 0:
-                amount_due = 500000  # Montant par défaut
+        academic_class = get_object_or_404(
+            AcademicClass.objects.select_related("programme", "branch", "academic_year"),
+            pk=academic_class_id,
+        ) if academic_class_id else None
 
-        inscription = Inscription.objects.create(
+        if not amount_due:
+            amount_due = get_positioning_fee_for_level(candidature.programme, getattr(academic_class, "level", "")) or 0
+            if amount_due == 0:
+                messages.error(request, "Aucun frais n'est configure pour la classe selectionnee.")
+                return redirect(f"{reverse('superadmin:inscription_create')}?candidature={candidature_id}")
+
+        from inscriptions.services import create_inscription_from_candidature
+
+        inscription = create_inscription_from_candidature(
             candidature=candidature,
             amount_due=int(amount_due),
-            status=status
+            academic_class=academic_class,
+            status=status,
         )
 
         messages.success(request, f"Inscription créée avec succès ! Référence : {inscription.public_token}")
@@ -1418,16 +1446,17 @@ def inscription_create(request):
     candidature_id = request.GET.get('candidature')
     if candidature_id:
         candidature = get_object_or_404(Candidature, pk=candidature_id)
-        # Calculer le montant suggéré
-        amount_due = candidature.programme.get_inscription_amount_for_year(candidature.entry_year)
-        if amount_due == 0:
-            amount_due = 500000
+        positioning = get_positioning_context(candidature=candidature)
+        amount_due = 0
+        if positioning["available_levels"]:
+            amount_due = positioning["fee_by_level"].get(positioning["available_levels"][0], 0)
 
         context = {
-            'page_title': 'Créer une inscription',
+            'page_title': 'Creer une inscription',
             'active_menu': 'inscriptions',
             'candidature': candidature,
             'amount_due': amount_due,
+            'positioning': positioning,
             'status_choices': Inscription.STATUS_CHOICES,
         }
         return render(request, 'superadmin/inscriptions/create.html', context)

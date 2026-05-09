@@ -319,6 +319,12 @@ class ManagerDashboardRegressionTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Regularisation caisse")
 
+	def test_manager_report_section_renders_annual_revenue_panel(self):
+		response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "rapport"})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Argent genere par an")
+
 	def test_salary_ready_notifies_employee_dashboard(self):
 		employee = USER_MANAGER.create_user(
 			username="employee_payroll_ready",

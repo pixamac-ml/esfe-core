@@ -319,6 +319,29 @@ def _manager_context(request, active_section="overview"):
             status=Payment.STATUS_VALIDATED
         ).aggregate(total=Sum("amount"))["total"] or 0,
     }
+    annual_revenue_rows = list(
+        base_payments
+        .filter(status=Payment.STATUS_VALIDATED)
+        .values("paid_at__year")
+        .annotate(total_amount=Sum("amount"), payments_count=Count("id"))
+        .order_by("-paid_at__year")
+    )
+    annual_revenue_rows = [row for row in annual_revenue_rows if row.get("paid_at__year") is not None]
+    current_year = today.year
+    current_year_revenue = next(
+        ((row["total_amount"] or 0) for row in annual_revenue_rows if row["paid_at__year"] == current_year),
+        0,
+    )
+    previous_year_revenue = next(
+        ((row["total_amount"] or 0) for row in annual_revenue_rows if row["paid_at__year"] == current_year - 1),
+        0,
+    )
+    annual_revenue_growth = 0
+    if previous_year_revenue > 0:
+        annual_revenue_growth = round(
+            ((current_year_revenue - previous_year_revenue) / previous_year_revenue) * 100,
+            1,
+        )
 
     expense_status = request.GET.get("expense_status", "").strip()
     expense_category = request.GET.get("expense_category", "").strip()
@@ -605,6 +628,13 @@ def _manager_context(request, active_section="overview"):
         "ins_search": ins_search,
         "payments": payments_page,
         "payment_stats": payment_stats,
+        "annual_revenue_rows": annual_revenue_rows,
+        "annual_revenue_total": sum((row.get("total_amount") or 0) for row in annual_revenue_rows),
+        "annual_revenue_current_year": current_year_revenue,
+        "annual_revenue_previous_year": previous_year_revenue,
+        "annual_revenue_growth": annual_revenue_growth,
+        "annual_revenue_current_year_label": current_year,
+        "annual_revenue_previous_year_label": current_year - 1,
         "pay_status": pay_status,
         "pay_date": pay_date,
         "pay_search": pay_search,
@@ -647,7 +677,7 @@ def _render_manager_dashboard(request, active_section):
 @manager_required
 def manager_dashboard(request):
     section = request.GET.get("section", "overview").strip() or "overview"
-    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse", "boutique"}
+    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse", "rapport", "boutique"}
     if section not in allowed_sections:
         section = "overview"
     return _render_manager_dashboard(request, section)

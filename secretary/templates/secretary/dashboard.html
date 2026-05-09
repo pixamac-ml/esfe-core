@@ -1,411 +1,724 @@
 {% extends "secretary/base.html" %}
-
-{% block title %}Dashboard Secretariat{% endblock %}
+{% block title %}Dashboard Secrétariat{% endblock %}
 
 {% block content %}
-<div x-data="secretaryDashboard()" x-init="init()" class="space-y-6">
-  <section class="glass-card secretary-section secretary-section-blue rounded-3xl p-6 shadow-card">
+<div x-data="secretaryDashboard()" x-init="init()" class="space-y-5">
+
+  {# ══════════════════════════════════════════════════════════
+     §1 — HEADER : identité + horloge live + 5 KPI + 3 actions
+  ══════════════════════════════════════════════════════════ #}
+  <section class="glass-card rounded-3xl px-6 py-4 shadow-card border-t-4 border-t-blue-600">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div class="max-w-3xl">
+
+      {# Identité + horloge #}
+      <div class="min-w-0">
         <p class="secretary-kicker">Accueil opérationnel</p>
-        <h3 class="mt-1 text-2xl font-extrabold tracking-tight">Secrétariat</h3>
-        <p class="mt-2 text-sm font-medium text-slate-500 dark:text-slate-400">
-          Une vue courte pour traiter les flux du jour, garder la trace et ouvrir les formulaires sans quitter le poste.
-        </p>
+        <h2 class="mt-0.5 text-xl font-extrabold tracking-tight">Secrétariat</h2>
+        <p class="mt-0.5 text-xs font-medium text-slate-400" x-text="currentDateTime"></p>
       </div>
-      <div class="flex flex-wrap gap-3">
-        <button type="button" class="secretary-btn secretary-btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-          Nouvelle visite
+
+      {# 5 KPI — une seule rangée compacte #}
+      <div class="flex flex-wrap gap-2 lg:gap-3">
+        <template x-for="kpi in kpis" :key="kpi.label">
+          <div class="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700
+                      bg-white dark:bg-slate-900 px-3 py-2 shadow-sm min-w-[108px] cursor-default">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" :class="kpi.bg">
+              <i :data-lucide="kpi.icon" class="h-4 w-4" :class="kpi.color"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate" x-text="kpi.label"></p>
+              <p class="text-lg font-extrabold leading-none" x-text="kpi.value"></p>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      {# 3 actions primaires header #}
+      <div class="flex flex-wrap gap-2 shrink-0">
+        <button type="button"
+          class="secretary-btn secretary-btn-primary text-xs px-3 py-2 min-h-0 h-9 gap-1.5"
+          hx-get="{% url 'secretary:visitor_create' %}"
+          hx-target="#secretary-modal-content" hx-swap="innerHTML"
+          hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+          <i data-lucide="user-plus" class="h-3.5 w-3.5"></i> Visite
         </button>
-        <button type="button" class="secretary-btn secretary-btn-primary" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-          Nouveau rendez-vous
+        <button type="button"
+          class="secretary-btn secretary-btn-primary text-xs px-3 py-2 min-h-0 h-9 gap-1.5"
+          hx-get="{% url 'secretary:appointment_create' %}"
+          hx-target="#secretary-modal-content" hx-swap="innerHTML"
+          hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+          <i data-lucide="calendar-plus" class="h-3.5 w-3.5"></i> RDV
         </button>
-        <button type="button" class="secretary-btn secretary-btn-primary" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-          Recevoir pièce
+        <button type="button"
+          class="secretary-btn secretary-btn-primary text-xs px-3 py-2 min-h-0 h-9 gap-1.5"
+          hx-get="{% url 'secretary:document_receipt_create' %}"
+          hx-target="#secretary-modal-content" hx-swap="innerHTML"
+          hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+          <i data-lucide="file-plus" class="h-3.5 w-3.5"></i> Pièce
         </button>
       </div>
+
     </div>
   </section>
 
-  <section class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-    <template x-for="stat in stats" :key="stat.label">
-      <div class="glass-card rounded-3xl p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-soft" :class="stat.cardClass">
-        <div class="flex items-center gap-4">
-          <div class="flex h-16 w-16 items-center justify-center rounded-3xl" :class="stat.bg">
-            <i :data-lucide="stat.icon" class="h-8 w-8" :class="stat.color"></i>
-          </div>
+  {# GRID 2 colonnes #}
+  <div class="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
+
+    {# ══════════════════════
+       COLONNE GAUCHE
+    ══════════════════════ #}
+    <div class="space-y-5">
+
+      {# ══════════════════════════════════════════════════════════
+         §2 — FLUX DU JOUR : 5 sous-blocs, rows une ligne
+      ══════════════════════════════════════════════════════════ #}
+      <section class="glass-card secretary-section secretary-section-cyan rounded-3xl shadow-card">
+        <div class="flex items-center justify-between px-6 pt-5 pb-2">
           <div>
-            <p class="text-xs font-extrabold uppercase tracking-wider text-slate-400" x-text="stat.label"></p>
-            <p class="mt-1 text-3xl font-extrabold" x-text="stat.value"></p>
-            <p class="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400" x-text="stat.sub"></p>
+            <p class="secretary-kicker">Temps réel</p>
+            <h3 class="text-base font-extrabold">Flux du jour</h3>
           </div>
+          <span class="secretary-badge text-xs">
+            {{ pending_registry_count|add:pending_documents_count|add:pending_tasks|add:active_visits }} à traiter
+          </span>
         </div>
-      </div>
-    </template>
-  </section>
 
-  <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_.9fr]">
-    <article class="glass-card secretary-section secretary-section-cyan rounded-3xl p-6 shadow-card">
-      <div class="mb-5 flex items-center justify-between">
-        <div>
-          <p class="secretary-kicker">Flux du jour</p>
-          <h3 class="mt-1 text-lg font-extrabold">Files à traiter</h3>
-        </div>
-        <span class="secretary-badge">{{ pending_registry_count|add:pending_documents_count|add:pending_tasks|add:active_visits }} à traiter</span>
-      </div>
-
-      <div class="space-y-3">
-        <div>
-          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Registre</h4>
-          <ul class="space-y-3">
-            {% for entry in pending_registry_rows %}
-              <li class="secretary-list-row">
-                <div class="min-w-0 flex-1">
-                  <strong class="block truncate text-sm font-extrabold">{{ entry.title }}</strong>
-                  <span class="block truncate text-xs font-medium text-slate-500">{{ entry.entry_type }} | {{ entry.get_status_display }} | {{ entry.created_at|date:"d/m/Y H:i" }}</span>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  {% if entry.status == "pending" %}
-                    <form method="post" hx-post="{% url 'secretary:registry_start' entry.id %}" hx-target="body" hx-swap="none">
-                      {% csrf_token %}
-                      <button class="secretary-btn secretary-btn-secondary" type="submit">Prendre en charge</button>
-                    </form>
-                  {% endif %}
-                  {% if entry.status != "completed" %}
-                    <form method="post" hx-post="{% url 'secretary:registry_mark_processed' entry.id %}" hx-target="body" hx-swap="none">
-                      {% csrf_token %}
-                      <button class="secretary-btn secretary-btn-primary" type="submit">Traiter</button>
-                    </form>
-                  {% endif %}
-                  {% if not entry.is_archived %}
-                    <form method="post" hx-post="{% url 'secretary:registry_archive' entry.id %}" hx-target="body" hx-swap="none">
-                      {% csrf_token %}
-                      <button class="secretary-btn secretary-btn-secondary" type="submit">Archiver</button>
-                    </form>
-                  {% endif %}
-                </div>
-              </li>
-            {% empty %}
-              <li class="secretary-list-row"><span class="secretary-muted">Aucune entrée de registre à traiter.</span></li>
+        {# ── Registre ── #}
+        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
+          <div class="mb-2 flex items-center gap-2">
+            <i data-lucide="book-copy" class="h-3.5 w-3.5 text-sky-600"></i>
+            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Registre</h4>
+            {% if pending_registry_count > 0 %}
+            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900 text-[10px] font-extrabold text-sky-700 dark:text-sky-300">{{ pending_registry_count }}</span>
+            {% endif %}
+          </div>
+          {% if pending_registry_rows %}
+          <ul class="space-y-1.5">
+            {% for item in pending_registry_rows %}
+            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
+              <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-sky-400"></span>
+              <div class="min-w-0 flex-1">
+                <span class="text-sm font-extrabold truncate block">{{ item.title }}</span>
+              </div>
+              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.entry_type }} · {{ item.get_status_display }}</span>
+              <div class="flex gap-1.5 shrink-0">
+                {% if item.status == 'pending' %}
+                <form method="post" hx-post="{% url 'secretary:registry_start' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
+                </form>
+                {% endif %}
+                {% if item.status != 'completed' %}
+                <form method="post" hx-post="{% url 'secretary:registry_mark_processed' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Traiter</button>
+                </form>
+                {% endif %}
+                {% if not item.is_archived %}
+                <form method="post" hx-post="{% url 'secretary:registry_archive' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-secondary text-[11px] px-2 py-0.5 min-h-0 h-6 rounded-lg" type="submit" title="Archiver"><i data-lucide="archive" class="h-3 w-3"></i></button>
+                </form>
+                {% endif %}
+              </div>
+            </li>
             {% endfor %}
           </ul>
+          {% else %}
+          <p class="secretary-muted text-xs py-1.5 italic">Registre vide.</p>
+          {% endif %}
         </div>
 
-        <div>
-          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Documents</h4>
-          <ul class="space-y-3">
-            {% for document in pending_documents_rows %}
-              <li class="secretary-list-row">
-                <div class="min-w-0 flex-1">
-                  <strong class="block truncate text-sm font-extrabold">{{ document.title }}</strong>
-                  <span class="block truncate text-xs font-medium text-slate-500">{{ document.submitted_by_name }} | {{ document.get_status_display }} | {{ document.received_at|date:"d/m/Y H:i" }}</span>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  {% if document.status == "pending" %}
-                    <form method="post" hx-post="{% url 'secretary:document_receipt_start' document.id %}" hx-target="body" hx-swap="none">
-                      {% csrf_token %}
-                      <button class="secretary-btn secretary-btn-secondary" type="submit">Prendre en charge</button>
-                    </form>
-                  {% endif %}
-                  {% if document.file %}
-                    <a class="secretary-btn secretary-btn-secondary" href="{{ document.file.url }}" target="_blank" rel="noopener">Fichier</a>
-                  {% endif %}
-                  {% if not document.is_archived %}
-                    <form method="post" hx-post="{% url 'secretary:document_receipt_archive' document.id %}" hx-target="body" hx-swap="none">
-                      {% csrf_token %}
-                      <button class="secretary-btn secretary-btn-primary" type="submit">Archiver</button>
-                    </form>
-                  {% endif %}
-                </div>
-              </li>
-            {% empty %}
-              <li class="secretary-list-row"><span class="secretary-muted">Aucun document en attente.</span></li>
+        {# ── Documents ── #}
+        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
+          <div class="mb-2 flex items-center gap-2">
+            <i data-lucide="file-signature" class="h-3.5 w-3.5 text-amber-600"></i>
+            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Documents</h4>
+            {% if pending_documents_count > 0 %}
+            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900 text-[10px] font-extrabold text-amber-700 dark:text-amber-300">{{ pending_documents_count }}</span>
+            {% endif %}
+          </div>
+          {% if pending_documents_rows %}
+          <ul class="space-y-1.5">
+            {% for item in pending_documents_rows %}
+            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
+              <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-amber-400"></span>
+              <div class="min-w-0 flex-1">
+                <span class="text-sm font-extrabold truncate block">{{ item.title }}</span>
+              </div>
+              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.submitted_by_name }} · {{ item.get_status_display }}</span>
+              <div class="flex gap-1.5 shrink-0">
+                {% if item.status == 'pending' %}
+                <form method="post" hx-post="{% url 'secretary:document_receipt_start' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
+                </form>
+                {% endif %}
+                {% if item.file %}
+                <a class="secretary-btn secretary-btn-secondary text-[11px] px-2 py-0.5 min-h-0 h-6 rounded-lg" href="{{ item.file.url }}" target="_blank" rel="noopener" title="Ouvrir"><i data-lucide="paperclip" class="h-3 w-3"></i></a>
+                {% endif %}
+                {% if not item.is_archived %}
+                <form method="post" hx-post="{% url 'secretary:document_receipt_archive' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Archiver</button>
+                </form>
+                {% endif %}
+              </div>
+            </li>
             {% endfor %}
           </ul>
+          {% else %}
+          <p class="secretary-muted text-xs py-1.5 italic">Aucun document en attente.</p>
+          {% endif %}
         </div>
 
-        <div>
-          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Rendez-vous</h4>
-          <ul class="space-y-3">
-            {% for appointment in today_appointments_rows %}
-              <li class="secretary-list-row">
-                <div class="min-w-0 flex-1">
-                  <strong class="block truncate text-sm font-extrabold">{{ appointment.title }}</strong>
-                  <span class="block truncate text-xs font-medium text-slate-500">{{ appointment.person_name }} | {{ appointment.scheduled_at|date:"d/m/Y H:i" }} | {{ appointment.get_status_display }}</span>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  {% if appointment.status != "completed" %}
-                    <form method="post" hx-post="{% url 'secretary:appointment_complete' appointment.id %}" hx-target="body" hx-swap="none">
-                      {% csrf_token %}
-                      <button class="secretary-btn secretary-btn-primary" type="submit">Clôturer</button>
-                    </form>
-                  {% endif %}
-                  <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:appointment_list' %}">Liste</a>
-                </div>
-              </li>
-            {% empty %}
-              <li class="secretary-list-row"><span class="secretary-muted">Aucun rendez-vous prévu aujourd’hui.</span></li>
+        {# ── Rendez-vous du jour ── #}
+        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
+          <div class="mb-2 flex items-center gap-2">
+            <i data-lucide="calendar-check-2" class="h-3.5 w-3.5 text-emerald-600"></i>
+            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Rendez-vous du jour</h4>
+            {% if appointments_today > 0 %}
+            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">{{ appointments_today }}</span>
+            {% endif %}
+          </div>
+          {% if today_appointments_rows %}
+          <ul class="space-y-1.5">
+            {% for item in today_appointments_rows %}
+            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
+              <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-400"></span>
+              <div class="min-w-0 flex-1">
+                <span class="text-sm font-extrabold truncate block">{{ item.title }}</span>
+              </div>
+              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.person_name }} · {{ item.scheduled_at|date:"H:i" }}</span>
+              <div class="flex gap-1.5 shrink-0">
+                {% if item.status != 'completed' %}
+                <form method="post" hx-post="{% url 'secretary:appointment_complete' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Clôturer</button>
+                </form>
+                {% else %}
+                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                  <i data-lucide="check" class="h-3 w-3"></i> Terminé
+                </span>
+                {% endif %}
+              </div>
+            </li>
             {% endfor %}
           </ul>
+          {% else %}
+          <p class="secretary-muted text-xs py-1.5 italic">Aucun rendez-vous prévu aujourd'hui.</p>
+          {% endif %}
         </div>
 
-        <div>
-          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Visites</h4>
-          <ul class="space-y-3">
-            {% for visit in open_visits_rows %}
-              <li class="secretary-list-row">
-                <div class="min-w-0 flex-1">
-                  <strong class="block truncate text-sm font-extrabold">{{ visit.full_name }}</strong>
-                  <span class="block truncate text-xs font-medium text-slate-500">{{ visit.reason|default:"-" }} | {{ visit.arrived_at|date:"d/m/Y H:i" }}</span>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <form method="post" hx-post="{% url 'secretary:visitor_complete' visit.id %}" hx-target="body" hx-swap="none">
-                    {% csrf_token %}
-                    <button class="secretary-btn secretary-btn-primary" type="submit">Clôturer</button>
-                  </form>
-                  <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:visitor_list' %}">Liste</a>
-                </div>
-              </li>
-            {% empty %}
-              <li class="secretary-list-row"><span class="secretary-muted">Aucune visite ouverte.</span></li>
+        {# ── Visites ouvertes ── #}
+        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
+          <div class="mb-2 flex items-center gap-2">
+            <i data-lucide="user-round-search" class="h-3.5 w-3.5 text-violet-600"></i>
+            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Visites ouvertes</h4>
+            {% if active_visits > 0 %}
+            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900 text-[10px] font-extrabold text-violet-700 dark:text-violet-300">{{ active_visits }}</span>
+            {% endif %}
+          </div>
+          {% if open_visits_rows %}
+          <ul class="space-y-1.5">
+            {% for item in open_visits_rows %}
+            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
+              <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-violet-400"></span>
+              <div class="min-w-0 flex-1">
+                <span class="text-sm font-extrabold truncate block">{{ item.full_name }}</span>
+              </div>
+              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.reason|default:"—"|truncatechars:20 }} · {{ item.arrived_at|date:"H:i" }}</span>
+              <div class="flex gap-1.5 shrink-0">
+                <form method="post" hx-post="{% url 'secretary:visitor_complete' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Clôturer</button>
+                </form>
+              </div>
+            </li>
             {% endfor %}
           </ul>
+          {% else %}
+          <p class="secretary-muted text-xs py-1.5 italic">Aucune visite ouverte.</p>
+          {% endif %}
         </div>
 
-        <div>
-          <h4 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-500">Tâches</h4>
-          <ul class="space-y-3">
-            {% for task in pending_tasks_rows %}
-              <li class="secretary-list-row">
-                <div class="min-w-0 flex-1">
-                  <strong class="block truncate text-sm font-extrabold">{{ task.title }}</strong>
-                  <span class="block truncate text-xs font-medium text-slate-500">{{ task.get_priority_display }} | {{ task.get_status_display }} | {{ task.due_date|date:"d/m/Y"|default:"-" }}</span>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  {% if task.status == "pending" %}
-                    <form method="post" hx-post="{% url 'secretary:task_start' task.id %}" hx-target="body" hx-swap="none">
-                      {% csrf_token %}
-                      <button class="secretary-btn secretary-btn-secondary" type="submit">Prendre en charge</button>
-                    </form>
-                  {% endif %}
-                  {% if task.status != "completed" %}
-                    <form method="post" hx-post="{% url 'secretary:task_complete' task.id %}" hx-target="body" hx-swap="none">
-                      {% csrf_token %}
-                      <button class="secretary-btn secretary-btn-primary" type="submit">Terminer</button>
-                    </form>
-                  {% endif %}
-                  <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:task_list' %}">Liste</a>
-                </div>
-              </li>
-            {% empty %}
-              <li class="secretary-list-row"><span class="secretary-muted">Aucune tâche prioritaire.</span></li>
+        {# ── Tâches prioritaires ── #}
+        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3 pb-5">
+          <div class="mb-2 flex items-center gap-2">
+            <i data-lucide="check-square" class="h-3.5 w-3.5 text-rose-600"></i>
+            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Tâches prioritaires</h4>
+            {% if pending_tasks > 0 %}
+            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900 text-[10px] font-extrabold text-rose-700 dark:text-rose-300">{{ pending_tasks }}</span>
+            {% endif %}
+          </div>
+          {% if pending_tasks_rows %}
+          <ul class="space-y-1.5">
+            {% for item in pending_tasks_rows %}
+            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
+              <span class="inline-block h-2 w-2 shrink-0 rounded-full
+                {% if item.priority == 'urgent' %}bg-rose-500{% elif item.priority == 'high' %}bg-orange-400{% else %}bg-rose-300{% endif %}"></span>
+              <div class="min-w-0 flex-1">
+                <span class="text-sm font-extrabold truncate block">{{ item.title }}</span>
+              </div>
+              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.get_priority_display }} · {{ item.due_date|date:"d/m"|default:"—" }}</span>
+              <div class="flex gap-1.5 shrink-0">
+                {% if item.status == 'pending' %}
+                <form method="post" hx-post="{% url 'secretary:task_start' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
+                </form>
+                {% endif %}
+                {% if item.status != 'completed' %}
+                <form method="post" hx-post="{% url 'secretary:task_complete' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
+                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Terminer</button>
+                </form>
+                {% endif %}
+              </div>
+            </li>
             {% endfor %}
           </ul>
+          {% else %}
+          <p class="secretary-muted text-xs py-1.5 italic">Aucune tâche prioritaire.</p>
+          {% endif %}
         </div>
-      </div>
-    </article>
 
-    <aside class="space-y-6">
-      <section class="glass-card secretary-section secretary-section-amber rounded-3xl p-6 shadow-card">
-        <div class="mb-5 flex items-center justify-between">
+      </section>
+
+      {# ══════════════════════════════════════════════════════════
+         §3 — RÉSULTATS ACADÉMIQUES (lecture seule)
+      ══════════════════════════════════════════════════════════ #}
+      <section class="glass-card secretary-section secretary-section-violet rounded-3xl shadow-card">
+        <div class="flex items-center justify-between px-6 pt-5 pb-3">
           <div>
-            <p class="secretary-kicker">Actions utiles</p>
-            <h3 class="mt-1 text-lg font-extrabold">Bureau du jour</h3>
+            <p class="secretary-kicker">Lecture seule</p>
+            <h3 class="text-base font-extrabold">Résultats académiques</h3>
+          </div>
+          <input type="text"
+            class="secretary-input text-xs h-8 w-40 !py-1.5"
+            placeholder="Filière, classe…"
+            x-model="resultsFilter"
+            @input="filterResults()">
+        </div>
+        <div class="px-6 pb-5 space-y-2">
+          {% for result in academic_results %}
+          <div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800
+                      bg-white/60 dark:bg-slate-900/60 px-4 py-2.5 result-row"
+               data-search="{{ result.filiere|lower }} {{ result.classe|lower }} {{ result.titre|lower }} {{ result.annee_academique|lower }}">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/50">
+                <i data-lucide="graduation-cap" class="h-4 w-4 text-violet-600 dark:text-violet-300"></i>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-extrabold truncate">{{ result.titre }}</p>
+                <p class="text-xs text-slate-400 truncate">{{ result.filiere }} · {{ result.classe }} · {{ result.annee_academique }}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide
+                {% if result.is_published %}bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300
+                {% else %}bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300{% endif %}">
+                {% if result.is_published %}Publié{% else %}Brouillon{% endif %}
+              </span>
+              {% if result.fichier_pdf %}
+              <a href="{{ result.fichier_pdf.url }}" target="_blank" rel="noopener"
+                 class="secretary-btn secretary-btn-secondary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl gap-1"
+                 title="Télécharger le PDF">
+                <i data-lucide="download" class="h-3 w-3"></i> PDF
+              </a>
+              {% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <p class="secretary-muted text-sm py-4 text-center">Aucun résultat publié pour cette annexe.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      {# ══════════════════════════════════════════════════════════
+         §4 — DOSSIERS ÉTUDIANTS : recherche live HTMX + snapshot
+      ══════════════════════════════════════════════════════════ #}
+      <section class="glass-card secretary-section secretary-section-teal rounded-3xl shadow-card">
+        <div class="flex items-center justify-between px-6 pt-5 pb-3">
+          <div>
+            <p class="secretary-kicker">Dossiers</p>
+            <h3 class="text-base font-extrabold">Étudiants</h3>
+          </div>
+          <span class="secretary-badge text-xs">
+            <i data-lucide="users" class="h-3 w-3"></i>
+            {{ students_count }} actifs
+          </span>
+        </div>
+
+        {# Barre recherche #}
+        <div class="px-6 pb-3">
+          <div class="relative">
+            <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"></i>
+            <input type="text"
+              name="student_q"
+              class="secretary-input !pl-10 !py-2 text-sm"
+              placeholder="Nom, matricule, email…"
+              hx-get="{% url 'secretary:htmx_student_results' %}"
+              hx-trigger="input changed delay:350ms"
+              hx-target="#student-results-panel"
+              hx-include="[name='student_q']"
+              value="{{ student_query }}">
           </div>
         </div>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <button type="button" class="secretary-btn secretary-btn-primary w-full justify-start" hx-get="{% url 'secretary:registry_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            Saisir registre
+
+        <div id="student-results-panel" class="px-6 pb-5 space-y-2">
+          {% for student in student_results %}
+          <div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800
+                      bg-white/60 dark:bg-slate-900/60 px-4 py-2.5">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl
+                          bg-teal-50 dark:bg-teal-950/50 font-extrabold text-teal-700 dark:text-teal-300 text-xs uppercase">
+                {{ student.full_name|first }}
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-extrabold truncate">{{ student.full_name }}</p>
+                <p class="text-xs text-slate-400 truncate">
+                  {{ student.matricule }} · {{ student.inscription.candidature.programme.title|default:"—" }}
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-2 shrink-0">
+              <button type="button"
+                class="secretary-btn secretary-btn-secondary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl"
+                hx-get="{% url 'secretary:student_snapshot_view' student.id %}"
+                hx-target="#secretary-modal-content" hx-swap="innerHTML"
+                hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+                Dossier
+              </button>
+              <button type="button"
+                class="secretary-btn secretary-btn-primary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl"
+                hx-get="{% url 'secretary:registry_create' %}?student={{ student.id }}"
+                hx-target="#secretary-modal-content" hx-swap="innerHTML"
+                hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+                + Registre
+              </button>
+            </div>
+          </div>
+          {% empty %}
+          <p class="secretary-muted text-sm py-4 text-center italic">
+            {% if student_query %}Aucun étudiant trouvé pour « {{ student_query }} ».
+            {% else %}Saisir un nom, matricule ou email pour rechercher.{% endif %}
+          </p>
+          {% endfor %}
+        </div>
+      </section>
+
+      {# ══════════════════════════════════════════════════════════
+         §5 — COMMANDES SHOP : URLs corrigées (shop/urls.py réel)
+      ══════════════════════════════════════════════════════════ #}
+      <section class="glass-card secretary-section secretary-section-amber rounded-3xl shadow-card">
+        <div class="flex items-center justify-between px-6 pt-5 pb-3">
+          <div>
+            <p class="secretary-kicker">Boutique</p>
+            <h3 class="text-base font-extrabold">Commandes en attente</h3>
+          </div>
+          {# Pas de vue liste shop côté secrétaire — lien retiré #}
+        </div>
+        <div class="px-6 pb-5 space-y-2">
+          {% for order in pending_shop_orders %}
+          <div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800
+                      bg-white/60 dark:bg-slate-900/60 px-4 py-2.5">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/50">
+                <i data-lucide="shopping-bag" class="h-4 w-4 text-amber-600 dark:text-amber-300"></i>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-extrabold truncate">
+                  {{ order.inscription.candidature.first_name }} {{ order.inscription.candidature.last_name }}
+                </p>
+                <p class="text-xs text-slate-400 truncate">
+                  Réf. {{ order.reference|default:"—" }} ·
+                  {{ order.total_amount|floatformat:0 }} FCFA ·
+                  <span class="{% if order.status == 'ready' %}text-emerald-600 font-bold{% endif %}">
+                    {{ order.get_status_display }}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-2 shrink-0">
+              {# Détail étudiant — URL existante dans shop/urls.py #}
+              <a href="{% url 'shop:student_order_detail' order.pk %}"
+                 class="secretary-btn secretary-btn-secondary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl">
+                Détail
+              </a>
+              {# Livraison — uniquement si statut = ready #}
+              {% if order.status == 'ready' %}
+              <form method="post" action="{% url 'shop:manager_order_deliver' order.pk %}">
+                {% csrf_token %}
+                <button type="submit"
+                  class="secretary-btn secretary-btn-primary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl">
+                  Remettre
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <p class="secretary-muted text-sm py-4 text-center">Aucune commande en attente.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+    </div>{# /colonne gauche #}
+
+    {# ══════════════════════
+       COLONNE DROITE (sidebar)
+    ══════════════════════ #}
+    <aside class="space-y-5">
+
+      {# ══════════════════════════════════════════════════════════
+         §6 — ACTIONS RAPIDES : grille 2×3
+      ══════════════════════════════════════════════════════════ #}
+      <section class="glass-card secretary-section secretary-section-blue rounded-3xl shadow-card px-5 pt-5 pb-5">
+        <p class="secretary-kicker mb-1">Raccourcis</p>
+        <h3 class="text-base font-extrabold mb-4">Actions rapides</h3>
+        <div class="grid grid-cols-2 gap-2.5">
+
+          <button type="button"
+            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-sky-400 hover:shadow-md transition-all group"
+            hx-get="{% url 'secretary:registry_create' %}"
+            hx-target="#secretary-modal-content" hx-swap="innerHTML"
+            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950/50 transition-transform group-hover:scale-110">
+              <i data-lucide="book-plus" class="h-4 w-4 text-sky-600 dark:text-sky-300"></i>
+            </span>
+            <span class="text-[11px] font-bold leading-tight">Saisir registre</span>
           </button>
-          <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:task_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            Créer tâche
+
+          <button type="button"
+            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-rose-400 hover:shadow-md transition-all group"
+            hx-get="{% url 'secretary:task_create' %}"
+            hx-target="#secretary-modal-content" hx-swap="innerHTML"
+            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-950/50 transition-transform group-hover:scale-110">
+              <i data-lucide="list-plus" class="h-4 w-4 text-rose-600 dark:text-rose-300"></i>
+            </span>
+            <span class="text-[11px] font-bold leading-tight">Créer tâche</span>
           </button>
-          <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            Programmer RDV
+
+          <button type="button"
+            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-emerald-400 hover:shadow-md transition-all group"
+            hx-get="{% url 'secretary:appointment_create' %}"
+            hx-target="#secretary-modal-content" hx-swap="innerHTML"
+            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/50 transition-transform group-hover:scale-110">
+              <i data-lucide="calendar-plus" class="h-4 w-4 text-emerald-600 dark:text-emerald-300"></i>
+            </span>
+            <span class="text-[11px] font-bold leading-tight">Programmer RDV</span>
           </button>
-          <button type="button" class="secretary-btn secretary-btn-secondary w-full justify-start" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            Recevoir pièce
+
+          <button type="button"
+            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-amber-400 hover:shadow-md transition-all group"
+            hx-get="{% url 'secretary:document_receipt_create' %}"
+            hx-target="#secretary-modal-content" hx-swap="innerHTML"
+            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/50 transition-transform group-hover:scale-110">
+              <i data-lucide="file-plus" class="h-4 w-4 text-amber-600 dark:text-amber-300"></i>
+            </span>
+            <span class="text-[11px] font-bold leading-tight">Recevoir pièce</span>
+          </button>
+
+          <button type="button"
+            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-violet-400 hover:shadow-md transition-all group"
+            hx-get="{% url 'secretary:visitor_create' %}"
+            hx-target="#secretary-modal-content" hx-swap="innerHTML"
+            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/50 transition-transform group-hover:scale-110">
+              <i data-lucide="user-plus" class="h-4 w-4 text-violet-600 dark:text-violet-300"></i>
+            </span>
+            <span class="text-[11px] font-bold leading-tight">Nouvelle visite</span>
+          </button>
+
+          <button type="button"
+            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-teal-400 hover:shadow-md transition-all group"
+            hx-get="{% url 'secretary:htmx_student_results' %}"
+            hx-target="#secretary-modal-content" hx-swap="innerHTML"
+            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-950/50 transition-transform group-hover:scale-110">
+              <i data-lucide="search" class="h-4 w-4 text-teal-600 dark:text-teal-300"></i>
+            </span>
+            <span class="text-[11px] font-bold leading-tight">Chercher étudiant</span>
+          </button>
+
+        </div>
+      </section>
+
+      {# ══════════════════════════════════════════════════════════
+         §7 — NOTIFICATIONS / MESSAGES
+      ══════════════════════════════════════════════════════════ #}
+      <section class="glass-card secretary-section secretary-section-slate rounded-3xl shadow-card px-5 pt-5 pb-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="secretary-kicker">Boîte</p>
+            <h3 class="text-base font-extrabold">Messages récents</h3>
+          </div>
+          {% if messages_count > 0 %}
+          <span class="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-extrabold">
+            {{ messages_count }}
+          </span>
+          {% endif %}
+        </div>
+
+        <div class="space-y-2">
+          {% for notif in notifications|slice:":6" %}
+          <div class="flex items-start gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-3">
+            <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+              <i data-lucide="bell" class="h-3.5 w-3.5 text-slate-500"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-extrabold truncate">{{ notif.title }}</p>
+              <p class="text-[11px] text-slate-400 mt-0.5 truncate">{{ notif.body|default:"Notification" }}</p>
+              <p class="text-[10px] text-slate-300 dark:text-slate-600 mt-0.5">{{ notif.created_at|date:"d/m H:i" }}</p>
+            </div>
+          </div>
+          {% empty %}
+          <p class="secretary-muted text-sm py-4 text-center">Aucune notification récente.</p>
+          {% endfor %}
+        </div>
+
+        <div class="mt-3">
+          <button class="secretary-btn secretary-btn-secondary w-full text-xs h-8 min-h-0 rounded-xl"
+            hx-get="{% url 'secretary:htmx_messages_panel' %}"
+            hx-target="#secretary-modal-content" hx-swap="innerHTML"
+            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
+            Voir tous les messages
           </button>
         </div>
       </section>
 
-      <section class="glass-card secretary-section secretary-section-emerald rounded-3xl p-6 shadow-card">
-        <div class="mb-5 flex items-center justify-between">
-          <div>
-            <p class="secretary-kicker">Campagne</p>
-            <h3 class="mt-1 text-lg font-extrabold">Admissions</h3>
-          </div>
-          <a href="{% url 'secretary:document_receipt_list' %}" class="secretary-btn secretary-btn-secondary">Pièces</a>
-        </div>
-        <div class="space-y-3">
-          <div class="secretary-list-row">
-            <div>
-              <strong class="block text-sm font-extrabold">Réception des dossiers</strong>
-              <span class="block text-xs font-medium text-slate-500">Enregistrer et rattacher l’étudiant sans doublon.</span>
+      {# ══════════════════════════════════════════════════════════
+         §8 — NAVIGATION vers les listes avec compteurs
+      ══════════════════════════════════════════════════════════ #}
+      <section class="glass-card secretary-section secretary-section-emerald rounded-3xl shadow-card px-5 pt-5 pb-5">
+        <p class="secretary-kicker mb-1">Navigation</p>
+        <h3 class="text-base font-extrabold mb-4">Accès aux listes</h3>
+        <div class="space-y-1.5">
+
+          <a href="{% url 'secretary:registry_list' %}"
+             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-sky-400 hover:shadow-sm transition-all">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="book-copy" class="h-4 w-4 text-sky-500"></i>
+              <span class="text-sm font-bold">Registre</span>
             </div>
-          </div>
-          <div class="secretary-list-row">
-            <div>
-              <strong class="block text-sm font-extrabold">Vérification des pièces</strong>
-              <span class="block text-xs font-medium text-slate-500">Contrôler la complétude avant transmission.</span>
+            {% if pending_registry_count %}<span class="text-[11px] font-extrabold text-slate-400">{{ pending_registry_count }}</span>{% endif %}
+          </a>
+
+          <a href="{% url 'secretary:appointment_list' %}"
+             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-emerald-400 hover:shadow-sm transition-all">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="calendar-check-2" class="h-4 w-4 text-emerald-500"></i>
+              <span class="text-sm font-bold">Rendez-vous</span>
             </div>
-          </div>
-          <div class="secretary-list-row">
-            <div>
-              <strong class="block text-sm font-extrabold">Passerelle admissions</strong>
-              <span class="block text-xs font-medium text-slate-500">Partager les mêmes dossiers avec le tunnel de candidature.</span>
+            {% if appointments_today %}<span class="text-[11px] font-extrabold text-slate-400">{{ appointments_today }}</span>{% endif %}
+          </a>
+
+          <a href="{% url 'secretary:visitor_list' %}"
+             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-violet-400 hover:shadow-sm transition-all">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="user-round-search" class="h-4 w-4 text-violet-500"></i>
+              <span class="text-sm font-bold">Visites</span>
             </div>
-          </div>
+            {% if active_visits %}<span class="text-[11px] font-extrabold text-slate-400">{{ active_visits }}</span>{% endif %}
+          </a>
+
+          <a href="{% url 'secretary:task_list' %}"
+             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-rose-400 hover:shadow-sm transition-all">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="check-square" class="h-4 w-4 text-rose-500"></i>
+              <span class="text-sm font-bold">Tâches</span>
+            </div>
+            {% if pending_tasks %}<span class="text-[11px] font-extrabold text-slate-400">{{ pending_tasks }}</span>{% endif %}
+          </a>
+
+          <a href="{% url 'secretary:document_receipt_list' %}"
+             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-amber-400 hover:shadow-sm transition-all">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="file-signature" class="h-4 w-4 text-amber-500"></i>
+              <span class="text-sm font-bold">Documents</span>
+            </div>
+            {% if pending_documents_count %}<span class="text-[11px] font-extrabold text-slate-400">{{ pending_documents_count }}</span>{% endif %}
+          </a>
+
         </div>
       </section>
 
-      <section class="glass-card secretary-section secretary-section-slate rounded-3xl p-6 shadow-card">
-        <div class="mb-5 flex items-center justify-between">
-          <div>
-            <p class="secretary-kicker">Navigation</p>
-            <h3 class="mt-1 text-lg font-extrabold">Accès aux listes</h3>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:registry_list' %}">Registre</a>
-          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:appointment_list' %}">RDV</a>
-          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:visitor_list' %}">Visites</a>
-          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:task_list' %}">Tâches</a>
-          <a class="secretary-btn secretary-btn-secondary" href="{% url 'secretary:document_receipt_list' %}">Documents</a>
-          <a class="secretary-btn secretary-btn-secondary" href="#messages">Messages</a>
-        </div>
-      </section>
     </aside>
-  </section>
 
-  <section id="messages" class="glass-card secretary-section secretary-section-cyan rounded-3xl p-6 shadow-card" x-data="{ open: false }">
-    <div class="mb-5 flex items-center justify-between">
-      <div>
-        <p class="secretary-kicker">Messages</p>
-        <h3 class="mt-1 text-lg font-extrabold">Notifications récentes</h3>
-      </div>
-      <button class="secretary-btn secretary-btn-primary" type="button" @click="open = !open">Ouvrir messages</button>
-    </div>
-    <div class="space-y-3">
-      {% for notification in notifications|slice:":4" %}
-        <div class="secretary-list-row">
-          <div>
-            <strong class="block text-sm font-extrabold">{{ notification.title }}</strong>
-            <span class="block text-xs font-medium text-slate-500">{{ notification.body|default:"Notification centralisee" }} | {{ notification.created_at|date:"d/m/Y H:i" }}</span>
-          </div>
-        </div>
-      {% empty %}
-        <div class="secretary-list-row"><span class="secretary-muted">Aucune notification récente.</span></div>
-      {% endfor %}
-    </div>
+  </div>{# /grid #}
 
-    <div class="fixed bottom-5 right-5 z-40 w-[360px] max-w-[calc(100vw-2rem)]" x-show="open" x-transition>
-      <div class="glass-card rounded-3xl p-5 shadow-card">
-        <div class="mb-4 flex items-center justify-between">
-          <h4 class="text-base font-extrabold">Messages récents</h4>
-          <button class="secretary-btn secretary-btn-secondary" type="button" @click="open = false">Fermer</button>
-        </div>
-        <div hx-get="{% url 'secretary:htmx_messages_panel' %}" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
-          Chargement...
-        </div>
-      </div>
-    </div>
-  </section>
-</div>
+</div>{# /x-data #}
 
 <script>
-  function secretaryDashboard() {
-    return {
-      lineChart: null,
-      donutChart: null,
-      stats: [
-        { label: 'Registre', value: '{{ pending_registry_count|default:0|escapejs }}', sub: 'En attente', icon: 'book-copy', bg: 'bg-sky-50 dark:bg-sky-950/50', color: 'text-sky-600 dark:text-sky-300', cardClass: 'stat-card-accent-blue' },
-        { label: 'Documents', value: '{{ pending_documents_count|default:0|escapejs }}', sub: 'À classer', icon: 'file-signature', bg: 'bg-amber-50 dark:bg-amber-950/50', color: 'text-amber-600 dark:text-amber-300', cardClass: 'stat-card-accent-amber' },
-        { label: 'Rendez-vous', value: '{{ appointments_today|default:0|escapejs }}', sub: 'Du jour', icon: 'calendar-check-2', bg: 'bg-emerald-50 dark:bg-emerald-950/50', color: 'text-emerald-600 dark:text-emerald-300', cardClass: 'stat-card-accent-emerald' },
-        { label: 'Visites', value: '{{ active_visits|default:0|escapejs }}', sub: 'Ouvertes', icon: 'user-round-search', bg: 'bg-violet-50 dark:bg-violet-950/50', color: 'text-violet-600 dark:text-violet-300', cardClass: 'stat-card-accent-violet' },
-      ],
-      init() {
-        this.$nextTick(() => {
-          this.renderIcons();
-          this.buildCharts();
-        });
-        document.body.addEventListener('htmx:afterSwap', () => this.renderIcons());
+function secretaryDashboard() {
+  return {
+    currentDateTime: "",
+    resultsFilter: "",
+    kpis: [
+      {
+        label: "Registre",
+        value: "{{ pending_registry_count|default:0 }}",
+        icon: "book-copy",
+        bg: "bg-sky-50 dark:bg-sky-950/50",
+        color: "text-sky-600 dark:text-sky-300"
       },
-      renderIcons() {
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-          window.lucide.createIcons();
-        }
+      {
+        label: "Documents",
+        value: "{{ pending_documents_count|default:0 }}",
+        icon: "file-signature",
+        bg: "bg-amber-50 dark:bg-amber-950/50",
+        color: "text-amber-600 dark:text-amber-300"
       },
-      buildCharts() {
-        if (!window.Chart) return;
+      {
+        label: "RDV",
+        value: "{{ appointments_today|default:0 }}",
+        icon: "calendar-check-2",
+        bg: "bg-emerald-50 dark:bg-emerald-950/50",
+        color: "text-emerald-600 dark:text-emerald-300"
+      },
+      {
+        label: "Visites",
+        value: "{{ active_visits|default:0 }}",
+        icon: "user-round-search",
+        bg: "bg-violet-50 dark:bg-violet-950/50",
+        color: "text-violet-600 dark:text-violet-300"
+      },
+      {
+        label: "Tâches",
+        value: "{{ pending_tasks|default:0 }}",
+        icon: "check-square",
+        bg: "bg-rose-50 dark:bg-rose-950/50",
+        color: "text-rose-600 dark:text-rose-300"
+      },
+    ],
 
-        const isDark = document.documentElement.classList.contains('dark');
-        const gridColor = isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(148, 163, 184, 0.22)';
-        const textColor = isDark ? '#cbd5e1' : '#64748b';
+    init() {
+      this.tickClock();
+      setInterval(() => this.tickClock(), 30000);
+      this.$nextTick(() => {
+        if (window.lucide) window.lucide.createIcons();
+      });
+      // Re-render icons après chaque swap HTMX
+      document.body.addEventListener("htmx:afterSwap", () => {
+        if (window.lucide) window.lucide.createIcons();
+      });
+      // Refresh auto du dashboard toutes les 5 minutes
+      setInterval(() => {
+        if (!document.hidden) window.location.reload();
+      }, 300000);
+    },
 
-        const lineCanvas = document.getElementById('secretaryLineChart');
-        const donutCanvas = document.getElementById('secretaryDonutChart');
+    tickClock() {
+      const now = new Date();
+      this.currentDateTime =
+        now.toLocaleDateString("fr-FR", {
+          weekday: "long", day: "numeric", month: "long", year: "numeric"
+        }) + " · " +
+        now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    },
 
-        if (lineCanvas) {
-          this.lineChart = new Chart(lineCanvas, {
-            type: 'line',
-            data: {
-              labels: ['Ouverture', 'Matin', 'Midi', 'Après-midi', 'Soir'],
-              datasets: [{
-                label: 'Flux',
-                data: [
-                  parseInt('{{ appointments_today|default:0|escapejs }}', 10) || 0,
-                  parseInt('{{ visits_today|default:0|escapejs }}', 10) || 0,
-                  parseInt('{{ active_visits|default:0|escapejs }}', 10) || 0,
-                  parseInt('{{ pending_tasks|default:0|escapejs }}', 10) || 0,
-                  parseInt('{{ messages_count|default:0|escapejs }}', 10) || 0
-                ],
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, 0.12)',
-                fill: true,
-                tension: 0.42,
-                pointRadius: 0,
-                pointHoverRadius: 6,
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', padding: 12, cornerRadius: 12 } },
-              scales: {
-                y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, font: { weight: 600 } } },
-                x: { grid: { display: false }, ticks: { color: textColor, font: { weight: 600 } } }
-              }
-            }
-          });
-        }
-
-        if (donutCanvas) {
-          this.donutChart = new Chart(donutCanvas, {
-            type: 'doughnut',
-            data: {
-              labels: ['Documents', 'Rendez-vous', 'Visites', 'Tâches'],
-              datasets: [{
-                data: [
-                  parseInt('{{ pending_documents_count|default:0|escapejs }}', 10) || 0,
-                  parseInt('{{ appointments_today|default:0|escapejs }}', 10) || 0,
-                  parseInt('{{ active_visits|default:0|escapejs }}', 10) || 0,
-                  parseInt('{{ pending_tasks|default:0|escapejs }}', 10) || 0
-                ],
-                backgroundColor: ['#2563eb', '#0ea5e9', '#14b8a6', '#f59e0b'],
-                borderWidth: 0,
-                cutout: '68%'
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', padding: 12, cornerRadius: 12 } }
-            }
-          });
-        }
-      }
-    };
-  }
+    filterResults() {
+      const q = this.resultsFilter.toLowerCase().trim();
+      document.querySelectorAll(".result-row").forEach(row => {
+        row.style.display = (!q || row.dataset.search.includes(q)) ? "" : "none";
+      });
+    }
+  };
+}
 </script>
 {% endblock %}

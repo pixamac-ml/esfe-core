@@ -1,0 +1,128 @@
+{# secretary/templates/secretary/partials/_flux_block.html
+   Paramètres attendus :
+     title, icon, color, items (queryset), empty (str), type (str: registry|document|appointment|visit|task)
+#}
+<div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
+  <div class="mb-2 flex items-center gap-2">
+    <i data-lucide="{{ icon }}" class="h-3.5 w-3.5 {{ color }}"></i>
+    <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">{{ title }}</h4>
+  </div>
+
+  {% if items %}
+  <ul class="space-y-1.5">
+    {% for item in items %}
+    <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2 text-sm">
+
+      {# ── Label principal + sous-info en une seule ligne ── #}
+      <div class="flex items-center gap-3 min-w-0 flex-1">
+        {# Badge statut coloré #}
+        <span class="inline-block h-2 w-2 shrink-0 rounded-full
+          {% if type == 'visit' %}bg-violet-400
+          {% elif type == 'appointment' %}bg-emerald-400
+          {% elif type == 'document' %}bg-amber-400
+          {% elif type == 'task' %}
+            {% if item.priority == 'urgent' %}bg-rose-500{% elif item.priority == 'high' %}bg-orange-400{% else %}bg-rose-300{% endif %}
+          {% else %}bg-sky-400{% endif %}"></span>
+
+        {# Texte principal #}
+        <span class="font-extrabold truncate">
+          {% if type == 'visit' %}{{ item.full_name }}
+          {% else %}{{ item.title }}{% endif %}
+        </span>
+
+        {# Info secondaire (séparateur ·) #}
+        <span class="hidden sm:block truncate text-xs text-slate-400 shrink-0">
+          {% if type == 'registry' %}
+            {{ item.entry_type }} · {{ item.get_status_display }}
+          {% elif type == 'document' %}
+            {{ item.submitted_by_name }} · {{ item.get_status_display }}
+          {% elif type == 'appointment' %}
+            {{ item.person_name }} · {{ item.scheduled_at|date:"H:i" }}
+          {% elif type == 'visit' %}
+            {{ item.reason|default:"—"|truncatechars:24 }} · {{ item.arrived_at|date:"H:i" }}
+          {% elif type == 'task' %}
+            {{ item.get_priority_display }} · {{ item.due_date|date:"d/m"|default:"—" }}
+          {% endif %}
+        </span>
+      </div>
+
+      {# ── Actions inline ── #}
+      <div class="flex gap-1.5 shrink-0">
+        {% if type == 'registry' %}
+          {% if item.status == 'pending' %}
+          <form method="post" hx-post="{% url 'secretary:registry_start' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
+          </form>
+          {% endif %}
+          {% if item.status != 'completed' %}
+          <form method="post" hx-post="{% url 'secretary:registry_mark_processed' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Traiter</button>
+          </form>
+          {% endif %}
+          {% if not item.is_archived %}
+          <form method="post" hx-post="{% url 'secretary:registry_archive' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit" title="Archiver">
+              <i data-lucide="archive" class="h-3 w-3"></i>
+            </button>
+          </form>
+          {% endif %}
+
+        {% elif type == 'document' %}
+          {% if item.status == 'pending' %}
+          <form method="post" hx-post="{% url 'secretary:document_receipt_start' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
+          </form>
+          {% endif %}
+          {% if item.file %}
+          <a class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" href="{{ item.file.url }}" target="_blank" rel="noopener" title="Ouvrir le fichier">
+            <i data-lucide="paperclip" class="h-3 w-3"></i>
+          </a>
+          {% endif %}
+          {% if not item.is_archived %}
+          <form method="post" hx-post="{% url 'secretary:document_receipt_archive' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Archiver</button>
+          </form>
+          {% endif %}
+
+        {% elif type == 'appointment' %}
+          {% if item.status != 'completed' %}
+          <form method="post" hx-post="{% url 'secretary:appointment_complete' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Clôturer</button>
+          </form>
+          {% endif %}
+
+        {% elif type == 'visit' %}
+          <form method="post" hx-post="{% url 'secretary:visitor_complete' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Clôturer</button>
+          </form>
+
+        {% elif type == 'task' %}
+          {% if item.status == 'pending' %}
+          <form method="post" hx-post="{% url 'secretary:task_start' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
+          </form>
+          {% endif %}
+          {% if item.status != 'completed' %}
+          <form method="post" hx-post="{% url 'secretary:task_complete' item.id %}" hx-target="body" hx-swap="none">
+            {% csrf_token %}
+            <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Terminer</button>
+          </form>
+          {% endif %}
+        {% endif %}
+      </div>
+
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="secretary-muted text-xs py-2 text-center italic">{{ empty }}</p>
+  {% endif %}
+</div>

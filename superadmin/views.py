@@ -3948,17 +3948,23 @@ def settings(request):
             site_configuration.about_values_subtitle or '',
         ).strip()
 
+        if request.POST.get('remove_about_hero_background_image') == 'on':
+            site_configuration.about_hero_background_image = None
         if request.POST.get('remove_about_hero_image') == 'on':
             site_configuration.about_hero_image = None
         if request.POST.get('remove_about_main_image') == 'on':
             site_configuration.about_main_image = None
 
+        about_hero_background_image = request.FILES.get('about_hero_background_image')
         about_hero_image = request.FILES.get('about_hero_image')
         about_main_image = request.FILES.get('about_main_image')
 
         try:
+            _validate_public_image(about_hero_background_image, 'Fond section HERO A propos')
             _validate_public_image(about_hero_image, 'Image Hero A propos')
             _validate_public_image(about_main_image, 'Image principale A propos')
+            if about_hero_background_image:
+                site_configuration.about_hero_background_image = about_hero_background_image
             if about_hero_image:
                 site_configuration.about_hero_image = about_hero_image
             if about_main_image:

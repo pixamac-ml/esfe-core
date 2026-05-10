@@ -1,237 +1,126 @@
-Analyse entièrement le système de gestion des années académiques avant toute modification.
+Analyse entièrement le projet Django avant toute modification.
+
+Contexte :
+Le projet est la plateforme ESFé Mali (École de Santé Félix Houphouët-Boigny Mali).
+Je suis actuellement sur la page “À propos” du site public et j’ai un problème critique :
+je n’arrive pas à identifier où se configure l’image du HERO/About Hero affichée dans la section “À propos de nous”.
+
+Objectif :
+Je veux que tu fouilles le projet pour identifier précisément :
+
+1. Quelle app gère la page “About / À propos”
+2. Quelle vue Django rend cette page
+3. Quel template HTML est utilisé
+4. Quel modèle contient les données du hero
+5. Où se trouve le champ image
+6. Comment l’image est injectée dans le template
+7. Comment cette image est censée être modifiée depuis le SuperAdmin
+8. Pourquoi actuellement je ne trouve pas l’emplacement dans l’administration
+9. Si le système existe déjà mais est mal branché
+10. Si le système n’existe pas, proposer une structure propre et professionnelle
 
 IMPORTANT :
+NE RIEN MODIFIER AU DÉBUT.
+Commence uniquement par une PHASE D’ANALYSE COMPLÈTE.
 
-* Ne pas appliquer de correctif superficiel.
-* Ne pas patcher localement uniquement le modal.
-* Identifier la vraie source d’incohérence.
-* Stabiliser définitivement le système des années académiques dans tout le projet.
+Tu dois explorer :
+- les apps `core`
+- `about`
+- `news`
+- `website`
+- ou toute autre app concernée
+- les templates publics
+- les modèles liés au contenu institutionnel
+- les fichiers admin.py
+- les services
+- les context processors
+- les composants Django Components
+- les partials HTMX éventuels
 
-PROBLÈME ACTUEL
+Tu dois rechercher spécifiquement :
+- les mots-clés :
+  - about
+  - hero
+  - banner
+  - institution
+  - school
+  - presentation
+  - about_section
+  - hero_image
+  - image
+  - apropos
 
-Le modal de positionnement académique fonctionne désormais correctement au niveau :
+Tu dois aussi vérifier :
+- si l’image est hardcodée directement dans le template
+- si elle vient d’un modèle
+- si elle vient d’un seed
+- si elle vient d’un fixture
+- si elle vient d’un composant réutilisable
+- si elle est stockée dans MEDIA
+- si elle utilise STATIC
+- si elle est injectée via un context processor
 
-* sélection classe,
-* sélection niveau,
-* workflow inscription.
+Ensuite, produire un RAPPORT TECHNIQUE CLAIR ET STRUCTURÉ avec :
 
-MAIS une incohérence persiste :
+# RAPPORT ABOUT HERO
 
-```text
-"La classe académique ne correspond pas à l'année académique."
-```
+## 1. App responsable
+- chemin exact
 
-Cela signifie que plusieurs systèmes d’année académique coexistent encore dans le projet.
+## 2. Vue responsable
+- fichier
+- classe ou fonction
 
-Le problème semble venir d’un conflit entre :
+## 3. Template responsable
+- chemin exact
 
-* l’année académique stockée dans academics,
-* l’année académique utilisée dans les formulaires,
-* l’année académique utilisée dans inscriptions/admissions,
-* l’année académique utilisée dans l’affectation académique.
+## 4. Source réelle de l’image
+- hardcoded
+- modèle
+- static
+- media
+- seed
+- fixture
 
-Le système semble parfois :
+## 5. Modèle concerné
+- champs
+- relations
+- image field
 
-* créer avec une année,
-* puis comparer avec une autre,
-* ou utiliser plusieurs sources différentes.
+## 6. Administration Django
+- existe ou non
+- enregistré ou non dans admin.py
+- pourquoi je ne vois pas l’image dans le SuperAdmin
 
-OBJECTIF PRINCIPAL
+## 7. Workflow actuel
+Explique exactement comment le système fonctionne actuellement.
 
-Créer UNE SEULE source de vérité pour l’année académique dans tout le projet.
+## 8. Problèmes détectés
+Lister tous les problèmes d’architecture ou de gestion de contenu.
 
-Aucune duplication.
-Aucune logique contradictoire.
-Aucune année académique implicite.
-
-──────────────────────────────
-PHASE 1 — AUDIT GLOBAL
-──────────────────────────────
-
-Analyser entièrement :
-
-* academics
-* admissions
-* inscriptions
-* students
-* portal
-* payments
-* superadmin
-
-Identifier précisément :
-
-* tous les modèles utilisant academic_year,
-* toutes les ForeignKey AcademicYear,
-* tous les CharField représentant une année académique,
-* tous les defaults automatiques,
-* tous les services injectant une année académique,
-* tous les formulaires manipulant une année académique,
-* tous les selectors filtrant une année académique,
-* tous les signaux utilisant academic_year,
-* tous les workflows de création étudiant/enrollment.
-
-IMPORTANT :
-Identifier les endroits où :
-
-* une année académique string est utilisée,
-* une année académique FK est utilisée,
-* une année académique implicite est utilisée.
-
-Produire une cartographie complète avant modification.
-
-──────────────────────────────
-PHASE 2 — IDENTIFIER LE VRAI CONFLIT
-──────────────────────────────
-
-Identifier pourquoi :
-
-```text
-"La classe académique ne correspond pas à l'année académique."
-```
-
-apparaît encore.
-
-Vérifier notamment :
-
-* création inscription,
-* modal positionnement académique,
-* récupération AcademicClass,
-* AcademicEnrollment,
-* resolver académique,
-* classes créées,
-* année académique active,
-* année académique courante,
-* données legacy.
-
-Vérifier aussi :
-
-* mismatch entre IDs,
-* mismatch entre strings,
-* mismatch entre objets,
-* mismatch entre années actives.
-
-──────────────────────────────
-PHASE 3 — CENTRALISATION
-──────────────────────────────
-
-Créer un système centralisé et stable.
-
-Le projet doit avoir :
-
-* une seule logique d’année académique,
-* une seule source de récupération,
-* une seule méthode de résolution.
-
-Créer si nécessaire :
-
-```python
-get_current_academic_year()
-```
-
-ou :
-
-```python
-AcademicYearResolver
-```
-
-Tous les services doivent passer par cette couche.
-
-INTERDICTION :
-
-* hardcode,
-* fallback implicite dangereux,
-* string magique,
-* duplication.
-
-──────────────────────────────
-PHASE 4 — NORMALISATION
-──────────────────────────────
-
-Uniformiser tout le projet.
+## 9. Recommandation professionnelle
+Proposer une architecture propre et maintenable pour gérer :
+- le hero About
+- les images
+- les textes
+- les CTA
+- les statistiques
+- les vidéos éventuelles
 
 IMPORTANT :
-Éviter absolument :
+- Ne pas casser le design actuel
+- Ne pas modifier le hero sans comprendre le workflow
+- Respecter l’architecture Django existante
+- Respecter les composants existants
+- Respecter le système MEDIA/STATIC actuel
+- Respecter la structure modulaire du projet
 
-* academic_year string dans certains modules,
-* AcademicYear FK ailleurs,
-* comparaisons hybrides.
+Après l’analyse seulement :
+si nécessaire, proposer une implémentation propre permettant de gérer le HERO ABOUT directement depuis le SuperAdmin avec :
+- upload image
+- aperçu image
+- fallback image
+- validation
+- responsive propre
 
-Le projet doit utiliser une logique cohérente partout.
-
-Vérifier :
-
-* migrations,
-* contraintes,
-* validators,
-* clean(),
-* services,
-* selectors,
-* signaux.
-
-──────────────────────────────
-PHASE 5 — POSITIONNEMENT ACADÉMIQUE
-──────────────────────────────
-
-Le nouveau workflow de positionnement académique doit devenir stable.
-
-Quand la gestionnaire choisit :
-
-* niveau,
-* classe,
-
-le système doit :
-
-* vérifier correctement l’année académique,
-* comparer correctement les objets,
-* injecter correctement l’année académique dans l’inscription,
-* réutiliser cette même année partout.
-
-Aucune incohérence.
-
-──────────────────────────────
-PHASE 6 — COMPATIBILITÉ EXISTANT
-──────────────────────────────
-
-IMPORTANT :
-Ne pas casser :
-
-* tunnel admissions,
-* inscriptions existantes,
-* paiements,
-* création étudiant,
-* dashboards,
-* enrollment,
-* notes,
-* emplois du temps,
-* bulletins,
-* workflows existants.
-
-Le correctif doit être :
-
-* centralisé,
-* stable,
-* rétrocompatible.
-
-──────────────────────────────
-PHASE 7 — ROBUSTESSE
-──────────────────────────────
-
-Ajouter :
-
-* logs propres,
-* validations explicites,
-* erreurs compréhensibles,
-* protections contre mismatch.
-
-Le système doit devenir institutionnel et fiable.
-
-OBJECTIF FINAL
-
-Après implémentation :
-
-* une seule année académique réelle,
-* aucune incohérence,
-* aucune erreur de comparaison,
-* aucune confusion entre classes et années,
-* workflow inscription totalement stable,
-* affectation académique fiable.
+Je veux un audit sérieux et précis, pas une réponse approximative.

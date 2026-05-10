@@ -13,7 +13,7 @@
             </div>
         </div>
         <div class="card-body">
-            <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {% csrf_token %}
 
                 <label class="text-sm text-slate-700">
@@ -68,6 +68,112 @@
 
                 <div class="md:col-span-2 flex justify-end gap-2 pt-2">
                     <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="text-base font-semibold text-slate-900 mb-1">Page A propos</h2>
+                <p class="text-sm text-slate-500 mb-0">Configuration du hero, des images et des textes publics de la page A propos.</p>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {% csrf_token %}
+
+                <label class="text-sm text-slate-700 md:col-span-2">
+                    <span class="block mb-1 font-medium">Titre du hero</span>
+                    <input type="text" name="hero_title" value="{{ presentation.hero_title|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </label>
+
+                <label class="text-sm text-slate-700 md:col-span-2">
+                    <span class="block mb-1 font-medium">Sous-titre du hero</span>
+                    <textarea name="hero_subtitle" rows="2" class="w-full rounded-lg border border-slate-300 px-3 py-2">{{ presentation.hero_subtitle|default:'' }}</textarea>
+                </label>
+
+                <div class="md:col-span-2 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-sm font-semibold text-slate-800 mb-3">Fond section HERO (arriere-plan)</p>
+                        {% if site_configuration.about_hero_background_image %}
+                            <img src="{{ site_configuration.about_hero_background_image.url }}" alt="Fond section HERO" class="mb-3 h-44 w-full rounded-lg object-cover border border-slate-200 bg-white">
+                            <label class="mb-3 flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="remove_about_hero_background_image" class="rounded border-slate-300">
+                                <span>Supprimer l'image actuelle</span>
+                            </label>
+                        {% else %}
+                            <div class="mb-3 flex h-44 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500">Aucune image configuree (gradient par defaut)</div>
+                        {% endif %}
+                        <input type="file" name="about_hero_background_image" accept="image/jpeg,image/png,image/webp" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                        <p class="mt-2 text-xs text-slate-500">Controle l'arriere-plan de toute la section HERO. JPG, PNG ou WebP, 5 Mo max.</p>
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-sm font-semibold text-slate-800 mb-3">Image carte HERO (bloc droite)</p>
+                        {% if site_configuration.about_hero_image %}
+                            <img src="{{ site_configuration.about_hero_image.url }}" alt="Image carte HERO" class="mb-3 h-44 w-full rounded-lg object-cover border border-slate-200 bg-white">
+                            <label class="mb-3 flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="remove_about_hero_image" class="rounded border-slate-300">
+                                <span>Supprimer l'image actuelle</span>
+                            </label>
+                        {% else %}
+                            <div class="mb-3 flex h-44 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500">Aucune image configuree</div>
+                        {% endif %}
+                        <input type="file" name="about_hero_image" accept="image/jpeg,image/png,image/webp" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                        <p class="mt-2 text-xs text-slate-500">Controle l'image du bloc visuel a droite (pas l'arriere-plan global). JPG, PNG ou WebP, 5 Mo max.</p>
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-sm font-semibold text-slate-800 mb-3">Image principale A propos</p>
+                        {% if site_configuration.about_main_image %}
+                            <img src="{{ site_configuration.about_main_image.url }}" alt="Image principale A propos" class="mb-3 h-44 w-full rounded-lg object-cover border border-slate-200 bg-white">
+                            <label class="mb-3 flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="remove_about_main_image" class="rounded border-slate-300">
+                                <span>Supprimer l'image actuelle</span>
+                            </label>
+                        {% else %}
+                            <div class="mb-3 flex h-44 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500">Aucune image configuree</div>
+                        {% endif %}
+                        <input type="file" name="about_main_image" accept="image/jpeg,image/png,image/webp" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                        <p class="mt-2 text-xs text-slate-500">Utilisee dans la section presentation de la page A propos.</p>
+                    </div>
+                </div>
+
+                <label class="text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Titre vision</span>
+                    <input type="text" name="about_vision_title" value="{{ site_configuration.about_vision_title|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </label>
+
+                <label class="text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Titre valeurs</span>
+                    <input type="text" name="about_values_title" value="{{ site_configuration.about_values_title|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </label>
+
+                <label class="text-sm text-slate-700 md:col-span-2">
+                    <span class="block mb-1 font-medium">Texte vision</span>
+                    <textarea name="about_vision_text" rows="3" class="w-full rounded-lg border border-slate-300 px-3 py-2">{{ site_configuration.about_vision_text|default:'' }}</textarea>
+                </label>
+
+                <label class="text-sm text-slate-700 md:col-span-2">
+                    <span class="block mb-1 font-medium">Sous-titre valeurs</span>
+                    <input type="text" name="about_values_subtitle" value="{{ site_configuration.about_values_subtitle|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </label>
+
+                <label class="text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">Texte bouton CTA</span>
+                    <input type="text" name="cta_button_text" value="{{ presentation.cta_button_text|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </label>
+
+                <label class="text-sm text-slate-700">
+                    <span class="block mb-1 font-medium">URL bouton CTA</span>
+                    <input type="text" name="cta_button_url" value="{{ presentation.cta_button_url|default:'' }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </label>
+
+                <div class="md:col-span-2 flex justify-end gap-2 pt-2">
+                    <a href="{% url 'core:about' %}" target="_blank" rel="noopener" class="btn btn-secondary">Voir la page</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer la page A propos</button>
                 </div>
             </form>
         </div>

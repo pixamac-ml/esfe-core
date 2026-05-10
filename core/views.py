@@ -291,6 +291,11 @@ def about(request):
     # Hero data
     hero_title = presentation.hero_title if presentation else (institution.name if institution else "Notre Institution")
     hero_subtitle = presentation.hero_subtitle if presentation else "Excellence académique et formation professionnelle de qualité"
+    about_hero_background_url = (
+        site_configuration.about_hero_background_image.url
+        if site_configuration and site_configuration.about_hero_background_image
+        else ""
+    )
 
     context = {
         "institution": institution,
@@ -307,6 +312,7 @@ def about(request):
         "branches": branches,
         "hero_title": hero_title,
         "hero_subtitle": hero_subtitle,
+        "about_hero_background_url": about_hero_background_url,
         **get_institution_context(),
     }
 

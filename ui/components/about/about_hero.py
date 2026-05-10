@@ -18,6 +18,7 @@ class AboutHero(component.Component):
         subtitle="",
         label="À propos",
         image=None,
+        background_image=None,
         cta_text=None,
         cta_url=None,
     ):
@@ -29,6 +30,7 @@ class AboutHero(component.Component):
             "subtitle": subtitle,
             "label": label,
             "image": image if image else None,  # Gère le cas vide
+            "background_image": background_image if background_image else None,
             "cta_text": cta_text,
             "cta_url": cta_url,
         }

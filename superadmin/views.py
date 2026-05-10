@@ -36,7 +36,17 @@ from news.models import News, Event, EventType, MediaItem, ResultSession, Catego
 from news.services import create_event_media_batch
 from communication.models import CommunicationNotification
 from communication.services import EmailService
-from core.models import Institution, LegalPage, LegalSection, LegalSidebarBlock, Partner, ContactMessage, Testimonial
+from core.models import (
+    Institution,
+    InstitutionPresentation,
+    LegalPage,
+    LegalSection,
+    LegalSidebarBlock,
+    Partner,
+    ContactMessage,
+    SiteConfiguration,
+    Testimonial,
+)
 from inscriptions.models import Inscription, StatusHistory
 from payments.models import Payment, PaymentAgent, CashPaymentSession
 from students.models import Student
@@ -3873,13 +3883,38 @@ def message_delete(request, pk):
     return redirect('superadmin:message_list')
 
 
+def _validate_public_image(uploaded_file, label):
+    if not uploaded_file:
+        return
+    max_size = 5 * 1024 * 1024
+    allowed_types = {'image/jpeg', 'image/png', 'image/webp'}
+    content_type = getattr(uploaded_file, 'content_type', '')
+    if content_type not in allowed_types:
+        raise ValidationError(f"{label}: format invalide. Utilisez JPG, PNG ou WebP.")
+    if uploaded_file.size > max_size:
+        raise ValidationError(f"{label}: fichier trop lourd. Maximum autorise: 5 Mo.")
+
+
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def settings(request):
     institution = Institution.objects.first()
+    site_configuration = SiteConfiguration.objects.first()
+    presentation = InstitutionPresentation.objects.first()
 
     if request.method == 'POST':
         if not institution:
             institution = Institution()
+        if not site_configuration:
+            site_configuration = SiteConfiguration()
+        if not presentation:
+            presentation = InstitutionPresentation(
+                about_text=(
+                    "<p>L'institution presente son projet academique, ses valeurs "
+                    "et son engagement pour la formation professionnelle.</p>"
+                ),
+                vision_text="Construire une formation de reference, utile et professionnalisante.",
+                mission_text="Former des profils competents, responsables et operationnels.",
+            )
 
         institution.name = request.POST.get('name', institution.name or '').strip() or 'Institution'
         institution.short_name = request.POST.get('short_name', institution.short_name or '').strip()
@@ -3891,14 +3926,59 @@ def settings(request):
         institution.legal_status = request.POST.get('legal_status', institution.legal_status or '').strip()
         institution.approval_number = request.POST.get('approval_number', institution.approval_number or '').strip()
         institution.director_title = request.POST.get('director_title', institution.director_title or '').strip() or 'Direction Generale'
-        institution.save()
-        messages.success(request, 'Parametres institutionnels enregistres.')
-        return redirect('superadmin:settings')
+
+        presentation.hero_title = request.POST.get('hero_title', presentation.hero_title or '').strip() or 'ESFE Mali'
+        presentation.hero_subtitle = request.POST.get('hero_subtitle', presentation.hero_subtitle or '').strip()
+        presentation.cta_button_text = request.POST.get('cta_button_text', presentation.cta_button_text or '').strip() or 'Candidater maintenant'
+        presentation.cta_button_url = request.POST.get('cta_button_url', presentation.cta_button_url or '').strip() or '/admissions/'
+        site_configuration.about_vision_title = request.POST.get(
+            'about_vision_title',
+            site_configuration.about_vision_title or '',
+        ).strip() or 'Notre Vision'
+        site_configuration.about_vision_text = request.POST.get(
+            'about_vision_text',
+            site_configuration.about_vision_text or '',
+        ).strip()
+        site_configuration.about_values_title = request.POST.get(
+            'about_values_title',
+            site_configuration.about_values_title or '',
+        ).strip() or 'Nos Valeurs'
+        site_configuration.about_values_subtitle = request.POST.get(
+            'about_values_subtitle',
+            site_configuration.about_values_subtitle or '',
+        ).strip()
+
+        if request.POST.get('remove_about_hero_image') == 'on':
+            site_configuration.about_hero_image = None
+        if request.POST.get('remove_about_main_image') == 'on':
+            site_configuration.about_main_image = None
+
+        about_hero_image = request.FILES.get('about_hero_image')
+        about_main_image = request.FILES.get('about_main_image')
+
+        try:
+            _validate_public_image(about_hero_image, 'Image Hero A propos')
+            _validate_public_image(about_main_image, 'Image principale A propos')
+            if about_hero_image:
+                site_configuration.about_hero_image = about_hero_image
+            if about_main_image:
+                site_configuration.about_main_image = about_main_image
+
+            institution.save()
+            presentation.save()
+            site_configuration.save()
+        except ValidationError as exc:
+            messages.error(request, ' '.join(exc.messages))
+        else:
+            messages.success(request, 'Parametres institutionnels et visuels enregistres.')
+            return redirect('superadmin:settings')
 
     return render(request, 'superadmin/settings/index.html', {
         'page_title': 'Parametres institutionnels',
         'active_menu': 'settings',
         'institution': institution,
+        'presentation': presentation,
+        'site_configuration': site_configuration,
     })
 
 

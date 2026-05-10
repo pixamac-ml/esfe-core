@@ -222,6 +222,12 @@ class SiteConfiguration(models.Model):
     )
 
     # About
+    about_hero_background_image = models.ImageField(
+        upload_to="site/about/hero/background/",
+        blank=True,
+        null=True,
+        verbose_name="Image de fond Hero (A propos)",
+    )
     about_hero_image = models.ImageField(
         upload_to="site/about/hero/",
         blank=True,

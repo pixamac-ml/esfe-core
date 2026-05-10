@@ -166,10 +166,11 @@ class SiteConfigurationAdmin(admin.ModelAdmin):
             "fields": (
                 "home_hero_image",
                 "home_about_image",
+                "about_hero_background_image",
                 "about_hero_image",
                 "about_main_image",
             ),
-            "description": "Ces 4 images alimentent directement la Landing et la page A propos."
+            "description": "Ces images alimentent directement la Landing et la page A propos."
         }),
         ("Branding", {
             "fields": ("site_logo",)

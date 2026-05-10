@@ -14,7 +14,7 @@ from students.models import Student, StudentAttendance, TeacherAttendance
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from formations.models import Programme, Cycle, Diploma, Filiere
-from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, LessonLog, Semester, UE
+from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, ECChapter, ECContent, LessonLog, Semester, UE, WeeklyScheduleSlot
 
 from accounts.access import (
 	can_access,
@@ -28,7 +28,7 @@ from accounts.models import BranchCashMovement, PayrollEntry
 from communication.models import CommunicationNotification
 from portal.permissions import get_user_role as get_portal_user_role
 from portal.permissions import get_post_login_portal_url
-from portal.models import SupportAuditLog
+from portal.models import DirectorTeacherAssignment, SupportAuditLog
 
 
 User = get_user_model()
@@ -657,6 +657,193 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_teacher"))
 		self.assertEqual(response.status_code, 403)
 
+	def test_portal_teacher_route_renders_dashboard_for_teacher(self):
+		teacher = self._create_user("portal_teacher_dashboard", role="teacher", position="teacher")
+		teacher.profile.employee_code = "ENS-001"
+		teacher.profile.employment_status = "permanent"
+		teacher.profile.save(update_fields=["employee_code", "employment_status", "updated_at"])
+		self.client.force_login(teacher)
+
+		response = self.client.get(reverse("accounts_portal:portal_teacher"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Dashboard enseignant")
+		self.assertContains(response, "ENS-001")
+		self.assertContains(response, "Mes classes et effectifs")
+
+	def test_teacher_class_detail_renders_for_assigned_teacher(self):
+		teacher = self._create_user("portal_teacher_class_detail", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L2")
+		self._create_course_event(academic_class, academic_year, ec, teacher, hour=9)
+		self.client.force_login(teacher)
+
+		response = self.client.get(reverse("accounts_portal:teacher_class_detail", args=[academic_class.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, academic_class.display_name)
+		self.assertContains(response, "Etudiants de la classe")
+
+	def test_teacher_lesson_log_panel_post_creates_log(self):
+		teacher = self._create_user("portal_teacher_log_panel", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L3")
+		schedule_event = self._create_course_event(academic_class, academic_year, ec, teacher, hour=11)
+		self.client.force_login(teacher)
+
+		response = self.client.post(
+			reverse("accounts_portal:teacher_lesson_log_panel", args=[schedule_event.id]),
+			{
+				"status": LessonLog.STATUS_DONE,
+				"content": "Cours assure normalement",
+				"homework": "Exercice 1",
+				"observations": "RAS",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertNotIn("HX-Refresh", response)
+		self.assertContains(response, "Cahier enregistre avec succes.")
+		self.assertTrue(
+			LessonLog.objects.filter(
+				teacher=teacher,
+				schedule_event=schedule_event,
+				status=LessonLog.STATUS_DONE,
+			).exists()
+		)
+
+	def test_teacher_class_detail_renders_weekly_slot_rows(self):
+		teacher = self._create_user("portal_teacher_weekly_slot", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L3S")
+		WeeklyScheduleSlot.objects.create(
+			academic_class=academic_class,
+			academic_year=academic_year,
+			branch=academic_class.branch,
+			teacher=teacher,
+			ec=ec,
+			weekday=1,
+			start_time=datetime.strptime("10:00", "%H:%M").time(),
+			end_time=datetime.strptime("12:00", "%H:%M").time(),
+			room="B12",
+		)
+		self.client.force_login(teacher)
+
+		response = self.client.get(reverse("accounts_portal:teacher_class_detail", args=[academic_class.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Trame hebdomadaire officielle")
+		self.assertContains(response, "B12")
+
+	def test_teacher_support_workspace_creates_video_and_text_supports(self):
+		teacher = self._create_user("portal_teacher_supports", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L4")
+		self._create_course_event(academic_class, academic_year, ec, teacher, hour=11)
+		self.client.force_login(teacher)
+
+		chapter_response = self.client.post(
+			reverse("accounts_portal:teacher_support_workspace"),
+			{
+				"action": "create_chapter",
+				"class_id": academic_class.id,
+				"ec_id": ec.id,
+				"chapter_title": "Chapitre 1",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertEqual(chapter_response.status_code, 200)
+		chapter = ECChapter.objects.get(ec=ec, title="Chapitre 1")
+
+		video_response = self.client.post(
+			reverse("accounts_portal:teacher_support_workspace"),
+			{
+				"action": "create_content",
+				"class_id": academic_class.id,
+				"ec_id": ec.id,
+				"chapter_id": chapter.id,
+				"content_title": "Video chapitre 1",
+				"content_type": ECContent.CONTENT_TYPE_VIDEO,
+				"video_url": "https://example.com/video-intro",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertEqual(video_response.status_code, 200)
+		self.assertTrue(
+			ECContent.objects.filter(
+				chapter=chapter,
+				title="Video chapitre 1",
+				content_type=ECContent.CONTENT_TYPE_VIDEO,
+				video_url="https://example.com/video-intro",
+			).exists()
+		)
+
+		text_response = self.client.post(
+			reverse("accounts_portal:teacher_support_workspace"),
+			{
+				"action": "create_content",
+				"class_id": academic_class.id,
+				"ec_id": ec.id,
+				"chapter_id": chapter.id,
+				"content_title": "Resume chapitre 1",
+				"content_type": ECContent.CONTENT_TYPE_TEXT,
+				"text_content": "Synthese du cours et consignes.",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertEqual(text_response.status_code, 200)
+		self.assertTrue(
+			ECContent.objects.filter(
+				chapter=chapter,
+				title="Resume chapitre 1",
+				content_type=ECContent.CONTENT_TYPE_TEXT,
+				text_content="Synthese du cours et consignes.",
+			).exists()
+		)
+
+	def test_teacher_dashboard_uses_director_assignment_even_without_schedule(self):
+		teacher = self._create_user("portal_teacher_assignment_only", role="teacher", position="teacher")
+		director = self._create_user("portal_director_assignment_only", role="staff_admin", position="director_of_studies")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L5")
+		director.profile.branch = academic_class.branch
+		director.profile.save(update_fields=["branch", "updated_at"])
+		DirectorTeacherAssignment.objects.create(
+			branch=academic_class.branch,
+			teacher=teacher,
+			academic_class=academic_class,
+			ec=ec,
+			room_label="C-14",
+			planned_hours="24.00",
+			created_by=director,
+		)
+		self.client.force_login(teacher)
+
+		response = self.client.get(reverse("accounts_portal:portal_teacher"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, academic_class.display_name)
+		self.assertContains(response, ec.title)
+
+	def test_teacher_support_workspace_lists_director_assigned_class_without_schedule(self):
+		teacher = self._create_user("portal_teacher_assignment_support", role="teacher", position="teacher")
+		director = self._create_user("portal_director_assignment_support", role="staff_admin", position="director_of_studies")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("M1")
+		director.profile.branch = academic_class.branch
+		director.profile.save(update_fields=["branch", "updated_at"])
+		DirectorTeacherAssignment.objects.create(
+			branch=academic_class.branch,
+			teacher=teacher,
+			academic_class=academic_class,
+			ec=ec,
+			room_label="Lab-2",
+			planned_hours="18.00",
+			created_by=director,
+		)
+		self.client.force_login(teacher)
+
+		response = self.client.get(reverse("accounts_portal:teacher_support_workspace"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, academic_class.display_name)
+		self.assertContains(response, ec.title)
+
 	def test_portal_dashboard_renders_staff_page_from_single_entry(self):
 		staff_user = self._create_user("portal_staff", groups=["admissions_managers"])
 		self.client.force_login(staff_user)
@@ -867,6 +1054,374 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Dashboard Direction des Etudes")
 		self.assertContains(response, "Pilotage de la qualite academique et des charges")
+
+	def test_director_can_create_teacher_with_initial_room_assignment(self):
+		director = self._create_user("portal_director_create_teacher", role="executive", position="director_of_studies")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("D1A")
+		self.client.force_login(director)
+
+		response = self.client.post(
+			reverse("accounts_portal:director_teacher_create"),
+			{
+				"first_name": "Awa",
+				"last_name": "Diallo",
+				"email": "awa.diallo@example.com",
+				"phone": "+22370000000",
+				"specialty": "Anatomie",
+				"class_id": academic_class.id,
+				"ec_id": ec.id,
+				"room_label": "Salle B12",
+				"planned_hours": "24",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		teacher = User.objects.get(email="awa.diallo@example.com")
+		self.assertEqual(teacher.profile.position, "teacher")
+		assignment = DirectorTeacherAssignment.objects.get(teacher=teacher, academic_class=academic_class, ec=ec)
+		self.assertEqual(assignment.room_label, "Salle B12")
+		self.assertEqual(str(assignment.planned_hours), "24.00")
+		self.assertContains(response, "Enseignant cree, affecte et acces generes.")
+
+	def test_director_teacher_assignment_requires_matching_class_room_and_ec(self):
+		director = self._create_user("portal_director_assign_teacher", role="executive", position="director_of_studies")
+		teacher = self._create_user("portal_teacher_for_director_assign", role="teacher", position="teacher")
+		_academic_year, academic_class, ec = self._create_academic_class_bundle("D2A")
+		other_year = AcademicYear.objects.create(
+			name="2026-2027",
+			start_date="2025-10-01",
+			end_date="2026-07-31",
+			is_active=False,
+		)
+		other_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=other_year,
+			level="D3A",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		other_semester = Semester.objects.create(academic_class=other_class, number=1)
+		other_ue = UE.objects.create(semester=other_semester, code="UE-D3A", title="UE D3A")
+		other_ec = EC.objects.create(ue=other_ue, title="EC Hors Classe Directeur", credit_required=3, coefficient=2)
+		self.client.force_login(director)
+
+		error_response = self.client.post(
+			reverse("accounts_portal:director_teacher_assign"),
+			{
+				"teacher_id": teacher.id,
+				"class_id": academic_class.id,
+				"ec_id": other_ec.id,
+				"room_label": "Salle B14",
+				"planned_hours": "18",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(error_response.status_code, 200)
+		self.assertContains(error_response, "La matiere selectionnee")
+		self.assertContains(error_response, "classe choisie")
+		self.assertFalse(DirectorTeacherAssignment.objects.filter(teacher=teacher, academic_class=academic_class).exists())
+
+		success_response = self.client.post(
+			reverse("accounts_portal:director_teacher_assign"),
+			{
+				"teacher_id": teacher.id,
+				"class_id": academic_class.id,
+				"ec_id": ec.id,
+				"room_label": "Salle B14",
+				"planned_hours": "18",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(success_response.status_code, 200)
+		assignment = DirectorTeacherAssignment.objects.get(teacher=teacher, academic_class=academic_class, ec=ec)
+		self.assertEqual(assignment.room_label, "Salle B14")
+		self.assertEqual(str(assignment.planned_hours), "18.00")
+		self.assertContains(success_response, "Affectation enregistree :")
+
+	def test_director_teacher_assignment_requires_planned_hours(self):
+		director = self._create_user("portal_director_assign_hours", role="executive", position="director_of_studies")
+		teacher = self._create_user("portal_teacher_assign_hours", role="teacher", position="teacher")
+		_academic_year, academic_class, ec = self._create_academic_class_bundle("D4A")
+		self.client.force_login(director)
+
+		response = self.client.post(
+			reverse("accounts_portal:director_teacher_assign"),
+			{
+				"teacher_id": teacher.id,
+				"class_id": academic_class.id,
+				"ec_id": ec.id,
+				"room_label": "Salle C10",
+				"planned_hours": "",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Le volume horaire est obligatoire")
+		self.assertFalse(DirectorTeacherAssignment.objects.filter(teacher=teacher, academic_class=academic_class, ec=ec).exists())
+
+	def test_director_can_open_planner_hub_for_class(self):
+		director = self._create_user("portal_director_planner_hub", role="executive", position="director_of_studies")
+		_academic_year, academic_class, _ec = self._create_academic_class_bundle("D5A")
+		self.client.force_login(director)
+
+		response = self.client.get(
+			reverse("accounts_portal:director_planner_hub"),
+			{"class_id": academic_class.id, "week_start": "2026-05-11"},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, academic_class.display_name)
+		self.assertContains(response, "Grille hebdomadaire")
+
+	def test_director_can_plan_weekly_slot_and_generate_month(self):
+		director = self._create_user("portal_director_plan_month", role="executive", position="director_of_studies")
+		teacher = self._create_user("portal_teacher_plan_month", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("D6A")
+		self.client.force_login(director)
+
+		save_response = self.client.post(
+			reverse("accounts_portal:director_weekly_slot_save", args=[academic_class.id]),
+			{
+				"week_start": "2026-05-11",
+				"action": "create",
+				"weekday": "0",
+				"start_time": "08:00",
+				"end_time": "10:00",
+				"ec_id": ec.id,
+				"teacher_id": teacher.id,
+				"room": "Salle D12",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(save_response.status_code, 200)
+		self.assertContains(save_response, "Creneau hebdomadaire cree.")
+
+		month_response = self.client.post(
+			reverse("accounts_portal:director_month_materialize", args=[academic_class.id]),
+			{"week_start": "2026-05-11"},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(month_response.status_code, 200)
+		self.assertContains(month_response, "Mois pedagogique genere")
+		self.assertEqual(
+			AcademicScheduleEvent.objects.filter(
+				academic_class=academic_class,
+				academic_year=academic_year,
+				ec=ec,
+				teacher=teacher,
+				location="Salle D12",
+			).count(),
+			4,
+		)
+
+		second_month_response = self.client.post(
+			reverse("accounts_portal:director_month_materialize", args=[academic_class.id]),
+			{"week_start": "2026-05-11"},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(second_month_response.status_code, 200)
+		self.assertEqual(
+			AcademicScheduleEvent.objects.filter(
+				academic_class=academic_class,
+				academic_year=academic_year,
+				ec=ec,
+				teacher=teacher,
+				location="Salle D12",
+			).count(),
+			4,
+		)
+
+	def test_director_can_program_teacher_in_free_slot(self):
+		director = self._create_user("portal_director_program_free", role="executive", position="director_of_studies")
+		teacher = self._create_user("portal_teacher_program_free", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("D7A")
+		self.client.force_login(director)
+
+		response = self.client.post(
+			reverse("accounts_portal:director_create_schedule_event", args=[academic_class.id]),
+			{
+				"week_start": "2026-05-11",
+				"planner_intent": "program",
+				"date": "2026-05-11",
+				"start_time": "08:00",
+				"end_time": "10:00",
+				"location": "Salle E01",
+				"ec_id": ec.id,
+				"teacher_id": teacher.id,
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Cours programme sur la semaine.")
+		self.assertTrue(
+			AcademicScheduleEvent.objects.filter(
+				academic_class=academic_class,
+				academic_year=academic_year,
+				ec=ec,
+				teacher=teacher,
+				location="Salle E01",
+			).exists()
+		)
+
+	def test_director_schedule_event_rejects_teacher_room_and_class_conflicts(self):
+		director = self._create_user("portal_director_conflicts", role="executive", position="director_of_studies")
+		teacher = self._create_user("portal_teacher_conflicts", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("D8A")
+		other_year = AcademicYear.objects.create(
+			name="2028-2029",
+			start_date="2028-10-01",
+			end_date="2029-07-31",
+			is_active=False,
+		)
+		other_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=other_year,
+			level="D8B",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		other_semester = Semester.objects.create(academic_class=other_class, number=1)
+		other_ue = UE.objects.create(semester=other_semester, code="UE-D8B", title="UE D8B")
+		other_ec = EC.objects.create(ue=other_ue, title="EC D8B", credit_required=3, coefficient=2)
+		self.client.force_login(director)
+
+		self.client.post(
+			reverse("accounts_portal:director_create_schedule_event", args=[academic_class.id]),
+			{
+				"week_start": "2026-05-11",
+				"planner_intent": "program",
+				"date": "2026-05-11",
+				"start_time": "08:00",
+				"end_time": "10:00",
+				"location": "Salle F10",
+				"ec_id": ec.id,
+				"teacher_id": teacher.id,
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		class_conflict = self.client.post(
+			reverse("accounts_portal:director_create_schedule_event", args=[academic_class.id]),
+			{
+				"week_start": "2026-05-11",
+				"planner_intent": "program",
+				"date": "2026-05-11",
+				"start_time": "09:00",
+				"end_time": "11:00",
+				"location": "Salle F11",
+				"ec_id": ec.id,
+				"teacher_id": teacher.id,
+			},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertContains(class_conflict, "Classe occupee")
+
+		teacher_room_conflict = self.client.post(
+			reverse("accounts_portal:director_create_schedule_event", args=[other_class.id]),
+			{
+				"week_start": "2026-05-11",
+				"planner_intent": "program",
+				"date": "2026-05-11",
+				"start_time": "09:00",
+				"end_time": "11:00",
+				"location": "Salle F10",
+				"ec_id": other_ec.id,
+				"teacher_id": teacher.id,
+			},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertContains(teacher_room_conflict, "Enseignant deja programme")
+		self.assertContains(teacher_room_conflict, "Salle occupee")
+
+	def test_director_schedule_event_respects_assignment_planned_hours(self):
+		director = self._create_user("portal_director_hours_limit", role="executive", position="director_of_studies")
+		teacher = self._create_user("portal_teacher_hours_limit", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("H1A")
+		DirectorTeacherAssignment.objects.create(
+			teacher=teacher,
+			academic_class=academic_class,
+			ec=ec,
+			branch=self.branch,
+			room_label="Salle H01",
+			planned_hours="2.0",
+			created_by=director,
+		)
+		self.client.force_login(director)
+
+		first_response = self.client.post(
+			reverse("accounts_portal:director_create_schedule_event", args=[academic_class.id]),
+			{
+				"week_start": "2026-05-11",
+				"planner_intent": "program",
+				"date": "2026-05-11",
+				"start_time": "08:00",
+				"end_time": "10:00",
+				"location": "Salle H01",
+				"ec_id": ec.id,
+				"teacher_id": teacher.id,
+			},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertContains(first_response, "Cours programme sur la semaine.")
+
+		overflow_response = self.client.post(
+			reverse("accounts_portal:director_create_schedule_event", args=[academic_class.id]),
+			{
+				"week_start": "2026-05-11",
+				"planner_intent": "program",
+				"date": "2026-05-12",
+				"start_time": "08:00",
+				"end_time": "09:00",
+				"location": "Salle H01",
+				"ec_id": ec.id,
+				"teacher_id": teacher.id,
+			},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertContains(overflow_response, "Heures depassees")
+
+	def test_director_class_schedule_print_works(self):
+		director = self._create_user("portal_director_print_class", role="executive", position="director_of_studies")
+		teacher = self._create_user("portal_teacher_print_class", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("D9A")
+		self._create_course_event(academic_class, academic_year, ec, teacher, hour=8)
+		self.client.force_login(director)
+
+		response = self.client.get(
+			reverse("accounts_portal:schedule_class_print", args=[academic_class.id]),
+			{"week_start": "2026-04-27", "period": "week"},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Emploi du temps officiel de classe")
+		self.assertContains(response, academic_class.display_name)
+
+	def test_director_teacher_schedule_print_works(self):
+		director = self._create_user("portal_director_print_teacher", role="executive", position="director_of_studies")
+		teacher = self._create_user("portal_teacher_print_teacher", role="teacher", position="teacher")
+		academic_year, academic_class, ec = self._create_academic_class_bundle("D10")
+		self._create_course_event(academic_class, academic_year, ec, teacher, hour=10)
+		self.client.force_login(director)
+
+		response = self.client.get(
+			reverse("accounts_portal:schedule_teacher_print", args=[teacher.id]),
+			{"week_start": "2026-04-27", "period": "week"},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Emploi du temps enseignant")
+		self.assertContains(response, teacher.username)
 
 	def test_portal_dashboard_renders_it_dashboard_from_single_entry(self):
 		it_user = self._create_user("portal_it", position="it_support")

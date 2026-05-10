@@ -57,11 +57,17 @@ def build_director_teacher_assignment_context(*, branch, schedule_stats, teacher
     )
     if branch:
         assignments = assignments.filter(branch=branch)
+    rooms_by_teacher = defaultdict(dict)
+    planned_hours_by_teacher = defaultdict(Decimal)
     for assignment in assignments:
         if assignment.academic_class_id:
             classes_by_teacher[assignment.teacher_id][assignment.academic_class_id] = assignment.academic_class.display_name
         if assignment.ec_id:
             ecs_by_teacher[assignment.teacher_id][assignment.ec_id] = assignment.ec.title
+        if assignment.room_label:
+            rooms_by_teacher[assignment.teacher_id][assignment.id] = assignment.room_label
+        if assignment.planned_hours is not None:
+            planned_hours_by_teacher[assignment.teacher_id] += assignment.planned_hours
 
     teacher_load_map = schedule_stats.get("teacher_load") or {}
     teacher_rows = []
@@ -72,6 +78,8 @@ def build_director_teacher_assignment_context(*, branch, schedule_stats, teacher
         event_items = events_by_teacher.get(teacher.id, [])
         class_labels = list(classes_by_teacher.get(teacher.id, {}).values())
         ec_labels = list(ecs_by_teacher.get(teacher.id, {}).values())
+        room_labels = list(rooms_by_teacher.get(teacher.id, {}).values())
+        planned_hours_target = planned_hours_by_teacher.get(teacher.id, Decimal("0"))
         has_assignment = bool(classes_by_teacher.get(teacher.id) or ecs_by_teacher.get(teacher.id))
         teacher_rows.append({
             "teacher": teacher,
@@ -85,6 +93,9 @@ def build_director_teacher_assignment_context(*, branch, schedule_stats, teacher
             "employee_code": getattr(getattr(teacher, "profile", None), "employee_code", "") or "Code absent",
             "class_labels": class_labels[:6],
             "ec_labels": ec_labels[:8],
+            "room_labels": room_labels[:6],
+            "planned_hours_target": planned_hours_target,
+            "planned_hours_gap": planned_hours_target - Decimal(str(load.get("hours", Decimal("0")) or Decimal("0"))),
             "slot_count": len(slot_items),
             "event_count": len(event_items),
             "first_events": event_items[:4],

@@ -49,6 +49,42 @@ def _paginate(request, queryset, *, param_name, per_page=20):
     return paginator.get_page(request.GET.get(param_name, 1))
 
 
+def _resolve_report_period(request, today):
+    preset = (request.GET.get("report_period") or "month").strip()
+    start_raw = (request.GET.get("report_start") or "").strip()
+    end_raw = (request.GET.get("report_end") or "").strip()
+
+    period_map = {
+        "today": (today, today, "Aujourd'hui"),
+        "week": (today - timedelta(days=6), today, "Cette semaine glissante"),
+        "two_weeks": (today - timedelta(days=13), today, "Deux semaines"),
+        "month": (today.replace(day=1), today, "Ce mois"),
+        "three_months": (today - timedelta(days=89), today, "Trois mois"),
+        "semester": (today - timedelta(days=179), today, "Semestre"),
+        "year": (today.replace(month=1, day=1), today, "Cette annee"),
+    }
+
+    if preset == "custom":
+        try:
+            start_date = date.fromisoformat(start_raw)
+            end_date = date.fromisoformat(end_raw)
+        except ValueError:
+            start_date = today.replace(day=1)
+            end_date = today
+            preset = "month"
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+        return {
+            "preset": preset,
+            "start": start_date,
+            "end": end_date,
+            "label": "Periode personnalisee",
+        }
+
+    start_date, end_date, label = period_map.get(preset, period_map["month"])
+    return {"preset": preset, "start": start_date, "end": end_date, "label": label}
+
+
 def _get_manager_agent(user, branch):
     return (
         PaymentAgent.objects
@@ -343,6 +379,61 @@ def _manager_context(request, active_section="overview"):
             1,
         )
 
+    report_period = _resolve_report_period(request, today)
+    report_movements = BranchCashMovement.objects.filter(
+        branch=branch,
+        movement_date__gte=report_period["start"],
+        movement_date__lte=report_period["end"],
+    )
+    report_total_entries = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_IN
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_total_exits = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_student_payments = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_IN,
+        source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_shop_sales = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_IN,
+        source=BranchCashMovement.SOURCE_SHOP,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_expenses = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT,
+        source=BranchCashMovement.SOURCE_EXPENSE,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_salaries = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT,
+        source=BranchCashMovement.SOURCE_PAYROLL,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_other_charges = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT,
+    ).exclude(
+        source__in=[BranchCashMovement.SOURCE_EXPENSE, BranchCashMovement.SOURCE_PAYROLL]
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_other_entries = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_IN,
+    ).exclude(
+        source__in=[BranchCashMovement.SOURCE_STUDENT_PAYMENT, BranchCashMovement.SOURCE_SHOP]
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_rows = [
+        {"label": "Total entrees", "amount": report_total_entries, "tone": "emerald"},
+        {"label": "Total sorties", "amount": report_total_exits, "tone": "rose"},
+        {"label": "Paiements scolaires", "amount": report_student_payments, "tone": "blue"},
+        {"label": "Ventes boutique", "amount": report_shop_sales, "tone": "violet"},
+        {"label": "Depenses", "amount": report_expenses, "tone": "amber"},
+        {"label": "Salaires", "amount": report_salaries, "tone": "slate"},
+        {"label": "Autres charges", "amount": report_other_charges, "tone": "rose"},
+        {"label": "Autres entrees", "amount": report_other_entries, "tone": "emerald"},
+        {"label": "Solde net", "amount": report_total_entries - report_total_exits, "tone": "dark"},
+        {
+            "label": "Gain reel annexe",
+            "amount": (report_student_payments + report_shop_sales + report_other_entries) - (report_expenses + report_salaries + report_other_charges),
+            "tone": "primary",
+        },
+    ]
+
     expense_status = request.GET.get("expense_status", "").strip()
     expense_category = request.GET.get("expense_category", "").strip()
     expense_search = request.GET.get("expense_q", "").strip()
@@ -628,6 +719,8 @@ def _manager_context(request, active_section="overview"):
         "ins_search": ins_search,
         "payments": payments_page,
         "payment_stats": payment_stats,
+        "report_period": report_period,
+        "report_rows": report_rows,
         "annual_revenue_rows": annual_revenue_rows,
         "annual_revenue_total": sum((row.get("total_amount") or 0) for row in annual_revenue_rows),
         "annual_revenue_current_year": current_year_revenue,

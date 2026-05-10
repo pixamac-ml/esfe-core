@@ -1,0 +1,106 @@
+Analyse entièrement le projet Django avant toute modification.
+
+Objectif : corriger et renforcer le workflow planning côté Directeur des Études pour éviter toute duplication d’emploi du temps avec le Surveillant Général.
+
+RÈGLE MÉTIER ABSOLUE :
+Il ne doit jamais exister deux plannings concurrents pour la même classe, la même semaine ou la même période.
+Le planning est unique, partagé et officiel.
+Le Surveillant Général et le Directeur des Études doivent travailler sur la même source de données.
+
+Contexte métier :
+Dans l’école, le Surveillant Général et le Directeur des Études interviennent tous les deux sur l’emploi du temps.
+Le Surveillant Général peut préparer la grille hebdomadaire, créer les créneaux, gérer les salles et organiser les classes.
+Le Directeur des Études peut programmer les enseignants, affecter les cours, compléter les heures pédagogiques, vérifier les disponibilités et éviter les chevauchements.
+Mais les deux doivent toujours manipuler le même planning officiel.
+
+À FAIRE :
+
+1. Auditer l’existant
+- Vérifier les modèles liés au planning, créneaux, classes, salles, enseignants, affectations, matières/EC, semaines et mois.
+- Identifier si le dashboard directeur crée une copie ou un planning séparé.
+- Identifier les vues, services, selectors, urls et templates déjà branchés récemment :
+  - portal/urls.py
+  - portal/views/views.py
+  - templates/portal/staff/director/partials/workspace.html
+  - templates/portal/staff/director/modals/teacher_assign_modal.html
+  - templates/portal/staff/supervisor/partials/planner_class_hub.html
+  - templates/portal/staff/supervisor/partials/planner_view_workspace.html
+  - templates/portal/staff/supervisor/partials/planner_workspace.html
+  - templates/portal/staff/supervisor/partials/weekly_slots_workspace.html
+
+2. Corriger l’architecture fonctionnelle
+- Le Directeur des Études doit ouvrir le planning existant de la classe.
+- S’il existe déjà une grille hebdomadaire ou mensuelle pour la classe, il doit la réutiliser.
+- S’il n’existe aucune grille, il peut initialiser une grille officielle, mais sans créer de doublon.
+- La clé logique doit être : branch/annexe + classe + année académique + semaine/période.
+- Toute création doit passer par un service centralisé qui fait get_or_create proprement.
+
+3. Empêcher les chevauchements
+Avant de programmer un enseignant, vérifier :
+- que la classe est libre sur ce créneau ;
+- que la salle est libre sur ce créneau ;
+- que l’enseignant est libre sur ce créneau ;
+- que l’EC/cours correspond bien à l’affectation pédagogique ;
+- que le nombre d’heures planifiées ne dépasse pas les heures prévues pour l’affectation si cette règle existe déjà.
+
+Si conflit :
+- ne pas enregistrer ;
+- retourner une erreur claire dans l’interface HTMX ;
+- indiquer précisément le conflit : classe occupée, salle occupée, enseignant déjà programmé, ou heures dépassées.
+
+4. Interface directeur
+Dans le dashboard directeur :
+- afficher l’emploi du temps officiel de la classe ;
+- distinguer visuellement les créneaux occupés et libres ;
+- permettre de cliquer sur un créneau libre pour programmer un enseignant ;
+- préremplir le formulaire avec la classe, la semaine, la salle ou le créneau si disponible ;
+- afficher les affectations existantes de l’enseignant ;
+- permettre une génération semaine/mois uniquement sur la base du planning officiel partagé.
+
+5. Impression
+Ajouter une fonctionnalité d’impression professionnelle :
+- imprimer l’emploi du temps d’une classe ;
+- imprimer l’emploi du temps d’un enseignant ;
+- imprimer la semaine ;
+- imprimer le mois si la génération mensuelle existe déjà ;
+- prévoir une vue/template print propre, sans sidebar ni dashboard ;
+- ajouter un bouton “Imprimer” dans l’espace planning.
+
+6. Dashboard enseignant
+Préparer les données pour que le dashboard enseignant puisse ensuite afficher uniquement :
+- ses cours planifiés ;
+- ses créneaux de la semaine ;
+- ses salles ;
+- ses classes ;
+- ses horaires ;
+- sans voir tout le planning général.
+
+Ne pas encore refaire tout le dashboard enseignant, mais structurer les selectors/services pour qu’il puisse consommer ces données proprement.
+
+7. Contraintes techniques
+- Respecter l’architecture existante.
+- Ne pas mettre de logique métier lourde dans les templates.
+- Utiliser services.py et selectors.py si disponibles.
+- Garder les vues minces.
+- Respecter le filtrage par branch/annexe.
+- Ne pas casser le workflow du Surveillant Général.
+- Ne pas dupliquer les templates inutilement : rendre les partials réutilisables entre surveillant/directeur quand c’est logique.
+- Utiliser HTMX pour les chargements dynamiques.
+- Ajouter ou corriger les tests nécessaires.
+
+8. Tests obligatoires
+Ajouter ou corriger des tests pour vérifier :
+- le directeur ouvre le planning officiel existant d’une classe ;
+- le directeur ne crée pas un second planning pour la même classe/semaine ;
+- un enseignant ne peut pas être programmé sur deux créneaux qui se chevauchent ;
+- une salle ne peut pas être utilisée par deux classes au même moment ;
+- une classe ne peut pas avoir deux cours au même moment ;
+- le directeur peut programmer un enseignant dans un créneau libre ;
+- l’impression d’un emploi du temps classe fonctionne ;
+- l’impression d’un emploi du temps enseignant fonctionne.
+
+Commande de test attendue :
+python manage.py test accounts.tests.PortalPhaseOneTests --verbosity 2
+
+Résultat attendu :
+Un workflow planning unique, partagé, propre, sans duplication entre Directeur des Études et Surveillant Général, avec programmation intelligente des enseignants, prévention des conflits et impression des emplois du temps.

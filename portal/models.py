@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from academics.models import AcademicClass, EC
@@ -315,6 +316,8 @@ class DirectorTeacherAssignment(models.Model):
         null=True,
         blank=True,
     )
+    room_label = models.CharField(max_length=120, blank=True)
+    planned_hours = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -345,7 +348,26 @@ class DirectorTeacherAssignment(models.Model):
     def __str__(self):
         class_label = self.academic_class.display_name if self.academic_class_id else "Sans classe"
         ec_label = self.ec.title if self.ec_id else "Sans matiere"
-        return f"{self.teacher} - {class_label} - {ec_label}"
+        room_label = self.room_label or "Salle non precisee"
+        hours_label = f"{self.planned_hours} h prevues" if self.planned_hours is not None else "Volume non precise"
+        return f"{self.teacher} - {class_label} - {ec_label} - {room_label} - {hours_label}"
+
+    def clean(self):
+        errors = {}
+        if self.planned_hours is not None and self.planned_hours <= 0:
+            errors["planned_hours"] = "Le volume horaire doit etre superieur a 0."
+        if self.ec_id and self.academic_class_id and self.ec.ue.semester.academic_class_id != self.academic_class_id:
+            errors["ec"] = "La matiere selectionnee n'appartient pas a la classe choisie."
+        if self.academic_class_id and not self.room_label.strip():
+            errors["room_label"] = "La salle de reference est obligatoire pour une affectation de classe."
+        if self.academic_class_id and self.planned_hours is None:
+            errors["planned_hours"] = "Le volume horaire prevu est obligatoire pour une affectation de classe."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class TeacherDocument(models.Model):

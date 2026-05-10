@@ -1180,11 +1180,67 @@
     {% endif %}
 
     {% if active_section == "rapport" %}
+    <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+        <form method="get" class="grid grid-cols-1 gap-4 lg:grid-cols-[220px_1fr_1fr_auto] lg:items-end">
+            <input type="hidden" name="section" value="rapport">
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-slate-700">Periode</label>
+                <select name="report_period" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm">
+                    <option value="today" {% if report_period.preset == "today" %}selected{% endif %}>Aujourd'hui</option>
+                    <option value="week" {% if report_period.preset == "week" %}selected{% endif %}>Cette semaine</option>
+                    <option value="two_weeks" {% if report_period.preset == "two_weeks" %}selected{% endif %}>Deux semaines</option>
+                    <option value="month" {% if report_period.preset == "month" %}selected{% endif %}>Ce mois</option>
+                    <option value="three_months" {% if report_period.preset == "three_months" %}selected{% endif %}>Trois mois</option>
+                    <option value="semester" {% if report_period.preset == "semester" %}selected{% endif %}>Semestre</option>
+                    <option value="year" {% if report_period.preset == "year" %}selected{% endif %}>Cette annee</option>
+                    <option value="custom" {% if report_period.preset == "custom" %}selected{% endif %}>Personnalisee</option>
+                </select>
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-slate-700">Date debut</label>
+                <input type="date" name="report_start" value="{{ report_period.start|date:'Y-m-d' }}" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm">
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-slate-700">Date fin</label>
+                <input type="date" name="report_end" value="{{ report_period.end|date:'Y-m-d' }}" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm">
+            </div>
+            <button class="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">Generer</button>
+        </form>
+        <p class="mt-3 text-sm text-slate-500">Lecture finance annexe sur la periode du {{ report_period.start|date:"d/m/Y" }} au {{ report_period.end|date:"d/m/Y" }}.</p>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+        <div class="px-6 py-4 border-b border-slate-100">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Bilan financier</p>
+            <h3 class="text-lg font-semibold text-slate-900 mt-1">{{ report_period.label }}</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[760px] divide-y divide-slate-100">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Indicateur</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Montant</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for row in report_rows %}
+                    <tr>
+                        <td class="px-6 py-4 text-sm font-semibold text-slate-900">{{ row.label }}</td>
+                        <td class="px-6 py-4 text-right text-sm font-bold {% if row.tone == 'emerald' %}text-emerald-700{% elif row.tone == 'rose' %}text-rose-700{% elif row.tone == 'violet' %}text-violet-700{% elif row.tone == 'blue' %}text-blue-700{% elif row.tone == 'primary' %}text-primary{% elif row.tone == 'dark' and row.amount < 0 %}text-rose-700{% elif row.tone == 'dark' %}text-slate-900{% else %}text-slate-700{% endif %}">
+                            {{ row.amount|intcomma }} FCFA
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div class="bg-white rounded-2xl border border-slate-100 p-5">
             <p class="text-sm text-slate-500">Recettes {{ annual_revenue_current_year_label }}</p>
             <p class="text-3xl font-bold text-emerald-600 mt-2">{{ annual_revenue_current_year|intcomma }}</p>
-            <p class="text-xs text-slate-500 mt-2">Paiements valides de l'annee en cours</p>
+            <p class="text-xs text-slate-500 mt-2">Paiements scolaires valides de l'annee en cours</p>
         </div>
         <div class="bg-white rounded-2xl border border-slate-100 p-5">
             <p class="text-sm text-slate-500">Recettes {{ annual_revenue_previous_year_label }}</p>

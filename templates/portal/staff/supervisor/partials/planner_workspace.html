@@ -17,15 +17,23 @@
         <button
           type="button"
           class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900"
-          hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
-          hx-target="#supervisor-workspace"
+          hx-get="{% url planner_hub_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+          hx-target="{{ workspace_target_id }}"
           hx-swap="innerHTML"
         >
           Retour aux actions
         </button>
-        <button type="button" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900">
-          <i data-lucide="printer" class="mr-2 inline h-4 w-4"></i> Imprimer
-        </button>
+        <a href="{% url class_print_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&period=week" target="_blank" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900">
+          <i data-lucide="printer" class="mr-2 inline h-4 w-4"></i> Imprimer classe
+        </a>
+        <a href="{% url class_print_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&period=month" target="_blank" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900">
+          <i data-lucide="printer" class="mr-2 inline h-4 w-4"></i> Imprimer mois
+        </a>
+        {% if prefill_teacher_id %}
+        <a href="{% url teacher_print_url prefill_teacher_id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&period=week" target="_blank" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900">
+          <i data-lucide="printer" class="mr-2 inline h-4 w-4"></i> Imprimer enseignant
+        </a>
+        {% endif %}
         <button type="button" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold dark:border-slate-700 dark:bg-slate-900">
           <i data-lucide="eye" class="mr-2 inline h-4 w-4"></i> Previsualiser
         </button>
@@ -71,8 +79,8 @@
           <button
             type="button"
             class="rounded-xl border border-slate-200 p-2 dark:border-slate-700"
-            hx-get="{% url 'accounts_portal:supervisor_planner_workspace' %}?class_id={{ academic_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}"
-            hx-target="#supervisor-workspace"
+            hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}"
+            hx-target="{{ workspace_target_id }}"
             hx-swap="innerHTML"
           >
             <i data-lucide="chevron-left" class="h-4 w-4"></i>
@@ -83,8 +91,8 @@
           <button
             type="button"
             class="rounded-xl border border-slate-200 p-2 dark:border-slate-700"
-            hx-get="{% url 'accounts_portal:supervisor_planner_workspace' %}?class_id={{ academic_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}"
-            hx-target="#supervisor-workspace"
+            hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}"
+            hx-target="{{ workspace_target_id }}"
             hx-swap="innerHTML"
           >
             <i data-lucide="chevron-right" class="h-4 w-4"></i>
@@ -134,12 +142,23 @@
         </div>
       </div>
 
+      {% if prefill_teacher_id or prefill_ec_id or prefill_room_label or prefill_planned_hours %}
+      <div class="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
+        <p class="font-extrabold">Contexte d'affectation charge</p>
+        <p class="mt-1">
+          Le formulaire est pre-rempli a partir d'une affectation enseignant.
+          {% if prefill_planned_hours %} Volume cible: {{ prefill_planned_hours }} h.{% endif %}
+          {% if prefill_room_label %} Salle de reference: {{ prefill_room_label }}.{% endif %}
+        </p>
+      </div>
+      {% endif %}
+
       <form
         method="post"
-        action="{% url 'accounts_portal:supervisor_create_schedule_event' academic_class.id %}"
+        action="{% url create_schedule_event_url academic_class.id %}"
         class="space-y-4"
-        hx-post="{% url 'accounts_portal:supervisor_create_schedule_event' academic_class.id %}"
-        hx-target="#supervisor-workspace"
+        hx-post="{% url create_schedule_event_url academic_class.id %}"
+        hx-target="{{ workspace_target_id }}"
         hx-swap="innerHTML"
       >
         {% csrf_token %}
@@ -165,11 +184,11 @@
         <div class="grid gap-4 md:grid-cols-2">
           <div>
             <label class="mb-2 block text-sm font-bold">Date du cours</label>
-            <input name="date" type="date" required value="{{ schedule.week_start|date:'Y-m-d' }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
+            <input name="date" type="date" required value="{% if prefill_date %}{{ prefill_date }}{% else %}{{ schedule.week_start|date:'Y-m-d' }}{% endif %}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
           </div>
           <div>
             <label class="mb-2 block text-sm font-bold">Salle</label>
-            <input name="location" type="text" placeholder="Ex: Salle A102" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
+            <input name="location" type="text" value="{{ prefill_room_label }}" placeholder="Ex: Salle A102" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
           </div>
         </div>
 
@@ -189,11 +208,11 @@
         <div class="grid gap-4 md:grid-cols-2">
           <div>
             <label class="mb-2 block text-sm font-bold">Heure de debut</label>
-            <input name="start_time" type="time" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
+            <input name="start_time" type="time" required value="{{ prefill_start_time }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
           </div>
           <div>
             <label class="mb-2 block text-sm font-bold">Heure de fin</label>
-            <input name="end_time" type="time" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
+            <input name="end_time" type="time" required value="{{ prefill_end_time }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
           </div>
         </div>
 
@@ -240,6 +259,27 @@
           </button>
         </div>
       </form>
+
+      {% if prefill_teacher_id or prefill_ec_id %}
+      <script>
+        (function () {
+          const root = document.getElementById('planner-create-course');
+          if (!root) {
+            return;
+          }
+          const ecSelect = root.querySelector('select[name="ec_id"]');
+          const teacherSelect = root.querySelector('select[name="teacher_id"]');
+          const prefillEcId = "{{ prefill_ec_id|default:'' }}";
+          const prefillTeacherId = "{{ prefill_teacher_id|default:'' }}";
+          if (ecSelect && prefillEcId) {
+            ecSelect.value = prefillEcId;
+          }
+          if (teacherSelect && prefillTeacherId) {
+            teacherSelect.value = prefillTeacherId;
+          }
+        }());
+      </script>
+      {% endif %}
     </div>
   </div>
 </section>

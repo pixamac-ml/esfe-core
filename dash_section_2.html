@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESFÉ Mali — Classe & Effectifs</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body{
+            font-family: Inter, system-ui, sans-serif;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar{
+            width:6px;
+            height:6px;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-thumb{
+            background:#cbd5e1;
+            border-radius:999px;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50">
+
+<div
+    x-data="{
+        activeTab:'students',
+        openStudentModal:false,
+        openTeacherModal:false
+    }"
+    class="min-h-screen p-6"
+>
+
+    <!-- HEADER -->
+    <div class="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-5 mb-6">
+
+        <!-- LEFT -->
+        <div>
+
+            <!-- BREADCRUMB -->
+            <div class="flex items-center gap-2 text-sm text-slate-500 mb-3">
+
+                <span>Dashboard</span>
+
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+
+                <span>Classes</span>
+
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+
+                <span class="font-semibold text-slate-900">
+                    Licence 2 Sciences Infirmières
+                </span>
+
+            </div>
+
+            <h1 class="text-3xl font-black text-slate-900">
+                Gestion de classe
+            </h1>
+
+            <p class="text-slate-500 mt-2">
+                Consultation des étudiants, enseignants, documents et statistiques de la classe.
+            </p>
+
+        </div>
+
+        <!-- RIGHT -->
+        <div class="flex flex-wrap items-center gap-3">
+
+            <button class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                Année 2025 / 2026
+            </button>
+
+            <button class="h-11 px-5 rounded-xl bg-blue-600 text-white font-semibold flex items-center gap-2 hover:bg-blue-700 transition">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                Imprimer liste
+            </button>
+
+            <button class="h-11 px-5 rounded-xl bg-emerald-600 text-white font-semibold flex items-center gap-2 hover:bg-emerald-700 transition">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                Export Excel
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- CLASS OVERVIEW -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 mb-6">
+
+        <!-- CARD -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+
+            <div class="flex items-center justify-between">
+
+                <div>
+                    <p class="text-sm text-slate-500">
+                        Étudiants
+                    </p>
+
+                    <h2 class="text-4xl font-black mt-3">
+                        320
+                    </h2>
+
+                    <p class="text-sm text-emerald-600 mt-2">
+                        280 actifs
+                    </p>
+                </div>
+
+                <div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                    <i data-lucide="users" class="w-7 h-7"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- CARD -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+
+            <div class="flex items-center justify-between">
+
+                <div>
+                    <p class="text-sm text-slate-500">
+                        Enseignants
+                    </p>
+
+                    <h2 class="text-4xl font-black mt-3">
+                        18
+                    </h2>
+
+                    <p class="text-sm text-slate-500 mt-2">
+                        Affectés
+                    </p>
+                </div>
+
+                <div class="w-14 h-14 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                    <i data-lucide="graduation-cap" class="w-7 h-7"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- CARD -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+
+            <div class="flex items-center justify-between">
+
+                <div>
+                    <p class="text-sm text-slate-500">
+                        Moyenne classe
+                    </p>
+
+                    <h2 class="text-4xl font-black mt-3">
+                        12.45
+                    </h2>
+
+                    <p class="text-sm text-emerald-600 mt-2">
+                        Bonne progression
+                    </p>
+                </div>
+
+                <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                    <i data-lucide="bar-chart-3" class="w-7 h-7"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- CARD -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+
+            <div class="flex items-center justify-between">
+
+                <div>
+                    <p class="text-sm text-slate-500">
+                        Anomalies
+                    </p>
+
+                    <h2 class="text-4xl font-black text-red-600 mt-3">
+                        4
+                    </h2>
+
+                    <p class="text-sm text-red-500 mt-2">
+                        À corriger
+                    </p>
+                </div>
+
+                <div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center">
+                    <i data-lucide="triangle-alert" class="w-7 h-7"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- CARD -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+
+            <div class="flex items-center justify-between">
+
+                <div>
+                    <p class="text-sm text-slate-500">
+                        Emploi du temps
+                    </p>
+
+                    <h2 class="text-4xl font-black mt-3">
+                        24
+                    </h2>
+
+                    <p class="text-sm text-slate-500 mt-2">
+                        Séances / semaine
+                    </p>
+                </div>
+
+                <div class="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                    <i data-lucide="calendar-days" class="w-7 h-7"></i>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- TABS -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+
+        <!-- TAB HEADER -->
+        <div class="border-b border-slate-200 px-5">
+
+            <div class="flex items-center gap-2 overflow-x-auto scrollbar-thin py-3">
+
+                <!-- STUDENTS -->
+                <button
+                    @click="activeTab='students'"
+                    :class="activeTab === 'students'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                    class="h-11 px-5 rounded-xl font-semibold text-sm transition whitespace-nowrap"
+                >
+                    Étudiants de la classe
+                </button>
+
+                <!-- TEACHERS -->
+                <button
+                    @click="activeTab='teachers'"
+                    :class="activeTab === 'teachers'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                    class="h-11 px-5 rounded-xl font-semibold text-sm transition whitespace-nowrap"
+                >
+                    Enseignants affectés
+                </button>
+
+            </div>
+
+        </div>
+
+        <!-- STUDENTS SECTION -->
+        <div x-show="activeTab === 'students'" x-transition>
+
+            <!-- TOPBAR -->
+            <div class="p-5 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+
+                <!-- FILTERS -->
+                <div class="flex flex-wrap items-center gap-3">
+
+                    <!-- SEARCH -->
+                    <div class="relative">
+
+                        <input
+                            type="text"
+                            placeholder="Rechercher un étudiant..."
+                            class="h-11 w-80 rounded-xl border border-slate-200 pl-11 pr-4 outline-none focus:border-blue-500"
+                        >
+
+                        <i
+                            data-lucide="search"
+                            class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        ></i>
+
+                    </div>
+
+                    <!-- FILTER -->
+                    <select class="h-11 rounded-xl border border-slate-200 px-4 text-sm">
+                        <option>Tous les statuts</option>
+                    </select>
+
+                    <select class="h-11 rounded-xl border border-slate-200 px-4 text-sm">
+                        <option>Toutes les moyennes</option>
+                    </select>
+
+                </div>
+
+                <!-- ACTIONS -->
+                <div class="flex flex-wrap items-center gap-3">
+
+                    <button class="h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold flex items-center gap-2">
+                        <i data-lucide="mail" class="w-4 h-4"></i>
+                        Notifier
+                    </button>
+
+                    <button class="h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold flex items-center gap-2">
+                        <i data-lucide="printer" class="w-4 h-4"></i>
+                        Imprimer
+                    </button>
+
+                </div>
+
+            </div>
+
+            <!-- TABLE -->
+            <div class="overflow-x-auto scrollbar-thin">
+
+                <table class="w-full min-w-[1500px]">
+
+                    <!-- HEAD -->
+                    <thead class="bg-slate-100 border-b border-slate-200">
+
+                    <tr>
+
+                        <th class="px-5 py-4 text-left">
+                            <input type="checkbox">
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Étudiant
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Matricule
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Téléphone
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Moyenne
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Crédits
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Absences
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Statut
+                        </th>
+
+                        <th class="px-5 py-4 text-right text-sm font-bold text-slate-700">
+                            Actions
+                        </th>
+
+                    </tr>
+
+                    </thead>
+
+                    <!-- BODY -->
+                    <tbody class="divide-y divide-slate-100 text-sm">
+
+                    <!-- ROW -->
+                    <tr class="hover:bg-slate-50 transition">
+
+                        <td class="px-5 py-4">
+                            <input type="checkbox">
+                        </td>
+
+                        <td class="px-5 py-4">
+
+                            <div class="flex items-center gap-3">
+
+                                <div class="w-11 h-11 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center">
+                                    MT
+                                </div>
+
+                                <div>
+
+                                    <p class="font-semibold text-slate-900">
+                                        TRAORÉ Moussa
+                                    </p>
+
+                                    <p class="text-xs text-slate-500">
+                                        Licence 2 SI
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                        </td>
+
+                        <td class="px-5 py-4 text-slate-600">
+                            ESF2025012
+                        </td>
+
+                        <td class="px-5 py-4 text-slate-600">
+                            +223 70 00 00 00
+                        </td>
+
+                        <td class="px-5 py-4 font-bold">
+                            14.50
+                        </td>
+
+                        <td class="px-5 py-4">
+                            24 / 30
+                        </td>
+
+                        <td class="px-5 py-4">
+                            2
+                        </td>
+
+                        <td class="px-5 py-4">
+
+                            <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                Actif
+                            </span>
+
+                        </td>
+
+                        <td class="px-5 py-4">
+
+                            <div class="flex justify-end gap-2">
+
+                                <button
+                                    @click="openStudentModal = true"
+                                    class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100"
+                                >
+                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                </button>
+
+                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
+                                    <i data-lucide="printer" class="w-4 h-4"></i>
+                                </button>
+
+                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
+                                    <i data-lucide="mail" class="w-4 h-4"></i>
+                                </button>
+
+                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
+                                    <i data-lucide="square-pen" class="w-4 h-4"></i>
+                                </button>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+        <!-- TEACHERS SECTION -->
+        <div x-show="activeTab === 'teachers'" x-transition>
+
+            <!-- TOP -->
+            <div class="p-5 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+
+                <div class="flex flex-wrap items-center gap-3">
+
+                    <div class="relative">
+
+                        <input
+                            type="text"
+                            placeholder="Rechercher un enseignant..."
+                            class="h-11 w-80 rounded-xl border border-slate-200 pl-11 pr-4 outline-none focus:border-blue-500"
+                        >
+
+                        <i
+                            data-lucide="search"
+                            class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        ></i>
+
+                    </div>
+
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+
+                    <button class="h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold flex items-center gap-2">
+                        <i data-lucide="printer" class="w-4 h-4"></i>
+                        Imprimer
+                    </button>
+
+                    <button class="h-11 px-5 rounded-xl bg-blue-600 text-white font-semibold flex items-center gap-2">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        Affecter enseignant
+                    </button>
+
+                </div>
+
+            </div>
+
+            <!-- TABLE -->
+            <div class="overflow-x-auto scrollbar-thin">
+
+                <table class="w-full min-w-[1400px]">
+
+                    <thead class="bg-slate-100 border-b border-slate-200">
+
+                    <tr>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Enseignant
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Spécialité
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            UE affectées
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Charge horaire
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Téléphone
+                        </th>
+
+                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
+                            Statut
+                        </th>
+
+                        <th class="px-5 py-4 text-right text-sm font-bold text-slate-700">
+                            Actions
+                        </th>
+
+                    </tr>
+
+                    </thead>
+
+                    <tbody class="divide-y divide-slate-100 text-sm">
+
+                    <!-- ROW -->
+                    <tr class="hover:bg-slate-50 transition">
+
+                        <td class="px-5 py-4">
+
+                            <div class="flex items-center gap-3">
+
+                                <div class="w-11 h-11 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center">
+                                    AD
+                                </div>
+
+                                <div>
+
+                                    <p class="font-semibold text-slate-900">
+                                        Dr. Awa DIARRA
+                                    </p>
+
+                                    <p class="text-xs text-slate-500">
+                                        Enseignant titulaire
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                        </td>
+
+                        <td class="px-5 py-4">
+                            Sciences Infirmières
+                        </td>
+
+                        <td class="px-5 py-4">
+                            4 UE
+                        </td>
+
+                        <td class="px-5 py-4">
+                            18h / semaine
+                        </td>
+
+                        <td class="px-5 py-4">
+                            +223 60 00 00 00
+                        </td>
+
+                        <td class="px-5 py-4">
+
+                            <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                Actif
+                            </span>
+
+                        </td>
+
+                        <td class="px-5 py-4">
+
+                            <div class="flex justify-end gap-2">
+
+                                <button
+                                    @click="openTeacherModal = true"
+                                    class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100"
+                                >
+                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                </button>
+
+                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
+                                    <i data-lucide="calendar-days" class="w-4 h-4"></i>
+                                </button>
+
+                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
+                                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                                </button>
+
+                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
+                                    <i data-lucide="square-pen" class="w-4 h-4"></i>
+                                </button>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- STUDENT MODAL -->
+    <div
+        x-show="openStudentModal"
+        x-transition
+        class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6"
+    >
+
+        <div
+            @click.away="openStudentModal = false"
+            class="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+        >
+
+            <!-- HEADER -->
+            <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+
+                <div>
+
+                    <h2 class="text-2xl font-black text-slate-900">
+                        Détails étudiant
+                    </h2>
+
+                    <p class="text-sm text-slate-500 mt-1">
+                        Consultation rapide du profil académique
+                    </p>
+
+                </div>
+
+                <button
+                    @click="openStudentModal = false"
+                    class="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center"
+                >
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+
+            </div>
+
+            <!-- CONTENT -->
+            <div class="p-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+                <!-- LEFT -->
+                <div class="xl:col-span-1">
+
+                    <div class="bg-slate-50 rounded-2xl p-6 text-center border border-slate-200">
+
+                        <div class="w-28 h-28 rounded-full bg-blue-100 text-blue-700 font-black text-3xl flex items-center justify-center mx-auto">
+                            MT
+                        </div>
+
+                        <h3 class="text-xl font-black mt-5 text-slate-900">
+                            TRAORÉ Moussa
+                        </h3>
+
+                        <p class="text-sm text-slate-500 mt-1">
+                            ESF2025012
+                        </p>
+
+                        <div class="mt-5 flex justify-center gap-2 flex-wrap">
+
+                            <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                Actif
+                            </span>
+
+                            <span class="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
+                                L2 SI
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- RIGHT -->
+                <div class="xl:col-span-2 space-y-5">
+
+                    <!-- INFO -->
+                    <div class="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+
+                        <h4 class="font-bold text-slate-900 mb-4">
+                            Informations générales
+                        </h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+
+                            <div>
+                                <p class="text-slate-500">
+                                    Téléphone
+                                </p>
+
+                                <p class="font-semibold mt-1">
+                                    +223 70 00 00 00
+                                </p>
+                            </div>
+
+                            <div>
+                                <p class="text-slate-500">
+                                    Email
+                                </p>
+
+                                <p class="font-semibold mt-1">
+                                    moussa@email.com
+                                </p>
+                            </div>
+
+                            <div>
+                                <p class="text-slate-500">
+                                    Moyenne générale
+                                </p>
+
+                                <p class="font-semibold mt-1">
+                                    14.50
+                                </p>
+                            </div>
+
+                            <div>
+                                <p class="text-slate-500">
+                                    Crédits validés
+                                </p>
+
+                                <p class="font-semibold mt-1">
+                                    24 / 30
+                                </p>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    lucide.createIcons();
+</script>
+
+</body>
+</html>

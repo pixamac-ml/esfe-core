@@ -1,0 +1,62 @@
+{% if toast %}
+<div class="mb-4 rounded-2xl border px-4 py-3 text-sm font-semibold {% if toast.level == 'error' %}border-rose-200 bg-rose-50 text-rose-700{% elif toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-700{% else %}border-slate-200 bg-slate-50 text-slate-700{% endif %}">
+  {{ toast.message }}
+</div>
+{% endif %}
+
+{% if schedule_event %}
+<article class="space-y-5">
+  <div class="rounded-2xl bg-cyan-950 px-5 py-5 text-white">
+    <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200">Cahier de texte</p>
+    <h3 class="mt-2 text-xl font-black">{{ schedule_event.ec.title }}</h3>
+    <p class="mt-2 text-sm font-semibold text-slate-100">{{ schedule_event.academic_class.display_name }} - {{ schedule_event.start_datetime|date:"D d/m/Y" }}</p>
+    <p class="mt-2 text-xs text-cyan-100">{{ schedule_event.start_datetime|date:"H:i" }} - {{ schedule_event.end_datetime|date:"H:i" }} - {{ schedule_event.location|default:"Salle non precisee" }}</p>
+  </div>
+
+  <form method="post" action="{% url 'accounts_portal:teacher_lesson_log_panel' schedule_event.id %}" class="space-y-4" hx-post="{% url 'accounts_portal:teacher_lesson_log_panel' schedule_event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" onsubmit="return false;">
+    {% csrf_token %}
+    <div>
+      <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Statut</label>
+      <select name="status" class="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none">
+        {% for value, label in lesson_log_status_choices %}
+        <option value="{{ value }}"{% if lesson_log and lesson_log.status == value %} selected{% elif not lesson_log and value == 'done' %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Contenu du cours</label>
+      <textarea name="content" rows="5" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 outline-none" placeholder="Resume du cours, points traites, progression...">{{ lesson_log.content|default:"" }}</textarea>
+    </div>
+
+    <div>
+      <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Travaux / devoirs</label>
+      <textarea name="homework" rows="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 outline-none" placeholder="Travaux donnes a la classe...">{{ lesson_log.homework|default:"" }}</textarea>
+    </div>
+
+    <div>
+      <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Observations</label>
+      <textarea name="observations" rows="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 outline-none" placeholder="Retard, ajustement, incident, remarque utile...">{{ lesson_log.observations|default:"" }}</textarea>
+    </div>
+
+    {% if lesson_log %}
+    <div class="rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
+      Derniere mise a jour : {{ lesson_log.updated_at|date:"d/m/Y H:i" }}
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-3">
+      <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-cyan-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-cyan-500">
+        {% if lesson_log %}Mettre a jour{% else %}Enregistrer{% endif %}
+      </button>
+      <button type="button" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50" hx-get="{% url 'accounts_portal:teacher_class_detail' schedule_event.academic_class_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML">
+        Aperçu classe
+      </button>
+    </div>
+  </form>
+</article>
+{% else %}
+<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm font-semibold text-slate-500">
+  Cours introuvable.
+</div>
+{% endif %}

@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -15,6 +16,7 @@ from shop.services.shop_service import (
     create_shop_payment,
     create_student_required_order,
     deliver_order,
+    get_branch_public_shop_identifier,
     get_required_shop_context,
     get_manager_shop_context,
     mark_order_ready,
@@ -45,10 +47,11 @@ def manager_shop_redirect(request):
     return response
 
 
-def render_manager_shop_panel(request, *, product_form=None, stock_form=None, counter_order_form=None, status=200):
+def render_manager_shop_panel(request, *, product_form=None, stock_form=None, counter_order_form=None, shop_error="", status=200):
     shop_context = get_manager_shop_context(request.branch)
     context = {
         **shop_context,
+        "shop_error": shop_error or shop_context.get("shop_error", ""),
         "shop_product_form": product_form or ShopProductForm(),
         "shop_stock_form": stock_form or ShopStockInForm(branch=request.branch),
         "shop_counter_order_form": counter_order_form or ShopCounterOrderForm(branch=request.branch),
@@ -56,16 +59,6 @@ def render_manager_shop_panel(request, *, product_form=None, stock_form=None, co
     response = render(request, "shop/partials/manager_shop_panel.html", context)
     response.status_code = status
     return response
-
-
-def get_branch_public_shop_identifier(branch):
-    slug = (getattr(branch, "slug", "") or "").strip()
-    if slug:
-        return slug
-    code = (getattr(branch, "code", "") or "").strip().lower()
-    if code:
-        return code
-    return slugify(getattr(branch, "name", "") or "")
 
 
 def resolve_public_shop_branch(identifier):
@@ -147,6 +140,7 @@ def render_public_shop_catalog(request, *, branch, status=200, form=None, select
             "public_order_product_id": selected_product.id if selected_product else None,
             "public_order_product": selected_product,
             "order_success_reference": (request.GET.get("ordered") or "").strip(),
+            "order_error": (request.GET.get("error") or "").strip(),
             "catalog_stats": {
                 "products": len(products),
                 "required": sum(1 for product in products if product.is_required),
@@ -185,17 +179,21 @@ def public_shop_product_order(request, branch_slug, pk):
             return render_public_shop_catalog(request, branch=branch, status=400, form=form, selected_product=product)
 
     actor = request.user if getattr(request.user, "is_authenticated", False) else None
-    order, _payment = create_counter_order(
-        branch=branch,
-        product=product,
-        quantity=form.cleaned_data["quantity"],
-        payment_method=form.cleaned_data["payment_method"],
-        created_by=actor,
-        student=student_record.user if student_record else None,
-        customer_name=form.cleaned_data.get("customer_name", ""),
-        customer_email=form.cleaned_data.get("customer_email", ""),
-        customer_phone=form.cleaned_data.get("customer_phone", ""),
-    )
+    try:
+        order, _payment = create_counter_order(
+            branch=branch,
+            product=product,
+            quantity=form.cleaned_data["quantity"],
+            payment_method=form.cleaned_data["payment_method"],
+            created_by=actor,
+            student=student_record.user if student_record else None,
+            customer_name=form.cleaned_data.get("customer_name", ""),
+            customer_email=form.cleaned_data.get("customer_email", ""),
+            customer_phone=form.cleaned_data.get("customer_phone", ""),
+        )
+    except ValidationError as exc:
+        form.add_error(None, exc.message)
+        return render_public_shop_catalog(request, branch=branch, status=400, form=form, selected_product=product)
     return redirect(f"/shop/{get_branch_public_shop_identifier(branch)}/?ordered={order.reference}")
 
 
@@ -210,7 +208,10 @@ def student_required_modal(request):
 @require_POST
 def student_create_required_order(request):
     product_ids = request.POST.getlist("product_ids")
-    order = create_student_required_order(request.user, product_ids, created_by=request.user)
+    try:
+        order = create_student_required_order(request.user, product_ids, created_by=request.user)
+    except ValidationError as exc:
+        return HttpResponse(exc.message, status=400)
     if not order:
         return HttpResponse("Aucun article selectionne.", status=400)
     return redirect(f"/shop/student/order/{order.pk}/")
@@ -330,17 +331,21 @@ def manager_counter_order_create(request):
     if not form.is_valid():
         return render_manager_shop_panel(request, counter_order_form=form, status=400)
     student = form.cleaned_data.get("student")
-    create_counter_order(
-        branch=request.branch,
-        product=form.cleaned_data["product"],
-        quantity=form.cleaned_data["quantity"],
-        payment_method=form.cleaned_data["payment_method"],
-        created_by=request.user,
-        student=student,
-        customer_name=form.cleaned_data.get("customer_name", ""),
-        customer_email=form.cleaned_data.get("customer_email", ""),
-        customer_phone=form.cleaned_data.get("customer_phone", ""),
-    )
+    try:
+        create_counter_order(
+            branch=request.branch,
+            product=form.cleaned_data["product"],
+            quantity=form.cleaned_data["quantity"],
+            payment_method=form.cleaned_data["payment_method"],
+            created_by=request.user,
+            student=student,
+            customer_name=form.cleaned_data.get("customer_name", ""),
+            customer_email=form.cleaned_data.get("customer_email", ""),
+            customer_phone=form.cleaned_data.get("customer_phone", ""),
+        )
+    except ValidationError as exc:
+        form.add_error(None, exc.message)
+        return render_manager_shop_panel(request, counter_order_form=form, status=400)
     if request.headers.get("HX-Request"):
         return render_manager_shop_panel(request, counter_order_form=ShopCounterOrderForm(branch=request.branch))
     return manager_shop_redirect(request)
@@ -350,7 +355,10 @@ def manager_counter_order_create(request):
 @require_POST
 def manager_payment_validate(request, pk):
     payment = get_object_or_404(ShopPayment, pk=pk, order__branch=request.branch)
-    validate_shop_payment(payment, user=request.user)
+    try:
+        validate_shop_payment(payment, user=request.user)
+    except ValidationError as exc:
+        return render_manager_shop_panel(request, shop_error=exc.message, status=400)
     if request.headers.get("HX-Request"):
         return render_manager_shop_panel(request)
     return manager_shop_redirect(request)

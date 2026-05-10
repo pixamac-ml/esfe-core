@@ -19,6 +19,8 @@ from academics.models import (
     AcademicEnrollment,
     AcademicScheduleEvent,
     EC,
+    ECChapter,
+    ECContent,
     ECGrade,
     LessonLog,
     Semester,
@@ -31,6 +33,7 @@ from academics.services.schedule_service import (
     create_weekly_schedule_slot,
     deactivate_weekly_schedule_slot,
     get_class_week_schedule,
+    get_teacher_week_schedule,
     get_director_schedule_overview,
     list_weekly_slots_for_class,
     serialize_weekly_slot_for_ui,
@@ -46,7 +49,17 @@ from branches.models import Branch
 from inscriptions.models import Inscription
 from payments.models import Payment
 from portal.permissions import get_post_login_portal_url
-from portal.services import build_it_dashboard_context, build_supervisor_dashboard_context
+from portal.services import (
+    build_it_dashboard_context,
+    build_supervisor_dashboard_context,
+    build_teacher_class_detail_context,
+    build_teacher_dashboard_context,
+    build_teacher_lesson_log_context,
+)
+from portal.services.teacher_dashboard_service import (
+    _validate_content_file_extension,
+    build_teacher_support_workspace_context,
+)
 from portal.services.director import (
     build_director_classroom_ops_context,
     build_director_document_context,
@@ -81,7 +94,7 @@ from portal.services.it_support_service import (
     update_account_email,
     update_support_ticket_status,
 )
-from portal.models import SupportTicket
+from portal.models import DirectorTeacherAssignment, SupportTicket
 from portal.views.it_grades_import import build_it_grade_selection_context
 from students.models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, StudentCase
 from students.services.attendance_service import (
@@ -269,14 +282,27 @@ def _render_director_dashboard(request):
         ),
         "dashboard_kind": "Direction des etudes",
         **workspace_context,
+        "director_active_section": workspace_context.get("section", "home"),
         "quality_score": (workspace_context.get("quality") or {}).get("score", 0),
         "home_alerts_count": len(workspace_context.get("alerts") or []),
+        "lesson_logs_count": len(workspace_context.get("recent_lesson_logs") or []),
     }
     return render(request, "portal/staff/director_dashboard.html", context)
 
 
 def _parse_director_section(request, default="home"):
     section = (request.GET.get("section") or request.POST.get("section") or default).strip().lower()
+    aliases = {
+        "classes": "operations",
+        "planning": "assignments",
+        "edt": "assignments",
+        "schedule": "assignments",
+        "transfers": "documents",
+        "notifications": "stats",
+        "logs": "stats",
+        "anomalies": "assignments",
+    }
+    section = aliases.get(section, section)
     allowed = {
         "home",
         "operations",
@@ -929,8 +955,10 @@ def director_teacher_create(request):
                 "email": request.POST.get("email"),
                 "phone": request.POST.get("phone"),
                 "specialty": request.POST.get("specialty"),
-                "class_ids": request.POST.getlist("class_ids"),
-                "ec_ids": request.POST.getlist("ec_ids"),
+                "class_id": request.POST.get("class_id"),
+                "ec_id": request.POST.get("ec_id"),
+                "room_label": request.POST.get("room_label"),
+                "planned_hours": request.POST.get("planned_hours"),
             },
             request.user,
         )
@@ -947,6 +975,143 @@ def director_teacher_create(request):
         return response
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Creation impossible."}
+
+    context = _build_director_workspace_context(request, toast=toast)
+    context["section"] = "teachers"
+    return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_teacher_assign(request):
+    """Modale d'affectation enseignant -> classe/EC/salle (GET: modal, POST: sauvegarde)."""
+    branch = _resolve_academic_branch(request)
+    User = get_user_model()
+
+    teacher_id_raw = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
+    teacher_id = int(teacher_id_raw) if teacher_id_raw.isdigit() else None
+    teacher = None
+    if teacher_id:
+        teacher = User.objects.select_related("profile", "profile__branch").filter(
+            id=teacher_id, is_active=True, profile__position="teacher"
+        ).first()
+
+    if request.method == "GET":
+        classes_qs = AcademicClass.objects.select_related("programme", "academic_year").filter(is_active=True)
+        if branch:
+            classes_qs = classes_qs.filter(branch=branch)
+        ecs_qs = EC.objects.select_related(
+            "ue", "ue__semester", "ue__semester__academic_class"
+        )
+        if branch:
+            ecs_qs = ecs_qs.filter(ue__semester__academic_class__branch=branch)
+        existing = []
+        if teacher:
+            existing = list(
+                DirectorTeacherAssignment.objects.select_related("academic_class", "ec").filter(
+                    teacher=teacher, is_active=True
+                )
+            )
+        selected_class_id = ""
+        selected_ec_id = ""
+        selected_room_label = ""
+        selected_planned_hours = ""
+        if existing:
+            selected_class_id = str(existing[0].academic_class_id or "")
+            selected_ec_id = str(existing[0].ec_id or "")
+            selected_room_label = existing[0].room_label or ""
+            selected_planned_hours = str(existing[0].planned_hours or "")
+        return render(request, "portal/staff/director/modals/teacher_assign_modal.html", {
+            "assign_teacher": teacher,
+            "assign_teacher_name": teacher.get_full_name() or teacher.username if teacher else "",
+            "assign_classes": list(classes_qs.order_by("level", "programme__title")[:80]),
+            "assign_ecs": list(ecs_qs.order_by("title")[:120]),
+            "assign_existing": existing,
+            "assign_selected_class_id": selected_class_id,
+            "assign_selected_ec_id": selected_ec_id,
+            "assign_selected_room_label": selected_room_label,
+            "assign_selected_planned_hours": selected_planned_hours,
+        })
+
+    # POST
+    action = (request.POST.get("action") or "add").strip()
+    toast = {"level": "error", "message": "Action impossible."}
+    try:
+        if teacher is None:
+            raise ValidationError("Enseignant introuvable.")
+        if branch and getattr(getattr(teacher, "profile", None), "branch_id", None) != branch.id:
+            raise ValidationError("Affectation hors perimetre refusee.")
+
+        if action == "remove":
+            asg_id_raw = (request.POST.get("assignment_id") or "").strip()
+            asg_id = int(asg_id_raw) if asg_id_raw.isdigit() else None
+            if not asg_id:
+                raise ValidationError("Affectation introuvable.")
+            deleted, _ = DirectorTeacherAssignment.objects.filter(id=asg_id, teacher=teacher).delete()
+            if not deleted:
+                raise ValidationError("Affectation introuvable ou deja supprimee.")
+            toast = {"level": "success", "message": "Affectation retiree."}
+        else:
+            class_id_raw = (request.POST.get("class_id") or "").strip()
+            class_id = int(class_id_raw) if class_id_raw.isdigit() else None
+            ec_id_raw = (request.POST.get("ec_id") or "").strip()
+            ec_id = int(ec_id_raw) if ec_id_raw.isdigit() else None
+            room_label = (request.POST.get("room_label") or "").strip()
+            planned_hours_raw = (request.POST.get("planned_hours") or "").strip()
+
+            if not class_id:
+                raise ValidationError("La classe est obligatoire.")
+            if not room_label:
+                raise ValidationError("La salle est obligatoire pour cette affectation.")
+            if not planned_hours_raw:
+                raise ValidationError("Le volume horaire est obligatoire pour cette affectation.")
+            academic_class = AcademicClass.objects.filter(id=class_id, is_active=True).first()
+            if academic_class is None:
+                raise ValidationError("Classe introuvable.")
+            if branch and academic_class.branch_id != branch.id:
+                raise ValidationError("Classe hors perimetre refusee.")
+            ec_obj = EC.objects.filter(id=ec_id).first() if ec_id else None
+            if ec_obj is not None and ec_obj.ue.semester.academic_class_id != academic_class.id:
+                raise ValidationError("La matiere selectionnee n'appartient pas a la classe choisie.")
+
+            assignment, created = DirectorTeacherAssignment.objects.get_or_create(
+                teacher=teacher,
+                academic_class=academic_class,
+                ec=ec_obj,
+                defaults={
+                    "branch": branch or academic_class.branch,
+                    "created_by": request.user,
+                    "is_active": True,
+                    "room_label": room_label,
+                    "planned_hours": planned_hours_raw.replace(",", "."),
+                },
+            )
+            if not created:
+                assignment.branch = branch or academic_class.branch
+                assignment.is_active = True
+                assignment.room_label = room_label
+                assignment.planned_hours = planned_hours_raw.replace(",", ".")
+                if assignment.created_by_id is None:
+                    assignment.created_by = request.user
+                assignment.save(update_fields=["branch", "is_active", "room_label", "planned_hours", "created_by", "updated_at"])
+            toast = {
+                "level": "success",
+                "message": (
+                    f"Affectation mise a jour : {academic_class.display_name} -> {room_label}, {planned_hours_raw} h."
+                    if not created
+                    else f"Affectation enregistree : {academic_class.display_name} -> {room_label}, {planned_hours_raw} h."
+                ),
+            }
+
+        response = render(
+            request,
+            "portal/staff/director/partials/workspace.html",
+            {**_build_director_workspace_context(request, toast=toast), "section": "teachers"},
+        )
+        response["HX-Trigger"] = "director-modal-close"
+        return response
+
+    except ValidationError as exc:
+        toast = {"level": "error", "message": " ".join(getattr(exc, "messages", [])) or str(exc)}
 
     context = _build_director_workspace_context(request, toast=toast)
     context["section"] = "teachers"
@@ -1028,6 +1193,28 @@ def director_teacher_document_upload(request):
     context = _build_director_workspace_context(request, toast=toast)
     context["section"] = "documents"
     return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_teacher_documents_modal(request):
+    base_context = _build_director_workspace_context(request)
+    teacher_id_raw = (request.GET.get("teacher_id") or "").strip()
+    teacher_id = int(teacher_id_raw) if teacher_id_raw.isdigit() else None
+
+    selected_teacher = next(
+        (teacher for teacher in base_context.get("document_teacher_rows", []) if teacher.id == teacher_id),
+        base_context.get("selected_document_teacher"),
+    )
+
+    return render(
+        request,
+        "portal/staff/director/modals/teacher_documents_modal.html",
+        {
+            **base_context,
+            "selected_document_teacher": selected_teacher,
+            "teacher_documents": base_context.get("teacher_documents", []),
+        },
+    )
 
 
 @_position_required({"director_of_studies", "executive_director", "super_admin"})
@@ -1835,17 +2022,278 @@ def teacher_portal(request):
     if not can_access(request.user, "view_portal", "teacher"):
         return _deny_portal_access(request)
 
-    context = _build_portal_context(
+    context = build_teacher_dashboard_context(
         request,
-        page_title="Portail enseignant",
-        module_cards=[
-            "Cours",
-            "Evaluations",
-            "Documents",
-            "Classes",
-        ],
+        branch=_resolve_academic_branch(request),
+        base_context_builder=_build_portal_context,
     )
     return render(request, "portal/teacher.html", context)
+
+
+@_position_required({"teacher"})
+def teacher_class_detail(request, class_id: int):
+    branch = _resolve_academic_branch(request)
+    try:
+        raw_week_start = (request.GET.get("week_start") or "").strip()
+        week_start = timezone.localdate()
+        if raw_week_start:
+            week_start = datetime.strptime(raw_week_start, "%Y-%m-%d").date()
+        context = build_teacher_class_detail_context(
+            request,
+            branch=branch,
+            class_id=class_id,
+            week_start=week_start,
+        )
+    except (ValidationError, ValueError) as exc:
+        error_message = exc.messages[0] if isinstance(exc, ValidationError) and exc.messages else str(exc)
+        context = {
+            "toast": {"level": "error", "message": error_message},
+            "academic_class": None,
+        }
+    return render(request, "portal/partials/teacher_class_detail.html", context)
+
+
+@_position_required({"teacher"})
+def teacher_support_workspace(request):
+    branch = _resolve_academic_branch(request)
+
+    def _parse_id(raw_value):
+        raw_value = (raw_value or "").strip()
+        if not raw_value:
+            return None
+        return int(raw_value)
+
+    class_id = request.POST.get("class_id") if request.method == "POST" else request.GET.get("class_id")
+    ec_id = request.POST.get("ec_id") if request.method == "POST" else request.GET.get("ec_id")
+    chapter_id = request.POST.get("chapter_id") if request.method == "POST" else request.GET.get("chapter_id")
+
+    try:
+        parsed_class_id = _parse_id(class_id)
+        parsed_ec_id = _parse_id(ec_id)
+        parsed_chapter_id = _parse_id(chapter_id)
+
+        if request.method == "POST":
+            context = build_teacher_support_workspace_context(
+                request,
+                branch=branch,
+                class_id=parsed_class_id,
+                ec_id=parsed_ec_id,
+                chapter_id=parsed_chapter_id,
+            )
+            selected_class = context["selected_class"]
+            selected_ec = context["selected_ec"]
+            selected_chapter = context["selected_chapter"]
+            action = (request.POST.get("action") or "").strip()
+
+            if selected_class is None:
+                raise ValidationError("Aucune classe disponible pour ce compte.")
+            if selected_ec is None:
+                raise ValidationError("Selectionnez d'abord une matiere.")
+
+            toast_message = "Support enregistre avec succes."
+            if action == "create_chapter":
+                chapter_title = (request.POST.get("chapter_title") or "").strip()
+                if not chapter_title:
+                    raise ValidationError("Le titre du chapitre est obligatoire.")
+                chapter_order = selected_ec.chapters.count() + 1
+                created_chapter = ECChapter.objects.create(
+                    ec=selected_ec,
+                    title=chapter_title,
+                    order=chapter_order,
+                )
+                parsed_chapter_id = created_chapter.id
+                toast_message = f"Chapitre '{chapter_title}' cree avec succes."
+            elif action == "create_content":
+                if selected_chapter is None:
+                    raise ValidationError("Selectionnez ou creez d'abord un chapitre.")
+                content_title = (request.POST.get("content_title") or "").strip()
+                if not content_title:
+                    raise ValidationError("Le titre du support est obligatoire.")
+                content_type = (request.POST.get("content_type") or "").strip()
+                allowed_types = {choice[0] for choice in ECContent.CONTENT_TYPE_CHOICES}
+                if content_type not in allowed_types:
+                    raise ValidationError("Type de contenu invalide.")
+
+                uploaded_file = request.FILES.get("file")
+                video_url = (request.POST.get("video_url") or "").strip() or None
+                text_content = (request.POST.get("text_content") or "").strip()
+
+                if content_type == ECContent.CONTENT_TYPE_TEXT:
+                    if uploaded_file is not None:
+                        raise ValidationError("Le type Texte n'accepte pas de fichier.")
+                    if video_url:
+                        raise ValidationError("Le type Texte n'accepte pas d'URL video.")
+                    if not text_content:
+                        raise ValidationError("Le texte du support est obligatoire pour ce type de contenu.")
+                elif content_type == ECContent.CONTENT_TYPE_VIDEO:
+                    if uploaded_file is not None:
+                        raise ValidationError("Le type Video attend une URL video, pas un fichier.")
+                    if text_content:
+                        raise ValidationError("Le type Video n'accepte pas de texte direct.")
+                    if not video_url:
+                        raise ValidationError("Ajoutez l'URL video du support.")
+                else:
+                    if video_url:
+                        raise ValidationError("L'URL video est reservee au type Video.")
+                    if text_content:
+                        raise ValidationError("Le texte direct est reserve au type Texte.")
+                    if uploaded_file is None:
+                        raise ValidationError("Ajoutez le fichier du support.")
+
+                _validate_content_file_extension(content_type=content_type, uploaded_file=uploaded_file)
+
+                content_order = selected_chapter.contents.count() + 1
+                content = ECContent(
+                    chapter=selected_chapter,
+                    title=content_title,
+                    content_type=content_type,
+                    file=uploaded_file,
+                    video_url=video_url,
+                    text_content=text_content,
+                    order=content_order,
+                )
+                content.full_clean()
+                content.save()
+                toast_message = f"Support '{content_title}' ajoute avec succes."
+            else:
+                raise ValidationError("Action support inconnue.")
+
+            context = build_teacher_support_workspace_context(
+                request,
+                branch=branch,
+                class_id=selected_class.id,
+                ec_id=selected_ec.id,
+                chapter_id=parsed_chapter_id or getattr(selected_chapter, "id", None),
+                toast={"level": "success", "message": toast_message},
+            )
+            return render(request, "portal/partials/teacher_support_workspace.html", context)
+
+        context = build_teacher_support_workspace_context(
+            request,
+            branch=branch,
+            class_id=parsed_class_id,
+            ec_id=parsed_ec_id,
+            chapter_id=parsed_chapter_id,
+        )
+    except (ValidationError, ValueError, TypeError) as exc:
+        error_message = exc.messages[0] if isinstance(exc, ValidationError) and exc.messages else str(exc)
+        try:
+            context = build_teacher_support_workspace_context(
+                request,
+                branch=branch,
+                class_id=None,
+                ec_id=None,
+                chapter_id=None,
+                toast={"level": "error", "message": error_message},
+            )
+        except ValidationError:
+            context = {
+                "branch": branch,
+                "toast": {"level": "error", "message": error_message},
+                "teacher_support_classes": [],
+                "selected_class": None,
+                "selected_ec": None,
+                "selected_ec_summary": None,
+                "selected_chapter": None,
+                "teacher_support_ecs": [],
+                "teacher_support_chapters": [],
+                "teacher_support_contents": [],
+                "content_type_choices": ECContent.CONTENT_TYPE_CHOICES,
+                "file_content_type_choices": [
+                    choice for choice in ECContent.CONTENT_TYPE_CHOICES
+                    if choice[0] != ECContent.CONTENT_TYPE_TEXT
+                ],
+            }
+    return render(request, "portal/partials/teacher_support_workspace.html", context)
+
+
+@_position_required({"teacher"})
+def teacher_lesson_log_panel(request, event_id: int):
+    branch = _resolve_academic_branch(request)
+
+    if request.method == "POST":
+        allowed_statuses = {
+            LessonLog.STATUS_DONE,
+            LessonLog.STATUS_CANCELLED,
+            LessonLog.STATUS_PLANNED,
+        }
+        try:
+            context = build_teacher_lesson_log_context(
+                request,
+                branch=branch,
+                event_id=event_id,
+            )
+            schedule_event = context["schedule_event"]
+            status = (request.POST.get("status") or "").strip()
+            if status not in allowed_statuses:
+                raise ValidationError("Statut de cahier invalide.")
+            payload = {
+                "status": status,
+                "content": request.POST.get("content", ""),
+                "homework": request.POST.get("homework", ""),
+                "observations": request.POST.get("observations", ""),
+            }
+            lesson_log = context["lesson_log"]
+            if lesson_log is None:
+                create_lesson_log(
+                    academic_class=schedule_event.academic_class,
+                    ec=schedule_event.ec,
+                    teacher=schedule_event.teacher,
+                    date=timezone.localdate(schedule_event.start_datetime),
+                    start_time=timezone.localtime(schedule_event.start_datetime).time(),
+                    end_time=timezone.localtime(schedule_event.end_datetime).time(),
+                    branch=schedule_event.branch,
+                    created_by=request.user,
+                    schedule_event=schedule_event,
+                    **payload,
+                )
+            else:
+                update_lesson_log(
+                    lesson_log,
+                    updated_by=request.user,
+                    **payload,
+                )
+            context = build_teacher_lesson_log_context(
+                request,
+                branch=branch,
+                event_id=event_id,
+                toast={"level": "success", "message": "Cahier enregistre avec succes."},
+            )
+        except ValidationError as exc:
+            error_message = exc.messages[0] if exc.messages else str(exc)
+            try:
+                context = build_teacher_lesson_log_context(
+                    request,
+                    branch=branch,
+                    event_id=event_id,
+                    toast={"level": "error", "message": error_message},
+                )
+            except ValidationError:
+                context = {
+                    "toast": {"level": "error", "message": error_message},
+                    "schedule_event": None,
+                    "lesson_log": None,
+                    "lesson_log_status_choices": [],
+                }
+            return render(request, "portal/partials/teacher_lesson_log_panel.html", context)
+
+        return render(request, "portal/partials/teacher_lesson_log_panel.html", context)
+
+    try:
+        context = build_teacher_lesson_log_context(
+            request,
+            branch=branch,
+            event_id=event_id,
+        )
+    except ValidationError as exc:
+        error_message = exc.messages[0] if exc.messages else str(exc)
+        context = {
+            "toast": {"level": "error", "message": error_message},
+            "schedule_event": None,
+            "lesson_log": None,
+            "lesson_log_status_choices": [],
+        }
+    return render(request, "portal/partials/teacher_lesson_log_panel.html", context)
 
 
 @_position_required({"finance_manager", "payment_agent"})
@@ -3014,6 +3462,14 @@ def _build_supervisor_class_detail_context(request, *, branch, class_id: int, we
         for ec in ecs
     ]
 
+    prefill_teacher_raw = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
+    prefill_ec_raw = (request.GET.get("ec_id") or request.POST.get("ec_id") or "").strip()
+    prefill_room = (request.GET.get("room_label") or request.POST.get("room_label") or "").strip()
+    prefill_planned_hours = (request.GET.get("planned_hours") or request.POST.get("planned_hours") or "").strip()
+    prefill_date = (request.GET.get("date") or request.POST.get("date") or "").strip()
+    prefill_start_time = (request.GET.get("start_time") or request.POST.get("start_time") or "").strip()
+    prefill_end_time = (request.GET.get("end_time") or request.POST.get("end_time") or "").strip()
+
     return {
         "branch": branch,
         "academic_class": academic_class,
@@ -3026,6 +3482,13 @@ def _build_supervisor_class_detail_context(request, *, branch, class_id: int, we
         "subject_rows": subject_rows,
         "student_count": len(students),
         "scheduled_courses_count": week_events.count(),
+        "prefill_teacher_id": int(prefill_teacher_raw) if prefill_teacher_raw.isdigit() else None,
+        "prefill_ec_id": int(prefill_ec_raw) if prefill_ec_raw.isdigit() else None,
+        "prefill_room_label": prefill_room,
+        "prefill_planned_hours": prefill_planned_hours,
+        "prefill_date": prefill_date,
+        "prefill_start_time": prefill_start_time,
+        "prefill_end_time": prefill_end_time,
         "timetable_view": build_timetable_view_payload(
             branch=branch,
             academic_class=academic_class,
@@ -3082,6 +3545,67 @@ def _build_weekly_slots_workspace_context(
     if toast is not None:
         ctx["toast"] = toast
     return ctx
+
+
+def _inject_planner_route_context(context, *, role_prefix: str, workspace_target_id: str):
+    context.update(
+        {
+            "workspace_target_id": workspace_target_id,
+            "planner_hub_url": f"accounts_portal:{role_prefix}_planner_hub",
+            "planner_view_url": f"accounts_portal:{role_prefix}_planner_view_workspace",
+            "planner_workspace_url": f"accounts_portal:{role_prefix}_planner_workspace",
+            "weekly_slots_workspace_url": f"accounts_portal:{role_prefix}_weekly_slots_workspace",
+            "weekly_slot_save_url": f"accounts_portal:{role_prefix}_weekly_slot_save",
+            "week_materialize_url": f"accounts_portal:{role_prefix}_week_materialize",
+            "month_materialize_url": f"accounts_portal:{role_prefix}_month_materialize",
+            "create_schedule_event_url": f"accounts_portal:{role_prefix}_create_schedule_event",
+            "class_print_url": "accounts_portal:schedule_class_print",
+            "teacher_print_url": "accounts_portal:schedule_teacher_print",
+        }
+    )
+    return context
+
+
+def _materialize_period_from_weekly_slots(*, user, academic_class, week_start, weeks_count: int):
+    from academics.services.schedule_service import materialize_week_events_from_weekly_slots
+
+    created = 0
+    skipped = 0
+    normalized_week = week_start
+    for offset in range(max(1, weeks_count)):
+        cursor = normalized_week + timedelta(days=7 * offset)
+        result = materialize_week_events_from_weekly_slots(
+            user=user,
+            academic_class=academic_class,
+            week_start=cursor,
+        )
+        created += result["created"]
+        skipped += result["skipped_existing"]
+    return {"created": created, "skipped_existing": skipped, "weeks_count": max(1, weeks_count)}
+
+
+def _parse_planning_period_request(request):
+    week_start_raw = (request.GET.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+    period = (request.GET.get("period") or "week").strip().lower()
+    if period not in {"week", "month"}:
+        period = "week"
+    normalized_week = week_start - timedelta(days=week_start.weekday())
+    weeks = 4 if period == "month" else 1
+    return normalized_week, period, weeks
+
+
+def _build_print_week_blocks(schedule_builder, target, week_start, weeks):
+    blocks = []
+    for offset in range(weeks):
+        cursor = week_start + timedelta(days=7 * offset)
+        blocks.append(schedule_builder(target, cursor))
+    return blocks
 
 
 def _parse_supervisor_planner_request(request):
@@ -3152,6 +3676,7 @@ def supervisor_planner_workspace(request):
         week_start=week_start,
     )
     context["planner_intent"] = (request.GET.get("intent") or "create").strip() or "create"
+    _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
     return render(
         request,
         "portal/staff/supervisor/partials/planner_workspace.html",
@@ -3180,6 +3705,7 @@ def supervisor_planner_hub(request):
         class_id=class_id,
         week_start=week_start,
     )
+    _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
     return render(
         request,
         "portal/staff/supervisor/partials/planner_class_hub.html",
@@ -3208,6 +3734,7 @@ def supervisor_planner_view_workspace(request):
         class_id=class_id,
         week_start=week_start,
     )
+    _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
     return render(
         request,
         "portal/staff/supervisor/partials/planner_view_workspace.html",
@@ -3254,6 +3781,7 @@ def supervisor_weekly_slots_workspace(request, class_id: int):
             },
         )
 
+    _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
     return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
 
 
@@ -3391,6 +3919,7 @@ def supervisor_weekly_slot_save(request, class_id: int):
             },
         )
 
+    _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
     return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
 
 
@@ -3423,10 +3952,11 @@ def supervisor_week_materialize(request, class_id: int):
             branch=branch,
             is_active=True,
         )
-        result = materialize_week_events_from_weekly_slots(
+        result = _materialize_period_from_weekly_slots(
             user=request.user,
             academic_class=academic_class,
             week_start=week_start,
+            weeks_count=1,
         )
         toast = {
             "level": "success",
@@ -3443,6 +3973,59 @@ def supervisor_week_materialize(request, class_id: int):
         editing_slot_id=None,
         toast=toast,
     )
+    _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
+    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_month_materialize(request, class_id: int):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/weekly_slots_workspace.html",
+            {"toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}, "academic_class": None},
+        )
+
+    week_start_raw = (request.POST.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+
+    try:
+        academic_class = AcademicClass.objects.select_related("academic_year", "branch").get(
+            pk=class_id,
+            branch=branch,
+            is_active=True,
+        )
+        result = _materialize_period_from_weekly_slots(
+            user=request.user,
+            academic_class=academic_class,
+            week_start=week_start,
+            weeks_count=4,
+        )
+        toast = {
+            "level": "success",
+            "message": f"Mois pedagogique genere: {result['created']} cours crees ({result['skipped_existing']} deja presents).",
+        }
+    except AcademicClass.DoesNotExist:
+        toast = {"level": "error", "message": "Classe introuvable pour cette annexe."}
+
+    context = _build_weekly_slots_workspace_context(
+        request,
+        branch=branch,
+        class_id=class_id,
+        week_start=week_start,
+        editing_slot_id=None,
+        toast=toast,
+    )
+    _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
     return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
 
 
@@ -3501,7 +4084,7 @@ def supervisor_create_schedule_event(request, class_id: int):
             branch=branch,
             ec=ec,
             teacher=teacher,
-            title="",
+            title=f"{ec.title} - {academic_class.display_name}",
             description="",
             start_datetime=start_dt,
             end_datetime=end_dt,
@@ -3529,7 +4112,357 @@ def supervisor_create_schedule_event(request, class_id: int):
     )
     context["toast"] = toast
     context["planner_intent"] = (request.POST.get("planner_intent") or "create").strip() or "create"
+    _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
     return render(request, "portal/staff/supervisor/partials/planner_workspace.html", context)
+
+
+def _parse_director_planner_request(request):
+    branch = _resolve_academic_branch(request)
+    class_id_raw = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
+    week_start_raw = (request.GET.get("week_start") or request.POST.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+    class_id = int(class_id_raw) if class_id_raw.isdigit() else None
+    return branch, class_id, week_start
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_planner_hub(request):
+    branch, class_id, week_start = _parse_director_planner_request(request)
+    if branch is None:
+        return render(request, "portal/staff/supervisor/partials/planner_class_hub.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+    if class_id is None:
+        return render(request, "portal/staff/supervisor/partials/planner_class_hub.html", {"branch": branch, "academic_class": None})
+    context = _build_supervisor_class_detail_context(request, branch=branch, class_id=class_id, week_start=week_start)
+    _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
+    return render(request, "portal/staff/supervisor/partials/planner_class_hub.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_planner_view_workspace(request):
+    branch, class_id, week_start = _parse_director_planner_request(request)
+    if branch is None:
+        return render(request, "portal/staff/supervisor/partials/planner_view_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+    if class_id is None:
+        return render(request, "portal/staff/supervisor/partials/planner_view_workspace.html", {"branch": branch, "academic_class": None})
+    context = _build_supervisor_class_detail_context(request, branch=branch, class_id=class_id, week_start=week_start)
+    _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
+    return render(request, "portal/staff/supervisor/partials/planner_view_workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_planner_workspace(request):
+    branch, class_id, week_start = _parse_director_planner_request(request)
+    if branch is None:
+        return render(request, "portal/staff/supervisor/partials/planner_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+    if class_id is None:
+        return render(request, "portal/staff/supervisor/partials/planner_workspace.html", {"branch": branch, "academic_class": None})
+    context = _build_supervisor_class_detail_context(request, branch=branch, class_id=class_id, week_start=week_start)
+    context["planner_intent"] = (request.GET.get("intent") or "create").strip() or "create"
+    _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
+    return render(request, "portal/staff/supervisor/partials/planner_workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_weekly_slots_workspace(request, class_id: int):
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+    week_start_raw = (request.GET.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+    edit_raw = (request.GET.get("edit") or "").strip()
+    editing_slot_id = int(edit_raw) if edit_raw.isdigit() else None
+    try:
+        context = _build_weekly_slots_workspace_context(request, branch=branch, class_id=class_id, week_start=week_start, editing_slot_id=editing_slot_id)
+    except AcademicClass.DoesNotExist:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/weekly_slots_workspace.html",
+            {"academic_class": None, "toast": {"level": "error", "message": "Classe introuvable pour cette annexe."}},
+        )
+    _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
+    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_weekly_slot_save(request, class_id: int):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return render(
+            request,
+            "portal/staff/supervisor/partials/weekly_slots_workspace.html",
+            {"toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}, "academic_class": None},
+        )
+
+    week_start_raw = (request.POST.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+
+    action = (request.POST.get("action") or "create").strip().lower()
+    toast = None
+
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+
+    try:
+        academic_class = AcademicClass.objects.select_related("academic_year", "branch").get(pk=class_id, branch=branch, is_active=True)
+
+        if action == "delete":
+            slot_raw = (request.POST.get("slot_id") or "").strip()
+            if not slot_raw.isdigit():
+                raise ValidationError("Creneau invalide.")
+            slot = WeeklyScheduleSlot.objects.get(pk=int(slot_raw), academic_class=academic_class, branch=branch)
+            deactivate_weekly_schedule_slot(slot)
+            toast = {"level": "success", "message": "Creneau retire de la grille hebdomadaire."}
+        elif action in {"update", "create"}:
+            ec = EC.objects.select_related("ue", "ue__semester").get(pk=request.POST.get("ec_id"), ue__semester__academic_class=academic_class)
+            teacher = User.objects.get(pk=request.POST.get("teacher_id"), is_active=True)
+            weekday_raw = (request.POST.get("weekday") or "").strip()
+            if not weekday_raw.isdigit():
+                raise ValidationError("Jour de semaine invalide.")
+            weekday = int(weekday_raw)
+            if weekday < 0 or weekday > 6:
+                raise ValidationError("Jour de semaine hors plage (0-6).")
+            start_t = _parse_slot_time_hhmm(request.POST.get("start_time"))
+            end_t = _parse_slot_time_hhmm(request.POST.get("end_time"))
+            if end_t <= start_t:
+                raise ValidationError("L'heure de fin doit etre apres l'heure de debut.")
+            room = (request.POST.get("room") or "").strip()
+
+            if action == "update":
+                slot_raw = (request.POST.get("slot_id") or "").strip()
+                if not slot_raw.isdigit():
+                    raise ValidationError("Creneau invalide.")
+                slot = WeeklyScheduleSlot.objects.get(pk=int(slot_raw), academic_class=academic_class, branch=branch, is_active=True)
+                update_weekly_schedule_slot(slot, weekday=weekday, ec=ec, teacher=teacher, start_time=start_t, end_time=end_t, room=room, is_active=True)
+                toast = {"level": "success", "message": "Creneau hebdomadaire mis a jour."}
+            else:
+                create_weekly_schedule_slot(
+                    user=request.user,
+                    academic_class=academic_class,
+                    ec=ec,
+                    teacher=teacher,
+                    branch=branch,
+                    academic_year=academic_class.academic_year,
+                    weekday=weekday,
+                    start_time=start_t,
+                    end_time=end_t,
+                    room=room,
+                    is_active=True,
+                )
+                toast = {"level": "success", "message": "Creneau hebdomadaire cree."}
+        else:
+            raise ValidationError("Action non reconnue.")
+    except (AcademicClass.DoesNotExist, WeeklyScheduleSlot.DoesNotExist, EC.DoesNotExist, User.DoesNotExist):
+        toast = {"level": "error", "message": "Donnee introuvable ou hors du perimetre de cette classe."}
+    except ValidationError as exc:
+        toast = {"level": "error", "message": " ".join(exc.messages)}
+
+    context = _build_weekly_slots_workspace_context(
+        request,
+        branch=branch,
+        class_id=class_id,
+        week_start=week_start,
+        editing_slot_id=None,
+        toast=toast,
+    )
+    _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
+    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_week_materialize(request, class_id: int):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+    week_start_raw = (request.POST.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+    try:
+        academic_class = AcademicClass.objects.select_related("academic_year", "branch").get(pk=class_id, branch=branch, is_active=True)
+        result = _materialize_period_from_weekly_slots(user=request.user, academic_class=academic_class, week_start=week_start, weeks_count=1)
+        toast = {"level": "success", "message": f"Semaine generee: {result['created']} cours crees ({result['skipped_existing']} deja presents)."}
+    except AcademicClass.DoesNotExist:
+        toast = {"level": "error", "message": "Classe introuvable pour cette annexe."}
+    context = _build_weekly_slots_workspace_context(request, branch=branch, class_id=class_id, week_start=week_start, editing_slot_id=None, toast=toast)
+    _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
+    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_month_materialize(request, class_id: int):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+    week_start_raw = (request.POST.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+    try:
+        academic_class = AcademicClass.objects.select_related("academic_year", "branch").get(pk=class_id, branch=branch, is_active=True)
+        result = _materialize_period_from_weekly_slots(user=request.user, academic_class=academic_class, week_start=week_start, weeks_count=4)
+        toast = {"level": "success", "message": f"Mois pedagogique genere: {result['created']} cours crees ({result['skipped_existing']} deja presents)."}
+    except AcademicClass.DoesNotExist:
+        toast = {"level": "error", "message": "Classe introuvable pour cette annexe."}
+    context = _build_weekly_slots_workspace_context(request, branch=branch, class_id=class_id, week_start=week_start, editing_slot_id=None, toast=toast)
+    _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
+    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "super_admin"})
+def director_create_schedule_event(request, class_id: int):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return _deny_portal_access(request)
+
+    from django.contrib.auth import get_user_model
+    from django.core.exceptions import ValidationError
+
+    from academics.models import AcademicClass, AcademicScheduleEvent, EC
+    from academics.services.schedule_service import create_schedule_event
+
+    User = get_user_model()
+    academic_class = AcademicClass.objects.select_related("academic_year", "branch").get(pk=class_id, branch=branch, is_active=True)
+    ec = EC.objects.select_related("ue", "ue__semester").get(pk=request.POST.get("ec_id"), ue__semester__academic_class=academic_class)
+    teacher = User.objects.get(pk=request.POST.get("teacher_id"), is_active=True, profile__branch=branch, profile__position="teacher")
+    date_value = (request.POST.get("date") or "").strip()
+    start_time = (request.POST.get("start_time") or "").strip()
+    end_time = (request.POST.get("end_time") or "").strip()
+    location = (request.POST.get("location") or "").strip()
+    is_online = bool((request.POST.get("is_online") or "").strip())
+
+    try:
+        if not (date_value and start_time and end_time):
+            raise ValidationError("Date, heure debut et heure fin sont obligatoires.")
+        start_dt = timezone.make_aware(datetime.strptime(f"{date_value} {start_time}", "%Y-%m-%d %H:%M"))
+        end_dt = timezone.make_aware(datetime.strptime(f"{date_value} {end_time}", "%Y-%m-%d %H:%M"))
+        if end_dt <= start_dt:
+            raise ValidationError("L'heure de fin doit etre apres l'heure de debut.")
+
+        create_schedule_event(
+            user=request.user,
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            academic_class=academic_class,
+            academic_year=academic_class.academic_year,
+            branch=branch,
+            ec=ec,
+            teacher=teacher,
+            title=f"{ec.title} - {academic_class.display_name}",
+            description="",
+            start_datetime=start_dt,
+            end_datetime=end_dt,
+            location=location,
+            is_online=is_online,
+            is_active=True,
+        )
+        toast = {"level": "success", "message": "Cours programme sur la semaine."}
+    except (ValidationError, EC.DoesNotExist, User.DoesNotExist) as exc:
+        msg = " ".join(getattr(exc, "messages", [])) if hasattr(exc, "messages") else str(exc)
+        toast = {"level": "error", "message": msg or "Impossible de programmer ce cours."}
+
+    week_start_raw = (request.POST.get("week_start") or "").strip()
+    week_start = timezone.localdate()
+    if week_start_raw:
+        try:
+            week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+        except ValueError:
+            week_start = timezone.localdate()
+    context = _build_supervisor_class_detail_context(request, branch=branch, class_id=class_id, week_start=week_start)
+    context["toast"] = toast
+    context["planner_intent"] = (request.POST.get("planner_intent") or "create").strip() or "create"
+    _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
+    return render(request, "portal/staff/supervisor/partials/planner_workspace.html", context)
+
+
+@_position_required({"director_of_studies", "academic_supervisor", "executive_director", "super_admin"})
+def schedule_class_print(request, class_id: int):
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return HttpResponseForbidden("Aucune annexe n'est rattachee a ce compte.")
+
+    academic_class = AcademicClass.objects.select_related("programme", "academic_year", "branch").filter(
+        pk=class_id,
+        branch=branch,
+        is_active=True,
+    ).first()
+    if academic_class is None:
+        return HttpResponseForbidden("Classe introuvable pour cette annexe.")
+
+    week_start, period, weeks = _parse_planning_period_request(request)
+    week_blocks = _build_print_week_blocks(get_class_week_schedule, academic_class, week_start, weeks)
+    return render(
+        request,
+        "portal/staff/shared/prints/class_schedule_print.html",
+        {
+            "branch": branch,
+            "academic_class": academic_class,
+            "week_blocks": week_blocks,
+            "period": period,
+            "generated_at": timezone.now(),
+        },
+    )
+
+
+@_position_required({"director_of_studies", "academic_supervisor", "executive_director", "super_admin"})
+def schedule_teacher_print(request, teacher_id: int):
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return HttpResponseForbidden("Aucune annexe n'est rattachee a ce compte.")
+
+    teacher = get_user_model().objects.select_related("profile").filter(
+        pk=teacher_id,
+        is_active=True,
+        profile__branch=branch,
+        profile__position="teacher",
+    ).first()
+    if teacher is None:
+        return HttpResponseForbidden("Enseignant introuvable pour cette annexe.")
+
+    week_start, period, weeks = _parse_planning_period_request(request)
+    week_blocks = _build_print_week_blocks(get_teacher_week_schedule, teacher, week_start, weeks)
+    return render(
+        request,
+        "portal/staff/shared/prints/teacher_schedule_print.html",
+        {
+            "branch": branch,
+            "teacher": teacher,
+            "week_blocks": week_blocks,
+            "period": period,
+            "generated_at": timezone.now(),
+        },
+    )
 
 @login_required
 def dg_portal(request):

@@ -100,7 +100,8 @@ class ShopPublicOrderForm(forms.Form):
         ("walk_in", "Acheteur libre"),
     ))
     student_identifier = forms.CharField(required=False, max_length=80)
-    customer_name = forms.CharField(required=False, max_length=180)
+    customer_first_name = forms.CharField(required=False, max_length=90)
+    customer_last_name = forms.CharField(required=False, max_length=90)
     customer_email = forms.EmailField(required=False)
     customer_phone = forms.CharField(required=False, max_length=40)
     quantity = forms.IntegerField(min_value=1, initial=1)
@@ -108,12 +109,13 @@ class ShopPublicOrderForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ["buyer_type", "student_identifier", "customer_name", "customer_email", "customer_phone", "quantity", "payment_method"]:
+        for field_name in ["buyer_type", "student_identifier", "customer_first_name", "customer_last_name", "customer_email", "customer_phone", "quantity", "payment_method"]:
             self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
         self.fields["student_identifier"].widget.attrs.update({
             "placeholder": "ID utilisateur, username ou matricule etudiant",
         })
-        self.fields["customer_name"].widget.attrs.update({"placeholder": "Nom et prenom"})
+        self.fields["customer_first_name"].widget.attrs.update({"placeholder": "Prenom"})
+        self.fields["customer_last_name"].widget.attrs.update({"placeholder": "Nom"})
         self.fields["customer_email"].widget.attrs.update({"placeholder": "adresse@email.com"})
         self.fields["customer_phone"].widget.attrs.update({"placeholder": "Telephone"})
 
@@ -121,14 +123,18 @@ class ShopPublicOrderForm(forms.Form):
         cleaned = super().clean()
         buyer_type = cleaned.get("buyer_type")
         student_identifier = (cleaned.get("student_identifier") or "").strip()
-        customer_name = (cleaned.get("customer_name") or "").strip()
+        customer_first_name = (cleaned.get("customer_first_name") or "").strip()
+        customer_last_name = (cleaned.get("customer_last_name") or "").strip()
         customer_email = (cleaned.get("customer_email") or "").strip()
         if buyer_type == "student":
             if not student_identifier:
                 self.add_error("student_identifier", "Renseignez l'identifiant etudiant.")
         else:
-            if not customer_name:
-                self.add_error("customer_name", "Le nom de l'acheteur est requis.")
+            if not customer_first_name:
+                self.add_error("customer_first_name", "Le prenom est requis.")
+            if not customer_last_name:
+                self.add_error("customer_last_name", "Le nom est requis.")
             if not customer_email:
                 self.add_error("customer_email", "L'email est requis pour notifier l'acheteur.")
+            cleaned["customer_name"] = " ".join(part for part in [customer_first_name, customer_last_name] if part).strip()
         return cleaned

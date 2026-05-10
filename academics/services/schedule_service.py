@@ -37,6 +37,7 @@ STANDARD_SLOT_WINDOWS = [
     (time(14, 0), time(16, 0)),
     (time(16, 0), time(18, 0)),
 ]
+STANDARD_SLOT_END_BY_START = {start.strftime("%H:%M"): end.strftime("%H:%M") for start, end in STANDARD_SLOT_WINDOWS}
 
 
 def _normalize_week_start(week_start: date | datetime | None) -> date:
@@ -74,6 +75,80 @@ def _conflict_item(conflict_type: str, message: str, event) -> dict:
         "event_id": event.id if event is not None else None,
         "event": event,
     }
+
+
+def _format_event_conflict_label(event: AcademicScheduleEvent) -> str:
+    local_start = timezone.localtime(event.start_datetime)
+    local_end = timezone.localtime(event.end_datetime)
+    return (
+        f"{event.academic_class.display_name} | "
+        f"{local_start.strftime('%d/%m %H:%M')}-{local_end.strftime('%H:%M')} | "
+        f"{event.location or 'Salle non precisee'}"
+    )
+
+
+def _get_assignment_guardrails(*, branch, academic_class, teacher, ec):
+    from portal.models import DirectorTeacherAssignment
+
+    assignments_qs = DirectorTeacherAssignment.objects.filter(
+        teacher=teacher,
+        academic_class=academic_class,
+        is_active=True,
+    )
+    if branch is not None:
+        assignments_qs = assignments_qs.filter(branch=branch)
+    assignments = list(assignments_qs.select_related("ec"))
+    if not assignments:
+        return {"assignments": [], "matched": None}
+
+    exact_match = next((assignment for assignment in assignments if assignment.ec_id == getattr(ec, "id", None)), None)
+    generic_match = next((assignment for assignment in assignments if assignment.ec_id is None), None)
+    matched = exact_match or generic_match
+    return {"assignments": assignments, "matched": matched}
+
+
+def _validate_assignment_guardrails(*, academic_class, teacher, branch, academic_year, ec, start_datetime, end_datetime, exclude_event=None):
+    if teacher is None or academic_class is None or ec is None:
+        return
+
+    guardrails = _get_assignment_guardrails(
+        branch=branch,
+        academic_class=academic_class,
+        teacher=teacher,
+        ec=ec,
+    )
+    assignments = guardrails["assignments"]
+    matched = guardrails["matched"]
+    if assignments and matched is None:
+        ec_labels = ", ".join(
+            sorted({assignment.ec.title for assignment in assignments if assignment.ec_id})
+        ) or "affectation de classe"
+        raise ValidationError(
+            [f"L'enseignant n'est pas affecte a cet EC pour cette classe. Affectations autorisees: {ec_labels}."]
+        )
+
+    if matched is None or matched.planned_hours is None:
+        return
+
+    scheduled_minutes_qs = _base_conflict_queryset(exclude_event_id=getattr(exclude_event, "id", None)).filter(
+        academic_class=academic_class,
+        teacher=teacher,
+        branch=branch,
+        academic_year=academic_year,
+    )
+    if matched.ec_id:
+        scheduled_minutes_qs = scheduled_minutes_qs.filter(ec=matched.ec)
+    scheduled_minutes = Decimal("0")
+    for existing in scheduled_minutes_qs:
+        scheduled_minutes += Decimal(existing.duration_minutes)
+
+    incoming_minutes = Decimal(int((end_datetime - start_datetime).total_seconds() // 60))
+    total_hours = (scheduled_minutes + incoming_minutes) / Decimal("60")
+    if total_hours > matched.planned_hours:
+        scope_label = matched.ec.title if matched.ec_id else academic_class.display_name
+        raise ValidationError(
+            [f"Heures depassees pour l'affectation '{scope_label}' : {total_hours:.2f} h planifiees pour {matched.planned_hours:.2f} h prevues."]
+        )
 
 
 def _serialize_event(event: AcademicScheduleEvent, *, highlight_today: date | None = None) -> dict:
@@ -162,6 +237,8 @@ def _build_week_grid(events, week_start: date):
     for slot_label in standard_slot_labels:
         row = {
             "label": slot_label,
+            "end_label": STANDARD_SLOT_END_BY_START.get(slot_label, ""),
+            "time_range": f"{slot_label} - {STANDARD_SLOT_END_BY_START.get(slot_label, '')}".strip(" -"),
             "is_standard": True,
             "cells": [],
         }
@@ -173,19 +250,21 @@ def _build_week_grid(events, week_start: date):
                     continue
                 if event["slot_label"] == slot_label:
                     cell_events.append(event)
-            row["cells"].append({"day_index": offset, "events": cell_events})
+            row["cells"].append({"day_index": offset, "day_date": day_date, "events": cell_events})
         slots.append(row)
 
     extra_slots = []
     for slot_label in extra_slot_labels:
         row = {
             "label": slot_label,
+            "end_label": "",
+            "time_range": slot_label,
             "is_standard": False,
             "cells": [],
         }
         for offset, current_day in enumerate(days):
             cell_events = [event for event in serialized_events if event["weekday_index"] == offset and event["slot_label"] == slot_label]
-            row["cells"].append({"day_index": offset, "events": cell_events})
+            row["cells"].append({"day_index": offset, "day_date": current_day["date"], "events": cell_events})
         extra_slots.append(row)
 
     day_event_counts = []
@@ -233,15 +312,13 @@ def get_schedule_conflicts(*, academic_class=None, teacher=None, branch=None, ac
     filtered_queryset = queryset
     if branch is not None:
         filtered_queryset = filtered_queryset.filter(branch=branch)
-    if academic_year is not None:
-        filtered_queryset = filtered_queryset.filter(academic_year=academic_year)
 
     if academic_class is not None:
         class_conflicts = list(filtered_queryset.filter(academic_class=academic_class))
         conflicts.extend(
             _conflict_item(
                 "class_conflict",
-                "La classe a deja un evenement planifie sur ce creneau.",
+                f"Classe occupee : {_format_event_conflict_label(event)}.",
                 event,
             )
             for event in class_conflicts
@@ -251,7 +328,7 @@ def get_schedule_conflicts(*, academic_class=None, teacher=None, branch=None, ac
         conflicts.extend(
             _conflict_item(
                 "teacher_conflict",
-                "L'enseignant est deja planifie sur ce creneau.",
+                f"Enseignant deja programme : {_format_event_conflict_label(event)}.",
                 event,
             )
             for event in teacher_conflicts
@@ -261,7 +338,7 @@ def get_schedule_conflicts(*, academic_class=None, teacher=None, branch=None, ac
         conflicts.extend(
             _conflict_item(
                 "location_conflict",
-                "La salle ou le lieu est deja occupe sur ce creneau.",
+                f"Salle occupee : {_format_event_conflict_label(event)}.",
                 event,
             )
             for event in location_conflicts
@@ -304,6 +381,16 @@ def get_schedule_conflicts(*, academic_class=None, teacher=None, branch=None, ac
 
 
 def _ensure_no_conflicts(*, event, exclude_event=None):
+    _validate_assignment_guardrails(
+        academic_class=event.academic_class,
+        teacher=event.teacher,
+        branch=event.branch,
+        academic_year=event.academic_year,
+        ec=event.ec,
+        start_datetime=event.start_datetime,
+        end_datetime=event.end_datetime,
+        exclude_event=exclude_event,
+    )
     conflicts = get_schedule_conflicts(
         academic_class=event.academic_class,
         teacher=event.teacher,
@@ -890,24 +977,50 @@ def deactivate_weekly_schedule_slot(slot: WeeklyScheduleSlot):
 def detect_weekly_schedule_conflicts(
     *,
     academic_class,
+    teacher,
+    branch,
+    academic_year,
+    room,
     weekday: int,
     start_time: time,
     end_time: time,
     exclude_slot_id: int | None = None,
 ):
-    qs = WeeklyScheduleSlot.objects.filter(academic_class=academic_class, weekday=weekday, is_active=True)
+    qs = WeeklyScheduleSlot.objects.filter(
+        weekday=weekday,
+        branch=branch,
+        academic_year=academic_year,
+        is_active=True,
+    )
     if exclude_slot_id:
         qs = qs.exclude(pk=exclude_slot_id)
     conflicts = []
     for other in qs:
         if _weekly_times_overlap(start_time, end_time, other.start_time, other.end_time):
-            conflicts.append(
-                {
-                    "type": "weekly_slot_overlap",
-                    "message": f"Creneau qui chevauche un creneau existant ({other.start_time}-{other.end_time}).",
-                    "slot_id": other.id,
-                }
-            )
+            if other.academic_class_id == academic_class.id:
+                conflicts.append(
+                    {
+                        "type": "weekly_slot_overlap",
+                        "message": f"Classe deja occupee sur la grille officielle ({other.get_weekday_display()} {other.start_time.strftime('%H:%M')}-{other.end_time.strftime('%H:%M')}).",
+                        "slot_id": other.id,
+                    }
+                )
+            if teacher is not None and other.teacher_id == getattr(teacher, "id", None):
+                conflicts.append(
+                    {
+                        "type": "weekly_teacher_overlap",
+                        "message": f"Enseignant deja positionne sur un autre creneau officiel ({other.academic_class.display_name}, {other.start_time.strftime('%H:%M')}-{other.end_time.strftime('%H:%M')}).",
+                        "slot_id": other.id,
+                    }
+                )
+            if room and other.room and other.room.strip().lower() == room.strip().lower():
+                conflicts.append(
+                    {
+                        "type": "weekly_room_overlap",
+                        "message": f"Salle deja utilisee sur la grille officielle ({other.academic_class.display_name}, {other.start_time.strftime('%H:%M')}-{other.end_time.strftime('%H:%M')}).",
+                        "slot_id": other.id,
+                    }
+                )
     return {"has_conflict": bool(conflicts), "conflicts": conflicts}
 
 
@@ -919,6 +1032,10 @@ def create_weekly_schedule_slot(*, user=None, **fields):
     slot.full_clean()
     overlap = detect_weekly_schedule_conflicts(
         academic_class=slot.academic_class,
+        teacher=slot.teacher,
+        branch=slot.branch,
+        academic_year=slot.academic_year,
+        room=slot.room,
         weekday=slot.weekday,
         start_time=slot.start_time,
         end_time=slot.end_time,
@@ -936,6 +1053,10 @@ def update_weekly_schedule_slot(slot: WeeklyScheduleSlot, **changes):
     slot.full_clean()
     overlap = detect_weekly_schedule_conflicts(
         academic_class=slot.academic_class,
+        teacher=slot.teacher,
+        branch=slot.branch,
+        academic_year=slot.academic_year,
+        room=slot.room,
         weekday=slot.weekday,
         start_time=slot.start_time,
         end_time=slot.end_time,

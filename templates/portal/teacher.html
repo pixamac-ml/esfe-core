@@ -1,2 +1,760 @@
-{% extends "portal/base_portal.html" %}
+{% extends "base.html" %}
 
+{% block public_navbar %}{% endblock %}
+{% block public_footer %}{% endblock %}
+{% block public_floating_widget %}{% endblock %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .teacher-dashboard-page.dark-preview {
+    background: #0f172a;
+    color: #e2e8f0;
+  }
+
+  .teacher-dashboard-page.dark-preview .bg-slate-50 {
+    background-color: #0f172a !important;
+  }
+
+  .teacher-dashboard-page.dark-preview .bg-white,
+  .teacher-dashboard-page.dark-preview .bg-slate-100 {
+    background-color: #1e293b !important;
+  }
+
+  .teacher-dashboard-page.dark-preview .border-slate-200,
+  .teacher-dashboard-page.dark-preview .border-b,
+  .teacher-dashboard-page.dark-preview .border-r {
+    border-color: #334155 !important;
+  }
+
+  .teacher-dashboard-page.dark-preview .divide-slate-100 > * + * {
+    border-color: #334155 !important;
+  }
+
+  .teacher-dashboard-page.dark-preview .text-slate-900,
+  .teacher-dashboard-page.dark-preview .font-bold,
+  .teacher-dashboard-page.dark-preview .font-black {
+    color: #f8fafc;
+  }
+
+  .teacher-dashboard-page.dark-preview .text-slate-700,
+  .teacher-dashboard-page.dark-preview .text-slate-600,
+  .teacher-dashboard-page.dark-preview .text-slate-500,
+  .teacher-dashboard-page.dark-preview .text-slate-400 {
+    color: #cbd5e1 !important;
+  }
+
+  .teacher-dashboard-page.dark-preview input,
+  .teacher-dashboard-page.dark-preview textarea,
+  .teacher-dashboard-page.dark-preview select {
+    color: #f8fafc;
+    background: transparent;
+  }
+
+  .teacher-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .teacher-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+
+  .teacher-day-col {
+    min-width: 240px;
+  }
+
+  .teacher-search-panel {
+    backdrop-filter: blur(10px);
+  }
+
+  .teacher-sidebar {
+    background: linear-gradient(180deg, #061b34 0%, #0b2747 100%);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .teacher-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .teacher-modal-shell {
+    pointer-events: none;
+  }
+
+  .teacher-modal-shell.is-open {
+    pointer-events: auto;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% url 'accounts_portal:teacher_support_workspace' as teacher_support_workspace_url %}
+{% if not teacher_support_workspace_url %}
+{% url 'teacher_support_workspace' as teacher_support_workspace_url %}
+{% endif %}
+<div
+  x-data="teacherDashboardState()"
+  x-init="window.teacherDashboardController = $data"
+  :class="{ 'dark-preview': darkMode }"
+  class="teacher-dashboard-page min-h-screen flex overflow-hidden bg-slate-50 text-slate-900"
+>
+  <aside :class="sidebarOpen ? 'w-72' : 'w-20'" class="teacher-sidebar relative z-20 text-white transition-all duration-300 flex flex-col">
+    <div class="h-20 px-5 flex items-center gap-3 border-b border-white/10">
+      <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shrink-0">
+        <i data-lucide="graduation-cap" class="teacher-icon"></i>
+      </div>
+      <div x-show="sidebarOpen" x-transition>
+        <h1 class="font-bold text-lg leading-tight">ESFE Mali</h1>
+        <p class="text-xs text-slate-300">Espace enseignant interne</p>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-5 overflow-y-auto teacher-scrollbar">
+      <p x-show="sidebarOpen" class="px-3 mb-3 text-[11px] uppercase tracking-widest text-slate-400">Portail enseignant</p>
+      <div class="space-y-1">
+        <button @click="activeSection = 'overview'" :class="activeSection === 'overview' ? 'bg-blue-600 text-white' : 'hover:bg-white/10'" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition text-left">
+          <i data-lucide="layout-dashboard" class="teacher-icon"></i>
+          <span x-show="sidebarOpen">Accueil</span>
+        </button>
+        <button @click="activeSection = 'classes'" :class="activeSection === 'classes' ? 'bg-blue-600 text-white' : 'hover:bg-white/10'" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition text-left">
+          <i data-lucide="school" class="teacher-icon"></i>
+          <span x-show="sidebarOpen">Mes classes</span>
+        </button>
+        <button @click="activeSection = 'supports'" :class="activeSection === 'supports' ? 'bg-blue-600 text-white' : 'hover:bg-white/10'" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition text-left">
+          <i data-lucide="folder-open" class="teacher-icon"></i>
+          <span x-show="sidebarOpen">Supports de cours</span>
+        </button>
+        <button @click="activeSection = 'schedule'" :class="activeSection === 'schedule' ? 'bg-blue-600 text-white' : 'hover:bg-white/10'" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition text-left">
+          <i data-lucide="calendar-days" class="teacher-icon"></i>
+          <span x-show="sidebarOpen">Planning</span>
+        </button>
+        <button @click="activeSection = 'logs'" :class="activeSection === 'logs' ? 'bg-blue-600 text-white' : 'hover:bg-white/10'" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition text-left">
+          <i data-lucide="notebook-pen" class="teacher-icon"></i>
+          <span x-show="sidebarOpen">Cahier de texte</span>
+        </button>
+        <button @click="activeSection = 'settings'" :class="activeSection === 'settings' ? 'bg-blue-600 text-white' : 'hover:bg-white/10'" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition text-left">
+          <i data-lucide="settings-2" class="teacher-icon"></i>
+          <span x-show="sidebarOpen">Parametres</span>
+        </button>
+      </div>
+
+      <p x-show="sidebarOpen" class="px-3 mt-8 mb-3 text-[11px] uppercase tracking-widest text-slate-400">Raccourcis</p>
+      <div class="space-y-1">
+        {% if upcoming_events %}
+        <button
+          x-show="sidebarOpen"
+          hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' upcoming_events.0.id %}"
+          hx-target="#teacher-modal-panel"
+          hx-swap="innerHTML"
+          class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition text-left"
+        >
+          <i data-lucide="play-circle" class="teacher-icon"></i>
+          <span>Prochain cours</span>
+        </button>
+        {% endif %}
+        {% if class_focus_rows %}
+        <button
+          x-show="sidebarOpen"
+          hx-get="{% url 'accounts_portal:teacher_class_detail' class_focus_rows.0.class_id %}"
+          hx-target="#teacher-modal-panel"
+          hx-swap="innerHTML"
+          class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition text-left"
+        >
+          <i data-lucide="folders" class="teacher-icon"></i>
+          <span>Classe principale</span>
+        </button>
+        {% if teacher_support_workspace_url %}
+        <button
+          x-show="sidebarOpen"
+          hx-get="{{ teacher_support_workspace_url }}?class_id={{ class_focus_rows.0.class_id }}"
+          hx-target="#teacher-modal-panel"
+          hx-swap="innerHTML"
+          class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition text-left"
+        >
+          <i data-lucide="folder-open" class="teacher-icon"></i>
+          <span>Deposer un support</span>
+        </button>
+        {% endif %}
+        {% endif %}
+      </div>
+    </nav>
+
+    <div class="p-4 space-y-3 border-t border-white/10">
+      <div class="rounded-2xl bg-white/10 p-4 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-black">{{ user_display_name|slice:":1"|upper }}</div>
+        <div x-show="sidebarOpen">
+          <p class="text-sm font-semibold">{{ status_summary.employment_status }}</p>
+          <p class="text-xs text-slate-300">{{ status_summary.employee_code }}</p>
+        </div>
+      </div>
+
+      <button @click="activeSection = 'settings'" class="w-full flex items-center justify-between rounded-2xl border border-white/12 bg-white/10 px-4 py-3 text-sm font-extrabold text-white/95 transition hover:bg-white/14" :class="{ 'justify-center px-2': !sidebarOpen }">
+        <span x-show="sidebarOpen">Gestion du profil</span>
+        <i data-lucide="user-cog" class="teacher-icon"></i>
+      </button>
+
+      <form action="{% url 'accounts:logout' %}" method="post">
+        {% csrf_token %}
+        <button type="submit" class="w-full flex items-center justify-between rounded-2xl border border-white/12 bg-white/10 px-4 py-3 text-sm font-extrabold text-white/95 transition hover:bg-white/14" :class="{ 'justify-center px-2': !sidebarOpen }">
+          <span x-show="sidebarOpen">Deconnexion</span>
+          <i data-lucide="log-out" class="teacher-icon"></i>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <main class="flex-1 min-w-0 overflow-y-auto">
+    <header class="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-40">
+      <div class="flex items-center gap-4 min-w-0 flex-1">
+        <button @click="sidebarOpen = !sidebarOpen" class="w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-100">
+          <i data-lucide="menu" class="teacher-icon text-slate-700"></i>
+        </button>
+        <div class="relative hidden md:block w-full max-w-lg">
+          <label class="flex h-11 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-slate-400">
+            <i data-lucide="search" class="teacher-icon"></i>
+            <input
+              x-model="search"
+              @input.debounce.200ms="performSearch()"
+              @focus="performSearch()"
+              @keydown.enter.prevent="openFirstSearchResult()"
+              type="search"
+              placeholder="Rechercher partout dans le dashboard..."
+              class="w-full border-0 bg-transparent text-sm font-medium text-slate-900 outline-none"
+            >
+          </label>
+          <div x-show="searchOpen && searchResults.length > 0" x-cloak class="teacher-search-panel absolute left-0 right-0 top-12 z-[160] max-h-80 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+            <template x-for="result in searchResults" :key="result.id">
+              <button type="button" class="mb-1 w-full rounded-xl border border-transparent px-3 py-2 text-left hover:border-slate-200 hover:bg-slate-50" @click="openSearchResult(result)">
+                <span class="block truncate text-xs font-black uppercase tracking-wide text-blue-600" x-text="result.scope"></span>
+                <strong class="mt-1 block truncate text-sm text-slate-900" x-text="result.title"></strong>
+                <span class="mt-1 block truncate text-xs text-slate-500" x-text="result.snippet"></span>
+              </button>
+            </template>
+          </div>
+          <div x-show="searchOpen && search.trim().length >= 2 && searchResults.length === 0" x-cloak class="teacher-search-panel absolute left-0 right-0 top-12 z-[160] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500 shadow-2xl">
+            Aucun resultat.
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <div class="hidden xl:flex h-11 w-72 items-center gap-3 rounded-xl border border-slate-200 px-4 text-sm text-slate-500">
+          <i data-lucide="calendar-range" class="teacher-icon"></i>
+          <span>{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</span>
+        </div>
+        <button @click="toggleDarkMode()" class="w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-100" :title="darkMode ? 'Mode clair' : 'Mode sombre'">
+          <i :data-lucide="darkMode ? 'sun-medium' : 'moon-star'" class="teacher-icon text-slate-700"></i>
+        </button>
+        <button @click="activeSection = 'logs'" class="relative w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Notifications">
+          <i data-lucide="bell" class="teacher-icon text-slate-700"></i>
+          {% if pending_lesson_logs_count %}
+          <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">{{ pending_lesson_logs_count }}</span>
+          {% endif %}
+        </button>
+        <button @click="activeSection = 'settings'" class="w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Parametres">
+          <i data-lucide="sliders-horizontal" class="teacher-icon text-slate-700"></i>
+        </button>
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold">{{ user_display_name|slice:":1"|upper }}</div>
+          <div class="hidden md:block">
+            <p class="text-sm font-bold">{{ user_display_name }}</p>
+            <p class="text-xs text-slate-500">Enseignant</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="p-6 space-y-6">
+      <section id="teacher-overview-section" x-show="activeSection === 'overview'" x-cloak class="space-y-6">
+        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-bold">Accueil</h3>
+            <p class="text-sm text-slate-500">Pilotage rapide de vos cours, classes et seances.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2">{{ today|date:"d/m/Y" }}</div>
+            {% if upcoming_events %}
+            <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' upcoming_events.0.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold">Aperçu du prochain cours</button>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Cours aujourd'hui</p><h4 class="text-3xl font-black mt-2">{{ teacher_kpis.today_courses }}</h4><p class="text-xs text-emerald-600 mt-2">Journee en cours</p></div><div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="clock-3" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Cours semaine</p><h4 class="text-3xl font-black mt-2">{{ teacher_kpis.week_courses }}</h4><p class="text-xs text-emerald-600 mt-2">Charge actuelle</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="calendar-days" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Classes actives</p><h4 class="text-3xl font-black mt-2">{{ teacher_kpis.active_classes }}</h4><p class="text-xs text-sky-600 mt-2">Classes rattachees</p></div><div class="w-14 h-14 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center"><i data-lucide="school" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Cahiers a completer</p><h4 class="text-3xl font-black mt-2 {% if pending_lesson_logs_count %}text-red-600{% endif %}">{{ pending_lesson_logs_count }}</h4><p class="text-xs {% if pending_lesson_logs_count %}text-red-600{% else %}text-emerald-600{% endif %} mt-2">{% if pending_lesson_logs_count %}A traiter{% else %}A jour{% endif %}</p></div><div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center"><i data-lucide="triangle-alert" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Logs ce mois</p><h4 class="text-3xl font-black mt-2">{{ teacher_kpis.month_done_logs }}</h4><p class="text-xs text-violet-600 mt-2">{{ status_summary.employee_code }}</p></div><div class="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center"><i data-lucide="notebook-tabs" class="teacher-icon"></i></div></div></div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg">Cours du jour</h3><button @click="activeSection = 'schedule'" class="text-sm text-blue-600 font-semibold">Voir planning</button></div>
+            <div class="divide-y divide-slate-100">
+              {% for event in today_events %}
+              <div class="p-4 flex items-center justify-between gap-3 hover:bg-slate-50">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">{{ event.start_datetime|date:"H" }}</div>
+                  <div>
+                    <p class="font-semibold text-slate-900">{{ event.ec.title }}</p>
+                    <p class="text-sm text-slate-500">{{ event.academic_class.display_name }} · {{ event.location|default:"Salle non precisee" }}</p>
+                  </div>
+                </div>
+                <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-blue-50 text-blue-600 text-sm font-semibold">Aperçu</button>
+              </div>
+              {% empty %}
+              <div class="p-6 text-sm text-slate-500">Aucun cours aujourd'hui.</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg">Prochains cours</h3><button @click="activeSection = 'logs'" class="text-sm text-blue-600 font-semibold">Voir cahiers</button></div>
+            <div class="divide-y divide-slate-100">
+              {% for event in upcoming_events|slice:":4" %}
+              <div class="p-4 flex items-center justify-between gap-3 hover:bg-slate-50">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ event.title }}</p>
+                  <p class="text-sm text-slate-500">{{ event.class_name }}</p>
+                  <p class="text-xs text-slate-400 mt-1">{{ event.weekday_label|title }} · {{ event.time_range }}</p>
+                </div>
+                <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-semibold">Aperçu</button>
+              </div>
+              {% empty %}
+              <div class="p-6 text-sm text-slate-500">Aucun cours a venir.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="teacher-classes-section" x-show="activeSection === 'classes'" x-cloak class="space-y-6">
+        <div class="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-5">
+          <div>
+            <div class="flex items-center gap-2 text-sm text-slate-500 mb-3"><span>Dashboard</span><span>></span><span>Classes</span><span>></span><span class="font-semibold text-slate-900">{{ user_display_name }}</span></div>
+            <h1 class="text-3xl font-black text-slate-900">Mes classes et effectifs</h1>
+            <p class="text-slate-500 mt-2">Consultation des classes, des etudiants et des matieres que vous assurez.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Classes</p><h2 class="text-4xl font-black mt-3">{{ class_focus_rows|length }}</h2><p class="text-sm text-emerald-600 mt-2">Actives</p></div><div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="folders" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Matieres</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.subjects_count }}</h2><p class="text-sm text-slate-500 mt-2">Distinctes</p></div><div class="w-14 h-14 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center"><i data-lucide="book-open-text" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Seances semaine</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.week_courses }}</h2><p class="text-sm text-emerald-600 mt-2">Programmees</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="presentation" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Annee</p><h2 class="text-2xl font-black mt-3">{{ week_start|date:"Y" }}</h2><p class="text-sm text-red-500 mt-2">{{ status_summary.branch_name }}</p></div><div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center"><i data-lucide="calendar-range" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Statut</p><h2 class="text-2xl font-black mt-3">{{ status_summary.employment_status }}</h2><p class="text-sm text-slate-500 mt-2">Profil enseignant</p></div><div class="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="badge-check" class="teacher-icon"></i></div></div></div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="border-b border-slate-200 px-5">
+            <div class="flex items-center gap-2 overflow-x-auto teacher-scrollbar py-3">
+              <button class="h-11 px-5 rounded-xl font-semibold text-sm bg-blue-600 text-white whitespace-nowrap">Classes rattachees</button>
+              <button @click="activeSection = 'schedule'" class="h-11 px-5 rounded-xl font-semibold text-sm bg-slate-100 text-slate-700 whitespace-nowrap">Planning</button>
+              <button @click="activeSection = 'logs'" class="h-11 px-5 rounded-xl font-semibold text-sm bg-slate-100 text-slate-700 whitespace-nowrap">Cahier de texte</button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto teacher-scrollbar">
+            <table class="w-full min-w-[1200px]">
+              <thead class="bg-slate-100 border-b border-slate-200">
+                <tr>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Classe</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Programme</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Matieres</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Seances</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Prochaine</th>
+                  <th class="px-5 py-4 text-right text-sm font-bold text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-sm">
+                {% for row in class_focus_rows %}
+                <tr class="hover:bg-slate-50 transition">
+                  <td class="px-5 py-4 font-semibold text-slate-900">{{ row.class_name }}</td>
+                  <td class="px-5 py-4 text-slate-600">{{ row.programme_title }}</td>
+                  <td class="px-5 py-4 text-slate-600">{% for subject in row.subjects %}{{ subject }}{% if not forloop.last %}, {% endif %}{% empty %}A confirmer{% endfor %}</td>
+                  <td class="px-5 py-4">{{ row.event_count }} datee(s) / {{ row.slot_count }} trame(s)</td>
+                  <td class="px-5 py-4 text-slate-600">{% if row.next_event %}{{ row.next_event.start_datetime|date:"d/m H:i" }}{% else %}Non planifiee{% endif %}</td>
+                  <td class="px-5 py-4">
+                    <div class="flex justify-end gap-2">
+                      <button hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Aperçu classe">
+                        <i data-lucide="eye" class="teacher-icon text-slate-700"></i>
+                      </button>
+                      {% if row.next_event %}
+                      <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' row.next_event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Saisir le cahier">
+                        <i data-lucide="square-pen" class="teacher-icon text-slate-700"></i>
+                      </button>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="px-5 py-8 text-center text-slate-500">Aucune classe active rattachee a cet enseignant.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="teacher-supports-section" x-show="activeSection === 'supports'" x-cloak class="space-y-6">
+        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+          <div>
+            <div class="flex items-center gap-2 text-sm text-slate-500 mb-3"><span>Dashboard</span><span>></span><span>Supports de cours</span><span>></span><span class="font-semibold text-slate-900">{{ user_display_name }}</span></div>
+            <h1 class="text-3xl font-black text-slate-900">Depot des supports par classe</h1>
+            <p class="text-slate-500 mt-2">Classez vos supports par classe, matiere et chapitre avec des regles de depot claires.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            {% if teacher_support_workspace_url %}
+            <button hx-get="{{ teacher_support_workspace_url }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold">Aperçu des supports</button>
+            {% if class_focus_rows %}
+            <button hx-get="{{ teacher_support_workspace_url }}?class_id={{ class_focus_rows.0.class_id }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700">Classe principale</button>
+            {% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Classes rattachees</p><h2 class="text-4xl font-black mt-3">{{ class_focus_rows|length }}</h2><p class="text-sm text-emerald-600 mt-2">Perimetre actif</p></div><div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="school" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Formats geres</p><h2 class="text-4xl font-black mt-3">Fichier / URL / Texte</h2><p class="text-sm text-slate-500 mt-2">Selon le type de support</p></div><div class="w-14 h-14 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center"><i data-lucide="file-up" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Organisation</p><h2 class="text-4xl font-black mt-3">Classe / EC / Chap.</h2><p class="text-sm text-slate-500 mt-2">Parcours hiérarchique clair</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="layers-3" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Zone d'action</p><h2 class="text-4xl font-black mt-3">Panneau live</h2><p class="text-sm text-slate-500 mt-2">Aperçu et edition sans quitter l'ecran</p></div><div class="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center"><i data-lucide="refresh-cw" class="teacher-icon"></i></div></div></div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h3 class="font-bold text-lg">Classes disponibles pour le depot</h3>
+              <p class="text-sm text-slate-500 mt-1">Ouvre une classe pour gerer ses EC, chapitres et supports.</p>
+            </div>
+            <button @click="activeSection = 'classes'" class="text-sm text-blue-600 font-semibold">Voir les classes</button>
+          </div>
+          <div class="divide-y divide-slate-100">
+            {% for row in class_focus_rows %}
+            <div class="p-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between hover:bg-slate-50">
+              <div class="min-w-0">
+                <p class="font-semibold text-slate-900">{{ row.class_name }}</p>
+                <p class="text-sm text-slate-500">{{ row.programme_title }} · {{ row.academic_year_name }}</p>
+                <p class="text-xs text-slate-400 mt-1">Matieres: {% for subject in row.subjects %}{{ subject }}{% if not forloop.last %}, {% endif %}{% empty %}Aucune matiere rattachee{% endfor %}</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                {% if teacher_support_workspace_url %}
+                <button hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Aperçu supports</button>
+                {% endif %}
+                <button hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700">Aperçu classe</button>
+              </div>
+            </div>
+            {% empty %}
+            <div class="p-6 text-sm text-slate-500">Aucune classe active rattachee a cet enseignant.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <section id="teacher-schedule-section" x-show="activeSection === 'schedule'" x-cloak class="space-y-6">
+        <div class="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-5">
+          <div>
+            <div class="flex items-center gap-2 text-sm text-slate-500 mb-3"><span>Dashboard</span><span>></span><span>Emploi du temps</span><span>></span><span class="font-semibold text-slate-900">{{ user_display_name }}</span></div>
+            <h1 class="text-3xl font-black text-slate-900">Mon emploi du temps</h1>
+            <p class="text-slate-500 mt-2">Vision hebdomadaire reelle de vos cours, classes et salles.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Seances / semaine</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.week_courses }}</h2><p class="text-sm text-emerald-600 mt-2">Planning actif</p></div><div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="calendar-fold" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Cours aujourd'hui</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.today_courses }}</h2><p class="text-sm text-slate-500 mt-2">Journee</p></div><div class="w-14 h-14 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center"><i data-lucide="sun" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Classes</p><h2 class="text-4xl font-black mt-3">{{ class_focus_rows|length }}</h2><p class="text-sm text-slate-500 mt-2">Rattachees</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="school-2" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Matieres actives</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.subjects_count }}</h2><p class="text-sm text-red-500 mt-2">Dans la semaine</p></div><div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center"><i data-lucide="forward" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Salles mobilisees</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.weekly_rooms }}</h2><p class="text-sm text-slate-500 mt-2">{{ teacher_kpis.scheduled_days }} jour(s) planifies</p></div><div class="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="map-pinned" class="teacher-icon"></i></div></div></div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h2 class="text-xl font-black text-slate-900">Planning hebdomadaire</h2>
+              <p class="text-sm text-slate-500 mt-1">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</p>
+            </div>
+            <button @click="activeSection = 'logs'" class="text-sm text-blue-600 font-semibold">Voir les cahiers</button>
+          </div>
+
+          <div class="overflow-x-auto teacher-scrollbar">
+            <table class="w-full min-w-[1100px]">
+              <thead class="bg-slate-100 border-b border-slate-200">
+                <tr>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Jour</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Horaire</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Cours</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Classe</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Salle</th>
+                  <th class="px-5 py-4 text-right text-sm font-bold text-slate-700">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-sm">
+                {% if teacher_kpis.week_courses %}
+                  {% for day in teaching_days %}
+                    {% for event in day.events %}
+                    <tr class="hover:bg-slate-50 transition">
+                      <td class="px-5 py-4">
+                        <div class="font-semibold text-slate-900">{{ day.label }}</div>
+                        <div class="text-xs text-slate-500 mt-1">{{ day.date|date:"d/m/Y" }}</div>
+                      </td>
+                      <td class="px-5 py-4 text-slate-600">{{ event.time_range }}</td>
+                      <td class="px-5 py-4">
+                        <div class="font-semibold text-slate-900">{{ event.title }}</div>
+                        <div class="text-xs text-slate-500 mt-1">{{ event.branch_name }}</div>
+                      </td>
+                      <td class="px-5 py-4 text-slate-600">{{ event.class_name }}</td>
+                      <td class="px-5 py-4 text-slate-600">{{ event.location|default:"Salle non precisee" }}</td>
+                      <td class="px-5 py-4">
+                        <div class="flex justify-end gap-2">
+                          <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100">Aperçu</button>
+                          <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Cahier</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  {% endfor %}
+                {% else %}
+                <tr>
+                  <td colspan="6" class="px-5 py-10 text-center text-slate-500">Aucun cours planifie sur cette semaine.</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="teacher-logs-section" x-show="activeSection === 'logs'" x-cloak class="space-y-6">
+        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+          <div>
+            <div class="flex items-center gap-2 text-sm text-slate-500 mb-2"><span>Accueil</span><span>></span><span>Cahier de texte</span><span>></span><span class="text-slate-900 font-semibold">{{ user_display_name }}</span></div>
+            <h1 class="text-3xl font-black text-slate-900">Suivi du cahier de texte</h1>
+            <p class="text-slate-500 mt-2">Suivi et completion du cahier de texte sur les cours assures.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Logs enregistres</p><h2 class="text-4xl font-black mt-3 text-slate-900">{{ recent_lesson_logs|length }}</h2><p class="text-sm text-emerald-600 mt-2">Recents</p></div><div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="notebook-pen" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Cette semaine</p><h2 class="text-4xl font-black mt-3 text-slate-900">{{ week_lesson_logs_count }}</h2><p class="text-sm text-emerald-600 mt-2">Rythme actuel</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="calendar-check-2" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">En attente</p><h2 class="text-4xl font-black mt-3 {% if pending_lesson_logs_count %}text-red-600{% else %}text-slate-900{% endif %}">{{ pending_lesson_logs_count }}</h2><p class="text-sm {% if pending_lesson_logs_count %}text-red-500{% else %}text-emerald-600{% endif %} mt-2">{% if pending_lesson_logs_count %}A completer{% else %}RAS{% endif %}</p></div><div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center"><i data-lucide="alarm-clock-check" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Statut</p><h2 class="text-2xl font-black mt-3 text-slate-900">{{ status_summary.employment_status }}</h2><p class="text-sm text-cyan-600 mt-2">{{ status_summary.employee_code }}</p></div><div class="w-14 h-14 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center"><i data-lucide="shield-check" class="teacher-icon"></i></div></div></div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3"><div class="relative"><input type="text" placeholder="Suivi recent des cours..." class="h-11 w-72 rounded-xl border border-slate-200 pl-4 pr-4 outline-none focus:border-blue-500"></div></div>
+            <div class="flex flex-wrap items-center gap-3"><button class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold">Historique</button><button class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold">Cette semaine</button></div>
+          </div>
+
+          <div class="overflow-x-auto teacher-scrollbar">
+            <table class="w-full min-w-[1200px]">
+              <thead class="bg-slate-100 border-b border-slate-200">
+                <tr>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Cours</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Classe</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Date</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Statut</th>
+                  <th class="px-5 py-4 text-right text-sm font-bold text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-sm">
+                {% for log in recent_lesson_logs %}
+                <tr class="hover:bg-slate-50 transition">
+                  <td class="px-5 py-4 font-semibold text-slate-900">{{ log.ec.title }}</td>
+                  <td class="px-5 py-4 text-slate-600">{{ log.academic_class.display_name }}</td>
+                  <td class="px-5 py-4 text-slate-600">{{ log.date|date:"d/m/Y" }} · {{ log.start_time|time:"H:i" }}</td>
+                  <td class="px-5 py-4"><span class="px-3 py-1 rounded-full text-xs font-bold {% if log.status == 'done' %}bg-emerald-100 text-emerald-700{% elif log.status == 'absent_teacher' %}bg-red-100 text-red-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ log.get_status_display }}</span></td>
+                  <td class="px-5 py-4">
+                    <div class="flex justify-end gap-2">
+                      {% if log.schedule_event_id %}
+                      <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' log.schedule_event_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Voir le detail">
+                        <i data-lucide="eye" class="teacher-icon text-slate-700"></i>
+                      </button>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="px-5 py-8 text-center text-slate-500">Aucun cahier recent.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {% if pending_lesson_log_rows %}
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg">Cours a completer</h3><span class="text-sm text-red-600 font-semibold">{{ pending_lesson_logs_count }} en attente</span></div>
+          <div class="divide-y divide-slate-100">
+            {% for event in pending_lesson_log_rows %}
+            <div class="p-4 flex items-center justify-between gap-3 hover:bg-slate-50">
+              <div><p class="font-semibold text-slate-900">{{ event.ec.title }}</p><p class="text-sm text-slate-500">{{ event.academic_class.display_name }} · {{ event.start_datetime|date:"d/m/Y H:i" }}</p></div>
+              <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-semibold">Completer le cahier</button>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </section>
+
+      <section id="teacher-settings-section" x-show="activeSection === 'settings'" x-cloak class="space-y-6">
+        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+          <div>
+            <div class="flex items-center gap-2 text-sm text-slate-500 mb-2"><span>Accueil</span><span>></span><span>Parametres</span><span>></span><span class="text-slate-900 font-semibold">{{ user_display_name }}</span></div>
+            <h1 class="text-3xl font-black text-slate-900">Gestion du profil et preferences</h1>
+            <p class="text-slate-500 mt-2">Pilotez votre profil enseignant, vos preferences visuelles et vos raccourcis.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
+          <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-200"><h3 class="text-xl font-black text-slate-900">Profil enseignant</h3></div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
+              <div><p class="text-slate-500">Nom</p><p class="mt-1 font-semibold text-slate-900">{{ user_display_name }}</p></div>
+              <div><p class="text-slate-500">Code employe</p><p class="mt-1 font-semibold text-slate-900">{{ status_summary.employee_code }}</p></div>
+              <div><p class="text-slate-500">Statut</p><p class="mt-1 font-semibold text-slate-900">{{ status_summary.employment_status }}</p></div>
+              <div><p class="text-slate-500">Annexe</p><p class="mt-1 font-semibold text-slate-900">{{ status_summary.branch_name }}</p></div>
+              <div><p class="text-slate-500">Prise de service</p><p class="mt-1 font-semibold text-slate-900">{{ status_summary.hire_date|date:"d/m/Y"|default:"Non renseignee" }}</p></div>
+              <div><p class="text-slate-500">Classes actives</p><p class="mt-1 font-semibold text-slate-900">{{ teacher_kpis.active_classes }}</p></div>
+            </div>
+          </div>
+
+          <div class="space-y-6">
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="p-6 border-b border-slate-200"><h3 class="text-xl font-black text-slate-900">Preferences</h3></div>
+              <div class="p-6 space-y-4">
+                <button @click="toggleDarkMode()" class="w-full h-11 rounded-xl bg-blue-600 text-white text-sm font-semibold"><span x-text="darkMode ? 'Revenir en mode clair' : 'Activer le mode sombre'"></span></button>
+                <button @click="activeSection = 'overview'" class="w-full h-11 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700">Retour a l'accueil</button>
+              </div>
+            </div>
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="p-6 border-b border-slate-200"><h3 class="text-xl font-black text-slate-900">Session</h3></div>
+              <div class="p-6 space-y-4">
+                <form action="{% url 'accounts:logout' %}" method="post">
+                  {% csrf_token %}
+                  <button type="submit" class="w-full h-11 rounded-xl bg-red-600 text-white text-sm font-semibold">Se deconnecter</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </section>
+  </main>
+
+  <div class="teacher-modal-shell fixed inset-0 z-[180]" :class="{ 'is-open': actionPanelOpen }" x-show="actionPanelOpen" x-cloak>
+    <div class="absolute inset-0 bg-slate-950/35" @click="actionPanelOpen = false"></div>
+    <aside class="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl border-l border-slate-200 flex flex-col" @click.stop>
+      <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h3 class="text-xl font-black text-slate-900">Aperçu enseignant</h3>
+          <p class="text-sm text-slate-500 mt-1">Classes, supports et cahier sans quitter le dashboard.</p>
+        </div>
+        <button type="button" @click="actionPanelOpen = false" class="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100">
+          <i data-lucide="x" class="teacher-icon"></i>
+        </button>
+      </div>
+      <div id="teacher-modal-panel" class="flex-1 overflow-y-auto p-6 teacher-scrollbar">
+        <div class="rounded-2xl border-2 border-dashed border-slate-200 px-5 py-12 text-center text-sm font-semibold text-slate-500 bg-slate-50">Selectionne une classe, un cours ou un support depuis les sections du dashboard.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  function teacherDashboardState() {
+    return {
+      sidebarOpen: true,
+      activeSection: "overview",
+      darkMode: false,
+      actionPanelOpen: false,
+      search: "",
+      searchOpen: false,
+      searchResults: [],
+      sectionMeta: [
+        { key: "overview", scope: "Section", title: "Accueil", snippet: "Pilotage rapide des cours, classes et seances." },
+        { key: "classes", scope: "Section", title: "Mes classes", snippet: "Classes, effectifs et matieres rattachees." },
+        { key: "supports", scope: "Section", title: "Supports de cours", snippet: "Depot de fichiers par classe, EC et chapitre." },
+        { key: "schedule", scope: "Section", title: "Planning", snippet: "Emploi du temps et prochaines seances." },
+        { key: "logs", scope: "Section", title: "Cahier de texte", snippet: "Historique, suivis et cours a completer." },
+        { key: "settings", scope: "Section", title: "Parametres", snippet: "Profil, preferences et session." },
+      ],
+      normalizeSearch(text) {
+        return (text || "").toString().toLowerCase();
+      },
+      toggleDarkMode() {
+        this.darkMode = !this.darkMode;
+      },
+      performSearch() {
+        const query = this.normalizeSearch(this.search).trim();
+        if (query.length < 2) {
+          this.searchResults = [];
+          this.searchOpen = false;
+          return;
+        }
+        this.searchOpen = true;
+        const results = [];
+        this.sectionMeta.forEach((item) => {
+          const hay = this.normalizeSearch(`${item.title} ${item.snippet}`);
+          if (hay.includes(query)) {
+            results.push({ id: `meta-${item.key}`, ...item });
+          }
+        });
+        ["teacher-overview-section", "teacher-classes-section", "teacher-supports-section", "teacher-schedule-section", "teacher-logs-section", "teacher-settings-section"].forEach((id, index) => {
+          const node = document.getElementById(id);
+          if (!node) return;
+          const text = (node.innerText || "").replace(/\s+/g, " ").trim();
+          if (!text) return;
+          if (this.normalizeSearch(text).includes(query)) {
+            const meta = this.sectionMeta[index];
+            if (!results.some((r) => r.key === meta.key)) {
+              results.push({ id: `content-${meta.key}`, ...meta, scope: "Contenu" });
+            }
+          }
+        });
+        this.searchResults = results.slice(0, 10);
+      },
+      openSearchResult(result) {
+        this.activeSection = result.key;
+        this.searchOpen = false;
+      },
+      openFirstSearchResult() {
+        if (!this.searchResults.length) return;
+        this.openSearchResult(this.searchResults[0]);
+      },
+    };
+  }
+
+  document.addEventListener("alpine:init", () => {
+    queueMicrotask(() => {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    });
+  });
+
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    if (event.target && event.target.id === "teacher-modal-panel") {
+      if (window.teacherDashboardController) {
+        window.teacherDashboardController.actionPanelOpen = true;
+      }
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+  });
+
+  document.body.addEventListener("htmx:beforeRequest", (event) => {
+    const elt = event.detail && event.detail.elt ? event.detail.elt : null;
+    if (!elt) return;
+    const target = elt.getAttribute("hx-target");
+    if (target === "#teacher-modal-panel" && window.teacherDashboardController) {
+      window.teacherDashboardController.actionPanelOpen = true;
+    }
+  });
+</script>
+{% endblock %}

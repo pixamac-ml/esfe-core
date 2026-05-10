@@ -1,36 +1,36 @@
-<div class="grid gap-4">
+<div class="grid gap-5">
   <div class="flex items-start justify-between gap-4">
     <div>
       <p class="portal-section-kicker">Transfert</p>
-      <h3 class="mt-1 text-xl font-black text-slate-900">Nouvelle demande</h3>
-      <p class="mt-1 text-sm font-semibold text-slate-500">Créer un transfert classe ou école sans quitter le tableau de bord.</p>
+      <h3 class="mt-1 text-2xl font-black text-slate-900">Nouvelle demande</h3>
+      <p class="mt-1 text-sm font-semibold text-slate-500">Creer un transfert de classe ou d'ecole sans quitter le dashboard.</p>
     </div>
     <button type="button" class="director-btn director-btn-secondary" onclick="window.deCloseModal && window.deCloseModal()">Fermer</button>
   </div>
 
-  <form class="grid gap-4" method="post" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="{% url 'accounts_portal:director_transfer_create' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+  <form class="grid gap-5" method="post" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="{% url 'accounts_portal:director_transfer_create' %}" hx-target="#director-workspace" hx-swap="innerHTML">
     {% csrf_token %}
     <div class="director-grid-3">
-      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Étudiant
-        <select name="enrollment_id" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none">
+      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Etudiant
+        <select name="enrollment_id" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
           {% for enrollment in transfer_enrollments %}
             <option value="{{ enrollment.id }}">{{ enrollment.student.student_profile.full_name|default:enrollment.student.get_full_name|default:enrollment.student.username }} - {{ enrollment.academic_class.display_name }}</option>
           {% endfor %}
         </select>
       </label>
-      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
         Type
-        <select name="transfer_type" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none">
+        <select name="transfer_type" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
           {% for value, label in transfer_type_choices %}
             <option value="{{ value }}">{{ label }}</option>
           {% endfor %}
         </select>
       </label>
-      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
         Classe destination
-        <select name="target_class_id" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none">
-          <option value="">Sélectionner</option>
+        <select name="target_class_id" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
+          <option value="">Selectionner</option>
           {% for academic_class in transfer_target_classes %}
             <option value="{{ academic_class.id }}">{{ academic_class.display_name }}</option>
           {% endfor %}
@@ -39,24 +39,24 @@
     </div>
 
     <div class="director-grid-2">
-      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
-        École destination
-        <input type="text" name="target_school_name" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none" placeholder="Requis pour transfert d'école">
+      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Ecole destination
+        <input type="text" name="target_school_name" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" placeholder="Requis pour un transfert d'ecole">
       </label>
-      <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Pièce jointe
-        <input type="file" name="attachment" class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none">
+      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Piece jointe
+        <input type="file" name="attachment" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none">
       </label>
     </div>
 
-    <label class="grid gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+    <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
       Motif
-      <textarea name="reason" rows="4" class="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none" placeholder="Motif, contexte, décision pédagogique"></textarea>
+      <textarea name="reason" rows="4" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none" placeholder="Motif, contexte, decision pedagogique"></textarea>
     </label>
 
     <div class="flex flex-wrap items-center gap-3">
-      <button type="submit" class="director-btn director-btn-primary">Créer la demande</button>
-      <span class="text-xs font-semibold text-slate-500">Pour un transfert de classe, renseignez la classe cible. Pour un transfert d'école, renseignez l'école cible.</span>
+      <button type="submit" class="director-btn director-btn-primary">Creer la demande</button>
+      <span class="text-xs font-semibold text-slate-500">Pour un transfert de classe, renseignez la classe cible. Pour un transfert d'ecole, renseignez l'ecole cible.</span>
     </div>
   </form>
 </div>

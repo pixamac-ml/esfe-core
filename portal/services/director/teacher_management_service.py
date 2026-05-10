@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -67,6 +68,68 @@ def _normalize_assignment_inputs(*, branch, class_ids, ec_ids):
     return classes, ecs
 
 
+def _parse_planned_hours(raw_value):
+    value = (raw_value or "").strip()
+    if value == "":
+        return None
+    normalized = value.replace(",", ".")
+    try:
+        planned_hours = Decimal(normalized)
+    except InvalidOperation as exc:
+        raise ValidationError("Le volume horaire est invalide.") from exc
+    if planned_hours <= 0:
+        raise ValidationError("Le volume horaire doit etre superieur a 0.")
+    return planned_hours
+
+
+def _build_assignment_payloads(*, branch, classes, ecs, room_label, planned_hours, created_by, teacher):
+    assignments = []
+    if classes and ecs:
+        for academic_class in classes:
+            for ec in ecs:
+                if ec.ue.semester.academic_class_id != academic_class.id:
+                    continue
+                assignments.append(
+                    DirectorTeacherAssignment.objects.create(
+                        branch=branch,
+                        teacher=teacher,
+                        academic_class=academic_class,
+                        ec=ec,
+                        room_label=room_label,
+                        planned_hours=planned_hours,
+                        created_by=created_by,
+                    )
+                )
+    elif classes:
+        for academic_class in classes:
+            assignments.append(
+                DirectorTeacherAssignment.objects.create(
+                    branch=branch,
+                    teacher=teacher,
+                    academic_class=academic_class,
+                    room_label=room_label,
+                    planned_hours=planned_hours,
+                    created_by=created_by,
+                )
+            )
+    else:
+        for ec in ecs:
+            assignments.append(
+                DirectorTeacherAssignment.objects.create(
+                    branch=branch,
+                    teacher=teacher,
+                    academic_class=ec.ue.semester.academic_class,
+                    ec=ec,
+                    room_label=room_label,
+                    planned_hours=planned_hours,
+                    created_by=created_by,
+                )
+            )
+    if (classes or ecs) and not assignments:
+        raise ValidationError("La matiere selectionnee ne correspond pas a la classe choisie.")
+    return assignments
+
+
 @transaction.atomic
 def create_teacher_with_account(data, user) -> TeacherCreationResult:
     branch = get_user_branch(user)
@@ -80,11 +143,25 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
     email = (data.get("email") or "").strip().lower()
     phone = (data.get("phone") or "").strip()
     specialty = (data.get("specialty") or "").strip()
+    room_label = (data.get("room_label") or "").strip()
+    planned_hours = _parse_planned_hours(data.get("planned_hours"))
     class_ids = [int(value) for value in data.get("class_ids", []) if str(value).isdigit()]
     ec_ids = [int(value) for value in data.get("ec_ids", []) if str(value).isdigit()]
+    class_id = data.get("class_id")
+    ec_id = data.get("ec_id")
+    if not class_ids and str(class_id).isdigit():
+        class_ids = [int(class_id)]
+    if not ec_ids and str(ec_id).isdigit():
+        ec_ids = [int(ec_id)]
 
     if not first_name or not last_name or not email:
         raise ValidationError("Nom, prenom et email sont obligatoires.")
+    if ec_ids and not class_ids:
+        raise ValidationError("Selectionnez d'abord une classe pour affecter une matiere.")
+    if class_ids and room_label == "":
+        raise ValidationError("La salle est obligatoire pour une affectation enseignant.")
+    if class_ids and planned_hours is None:
+        raise ValidationError("Le volume horaire est obligatoire pour une affectation enseignant.")
 
     User = get_user_model()
     if User.objects.filter(email__iexact=email).exists():
@@ -130,40 +207,15 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
     class_labels = []
     ec_labels = []
     if classes or ecs:
-        if classes and ecs:
-            for academic_class in classes:
-                for ec in ecs:
-                    if ec.ue.semester.academic_class_id != academic_class.id:
-                        continue
-                    assignments.append(
-                        DirectorTeacherAssignment.objects.create(
-                            branch=branch,
-                            teacher=teacher,
-                            academic_class=academic_class,
-                            ec=ec,
-                            created_by=user,
-                        )
-                    )
-        else:
-            for academic_class in classes:
-                assignments.append(
-                    DirectorTeacherAssignment.objects.create(
-                        branch=branch,
-                        teacher=teacher,
-                        academic_class=academic_class,
-                        created_by=user,
-                    )
-                )
-            for ec in ecs:
-                assignments.append(
-                    DirectorTeacherAssignment.objects.create(
-                        branch=branch,
-                        teacher=teacher,
-                        academic_class=ec.ue.semester.academic_class,
-                        ec=ec,
-                        created_by=user,
-                    )
-                )
+        assignments = _build_assignment_payloads(
+            branch=branch,
+            classes=classes,
+            ecs=ecs,
+            room_label=room_label,
+            planned_hours=planned_hours,
+            created_by=user,
+            teacher=teacher,
+        )
 
         class_labels = list(dict.fromkeys(item.academic_class.display_name for item in assignments if item.academic_class_id))
         ec_labels = list(dict.fromkeys(item.ec.title for item in assignments if item.ec_id))
@@ -204,7 +256,11 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
         action_type="account_activated",
         target_user=teacher,
         target_label=f"{teacher.get_full_name()} ({teacher.username})",
-        details=f"Creation enseignant + affectations: classes={', '.join(class_labels) or '-'} ; matieres={', '.join(ec_labels) or '-'}",
+        details=(
+            f"Creation enseignant + affectations: classes={', '.join(class_labels) or '-'} ; "
+            f"matieres={', '.join(ec_labels) or '-'} ; salle={room_label or '-'} ; "
+            f"volume={planned_hours if planned_hours is not None else '-'}"
+        ),
     )
 
     return TeacherCreationResult(

@@ -1,9 +1,12 @@
 from io import BytesIO
 
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
+from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.utils.text import slugify
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -15,6 +18,7 @@ from accounts.models import BranchCashMovement
 from accounts.services.accounting_documents import create_cash_movement
 from communication.models import CommunicationNotification
 from communication.services import EmailService, NotificationService
+from accounts.dashboards.helpers import is_manager
 from shop.models import (
     ShopOrder,
     ShopOrderItem,
@@ -24,6 +28,7 @@ from shop.models import (
     ShopStockMovement,
 )
 
+User = get_user_model()
 
 PREFIX_BY_SEQUENCE = {
     ShopSequence.TYPE_ORDER: "CMD",
@@ -54,6 +59,61 @@ def next_shop_reference(branch, sequence_type, *, document_date=None):
     return f"{PREFIX_BY_SEQUENCE[sequence_type]}-{_branch_code(branch)}-{document_date.year}-{sequence.last_number:06d}"
 
 
+def get_branch_public_shop_identifier(branch):
+    slug = (getattr(branch, "slug", "") or "").strip()
+    if slug:
+        return slug
+    code = (getattr(branch, "code", "") or "").strip().lower()
+    if code:
+        return code
+    return slugify(getattr(branch, "name", "") or "")
+
+
+def _get_available_stock(product, variant=None):
+    if variant is not None:
+        return variant.current_stock
+    return product.current_stock
+
+
+def ensure_stock_available(*, product, quantity, variant=None):
+    available_stock = _get_available_stock(product, variant)
+    if quantity > available_stock:
+        raise ValidationError(
+            f"Stock insuffisant pour {product.name}. Disponible: {available_stock}, demande: {quantity}."
+        )
+
+
+def decrement_product_stock(order, *, user=None):
+    if order.stock_movements.filter(movement_type=ShopStockMovement.TYPE_OUT).exists():
+        return
+
+    for item in order.items.select_related("product", "variant"):
+        ensure_stock_available(product=item.product, variant=item.variant, quantity=item.quantity)
+        ShopStockMovement.objects.create(
+            branch=order.branch,
+            product=item.product,
+            variant=item.variant,
+            movement_type=ShopStockMovement.TYPE_OUT,
+            quantity=item.quantity,
+            reference=next_shop_reference(order.branch, ShopSequence.TYPE_STOCK),
+            order=order,
+            notes=f"Sortie stock apres paiement valide pour {order.reference}.",
+            created_by=user,
+        )
+
+
+def _get_branch_manager_recipients(branch):
+    return (
+        User.objects
+        .filter(
+            is_active=True,
+            profile__branch=branch,
+            groups__name="gestionnaire",
+        )
+        .distinct()
+    )
+
+
 def get_recommended_products_for_student(user):
     student = getattr(user, "student_profile", None)
     if not student:
@@ -78,6 +138,8 @@ def get_required_shop_context(user):
     student = getattr(user, "student_profile", None)
     if not student:
         return {"show_popup": False, "products": [], "open_orders": [], "required_missing_count": 0}
+    inscription = student.inscription
+    candidature = inscription.candidature
     products = get_recommended_products_for_student(user)
     required_products = [product for product in products if product.is_required]
     open_orders = list(
@@ -100,6 +162,7 @@ def get_required_shop_context(user):
         "missing_required": missing_required,
         "open_orders": open_orders,
         "required_missing_count": len(missing_required),
+        "branch_public_identifier": get_branch_public_shop_identifier(candidature.branch),
     }
 
 
@@ -116,6 +179,8 @@ def create_student_required_order(user, product_ids, created_by=None):
     if not products:
         return None
     with transaction.atomic():
+        for product in products:
+            ensure_stock_available(product=product, quantity=1)
         order = ShopOrder.objects.create(
             branch=branch,
             inscription=inscription,
@@ -139,11 +204,13 @@ def create_student_required_order(user, product_ids, created_by=None):
                 is_required=product.is_required,
             )
         order.refresh_total()
+        notify_shop_order_received(order=order, actor=created_by or user)
     return order
 
 
 def create_counter_order(*, branch, product, quantity, payment_method, created_by, student=None, customer_name="", customer_email="", customer_phone=""):
     with transaction.atomic():
+        ensure_stock_available(product=product, quantity=quantity)
         order = ShopOrder.objects.create(
             branch=branch,
             inscription=getattr(getattr(student, "student_profile", None), "inscription", None),
@@ -165,6 +232,7 @@ def create_counter_order(*, branch, product, quantity, payment_method, created_b
         )
         order.refresh_total()
         payment = create_shop_payment(order, order.total_amount, payment_method, created_by, auto_validate=False)
+        notify_shop_order_received(order=order, actor=created_by)
     return order, payment
 
 
@@ -265,6 +333,8 @@ def validate_shop_payment(payment, user=None):
         order.refresh_total(save=False)
         order.status = ShopOrder.STATUS_PAID if order.balance <= 0 else ShopOrder.STATUS_PENDING_PAYMENT
         order.save(update_fields=["total_amount", "status", "updated_at"])
+        if order.status == ShopOrder.STATUS_PAID:
+            decrement_product_stock(order, user=user or payment.created_by)
 
         create_cash_movement(
             branch=order.branch,
@@ -277,8 +347,7 @@ def validate_shop_payment(payment, user=None):
             notes=f"Encaissement boutique commande {order.reference}.",
             created_by=user or payment.created_by,
         )
-        if order.student_id:
-            notify_shop_purchase(order=order, payment=payment, actor=user or payment.created_by)
+        notify_shop_payment_validated(order=order, payment=payment, actor=user or payment.created_by)
     return payment
 
 
@@ -305,6 +374,7 @@ def mark_order_ready(order, user):
         order.prepared_by = user
         order.prepared_at = timezone.now()
         order.save(update_fields=["status", "prepared_by", "prepared_at", "updated_at"])
+        notify_shop_order_ready(order=order, actor=user)
     return order
 
 
@@ -313,22 +383,11 @@ def deliver_order(order, user):
         order = ShopOrder.objects.select_for_update().prefetch_related("items", "items__product", "items__variant").get(pk=order.pk)
         if order.status not in {ShopOrder.STATUS_PAID, ShopOrder.STATUS_READY}:
             return order
-        for item in order.items.all():
-            ShopStockMovement.objects.create(
-                branch=order.branch,
-                product=item.product,
-                variant=item.variant,
-                movement_type=ShopStockMovement.TYPE_OUT,
-                quantity=item.quantity,
-                reference=next_shop_reference(order.branch, ShopSequence.TYPE_STOCK),
-                order=order,
-                notes=f"Remise commande {order.reference}.",
-                created_by=user,
-            )
         order.status = ShopOrder.STATUS_DELIVERED
         order.delivered_by = user
         order.delivered_at = timezone.now()
         order.save(update_fields=["status", "delivered_by", "delivered_at", "updated_at"])
+        notify_shop_order_delivered(order=order, actor=user)
     return order
 
 
@@ -345,6 +404,11 @@ def get_manager_shop_context(branch):
     month_sales = payments.filter(
         paid_at__date__gte=timezone.localdate().replace(day=1)
     ).aggregate(total=Sum("amount"))["total"] or 0
+    cash_entries_count = BranchCashMovement.objects.filter(
+        branch=branch,
+        source=BranchCashMovement.SOURCE_SHOP,
+        movement_type=BranchCashMovement.TYPE_IN,
+    ).count()
     return {
         "shop_products": products,
         "shop_orders": orders,
@@ -356,11 +420,33 @@ def get_manager_shop_context(branch):
             "paid_not_delivered": ShopOrder.objects.filter(branch=branch, status=ShopOrder.STATUS_PAID).count(),
             "ready_orders": ShopOrder.objects.filter(branch=branch, status=ShopOrder.STATUS_READY).count(),
             "month_sales": month_sales,
+            "cash_entries": cash_entries_count,
         },
     }
 
 
-def notify_shop_purchase(*, order, payment, actor=None):
+def notify_shop_order_received(*, order, actor=None):
+    title = "Nouvelle commande boutique"
+    body = (
+        f"La commande {order.reference} a ete enregistree pour {order.buyer_display}. "
+        f"Montant: {order.total_amount} FCFA."
+    )
+    for manager in _get_branch_manager_recipients(order.branch):
+        NotificationService.notify_user(
+            recipient=manager,
+            actor=actor,
+            event_type="shop_order_received",
+            title=title,
+            body=body,
+            source_app="shop",
+            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            metadata={"order_id": order.pk, "branch_id": order.branch_id},
+            legacy_source="shop_order",
+            legacy_object_id=str(order.pk),
+        )
+
+
+def notify_shop_payment_validated(*, order, payment, actor=None):
     title = "Achat boutique confirme"
     body = (
         f"Votre achat boutique {order.reference} a ete confirme pour un montant de {payment.amount} FCFA. "
@@ -384,6 +470,25 @@ def notify_shop_purchase(*, order, payment, actor=None):
             legacy_source="shop_order",
             legacy_object_id=str(order.pk),
         )
+    manager_body = (
+        f"Paiement valide pour {order.reference}. Montant: {payment.amount} FCFA. "
+        "La vente est entree en caisse et le stock a ete decremente."
+    )
+    for manager in _get_branch_manager_recipients(order.branch):
+        if actor and manager.pk == actor.pk and is_manager(manager):
+            continue
+        NotificationService.notify_user(
+            recipient=manager,
+            actor=actor,
+            event_type="shop_payment_validated_manager",
+            title="Paiement boutique valide",
+            body=manager_body,
+            source_app="shop",
+            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            metadata={"order_id": order.pk, "payment_id": payment.pk, "branch_id": order.branch_id},
+            legacy_source="shop_order",
+            legacy_object_id=str(order.pk),
+        )
     if order.buyer_email:
         EmailService.send_transactional(
             subject=title,
@@ -402,6 +507,54 @@ def notify_shop_purchase(*, order, payment, actor=None):
                 "branch_name": order.branch.name,
             },
             dispatch_on_commit=False,
+            legacy_source="shop_order",
+            legacy_object_id=str(order.pk),
+        )
+
+
+def notify_shop_order_ready(*, order, actor=None):
+    title = "Commande boutique prete"
+    body = f"Votre commande {order.reference} est prete. Vous pouvez passer pour le retrait."
+    if order.student_id:
+        NotificationService.notify_user(
+            recipient=order.student,
+            actor=actor,
+            event_type="shop_order_ready",
+            title=title,
+            body=body,
+            source_app="shop",
+            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            metadata={"order_id": order.pk, "branch_id": order.branch_id},
+            legacy_source="shop_order",
+            legacy_object_id=str(order.pk),
+        )
+    if order.buyer_email:
+        EmailService.send_transactional(
+            subject=title,
+            recipient=order.student if order.student_id else None,
+            recipient_email=order.buyer_email,
+            source_app="shop",
+            event_type="shop_order_ready_email",
+            html_template="emails/base_communication.html",
+            context={"title": title, "message": body, "recipient_name": order.buyer_display, "reference": order.reference},
+            legacy_source="shop_order",
+            legacy_object_id=str(order.pk),
+        )
+
+
+def notify_shop_order_delivered(*, order, actor=None):
+    title = "Commande boutique remise"
+    body = f"La commande {order.reference} a ete remise avec succes."
+    if order.student_id:
+        NotificationService.notify_user(
+            recipient=order.student,
+            actor=actor,
+            event_type="shop_order_delivered",
+            title=title,
+            body=body,
+            source_app="shop",
+            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            metadata={"order_id": order.pk, "branch_id": order.branch_id},
             legacy_source="shop_order",
             legacy_object_id=str(order.pk),
         )

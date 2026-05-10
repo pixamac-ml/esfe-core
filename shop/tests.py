@@ -9,8 +9,9 @@ from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from accounts.models import BranchCashMovement
-from shop.models import ShopOrder, ShopPayment, ShopProduct
+from shop.models import ShopOrder, ShopPayment, ShopProduct, ShopStockMovement
 from shop.services.shop_service import create_counter_order, create_shop_payment, validate_shop_payment
+from django.core.exceptions import ValidationError
 from students.models import Student
 
 
@@ -76,6 +77,14 @@ class ShopWorkflowTests(TestCase):
         )
 
     def test_validated_student_shop_payment_creates_cash_and_notification(self):
+        ShopStockMovement.objects.create(
+            branch=self.branch,
+            product=self.product,
+            movement_type=ShopStockMovement.TYPE_IN,
+            quantity=3,
+            reference="STK-ASH-2026-000001",
+            created_by=self.manager,
+        )
         order = ShopOrder.objects.create(
             branch=self.branch,
             inscription=self.student.inscription,
@@ -97,6 +106,10 @@ class ShopWorkflowTests(TestCase):
         order.refresh_from_db()
         self.assertEqual(payment.status, ShopPayment.STATUS_VALIDATED)
         self.assertEqual(order.status, ShopOrder.STATUS_PAID)
+        self.assertEqual(
+            ShopStockMovement.objects.filter(order=order, movement_type=ShopStockMovement.TYPE_OUT).count(),
+            1,
+        )
         self.assertTrue(
             BranchCashMovement.objects.filter(
                 branch=self.branch,
@@ -105,6 +118,7 @@ class ShopWorkflowTests(TestCase):
                 source_reference=payment.reference,
             ).exists()
         )
+        self.assertEqual(self.product.current_stock, 2)
         self.assertTrue(
             CommunicationNotification.objects.filter(
                 recipient=self.student_user,
@@ -113,6 +127,14 @@ class ShopWorkflowTests(TestCase):
         )
 
     def test_manager_can_create_counter_order_for_walk_in_customer(self):
+        ShopStockMovement.objects.create(
+            branch=self.branch,
+            product=self.product,
+            movement_type=ShopStockMovement.TYPE_IN,
+            quantity=5,
+            reference="STK-ASH-2026-000002",
+            created_by=self.manager,
+        )
         order, payment = create_counter_order(
             branch=self.branch,
             product=self.product,
@@ -146,6 +168,14 @@ class ShopWorkflowTests(TestCase):
         self.assertContains(response, "Blouse pratique")
 
     def test_student_can_order_from_public_catalog(self):
+        ShopStockMovement.objects.create(
+            branch=self.branch,
+            product=self.product,
+            movement_type=ShopStockMovement.TYPE_IN,
+            quantity=4,
+            reference="STK-ASH-2026-000003",
+            created_by=self.manager,
+        )
         response = self.client.post(
             f"/shop/{self.branch.code.lower()}/article/{self.product.id}/commander/",
             {
@@ -162,11 +192,20 @@ class ShopWorkflowTests(TestCase):
         self.assertEqual(order.status, ShopOrder.STATUS_PENDING_PAYMENT)
 
     def test_anonymous_buyer_can_initiate_public_order(self):
+        ShopStockMovement.objects.create(
+            branch=self.branch,
+            product=self.product,
+            movement_type=ShopStockMovement.TYPE_IN,
+            quantity=4,
+            reference="STK-ASH-2026-000004",
+            created_by=self.manager,
+        )
         response = self.client.post(
             f"/shop/{self.branch.code.lower()}/article/{self.product.id}/commander/",
             {
                 "buyer_type": "walk_in",
-                "customer_name": "Acheteur Public",
+                "customer_first_name": "Acheteur",
+                "customer_last_name": "Public",
                 "customer_email": "public@example.com",
                 "customer_phone": "70000001",
                 "quantity": 2,
@@ -179,3 +218,53 @@ class ShopWorkflowTests(TestCase):
         self.assertEqual(order.branch, self.branch)
         self.assertEqual(order.buyer_type, ShopOrder.BUYER_WALK_IN)
         self.assertEqual(order.total_amount, 30000)
+
+    def test_public_order_is_blocked_when_stock_is_insufficient(self):
+        response = self.client.post(
+            f"/shop/{self.branch.code.lower()}/article/{self.product.id}/commander/",
+            {
+                "buyer_type": "walk_in",
+                "customer_first_name": "Client",
+                "customer_last_name": "Test",
+                "customer_email": "rupture@example.com",
+                "customer_phone": "70000001",
+                "quantity": 1,
+                "payment_method": ShopPayment.METHOD_CASH,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Stock insuffisant")
+
+    def test_stock_is_not_decremented_twice_on_delivery(self):
+        ShopStockMovement.objects.create(
+            branch=self.branch,
+            product=self.product,
+            movement_type=ShopStockMovement.TYPE_IN,
+            quantity=5,
+            reference="STK-TEST-001",
+            created_by=self.manager,
+        )
+        order = ShopOrder.objects.create(
+            branch=self.branch,
+            inscription=self.student.inscription,
+            student=self.student_user,
+            buyer_type=ShopOrder.BUYER_STUDENT,
+            customer_name="Shop Student",
+            customer_email="student_shop@example.com",
+            reference="CMD-ASH-2026-000002",
+            status=ShopOrder.STATUS_PENDING_PAYMENT,
+            created_by=self.manager,
+            total_amount=15000,
+        )
+        order.items.create(product=self.product, quantity=1, unit_price=15000, is_required=True)
+        payment = create_shop_payment(order, 15000, ShopPayment.METHOD_CASH, self.student_user, auto_validate=False)
+
+        validate_shop_payment(payment, user=self.manager)
+        from shop.services.shop_service import deliver_order
+        deliver_order(order, self.manager)
+
+        self.assertEqual(
+            ShopStockMovement.objects.filter(order=order, movement_type=ShopStockMovement.TYPE_OUT).count(),
+            1,
+        )

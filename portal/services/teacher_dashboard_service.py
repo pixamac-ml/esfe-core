@@ -1,8 +1,10 @@
 from collections import defaultdict
 from datetime import timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 from django.core.exceptions import ValidationError
+from django.db import OperationalError, ProgrammingError
 from django.db.models import Count, Prefetch
 from django.utils import timezone
 
@@ -10,6 +12,7 @@ from academics.models import AcademicClass, AcademicScheduleEvent, EC, ECChapter
 from academics.services.lesson_log_service import get_teacher_lesson_logs
 from academics.services.schedule_service import get_teacher_next_events, get_teacher_week_schedule
 from students.models import Student
+from portal.models import TeacherDashboardPreference
 
 WEEKDAY_LABELS = [
     "Lundi",
@@ -20,6 +23,82 @@ WEEKDAY_LABELS = [
     "Samedi",
     "Dimanche",
 ]
+
+
+def _teacher_dashboard_preference_defaults():
+    return {
+        "dark_mode": False,
+        "sidebar_collapsed": False,
+        "compact_mode": False,
+        "default_section": TeacherDashboardPreference.DEFAULT_OVERVIEW,
+        "notify_lesson_reminders": True,
+        "notify_schedule_changes": True,
+        "notify_support_messages": True,
+    }
+
+
+def get_teacher_dashboard_preference(*, teacher, branch):
+    if branch is None:
+        return SimpleNamespace(**_teacher_dashboard_preference_defaults())
+    try:
+        preference, _created = TeacherDashboardPreference.objects.get_or_create(
+            teacher=teacher,
+            branch=branch,
+            defaults=_teacher_dashboard_preference_defaults(),
+        )
+        return preference
+    except (OperationalError, ProgrammingError):
+        return SimpleNamespace(**_teacher_dashboard_preference_defaults())
+
+
+def serialize_teacher_dashboard_preference(preference):
+    if preference is None:
+        preference = SimpleNamespace(**_teacher_dashboard_preference_defaults())
+    return {
+        "dark_mode": preference.dark_mode,
+        "sidebar_collapsed": preference.sidebar_collapsed,
+        "compact_mode": preference.compact_mode,
+        "default_section": preference.default_section,
+        "notify_lesson_reminders": preference.notify_lesson_reminders,
+        "notify_schedule_changes": preference.notify_schedule_changes,
+        "notify_support_messages": preference.notify_support_messages,
+    }
+
+
+def update_teacher_dashboard_preference(
+    *,
+    actor,
+    teacher,
+    branch,
+    dark_mode,
+    sidebar_collapsed,
+    compact_mode,
+    default_section,
+    notify_lesson_reminders,
+    notify_schedule_changes,
+    notify_support_messages,
+):
+    if branch is None:
+        raise ValidationError("Aucune annexe rattachee pour le compte enseignant.")
+
+    preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
+    allowed_sections = {choice[0] for choice in TeacherDashboardPreference.DEFAULT_SECTION_CHOICES}
+    default_section = (default_section or TeacherDashboardPreference.DEFAULT_OVERVIEW).strip()
+    if default_section not in allowed_sections:
+        raise ValidationError("La section d'ouverture selectionnee est invalide.")
+
+    preference.dark_mode = bool(dark_mode)
+    preference.sidebar_collapsed = bool(sidebar_collapsed)
+    preference.compact_mode = bool(compact_mode)
+    preference.default_section = default_section
+    preference.notify_lesson_reminders = bool(notify_lesson_reminders)
+    preference.notify_schedule_changes = bool(notify_schedule_changes)
+    preference.notify_support_messages = bool(notify_support_messages)
+    preference.updated_by = actor
+    if hasattr(preference, "full_clean"):
+        preference.full_clean()
+        preference.save()
+    return preference
 
 
 def _serialize_class_focus(academic_class, *, event_count, slot_count, subjects, next_event):
@@ -533,6 +612,7 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
     if branch is not None:
         monthly_done_logs = monthly_done_logs.filter(branch=branch)
 
+    preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
     status_summary = {
         "employment_status": getattr(getattr(teacher, "profile", None), "get_employment_status_display", lambda: "Inconnu")(),
         "employee_code": getattr(getattr(teacher, "profile", None), "employee_code", "") or "Non renseigne",
@@ -577,6 +657,7 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
         ),
         "dashboard_kind": "Enseignant",
         "branch": branch,
+        "teacher_dashboard_preference": serialize_teacher_dashboard_preference(preference) if preference is not None else _teacher_dashboard_preference_defaults(),
         "status_summary": status_summary,
         "today": today,
         "week_start": week_start,
@@ -607,6 +688,52 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
         },
     }
     return context
+
+
+def build_teacher_settings_context(request, *, branch, base_context_builder):
+    teacher = request.user
+    preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
+    profile = getattr(teacher, "profile", None)
+    status_summary = {
+        "employment_status": getattr(profile, "get_employment_status_display", lambda: "Inconnu")(),
+        "employee_code": getattr(profile, "employee_code", "") or "Non renseigne",
+        "branch_name": getattr(branch, "name", "Non rattache"),
+        "hire_date": getattr(profile, "hire_date", None),
+    }
+    class_ids = set(
+        AcademicScheduleEvent.objects.filter(teacher=teacher, is_active=True)
+        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .values_list("academic_class_id", flat=True)
+    )
+    class_ids.update(
+        WeeklyScheduleSlot.objects.filter(teacher=teacher, is_active=True).values_list("academic_class_id", flat=True)
+    )
+    class_ids.update(
+        assignment.academic_class_id
+        for assignment in _get_teacher_director_assignments(teacher=teacher, branch=branch)
+        if assignment.academic_class_id
+    )
+    return {
+        **base_context_builder(
+            request,
+            page_title="Dashboard enseignant",
+            module_cards=[
+                "Mes cours",
+                "Mes classes",
+                "Mon journal de cours",
+                "Mon planning",
+            ],
+        ),
+        "dashboard_kind": "Enseignant",
+        "branch": branch,
+        "status_summary": status_summary,
+        "teacher_dashboard_preference": serialize_teacher_dashboard_preference(preference),
+        "teacher_preferences_choices": TeacherDashboardPreference.DEFAULT_SECTION_CHOICES,
+        "teacher_settings_stats": {
+            "active_classes": len({class_id for class_id in class_ids if class_id}),
+            "display_mode": "Compact" if preference.compact_mode else "Standard",
+        },
+    }
 
 
 def build_teacher_class_detail_context(request, *, branch, class_id, week_start=None):

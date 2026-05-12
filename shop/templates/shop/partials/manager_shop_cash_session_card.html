@@ -1,0 +1,62 @@
+{% load humanize %}
+<div id="manager-shop-cash-session-{{ session.id }}" class="rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="space-y-3 flex-1 min-w-0">
+            {% if show_regenerated_notice %}
+            <div class="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                <i class="fas fa-sync-alt"></i>
+                Code regenere — boutique
+            </div>
+            {% endif %}
+
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">Commande boutique</p>
+                <p class="text-sm font-semibold text-slate-900">{{ session.order.reference }}</p>
+                <p class="text-sm text-slate-600">{{ session.order.buyer_display }}</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div class="rounded-xl border border-cyan-100 bg-white px-4 py-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">Reste a payer</p>
+                    <p class="mt-1 text-sm font-bold text-slate-900">{{ session.order.balance|intcomma }} FCFA</p>
+                </div>
+                <div class="rounded-xl border border-cyan-100 bg-white px-4 py-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">Expire a</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-800">{{ session.expires_at|date:"H:i" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:min-w-[260px] space-y-3">
+            <div class="rounded-2xl border border-cyan-200 bg-white p-4 text-center">
+                <p class="text-sm font-semibold uppercase tracking-wide text-slate-600">Code paiement especes boutique</p>
+                <p class="mt-2 font-mono text-3xl font-black tracking-[0.12em] text-cyan-700 break-all">{{ session.verification_code }}</p>
+                <p class="mt-2 text-sm text-slate-600 break-words">{{ manager_agent.user.get_full_name }} • {{ manager_agent.agent_code }}</p>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <button
+                    hx-post="/shop/manager/shop-cash-session/{{ session.id }}/regenerate/"
+                    hx-target="#manager-shop-cash-session-{{ session.id }}"
+                    hx-swap="outerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    type="button"
+                    class="inline-flex flex-1 min-w-[8rem] items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition">
+                    <i class="fas fa-rotate"></i>
+                    Regenerer
+                </button>
+                <button
+                    hx-post="/shop/manager/shop-cash-session/{{ session.id }}/cancel/"
+                    hx-target="#manager-shop-cash-session-{{ session.id }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Annuler cette session boutique ?"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    type="button"
+                    class="inline-flex flex-1 min-w-[8rem] items-center justify-center gap-2 rounded-xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition">
+                    <i class="fas fa-times"></i>
+                    Annuler
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

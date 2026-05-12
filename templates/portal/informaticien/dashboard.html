@@ -133,6 +133,7 @@
           <div>
             <p class="workflow-kicker" x-text="activeKicker()"></p>
             <h1 class="mt-1 text-3xl font-black tracking-tight" x-text="activeLabel()"></h1>
+            <p class="mt-2 text-sm font-semibold text-slate-500">Support technique, acces, et sante du portail</p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <button type="button" class="workflow-btn workflow-btn-secondary" @click="toggleDarkMode()">
@@ -169,6 +170,62 @@
         >
           <div class="workflow-empty">Chargement du workflow...</div>
         </section>
+
+        <section class="mt-4">
+          {% if selected_class and selected_semester %}
+            <div class="workflow-band workflow-band-ready_to_calculate">
+              <div>
+                <p class="workflow-kicker">Gestion des notes</p>
+                <h3>Workspace Notes</h3>
+                <p>{{ selected_class.display_name }} - Semestre {{ selected_semester.number }}</p>
+              </div>
+              <button
+                type="button"
+                class="workflow-btn workflow-btn-primary"
+                hx-get="{% url 'accounts_portal:it_notes_workspace' %}?class_id={{ selected_class.id }}&amp;semester_id={{ selected_semester.id }}"
+                hx-target="#it-workspace"
+                hx-swap="innerHTML"
+              >
+                Ouvrir le workspace
+              </button>
+            </div>
+          {% else %}
+            <div class="workflow-band workflow-band-empty">
+              <div>
+                <p class="workflow-kicker">Gestion des notes</p>
+                <h3>Workspace Notes</h3>
+                <p>Choisir une classe et un semestre pour charger le module complet.</p>
+              </div>
+              <button type="button" class="workflow-btn workflow-btn-secondary" disabled>
+                Choisir une classe
+              </button>
+            </div>
+          {% endif %}
+        </section>
+
+        {% if support_actions %}
+          <section class="mt-4 workflow-table-shell">
+            <div class="workflow-table-head">
+              <div>
+                <p class="workflow-kicker">Actions prioritaires</p>
+                <h3>Alertes du portail</h3>
+              </div>
+            </div>
+            <div class="workflow-list">
+              {% for action in support_actions %}
+                <article>
+                  <div>
+                    <strong>{{ action.title }}</strong>
+                    <span>{{ action.detail }}</span>
+                  </div>
+                  {% if action.href %}
+                    <a class="workflow-btn workflow-btn-secondary" href="{{ action.href }}">Ouvrir</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
       </div>
     </main>
   </div>

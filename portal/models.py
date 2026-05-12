@@ -289,6 +289,74 @@ class BranchITSettings(models.Model):
         return f"Parametres IT - {self.branch}"
 
 
+class TeacherDashboardPreference(models.Model):
+    DEFAULT_OVERVIEW = "overview"
+    DEFAULT_CLASSES = "classes"
+    DEFAULT_SUPPORTS = "supports"
+    DEFAULT_SCHEDULE = "schedule"
+    DEFAULT_LOGS = "logs"
+    DEFAULT_SETTINGS = "settings"
+
+    DEFAULT_SECTION_CHOICES = [
+        (DEFAULT_OVERVIEW, "Accueil"),
+        (DEFAULT_CLASSES, "Mes classes"),
+        (DEFAULT_SUPPORTS, "Supports"),
+        (DEFAULT_SCHEDULE, "Planning"),
+        (DEFAULT_LOGS, "Cahier de texte"),
+        (DEFAULT_SETTINGS, "Parametres"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="teacher_dashboard_preferences",
+        db_index=True,
+    )
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="teacher_dashboard_preferences",
+        db_index=True,
+    )
+    dark_mode = models.BooleanField(default=False)
+    sidebar_collapsed = models.BooleanField(default=False)
+    compact_mode = models.BooleanField(default=False)
+    default_section = models.CharField(
+        max_length=20,
+        choices=DEFAULT_SECTION_CHOICES,
+        default=DEFAULT_OVERVIEW,
+        db_index=True,
+    )
+    notify_lesson_reminders = models.BooleanField(default=True)
+    notify_schedule_changes = models.BooleanField(default=True)
+    notify_support_messages = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_teacher_dashboard_preferences",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Parametres dashboard enseignant"
+        verbose_name_plural = "Parametres dashboard enseignants"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["branch", "teacher"],
+                name="portal_unique_teacher_dashboard_preference",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["branch", "teacher"]),
+            models.Index(fields=["teacher", "default_section"]),
+        ]
+
+    def __str__(self):
+        return f"Parametres enseignant - {self.teacher}"
+
+
 class DirectorTeacherAssignment(models.Model):
     branch = models.ForeignKey(
         Branch,

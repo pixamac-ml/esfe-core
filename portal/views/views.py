@@ -59,6 +59,8 @@ from portal.services import (
 from portal.services.teacher_dashboard_service import (
     _validate_content_file_extension,
     build_teacher_support_workspace_context,
+    build_teacher_settings_context,
+    update_teacher_dashboard_preference,
 )
 from portal.services.director import (
     build_director_classroom_ops_context,
@@ -1424,6 +1426,12 @@ def _build_supervisor_courses_section_context(request, *, branch, academic_class
         .order_by("ue__semester__number", "ue__code", "title")[:250]
     )
     teacher_q = (request.GET.get("teacher_q") or "").strip()
+    prefill_ec_raw = (request.GET.get("ec_id") or request.POST.get("ec_id") or "").strip()
+    prefill_teacher_raw = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
+    prefill_date = (request.GET.get("date") or request.POST.get("date") or "").strip()
+    prefill_start_time = (request.GET.get("start_time") or request.POST.get("start_time") or "").strip()
+    prefill_end_time = (request.GET.get("end_time") or request.POST.get("end_time") or "").strip()
+    prefill_location = (request.GET.get("location") or request.POST.get("location") or "").strip()
     teachers_qs = User.objects.filter(
         is_active=True,
         profile__branch=branch,
@@ -1438,6 +1446,12 @@ def _build_supervisor_courses_section_context(request, *, branch, academic_class
     return {
         "ecs": ecs,
         "teachers": list(teachers_qs.order_by("first_name", "last_name", "username")[:80]),
+        "prefill_ec_id": int(prefill_ec_raw) if prefill_ec_raw.isdigit() else None,
+        "prefill_teacher_id": int(prefill_teacher_raw) if prefill_teacher_raw.isdigit() else None,
+        "prefill_date": prefill_date,
+        "prefill_start_time": prefill_start_time,
+        "prefill_end_time": prefill_end_time,
+        "prefill_location": prefill_location,
     }
 
 
@@ -1838,27 +1852,47 @@ def supervisor_quick_course_create(request):
 def supervisor_student_drawer(request):
     branch = _resolve_academic_branch(request)
     student_raw = (request.GET.get("student_id") or "").strip()
+    enrollment_raw = (request.GET.get("enrollment_id") or "").strip()
     class_raw = (request.GET.get("class_id") or "").strip()
-    if branch is None or not student_raw.isdigit() or not class_raw.isdigit():
+    if branch is None or (not student_raw.isdigit() and not enrollment_raw.isdigit()):
         return render(
             request,
             "portal/staff/supervisor/partials/student_drawer.html",
             {"student": None},
         )
 
-    student = (
-        Student.objects.select_related("inscription__candidature", "user")
-        .filter(
-            pk=int(student_raw),
-            inscription__candidature__branch=branch,
+    student_filters = {
+        "inscription__candidature__branch": branch,
+        "is_active": True,
+    }
+    if student_raw.isdigit():
+        student_filters["pk"] = int(student_raw)
+
+    student_qs = Student.objects.select_related("inscription__candidature", "user").filter(**student_filters)
+    if class_raw.isdigit():
+        student_qs = student_qs.filter(
             user__academic_enrollments__academic_class_id=int(class_raw),
             user__academic_enrollments__branch=branch,
             user__academic_enrollments__is_active=True,
-            is_active=True,
         )
-        .distinct()
-        .first()
-    )
+    if enrollment_raw.isdigit():
+        student_qs = student_qs.filter(
+            user__academic_enrollments__pk=int(enrollment_raw),
+            user__academic_enrollments__branch=branch,
+            user__academic_enrollments__is_active=True,
+        )
+
+    student = student_qs.distinct().first()
+    if student is None and student_raw.isdigit():
+        student = (
+            Student.objects.select_related("inscription__candidature", "user")
+            .filter(
+                pk=int(student_raw),
+                inscription__candidature__branch=branch,
+                is_active=True,
+            )
+            .first()
+        )
     history = get_student_attendance_history(student, branch=branch, limit=8) if student else []
     active_alerts = (
         AttendanceAlert.objects.filter(student=student, branch=branch, is_resolved=False).order_by("-triggered_at")
@@ -2205,6 +2239,63 @@ def teacher_support_workspace(request):
                 ],
             }
     return render(request, "portal/partials/teacher_support_workspace.html", context)
+
+
+@_position_required({"teacher"})
+def teacher_settings_workspace(request):
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return render(
+            request,
+            "portal/teacher/partials/settings_workspace.html",
+            {
+                "toast": {"level": "error", "message": "Aucune annexe rattachee a ce compte enseignant."},
+                "teacher_dashboard_preference": {
+                    "dark_mode": False,
+                    "sidebar_collapsed": False,
+                    "compact_mode": False,
+                    "default_section": "overview",
+                    "notify_lesson_reminders": True,
+                    "notify_schedule_changes": True,
+                    "notify_support_messages": True,
+                },
+                "teacher_preferences_choices": [],
+                "status_summary": {
+                    "employment_status": "Inconnu",
+                    "employee_code": "Non renseigne",
+                    "branch_name": "Non rattache",
+                    "hire_date": None,
+                },
+                "teacher_settings_stats": {"active_classes": 0, "display_mode": "Standard"},
+            },
+        )
+
+    toast = None
+    if request.method == "POST":
+        try:
+            update_teacher_dashboard_preference(
+                actor=request.user,
+                teacher=request.user,
+                branch=branch,
+                dark_mode=request.POST.get("dark_mode") == "on",
+                sidebar_collapsed=request.POST.get("sidebar_collapsed") == "on",
+                compact_mode=request.POST.get("compact_mode") == "on",
+                default_section=request.POST.get("default_section"),
+                notify_lesson_reminders=request.POST.get("notify_lesson_reminders") == "on",
+                notify_schedule_changes=request.POST.get("notify_schedule_changes") == "on",
+                notify_support_messages=request.POST.get("notify_support_messages") == "on",
+            )
+            toast = {"level": "success", "message": "Parametres enregistres."}
+        except ValidationError as exc:
+            toast = {"level": "error", "message": exc.messages[0] if getattr(exc, "messages", None) else str(exc)}
+
+    context = build_teacher_settings_context(
+        request,
+        branch=branch,
+        base_context_builder=_build_portal_context,
+    )
+    context["toast"] = toast
+    return render(request, "portal/teacher/partials/settings_workspace.html", context)
 
 
 @_position_required({"teacher"})
@@ -3465,6 +3556,7 @@ def _build_supervisor_class_detail_context(request, *, branch, class_id: int, we
     prefill_teacher_raw = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
     prefill_ec_raw = (request.GET.get("ec_id") or request.POST.get("ec_id") or "").strip()
     prefill_room = (request.GET.get("room_label") or request.POST.get("room_label") or "").strip()
+    prefill_location = (request.GET.get("location") or request.POST.get("location") or "").strip()
     prefill_planned_hours = (request.GET.get("planned_hours") or request.POST.get("planned_hours") or "").strip()
     prefill_date = (request.GET.get("date") or request.POST.get("date") or "").strip()
     prefill_start_time = (request.GET.get("start_time") or request.POST.get("start_time") or "").strip()
@@ -3485,6 +3577,7 @@ def _build_supervisor_class_detail_context(request, *, branch, class_id: int, we
         "prefill_teacher_id": int(prefill_teacher_raw) if prefill_teacher_raw.isdigit() else None,
         "prefill_ec_id": int(prefill_ec_raw) if prefill_ec_raw.isdigit() else None,
         "prefill_room_label": prefill_room,
+        "prefill_location": prefill_location or prefill_room,
         "prefill_planned_hours": prefill_planned_hours,
         "prefill_date": prefill_date,
         "prefill_start_time": prefill_start_time,

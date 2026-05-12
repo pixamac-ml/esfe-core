@@ -227,6 +227,7 @@
 <div
   x-data="directorDashboard()"
   x-init="init()"
+  @keydown.window.ctrl.slash.prevent="$refs.quickSearch && $refs.quickSearch.focus()"
   @keydown.escape.window="closeDrawer(); closeModal()"
   x-cloak
   :class="{ 'dark': darkMode }"
@@ -315,19 +316,28 @@
         </div>
 
         <div class="flex items-center gap-4">
-          <div class="hidden xl:flex h-11 w-80 items-center gap-3 rounded-xl border border-slate-200 px-4">
+          <form class="hidden xl:flex h-11 w-80 items-center gap-3 rounded-xl border border-slate-200 px-4" @submit.prevent="runQuickSearch()">
             <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
-            <input class="w-full outline-none text-sm" placeholder="Rechercher (Ctrl + /)" />
-          </div>
+            <input x-ref="quickSearch" class="w-full outline-none text-sm" placeholder="Rechercher enseignants ou etudiants" />
+            <button type="submit" class="sr-only">Rechercher</button>
+          </form>
 
-          <button class="relative w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center">
+          <button type="button" @click="openModule('stats')" class="relative w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center" title="Notifications">
             <i data-lucide="bell" class="w-5 h-5"></i>
             <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">{{ home_alerts_count|default:0 }}</span>
           </button>
 
-          <button class="w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center">
+          <button type="button" @click="openModule('documents')" class="w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center" title="Dossiers et transferts">
             <i data-lucide="mail" class="w-5 h-5"></i>
           </button>
+
+          <form method="post" action="{% url 'accounts:logout' %}" class="inline-flex">
+            {% csrf_token %}
+            <button type="submit" class="h-11 px-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm font-semibold flex items-center gap-2 hover:bg-red-100 transition">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+              <span class="hidden lg:inline">Deconnexion</span>
+            </button>
+          </form>
 
           <div class="flex items-center gap-3">
             <div class="w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold">
@@ -345,13 +355,13 @@
       <section class="p-6 space-y-6">
         <section x-show="activeModule === 'home'" x-transition class="space-y-6">
           <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-            <div>
-              <h3 class="text-lg font-bold">Accueil</h3>
-              <p class="text-sm text-slate-500">Pilotage rapide des operations academiques.</p>
-            </div>
+          <div>
+            <h3 class="text-lg font-bold">Accueil</h3>
+              <p class="text-sm text-slate-500">Pilotage de la qualite academique et des charges.</p>
+          </div>
 
             <div class="flex flex-wrap items-center gap-3">
-              <button class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2">
+              <button type="button" @click="openModule('assignments')" class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2" title="Ouvrir l'emploi du temps">
                 <i data-lucide="calendar" class="w-4 h-4"></i>
                 {{ today|date:"d/m/Y" }}
               </button>
@@ -672,6 +682,23 @@
           window.htmx.ajax('GET', url, '#director-workspace');
         }
         this.$nextTick(() => this.renderIcons());
+      },
+      runQuickSearch() {
+        const input = this.$refs.quickSearch;
+        const query = (input && input.value ? input.value : '').trim();
+        if (!query) {
+          this.openModule('home');
+          return;
+        }
+
+        const lowerQuery = query.toLowerCase();
+        const isTeacherSearch = this.activeModule === 'teachers' || lowerQuery.startsWith('teacher:') || lowerQuery.startsWith('prof:') || lowerQuery.includes('@');
+        const baseUrl = '{% url "accounts_portal:director_workspace" %}';
+        const url = isTeacherSearch
+          ? `${baseUrl}?section=teachers&teacher_q=${encodeURIComponent(query.replace(/^(teacher:|prof:)/i, '').trim())}`
+          : `${baseUrl}?section=students&student_q=${encodeURIComponent(query.replace(/^(student:|etudiant:)/i, '').trim())}`;
+
+        this.openWorkspaceUrl(url);
       },
       openModule(moduleKey) {
         this.activeModule = moduleKey || 'home';

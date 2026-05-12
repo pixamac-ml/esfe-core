@@ -125,6 +125,7 @@ from portal.views.views import (
     teacher_portal,
     teacher_class_detail,
     teacher_lesson_log_panel,
+    teacher_settings_workspace,
     teacher_support_workspace,
 )
 
@@ -140,6 +141,7 @@ urlpatterns = [
     path("teacher/", teacher_portal, name="portal_teacher"),
     path("teacher/classes/<int:class_id>/", teacher_class_detail, name="teacher_class_detail"),
     path("teacher/supports/", teacher_support_workspace, name="teacher_support_workspace"),
+    path("teacher/settings/", teacher_settings_workspace, name="teacher_settings_workspace"),
     path("teacher/events/<int:event_id>/lesson-log/", teacher_lesson_log_panel, name="teacher_lesson_log_panel"),
     path("finance/", finance_portal, name="portal_finance"),
     path("secretary/", secretary_portal, name="portal_secretary"),

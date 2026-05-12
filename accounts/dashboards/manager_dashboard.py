@@ -13,6 +13,7 @@ from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Pro
 from accounts.services.manager_intelligence import build_manager_intelligence_context
 from accounts.services.manager_intelligence import get_branch_cash_balance
 from shop.forms import ShopCounterOrderForm, ShopProductForm, ShopStockInForm
+from shop.services.shop_cash_session import manager_shop_sessions_for_agent
 from shop.services.shop_service import get_manager_shop_context
 from shop.views import get_branch_public_shop_identifier
 from inscriptions.models import Inscription
@@ -156,6 +157,9 @@ def _manager_context(request, active_section="overview"):
     active_cash_sessions_by_inscription = {
         session.inscription_id: session for session in active_cash_sessions
     }
+    active_shop_cash_sessions = []
+    if manager_agent:
+        active_shop_cash_sessions = manager_shop_sessions_for_agent(manager_agent, limit=12)
 
     overview_inscriptions = (
         base_inscriptions
@@ -702,6 +706,8 @@ def _manager_context(request, active_section="overview"):
         "manager_agent": manager_agent,
         "active_cash_sessions": active_cash_sessions,
         "active_cash_sessions_count": len(active_cash_sessions),
+        "active_shop_cash_sessions": active_shop_cash_sessions,
+        "active_shop_cash_sessions_count": len(active_shop_cash_sessions),
         "payable_inscriptions": payable_inscriptions,
         "payroll_month": payroll_month,
         "salary_month_value": payroll_month.strftime("%Y-%m"),

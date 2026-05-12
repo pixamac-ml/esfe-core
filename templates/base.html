@@ -41,25 +41,17 @@
   <!-- STYLES -->
   <link rel="stylesheet" href="{% static 'public/css/main.css' %}">
   <link rel="stylesheet" href="{% static 'core/css/esfe_theme.css' %}">
-  <link rel="stylesheet" href="{% static 'admin/css/widgets.css' %}">
+  {% block django_admin_form_css %}{% endblock %}
 
   <!-- FONTS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
   <!-- ICONS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-  <!-- LIBS -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script defer src="https://unpkg.com/@alpinejs/intersect@3.13.5/dist/cdn.min.js"></script>
-  <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
-
-  {% block extra_head %}{% endblock %}
-</head>
-
-<style>
+  <style>
 /* Cache les composants Alpine avant initialisation pour eviter le flicker. */
 [x-cloak] {
     display: none !important;
@@ -266,169 +258,22 @@ main {
     .esfe-fab { width: 2.8rem; height: 2.8rem; }
     .esfe-social-orb { width: 2.35rem; height: 2.35rem; }
 }
-</style>
+  </style>
+
+  <!-- LIBS (defer: ordre d'exécution après parsing du document) -->
+  <script defer src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+  <script defer src="https://unpkg.com/@alpinejs/intersect@3.13.5/dist/cdn.min.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
+  <script defer src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+  {% block extra_head %}{% endblock %}
+</head>
 
 <body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-roboto antialiased overflow-x-hidden"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
   <!-- ================= GLOBAL TOAST SYSTEM ================= -->
   {% include "toast.html" %}
-  {% comment %} Legacy toast implementation kept only for reference during migration. {% endcomment %}
-
-  {% comment %}
-  <!-- Django Messages Toasts -->
-  {% if messages %}
-  <div class="fixed top-20 left-1/2 -translate-x-1/2 z-[60] space-y-4 w-full max-w-md px-4">
-    {% for message in messages %}
-    <div x-data="{ show: true }"
-         x-show="show"
-         x-transition
-         x-init="setTimeout(() => show = false, 4000)"
-         class="flex items-start gap-3 p-4 rounded-2xl shadow-float border backdrop-blur-xl
-                {% if message.tags == 'success' %}
-                bg-green-50 border-green-200 text-green-700
-                {% elif message.tags == 'error' %}
-                bg-red-50 border-red-200 text-red-700
-                {% elif message.tags == 'warning' %}
-                bg-yellow-50 border-yellow-200 text-yellow-700
-                {% else %}
-                bg-gray-50 border-gray-200 text-gray-700
-                {% endif %}">
-
-      <div class="flex-1 text-sm font-medium">
-        {{ message }}
-      </div>
-
-      <button @click="show = false"
-              class="text-xs opacity-60 hover:opacity-100 transition">
-        ✕
-      </button>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  <!-- HTMX Triggered Toasts (toast component) -->
-  <div
-      x-data="toastComponent()"
-      x-show="show"
-      x-transition:enter="transition ease-out duration-300"
-      x-transition:enter-start="opacity-0 translate-y-4"
-      x-transition:enter-end="opacity-100 translate-y-0"
-      x-transition:leave="transition ease-in duration-200"
-      x-transition:leave-start="opacity-100 translate-y-0"
-      x-transition:leave-end="opacity-0 translate-y-4"
-      @toast.window="showToast($event.detail)"
-      class="fixed top-20 left-1/2 -translate-x-1/2 z-[60] max-w-md w-full px-4"
-      style="display: none;"
-  >
-    <div
-        class="rounded-[1.4rem] shadow-float overflow-hidden border border-white/10 backdrop-blur-xl"
-        :class="{
-            'bg-secondary text-white': type === 'success',
-            'bg-accent text-white': type === 'warning',
-            'bg-red-500 text-white': type === 'error',
-            'bg-primary-500 text-white': type === 'info'
-        }"
-    >
-      <div class="p-4 flex items-start gap-3">
-        <!-- Icône -->
-        <div class="flex-shrink-0 w-6 h-6">
-          <template x-if="type === 'success'">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-          </template>
-          <template x-if="type === 'error'">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-          </template>
-          <template x-if="type === 'warning'">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-            </svg>
-          </template>
-          <template x-if="type === 'info'">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-          </template>
-        </div>
-
-        <!-- Contenu -->
-        <div class="flex-1">
-          <p class="font-medium" x-text="message"></p>
-        </div>
-
-        <!-- Bouton fermer -->
-        <button
-            @click="close()"
-            class="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Progress bar -->
-      <div class="h-1 bg-black/10">
-        <div
-            class="h-full bg-white/50 transition-all ease-linear"
-            :style="`width: ${progress}%; transition-duration: ${duration}ms`"
-        ></div>
-      </div>
-    </div>
-  </div>
-
-  {% endcomment %}
-  <script>
-  function toastComponent() {
-    return {
-      show: false,
-      type: 'info',
-      message: '',
-      progress: 100,
-      duration: 5000,
-      timer: null,
-
-      showToast(detail) {
-        this.type = detail.type || 'info';
-        this.message = detail.message || '';
-        this.duration = detail.duration || 5000;
-
-        this.show = true;
-        this.progress = 100;
-
-        this.startProgress();
-
-        clearTimeout(this.timer);
-        this.timer = setTimeout(() => {
-          this.close();
-        }, this.duration);
-      },
-
-      startProgress() {
-        const startTime = Date.now();
-        const updateProgress = () => {
-          const elapsed = Date.now() - startTime;
-          this.progress = Math.max(0, 100 - (elapsed / this.duration) * 100);
-
-          if (this.progress > 0 && this.show) {
-            requestAnimationFrame(updateProgress);
-          }
-        };
-        requestAnimationFrame(updateProgress);
-      },
-
-      close() {
-        this.show = false;
-        clearTimeout(this.timer);
-      }
-    }
-  }
-  </script>
 
   <script>
   function esfeFloatingUi() {
@@ -439,15 +284,22 @@ main {
       showTop: false,
       showSocialTrigger: false,
       init() {
+        let scrollRaf = null;
         const syncScrollState = () => {
+          scrollRaf = null;
           this.showTop = window.scrollY > 320;
           this.showSocialTrigger = window.scrollY > 460;
           if (!this.showSocialTrigger) {
             this.socialOpen = false;
           }
         };
+        const onScroll = () => {
+          if (scrollRaf === null) {
+            scrollRaf = requestAnimationFrame(syncScrollState);
+          }
+        };
         syncScrollState();
-        window.addEventListener('scroll', syncScrollState, { passive: true });
+        window.addEventListener('scroll', onScroll, { passive: true });
       },
       toggleSocial() {
         this.socialOpen = !this.socialOpen;
@@ -669,7 +521,9 @@ main {
         init() {
           const hero = document.getElementById("hero-section");
 
+          let layoutRaf = null;
           const computeState = () => {
+            layoutRaf = null;
             if (!hero) {
               this.visible = true;
               this.scrolled = window.scrollY > 16;
@@ -681,9 +535,15 @@ main {
             this.visible = heroBottom <= window.innerHeight * 0.62;
           };
 
+          const scheduleLayout = () => {
+            if (layoutRaf === null) {
+              layoutRaf = requestAnimationFrame(computeState);
+            }
+          };
+
           computeState();
-          window.addEventListener("scroll", computeState, { passive: true });
-          window.addEventListener("resize", computeState);
+          window.addEventListener("scroll", scheduleLayout, { passive: true });
+          window.addEventListener("resize", scheduleLayout);
 
           if (!hero) {
             return;
@@ -724,10 +584,7 @@ main {
 
   {% block extra_scripts %}{% endblock %}
 
-  <!-- Admin Scripts -->
-  <script src="{% static 'admin/js/core.js' %}"></script>
-  <script src="{% static 'admin/js/SelectBox.js' %}"></script>
-  <script src="{% static 'admin/js/SelectFilter2.js' %}"></script>
+  {% block django_admin_form_js %}{% endblock %}
 
   <!-- Profile Tabs Handler -->
   <script>
@@ -835,7 +692,6 @@ main {
     <script type="text/plain" data-cookie-category="analytics">
       // Placez ici vos scripts analytics (ex: Google Analytics) quand vous serez pret.
     </script>
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </body>
 </html>
 

@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from django.db.models import Count, F, Q
@@ -139,6 +140,9 @@ def article_detail(request, slug):
                 user=request.user if request.user.is_authenticated else None
             )
             messages.success(request, "Votre commentaire a été publié.")
+        except ValidationError as e:
+            for msg in e.messages:
+                messages.error(request, msg)
         except Exception as e:
             messages.error(request, str(e))
 

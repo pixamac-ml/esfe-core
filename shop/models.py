@@ -167,6 +167,47 @@ class ShopOrder(models.Model):
         return max(self.total_amount - self.paid_amount, 0)
 
 
+class ShopCashPaymentSession(models.Model):
+    """Session de validation espèces boutique (même logique que les dossiers inscription)."""
+
+    order = models.ForeignKey(
+        "ShopOrder",
+        on_delete=models.CASCADE,
+        related_name="cash_sessions",
+        db_index=True,
+    )
+    agent = models.ForeignKey(
+        "payments.PaymentAgent",
+        on_delete=models.PROTECT,
+        related_name="shop_cash_sessions",
+        db_index=True,
+    )
+    verification_code = models.CharField(max_length=6)
+    expires_at = models.DateTimeField(db_index=True)
+    is_used = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["expires_at"]),
+            models.Index(fields=["is_used"]),
+            models.Index(fields=["agent", "created_at"]),
+            models.Index(fields=["order", "agent", "is_used"]),
+        ]
+
+    def generate_code(self):
+        import random
+        from datetime import timedelta
+
+        self.verification_code = str(random.randint(100000, 999999))
+        self.expires_at = timezone.now() + timedelta(minutes=5)
+        self.save(update_fields=["verification_code", "expires_at"])
+
+    def __str__(self):
+        return f"Session cash boutique {self.order.reference or self.order_id}"
+
+
 class ShopOrderItem(models.Model):
     order = models.ForeignKey(ShopOrder, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(ShopProduct, on_delete=models.PROTECT, related_name="order_items")
@@ -213,6 +254,20 @@ class ShopPayment(models.Model):
     receipt_pdf = models.FileField(upload_to="shop/receipts/", null=True, blank=True)
     paid_at = models.DateTimeField(default=timezone.now, db_index=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_shop_payments")
+    agent = models.ForeignKey(
+        "payments.PaymentAgent",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="shop_payments_collected",
+    )
+    cash_session = models.ForeignKey(
+        ShopCashPaymentSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payments",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

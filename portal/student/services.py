@@ -9,6 +9,7 @@ from communication.models import CommunicationNotification
 from news.models import Event
 from payments.models import Payment
 from .profile_service import get_profile_data
+from portal.student.widgets.academics import get_academics_widget
 from portal.student.widgets.academics import get_student_academic_snapshot
 
 
@@ -251,6 +252,7 @@ def get_student_dashboard_data(user):
             },
             "academic_status": snapshot["academic_status"],
             "academic_status_message": snapshot["academic_status_message"],
+            "academic_widget": get_academics_widget(user),
             "page_title": "Dashboard etudiant",
             "subtitle": "Vue d'ensemble de votre parcours academique",
         }
@@ -269,6 +271,7 @@ def get_student_dashboard_data(user):
         "stats": get_student_stats(student),
         "academic_status": snapshot["academic_status"],
         "academic_status_message": snapshot["academic_status_message"],
+        "academic_widget": get_academics_widget(user),
         "academic_class": snapshot["academic_class"],
         "academic_programme": snapshot["academic_programme"],
         "academic_year": snapshot["academic_year"],
@@ -315,6 +318,7 @@ def get_student_overview_data(user):
             },
             "academic_status": snapshot["academic_status"],
             "academic_status_message": snapshot["academic_status_message"],
+            "academic_widget": get_academics_widget(user),
             "academic_class": snapshot["academic_class"],
             "academic_programme": snapshot["academic_programme"],
             "academic_year": snapshot["academic_year"],
@@ -337,6 +341,7 @@ def get_student_overview_data(user):
         "stats": get_student_stats(student),
         "academic_status": snapshot["academic_status"],
         "academic_status_message": snapshot["academic_status_message"],
+        "academic_widget": get_academics_widget(user),
         "academic_class": snapshot["academic_class"],
         "academic_programme": snapshot["academic_programme"],
         "academic_year": snapshot["academic_year"],

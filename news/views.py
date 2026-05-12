@@ -1,33 +1,28 @@
 import json
 
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.views.generic import ListView, DetailView
-from django.db.models import Q
+from django.core.paginator import Paginator
+from django.db.models import Q, Count, Prefetch
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from .models import News, Category, Program, ResultSession
+from .models import (
+    News,
+    Category,
+    Program,
+    ResultSession,
+    Event,
+    EventType,
+    MediaItem,
+)
 from .filters import filter_news
 
 
 # =====================================================
 # ACTUALITÉS — LISTE
 # =====================================================
-
-from django.shortcuts import render
-from django.views.generic import ListView
-from django.shortcuts import render
-from django.db.models import Q
-
-from .models import News, Category, Program
-from .filters import filter_news
-
-from django.views.generic import ListView
-from django.shortcuts import render
-
-from .models import News, Category, Program
-from .filters import filter_news
 
 
 class NewsListView(ListView):
@@ -168,7 +163,7 @@ class NewsDetailView(DetailView):
             ),
         })
 
-        return context  # ← MANQUAIT ICI
+        return context
 
 # =====================================================
 # PROGRAMMES — LISTE
@@ -226,11 +221,6 @@ class ProgramDetailView(DetailView):
         })
 
         return context
-
-
-from django.views.generic import ListView
-from django.db.models import Count
-from .models import ResultSession
 
 
 class ResultSessionListView(ListView):
@@ -366,15 +356,6 @@ class ResultSessionPollingView(ResultSessionListView):
             return response
 
         return HttpResponse(status=204)
-
-
-
-from django.shortcuts import render, get_object_or_404
-from django.db.models import Count, Q, Prefetch
-from django.core.paginator import Paginator
-from django.utils import timezone
-
-from .models import Event, EventType, MediaItem
 
 
 # ==========================================================

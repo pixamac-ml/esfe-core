@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from portal.models import AccountSupportState, BranchITSettings, SupportAuditLog, SupportTicket, SupportTicketComment
+from portal.models import AccountSupportState, BranchITSettings, SupportAuditLog, SupportTicket, SupportTicketComment, TeacherDashboardPreference
 
 
 @admin.register(SupportAuditLog)
@@ -38,3 +38,10 @@ class AccountSupportStateAdmin(admin.ModelAdmin):
 class BranchITSettingsAdmin(admin.ModelAdmin):
     list_display = ("branch", "validation_threshold", "active_academic_year", "updated_at")
     search_fields = ("branch__name", "branch__code", "active_academic_year")
+
+
+@admin.register(TeacherDashboardPreference)
+class TeacherDashboardPreferenceAdmin(admin.ModelAdmin):
+    list_display = ("teacher", "branch", "default_section", "dark_mode", "sidebar_collapsed", "updated_at")
+    list_filter = ("branch", "default_section", "dark_mode", "sidebar_collapsed", "compact_mode")
+    search_fields = ("teacher__username", "teacher__first_name", "teacher__last_name", "branch__name", "branch__code")

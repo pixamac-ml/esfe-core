@@ -1,0 +1,162 @@
+<div id="teacher-settings-workspace" class="space-y-6">
+  {% if toast %}
+    <div class="rounded-2xl border px-4 py-3 text-sm font-semibold {% if toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-700{% else %}border-rose-200 bg-rose-50 text-rose-700{% endif %}">
+      {{ toast.message }}
+    </div>
+  {% endif %}
+
+  <div class="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+    <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+        <div>
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Profil enseignant</p>
+          <h2 class="mt-2 text-2xl font-black text-slate-900">Informations de reference</h2>
+        </div>
+        <div class="rounded-2xl bg-slate-100 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-600">
+          {{ teacher_settings_stats.active_classes }} classe(s)
+        </div>
+      </div>
+
+      <div class="grid gap-4 p-6 md:grid-cols-2">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Nom</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ user_display_name }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Code employe</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ status_summary.employee_code }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Statut</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ status_summary.employment_status }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Annexe</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ status_summary.branch_name }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Prise de service</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ status_summary.hire_date|date:"d/m/Y"|default:"Non renseignee" }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Mode d'affichage</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ teacher_settings_stats.display_mode }}</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div class="border-b border-slate-200 px-6 py-5">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Preferences</p>
+        <h2 class="mt-2 text-2xl font-black text-slate-900">Tableau de bord enseignant</h2>
+        <p class="mt-2 text-sm font-semibold text-slate-500">Les choix sont memorises pour que l'espace reste cohérent au prochain acces.</p>
+      </div>
+
+      <form
+        method="post"
+      hx-post="{% url 'accounts_portal:teacher_settings_workspace' %}"
+      hx-target="#teacher-settings-workspace"
+      hx-swap="outerHTML"
+      hx-disabled-elt="find button"
+      hx-on:htmx:beforeRequest="window.teacherDashboardController && (window.teacherDashboardController.darkMode = this.querySelector('[name=dark_mode]')?.checked, window.teacherDashboardController.sidebarOpen = !this.querySelector('[name=sidebar_collapsed]')?.checked)"
+      class="space-y-5 p-6"
+      >
+        {% csrf_token %}
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <input type="checkbox" name="dark_mode" {% if teacher_dashboard_preference.dark_mode %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+            <span>
+              <strong class="block text-sm font-black text-slate-900">Mode sombre</strong>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">Active une lecture plus confortable dans les longues sessions.</span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <input type="checkbox" name="sidebar_collapsed" {% if teacher_dashboard_preference.sidebar_collapsed %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+            <span>
+              <strong class="block text-sm font-black text-slate-900">Barre reduite</strong>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">Affiche une interface plus compacte sur les ecrans etroits.</span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <input type="checkbox" name="compact_mode" {% if teacher_dashboard_preference.compact_mode %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+            <span>
+              <strong class="block text-sm font-black text-slate-900">Affichage compact</strong>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">Resserre les blocs du dashboard pour voir plus de contenu.</span>
+            </span>
+          </label>
+
+          <label class="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <span class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Section d'ouverture</span>
+            <select name="default_section" class="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
+              {% for value, label in teacher_preferences_choices %}
+                <option value="{{ value }}"{% if teacher_dashboard_preference.default_section == value %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-3">
+          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <input type="checkbox" name="notify_lesson_reminders" {% if teacher_dashboard_preference.notify_lesson_reminders %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+            <span>
+              <strong class="block text-sm font-black text-slate-900">Rappels de cours</strong>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">Recevoir les rappels avant vos seances.</span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <input type="checkbox" name="notify_schedule_changes" {% if teacher_dashboard_preference.notify_schedule_changes %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+            <span>
+              <strong class="block text-sm font-black text-slate-900">Modifications EDT</strong>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">Etre alerte lors des changements de planning.</span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <input type="checkbox" name="notify_support_messages" {% if teacher_dashboard_preference.notify_support_messages %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+            <span>
+              <strong class="block text-sm font-black text-slate-900">Messages de support</strong>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">Recevoir les messages operatoires de la direction.</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+          <span class="text-xs font-semibold text-slate-500">La langue n'est pas geree ici. Les preferences sont concentrees sur l'usage du dashboard.</span>
+          <div class="flex items-center gap-3">
+            <span class="htmx-indicator text-xs font-bold text-slate-400">Enregistrement...</span>
+            <button type="submit" class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700">
+              Enregistrer
+            </button>
+          </div>
+        </div>
+      </form>
+    </article>
+  </div>
+
+  <div class="grid gap-4 md:grid-cols-3">
+    <button type="button" @click="activeSection='overview'" class="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50">
+      <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Raccourci</p>
+      <p class="mt-2 text-sm font-black text-slate-900">Retour a l'accueil</p>
+    </button>
+    <button type="button" @click="activeSection='schedule'" class="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50">
+      <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Raccourci</p>
+      <p class="mt-2 text-sm font-black text-slate-900">Ouvrir le planning</p>
+    </button>
+    <button type="button" @click="activeSection='supports'" class="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50">
+      <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Raccourci</p>
+      <p class="mt-2 text-sm font-black text-slate-900">Voir les supports</p>
+    </button>
+  </div>
+
+  <div class="rounded-3xl border border-slate-200 bg-slate-50 px-6 py-5 text-sm font-semibold text-slate-600 shadow-sm">
+    Session actuelle: {{ user_display_name }} · {{ status_summary.branch_name }}
+    <form action="{% url 'accounts:logout' %}" method="post" class="mt-4">
+      {% csrf_token %}
+      <button type="submit" class="rounded-xl bg-rose-600 px-4 py-3 text-sm font-black text-white transition hover:bg-rose-700">Se deconnecter</button>
+    </form>
+  </div>
+</div>

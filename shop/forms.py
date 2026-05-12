@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 
 from shop.models import ShopPayment, ShopProduct, ShopStockMovement
+from shop.services.shop_cash_session import validate_shop_cash_session_code, verify_agent_and_create_shop_session
 INPUT_CLASS = "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
 TEXTAREA_CLASS = "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm min-h-[90px] focus:ring-2 focus:ring-primary/20 focus:border-primary"
 CHECKBOX_CLASS = "rounded border-slate-300 text-primary focus:ring-primary"
@@ -52,6 +53,102 @@ class ShopPaymentForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["method"].widget.attrs.update({"class": INPUT_CLASS})
+
+
+class StudentShopPaymentForm(forms.Form):
+    """Paiement commande boutique côté étudiant — aligné sur le formulaire de scolarité."""
+
+    method = forms.ChoiceField(
+        choices=[],
+        label="Methode de paiement",
+        widget=forms.Select(
+            attrs={"class": INPUT_CLASS}
+        ),
+    )
+    agent_name = forms.CharField(
+        required=False,
+        label="Nom de l'agent",
+        widget=forms.TextInput(
+            attrs={
+                "class": INPUT_CLASS,
+                "placeholder": "Ex : Fatoumata Dia",
+            }
+        ),
+    )
+    verification_code = forms.CharField(
+        required=False,
+        label="Code de validation",
+        max_length=6,
+        widget=forms.TextInput(
+            attrs={
+                "class": f"{INPUT_CLASS} font-mono text-center tracking-widest text-lg max-w-[12rem]",
+                "placeholder": "------",
+                "maxlength": "6",
+            }
+        ),
+    )
+    amount = forms.IntegerField(
+        min_value=1,
+        label="Montant a payer (FCFA)",
+        widget=forms.NumberInput(
+            attrs={
+                "class": INPUT_CLASS,
+                "placeholder": "Ex : 50000",
+                "min": "1",
+            }
+        ),
+    )
+
+    def __init__(self, *args, order=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["method"].choices = ShopPayment.METHOD_CHOICES
+        self.order = order
+        self.agent = None
+        self.cash_session = None
+        balance = getattr(order, "balance", None)
+        max_amount = balance if balance is not None else 0
+        if max_amount > 0:
+            self.fields["amount"].widget.attrs["max"] = str(max_amount)
+    def clean(self):
+        cleaned = super().clean()
+        if not self.order:
+            raise forms.ValidationError("Commande invalide.")
+
+        amount = cleaned.get("amount")
+        method = cleaned.get("method")
+        agent_name = cleaned.get("agent_name")
+        code = (cleaned.get("verification_code") or "").strip()
+
+        if amount is None or amount <= 0:
+            raise forms.ValidationError("Montant invalide.")
+
+        balance = self.order.balance
+        if amount > balance:
+            self.add_error("amount", "Le montant depasse le solde restant de la commande.")
+
+        if method == ShopPayment.METHOD_CASH:
+            if not agent_name:
+                raise forms.ValidationError(
+                    "Veuillez entrer le nom de l'agent charge du paiement boutique."
+                )
+            agent, error = verify_agent_and_create_shop_session(self.order, agent_name)
+            if error:
+                raise forms.ValidationError(error)
+            if not code:
+                raise forms.ValidationError(
+                    "Veuillez entrer le code de validation communique par l'agent."
+                )
+            session, error = validate_shop_cash_session_code(self.order, agent, code)
+            if error:
+                raise forms.ValidationError(error)
+            self.agent = agent
+            self.cash_session = session
+
+        elif method in {ShopPayment.METHOD_ORANGE, ShopPayment.METHOD_BANK}:
+            cleaned["verification_code"] = ""
+            cleaned["agent_name"] = ""
+
+        return cleaned
 
 
 class ShopCounterOrderForm(forms.Form):

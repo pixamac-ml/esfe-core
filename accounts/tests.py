@@ -28,7 +28,7 @@ from accounts.models import BranchCashMovement, PayrollEntry
 from communication.models import CommunicationNotification
 from portal.permissions import get_user_role as get_portal_user_role
 from portal.permissions import get_post_login_portal_url
-from portal.models import DirectorTeacherAssignment, SupportAuditLog
+from portal.models import DirectorTeacherAssignment, SupportAuditLog, TeacherDashboardPreference
 
 
 User = get_user_model()
@@ -595,8 +595,9 @@ class PortalPhaseOneTests(TestCase):
 		return Student.objects.create(user=user, inscription=inscription, matricule=f"MAT-{user.pk}")
 
 	def _create_academic_class_bundle(self, level="L1"):
+		safe_level = "".join(ch for ch in level if ch.isalnum())[:3]
 		academic_year = AcademicYear.objects.create(
-			name=f"25-26-{level}",
+			name=f"25-26-{safe_level}",
 			start_date="2025-10-01",
 			end_date="2026-07-31",
 			is_active=True,
@@ -670,6 +671,7 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, "Dashboard enseignant")
 		self.assertContains(response, "ENS-001")
 		self.assertContains(response, "Mes classes et effectifs")
+		self.assertContains(response, "Chargement des parametres")
 
 	def test_teacher_class_detail_renders_for_assigned_teacher(self):
 		teacher = self._create_user("portal_teacher_class_detail", role="teacher", position="teacher")
@@ -843,6 +845,41 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, academic_class.display_name)
 		self.assertContains(response, ec.title)
+
+	def test_teacher_settings_workspace_renders_and_persists_preferences(self):
+		teacher = self._create_user("portal_teacher_settings", role="teacher", position="teacher")
+		self.client.force_login(teacher)
+
+		response = self.client.get(reverse("accounts_portal:teacher_settings_workspace"))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Tableau de bord enseignant")
+		self.assertContains(response, "Section d'ouverture")
+
+		post_response = self.client.post(
+			reverse("accounts_portal:teacher_settings_workspace"),
+			{
+				"dark_mode": "on",
+				"sidebar_collapsed": "on",
+				"compact_mode": "on",
+				"default_section": "schedule",
+				"notify_lesson_reminders": "on",
+				"notify_schedule_changes": "on",
+				"notify_support_messages": "on",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(post_response.status_code, 200)
+		self.assertContains(post_response, "Parametres enregistres.")
+
+		preference = TeacherDashboardPreference.objects.get(teacher=teacher, branch=self.branch)
+		self.assertTrue(preference.dark_mode)
+		self.assertTrue(preference.sidebar_collapsed)
+		self.assertTrue(preference.compact_mode)
+		self.assertEqual(preference.default_section, "schedule")
+		self.assertTrue(preference.notify_lesson_reminders)
+		self.assertTrue(preference.notify_schedule_changes)
+		self.assertTrue(preference.notify_support_messages)
 
 	def test_portal_dashboard_renders_staff_page_from_single_entry(self):
 		staff_user = self._create_user("portal_staff", groups=["admissions_managers"])
@@ -1054,6 +1091,7 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Dashboard Direction des Etudes")
 		self.assertContains(response, "Pilotage de la qualite academique et des charges")
+		self.assertContains(response, reverse("accounts:logout"))
 
 	def test_director_can_create_teacher_with_initial_room_assignment(self):
 		director = self._create_user("portal_director_create_teacher", role="executive", position="director_of_studies")

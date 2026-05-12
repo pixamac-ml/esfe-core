@@ -4,7 +4,7 @@
 
   {% csrf_token %}
 
-  <!-- Honeypot anti-spam -->
+  <!-- Honeypot anti-spam (laisser vide) -->
   <input type="text"
          name="website"
          class="hidden"
@@ -12,7 +12,6 @@
          tabindex="-1"
          aria-hidden="true">
 
-  <!-- Header -->
   <div class="flex items-center gap-3">
     <div class="bg-primary-600/10 p-2.5 rounded-xl">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -25,78 +24,61 @@
     </h3>
   </div>
 
-  <!-- Nom & Email sur même ligne en desktop -->
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-
-    <!-- Nom -->
     <div class="space-y-2">
-      <label for="author_name" class="text-sm font-medium text-gray-700">
+      <label for="id_comment_author_name" class="text-sm font-medium text-gray-700">
         Votre nom <span class="text-red-500">*</span>
       </label>
       <input type="text"
-             id="author_name"
+             id="id_comment_author_name"
              name="author_name"
              required
-             placeholder="Ex: Jean Dupont"
+             maxlength="150"
+             value="{% if request.user.is_authenticated %}{{ request.user.get_full_name|default:request.user.username|escape }}{% endif %}"
+             placeholder="Ex. Jean Dupont"
              class="w-full rounded-xl border border-gray-300 px-4 py-3.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 transition duration-200">
-                    focus:ring-2 focus:ring-primary-500
-                    focus:border-primary-500
-                    transition duration-200">
     </div>
 
-    <!-- Email (optionnel) -->
     <div class="space-y-2">
-      <label for="author_email" class="text-sm font-medium text-gray-700">
-             class="w-full rounded-xl border border-gray-300 px-4 py-3
-                    focus:ring-2 focus:ring-primary-500
-                    focus:border-primary-500
-             class="w-full rounded-xl border border-gray-300 px-4 py-3.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 transition duration-200">
+      <label for="id_comment_author_email" class="text-sm font-medium text-gray-700">
+        E-mail <span class="text-gray-400 font-normal">(optionnel)</span>
+      </label>
+      <input type="email"
+             id="id_comment_author_email"
              name="author_email"
-             placeholder="email@exemple.com"
-             class="w-full rounded-xl border border-gray-300 px-4 py-3
-                    focus:ring-2 focus:ring-primary-500
-                    focus:border-primary-500
-                    transition duration-200">
+             maxlength="254"
+             value="{% if request.user.is_authenticated and request.user.email %}{{ request.user.email|escape }}{% endif %}"
+             placeholder="vous@exemple.com"
+             class="w-full rounded-xl border border-gray-300 px-4 py-3.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 transition duration-200">
     </div>
-
   </div>
 
-  <!-- Commentaire -->
   <div class="space-y-2">
-              class="w-full rounded-xl border border-gray-300 px-4 py-3
-                     focus:ring-2 focus:ring-primary-500
-                     focus:border-primary-500
-                     transition duration-200 resize-none"></textarea>
-              class="w-full rounded-xl border border-gray-300 px-4 py-3.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 transition duration-200 resize-none"></textarea>
-              rows="4"
+    <label for="id_comment_content" class="text-sm font-medium text-gray-700">
+      Commentaire <span class="text-red-500">*</span>
+    </label>
+    <textarea id="id_comment_content"
+              name="content"
+              rows="5"
               required
               minlength="3"
               maxlength="2000"
-                   bg-primary-600 text-white px-6 py-3 rounded-xl
-              class="w-full rounded-xl border border-gray-300 px-4 py-3
-                     focus:ring-2 focus:ring-primary-500
-                   bg-primary-600 text-white px-6 py-3.5 rounded-xl
-                     transition duration-200 resize-none"></textarea>
-    <p class="text-xs text-gray-400">Maximum 2000 caractères</p>
+              placeholder="Votre message…"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 transition duration-200 resize-y min-h-[8rem]"></textarea>
+    <p class="text-xs text-gray-400">Entre 3 et 2000 caractères.</p>
   </div>
 
-  <!-- Submit -->
   <div class="flex justify-end">
     <button type="submit"
-            class="inline-flex items-center gap-2
-                   bg-primary-600 text-white px-6 py-3 rounded-xl
-                   font-medium hover:bg-primary-700
-                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
-                   transition duration-200 shadow-sm
-                   w-full sm:w-auto justify-center">
-
+            class="inline-flex items-center gap-2 w-full sm:w-auto justify-center
+                   bg-primary-600 text-white px-6 py-3.5 rounded-xl font-medium
+                   hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+                   transition duration-200 shadow-sm">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
       </svg>
-
       Publier le commentaire
     </button>
   </div>
-
 </form>

@@ -15,6 +15,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Table, TableStyle
 
 from accounts.models import BranchCashMovement
+from payments.models import PaymentAgent
 from accounts.services.accounting_documents import create_cash_movement
 from communication.models import CommunicationNotification
 from communication.services import EmailService, NotificationService
@@ -208,7 +209,19 @@ def create_student_required_order(user, product_ids, created_by=None):
     return order
 
 
-def create_counter_order(*, branch, product, quantity, payment_method, created_by, student=None, customer_name="", customer_email="", customer_phone=""):
+def create_counter_order(
+    *,
+    branch,
+    product,
+    quantity,
+    payment_method,
+    created_by,
+    student=None,
+    customer_name="",
+    customer_email="",
+    customer_phone="",
+    immediate_settlement=False,
+):
     with transaction.atomic():
         ensure_stock_available(product=product, quantity=quantity)
         order = ShopOrder.objects.create(
@@ -231,7 +244,18 @@ def create_counter_order(*, branch, product, quantity, payment_method, created_b
             is_required=product.is_required,
         )
         order.refresh_total()
-        payment = create_shop_payment(order, order.total_amount, payment_method, created_by, auto_validate=False)
+        collector = None
+        auto_validate_payment = immediate_settlement
+        if immediate_settlement and created_by is not None:
+            collector = PaymentAgent.objects.filter(user=created_by, branch=branch, is_active=True).first()
+        payment = create_shop_payment(
+            order,
+            order.total_amount,
+            payment_method,
+            created_by,
+            auto_validate=auto_validate_payment,
+            agent=collector if immediate_settlement else None,
+        )
         notify_shop_order_received(order=order, actor=created_by)
     return order, payment
 
@@ -351,7 +375,7 @@ def validate_shop_payment(payment, user=None):
     return payment
 
 
-def create_shop_payment(order, amount, method, user=None, *, auto_validate=False):
+def create_shop_payment(order, amount, method, user=None, *, auto_validate=False, agent=None, cash_session=None):
     payment = ShopPayment.objects.create(
         order=order,
         amount=amount,
@@ -359,6 +383,8 @@ def create_shop_payment(order, amount, method, user=None, *, auto_validate=False
         status=ShopPayment.STATUS_PENDING,
         reference=next_shop_reference(order.branch, ShopSequence.TYPE_PAYMENT) if auto_validate else "",
         created_by=user,
+        agent=agent,
+        cash_session=cash_session,
     )
     if auto_validate:
         payment = validate_shop_payment(payment, user=user)

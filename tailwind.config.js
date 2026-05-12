@@ -11,14 +11,17 @@ module.exports = {
     extend: {
       colors: {
 
-        // 🔵 Primary Institutionnelle
+        // 🔵 Primary Institutionnelle (DEFAULT + light requis pour bg-primary / hover:bg-primary-light)
         primary: {
-          50:  '#eef4f7',
+          DEFAULT: '#1e4f6f',
+          light: '#2d6a8f',
+          foreground: '#ffffff',
+          50: '#eef4f7',
           100: '#d6e4ec',
           200: '#adc9d9',
           300: '#84aec6',
           400: '#5b93b3',
-          500: '#1e4f6f',   // ✅ Couleur institutionnelle principale
+          500: '#1e4f6f',
           600: '#1a4561',
           700: '#163b53',
           800: '#123145',

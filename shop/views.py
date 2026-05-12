@@ -4,13 +4,22 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.dashboards.helpers import get_user_branch, is_manager
 from branches.models import Branch
-from shop.forms import ShopCounterOrderForm, ShopPaymentForm, ShopProductForm, ShopPublicOrderForm, ShopStockInForm
-from shop.models import ShopOrder, ShopPayment, ShopProduct, ShopSequence, ShopStockMovement
+from payments.models import PaymentAgent
+from shop.forms import (
+    ShopCounterOrderForm,
+    ShopProductForm,
+    ShopPublicOrderForm,
+    ShopStockInForm,
+    StudentShopPaymentForm,
+)
+from shop.models import ShopCashPaymentSession, ShopOrder, ShopPayment, ShopProduct, ShopSequence, ShopStockMovement
+from shop.services.shop_cash_session import verify_agent_and_create_shop_session
 from shop.services.shop_service import (
     create_counter_order,
     create_shop_payment,
@@ -24,6 +33,15 @@ from shop.services.shop_service import (
     validate_shop_payment,
 )
 from students.models import Student
+
+
+def _payment_agent_for_branch_manager(user, branch):
+    return (
+        PaymentAgent.objects
+        .select_related("user", "branch")
+        .filter(user=user, branch=branch, is_active=True)
+        .first()
+    )
 
 
 def manager_required(view_func):
@@ -225,12 +243,15 @@ def student_order_detail(request, pk):
         pk=pk,
         student=request.user,
     )
+    balance = order.balance
+    payment_form = StudentShopPaymentForm(order=order)
     return render(
         request,
         "shop/partials/student_order_detail.html",
         {
             "order": order,
-            "payment_form": ShopPaymentForm(),
+            "payment_form": payment_form,
+            "order_balance": balance,
             "has_pending_payment": order.payments.filter(status=ShopPayment.STATUS_PENDING).exists(),
         },
     )
@@ -240,7 +261,7 @@ def student_order_detail(request, pk):
 @require_POST
 def student_order_pay(request, pk):
     order = get_object_or_404(ShopOrder, pk=pk, student=request.user)
-    form = ShopPaymentForm(request.POST)
+    form = StudentShopPaymentForm(request.POST, order=order)
     if not form.is_valid():
         return render(
             request,
@@ -248,6 +269,7 @@ def student_order_pay(request, pk):
             {
                 "order": order,
                 "payment_form": form,
+                "order_balance": order.balance,
                 "has_pending_payment": order.payments.filter(status=ShopPayment.STATUS_PENDING).exists(),
             },
             status=400,
@@ -255,12 +277,62 @@ def student_order_pay(request, pk):
     if order.payments.filter(status=ShopPayment.STATUS_PENDING).exists():
         return redirect(f"/shop/student/order/{order.pk}/")
     method = form.cleaned_data["method"]
+    amount = form.cleaned_data["amount"]
     auto_validate = False
-    payment = create_shop_payment(order, order.balance or order.total_amount, method, request.user, auto_validate=auto_validate)
-    if not auto_validate:
-        order.status = ShopOrder.STATUS_PENDING_PAYMENT
-        order.save(update_fields=["status", "updated_at"])
+    payment = create_shop_payment(
+        order,
+        amount,
+        method,
+        request.user,
+        auto_validate=auto_validate,
+        agent=getattr(form, "agent", None),
+        cash_session=getattr(form, "cash_session", None),
+    )
+    order.status = ShopOrder.STATUS_PENDING_PAYMENT
+    order.save(update_fields=["status", "updated_at"])
     return redirect(f"/shop/student/order/{order.pk}/")
+
+
+@login_required
+@require_POST
+def student_shop_verify_agent(request, pk):
+    """HTMX — verification agent avant paiement boutique (blur sur le champ nom)."""
+
+    order = get_object_or_404(ShopOrder, pk=pk, student=request.user)
+    agent_name = (request.POST.get("agent_name") or "").strip()
+    if not agent_name or len(agent_name) < 2:
+        return render(
+            request,
+            "shop/partials/shop_agent_feedback.html",
+            {"show_error": True, "error": "Veuillez entrer au moins 2 caracteres."},
+            status=400,
+        )
+    agent, error = verify_agent_and_create_shop_session(order, agent_name)
+    if error:
+        return render(
+            request,
+            "shop/partials/shop_agent_feedback.html",
+            {"show_error": True, "error": error},
+            status=400,
+        )
+    session = (
+        ShopCashPaymentSession.objects.filter(
+            order=order,
+            agent=agent,
+            is_used=False,
+            expires_at__gt=timezone.now(),
+        )
+        .select_related("agent__user")
+        .order_by("-created_at")
+        .first()
+    )
+    response = render(
+        request,
+        "shop/partials/shop_agent_confirmed.html",
+        {"agent": agent, "session": session},
+    )
+    response["HX-Trigger"] = '{"toast": {"type": "success", "message": "Agent verifie avec succes!"}}'
+    return response
 
 
 @login_required
@@ -342,6 +414,7 @@ def manager_counter_order_create(request):
             customer_name=form.cleaned_data.get("customer_name", ""),
             customer_email=form.cleaned_data.get("customer_email", ""),
             customer_phone=form.cleaned_data.get("customer_phone", ""),
+            immediate_settlement=True,
         )
     except ValidationError as exc:
         form.add_error(None, exc.message)
@@ -382,3 +455,46 @@ def manager_order_deliver(request, pk):
     if request.headers.get("HX-Request"):
         return render_manager_shop_panel(request)
     return manager_shop_redirect(request)
+
+
+@manager_required
+@require_POST
+def manager_shop_cash_session_regenerate(request, pk):
+    manager_agent = _payment_agent_for_branch_manager(request.user, request.branch)
+    if not manager_agent:
+        return HttpResponse("Aucun profil agent pour cette annexe.", status=403)
+    session = get_object_or_404(
+        ShopCashPaymentSession.objects.select_related("order", "agent__user"),
+        pk=pk,
+        agent=manager_agent,
+        is_used=False,
+    )
+    session.generate_code()
+    return render(
+        request,
+        "shop/partials/manager_shop_cash_session_card.html",
+        {
+            "session": session,
+            "manager_agent": manager_agent,
+            "show_regenerated_notice": True,
+        },
+    )
+
+
+@manager_required
+@require_POST
+def manager_shop_cash_session_cancel(request, pk):
+    manager_agent = _payment_agent_for_branch_manager(request.user, request.branch)
+    if not manager_agent:
+        return HttpResponse("Aucun profil agent pour cette annexe.", status=403)
+    session = get_object_or_404(
+        ShopCashPaymentSession,
+        pk=pk,
+        agent=manager_agent,
+        is_used=False,
+    )
+    session.is_used = True
+    session.save(update_fields=["is_used"])
+    return HttpResponse(
+        "<p class=\"rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-600\">Session boutique annulee.</p>",
+    )

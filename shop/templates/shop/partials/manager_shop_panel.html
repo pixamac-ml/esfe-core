@@ -4,6 +4,8 @@
     class="space-y-6"
     x-data="{
         openCreateProduct: false,
+        openStockIn: false,
+        openCounterOrder: false,
         productDraft: {
             name: '{{ shop_product_form.name.value|default_if_none:""|escapejs }}',
             categoryLabel: 'Categorie',
@@ -15,224 +17,242 @@
             preview: ''
         },
         resetCreateProduct() {
-            this.productDraft = {
-                name: '',
-                categoryLabel: 'Categorie',
-                description: '',
-                price: '',
-                threshold: '5',
-                required: false,
-                active: true,
-                preview: ''
-            };
+            this.productDraft = { name: '', categoryLabel: 'Categorie', description: '', price: '', threshold: '5', required: false, active: true, preview: '' };
         }
     }"
     x-init="openCreateProduct = {% if shop_product_form.errors %}true{% else %}false{% endif %}"
-    @keydown.escape.window="openCreateProduct = false">
+    @keydown.escape.window="openCreateProduct = false; openStockIn = false; openCounterOrder = false">
+
     {% if shop_error %}
     <div class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-        {{ shop_error }}
+        <i class="fas fa-triangle-exclamation mr-2"></i>{{ shop_error }}
     </div>
     {% endif %}
-    <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"><p class="text-sm font-medium text-slate-700">Articles</p><p class="text-2xl font-bold text-slate-950 mt-2">{{ shop_stats.products }}</p></div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"><p class="text-sm font-medium text-slate-700">Obligatoires</p><p class="text-2xl font-bold text-primary mt-2">{{ shop_stats.required }}</p></div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"><p class="text-sm font-medium text-slate-700">Stock faible</p><p class="text-2xl font-bold text-rose-700 mt-2">{{ shop_stats.low_stock }}</p></div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"><p class="text-sm font-medium text-slate-700">Attente paiement</p><p class="text-2xl font-bold text-amber-700 mt-2">{{ shop_stats.pending_orders }}</p></div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"><p class="text-sm font-medium text-slate-700">A preparer</p><p class="text-2xl font-bold text-blue-700 mt-2">{{ shop_stats.paid_not_delivered }}</p></div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"><p class="text-sm font-medium text-slate-700">Pretes</p><p class="text-2xl font-bold text-emerald-700 mt-2">{{ shop_stats.ready_orders }}</p></div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"><p class="text-sm font-medium text-slate-700">Entrees caisse</p><p class="text-2xl font-bold text-violet-700 mt-2">{{ shop_stats.cash_entries }}</p></div>
+
+    <!-- ===================== STATS ===================== -->
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500">Articles</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1">{{ shop_stats.products }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500">Obligatoires</p>
+            <p class="text-2xl font-bold text-primary mt-1">{{ shop_stats.required }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500">Stock faible</p>
+            <p class="text-2xl font-bold text-rose-600 mt-1">{{ shop_stats.low_stock }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500">En attente paiement</p>
+            <p class="text-2xl font-bold text-amber-600 mt-1">{{ shop_stats.pending_orders }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500">A préparer</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1">{{ shop_stats.paid_not_delivered }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500">Prêtes</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ shop_stats.ready_orders }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <p class="text-xs font-medium text-slate-500">Entrées caisse</p>
+            <p class="text-2xl font-bold text-violet-600 mt-1">{{ shop_stats.cash_entries }}</p>
+        </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-[440px_minmax(0,1fr)] gap-6">
-        <div class="space-y-4 xl:sticky xl:top-6 self-start">
-            <div class="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-white to-primary/5 p-4 shadow-sm">
-                <p class="text-xs font-bold uppercase tracking-[0.22em] text-primary">Shop annexe</p>
-                <h3 class="mt-1 text-lg font-bold text-slate-950">Catalogue, encaissement, preparation, remise</h3>
-                <p class="mt-1 text-sm leading-6 text-slate-700">La gestionnaire pilote l'article, le stock, la commande, le paiement, la preparation et la remise dans un seul espace.</p>
-            </div>
+    <!-- ===================== BARRE D'ACTIONS ===================== -->
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">Shop annexe</p>
+            <h3 class="text-base font-bold text-slate-900 mt-0.5">Catalogue, stock et commandes</h3>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% if shop_public_identifier %}
+            <a href="{% url 'shop:public_catalog_slug' branch_slug=shop_public_identifier %}" target="_blank"
+               class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                <i class="fas fa-arrow-up-right-from-square text-slate-400"></i>
+                Vitrine publique
+            </a>
+            {% endif %}
+            <button type="button" @click="openStockIn = true"
+                class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                <i class="fas fa-boxes-stacked text-blue-500"></i>
+                Entrée stock
+            </button>
+            <button type="button" @click="openCounterOrder = true"
+                class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                <i class="fas fa-cash-register"></i>
+                Vente comptoir
+            </button>
+            <button type="button" @click="resetCreateProduct(); openCreateProduct = true"
+                class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition">
+                <i class="fas fa-plus"></i>
+                Nouvel article
+            </button>
+        </div>
+    </div>
 
-            <div id="manager-shop-product-form" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                <div class="flex items-start justify-between gap-4">
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-950">Catalogue articles</h3>
-                        <p class="text-sm leading-6 text-slate-700">Creation dans une modale claire, visible et immediate avec apercu produit.</p>
+    <!-- ===================== TABLEAU COMMANDES ===================== -->
+    <div id="manager-shop-orders" class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900">Commandes boutique</h3>
+                <p class="text-sm text-slate-500">Paiement, préparation puis remise à l'annexe.</p>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1080px] divide-y divide-slate-100">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Commande</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Acheteur</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Articles</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">État</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                {% for order in shop_orders %}
+                    <tr class="align-top hover:bg-slate-50 transition">
+                        <td class="px-6 py-4">
+                            <p class="text-sm font-semibold text-slate-900">{{ order.reference }}</p>
+                            <p class="text-xs text-slate-500">{{ order.created_at|date:"d/m/Y H:i" }}</p>
+                        </td>
+                        <td class="px-6 py-4">
+                            <p class="text-sm font-medium text-slate-900">{{ order.buyer_display }}</p>
+                            <p class="text-xs text-slate-500">{{ order.get_buyer_type_display }}</p>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-slate-600">
+                            {% for item in order.items.all %}
+                                <p>{{ item.quantity }} × {{ item.product.name }}</p>
+                            {% empty %}<p>-</p>{% endfor %}
+                        </td>
+                        <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ order.total_amount|intcomma }} FCFA</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if order.status == 'delivered' %}bg-emerald-100 text-emerald-700
+                                {% elif order.status == 'ready' %}bg-cyan-100 text-cyan-700
+                                {% elif order.status == 'paid' %}bg-blue-100 text-blue-700
+                                {% elif order.status == 'pending_payment' %}bg-amber-100 text-amber-700
+                                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-wrap justify-end gap-2">
+                                {% for payment in order.payments.all %}
+                                    {% if payment.status == "pending" %}
+                                    <button hx-post="/shop/manager/payment/{{ payment.id }}/validate/"
+                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                        hx-target="#manager-shop-module" hx-swap="outerHTML"
+                                        class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
+                                        <i class="fas fa-check mr-1"></i>Valider paiement
+                                    </button>
+                                    {% endif %}
+                                    {% if payment.receipt_pdf %}
+                                    <a href="/shop/payment/{{ payment.id }}/receipt/" target="_blank"
+                                       class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
+                                        <i class="fas fa-file-pdf mr-1"></i>Reçu
+                                    </a>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if order.status == "paid" %}
+                                <button hx-post="/shop/manager/order/{{ order.id }}/ready/"
+                                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                    hx-target="#manager-shop-module" hx-swap="outerHTML"
+                                    class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
+                                    <i class="fas fa-box-open mr-1"></i>Marquer prête
+                                </button>
+                                {% endif %}
+                                {% if order.status == "ready" or order.status == "paid" %}
+                                <button hx-post="/shop/manager/order/{{ order.id }}/deliver/"
+                                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                    hx-target="#manager-shop-module" hx-swap="outerHTML"
+                                    class="rounded-lg border border-primary-800 bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-700">
+                                    <i class="fas fa-hand-holding-box mr-1"></i>Remettre
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">Aucune commande boutique.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===================== CATALOGUE ARTICLES ===================== -->
+    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+        <div class="px-6 py-4 border-b border-slate-100">
+            <h3 class="text-lg font-semibold text-slate-900">Catalogue articles</h3>
+            <p class="text-sm text-slate-500">Vue des articles, prix, image, statut et stock.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
+            {% for product in shop_products %}
+            <div class="rounded-2xl border border-slate-100 bg-slate-50 overflow-hidden">
+                <div class="h-40 bg-slate-100">
+                    {% if product.image %}
+                    <img src="{{ product.image.url }}" alt="{{ product.name }}" class="h-full w-full object-cover">
+                    {% else %}
+                    <div class="h-full w-full grid place-items-center text-slate-300"><i class="fas fa-box-open text-4xl"></i></div>
+                    {% endif %}
+                </div>
+                <div class="p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">{{ product.name }}</p>
+                            <p class="text-xs text-slate-500">{{ product.get_category_display }}</p>
+                        </div>
+                        <span class="text-sm font-bold text-primary whitespace-nowrap">{{ product.unit_price|intcomma }} FCFA</span>
                     </div>
-                    <div class="flex flex-wrap justify-end gap-3">
-                        <a
-                            href="/shop/{{ shop_public_identifier }}/"
-                            target="_blank"
-                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50">
-                            <i class="fas fa-arrow-up-right-from-square"></i>
-                            Vitrine publique
-                        </a>
-                        <button
-                            type="button"
-                            @click="resetCreateProduct(); openCreateProduct = true"
-                            class="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-slate-950/20 transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300">
-                            <i class="fas fa-plus"></i>
-                            Nouvel article
+                    <p class="mt-2 text-sm text-slate-600 line-clamp-2">{{ product.description|default:"Aucune description." }}</p>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="rounded-full px-2.5 py-1 {% if product.is_low_stock %}bg-rose-100 text-rose-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                            Stock {{ product.current_stock }}
+                        </span>
+                        <span class="rounded-full px-2.5 py-1 {% if product.is_active %}bg-slate-900 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">
+                            {% if product.is_active %}Actif{% else %}Archivé{% endif %}
+                        </span>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between">
+                        <span class="text-xs font-semibold {% if product.is_required %}text-primary{% else %}text-slate-400{% endif %}">
+                            {% if product.is_required %}Obligatoire{% else %}Libre{% endif %}
+                        </span>
+                        <button hx-post="/shop/manager/product/{{ product.id }}/delete/"
+                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                            hx-target="#manager-shop-module" hx-swap="outerHTML"
+                            hx-confirm="Supprimer cet article ?"
+                            class="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100">
+                            <i class="fas fa-trash-alt mr-1"></i>Supprimer
                         </button>
                     </div>
                 </div>
-                <div class="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700">
-                    Astuce: image, prix, statut et seuil d'alerte sont prepares dans la creation pour eviter des retouches apres publication.
-                </div>
             </div>
-
-            <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">Entree stock</h3>
-                <form hx-post="/shop/manager/stock/in/" hx-target="#manager-shop-module" hx-swap="outerHTML" class="space-y-3">
-                    {% csrf_token %}
-                    {{ shop_stock_form.product }}
-                    {{ shop_stock_form.quantity }}
-                    {{ shop_stock_form.notes }}
-                    <button class="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">Ajouter au stock</button>
-                </form>
+            {% empty %}
+            <div class="col-span-3 py-10 text-center text-slate-400">
+                <i class="fas fa-box-open text-3xl mb-3"></i>
+                <p class="text-sm">Aucun article configuré. Cliquez sur "Nouvel article" pour commencer.</p>
             </div>
-
-            <div class="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4">Commande comptoir</h3>
-                <form hx-post="/shop/manager/order/create-counter/" hx-target="#manager-shop-module" hx-swap="outerHTML" class="space-y-3">
-                    {% csrf_token %}
-                    {{ shop_counter_order_form.buyer_type }}
-                    {{ shop_counter_order_form.student }}
-                    {{ shop_counter_order_form.customer_name }}
-                    {{ shop_counter_order_form.customer_email }}
-                    {{ shop_counter_order_form.customer_phone }}
-                    {{ shop_counter_order_form.product }}
-                    {{ shop_counter_order_form.quantity }}
-                    {{ shop_counter_order_form.payment_method }}
-                    <button class="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">Creer la commande</button>
-                </form>
-            </div>
-        </div>
-
-        <div class="space-y-4">
-            <div id="manager-shop-orders" class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                <div class="px-6 py-4 border-b border-slate-100">
-                    <h3 class="text-lg font-semibold text-slate-900">Commandes boutique</h3>
-                    <p class="text-sm text-slate-500">Paiement, preparation puis remise, toujours au niveau de l'annexe.</p>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[1080px] divide-y divide-slate-100">
-                        <thead class="bg-slate-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Commande</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Acheteur</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Articles</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total</th>
-                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Etat</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-50">
-                        {% for order in shop_orders %}
-                            <tr class="align-top">
-                                <td class="px-6 py-4">
-                                    <p class="text-sm font-semibold text-slate-900">{{ order.reference }}</p>
-                                    <p class="text-xs text-slate-500">{{ order.created_at|date:"d/m/Y H:i" }}</p>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-slate-700">
-                                    <p class="font-medium text-slate-900">{{ order.buyer_display }}</p>
-                                    <p class="text-xs text-slate-500">{{ order.get_buyer_type_display }}</p>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-slate-600">
-                                    {% for item in order.items.all %}
-                                        <p>{{ item.quantity }} x {{ item.product.name }}</p>
-                                    {% empty %}
-                                        <p>-</p>
-                                    {% endfor %}
-                                </td>
-                                <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ order.total_amount|intcomma }} FCFA</td>
-                                <td class="px-6 py-4">
-                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold {% if order.status == 'delivered' %}bg-emerald-100 text-emerald-700{% elif order.status == 'ready' %}bg-cyan-100 text-cyan-700{% elif order.status == 'paid' %}bg-blue-100 text-blue-700{% elif order.status == 'pending_payment' %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-700{% endif %}">
-                                        {{ order.get_status_display }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="flex flex-wrap justify-end gap-2">
-                                        {% for payment in order.payments.all %}
-                                            {% if payment.status == "pending" %}
-                                            <button hx-post="/shop/manager/payment/{{ payment.id }}/validate/" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#manager-shop-module" hx-swap="outerHTML" class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Valider paiement</button>
-                                            {% endif %}
-                                            {% if payment.receipt_pdf %}
-                                            <a href="/shop/payment/{{ payment.id }}/receipt/" target="_blank" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">Recu</a>
-                                            {% endif %}
-                                        {% endfor %}
-                                        {% if order.status == "paid" %}
-                                        <button hx-post="/shop/manager/order/{{ order.id }}/ready/" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#manager-shop-module" hx-swap="outerHTML" class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Marquer prete</button>
-                                        {% endif %}
-                                        {% if order.status == "ready" or order.status == "paid" %}
-                                        <button hx-post="/shop/manager/order/{{ order.id }}/deliver/" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#manager-shop-module" hx-swap="outerHTML" class="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white">Remettre</button>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">Aucune commande boutique.</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                <div class="px-6 py-4 border-b border-slate-100">
-                    <h3 class="text-lg font-semibold text-slate-900">Catalogue articles</h3>
-                    <p class="text-sm text-slate-500">Vue annexe des articles, prix, image, statut et stock.</p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
-                    {% for product in shop_products %}
-                    <div class="rounded-2xl border border-slate-100 bg-slate-50 overflow-hidden">
-                        <div class="h-40 bg-slate-100">
-                            {% if product.image %}
-                            <img src="{{ product.image.url }}" alt="{{ product.name }}" class="h-full w-full object-cover">
-                            {% else %}
-                            <div class="h-full w-full grid place-items-center text-slate-300"><i class="fas fa-box-open text-4xl"></i></div>
-                            {% endif %}
-                        </div>
-                        <div class="p-4">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-900">{{ product.name }}</p>
-                                    <p class="text-xs text-slate-500">{{ product.get_category_display }}</p>
-                                </div>
-                                <span class="text-sm font-bold text-primary">{{ product.unit_price|intcomma }} FCFA</span>
-                            </div>
-                            <p class="mt-3 text-sm text-slate-600 line-clamp-3">{{ product.description|default:"Aucune description." }}</p>
-                            <div class="mt-4 flex items-center justify-between text-xs">
-                                <span class="rounded-full px-2.5 py-1 {% if product.is_low_stock %}bg-rose-100 text-rose-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">Stock {{ product.current_stock }}</span>
-                                <span class="rounded-full px-2.5 py-1 {% if product.is_active %}bg-slate-900 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{% if product.is_active %}Actif{% else %}Archive{% endif %}</span>
-                            </div>
-                            <div class="mt-4 flex items-center justify-between">
-                                <span class="text-xs font-semibold {% if product.is_required %}text-primary{% else %}text-slate-400{% endif %}">{% if product.is_required %}Article recommande/obligatoire{% else %}Article libre{% endif %}</span>
-                                <button hx-post="/shop/manager/product/{{ product.id }}/delete/" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#manager-shop-module" hx-swap="outerHTML" class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">Supprimer</button>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <p class="text-sm text-slate-400">Aucun article configure.</p>
-                    {% endfor %}
-                </div>
-            </div>
+            {% endfor %}
         </div>
     </div>
 
-    <div
-        x-cloak
-        x-show="openCreateProduct"
-        x-transition.opacity
-        class="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6">
+    <!-- ===================== MODALE : NOUVEL ARTICLE ===================== -->
+    <div x-cloak x-show="openCreateProduct" x-transition.opacity
+         class="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6">
         <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" @click="openCreateProduct = false"></div>
         <section class="relative w-full max-w-7xl overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
             <div class="flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4 sm:px-7">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.24em] text-primary">Catalogue annexe</p>
-                    <h3 class="mt-1 text-xl font-black text-slate-900 sm:text-2xl">Creer un nouvel article</h3>
-                    <p class="mt-1 text-sm text-slate-500">Une saisie rapide, un rendu propre et un apercu direct avant publication.</p>
+                    <h3 class="mt-1 text-xl font-black text-slate-900 sm:text-2xl">Créer un nouvel article</h3>
+                    <p class="mt-1 text-sm text-slate-500">Saisie rapide, rendu propre et aperçu direct avant publication.</p>
                 </div>
-                <button type="button" @click="openCreateProduct = false" class="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200">
+                <button type="button" @click="openCreateProduct = false" class="grid h-11 w-11 place-items-center rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -242,26 +262,23 @@
                     <div class="max-h-[78vh] overflow-y-auto p-5 sm:p-7">
                         {% if shop_product_form.errors %}
                         <div class="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                            Verifiez les champs du formulaire avant de publier l'article.
+                            Vérifiez les champs du formulaire avant de publier l'article.
                         </div>
                         {% endif %}
 
-                        <form
-                            hx-post="/shop/manager/product/create/"
-                            hx-target="#manager-shop-module"
-                            hx-swap="outerHTML"
+                        <form hx-post="/shop/manager/product/create/"
+                            hx-target="#manager-shop-module" hx-swap="outerHTML"
                             hx-on::after-request="if ($event.detail.successful) { openCreateProduct = false; resetCreateProduct(); }"
-                            enctype="multipart/form-data"
-                            class="space-y-6">
+                            enctype="multipart/form-data" class="space-y-6">
                             {% csrf_token %}
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm h-full">
+                                <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                                     <div class="flex items-start justify-between gap-4">
                                         <div>
-                                            <h4 class="text-base font-bold text-slate-900">Presentation article</h4>
-                                            <p class="mt-1 text-sm text-slate-500">Nom, categorie, prix et description visibles dans le catalogue.</p>
+                                            <h4 class="text-base font-bold text-slate-900">Présentation article</h4>
+                                            <p class="mt-1 text-sm text-slate-500">Nom, catégorie, prix et description visibles dans le catalogue.</p>
                                         </div>
-                                        <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Etape 1</span>
+                                        <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Étape 1</span>
                                     </div>
                                     <div class="mt-5 grid grid-cols-1 gap-4">
                                         <div>
@@ -270,10 +287,8 @@
                                             {% if shop_product_form.name.errors %}<p class="mt-2 text-xs font-medium text-rose-600">{{ shop_product_form.name.errors|join:", " }}</p>{% endif %}
                                         </div>
                                         <div>
-                                            <label class="mb-2 block text-sm font-semibold text-slate-700">Categorie</label>
-                                            <div class="relative">
-                                                {{ shop_product_form.category }}
-                                            </div>
+                                            <label class="mb-2 block text-sm font-semibold text-slate-700">Catégorie</label>
+                                            {{ shop_product_form.category }}
                                             {% if shop_product_form.category.errors %}<p class="mt-2 text-xs font-medium text-rose-600">{{ shop_product_form.category.errors|join:", " }}</p>{% endif %}
                                         </div>
                                         <div>
@@ -289,20 +304,20 @@
                                     </div>
                                 </section>
 
-                                <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm h-full">
+                                <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                                     <div class="flex items-start justify-between gap-4">
                                         <div>
-                                            <h4 class="text-base font-bold text-slate-900">Image et disponibilite</h4>
-                                            <p class="mt-1 text-sm text-slate-500">L image est optionnelle mais fortement recommandee pour la boutique.</p>
+                                            <h4 class="text-base font-bold text-slate-900">Image et disponibilité</h4>
+                                            <p class="mt-1 text-sm text-slate-500">L'image est optionnelle mais recommandée pour la boutique.</p>
                                         </div>
-                                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">Etape 2</span>
+                                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">Étape 2</span>
                                     </div>
                                     <div class="mt-5 grid grid-cols-1 gap-4">
                                         <div>
                                             <label class="mb-2 block text-sm font-semibold text-slate-700">Image article</label>
                                             <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
                                                 {{ shop_product_form.image }}
-                                                <p class="mt-2 text-xs text-slate-500">Formats conseilles: JPG ou PNG, visuel propre et centre.</p>
+                                                <p class="mt-2 text-xs text-slate-500">Formats conseillés : JPG ou PNG.</p>
                                             </div>
                                             {% if shop_product_form.image.errors %}<p class="mt-2 text-xs font-medium text-rose-600">{{ shop_product_form.image.errors|join:", " }}</p>{% endif %}
                                         </div>
@@ -312,10 +327,10 @@
                                             {% if shop_product_form.low_stock_threshold.errors %}<p class="mt-2 text-xs font-medium text-rose-600">{{ shop_product_form.low_stock_threshold.errors|join:", " }}</p>{% endif %}
                                         </div>
                                         <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                                            <p class="text-sm font-semibold text-slate-700">Visibilite et usage</p>
+                                            <p class="text-sm font-semibold text-slate-700">Visibilité et usage</p>
                                             <div class="mt-4 space-y-3">
-                                                <label class="flex items-center gap-3 text-sm font-medium text-slate-700">{{ shop_product_form.is_required }} Recommande ou obligatoire</label>
-                                                <label class="flex items-center gap-3 text-sm font-medium text-slate-700">{{ shop_product_form.is_active }} Publie dans le catalogue</label>
+                                                <label class="flex items-center gap-3 text-sm font-medium text-slate-700">{{ shop_product_form.is_required }} Recommandé ou obligatoire</label>
+                                                <label class="flex items-center gap-3 text-sm font-medium text-slate-700">{{ shop_product_form.is_active }} Publié dans le catalogue</label>
                                             </div>
                                         </div>
                                     </div>
@@ -330,45 +345,35 @@
 
                             <div class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:-mx-7 sm:px-7">
                                 <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <button type="button" @click="openCreateProduct = false" class="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">Fermer</button>
-                                    <div class="flex items-center gap-3">
-                                        <div class="hidden text-right sm:block">
-                                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Publication</p>
-                                            <p class="text-sm text-slate-600">L article sera cree pour cette annexe uniquement.</p>
-                                        </div>
-                                        <button class="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-slate-950/20 transition hover:bg-slate-800">
-                                            <i class="fas fa-check"></i>
-                                            Creer l'article
-                                        </button>
-                                    </div>
+                                    <button type="button" @click="openCreateProduct = false" class="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Annuler</button>
+                                    <button class="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800">
+                                        <i class="fas fa-check"></i>Créer l'article
+                                    </button>
                                 </div>
                             </div>
                         </form>
                     </div>
                 </div>
 
+                <!-- Aperçu -->
                 <div class="bg-white">
                     <div class="flex h-full max-h-[78vh] flex-col p-5 sm:p-7">
                         <div class="flex items-center justify-between gap-3">
                             <div>
-                                <p class="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">Apercu</p>
+                                <p class="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">Aperçu</p>
                                 <h4 class="mt-1 text-lg font-semibold text-slate-900">Carte catalogue</h4>
                             </div>
-                            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Apercu instantane</span>
+                            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Aperçu instantané</span>
                         </div>
-
                         <div class="mt-6 flex-1 overflow-y-auto rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-primary/5 p-5">
                             <div class="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
                                 <div class="h-60 bg-slate-100">
                                     <template x-if="productDraft.preview">
-                                        <img :src="productDraft.preview" alt="Apercu article" class="h-full w-full object-cover">
+                                        <img :src="productDraft.preview" alt="Aperçu article" class="h-full w-full object-cover">
                                     </template>
                                     <template x-if="!productDraft.preview">
                                         <div class="h-full w-full grid place-items-center text-slate-300">
-                                            <div class="text-center">
-                                                <i class="fas fa-image text-4xl"></i>
-                                                <p class="mt-3 text-sm font-medium">Image article</p>
-                                            </div>
+                                            <div class="text-center"><i class="fas fa-image text-4xl"></i><p class="mt-3 text-sm font-medium">Image article</p></div>
                                         </div>
                                     </template>
                                 </div>
@@ -376,19 +381,19 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
                                             <p class="text-xl font-black text-slate-900" x-text="productDraft.name || 'Article boutique'"></p>
-                                            <p class="text-sm text-slate-500" x-text="productDraft.categoryLabel || 'Categorie du catalogue'"></p>
+                                            <p class="text-sm text-slate-500" x-text="productDraft.categoryLabel || 'Catégorie'"></p>
                                         </div>
-                                        <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary" x-text="productDraft.active ? 'Visible' : 'Archive'"></span>
+                                        <span class="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary" x-text="productDraft.active ? 'Visible' : 'Archivé'"></span>
                                     </div>
-                                    <p class="mt-4 text-sm leading-6 text-slate-600" x-text="productDraft.description || 'L article apparaitra dans le catalogue de l annexe avec une presentation claire, son image et ses indicateurs de disponibilite.'"></p>
+                                    <p class="mt-4 text-sm leading-6 text-slate-600" x-text="productDraft.description || 'Description de l\'article...'"></p>
                                     <div class="mt-6 space-y-3 text-sm">
                                         <div class="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
                                             <span class="text-slate-500">Prix catalogue</span>
-                                            <span class="font-semibold text-slate-900" x-text="productDraft.price ? `${productDraft.price} FCFA` : 'Non renseigne'"></span>
+                                            <span class="font-semibold text-slate-900" x-text="productDraft.price ? `${productDraft.price} FCFA` : 'Non renseigné'"></span>
                                         </div>
                                         <div class="grid grid-cols-2 gap-3">
                                             <div class="rounded-2xl bg-slate-50 px-4 py-3">
-                                                <p class="text-slate-500">Seuil d alerte</p>
+                                                <p class="text-slate-500">Seuil alerte</p>
                                                 <p class="mt-1 font-semibold text-slate-900" x-text="productDraft.threshold || '5'"></p>
                                             </div>
                                             <div class="rounded-2xl bg-slate-50 px-4 py-3">
@@ -396,26 +401,120 @@
                                                 <p class="mt-1 font-semibold" :class="productDraft.required ? 'text-primary' : 'text-slate-700'" x-text="productDraft.required ? 'Obligatoire' : 'Libre'"></p>
                                             </div>
                                         </div>
-                                        <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-4">
-                                            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">A quoi ressemblera la publication</p>
-                                            <div class="mt-3 flex items-center justify-between gap-3">
-                                                <div>
-                                                    <p class="font-semibold text-slate-900" x-text="productDraft.name || 'Article boutique'"></p>
-                                                    <p class="text-xs text-slate-500">Annexe, catalogue, commandes et stock relies</p>
-                                                </div>
-                                                <span class="rounded-full px-3 py-1 text-xs font-bold" :class="productDraft.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'" x-text="productDraft.active ? 'Publie' : 'Masque'"></span>
-                                            </div>
-                                        </div>
-                                        <div class="rounded-2xl bg-slate-900 px-4 py-4 text-white">
-                                            <p class="text-xs uppercase tracking-[0.16em] text-white/60">Conseil gestionnaire</p>
-                                            <p class="mt-2 text-sm leading-6 text-white/85">Ajoute une image propre et un prix final des le depart pour limiter les retouches et accelerer les commandes comptoir ou etudiantes.</p>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== MODALE : ENTRÉE STOCK ===================== -->
+    <div x-cloak x-show="openStockIn" x-transition.opacity
+         class="fixed inset-0 z-[90] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" @click="openStockIn = false"></div>
+        <section class="relative w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-blue-600">Stock</p>
+                    <h3 class="mt-0.5 text-lg font-bold text-slate-900">Entrée stock</h3>
+                </div>
+                <button type="button" @click="openStockIn = false" class="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <form hx-post="/shop/manager/stock/in/"
+                    hx-target="#manager-shop-module" hx-swap="outerHTML"
+                    hx-on::after-request="if ($event.detail.successful) { openStockIn = false; }"
+                    class="space-y-4">
+                    {% csrf_token %}
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Article</label>
+                        {{ shop_stock_form.product }}
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Quantité</label>
+                        {{ shop_stock_form.quantity }}
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Notes</label>
+                        {{ shop_stock_form.notes }}
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" @click="openStockIn = false" class="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Annuler</button>
+                        <button type="submit" class="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
+                            <i class="fas fa-plus mr-2"></i>Ajouter au stock
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== MODALE : VENTE COMPTOIR ===================== -->
+    <div x-cloak x-show="openCounterOrder" x-transition.opacity
+         class="fixed inset-0 z-[90] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" @click="openCounterOrder = false"></div>
+        <section class="relative w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-emerald-600">Boutique</p>
+                    <h3 class="mt-0.5 text-lg font-bold text-slate-900">Vente comptoir</h3>
+                </div>
+                <button type="button" @click="openCounterOrder = false" class="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 max-h-[80vh] overflow-y-auto">
+                <form hx-post="/shop/manager/order/create-counter/"
+                    hx-target="#manager-shop-module" hx-swap="outerHTML"
+                    hx-on::after-request="if ($event.detail.successful) { openCounterOrder = false; }"
+                    class="space-y-4">
+                    {% csrf_token %}
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Type d'acheteur</label>
+                        {{ shop_counter_order_form.buyer_type }}
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Étudiant (si applicable)</label>
+                        {{ shop_counter_order_form.student }}
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-slate-700">Nom client</label>
+                            {{ shop_counter_order_form.customer_name }}
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-slate-700">Email</label>
+                            {{ shop_counter_order_form.customer_email }}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Téléphone</label>
+                        {{ shop_counter_order_form.customer_phone }}
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Article</label>
+                        {{ shop_counter_order_form.product }}
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Quantité</label>
+                        {{ shop_counter_order_form.quantity }}
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">Mode de paiement</label>
+                        {{ shop_counter_order_form.payment_method }}
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" @click="openCounterOrder = false" class="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Annuler</button>
+                        <button type="submit" class="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                            <i class="fas fa-cash-register mr-2"></i>Créer la commande
+                        </button>
+                    </div>
+                </form>
             </div>
         </section>
     </div>
@@ -439,7 +538,7 @@
                 const state = getState();
                 if (!state) return;
                 state.productDraft.name = nameInput ? nameInput.value : '';
-                state.productDraft.categoryLabel = categoryInput ? (categoryInput.options[categoryInput.selectedIndex]?.text || 'Categorie') : 'Categorie';
+                state.productDraft.categoryLabel = categoryInput ? (categoryInput.options[categoryInput.selectedIndex]?.text || 'Catégorie') : 'Catégorie';
                 state.productDraft.description = descriptionInput ? descriptionInput.value : '';
                 state.productDraft.price = priceInput ? priceInput.value : '';
                 state.productDraft.threshold = thresholdInput ? thresholdInput.value : '5';
@@ -456,19 +555,12 @@
                 imageInput.onchange = (event) => {
                     const file = event.target.files && event.target.files[0];
                     const state = getState();
-                    if (!file) {
-                        if (state) state.productDraft.preview = '';
-                        return;
-                    }
+                    if (!file) { if (state) state.productDraft.preview = ''; return; }
                     const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const currentState = getState();
-                        if (currentState) currentState.productDraft.preview = e.target.result;
-                    };
+                    reader.onload = (e) => { const s = getState(); if (s) s.productDraft.preview = e.target.result; };
                     reader.readAsDataURL(file);
                 };
             }
-
             syncDraft();
         })();
     </script>

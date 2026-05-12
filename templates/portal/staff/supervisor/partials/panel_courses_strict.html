@@ -28,7 +28,7 @@
           <select name="ec_id" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">
             <option value="">Choisir</option>
             {% for ec in ecs %}
-              <option value="{{ ec.id }}">{{ ec.title }}</option>
+              <option value="{{ ec.id }}"{% if prefill_ec_id == ec.id %} selected{% endif %}>{{ ec.title }}</option>
             {% endfor %}
           </select>
         </label>
@@ -38,29 +38,29 @@
           <select name="teacher_id" required class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">
             <option value="">Choisir</option>
             {% for t in teachers %}
-              <option value="{{ t.id }}">{{ t.get_full_name|default:t.username }}</option>
+              <option value="{{ t.id }}"{% if prefill_teacher_id == t.id %} selected{% endif %}>{{ t.get_full_name|default:t.username }}</option>
             {% endfor %}
           </select>
         </label>
 
         <label class="text-xs font-bold text-slate-600">
           Date
-          <input type="date" name="date" value="{{ today|date:'Y-m-d' }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
+          <input type="date" name="date" value="{% if prefill_date %}{{ prefill_date }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
         </label>
 
         <label class="text-xs font-bold text-slate-600">
           Heure début
-          <input type="time" name="start_time" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
+          <input type="time" name="start_time" value="{{ prefill_start_time }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
         </label>
 
         <label class="text-xs font-bold text-slate-600">
           Heure fin
-          <input type="time" name="end_time" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
+          <input type="time" name="end_time" value="{{ prefill_end_time }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" required>
         </label>
 
         <label class="text-xs font-bold text-slate-600">
           Salle / lieu
-          <input type="text" name="location" placeholder="Ex: Salle A102" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">
+          <input type="text" name="location" value="{{ prefill_location }}" placeholder="Ex: Salle A102" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">
         </label>
 
         <div class="md:col-span-3 flex flex-wrap items-center justify-end gap-2">

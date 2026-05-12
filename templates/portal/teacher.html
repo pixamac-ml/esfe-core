@@ -209,7 +209,7 @@
   <main class="flex-1 min-w-0 overflow-y-auto">
     <header class="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-40">
       <div class="flex items-center gap-4 min-w-0 flex-1">
-        <button @click="sidebarOpen = !sidebarOpen" class="w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-100">
+        <button @click="toggleSidebar()" class="w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-100">
           <i data-lucide="menu" class="teacher-icon text-slate-700"></i>
         </button>
         <div class="relative hidden md:block w-full max-w-lg">
@@ -601,45 +601,15 @@
       </section>
 
       <section id="teacher-settings-section" x-show="activeSection === 'settings'" x-cloak class="space-y-6">
-        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
-          <div>
-            <div class="flex items-center gap-2 text-sm text-slate-500 mb-2"><span>Accueil</span><span>></span><span>Parametres</span><span>></span><span class="text-slate-900 font-semibold">{{ user_display_name }}</span></div>
-            <h1 class="text-3xl font-black text-slate-900">Gestion du profil et preferences</h1>
-            <p class="text-slate-500 mt-2">Pilotez votre profil enseignant, vos preferences visuelles et vos raccourcis.</p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
-          <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="p-6 border-b border-slate-200"><h3 class="text-xl font-black text-slate-900">Profil enseignant</h3></div>
-            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
-              <div><p class="text-slate-500">Nom</p><p class="mt-1 font-semibold text-slate-900">{{ user_display_name }}</p></div>
-              <div><p class="text-slate-500">Code employe</p><p class="mt-1 font-semibold text-slate-900">{{ status_summary.employee_code }}</p></div>
-              <div><p class="text-slate-500">Statut</p><p class="mt-1 font-semibold text-slate-900">{{ status_summary.employment_status }}</p></div>
-              <div><p class="text-slate-500">Annexe</p><p class="mt-1 font-semibold text-slate-900">{{ status_summary.branch_name }}</p></div>
-              <div><p class="text-slate-500">Prise de service</p><p class="mt-1 font-semibold text-slate-900">{{ status_summary.hire_date|date:"d/m/Y"|default:"Non renseignee" }}</p></div>
-              <div><p class="text-slate-500">Classes actives</p><p class="mt-1 font-semibold text-slate-900">{{ teacher_kpis.active_classes }}</p></div>
-            </div>
-          </div>
-
-          <div class="space-y-6">
-            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-              <div class="p-6 border-b border-slate-200"><h3 class="text-xl font-black text-slate-900">Preferences</h3></div>
-              <div class="p-6 space-y-4">
-                <button @click="toggleDarkMode()" class="w-full h-11 rounded-xl bg-blue-600 text-white text-sm font-semibold"><span x-text="darkMode ? 'Revenir en mode clair' : 'Activer le mode sombre'"></span></button>
-                <button @click="activeSection = 'overview'" class="w-full h-11 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700">Retour a l'accueil</button>
-              </div>
-            </div>
-            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-              <div class="p-6 border-b border-slate-200"><h3 class="text-xl font-black text-slate-900">Session</h3></div>
-              <div class="p-6 space-y-4">
-                <form action="{% url 'accounts:logout' %}" method="post">
-                  {% csrf_token %}
-                  <button type="submit" class="w-full h-11 rounded-xl bg-red-600 text-white text-sm font-semibold">Se deconnecter</button>
-                </form>
-              </div>
-            </div>
-          </div>
+        <div
+          id="teacher-settings-workspace"
+          hx-get="{% url 'accounts_portal:teacher_settings_workspace' %}"
+          hx-trigger="load"
+          hx-target="this"
+          hx-swap="outerHTML"
+          class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm text-sm font-semibold text-slate-500"
+        >
+          Chargement des parametres...
         </div>
       </section>
 
@@ -668,13 +638,19 @@
 <script>
   function teacherDashboardState() {
     return {
-      sidebarOpen: true,
-      activeSection: "overview",
-      darkMode: false,
+      sidebarOpen: {{ teacher_dashboard_preference.sidebar_collapsed|yesno:"false,true" }},
+      activeSection: "{{ teacher_dashboard_preference.default_section|default:'overview' }}",
+      darkMode: {{ teacher_dashboard_preference.dark_mode|yesno:"true,false" }},
       actionPanelOpen: false,
       search: "",
       searchOpen: false,
       searchResults: [],
+      preferenceState: {
+        defaultSection: "{{ teacher_dashboard_preference.default_section|default:'overview' }}",
+        darkMode: {{ teacher_dashboard_preference.dark_mode|yesno:"true,false" }},
+        sidebarCollapsed: {{ teacher_dashboard_preference.sidebar_collapsed|yesno:"true,false" }},
+        compactMode: {{ teacher_dashboard_preference.compact_mode|yesno:"true,false" }},
+      },
       sectionMeta: [
         { key: "overview", scope: "Section", title: "Accueil", snippet: "Pilotage rapide des cours, classes et seances." },
         { key: "classes", scope: "Section", title: "Mes classes", snippet: "Classes, effectifs et matieres rattachees." },
@@ -688,6 +664,11 @@
       },
       toggleDarkMode() {
         this.darkMode = !this.darkMode;
+        this.preferenceState.darkMode = this.darkMode;
+      },
+      toggleSidebar() {
+        this.sidebarOpen = !this.sidebarOpen;
+        this.preferenceState.sidebarCollapsed = !this.sidebarOpen;
       },
       performSearch() {
         const query = this.normalizeSearch(this.search).trim();

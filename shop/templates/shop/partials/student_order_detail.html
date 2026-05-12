@@ -8,7 +8,7 @@
       {% for item in order.items.all %}
       <div class="flex items-center justify-between gap-4 py-3">
         <div class="flex items-center gap-3">
-          <div class="h-16 w-16 overflow-hidden rounded-xl bg-slate-100 border border-slate-200 grid place-items-center shrink-0">
+          <div class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
             {% if item.product.image %}
             <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" class="h-full w-full object-cover">
             {% else %}
@@ -34,18 +34,111 @@
       Paiement envoye. La gestionnaire doit le valider avant l'emission du recu.
     </div>
     {% elif order.balance > 0 %}
-    <form method="post" action="/shop/student/order/{{ order.id }}/pay/" class="mt-5 flex flex-col sm:flex-row gap-3">
-      {% csrf_token %}
-      {{ payment_form.method }}
-      <button type="submit" class="rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white">Payer la commande</button>
-    </form>
+    <div
+        id="shop-payment-form-block"
+        class="mt-6 rounded-2xl border border-primary/20 bg-gradient-to-br from-slate-50 to-primary/[0.07] p-5 sm:p-6">
+      <div class="mb-6 flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-white shadow-lg">
+          <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-semibold text-slate-900">Payer la commande</h3>
+          <p class="text-sm text-slate-500">Meme logique que votre paiement de scolarite (especes : agent + code + montant).</p>
+        </div>
+      </div>
+
+      <form method="post" action="/shop/student/order/{{ order.id }}/pay/" class="space-y-5">
+        {% csrf_token %}
+
+        <div>
+          <label class="mb-2 block text-sm font-medium text-slate-700" for="{{ payment_form.method.id_for_label }}">
+            Methode de paiement <span class="text-red-500">*</span>
+          </label>
+          <select
+              name="{{ payment_form.method.html_name }}"
+              id="{{ payment_form.method.id_for_label }}"
+              required
+              class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+            <option value="">Selectionnez une methode</option>
+            {% for value, label in payment_form.fields.method.choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          {% if payment_form.method.errors %}<p class="mt-1 text-xs font-medium text-rose-600">{{ payment_form.method.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div id="shop-cash-fields" class="hidden space-y-4">
+          <div>
+            <label class="mb-2 block text-sm font-medium text-slate-700" for="{{ payment_form.agent_name.id_for_label }}">
+              Nom de l'agent <span class="text-red-500">*</span>
+            </label>
+            <input type="text"
+                   name="{{ payment_form.agent_name.html_name }}"
+                   id="{{ payment_form.agent_name.id_for_label }}"
+                   value="{{ payment_form.agent_name.value|default_if_none:'' }}"
+                   hx-post="{% url 'shop:student_shop_verify_agent' order.pk %}"
+                   hx-trigger="blur delay:250ms"
+                   hx-target="#shop-agent-result"
+                   hx-swap="outerHTML"
+                   hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                   autocomplete="off"
+                   class="{{ payment_form.agent_name.field.widget.attrs.class }}"
+                   placeholder="Ex : Fatoumata Dia" />
+            <p class="mt-1 text-xs text-slate-500">Saisissez le nom puis quittez le champ pour valider l'agent aupres du systeme.</p>
+          </div>
+          <div id="shop-agent-result"></div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-slate-700" for="{{ payment_form.verification_code.id_for_label }}">
+              Code de validation <span class="text-red-500">*</span>
+            </label>
+            {{ payment_form.verification_code }}
+            {% if payment_form.verification_code.help_text %}<p class="mt-1 text-xs text-slate-500">{{ payment_form.verification_code.help_text }}</p>{% endif %}
+            {% if payment_form.verification_code.errors %}<p class="mt-1 text-xs text-rose-600">{{ payment_form.verification_code.errors.0 }}</p>{% endif %}
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-sm font-medium text-slate-700" for="{{ payment_form.amount.id_for_label }}">
+            Montant a payer <span class="text-red-500">*</span>
+          </label>
+          <div>{{ payment_form.amount }}</div>
+          {% if payment_form.amount.errors %}
+          <p class="mt-1 text-xs text-rose-600">{{ payment_form.amount.errors.0 }}</p>
+          {% else %}
+          <p class="mt-1 text-xs text-slate-500">Solde maximal : {{ order_balance|intcomma }} FCFA</p>
+          {% endif %}
+        </div>
+
+        {% if payment_form.non_field_errors %}
+        <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {{ payment_form.non_field_errors.0 }}
+        </div>
+        {% endif %}
+
+        <button type="submit" class="w-full min-h-[48px] rounded-xl border-2 border-primary-800 bg-primary-600 py-4 text-sm font-bold text-white shadow-lg transition hover:bg-primary-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary-300 focus-visible:ring-offset-2">
+          Envoyer la demande de paiement
+        </button>
+      </form>
+      <script>
+      (function(){
+        var sel = document.getElementById("{{ payment_form.method.id_for_label }}");
+        var box = document.getElementById("shop-cash-fields");
+        if (!sel || !box) return;
+        function sync(){ box.classList.toggle("hidden", sel.value !== "cash"); }
+        sel.addEventListener("change", sync);
+        sync();
+      })();
+      </script>
+    </div>
     {% endif %}
     <div class="mt-5 space-y-2">
       {% for payment in order.payments.all %}
-      <div class="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm">
-        <span>{{ payment.reference|default:"Paiement en attente" }} - {{ payment.get_status_display }}</span>
+      <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm">
+        <span class="break-words">{{ payment.reference|default:"Paiement en attente" }} — {{ payment.get_status_display }} — {{ payment.amount|intcomma }} F — {{ payment.get_method_display }}</span>
         {% if payment.receipt_pdf %}
-        <a href="/shop/payment/{{ payment.id }}/receipt/" class="font-semibold text-primary">Recu PDF</a>
+        <a href="/shop/payment/{{ payment.id }}/receipt/" class="shrink-0 font-semibold text-primary">Recu PDF</a>
         {% endif %}
       </div>
       {% endfor %}

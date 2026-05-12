@@ -9,6 +9,7 @@ from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from accounts.models import BranchCashMovement
+from payments.models import PaymentAgent
 from shop.models import ShopOrder, ShopPayment, ShopProduct, ShopStockMovement
 from shop.services.shop_service import create_counter_order, create_shop_payment, validate_shop_payment
 from django.core.exceptions import ValidationError
@@ -150,14 +151,27 @@ class ShopWorkflowTests(TestCase):
         self.assertEqual(order.buyer_type, ShopOrder.BUYER_WALK_IN)
         self.assertEqual(order.customer_name, "Client Comptoir")
         self.assertEqual(order.total_amount, 30000)
-        self.assertEqual(payment.status, ShopPayment.STATUS_PENDING)
+        self.assertEqual(payment.status, ShopPayment.STATUS_VALIDATED)
+
+        movement = BranchCashMovement.objects.filter(
+            branch=self.branch,
+            source=BranchCashMovement.SOURCE_SHOP,
+            movement_type=BranchCashMovement.TYPE_IN,
+            source_reference=payment.reference,
+        ).first()
+        self.assertIsNotNone(movement)
+        self.assertEqual(movement.amount, payment.amount)
+        outs = ShopStockMovement.objects.filter(order=order, movement_type=ShopStockMovement.TYPE_OUT)
+        self.assertEqual(outs.count(), 1)
+        self.assertEqual(self.product.current_stock, 3)
 
     def test_manager_shop_panel_renders_for_branch(self):
+        PaymentAgent.objects.create(user=self.manager, branch=self.branch, is_active=True)
         self.client.force_login(self.manager)
         response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "boutique"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Commande comptoir")
+        self.assertContains(response, "Vente comptoir")
         self.assertContains(response, "Blouse pratique")
 
     def test_public_catalog_renders_branch_products(self):

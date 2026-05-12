@@ -186,10 +186,10 @@
             <label class="mb-2 block text-sm font-bold">Date du cours</label>
             <input name="date" type="date" required value="{% if prefill_date %}{{ prefill_date }}{% else %}{{ schedule.week_start|date:'Y-m-d' }}{% endif %}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
           </div>
-          <div>
-            <label class="mb-2 block text-sm font-bold">Salle</label>
-            <input name="location" type="text" value="{{ prefill_room_label }}" placeholder="Ex: Salle A102" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
-          </div>
+        <div>
+          <label class="mb-2 block text-sm font-bold">Salle</label>
+          <input name="location" type="text" value="{% if prefill_location %}{{ prefill_location }}{% else %}{{ prefill_room_label }}{% endif %}" placeholder="Ex: Salle A102" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
+        </div>
         </div>
 
         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -221,7 +221,7 @@
           <select name="ec_id" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
             <option value="">Choisir un EC</option>
             {% for ec in ecs %}
-            <option value="{{ ec.id }}">{{ ec.ue.code }} · {{ ec.title }}</option>
+            <option value="{{ ec.id }}"{% if prefill_ec_id == ec.id %} selected{% endif %}>{{ ec.ue.code }} · {{ ec.title }}</option>
             {% endfor %}
           </select>
         </div>
@@ -231,7 +231,7 @@
           <select name="teacher_id" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950">
             <option value="">Choisir un enseignant</option>
             {% for teacher in teachers %}
-            <option value="{{ teacher.id }}">{{ teacher.get_full_name|default:teacher.username }}</option>
+            <option value="{{ teacher.id }}"{% if prefill_teacher_id == teacher.id %} selected{% endif %}>{{ teacher.get_full_name|default:teacher.username }}</option>
             {% endfor %}
           </select>
         </div>

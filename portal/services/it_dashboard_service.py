@@ -122,7 +122,7 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
                 "Sante du portail",
             ],
         ),
-        "dashboard_kind": "Support technique",
+        "dashboard_kind": "Support technique, acces, et sante du portail",
         "branch": branch,
         "week_start": week_start,
         "week_end": week_end,
@@ -147,7 +147,7 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
                 "href": f"{reverse('accounts_portal:portal_dashboard')}#grades",
             },
             {
-                "title": "Verifier les affectations",
+                "title": "Inscriptions sans affectation",
                 "detail": f"{inscriptions_without_assignment.count()} inscription(s) active(s) sans affectation academique.",
             },
             {

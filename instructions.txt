@@ -1,83 +1,314 @@
-ProgrammingError at /portal/dashboard/
-ERREUR:  la relation « portal_teacherdashboardpreference » n'existe pas
-LINE 1: ...tal_teacherdashboardpreference"."updated_at" FROM "portal_te...
-                                                             ^
-Request Method:	GET
-Request URL:	http://127.0.0.1:8000/portal/dashboard/
-Django Version:	6.0.1
-Exception Type:	ProgrammingError
-Exception Value:	
-ERREUR:  la relation « portal_teacherdashboardpreference » n'existe pas
-LINE 1: ...tal_teacherdashboardpreference"."updated_at" FROM "portal_te...
-                                                             ^
-Exception Location:	C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\backends\utils.py, line 105, in _execute
-Raised during:	portal.views.views.portal_dashboard
-Python Executable:	C:\Users\WORK\PycharmProjects\esfe-core\.venv\Scripts\python.exe
-Python Version:	3.12.10
-Python Path:	
-['C:\\Users\\WORK\\PycharmProjects\\esfe-core',
- 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip',
- 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\DLLs',
- 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312\\Lib',
- 'C:\\Users\\WORK\\AppData\\Local\\Programs\\Python\\Python312',
- 'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv',
- 'C:\\Users\\WORK\\PycharmProjects\\esfe-core\\.venv\\Lib\\site-packages']
-Server time:	Mon, 11 May 2026 18:47:41 +0000
-Traceback Switch to copy-and-paste view
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\backends\utils.py, line 105, in _execute
-                return self.cursor.execute(sql, params)
-                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-The above exception (ERREUR: la relation « portal_teacherdashboardpreference » n'existe pas LINE 1: ...tal_teacherdashboardpreference"."updated_at" FROM "portal_te... ^ ) was the direct cause of the following exception:
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py, line 42, in inner
-                response = await get_response(request)
-                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\base.py, line 254, in _get_response_async
-                response = await wrapped_callback(
-                                 …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\contrib\auth\decorators.py, line 59, in _view_wrapper
-                    return view_func(request, *args, **kwargs)
-                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\portal\views\views.py, line 1987, in portal_dashboard
-        return teacher_portal(request)
-                     ^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\contrib\auth\decorators.py, line 59, in _view_wrapper
-                    return view_func(request, *args, **kwargs)
-                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\portal\views\views.py, line 2027, in teacher_portal
-    context = build_teacher_dashboard_context(
-                     …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\portal\services\teacher_dashboard_service.py, line 604, in build_teacher_dashboard_context
-    preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\portal\services\teacher_dashboard_service.py, line 41, in get_teacher_dashboard_preference
-    preference, _created = TeacherDashboardPreference.objects.get_or_create(
-                                …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\models\manager.py, line 87, in manager_method
-                return getattr(self.get_queryset(), name)(*args, **kwargs)
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\models\query.py, line 987, in get_or_create
-            return self.get(**kwargs), False
-                        ^^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\models\query.py, line 635, in get
-        num = len(clone)
-                   ^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\models\query.py, line 372, in __len__
-        self._fetch_all()
-             ^^^^^^^^^^^^^^^^^ …
-Local vars
-C:\Users\WORK\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\db\models\query.py, line 2000, in _fetch_all
-            self._result_cache = list(self._iterable_class(self))
-                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ …
-Local vars
+Tu es en train de travailler sur le projet Django ESFE Core (École de Santé Félix Houphouët-Boigny Mali).
+Avant toute modification, analyse complètement l’architecture actuelle du projet, tous les dashboards existants, les modèles utilisateurs, les systèmes de profils, les paramètres utilisateurs, les composants UI, les vues, les services, les selectors, les templates HTMX et les workflows par rôle.
+
+⚠️ IMPORTANT :
+
+* Ne casse aucun workflow existant.
+* Ne supprime aucune logique métier existante.
+* Respecte strictement l’architecture actuelle :
+
+  * business logic dans services.py
+  * requêtes optimisées dans selectors.py
+  * vues fines
+  * HTMX/AJAX pour les interactions dynamiques
+  * composants réutilisables
+  * filtrage strict par annexe/branch
+  * aucun mélange de logique métier dans les templates
+  * le dashboard `portal` reste un orchestrateur UI uniquement
+
+====================================================
+PHASE 1 — AUDIT COMPLET DES DASHBOARDS
+======================================
+
+Analyse tous les dashboards du système :
+
+* Étudiant
+* Enseignant
+* Directeur des études
+* Surveillant général
+* Directeur général
+* Gestionnaire
+* Secrétaire
+* Informaticien
+* Staff administratif
+* Superadmin
+* Tout autre dashboard existant
+
+Tu dois produire un audit technique clair de :
+
+1. Quels dashboards possèdent déjà :
+
+   * un système de profil
+   * un système de paramètres
+   * une édition de compte
+   * gestion photo de profil
+   * changement mot de passe
+   * gestion documents utilisateur
+
+2. Quels dashboards sont incomplets ou incohérents
+
+3. Quels composants sont réutilisables
+
+4. Quels modèles utilisateurs existent déjà :
+
+   * User
+   * Profile
+   * Student
+   * Teacher
+   * Staff
+   * etc.
+
+5. Quels champs existent déjà et quels champs manquent
+
+6. Quels dashboards utilisent déjà HTMX pour le profil
+
+7. Quels dashboards nécessitent :
+
+   * refactorisation
+   * modularisation
+   * centralisation des paramètres
+   * amélioration UX/UI
+
+====================================================
+PHASE 2 — CONCEPTION D’UNE ARCHITECTURE
+CENTRALISÉE DE PROFILS & PARAMÈTRES
+===================================
+
+Après audit, crée une architecture professionnelle et scalable pour gérer :
+
+* profils utilisateurs
+* paramètres utilisateurs
+* paramètres de sécurité
+* édition des informations personnelles
+* avatars/photos
+* gestion documents personnels
+* paramètres de notifications
+* sécurité du compte
+* changement de mot de passe
+* historique de connexion
+* préférences UI
+* informations administratives
+* informations familiales
+* informations professionnelles
+
+Le système doit être :
+
+* modulaire
+* extensible
+* propre
+* orienté workflow
+* responsive
+* ultra professionnel
+
+====================================================
+PHASE 3 — STRUCTURE MÉTIER PAR RÔLE
+===================================
+
+⚠️ Chaque rôle possède des paramètres différents.
+
+========================
+ÉTUDIANTS
+=========
+
+Les étudiants doivent pouvoir gérer :
+
+* photo de profil
+* informations personnelles
+* téléphone
+* email
+* adresse
+* nom du père
+* nom de la mère
+* tuteur légal
+* personne à contacter en urgence
+* documents administratifs
+* mot de passe
+* préférences notifications
+
+⚠️ Les étudiants NE doivent PAS pouvoir modifier :
+
+* matricule
+* formation
+* cycle
+* niveau
+* annexe
+* statut académique
+* données critiques administratives
+
+========================
+ENSEIGNANTS
+===========
+
+Les enseignants doivent pouvoir gérer :
+
+* photo
+* biographie
+* spécialité
+* diplômes
+* CV
+* expérience
+* téléphone
+* email
+* mot de passe
+* signature numérique
+* documents
+
+========================
+STAFF ADMINISTRATIF
+===================
+
+Le staff administratif doit pouvoir gérer :
+
+* photo
+* situation matrimoniale
+* nombre d’enfants
+* contacts
+* documents RH
+* adresse
+* date de naissance
+* poste
+* département
+* CV
+* diplômes
+* mot de passe
+* paramètres notifications
+
+⚠️ Le salaire doit être visible uniquement :
+
+* dans les panneaux administratifs autorisés
+* jamais dans le profil public utilisateur
+
+========================
+INFORMATICIEN
+=============
+
+Ajouter aussi :
+
+* permissions techniques
+* logs récents
+* activités système
+* niveau d’accès
+* sécurité
+
+========================
+DIRECTEURS / SURVEILLANTS
+=========================
+
+Ajouter :
+
+* signature administrative
+* cachet numérique
+* documents administratifs
+* historique actions
+
+====================================================
+PHASE 4 — UX/UI PROFESSIONNELLE
+===============================
+
+Créer une expérience moderne type SaaS premium :
+
+Inspirations :
+
+* Notion
+* Linear
+* Odoo
+* Slack
+* Moodle moderne
+
+Le système de profil doit inclure :
+
+* sidebar paramètres
+* onglets dynamiques
+* édition HTMX sans reload
+* upload image instantané
+* aperçu image
+* cartes profil premium
+* badges rôle
+* informations organisées
+* sections collapsibles
+* responsive mobile/tablette/desktop
+* dark mode compatible
+
+Les profils doivent être affichés partout dans le système :
+
+* listes utilisateurs
+* commentaires
+* dashboards
+* tables
+* notifications
+* messages
+* activités
+* workflow administratifs
+
+⚠️ Toujours afficher :
+
+* photo
+* nom complet
+* rôle
+* annexe si nécessaire
+
+====================================================
+PHASE 5 — CENTRALISATION TECHNIQUE
+==================================
+
+Créer une architecture réutilisable :
+
+Exemples possibles :
+
+* accounts/
+* profiles/
+* settings/
+* preferences/
+* user_documents/
+
+Créer :
+
+* services dédiés
+* selectors dédiés
+* composants HTMX
+* composants UI réutilisables
+* partials
+* forms modulaires
+* upload manager
+* image manager
+
+====================================================
+PHASE 6 — SÉCURITÉ
+==================
+
+Vérifier :
+
+* permissions
+* accès par rôle
+* accès par annexe
+* protection upload fichiers
+* validation formats images
+* validation documents
+* sécurisation changement mot de passe
+* audit accès profils
+
+====================================================
+PHASE 7 — LIVRABLES ATTENDUS
+============================
+
+À la fin :
+
+1. Produire un audit détaillé
+2. Identifier les dashboards prêts et non prêts
+3. Identifier les problèmes structurels
+4. Proposer l’architecture finale
+5. Commencer l’implémentation progressivement
+6. Commencer par la base commune profils + paramètres
+7. Puis intégrer rôle par rôle proprement
+
+⚠️ IMPORTANT :
+
+* Ne pas coder brutalement.
+* Commencer par analyser complètement le projet.
+* Comprendre toute l’architecture actuelle.
+* Identifier les composants existants réutilisables.
+* Réduire la duplication.
+* Respecter les workflows métier ESFE.
+* Garder le système ultra maintenable et scalable.
+
+Travaille proprement, étape par étape, avec une vision long terme de plateforme universitaire professionnelle haut de gamme.

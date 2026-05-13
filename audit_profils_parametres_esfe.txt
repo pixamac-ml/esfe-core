@@ -1,0 +1,269 @@
+﻿Audit ESFE Core - Profils, Parametres, Dashboards
+
+Date: 2026-05-13
+Perimetre: audit statique du codebase present dans le workspace
+
+1. Synthese
+
+Le projet dispose deja d'un socle de profil central dans `accounts.Profile`,
+de plusieurs dashboards par role dans `accounts` et `portal`, d'un espace profil communautaire en HTMX,
+et de plusieurs preferences specialisees par role. La base est exploitable, mais la gestion des profils et
+des parametres est fragmentee entre plusieurs apps, avec des surfaces UI incoherentes selon le role.
+
+Le point le plus solide est le portail etudiant et le workspace informaticien, qui ont deja une logique HTMX et
+des panneaux de configuration.
+Le point le plus incomplet est un vrai systeme unique de profil/parametres trans-roles: il n'existe pas encore de couche centrale pour les informations personnelles, familiales, professionnelles, securite, documents et preferences, ni de modele unifie de settings utilisateur.
+
+2. Audit complet des dashboards
+
+A. Etudiant
+- Dashboard present: `portal.student.dashboard`.
+- Profil: partiellement present.
+- Parametres: oui, via `portal.student.settings_partial`.
+- Edition de compte: partielle, email et telephone seulement.
+- Photo de profil: affichee dans la carte profil, mais pas modifiable depuis cet espace.
+- Changement de mot de passe: pas integre dans le workspace etudiant, redirection standard Django seulement.
+- Documents utilisateur: oui, upload de documents requis dans les parametres.
+- HTMX profil: oui, vrai fragment HTMX avec update sans reload.
+- Etat: le plus proche d'un sous-systeme profil coherent, mais scope trop limite.
+
+B. Enseignant
+- Dashboard present: `portal.teacher` dans `portal.views.views` et espace `templates/portal/teacher/partials/settings_workspace.html`.
+- Profil: oui, mais surtout comme resume de reference.
+- Parametres: oui, preferences dashboard dans `portal.models.TeacherDashboardPreference`.
+- Edition de compte: partielle, surtout preferences UI et notifications.
+- Photo de profil: visible via `accounts.Profile.avatar`, pas de vrai formulaire specialise ici.
+- Changement de mot de passe: lien standard, pas de workflow dedie.
+- Documents utilisateur: oui, `portal.models.TeacherDocument` et workflows de direction.
+- HTMX profil: oui pour settings workspace.
+- Etat: assez avance, mais concentre sur preferences dashboard plus que sur une fiche profil complete.
+
+C. Direction des etudes / Directeur
+- Dashboard present: `templates/portal/staff/director_dashboard.html` et vues `director_portal`, `director_workspace`, `director_drawer`.
+- Profil: surtout implicite via `accounts.Profile` et `status_summary`.
+- Parametres: partiels, surtout configuration du workspace, pas un vrai profil personnel unifie.
+- Edition de compte: non centralisee.
+- Photo de profil: affichee indirectement si dispo, pas de panneau dedie.
+- Changement de mot de passe: absent du workspace metier.
+- Documents utilisateur: oui, documents enseignants, contrats, transferts.
+- HTMX profil: non comme profil personnel, oui comme modules métiers.
+- Etat: dashboard riche, mais pas un systeme profil/parametres personnel complet.
+
+D. Surveillant general / superviseur
+- Dashboard present: `portal.supervisor` et multiples workspaces HTMX.
+- Profil: absent comme sous-systeme personnel; focus operationnel.
+- Parametres: absents comme preference utilisateur.
+- Edition de compte: non.
+- Photo de profil: non apparente dans le workflow.
+- Changement de mot de passe: non.
+- Documents utilisateur: non, hors dossiers metier.
+- HTMX profil: non, uniquement workflows metier.
+- Etat: tres bon dashboard operationnel, mais pas une base profil.
+
+E. Directeur General
+- Dashboard present: `portal.dg_portal`.
+- Profil: non specifique.
+- Parametres: non specifique.
+- Edition de compte: non.
+- Photo de profil: non visible comme composant de profil.
+- Changement de mot de passe: non.
+- Documents utilisateur: non.
+- HTMX profil: non.
+- Etat: dashboard de pilotage, pas de couche profil.
+
+F. Gestionnaire / finance
+- Dashboard present: `accounts.finance_dashboard`, `accounts.manager_dashboard`, `accounts.executive_dashboard`.
+- Profil: indirect via `accounts.Profile`.
+- Parametres: surtout metiers et financiers, pas personnels.
+- Edition de compte: non dediee.
+- Photo de profil: disponible seulement via profil central.
+- Changement de mot de passe: via standard Django.
+- Documents utilisateur: oui pour pieces metiers/financieres, pas une fiche profil complete.
+- HTMX profil: non, HTMX surtout sur la finance et les admissions.
+- Etat: robuste sur les workflows, faible sur l'espace personnel.
+
+G. Secretaire
+- Dashboard present: `secretary_dashboard`.
+- Profil: absent comme bloc dedie.
+- Parametres: absents.
+- Edition de compte: absente.
+- Photo de profil: absente.
+- Changement de mot de passe: absent du workspace.
+- Documents utilisateur: documents administratifs metiers oui, documents profil non.
+- HTMX profil: non.
+- Etat: dashboard administratif bien structure, mais sans profil/settings personnel.
+
+H. Informaticien
+- Dashboard present: `portal.it_portal` + `templates/portal/informaticien/dashboard.html` + `portal.views.it_workflows`.
+- Profil: oui, section `Mon profil` et `Parametres`.
+- Parametres: oui, tres developpes.
+- Edition de compte: oui, nom, prenom, email dans `it_my_account_workspace`.
+- Photo de profil: affichee via `accounts.Profile` mais pas de vrai flux d'upload dedie ici.
+- Changement de mot de passe: present comme action standard et via reset compte admin.
+- Documents utilisateur: partiels, surtout workflows techniques et carte staff.
+- HTMX profil: oui, workspace HTMX, actions dynamiques.
+- Etat: le plus proche d'un cockpit profil/settings par role, mais tourne encore autour du dashboard, pas d'un modele profil unifie.
+
+I. Staff administratif
+- Le role existe implicitement dans `accounts.access` et `accounts.Profile.user_type` / `position`.
+- Dashboard: present via les dashboards finance, admissions, secretaire, gestionnaire, informaticien selon le poste.
+- Profil/settings: fragmentes.
+- Etat: pas de dashboard unique ni de systeme de parametres central.
+
+J. Superadmin
+- Dashboard present: `superadmin.dashboard` et `superadmin.settings`.
+- Profil: pas de profil personnel riche; surtout cockpit et gestion globale.
+- Parametres: oui, mais institutionnels et cockpit, pas utilisateur personnel.
+- Edition de compte: oui, gestion des utilisateurs dans `superadmin.views.user_create` et `user_edit`.
+- Photo de profil: non.
+- Changement de mot de passe: oui lors de la gestion de compte, pas en espace profil personnel.
+- Documents utilisateur: oui pour candidats, programmes, documents requis; pas une fiche profil perso.
+- HTMX profil: non.
+- Etat: tres complet comme back-office, mais pas comme espace utilisateur personnel.
+
+3. Architecture utilisateur existante
+
+Modeles deja presents:
+- `accounts.Profile` : profil central utilisateur.
+- `students.Student` : profil etudiant officiel.
+- `portal.SupportAuditLog` : journal d'actions IT.
+- `portal.AccountSupportState` : etat de securite du compte.
+- `portal.BranchITSettings` : parametres IT d'annexe.
+- `portal.TeacherDashboardPreference` : preferences dashboard enseignant.
+- `portal.TeacherDocument` : documents enseignant.
+- `portal.DirectorTeacherAssignment` : affectations direction/enseignant.
+- `secretary` models : registry, appointment, visitor, document receipt, tasks.
+- `superadmin.SuperadminCockpitPreference` : preferences cockpit superadmin.
+
+Conclusion sur le user model:
+- Le projet utilise le `User` Django standard avec des `OneToOneField` de profil, pas un custom user model visible dans l'audit.
+- Le champ central de routage reste `accounts.Profile`.
+
+4. Champs deja existants
+
+Dans `accounts.Profile`:
+- `role`, `user_type`, `position`, `branch`, `employee_code`, `salary_base`, `employment_status`, `hire_date`, `avatar`, `bio`, `location`, `website`, `main_domain`, compteurs communautaires, badges, dates de suivi.
+
+Dans `students.Student`:
+- `user`, `inscription`, `matricule`, `is_active`, `created_at`.
+
+Dans `portal.TeacherDashboardPreference`:
+- `dark_mode`, `sidebar_collapsed`, `compact_mode`, `default_section`, `notify_lesson_reminders`, `notify_schedule_changes`, `notify_support_messages`.
+
+Dans `portal.AccountSupportState`:
+- `is_suspended`, `is_blocked`, `must_change_password`, `failed_login_count`, `blocked_until`, `note`.
+
+Dans `portal.BranchITSettings`:
+- `validation_threshold`, `active_academic_year`, `local_config`.
+
+Dans `portal.TeacherDocument`:
+- `document_type`, `file`, `note`, `is_verified`, `uploaded_by`, `verified_by`.
+
+Dans `superadmin.SuperadminCockpitPreference`:
+- `sidebar_collapsed`, `dashboard_period`, `widget_autorefresh`.
+
+Dans `portal.student.profile_service`:
+- editables limites: `email`, `phone`.
+- readonly: `full_name`, `matricule`, `birth_date`, `birth_place`.
+- academique: `formation`, `classroom`, `academic_year`, `enrollment_status`, `academic_status`, `annexe`.
+- documents: issus des documents requis de candidature.
+
+5. Champs manquants pour la cible demandee
+
+Manquants ou non centralises:
+- informations personnelles completes par role.
+- photo/avatars avec vrai manager centralise.
+- telephone standardise dans le profil central.
+- adresse detaillee par role.
+- informations familiales etudiant: pere, mere, tuteur, contact urgence.
+- informations professionnelles enseignant et staff: biographie, specialite, diplome, CV, experience, signature numerique.
+- documents personnels centralises et typologies unifiees.
+- parametres de notifications unifies.
+- historique de connexion.
+- preferences UI unifiees.
+- securite de compte unifiee au lieu de plusieurs sous-states.
+- panneau de settings personnel multi-roles.
+
+6. Dashboards deja HTMX pour le profil
+
+Oui:
+- `accounts.profile_detail` avec onglets HTMX `activity`, `topics`, `answers`, `badges`, `settings`.
+- `portal.student.settings_partial` avec update et upload sans reload.
+- `portal.teacher.settings_workspace` avec `hx-post`.
+- `portal.it_portal` / `it_workflows` avec workspaces HTMX.
+- `secretary` avec plusieurs panneaux HTMX, mais pas profil.
+- `superadmin` a surtout du standard, peu de profil HTMX.
+
+7. Dashboards incomplets ou incoherents
+
+Incomplets:
+- `accounts.profile_detail` : trop oriente communautaire, pas assez metier ESFE.
+- `portal.student` : bien avance mais scope limite.
+- `portal.teacher` : bonnes preferences, mais profil personnel incomplet.
+- `portal.it_portal` : complet operativement, pas structure en vraie couche profil/settings.
+- `superadmin` : preference cockpit, mais pas profil personnel.
+- `secretary`, `supervisor`, `dg`, `finance`, `manager` : pas de vrai systeme profil/settings unifie.
+
+Incoherents:
+- duplication de la notion de profil entre `accounts.Profile`, `Student`, `TeacherDocument`, `TeacherDashboardPreference`, `SuperadminCockpitPreference`.
+- contrastes UI forts entre dashboards.
+- routes settings reparties dans plusieurs apps sans couche commune.
+- certains roles exposent salaire et parametres dans des panneaux metiers, mais pas dans un coffre-fort de profil central.
+
+8. Composants reutilisables
+
+Reutilisables maintenant:
+- `accounts.Profile` comme source principale de base.
+- `portal.student.profile_service` comme logique de profil etudiant.
+- `portal.services.teacher_dashboard_service` pour preferences enseignant.
+- `portal.views.it_workflows` + `ui.components.informaticien.settings_panel` pour la structure de settings IT.
+- `secretary.selectors` pour filtrage par annexe.
+- `accounts.access` et `accounts.dashboards.permissions` pour la couche de droits et de scope.
+- `superadmin.SuperadminCockpitPreference` pour le pattern preferences UI.
+- `accounts.edit_profile` et `accounts.partials.profile_settings` pour la base d'un centre de compte.
+
+9. Architecture cible proposee
+
+Base commune:
+- `profiles/` ou `accounts/profile_center/` pour la fiche centrale utilisateur.
+- `preferences/` pour les preferences UI, notifications, securite.
+- `documents/` pour la gestion unifiee des pieces personnelles.
+- `security/` pour etat du compte, historique de connexion, journal d'actions.
+
+Couche metier:
+- services par domaine dans `services.py` ou sous-modules de services.
+- selectors par domaine pour requetes scopees par annexe.
+- forms modulaires par role et par section.
+- templates partiels HTMX reutilisables.
+- composant de header profil reusable partout.
+
+Sections de profil:
+- identite et contact.
+- avatar et presentation.
+- documents personnels.
+- informations academiques / administratives.
+- informations familiales.
+- informations professionnelles.
+- preferences de notification.
+- securite du compte.
+- historique de connexion.
+- preferences UI.
+
+10. Priorite d'implementation
+
+Priorite 1:
+- creer la base commune profil + preferences.
+- centraliser la carte profil et les actions de base.
+- unifier photo, email, mot de passe, notification, documents.
+
+Priorite 2:
+- brancher les specificites par role.
+- etudiant: famille, urgence, documents, mais pas les champs critiques.
+- enseignant: bio, diplomes, CV, signature.
+- staff administratif: etat civil, poste, departement, CV, documents RH.
+- informaticien: permissions techniques, logs, niveau d'acces.
+- directeurs / surveillants: signature, cachet, documents administratifs, historique.
+
+11. Conclusion
+
+Le projet est deja bien dote en dashboards metiers et en HTMX. En revanche, le systeme de profil/parametres reste distribue par role et par app. La bonne direction est de conserver les workflows existants, mais de les raccrocher a une couche centrale de profil et de preferences, avec des sections modulaires et des selectors scopees par annexe.

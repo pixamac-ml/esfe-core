@@ -1,5 +1,14 @@
 <div class="workflow-actions">
   {% for action in actions %}
+  {% if action.kind == "modal" %}
+  <button
+    type="button"
+    class="workflow-btn workflow-btn-{{ action.style }}"
+    hx-get="{% url 'accounts_portal:it_notes_retake_modal' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}"
+    hx-target="#it-modal-root"
+    hx-swap="innerHTML"
+  >{{ action.label }}</button>
+  {% else %}
   <form
     method="post"
     action="{% url 'accounts_portal:it_notes_workflow_action' %}"
@@ -13,6 +22,7 @@
     <input type="hidden" name="action" value="{{ action.code }}">
     <button type="submit" class="workflow-btn workflow-btn-{{ action.style }}">{{ action.label }}</button>
   </form>
+  {% endif %}
   {% empty %}
   <p class="workflow-muted">Aucune action disponible pour cet etat.</p>
   {% endfor %}

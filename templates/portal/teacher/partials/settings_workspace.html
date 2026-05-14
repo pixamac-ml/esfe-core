@@ -5,12 +5,50 @@
     </div>
   {% endif %}
 
-  <div class="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+  <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Compte enseignant</p>
+        <h2 class="mt-2 text-2xl font-black text-slate-900">Essentiel du profil</h2>
+        <p class="mt-2 text-sm font-semibold text-slate-500">Profil central, securite et preferences communes sans parcours inutile.</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a href="{% url 'accounts:edit_profile' %}" class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700">Modifier le profil</a>
+        <a href="{% url 'accounts:edit_preferences' %}" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900 transition hover:border-blue-200 hover:bg-blue-50">Preferences communes</a>
+        <a href="{% url 'password_change' %}" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900 transition hover:border-blue-200 hover:bg-blue-50">Mot de passe</a>
+      </div>
+    </div>
+
+    <div class="grid gap-3 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Telephone</p>
+        <p class="mt-2 text-sm font-semibold text-slate-900">{{ account_profile_summary.phone }}</p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Annexe</p>
+        <p class="mt-2 text-sm font-semibold text-slate-900">{{ status_summary.branch_name }}</p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Notifications</p>
+        <p class="mt-2 text-sm font-semibold text-slate-900">
+          {% if account_preference_summary.notify_email %}Email{% endif %}{% if account_preference_summary.notify_email and account_preference_summary.notify_in_app %} + {% endif %}{% if account_preference_summary.notify_in_app %}Plateforme{% endif %}{% if not account_preference_summary.notify_email and not account_preference_summary.notify_in_app %}Inactives{% endif %}
+        </p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Securite</p>
+        <p class="mt-2 text-sm font-semibold text-slate-900">
+          {% if account_security_summary.is_suspended %}Suspendu{% elif account_security_summary.is_blocked %}Bloque{% elif account_security_summary.must_change_password %}Mot de passe a changer{% else %}Compte normal{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
     <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5">
         <div>
-          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Profil enseignant</p>
-          <h2 class="mt-2 text-2xl font-black text-slate-900">Informations de reference</h2>
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Resume</p>
+          <h2 class="mt-2 text-2xl font-black text-slate-900">Repere rapide</h2>
         </div>
         <div class="rounded-2xl bg-slate-100 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-600">
           {{ teacher_settings_stats.active_classes }} classe(s)
@@ -31,44 +69,40 @@
           <p class="mt-2 text-sm font-semibold text-slate-900">{{ status_summary.employment_status }}</p>
         </div>
         <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Annexe</p>
-          <p class="mt-2 text-sm font-semibold text-slate-900">{{ status_summary.branch_name }}</p>
-        </div>
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Prise de service</p>
-          <p class="mt-2 text-sm font-semibold text-slate-900">{{ status_summary.hire_date|date:"d/m/Y"|default:"Non renseignee" }}</p>
-        </div>
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Mode d'affichage</p>
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Affichage</p>
           <p class="mt-2 text-sm font-semibold text-slate-900">{{ teacher_settings_stats.display_mode }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 md:col-span-2">
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Presentation</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ account_profile_summary.bio|default:"Aucune presentation renseignee." }}</p>
         </div>
       </div>
     </article>
 
     <article class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div class="border-b border-slate-200 px-6 py-5">
-        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Preferences</p>
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Preferences metier</p>
         <h2 class="mt-2 text-2xl font-black text-slate-900">Tableau de bord enseignant</h2>
-        <p class="mt-2 text-sm font-semibold text-slate-500">Les choix sont memorises pour que l'espace reste cohérent au prochain acces.</p>
+        <p class="mt-2 text-sm font-semibold text-slate-500">Reglez seulement ce qui change vraiment votre usage quotidien.</p>
       </div>
 
       <form
         method="post"
-      hx-post="{% url 'accounts_portal:teacher_settings_workspace' %}"
-      hx-target="#teacher-settings-workspace"
-      hx-swap="outerHTML"
-      hx-disabled-elt="find button"
-      hx-on:htmx:beforeRequest="window.teacherDashboardController && (window.teacherDashboardController.darkMode = this.querySelector('[name=dark_mode]')?.checked, window.teacherDashboardController.sidebarOpen = !this.querySelector('[name=sidebar_collapsed]')?.checked)"
-      class="space-y-5 p-6"
+        hx-post="{% url 'accounts_portal:teacher_settings_workspace' %}"
+        hx-target="#teacher-settings-workspace"
+        hx-swap="outerHTML"
+        hx-disabled-elt="find button"
+        hx-on:htmx:beforeRequest="window.teacherDashboardController && (window.teacherDashboardController.darkMode = this.querySelector('[name=dark_mode]')?.checked, window.teacherDashboardController.sidebarOpen = !this.querySelector('[name=sidebar_collapsed]')?.checked)"
+        class="space-y-5 p-6"
       >
         {% csrf_token %}
 
         <div class="grid gap-4 md:grid-cols-2">
           <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <input type="checkbox" name="dark_mode" {% if teacher_dashboard_preference.dark_mode %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+            <input type="checkbox" name="compact_mode" {% if teacher_dashboard_preference.compact_mode %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
             <span>
-              <strong class="block text-sm font-black text-slate-900">Mode sombre</strong>
-              <span class="mt-1 block text-sm font-semibold text-slate-500">Active une lecture plus confortable dans les longues sessions.</span>
+              <strong class="block text-sm font-black text-slate-900">Affichage compact</strong>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">Voir plus de contenu sans surcharge visuelle.</span>
             </span>
           </label>
 
@@ -76,15 +110,15 @@
             <input type="checkbox" name="sidebar_collapsed" {% if teacher_dashboard_preference.sidebar_collapsed %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
             <span>
               <strong class="block text-sm font-black text-slate-900">Barre reduite</strong>
-              <span class="mt-1 block text-sm font-semibold text-slate-500">Affiche une interface plus compacte sur les ecrans etroits.</span>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">Plus d'espace pour travailler dans le contenu.</span>
             </span>
           </label>
 
           <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <input type="checkbox" name="compact_mode" {% if teacher_dashboard_preference.compact_mode %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+            <input type="checkbox" name="notify_lesson_reminders" {% if teacher_dashboard_preference.notify_lesson_reminders %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
             <span>
-              <strong class="block text-sm font-black text-slate-900">Affichage compact</strong>
-              <span class="mt-1 block text-sm font-semibold text-slate-500">Resserre les blocs du dashboard pour voir plus de contenu.</span>
+              <strong class="block text-sm font-black text-slate-900">Rappels de cours</strong>
+              <span class="mt-1 block text-sm font-semibold text-slate-500">L'essentiel avant vos seances.</span>
             </span>
           </label>
 
@@ -98,34 +132,26 @@
           </label>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-3">
-          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <input type="checkbox" name="notify_lesson_reminders" {% if teacher_dashboard_preference.notify_lesson_reminders %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
-            <span>
-              <strong class="block text-sm font-black text-slate-900">Rappels de cours</strong>
-              <span class="mt-1 block text-sm font-semibold text-slate-500">Recevoir les rappels avant vos seances.</span>
-            </span>
-          </label>
-
-          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <input type="checkbox" name="notify_schedule_changes" {% if teacher_dashboard_preference.notify_schedule_changes %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
-            <span>
-              <strong class="block text-sm font-black text-slate-900">Modifications EDT</strong>
-              <span class="mt-1 block text-sm font-semibold text-slate-500">Etre alerte lors des changements de planning.</span>
-            </span>
-          </label>
-
-          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <input type="checkbox" name="notify_support_messages" {% if teacher_dashboard_preference.notify_support_messages %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
-            <span>
-              <strong class="block text-sm font-black text-slate-900">Messages de support</strong>
-              <span class="mt-1 block text-sm font-semibold text-slate-500">Recevoir les messages operatoires de la direction.</span>
-            </span>
-          </label>
-        </div>
+        <details class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <summary class="cursor-pointer text-sm font-black text-slate-900">Options avancees</summary>
+          <div class="mt-4 grid gap-4 md:grid-cols-3">
+            <label class="flex items-start gap-3">
+              <input type="checkbox" name="dark_mode" {% if teacher_dashboard_preference.dark_mode %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+              <span class="text-sm font-semibold text-slate-600">Mode sombre</span>
+            </label>
+            <label class="flex items-start gap-3">
+              <input type="checkbox" name="notify_schedule_changes" {% if teacher_dashboard_preference.notify_schedule_changes %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+              <span class="text-sm font-semibold text-slate-600">Modifications EDT</span>
+            </label>
+            <label class="flex items-start gap-3">
+              <input type="checkbox" name="notify_support_messages" {% if teacher_dashboard_preference.notify_support_messages %}checked{% endif %} class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
+              <span class="text-sm font-semibold text-slate-600">Messages de support</span>
+            </label>
+          </div>
+        </details>
 
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-          <span class="text-xs font-semibold text-slate-500">La langue n'est pas geree ici. Les preferences sont concentrees sur l'usage du dashboard.</span>
+          <span class="text-xs font-semibold text-slate-500">Moins d'options visibles, plus de vitesse d'usage.</span>
           <div class="flex items-center gap-3">
             <span class="htmx-indicator text-xs font-bold text-slate-400">Enregistrement...</span>
             <button type="submit" class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-700">

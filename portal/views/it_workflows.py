@@ -13,7 +13,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from academics.models import AcademicClass, Semester
+from academics.models import AcademicClass, EC, Semester, UE
 from academics.services.semester import compute_semester_result
 from accounts.access import get_user_position
 from accounts.dashboards.helpers import get_user_branch
@@ -22,10 +22,20 @@ from portal.selectors import (
     get_it_semesters_for_class,
     get_it_students_for_class,
 )
+from portal.services.academic_structure_service import (
+    archive_academic_class,
+    assign_student_to_class,
+    build_academic_structure_context,
+    delete_ec,
+    save_academic_class,
+    save_ec,
+    save_ue,
+)
 from portal.services.notes_workflow import (
     apply_notes_workflow_action,
     get_available_actions,
     get_notes_state,
+    get_retake_candidates,
 )
 from portal.services.it_support_service import get_account_support_state, get_scoped_staff_queryset
 from portal.services.it_support_service import create_temp_password, log_support_action
@@ -34,7 +44,6 @@ from portal.services.informaticien_workflows import (
     build_catalog_context,
     build_home_context,
     build_import_context,
-    build_structure_context,
     build_supervision_context,
     build_support_context,
     create_branch_ticket,
@@ -154,8 +163,9 @@ def it_notes_workflow_action(request):
         )
         messages = {
             "verifier_notes": "Controle termine: aucune note manquante bloquante.",
-            "calculer_resultats": "Resultats calcules et journalises.",
-            "envoyer_direction": "Resultats marques comme envoyes au Directeur des Etudes.",
+            "publier_session_normale": "Session normale publiee. Le rattrapage peut maintenant etre prepare.",
+            "activer_rattrapage": "Rattrapage active. Seules les notes de rattrapage restent modifiables.",
+            "publier_resultats_finaux": "Resultats finaux publies. Les releves et exports sont deblocables.",
         }
         toast = {"level": "success", "message": messages.get(action, "Workflow notes mis a jour.")}
     except ValidationError as exc:
@@ -429,11 +439,132 @@ def it_export_notes_excel(request):
 def it_structure_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
+    selected_class_id = (request.GET.get("class_id") or request.GET.get("classe") or "").strip()
+    student_query = (request.GET.get("student_q") or "").strip()
+    section = (request.GET.get("section") or "classes").strip()
     return render(
         request,
         "portal/informaticien/workflows/structure_workspace.html",
-        build_structure_context(branch=get_user_branch(request.user)),
+        build_academic_structure_context(
+            branch=get_user_branch(request.user),
+            selected_class_id=selected_class_id,
+            student_query=student_query,
+            section=section,
+        ),
     )
+
+
+@login_required
+def it_structure_modal(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    branch = get_user_branch(request.user)
+    kind = (request.GET.get("kind") or "").strip()
+    object_id = (request.GET.get("id") or "").strip()
+    class_id = (request.GET.get("class_id") or "").strip()
+    section = (request.GET.get("section") or "classes").strip()
+    semester_id = (request.GET.get("semester_id") or "").strip()
+    ue_id = (request.GET.get("ue_id") or "").strip()
+    student_id = (request.GET.get("student_id") or "").strip()
+
+    context = build_academic_structure_context(branch=branch, selected_class_id=class_id, section=section)
+    context.update(
+        {
+            "kind": kind,
+            "target_id": object_id,
+            "target_class": AcademicClass.objects.filter(pk=object_id, branch=branch).first() if kind == "class" and object_id else None,
+            "target_ue": UE.objects.filter(pk=object_id, semester__academic_class__branch=branch).first() if kind == "ue" and object_id else None,
+            "target_ec": EC.objects.filter(pk=object_id, ue__semester__academic_class__branch=branch).first() if kind == "ec" and object_id else None,
+            "target_student": Student.objects.select_related("inscription__candidature").filter(
+                pk=student_id,
+                inscription__candidature__branch=branch,
+            ).first() if kind == "assign" and student_id else None,
+            "selected_semester": Semester.objects.filter(pk=semester_id, academic_class__branch=branch).first() if semester_id else None,
+            "selected_ue": UE.objects.filter(pk=ue_id, semester__academic_class__branch=branch).first() if ue_id else None,
+        }
+    )
+    return render(request, "portal/informaticien/workflows/structure_modal.html", context)
+
+
+@login_required
+def it_structure_action(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    if request.method != "POST":
+        return HttpResponseForbidden("Methode non autorisee.")
+
+    branch = get_user_branch(request.user)
+    selected_class_id = (request.POST.get("selected_class_id") or "").strip()
+    action = (request.POST.get("action") or "").strip()
+    section = (request.POST.get("section") or "classes").strip()
+    toast = None
+    try:
+        if action == "save_class":
+            academic_class = save_academic_class(
+                branch=branch,
+                class_id=(request.POST.get("class_id") or "").strip() or None,
+                programme_id=request.POST.get("programme_id"),
+                academic_year_id=request.POST.get("academic_year_id"),
+                level=request.POST.get("level"),
+                threshold=request.POST.get("validation_threshold"),
+                actor=request.user,
+            )
+            selected_class_id = str(academic_class.id)
+            section = "classes"
+            toast = {"level": "success", "message": "Classe academique enregistree."}
+        elif action == "archive_class":
+            archive_academic_class(branch=branch, class_id=request.POST.get("class_id"))
+            section = "classes"
+            toast = {"level": "success", "message": "Classe archivee."}
+        elif action == "save_ue":
+            ue = save_ue(
+                branch=branch,
+                ue_id=(request.POST.get("ue_id") or "").strip() or None,
+                semester_id=request.POST.get("semester_id"),
+                code=request.POST.get("code"),
+                title=request.POST.get("title"),
+            )
+            selected_class_id = str(ue.semester.academic_class_id)
+            section = "maquettes"
+            toast = {"level": "success", "message": "UE enregistree."}
+        elif action == "save_ec":
+            ec = save_ec(
+                branch=branch,
+                ec_id=(request.POST.get("ec_id") or "").strip() or None,
+                ue_id=request.POST.get("ue_id"),
+                title=request.POST.get("title"),
+                coefficient=request.POST.get("coefficient"),
+                credit_required=request.POST.get("credit_required"),
+            )
+            selected_class_id = str(ec.ue.semester.academic_class_id)
+            section = "maquettes"
+            toast = {"level": "success", "message": "EC enregistre."}
+        elif action == "delete_ec":
+            delete_ec(branch=branch, ec_id=request.POST.get("ec_id"))
+            section = "maquettes"
+            toast = {"level": "success", "message": "EC supprime."}
+        elif action == "assign_student":
+            enrollment = assign_student_to_class(
+                branch=branch,
+                student_id=request.POST.get("student_id"),
+                class_id=request.POST.get("class_id"),
+            )
+            selected_class_id = str(enrollment.academic_class_id)
+            section = "affectations"
+            toast = {"level": "success", "message": "Etudiant affecte a la classe."}
+        else:
+            raise ValidationError("Action de parametrage inconnue.")
+    except ValidationError as exc:
+        toast = {"level": "error", "message": " ".join(exc.messages)}
+
+    context = build_academic_structure_context(
+        branch=branch,
+        selected_class_id=selected_class_id,
+        student_query=(request.POST.get("student_q") or "").strip(),
+        section=section,
+    )
+    context["toast"] = toast
+    return render(request, "portal/informaticien/workflows/structure_workspace.html", context)
 
 
 @login_required
@@ -673,7 +804,37 @@ def it_branch_settings_save(request):
     return render(
         request,
         "portal/informaticien/workflows/branch_settings_workspace.html",
-        {"branch": branch, "settings": settings, "toast": toast},
+        {
+            "branch": branch,
+            "settings": settings,
+            "toast": toast,
+            "profile": getattr(request.user, "profile", None),
+        },
+    )
+
+
+@login_required
+def it_notes_retake_modal(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+
+    context = _resolve_workflow_selection(request)
+    academic_class = context["selected_class"]
+    semester = context["selected_semester"]
+    state = get_notes_state(academic_class=academic_class, semester=semester)
+    candidates = get_retake_candidates(academic_class=academic_class, semester=semester)
+    subject_count = sum(len(candidate.failed_subjects) for candidate in candidates)
+
+    return render(
+        request,
+        "portal/informaticien/workflows/retake_modal.html",
+        {
+            "academic_class": academic_class,
+            "semester": semester,
+            "state": state,
+            "candidates": candidates,
+            "subject_count": subject_count,
+        },
     )
 
 

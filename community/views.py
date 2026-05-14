@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -41,19 +42,8 @@ def paginate_items(request, items, per_page=12, page_param="page"):
 # =====================================================
 # BUILDER : QUERY TOPICS
 # =====================================================
-def build_topic_queryset(sort="active", query=""):
-    queryset = (
-        Topic.objects
-        .filter(is_published=True, is_deleted=False)
-        .select_related("author", "category")
-        .prefetch_related("tags")
-        .annotate(
-            answer_count=Count(
-                "answers",
-                filter=Q(answers__is_deleted=False)
-            )
-        )
-    )
+def build_topic_queryset(sort="active", query="", focus=""):
+    queryset = _community_topic_base_queryset()
 
     if query:
         queryset = queryset.filter(
@@ -64,14 +54,44 @@ def build_topic_queryset(sort="active", query=""):
             Q(category__name__icontains=query)
         ).distinct()
 
+    queryset = _apply_topic_focus(queryset, focus)
+
     sort_map = {
-        "recent": "-created_at",
-        "answers": "-answer_count",
-        "views": "-view_count",
-        "active": "-last_activity_at",
+        "recent": ["-created_at"],
+        "answers": ["-answer_count", "-last_activity_at"],
+        "views": ["-view_count", "-last_activity_at"],
+        "active": ["-last_activity_at"],
+        "hot": ["-answer_count", "-view_count", "-last_activity_at"],
     }
 
-    return queryset.order_by(sort_map.get(sort, "-last_activity_at"))
+    ordering = ["-is_pinned"] + sort_map.get(sort, sort_map["active"])
+    return queryset.order_by(*ordering)
+
+
+def _community_topic_base_queryset():
+    return (
+        Topic.objects
+        .filter(is_published=True, is_deleted=False)
+        .select_related("author", "author__profile", "category")
+        .prefetch_related("tags")
+        .annotate(
+            answer_count=Count(
+                "answers",
+                filter=Q(answers__is_deleted=False)
+            )
+        )
+    )
+
+
+def _apply_topic_focus(queryset, focus):
+    focus = (focus or "").strip().lower()
+    if focus == "pinned":
+        return queryset.filter(is_pinned=True)
+    if focus == "unanswered":
+        return queryset.filter(answer_count=0)
+    if focus == "answered":
+        return queryset.filter(answer_count__gt=0)
+    return queryset
 
 # =====================================================
 # BUILDER : SIDEBAR CONTEXT
@@ -137,24 +157,112 @@ def build_sidebar_context(request=None):
     }
 
 
+def build_community_hub_context(request, *, sort="active", query="", focus=""):
+    topics_qs = build_topic_queryset(sort=sort, query=query, focus=focus)
+    page_obj = paginate_items(request, topics_qs, per_page=12)
+
+    today = timezone.localdate()
+    thirty_days_ago = today - timedelta(days=30)
+
+    published_topics = _community_topic_base_queryset()
+    published_answers = (
+        Answer.objects
+        .filter(is_deleted=False, topic__is_deleted=False, topic__is_published=True)
+        .select_related("author", "topic", "topic__category")
+    )
+
+    recent_authors = set(
+        published_topics.filter(last_activity_at__date__gte=thirty_days_ago).values_list("author_id", flat=True)
+    )
+    recent_authors.update(
+        published_answers.filter(created_at__date__gte=thirty_days_ago).values_list("author_id", flat=True)
+    )
+
+    top_contributors = (
+        User.objects
+        .select_related("profile")
+        .select_related("profile", "gamification")
+        .prefetch_related("user_badges")
+        .filter(profile__isnull=False)
+        .annotate(
+            topic_count=Count("community_topics", filter=Q(community_topics__is_deleted=False)),
+            answer_count=Count("community_answers", filter=Q(community_answers__is_deleted=False)),
+            badge_count=Count("user_badges", distinct=True),
+        )
+        .filter(Q(topic_count__gt=0) | Q(answer_count__gt=0))
+        .order_by("-answer_count", "-topic_count", "first_name", "last_name")[:6]
+    )
+
+    featured_topics = list(
+        published_topics
+        .filter(is_pinned=True)
+        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
+        .order_by("-last_activity_at", "-created_at")[:3]
+    )
+    if len(featured_topics) < 3:
+        fallback_ids = {topic.id for topic in featured_topics}
+        featured_topics.extend(
+            list(
+                published_topics
+                .exclude(id__in=fallback_ids)
+                .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
+                .order_by("-last_activity_at", "-view_count")[: 3 - len(featured_topics)]
+            )
+        )
+
+    trending_topics = list(
+        published_topics
+        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
+        .order_by("-answer_count", "-view_count", "-last_activity_at")[:5]
+    )
+    unanswered_topics = list(
+        published_topics
+        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
+        .filter(answer_count=0)
+        .order_by("-created_at")[:5]
+    )
+    recent_topics = list(
+        published_topics
+        .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
+        .order_by("-created_at")[:5]
+    )
+
+    community_stats = {
+        "topics_total": published_topics.count(),
+        "answers_total": published_answers.count(),
+        "contributors_total": len(recent_authors),
+        "today_topics": published_topics.filter(created_at__date=today).count(),
+        "today_answers": published_answers.filter(created_at__date=today).count(),
+        "pinned_topics": len(featured_topics),
+        "unanswered_topics": len(unanswered_topics),
+    }
+
+    return {
+        "topics": page_obj.object_list,
+        "topics_total": topics_qs.count(),
+        "page_obj": page_obj,
+        "current_sort": sort,
+        "query": query,
+        "current_focus": focus,
+        "community_stats": community_stats,
+        "featured_topics": featured_topics,
+        "trending_topics": trending_topics,
+        "unanswered_topics": unanswered_topics,
+        "recent_topics": recent_topics,
+        "top_contributors": top_contributors,
+        **build_sidebar_context(request),
+    }
+
+
 # =====================================================
 # LISTE GÉNÉRALE
 # =====================================================
 def topic_list(request):
     sort = request.GET.get("sort", "active")
     query = request.GET.get("q", "").strip()
+    focus = request.GET.get("focus", "").strip()
 
-    topics_qs = build_topic_queryset(sort=sort, query=query)
-    page_obj = paginate_items(request, topics_qs, per_page=12)
-
-    context = {
-        "topics": page_obj.object_list,
-        "topics_total": topics_qs.count(),
-        "page_obj": page_obj,
-        "current_sort": sort,
-        "query": query,
-        **build_sidebar_context(request),
-    }
+    context = build_community_hub_context(request, sort=sort, query=query, focus=focus)
 
     if request.headers.get("HX-Request"):
         html = render_to_string(
@@ -173,21 +281,19 @@ def topic_list(request):
 def topic_by_tag(request, slug):
     sort = request.GET.get("sort", "active")
     query = request.GET.get("q", "").strip()
+    focus = request.GET.get("focus", "").strip()
 
     tag = get_object_or_404(Tag, slug=slug)
 
-    topics_qs = build_topic_queryset(sort=sort, query=query).filter(tags=tag)
+    context = build_community_hub_context(request, sort=sort, query=query, focus=focus)
+    topics_qs = build_topic_queryset(sort=sort, query=query, focus=focus).filter(tags=tag)
     page_obj = paginate_items(request, topics_qs, per_page=12)
-
-    context = {
+    context.update({
         "topics": page_obj.object_list,
         "topics_total": topics_qs.count(),
         "page_obj": page_obj,
         "tag": tag,
-        "current_sort": sort,
-        "query": query,
-        **build_sidebar_context(request),
-    }
+    })
 
     if request.headers.get("HX-Request"):
         html = render_to_string(
@@ -206,21 +312,19 @@ def topic_by_tag(request, slug):
 def topic_by_category(request, slug):
     sort = request.GET.get("sort", "active")
     query = request.GET.get("q", "").strip()
+    focus = request.GET.get("focus", "").strip()
 
     category = get_object_or_404(Category, slug=slug, is_active=True)
 
-    topics_qs = build_topic_queryset(sort=sort, query=query).filter(category=category)
+    context = build_community_hub_context(request, sort=sort, query=query, focus=focus)
+    topics_qs = build_topic_queryset(sort=sort, query=query, focus=focus).filter(category=category)
     page_obj = paginate_items(request, topics_qs, per_page=12)
-
-    context = {
+    context.update({
         "topics": page_obj.object_list,
         "topics_total": topics_qs.count(),
         "page_obj": page_obj,
         "category": category,
-        "current_sort": sort,
-        "query": query,
-        **build_sidebar_context(request),
-    }
+    })
 
     if request.headers.get("HX-Request"):
         html = render_to_string(
@@ -299,18 +403,27 @@ def topic_detail(request, slug):
     )
 
     # Sujets similaires
-    similar_topics = (
+    related_topics = list(
         Topic.objects
         .filter(
-            category=topic.category,
             is_published=True,
-            is_deleted=False
+            is_deleted=False,
         )
         .exclude(pk=topic.pk)
-        .select_related("author")
+        .select_related("author", "author__profile", "category")
+        .prefetch_related("tags")
         .annotate(answer_count=Count("answers", filter=Q(answers__is_deleted=False)))
-        .order_by("-view_count")[:5]
+        .filter(Q(category=topic.category) | Q(tags__in=topic.tags.all()))
+        .distinct()
+        .order_by("-is_pinned", "-answer_count", "-view_count", "-last_activity_at")[:6]
     )
+
+    topic_insights = {
+        "answers_total": answers_total,
+        "views_total": topic.view_count,
+        "tags_total": topic.tags.count(),
+        "related_total": len(related_topics),
+    }
 
     # Abonnements utilisateur
     user_subscriptions = []
@@ -326,7 +439,8 @@ def topic_detail(request, slug):
         "answers": answers_page.object_list,
         "answers_total": answers_total,
         "answers_page": answers_page,
-        "similar_topics": similar_topics,
+        "related_topics": related_topics,
+        "topic_insights": topic_insights,
         "user_subscriptions": user_subscriptions,
     })
 

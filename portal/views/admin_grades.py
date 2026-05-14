@@ -15,6 +15,7 @@ from accounts.access import can_access, get_user_position, get_user_scope
 from accounts.dashboards.helpers import get_user_branch
 from portal.services.it_support_service import log_support_action
 from portal.models import SupportAuditLog
+from portal.services.notes_workflow import can_edit_retake_grade
 from secretary.permissions import is_secretary
 
 
@@ -305,6 +306,7 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
             if grade:
                 edit_score = grade.retake_score if active_session_type == "retake" else grade.normal_score
                 final_score = grade.final_score
+            is_retake_editable = can_edit_retake_grade(grade=grade, threshold=threshold)
             ec_status = compute_ec_status(final_score, threshold)
             display_status = (
                 compute_ec_status(grade.normal_score if grade else None, threshold)
@@ -324,6 +326,7 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
                 "final_score": final_score if final_score is not None else "",
                 "final_score_display": _format_decimal(final_score),
                 "has_retake_score": bool(grade and grade.retake_score is not None),
+                "is_retake_editable": is_retake_editable,
                 "status": ec_status,
                 "display_status": display_status,
                 "note_coefficient": row["note_coefficient"],
@@ -438,13 +441,18 @@ def save_grade(request):
         if note < Decimal("0") or note > Decimal("20"):
             return HttpResponse("La note doit etre comprise entre 0 et 20.", status=400)
 
-        grade, _ = ECGrade.objects.get_or_create(
-            enrollment=enrollment,
-            ec=ec,
-        )
         if session_type == "retake":
+            grade = ECGrade.objects.filter(enrollment=enrollment, ec=ec).first()
+            if not can_edit_retake_grade(grade=grade, threshold=resolve_threshold(enrollment)):
+                return HttpResponse("Seules les matieres non validees peuvent etre modifiees au rattrapage.", status=403)
+            if grade is None:
+                return HttpResponse("Note normale requise avant saisie du rattrapage.", status=400)
             grade.retake_score = note
         else:
+            grade, _ = ECGrade.objects.get_or_create(
+                enrollment=enrollment,
+                ec=ec,
+            )
             grade.normal_score = note
         apply_ec_grade(grade)
         grade.save()
@@ -453,6 +461,8 @@ def save_grade(request):
         grade = ECGrade.objects.filter(enrollment=enrollment, ec=ec).first()
         if grade:
             if session_type == "retake":
+                if not can_edit_retake_grade(grade=grade, threshold=resolve_threshold(enrollment)):
+                    return HttpResponse("Seules les matieres non validees peuvent etre modifiees au rattrapage.", status=403)
                 grade.retake_score = None
             else:
                 grade.normal_score = None

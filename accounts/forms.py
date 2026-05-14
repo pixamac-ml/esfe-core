@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 
-from .models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
+from .models import BranchCashMovement, BranchExpense, PayrollEntry, Profile, UserPreference
 
 User = get_user_model()
 
@@ -56,12 +56,35 @@ class CustomUserCreationForm(UserCreationForm):
 # PROFIL COMPLET
 # ==========================
 class ProfileForm(forms.ModelForm):
+    first_name = forms.CharField(max_length=150, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+
     class Meta:
         model = Profile
-        fields = ["avatar", "bio", "location", "main_domain", "website"]
+        fields = [
+            "avatar",
+            "bio",
+            "location",
+            "phone",
+            "address",
+            "main_domain",
+            "website",
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance and self.instance.user_id:
+            self.fields["first_name"].initial = self.instance.user.first_name
+            self.fields["last_name"].initial = self.instance.user.last_name
+
+        self.fields["first_name"].widget.attrs.update({
+            "class": INPUT_CLASS,
+            "placeholder": "Prenom",
+        })
+        self.fields["last_name"].widget.attrs.update({
+            "class": INPUT_CLASS,
+            "placeholder": "Nom",
+        })
 
         # Avatar
         self.fields["avatar"].widget.attrs.update({
@@ -84,6 +107,16 @@ class ProfileForm(forms.ModelForm):
             "placeholder": "Ex: Douala, Cameroun"
         })
 
+        self.fields["phone"].widget.attrs.update({
+            "class": INPUT_CLASS,
+            "placeholder": "Ex: +237 6 00 00 00 00",
+        })
+
+        self.fields["address"].widget.attrs.update({
+            "class": INPUT_CLASS,
+            "placeholder": "Ex: Quartier, ville, annexe ou adresse administrative",
+        })
+
         # Domaine principal
         self.fields["main_domain"].widget.attrs.update({
             "class": INPUT_CLASS,
@@ -95,6 +128,16 @@ class ProfileForm(forms.ModelForm):
             "class": INPUT_CLASS,
             "placeholder": "https://votre-site.com"
         })
+
+    def save(self, commit=True):
+        profile = super().save(commit=False)
+        user = profile.user
+        user.first_name = self.cleaned_data.get("first_name", "").strip()
+        user.last_name = self.cleaned_data.get("last_name", "").strip()
+        if commit:
+            user.save(update_fields=["first_name", "last_name"])
+            profile.save()
+        return profile
 
 
 # ==========================
@@ -113,6 +156,37 @@ class EmailUpdateForm(forms.ModelForm):
             "placeholder": "exemple@domaine.com",
             "type": "email"
         })
+
+
+class UserPreferenceForm(forms.ModelForm):
+    class Meta:
+        model = UserPreference
+        fields = [
+            "notify_email",
+            "notify_in_app",
+            "notify_sms",
+            "ui_sidebar_collapsed",
+            "ui_compact_mode",
+            "ui_autorefresh",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        checkbox_class = (
+            "h-5 w-5 rounded border-gray-300 text-primary-600 "
+            "focus:ring-2 focus:ring-primary-200"
+        )
+        labels = {
+            "notify_email": "Recevoir les notifications par email",
+            "notify_in_app": "Recevoir les notifications dans la plateforme",
+            "notify_sms": "Recevoir les alertes critiques par SMS",
+            "ui_sidebar_collapsed": "Ouvrir les espaces avec barre laterale reduite",
+            "ui_compact_mode": "Activer l'affichage compact",
+            "ui_autorefresh": "Autoriser l'actualisation automatique des widgets",
+        }
+        for field_name, field in self.fields.items():
+            field.widget.attrs.update({"class": checkbox_class})
+            field.label = labels[field_name]
 
 
 class PayrollEntryForm(forms.ModelForm):

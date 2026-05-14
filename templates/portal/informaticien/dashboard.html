@@ -136,6 +136,10 @@
             <p class="mt-2 text-sm font-semibold text-slate-500">Support technique, acces, et sante du portail</p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
+            <button type="button" class="workflow-btn workflow-btn-primary" @click="openModule('settings')">
+              <i data-lucide="settings" class="mr-2 h-4 w-4"></i>
+              Compte
+            </button>
             <button type="button" class="workflow-btn workflow-btn-secondary" @click="toggleDarkMode()">
               <i data-lucide="moon" class="mr-2 h-4 w-4"></i>
               Theme
@@ -148,10 +152,9 @@
                 <span>{{ request.user.get_full_name|default:request.user.username }}</span>
               </button>
               <div x-show="profileOpen" x-transition class="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
-                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_branch_settings_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" @click="profileOpen=false">Mon profil</button>
-                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_branch_settings_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" @click="profileOpen=false">Parametres</button>
-                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold text-slate-400">Ma carte staff</button>
-                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold text-slate-400">Mon salaire</button>
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" @click="activeModule='settings'; profileOpen=false">Mon profil</button>
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_branch_settings_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" @click="activeModule='settings'; profileOpen=false">Parametres annexe</button>
+                <a href="{% url 'password_change' %}" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900">Mot de passe</a>
                 <form method="post" action="{% url 'accounts:logout' %}">
                   {% csrf_token %}
                   <button type="submit" class="block w-full px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50">Deconnexion</button>
@@ -170,62 +173,7 @@
         >
           <div class="workflow-empty">Chargement du workflow...</div>
         </section>
-
-        <section class="mt-4">
-          {% if selected_class and selected_semester %}
-            <div class="workflow-band workflow-band-ready_to_calculate">
-              <div>
-                <p class="workflow-kicker">Gestion des notes</p>
-                <h3>Workspace Notes</h3>
-                <p>{{ selected_class.display_name }} - Semestre {{ selected_semester.number }}</p>
-              </div>
-              <button
-                type="button"
-                class="workflow-btn workflow-btn-primary"
-                hx-get="{% url 'accounts_portal:it_notes_workspace' %}?class_id={{ selected_class.id }}&amp;semester_id={{ selected_semester.id }}"
-                hx-target="#it-workspace"
-                hx-swap="innerHTML"
-              >
-                Ouvrir le workspace
-              </button>
-            </div>
-          {% else %}
-            <div class="workflow-band workflow-band-empty">
-              <div>
-                <p class="workflow-kicker">Gestion des notes</p>
-                <h3>Workspace Notes</h3>
-                <p>Choisir une classe et un semestre pour charger le module complet.</p>
-              </div>
-              <button type="button" class="workflow-btn workflow-btn-secondary" disabled>
-                Choisir une classe
-              </button>
-            </div>
-          {% endif %}
-        </section>
-
-        {% if support_actions %}
-          <section class="mt-4 workflow-table-shell">
-            <div class="workflow-table-head">
-              <div>
-                <p class="workflow-kicker">Actions prioritaires</p>
-                <h3>Alertes du portail</h3>
-              </div>
-            </div>
-            <div class="workflow-list">
-              {% for action in support_actions %}
-                <article>
-                  <div>
-                    <strong>{{ action.title }}</strong>
-                    <span>{{ action.detail }}</span>
-                  </div>
-                  {% if action.href %}
-                    <a class="workflow-btn workflow-btn-secondary" href="{{ action.href }}">Ouvrir</a>
-                  {% endif %}
-                </article>
-              {% endfor %}
-            </div>
-          </section>
-        {% endif %}
+        <div id="it-modal-root"></div>
       </div>
     </main>
   </div>
@@ -241,11 +189,12 @@
       modules: [
         { key: 'home', label: 'Accueil', icon: 'home', kicker: 'Actions rapides et priorites' },
         { key: 'notes', label: 'Notes & Resultats', icon: 'file-spreadsheet', kicker: 'Classe -> Semestre -> Etat -> Action' },
+        { key: 'structure', label: 'Parametrage academique', icon: 'blocks', kicker: 'Classes -> UE -> EC -> Affectations' },
         { key: 'import', label: 'Import / export', icon: 'upload-cloud', kicker: 'Excel notes et export classe' },
         { key: 'cards', label: 'Cartes etudiants', icon: 'badge', kicker: 'Classe -> Etudiant -> PDF' },
         { key: 'accounts', label: 'Utilisateurs', icon: 'shield-check', kicker: 'Utilisateur -> Etat compte -> Action' },
         { key: 'support', label: 'Support', icon: 'life-buoy', kicker: 'Tickets de l annexe' },
-        { key: 'settings', label: 'Parametres', icon: 'settings', kicker: 'Profil, securite, apparence' },
+        { key: 'settings', label: 'Compte', icon: 'settings', kicker: 'Profil, securite, preferences et annexe' },
       ],
       init() {
         this.collapsed = window.localStorage.getItem('it_flow_sidebar') === '1';
@@ -268,11 +217,12 @@
         const urls = {
           home: "{% url 'accounts_portal:it_home_workspace' %}",
           notes: "{% url 'accounts_portal:it_notes_flow_workspace' %}",
+          structure: "{% url 'accounts_portal:it_structure_workspace' %}",
           import: "{% url 'accounts_portal:it_import_workspace' %}",
           accounts: "{% url 'accounts_portal:it_accounts_flow_workspace' %}",
           cards: "{% url 'accounts_portal:it_cards_workspace' %}",
           support: "{% url 'accounts_portal:it_support_flow_workspace' %}",
-          settings: "{% url 'accounts_portal:it_branch_settings_workspace' %}",
+          settings: "{% url 'accounts_portal:it_my_account_workspace' %}",
         };
         if (window.htmx) {
           window.htmx.ajax('GET', urls[moduleKey], '#it-workspace');

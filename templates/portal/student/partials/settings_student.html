@@ -40,6 +40,11 @@
       @click="tab='documents'">
       Documents
     </button>
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]"
+      :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'account' }"
+      @click="tab='account'">
+      Compte central
+    </button>
   </div>
 
   {% if form_success %}
@@ -190,5 +195,81 @@
         </div>
       {% endfor %}
     </div>
+  </section>
+
+  <section x-show="tab === 'account'" x-cloak class="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+    <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+      <div class="mb-4">
+        <p class="student-section-kicker">Compte</p>
+        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Centre de profil unifie</h4>
+        <p class="mt-2 text-sm text-[color:var(--muted)]">Les donnees ci-dessous sont partagees avec les autres espaces du compte.</p>
+      </div>
+
+      <div class="grid gap-3 md:grid-cols-2">
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Identite</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.full_name }}</strong>
+        </div>
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Email compte</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.email|default:"Non renseigne" }}</strong>
+        </div>
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Telephone central</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.phone|default:"Non renseigne" }}</strong>
+        </div>
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Localisation</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.location|default:"Non renseignee" }}</strong>
+        </div>
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3 md:col-span-2">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Adresse</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.address|default:"Non renseignee" }}</strong>
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap gap-3">
+        <a href="{{ account_center.profile_url }}" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm font-bold text-[color:var(--text)]">Voir mon profil</a>
+        <a href="{{ account_center.edit_profile_url }}" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-600">Modifier mon profil central</a>
+        <a href="{{ account_center.edit_preferences_url }}" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm font-bold text-[color:var(--text)]">Preferences communes</a>
+      </div>
+    </article>
+
+    <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+      <div class="mb-4">
+        <p class="student-section-kicker">Securite et preferences</p>
+        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Etat transversal du compte</h4>
+      </div>
+
+      <div class="grid gap-3">
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Notifications</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">
+            Email: {% if account_center.notify_email %}active{% else %}inactive{% endif %} ·
+            Plateforme: {% if account_center.notify_in_app %}active{% else %}inactive{% endif %} ·
+            SMS: {% if account_center.notify_sms %}active{% else %}inactive{% endif %}
+          </strong>
+        </div>
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Interface</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">
+            Compact: {% if account_center.ui_compact_mode %}oui{% else %}non{% endif %} ·
+            Barre reduite: {% if account_center.ui_sidebar_collapsed %}oui{% else %}non{% endif %}
+          </strong>
+        </div>
+        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
+          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Securite</span>
+          <strong class="mt-2 block text-sm text-[color:var(--text)]">
+            Suspension: {% if account_center.is_suspended %}oui{% else %}non{% endif %} ·
+            Blocage: {% if account_center.is_blocked %}oui{% else %}non{% endif %} ·
+            Changement MDP force: {% if account_center.must_change_password %}oui{% else %}non{% endif %}
+          </strong>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <a href="{{ account_center.password_change_url }}" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm font-bold text-[color:var(--text)]">Changer mon mot de passe</a>
+      </div>
+    </article>
   </section>
 </div>

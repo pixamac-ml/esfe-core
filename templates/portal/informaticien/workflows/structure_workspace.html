@@ -1,42 +1,355 @@
+{% if toast %}
+<section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
+{% endif %}
+
 <section class="workflow-stack">
   <div class="workflow-band workflow-band-in_progress">
     <div>
-      <p class="workflow-kicker">Structure academique</p>
-      <h3>{{ branch.name|default:"Annexe" }}</h3>
-      <p>Lecture des formations, classes, effectifs et anomalies actionnables.</p>
+      <p class="workflow-kicker">Parametrage academique</p>
+      <h3>Classes, maquettes et affectations</h3>
+      <p>Une section autonome pour gerer la structure academique sans melanger le workflow notes.</p>
     </div>
-    <span>{{ active_year.name|default:"Annee non active" }}</span>
+    <span>{{ branch.name|default:"Annexe" }}</span>
   </div>
 
-  <div class="workflow-table-shell">
-    <div class="workflow-table-head"><h3>Classes et effectifs</h3></div>
-    <div class="workflow-list">
-      {% for class in classes %}
-        <article>
-          <div><strong>{{ class.display_name }}</strong><span>{{ class.programme.title }} - {{ class.effectif }} etudiant(s)</span></div>
-        </article>
-      {% empty %}
-        <section class="workflow-empty">Aucune classe dans cette annexe.</section>
-      {% endfor %}
+  <section class="workflow-table-shell">
+    <div class="workflow-actions">
+      <button
+        type="button"
+        class="workflow-btn {% if section == 'classes' %}workflow-btn-primary{% else %}workflow-btn-secondary{% endif %}"
+        hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=classes{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
+        hx-target="#it-workspace"
+        hx-swap="innerHTML"
+      >
+        Classes
+      </button>
+      <button
+        type="button"
+        class="workflow-btn {% if section == 'maquettes' %}workflow-btn-primary{% else %}workflow-btn-secondary{% endif %}"
+        hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=maquettes{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
+        hx-target="#it-workspace"
+        hx-swap="innerHTML"
+      >
+        Maquettes
+      </button>
+      <button
+        type="button"
+        class="workflow-btn {% if section == 'affectations' %}workflow-btn-primary{% else %}workflow-btn-secondary{% endif %}"
+        hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=affectations{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
+        hx-target="#it-workspace"
+        hx-swap="innerHTML"
+      >
+        Affectations
+      </button>
     </div>
+  </section>
+
+  <div class="grid gap-3 md:grid-cols-4">
+    <article class="workflow-table-shell">
+      <p class="workflow-kicker">Classes</p>
+      <h3>{{ metrics.classes }}</h3>
+      <p class="workflow-muted">Classes configurees dans l'annexe.</p>
+    </article>
+    <article class="workflow-table-shell">
+      <p class="workflow-kicker">UE</p>
+      <h3>{{ metrics.ues }}</h3>
+      <p class="workflow-muted">UE de la classe active.</p>
+    </article>
+    <article class="workflow-table-shell">
+      <p class="workflow-kicker">EC</p>
+      <h3>{{ metrics.ecs }}</h3>
+      <p class="workflow-muted">Matieres de la classe active.</p>
+    </article>
+    <article class="workflow-table-shell">
+      <p class="workflow-kicker">Sans classe</p>
+      <h3>{{ metrics.students_without_class }}</h3>
+      <p class="workflow-muted">Etudiants a affecter.</p>
+    </article>
   </div>
 
-  <div class="workflow-split">
-    <div class="workflow-table-shell">
-      <div class="workflow-table-head"><h3>Classes sans notes</h3></div>
-      <div class="workflow-list">
-        {% for class in classes_without_notes %}
-          <article><div><strong>{{ class.display_name }}</strong><span>{{ class.programme.title }}</span></div></article>
-        {% empty %}<section class="workflow-empty">Aucune anomalie.</section>{% endfor %}
+  {% if section == "classes" %}
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Classes</p>
+        <h3>Parcours et seuils</h3>
+      </div>
+      <div class="workflow-actions">
+                <button
+                  type="button"
+                  class="workflow-btn workflow-btn-primary"
+                  hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=class&section=classes"
+                  hx-target="#it-modal-root"
+                  hx-swap="innerHTML"
+                >
+          Nouvelle classe
+        </button>
       </div>
     </div>
-    <div class="workflow-table-shell">
-      <div class="workflow-table-head"><h3>EC sans enseignant</h3></div>
-      <div class="workflow-list">
-        {% for ec in ecs_without_teacher %}
-          <article><div><strong>{{ ec.title }}</strong><span>{{ ec.ue.semester.academic_class.display_name }}</span></div></article>
-        {% empty %}<section class="workflow-empty">Aucune anomalie.</section>{% endfor %}
-      </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-200 text-left text-slate-500">
+            <th class="px-3 py-3">Classe</th>
+            <th class="px-3 py-3">Programme</th>
+            <th class="px-3 py-3">Annee</th>
+            <th class="px-3 py-3">Seuil</th>
+            <th class="px-3 py-3">Statut</th>
+            <th class="px-3 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for class_item in classes %}
+          <tr class="border-b border-slate-100 {% if selected_class and selected_class.id == class_item.id %}bg-blue-50/70{% endif %}">
+            <td class="px-3 py-3 font-black text-slate-900">
+              <button
+                type="button"
+                class="text-left"
+                hx-get="{% url 'accounts_portal:it_structure_workspace' %}?class_id={{ class_item.id }}"
+                hx-target="#it-workspace"
+                hx-swap="innerHTML"
+              >
+                {{ class_item.display_name }}
+              </button>
+            </td>
+            <td class="px-3 py-3 font-semibold text-slate-600">{{ class_item.programme.title }}</td>
+            <td class="px-3 py-3 font-semibold text-slate-600">{{ class_item.academic_year.name }}</td>
+            <td class="px-3 py-3 font-semibold text-slate-600">{{ class_item.validation_threshold|default:"-" }}</td>
+            <td class="px-3 py-3">
+              <span class="rounded-full px-3 py-1 text-xs font-black {% if class_item.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-slate-200 text-slate-600{% endif %}">
+                {{ class_item.is_active|yesno:"Active,Archivee" }}
+              </span>
+            </td>
+            <td class="px-3 py-3">
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="workflow-btn workflow-btn-secondary"
+                  hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=class&id={{ class_item.id }}&section=classes"
+                  hx-target="#it-modal-root"
+                  hx-swap="innerHTML"
+                >
+                  Modifier
+                </button>
+                {% if class_item.is_active %}
+                <form
+                  method="post"
+                  action="{% url 'accounts_portal:it_structure_action' %}"
+                  hx-post="{% url 'accounts_portal:it_structure_action' %}"
+                  hx-target="#it-workspace"
+                  hx-swap="innerHTML"
+                >
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="archive_class">
+                  <input type="hidden" name="section" value="classes">
+                  <input type="hidden" name="class_id" value="{{ class_item.id }}">
+                  <button type="submit" class="workflow-btn workflow-btn-secondary">Archiver</button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-3 py-8 text-center text-slate-500">Aucune classe configuree.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-  </div>
+  </section>
+  {% endif %}
+
+  {% if section == "maquettes" %}
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Maquette academique</p>
+        <h3>{% if selected_class %}{{ selected_class.display_name }}{% else %}Choisir une classe{% endif %}</h3>
+      </div>
+      {% if selected_class %}
+      <div class="workflow-actions">
+        {% for semester in semesters %}
+        <button
+          type="button"
+          class="workflow-btn workflow-btn-secondary"
+          hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ue&class_id={{ selected_class.id }}&semester_id={{ semester.id }}&section=maquettes"
+          hx-target="#it-modal-root"
+          hx-swap="innerHTML"
+        >
+          Ajouter UE S{{ semester.number }}
+        </button>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if selected_class %}
+      <div class="grid gap-4 lg:grid-cols-2">
+        {% for row in ue_rows %}
+        <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p class="workflow-kicker">Semestre {{ row.semester.number }}</p>
+              <h4 class="text-lg font-black text-slate-900">{{ row.semester.get_status_display }}</h4>
+            </div>
+          </div>
+          <div class="space-y-3">
+            {% for ue in row.ues %}
+            <article class="rounded-2xl border border-slate-200 bg-white p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="font-black text-slate-900">{{ ue.code }} · {{ ue.title }}</p>
+                  <p class="mt-1 text-sm font-semibold text-slate-500">{{ ue.ecs.count }} EC · {{ ue.credit_required }} credits</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="workflow-btn workflow-btn-secondary"
+                    hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ue&id={{ ue.id }}&class_id={{ selected_class.id }}&section=maquettes"
+                    hx-target="#it-modal-root"
+                    hx-swap="innerHTML"
+                  >
+                    Modifier UE
+                  </button>
+                  <button
+                    type="button"
+                    class="workflow-btn workflow-btn-primary"
+                    hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ec&ue_id={{ ue.id }}&class_id={{ selected_class.id }}&section=maquettes"
+                    hx-target="#it-modal-root"
+                    hx-swap="innerHTML"
+                  >
+                    Ajouter EC
+                  </button>
+                </div>
+              </div>
+              <div class="mt-4 overflow-x-auto">
+                <table class="min-w-full text-sm">
+                  <thead>
+                    <tr class="border-b border-slate-200 text-left text-slate-500">
+                      <th class="px-2 py-2">EC</th>
+                      <th class="px-2 py-2">Coef.</th>
+                      <th class="px-2 py-2">Credits</th>
+                      <th class="px-2 py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for ec in ue.ecs.all %}
+                    <tr class="border-b border-slate-100">
+                      <td class="px-2 py-2 font-semibold text-slate-800">{{ ec.title }}</td>
+                      <td class="px-2 py-2 text-slate-600">{{ ec.coefficient }}</td>
+                      <td class="px-2 py-2 text-slate-600">{{ ec.credit_required }}</td>
+                      <td class="px-2 py-2">
+                        <div class="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            class="workflow-btn workflow-btn-secondary"
+                            hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ec&id={{ ec.id }}&class_id={{ selected_class.id }}&section=maquettes"
+                            hx-target="#it-modal-root"
+                            hx-swap="innerHTML"
+                          >
+                            Modifier
+                          </button>
+                          <form
+                            method="post"
+                            action="{% url 'accounts_portal:it_structure_action' %}"
+                            hx-post="{% url 'accounts_portal:it_structure_action' %}"
+                            hx-target="#it-workspace"
+                            hx-swap="innerHTML"
+                          >
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_ec">
+                            <input type="hidden" name="section" value="maquettes">
+                            <input type="hidden" name="ec_id" value="{{ ec.id }}">
+                            <input type="hidden" name="selected_class_id" value="{{ selected_class.id }}">
+                            <button type="submit" class="workflow-btn workflow-btn-secondary">Supprimer</button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="px-2 py-4 text-center text-slate-500">Aucun EC pour cette UE.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+            {% empty %}
+            <div class="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-sm font-semibold text-slate-500">
+              Aucune UE configuree pour ce semestre.
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      </div>
+    {% else %}
+    <section class="workflow-empty">Choisir d'abord une classe pour gerer les UE et EC.</section>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if section == "affectations" %}
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Affectation etudiants</p>
+        <h3>Etudiants sans classe</h3>
+      </div>
+      <form
+        class="workflow-actions"
+        hx-get="{% url 'accounts_portal:it_structure_workspace' %}"
+        hx-target="#it-workspace"
+        hx-swap="innerHTML"
+      >
+        <input type="hidden" name="section" value="affectations">
+        {% if selected_class %}<input type="hidden" name="class_id" value="{{ selected_class.id }}">{% endif %}
+        <input
+          type="search"
+          name="student_q"
+          value="{{ student_query }}"
+          placeholder="Rechercher un etudiant"
+          class="h-[42px] rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700"
+        >
+        <button type="submit" class="workflow-btn workflow-btn-secondary">Filtrer</button>
+      </form>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-200 text-left text-slate-500">
+            <th class="px-3 py-3">Etudiant</th>
+            <th class="px-3 py-3">Matricule</th>
+            <th class="px-3 py-3">Programme</th>
+            <th class="px-3 py-3">Statut inscription</th>
+            <th class="px-3 py-3">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for student in unassigned_students %}
+          <tr class="border-b border-slate-100">
+            <td class="px-3 py-3 font-black text-slate-900">{{ student.full_name }}</td>
+            <td class="px-3 py-3 font-semibold text-slate-600">{{ student.matricule }}</td>
+            <td class="px-3 py-3 font-semibold text-slate-600">{{ student.programme.title }}</td>
+            <td class="px-3 py-3 font-semibold text-slate-600">{{ student.inscription.get_status_display }}</td>
+            <td class="px-3 py-3">
+              <button
+                type="button"
+                class="workflow-btn workflow-btn-primary"
+                hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=assign&student_id={{ student.id }}&section=affectations{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
+                hx-target="#it-modal-root"
+                hx-swap="innerHTML"
+              >
+                Affecter
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">Aucun etudiant sans classe dans cette annexe.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
 </section>

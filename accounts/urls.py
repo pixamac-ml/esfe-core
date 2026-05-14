@@ -10,6 +10,7 @@ from .views import (
     register,
     edit_profile,
     update_email,
+    edit_preferences,
     profile_detail,
     profile_activity,
     profile_topics,
@@ -137,6 +138,11 @@ urlpatterns = [
         "profile/email/",
         update_email,
         name="update_email"
+    ),
+    path(
+        "profile/preferences/",
+        edit_preferences,
+        name="edit_preferences"
     ),
 
 

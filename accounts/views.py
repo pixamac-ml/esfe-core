@@ -26,8 +26,10 @@ from payments.models import Payment, PaymentAgent, CashPaymentSession
 from accounts.access import get_user_position
 from .dashboards.helpers import is_manager
 
-from .models import Profile
-from .forms import CustomUserCreationForm, ProfileForm, EmailUpdateForm
+from portal.models import AccountSupportState
+
+from .models import Profile, UserPreference
+from .forms import CustomUserCreationForm, ProfileForm, EmailUpdateForm, UserPreferenceForm
 
 from .dashboards.permissions import (
     check_admissions_access,
@@ -218,7 +220,7 @@ def edit_profile(request):
     Modification du profil utilisateur.
     """
 
-    profile = request.user.profile
+    profile, _created = Profile.objects.get_or_create(user=request.user)
 
     if request.method == "POST":
 
@@ -246,6 +248,39 @@ def edit_profile(request):
         request,
         "accounts/edit_profile.html",
         {"form": form}
+    )
+
+
+@login_required
+def edit_preferences(request):
+    """
+    Modification des preferences utilisateur unifiees.
+    """
+
+    preference, _created = UserPreference.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        form = UserPreferenceForm(request.POST, instance=preference)
+
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                "Vos preferences ont ete mises a jour."
+            )
+            return redirect("accounts:edit_preferences")
+    else:
+        form = UserPreferenceForm(instance=preference)
+
+    support_state = AccountSupportState.objects.filter(user=request.user).first()
+
+    return render(
+        request,
+        "accounts/profile_preferences.html",
+        {
+            "form": form,
+            "support_state": support_state,
+        }
     )
 
 
@@ -472,10 +507,18 @@ def profile_settings(request):
     Onglet Paramètres - Actions rapides.
     """
 
+    preference, _created = UserPreference.objects.get_or_create(user=request.user)
+    support_state = AccountSupportState.objects.filter(user=request.user).first()
+    profile, _profile_created = Profile.objects.get_or_create(user=request.user)
+
     if request.headers.get("HX-Request") == "true":
         return render(
             request,
             "accounts/partials/profile_settings.html",
-            {}
+            {
+                "preference": preference,
+                "support_state": support_state,
+                "profile": profile,
+            }
         )
     return redirect(f"{reverse('accounts:profile')}?tab=settings")

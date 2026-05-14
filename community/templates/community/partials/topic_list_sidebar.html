@@ -1,262 +1,157 @@
-<!-- ================= DOMAINES ================= -->
-<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg">
-
-    <h3 class="text-lg font-semibold text-primary-700 mb-6 flex items-center gap-2">
-        <i class="fa-solid fa-book text-secondary"></i>
-        Domaines académiques
-    </h3>
-
-    <div class="space-y-2 text-sm">
-
-        {% for cat in categories %}
-        <div class="flex items-center justify-between px-3 py-2 rounded-lg
-               hover:bg-primary-50 transition-all duration-200 group">
-
-            <a hx-get="{% url 'community:topic_by_category' cat.slug %}?sort={{ current_sort }}"
-               hx-target="#topic-list-container"
-               hx-swap="innerHTML"
-               hx-push-url="true"
-               class="flex items-center gap-2 text-primary-600 group-hover:text-secondary transition flex-1 cursor-pointer">
-
-                <div class="w-6 h-6 flex items-center justify-center rounded-md bg-primary-100 text-primary-500 text-xs">
-                    <i class="fa-solid fa-folder"></i>
-                </div>
-                <span>{{ cat.name }}</span>
-
-            </a>
-
-            <div class="flex items-center gap-2">
-                <span class="bg-gray-100 px-2 py-0.5 rounded-full text-xs text-gray-400">
-                    {{ cat.topic_count }}
-                </span>
-
-                <!-- BOUTON ABONNEMENT -->
-                {% if request.user.is_authenticated %}
-                <div id="subscribe-btn-{{ cat.slug }}">
-                    {% if cat.id in user_subscriptions %}
-                        <form hx-post="{% url 'community:unsubscribe_category' cat.slug %}"
-                              hx-target="#subscribe-btn-{{ cat.slug }}"
-                              hx-swap="innerHTML"
-                              class="inline">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="text-xs px-2 py-1 rounded-full
-                                           bg-green-100 text-green-600 hover:bg-red-50 hover:text-red-600
-                                           transition-colors duration-200"
-                                    title="Se désabonner">
-                                <i class="fa-solid fa-check"></i>
-                            </button>
-                        </form>
-                    {% else %}
-                        <form hx-post="{% url 'community:subscribe_category' cat.slug %}"
-                              hx-target="#subscribe-btn-{{ cat.slug }}"
-                              hx-swap="innerHTML"
-                              class="inline">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="text-xs px-2 py-1 rounded-full
-                                           bg-gray-100 text-gray-400 hover:bg-primary-100 hover:text-primary-600
-                                           transition-colors duration-200"
-                                    title="S'abonner">
-                                <i class="fa-solid fa-plus"></i>
-                            </button>
-                        </form>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-            </div>
-
-        </div>
-        {% empty %}
-        <p class="text-gray-400 text-sm">Aucun domaine disponible.</p>
-        {% endfor %}
-
+<aside class="space-y-4">
+  <section class="rounded-[28px] border border-primary-100 bg-white p-5 shadow-sm">
+    <div class="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">À la une</p>
+        <h3 class="mt-1 text-lg font-bold text-slate-950">Sujets mis en avant</h3>
+      </div>
+      <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+        {{ featured_topics|length }} actifs
+      </span>
     </div>
 
-    <!-- LIEN VERS MES ABONNEMENTS -->
-    {% if request.user.is_authenticated %}
-    <div class="mt-4 pt-4 border-t border-gray-100">
-        <a href="{% url 'community:my_subscriptions' %}"
-           class="flex items-center justify-center gap-2 text-sm text-primary-600 hover:text-primary-800 transition">
-            <i class="fa-solid fa-bell"></i>
-            <span>Mes abonnements</span>
-        </a>
-    </div>
-    {% endif %}
-
-</div>
-
-
-<!-- ================= CONTRIBUTEURS STACK ================= -->
-<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg">
-
-    <!-- HEADER -->
-    <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-semibold text-primary-700 flex items-center gap-2">
-            <i class="fa-solid fa-medal text-secondary"></i>
-            Contributeurs actifs
-        </h3>
-
-        <a href="{% url 'community:members_list' %}"
-           class="text-primary-500 hover:text-secondary transition text-sm flex items-center gap-1">
-            Voir tous
-            <i class="fa-solid fa-arrow-right text-xs"></i>
-        </a>
-    </div>
-
-
-    <!-- AVATAR STACK -->
-    <div class="flex items-center relative">
-
-        {% for user in top_users|slice:":6" %}
-        <a href="{% url 'community:public_profile' user.username %}"
-           class="-ml-3 first:ml-0 relative group z-10 hover:z-20 transition-all duration-200">
-
-            <!-- Halo si utilisateur actif -->
-            {% if user.answer_count > 5 %}
-            <div class="absolute inset-0 rounded-full ring-2 ring-secondary"></div>
+    <div class="space-y-3">
+      {% for topic in featured_topics|slice:":4" %}
+        <a href="{% url 'community:topic_detail' topic.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+          <div class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">
+            {% if topic.category %}
+              <span class="rounded-full bg-white px-2 py-1 text-slate-700 shadow-sm">{{ topic.category.name }}</span>
             {% endif %}
+            {% if topic.is_pinned %}
+              <span class="rounded-full bg-amber-50 px-2 py-1 text-amber-700">Épinglé</span>
+            {% endif %}
+          </div>
+          <p class="mt-2 line-clamp-2 font-semibold text-slate-950">{{ topic.title }}</p>
+          <p class="mt-1 text-sm text-slate-500">
+            {{ topic.answer_count|default:0 }} réponse{{ topic.answer_count|default:0|pluralize }}
+            {% if topic.last_activity_at %} · {{ topic.last_activity_at|date:"d/m H:i" }}{% endif %}
+          </p>
+        </a>
+      {% empty %}
+        <div class="rounded-2xl border border-dashed border-primary-200 p-4 text-sm text-slate-500">
+          Aucun sujet épinglé pour le moment.
+        </div>
+      {% endfor %}
+    </div>
+  </section>
 
-            {% if user.profile.avatar %}
-                <!-- PHOTO UTILISATEUR -->
-                <img src="{{ user.profile.avatar.url }}"
-                     alt="{{ user.username }}"
-                     class="w-11 h-11 rounded-full border-2 border-white shadow-sm object-cover
-                            group-hover:scale-110 group-hover:shadow-md transition-all duration-200">
+  <section class="rounded-[28px] border border-primary-100 bg-white p-5 shadow-sm">
+    <div class="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Fraîcheur</p>
+        <h3 class="mt-1 text-lg font-bold text-slate-950">Dernières publications</h3>
+      </div>
+      <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+        {{ recent_topics|length }}
+      </span>
+    </div>
+
+    <div class="space-y-3">
+      {% for topic in recent_topics|slice:":4" %}
+        <a href="{% url 'community:topic_detail' topic.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+          <p class="line-clamp-2 font-medium text-slate-950">{{ topic.title }}</p>
+          <p class="mt-2 text-sm text-slate-500">
+            {% if topic.last_activity_at %}{{ topic.last_activity_at|date:"d/m H:i" }}{% else %}Nouvelle publication{% endif %}
+          </p>
+        </a>
+      {% empty %}
+        <div class="rounded-2xl border border-dashed border-primary-200 p-4 text-sm text-slate-500">
+          Les dernières publications apparaîtront ici.
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="rounded-[28px] border border-primary-100 bg-white p-5 shadow-sm">
+    <div class="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Tendance</p>
+        <h3 class="mt-1 text-lg font-bold text-slate-950">Ce qui bouge maintenant</h3>
+      </div>
+      <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+        {{ trending_topics|length }} sujets
+      </span>
+    </div>
+
+    <div class="space-y-3">
+      {% for topic in trending_topics|slice:":4" %}
+        <a href="{% url 'community:topic_detail' topic.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+          <div class="flex items-center justify-between gap-3">
+            <p class="line-clamp-2 font-medium text-slate-950">{{ topic.title }}</p>
+            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+              {{ topic.view_count|default:0 }} vues
+            </span>
+          </div>
+          <p class="mt-2 text-sm text-slate-500">
+            {{ topic.answer_count|default:0 }} réponse{{ topic.answer_count|default:0|pluralize }}
+          </p>
+        </a>
+      {% empty %}
+        <div class="rounded-2xl border border-dashed border-primary-200 p-4 text-sm text-slate-500">
+          Les sujets actifs apparaîtront ici.
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="rounded-[28px] border border-primary-100 bg-white p-5 shadow-sm">
+    <div class="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Sans réponse</p>
+        <h3 class="mt-1 text-lg font-bold text-slate-950">Sujets à débloquer</h3>
+      </div>
+      <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+        {{ unanswered_topics|length }} ouverts
+      </span>
+    </div>
+
+    <div class="space-y-3">
+      {% for topic in unanswered_topics|slice:":4" %}
+        <a href="{% url 'community:topic_detail' topic.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+          <p class="line-clamp-2 font-medium text-slate-950">{{ topic.title }}</p>
+          <p class="mt-2 text-sm text-slate-500">
+            Publié par {{ topic.author.get_full_name|default:topic.author.username }}
+          </p>
+        </a>
+      {% empty %}
+        <div class="rounded-2xl border border-dashed border-primary-200 p-4 text-sm text-slate-500">
+          Aucun sujet sans réponse pour l’instant.
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="rounded-[28px] border border-primary-100 bg-white p-5 shadow-sm">
+    <div class="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Contributeurs</p>
+        <h3 class="mt-1 text-lg font-bold text-slate-950">Profils actifs</h3>
+      </div>
+      <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+        {{ top_contributors|length }} membres
+      </span>
+    </div>
+
+    <div class="space-y-3">
+      {% for contributor in top_contributors|slice:":5" %}
+        <div class="flex items-center gap-3 rounded-2xl border border-primary-100 p-3">
+          <div class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-primary-600 text-sm font-semibold text-white">
+            {% if contributor.profile.avatar %}
+              <img src="{{ contributor.profile.avatar.url }}" alt="{{ contributor.get_full_name|default:contributor.username }}" class="h-full w-full object-cover" />
             {% else %}
-                <!-- FALLBACK LETTRE -->
-                <div class="w-11 h-11 rounded-full bg-gradient-to-br
-                            from-primary-100 to-primary-200
-                            border-2 border-white flex items-center justify-center
-                            text-primary-700 text-xs font-semibold shadow-sm
-                            group-hover:scale-110 group-hover:shadow-md transition-all duration-200">
-                    {{ user.username|first|upper }}
-                </div>
+              {{ contributor.get_full_name|default:contributor.username|slice:":1"|upper }}
             {% endif %}
-
-            <!-- TOOLTIP -->
-            <div class="absolute -bottom-9 left-1/2 -translate-x-1/2
-                        bg-primary-700 text-white text-[10px]
-                        px-2 py-1 rounded opacity-0
-                        group-hover:opacity-100 transition whitespace-nowrap shadow-md">
-                {{ user.username }} • {{ user.answer_count }} réponses
-            </div>
-
-        </a>
-        {% endfor %}
-
-
-        <!-- +X USERS -->
-        {% if top_users|length > 6 %}
-        <a href="{% url 'community:members_list' %}"
-           class="-ml-3 w-11 h-11 rounded-full bg-gray-100 border-2 border-white
-                  flex items-center justify-center text-xs text-gray-600 font-semibold shadow-sm
-                  hover:bg-gray-200 transition">
-
-            +{{ top_users|length|add:"-6" }}
-
-        </a>
-        {% endif %}
-
-    </div>
-
-
-    <!-- DESCRIPTION -->
-    <div class="mt-5 text-xs text-gray-400 flex items-center gap-2">
-        <i class="fa-solid fa-circle-info text-primary-300 text-[10px]"></i>
-        Cliquez sur un profil pour voir ses statistiques et contributions.
-    </div>
-
-</div>
-<!-- ================= TAGS POPULAIRES ================= -->
-<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg">
-
-    <h3 class="text-lg font-semibold text-primary-700 mb-6 flex items-center gap-2">
-        <i class="fa-solid fa-hashtag text-secondary"></i>
-        Tags populaires
-    </h3>
-
-    <div class="flex flex-wrap gap-2 text-xs">
-
-        {% for tag in popular_tags %}
-        <a hx-get="{% url 'community:topic_by_tag' tag.slug %}?sort={{ current_sort }}"
-           hx-target="#topic-list-container"
-           hx-swap="innerHTML"
-           hx-push-url="true"
-           class="bg-primary-50 text-primary-600 px-3 py-1 rounded-md
-                  hover:bg-primary-100 hover:text-secondary transition-all duration-200
-                  flex items-center gap-1 shadow-sm hover:shadow cursor-pointer">
-
-            <i class="fa-solid fa-tag text-[9px] opacity-70"></i>
-            <span>{{ tag.name }}</span>
-            <span class="bg-white text-gray-400 px-1 rounded text-[10px]">
-                {{ tag.topic_count }}
-            </span>
-
-        </a>
-        {% empty %}
-        <p class="text-gray-400 text-sm">Aucun tag populaire.</p>
-        {% endfor %}
-
-    </div>
-
-</div>
-
-
-
-<!-- ================= STATS GLOBALES ================= -->
-<div class="bg-white rounded-xl border border-primary-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg">
-
-    <h3 class="text-lg font-semibold text-primary-700 mb-6 flex items-center gap-2">
-        <i class="fa-solid fa-chart-line text-secondary"></i>
-        Activité
-    </h3>
-
-    <div class="space-y-4 text-sm">
-
-        <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2 text-gray-600">
-                <i class="fa-solid fa-comments text-primary-400 text-xs"></i>
-                Discussions
-            </span>
-            <span class="font-semibold text-primary-700">
-                {{ topics_total|default:topics|length }}
-            </span>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-medium text-slate-950">{{ contributor.get_full_name|default:contributor.username }}</p>
+            <p class="text-sm text-slate-500">{{ contributor.profile.reputation|default:0 }} points</p>
+          </div>
         </div>
-
-        <div class="flex items-center justify-between">
-            <span class="flex items-center gap-2 text-gray-600">
-                <i class="fa-solid fa-users text-primary-400 text-xs"></i>
-                Membres actifs
-            </span>
-            <span class="font-semibold text-primary-700">
-                {{ top_users|length }}
-            </span>
+      {% empty %}
+        <div class="rounded-2xl border border-dashed border-primary-200 p-4 text-sm text-slate-500">
+          Les contributeurs apparaîtront ici.
         </div>
-
+      {% endfor %}
     </div>
-
-</div>
-
-
-
-<!-- ================= À PROPOS ================= -->
-<div class="bg-gradient-to-br from-primary-50 to-white rounded-xl border border-primary-100 shadow-sm p-6">
-
-    <h3 class="text-lg font-semibold text-primary-700 mb-4 flex items-center gap-2">
-        <i class="fa-solid fa-circle-info text-secondary"></i>
-        À propos
-    </h3>
-
-    <p class="text-sm text-gray-600 leading-relaxed">
-        Plateforme académique dédiée à la validation scientifique,
-        à l'entraide professionnelle et à la diffusion rigoureuse du savoir clinique.
-    </p>
-
-    <div class="mt-5 text-xs text-gray-400 flex items-center gap-2">
-        <i class="fa-solid fa-shield-heart"></i>
-        Modération académique active & validation par les pairs
-    </div>
-
-</div>
+  </section>
+</aside>

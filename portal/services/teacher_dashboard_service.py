@@ -11,6 +11,8 @@ from django.utils import timezone
 from academics.models import AcademicClass, AcademicScheduleEvent, EC, ECChapter, ECContent, LessonLog, WeeklyScheduleSlot
 from academics.services.lesson_log_service import get_teacher_lesson_logs
 from academics.services.schedule_service import get_teacher_next_events, get_teacher_week_schedule
+from accounts.models import UserPreference
+from portal.models import AccountSupportState
 from students.models import Student
 from portal.models import TeacherDashboardPreference
 
@@ -694,6 +696,8 @@ def build_teacher_settings_context(request, *, branch, base_context_builder):
     teacher = request.user
     preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
     profile = getattr(teacher, "profile", None)
+    account_preference, _account_preference_created = UserPreference.objects.get_or_create(user=teacher)
+    support_state = AccountSupportState.objects.filter(user=teacher).first()
     status_summary = {
         "employment_status": getattr(profile, "get_employment_status_display", lambda: "Inconnu")(),
         "employee_code": getattr(profile, "employee_code", "") or "Non renseigne",
@@ -727,6 +731,26 @@ def build_teacher_settings_context(request, *, branch, base_context_builder):
         "dashboard_kind": "Enseignant",
         "branch": branch,
         "status_summary": status_summary,
+        "account_profile_summary": {
+            "phone": getattr(profile, "phone", "") or "Non renseigne",
+            "location": getattr(profile, "location", "") or "Non renseignee",
+            "address": getattr(profile, "address", "") or "Non renseignee",
+            "main_domain": getattr(profile, "main_domain", "") or "Non renseigne",
+            "bio": getattr(profile, "bio", "") or "",
+        },
+        "account_preference_summary": {
+            "notify_email": account_preference.notify_email,
+            "notify_in_app": account_preference.notify_in_app,
+            "notify_sms": account_preference.notify_sms,
+            "ui_compact_mode": account_preference.ui_compact_mode,
+            "ui_sidebar_collapsed": account_preference.ui_sidebar_collapsed,
+            "ui_autorefresh": account_preference.ui_autorefresh,
+        },
+        "account_security_summary": {
+            "is_suspended": getattr(support_state, "is_suspended", False),
+            "is_blocked": getattr(support_state, "is_blocked", False),
+            "must_change_password": getattr(support_state, "must_change_password", False),
+        },
         "teacher_dashboard_preference": serialize_teacher_dashboard_preference(preference),
         "teacher_preferences_choices": TeacherDashboardPreference.DEFAULT_SECTION_CHOICES,
         "teacher_settings_stats": {

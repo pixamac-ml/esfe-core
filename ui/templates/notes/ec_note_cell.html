@@ -15,6 +15,7 @@
       hx-target="closest tr"
       hx-swap="outerHTML"
       hx-vals='{"student_id": "{{ row.student_id }}"}'
+      {% if row.active_session_type == "retake" and not ec_row.is_retake_editable %}disabled title="Matiere validee en session normale"{% endif %}
     >
     <div class="score-meta">
       <span class="score-token normal"><span class="score-token-label">N</span><span class="score-token-value">{{ ec_row.normal_score_display|default:"0,00" }}</span></span>
@@ -24,6 +25,7 @@
       {% endif %}
     </div>
     {% if row.active_session_type == "retake" and ec_row.has_retake_score %}<span class="retake-badge">R</span>{% endif %}
+    {% if row.active_session_type == "retake" and not ec_row.is_retake_editable %}<span class="retake-badge" title="Non modifiable">-</span>{% endif %}
   </div>
   <input type="hidden" name="enrollment_id" value="{{ row.enrollment.id }}">
   <input type="hidden" name="ec_id" value="{{ ec_row.ec.id }}">

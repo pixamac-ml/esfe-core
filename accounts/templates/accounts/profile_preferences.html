@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="pt-24 pb-10 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6">
+    <a href="{% url 'accounts:profile' %}?tab=settings" class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition mb-6">
+      <i class="fa-solid fa-arrow-left"></i>
+      Retour aux parametres
+    </a>
+
+    <div class="rounded-2xl border border-white/20 bg-white/10 backdrop-blur p-6 md:p-7">
+      <p class="text-xs uppercase tracking-widest text-primary-200">Centre de preferences</p>
+      <h1 class="text-3xl font-bold mt-2">Notifications et interface</h1>
+      <p class="text-primary-100 mt-2 text-sm max-w-2xl">Ces reglages unifient les preferences transverses du compte sans remplacer les parametres metier de chaque workspace.</p>
+    </div>
+  </div>
+</section>
+
+<section class="bg-soft pb-16">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 -mt-4 space-y-6">
+    <div class="bg-white rounded-2xl border border-primary-100 shadow-xl p-5 sm:p-6 md:p-8">
+      {% if form.non_field_errors %}
+      <div class="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-sm mb-6">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <form method="post" class="space-y-8">
+        {% csrf_token %}
+
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800 mb-4">Notifications</h2>
+          <div class="space-y-4">
+            <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-white">
+              {{ form.notify_email }}
+              <span>
+                <span class="block font-medium text-gray-800">{{ form.notify_email.label }}</span>
+                <span class="block text-sm text-gray-500">Utilise l'adresse email du compte pour les alertes et suivis usuels.</span>
+              </span>
+            </label>
+
+            <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-white">
+              {{ form.notify_in_app }}
+              <span>
+                <span class="block font-medium text-gray-800">{{ form.notify_in_app.label }}</span>
+                <span class="block text-sm text-gray-500">Conserve les notifications visibles dans l'interface.</span>
+              </span>
+            </label>
+
+            <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-white">
+              {{ form.notify_sms }}
+              <span>
+                <span class="block font-medium text-gray-800">{{ form.notify_sms.label }}</span>
+                <span class="block text-sm text-gray-500">Reserve ce canal aux besoins critiques quand un numero est renseigne.</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800 mb-4">Interface</h2>
+          <div class="space-y-4">
+            <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-white">
+              {{ form.ui_sidebar_collapsed }}
+              <span>
+                <span class="block font-medium text-gray-800">{{ form.ui_sidebar_collapsed.label }}</span>
+                <span class="block text-sm text-gray-500">Utile pour les ecrans etroits ou les interfaces tres denses.</span>
+              </span>
+            </label>
+
+            <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-white">
+              {{ form.ui_compact_mode }}
+              <span>
+                <span class="block font-medium text-gray-800">{{ form.ui_compact_mode.label }}</span>
+                <span class="block text-sm text-gray-500">Reduit les espacements dans les cartes et tableaux quand le role le supporte.</span>
+              </span>
+            </label>
+
+            <label class="flex items-start gap-3 p-4 rounded-xl border border-gray-200 bg-white">
+              {{ form.ui_autorefresh }}
+              <span>
+                <span class="block font-medium text-gray-800">{{ form.ui_autorefresh.label }}</span>
+                <span class="block text-sm text-gray-500">Laisse les widgets compatibles se recharger automatiquement.</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-primary-100 flex flex-col sm:flex-row gap-3">
+          <button type="submit" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700 transition shadow-md">Enregistrer les preferences</button>
+          <a href="{% url 'accounts:profile' %}?tab=settings" class="w-full sm:w-auto text-center px-6 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition">Annuler</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-primary-100 shadow-sm p-5 sm:p-6">
+      <h2 class="text-lg font-semibold text-gray-800 mb-3">Etat de securite</h2>
+      {% if support_state %}
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+        <div class="rounded-xl border border-gray-200 p-4">
+          <div class="text-gray-500">Compte suspendu</div>
+          <div class="font-semibold text-gray-800 mt-1">{% if support_state.is_suspended %}Oui{% else %}Non{% endif %}</div>
+        </div>
+        <div class="rounded-xl border border-gray-200 p-4">
+          <div class="text-gray-500">Compte bloque</div>
+          <div class="font-semibold text-gray-800 mt-1">{% if support_state.is_blocked %}Oui{% else %}Non{% endif %}</div>
+        </div>
+        <div class="rounded-xl border border-gray-200 p-4">
+          <div class="text-gray-500">Mot de passe a changer</div>
+          <div class="font-semibold text-gray-800 mt-1">{% if support_state.must_change_password %}Oui{% else %}Non{% endif %}</div>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-sm text-gray-500">Aucun etat support specifique n'est enregistre pour ce compte.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% endblock %}

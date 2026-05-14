@@ -14,7 +14,7 @@ from students.models import Student, StudentAttendance, TeacherAttendance
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from formations.models import Programme, Cycle, Diploma, Filiere
-from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, ECChapter, ECContent, LessonLog, Semester, UE, WeeklyScheduleSlot
+from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, ECChapter, ECContent, ECGrade, LessonLog, Semester, UE, WeeklyScheduleSlot
 
 from accounts.access import (
 	can_access,
@@ -24,11 +24,11 @@ from accounts.access import (
 	get_user_role,
 	get_user_scope,
 )
-from accounts.models import BranchCashMovement, PayrollEntry
+from accounts.models import BranchCashMovement, PayrollEntry, UserPreference
 from communication.models import CommunicationNotification
 from portal.permissions import get_user_role as get_portal_user_role
 from portal.permissions import get_post_login_portal_url
-from portal.models import DirectorTeacherAssignment, SupportAuditLog, TeacherDashboardPreference
+from portal.models import AccountSupportState, DirectorTeacherAssignment, SupportAuditLog, TeacherDashboardPreference
 
 
 User = get_user_model()
@@ -850,10 +850,16 @@ class PortalPhaseOneTests(TestCase):
 		teacher = self._create_user("portal_teacher_settings", role="teacher", position="teacher")
 		self.client.force_login(teacher)
 
+		dashboard_response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+		self.assertEqual(dashboard_response.status_code, 200)
+		self.assertContains(dashboard_response, "Profil central, preferences, securite")
+		self.assertContains(dashboard_response, "Ouvrir Parametres")
+
 		response = self.client.get(reverse("accounts_portal:teacher_settings_workspace"))
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Tableau de bord enseignant")
 		self.assertContains(response, "Section d'ouverture")
+		self.assertContains(response, "Modifier le profil")
 
 		post_response = self.client.post(
 			reverse("accounts_portal:teacher_settings_workspace"),
@@ -1526,6 +1532,129 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, "Gestion des notes")
 		self.assertContains(response, f"Semestre {semester.number}")
 
+	def test_it_notes_workflow_publishes_normal_session_then_unlocks_retake_modal(self):
+		it_user = self._create_user("portal_it_notes_publish_normal", position="it_support")
+		student_user = self._create_user("portal_student_notes_normal", role="student")
+		student = self._create_student_record(student_user, inscription_status=Inscription.STATUS_ACTIVE)
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L2N")
+		semester = academic_class.semesters.get(number=1)
+		AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		enrollment = AcademicEnrollment.objects.get(student=student_user, academic_class=academic_class)
+		ECGrade.objects.create(enrollment=enrollment, ec=ec, normal_score=8, final_score=8, is_validated=False)
+		self.client.force_login(it_user)
+
+		response = self.client.post(
+			reverse("accounts_portal:it_notes_workflow_action"),
+			{
+				"class_id": academic_class.id,
+				"semester_id": semester.id,
+				"action": "publier_session_normale",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		semester.refresh_from_db()
+		self.assertEqual(semester.status, Semester.STATUS_NORMAL_LOCKED)
+		self.assertContains(response, "Session normale publiee")
+		self.assertContains(response, "Ouvrir rattrapage")
+
+		modal_response = self.client.get(
+			reverse("accounts_portal:it_notes_retake_modal"),
+			{"class_id": academic_class.id, "semester_id": semester.id},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(modal_response.status_code, 200)
+		self.assertContains(modal_response, "Verification avant activation")
+		self.assertContains(modal_response, student.full_name)
+		self.assertContains(modal_response, ec.title)
+
+	def test_it_notes_retake_edit_is_blocked_for_validated_subject(self):
+		it_user = self._create_user("portal_it_notes_retake_blocked", position="it_support")
+		student_user = self._create_user("portal_student_notes_retake", role="student")
+		student = self._create_student_record(student_user, inscription_status=Inscription.STATUS_ACTIVE)
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L2R")
+		semester = academic_class.semesters.get(number=1)
+		semester.status = Semester.STATUS_RETAKE_ENTRY
+		semester.save(update_fields=["status"])
+		AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		enrollment = AcademicEnrollment.objects.get(student=student_user, academic_class=academic_class)
+		ECGrade.objects.create(enrollment=enrollment, ec=ec, normal_score=13, final_score=13, is_validated=True)
+		self.client.force_login(it_user)
+
+		response = self.client.post(
+			reverse("accounts_portal:save_grade"),
+			{
+				"enrollment_id": enrollment.id,
+				"ec_id": ec.id,
+				"session_type": "retake",
+				"note": "15",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertContains(response, "Seules les matieres non validees peuvent etre modifiees au rattrapage.")
+
+	def test_it_structure_workspace_renders_academic_configuration_module(self):
+		it_user = self._create_user("portal_it_structure_workspace", position="it_support")
+		academic_year, academic_class, _ec = self._create_academic_class_bundle("L3IT")
+		self.client.force_login(it_user)
+
+		response = self.client.get(
+			reverse("accounts_portal:it_structure_workspace"),
+			{"class_id": academic_class.id},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Parametrage academique")
+		self.assertContains(response, "Classes, maquettes et affectations")
+		self.assertContains(response, academic_class.display_name)
+
+	def test_it_structure_action_can_create_academic_class(self):
+		it_user = self._create_user("portal_it_structure_create", position="it_support")
+		academic_year = AcademicYear.objects.create(
+			name="26-27-IT",
+			start_date="2026-10-01",
+			end_date="2027-07-31",
+			is_active=False,
+		)
+		self.client.force_login(it_user)
+
+		response = self.client.post(
+			reverse("accounts_portal:it_structure_action"),
+			{
+				"action": "save_class",
+				"programme_id": self.programme.id,
+				"academic_year_id": academic_year.id,
+				"level": "L4",
+				"validation_threshold": "10",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		created_class = AcademicClass.objects.get(programme=self.programme, academic_year=academic_year, level="L4", branch=self.branch)
+		self.assertContains(response, "Classe academique enregistree.")
+		self.assertTrue(created_class.semesters.filter(number=1).exists())
+		self.assertTrue(created_class.semesters.filter(number=2).exists())
+
 	def test_it_dashboard_can_toggle_scoped_staff_account(self):
 		it_user = self._create_user("portal_it_toggle", position="it_support")
 		target_user = self._create_user("portal_staff_target", position="secretary")
@@ -1849,4 +1978,149 @@ class FixUserPositionsCommandTests(TestCase):
 
 		user.refresh_from_db()
 		self.assertEqual(user.profile.position, "payment_agent")
+
+
+class ProfileCenterTests(TestCase):
+	def setUp(self):
+		self.user = USER_MANAGER.create_user(
+			username="profil_central",
+			email="profil_central@example.com",
+			password="pass1234",
+			first_name="Avant",
+			last_name="Profil",
+		)
+		self.cycle = Cycle.objects.create(
+			name="Licence Profil",
+			theme="primary",
+			min_duration_years=1,
+			max_duration_years=3,
+		)
+		self.diploma = Diploma.objects.create(name="Diplome Profil", level="superieur")
+		self.filiere = Filiere.objects.create(name="Filiere Profil")
+		self.branch = Branch.objects.create(
+			name="Annexe Profil Centre",
+			code="APC",
+			slug="annexe-profil-centre",
+		)
+		self.programme = Programme.objects.create(
+			title="Programme Profil Centre",
+			filiere=self.filiere,
+			cycle=self.cycle,
+			diploma_awarded=self.diploma,
+			duration_years=3,
+			short_description="Programme de test profil",
+			description="Programme de test profil",
+		)
+
+	def test_edit_profile_updates_identity_and_contact_fields(self):
+		self.client.force_login(self.user)
+
+		response = self.client.post(
+			reverse("accounts:edit_profile"),
+			{
+				"first_name": "Awa",
+				"last_name": "Traore",
+				"bio": "Responsable de parcours",
+				"location": "Bamako",
+				"phone": "+22370000000",
+				"address": "Hamdallaye ACI",
+				"main_domain": "Administration",
+				"website": "https://esfe.example.com",
+			},
+		)
+
+		self.assertRedirects(response, reverse("accounts:profile"), fetch_redirect_response=False)
+		self.user.refresh_from_db()
+		self.assertEqual(self.user.first_name, "Awa")
+		self.assertEqual(self.user.last_name, "Traore")
+		self.assertEqual(self.user.profile.phone, "+22370000000")
+		self.assertEqual(self.user.profile.address, "Hamdallaye ACI")
+		self.assertEqual(self.user.profile.main_domain, "Administration")
+
+	def test_edit_preferences_creates_and_updates_unified_preferences(self):
+		self.client.force_login(self.user)
+		AccountSupportState.objects.create(
+			user=self.user,
+			is_blocked=True,
+			must_change_password=True,
+		)
+
+		response = self.client.post(
+			reverse("accounts:edit_preferences"),
+			{
+				"notify_email": "on",
+				"notify_in_app": "on",
+				"ui_compact_mode": "on",
+			},
+		)
+
+		self.assertRedirects(response, reverse("accounts:edit_preferences"), fetch_redirect_response=False)
+		preference = UserPreference.objects.get(user=self.user)
+		self.assertTrue(preference.notify_email)
+		self.assertTrue(preference.notify_in_app)
+		self.assertFalse(preference.notify_sms)
+		self.assertFalse(preference.ui_sidebar_collapsed)
+		self.assertTrue(preference.ui_compact_mode)
+		self.assertFalse(preference.ui_autorefresh)
+
+	def test_profile_settings_htmx_renders_preference_summary(self):
+		self.client.force_login(self.user)
+		UserPreference.objects.create(
+			user=self.user,
+			notify_email=False,
+			notify_in_app=True,
+			ui_compact_mode=True,
+		)
+		self.user.profile.phone = "65000000"
+		self.user.profile.address = "Kalaban"
+		self.user.profile.save(update_fields=["phone", "address", "updated_at"])
+
+		response = self.client.get(
+			reverse("accounts:profile_settings"),
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Notifications et interface")
+		self.assertContains(response, "65000000")
+		self.assertContains(response, "Kalaban")
+
+	def test_student_settings_updates_central_phone_profile(self):
+		self.user.profile.role = "student"
+		self.user.profile.save(update_fields=["role", "updated_at"])
+		candidature = Candidature.objects.create(
+			first_name="Avant",
+			last_name="Profil",
+			birth_date="2001-01-01",
+			birth_place="Bamako",
+			gender="male",
+			email=self.user.email,
+			phone="61000000",
+			programme=self.programme,
+			branch=self.branch,
+			academic_year="2025-2026",
+			status="accepted",
+		)
+		inscription = Inscription.objects.create(
+			candidature=candidature,
+			amount_due=100000,
+			status=Inscription.STATUS_ACTIVE,
+		)
+		Student.objects.create(user=self.user, inscription=inscription, matricule="MAT-PC-001")
+		self.client.force_login(self.user)
+
+		response = self.client.post(
+			reverse("portal_student:update_settings_profile"),
+			{
+				"email": "profil_central@example.com",
+				"phone": "+22376123456",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.user.refresh_from_db()
+		candidature.refresh_from_db()
+		self.assertEqual(candidature.phone, "+22376123456")
+		self.assertEqual(self.user.profile.phone, "+22376123456")
 

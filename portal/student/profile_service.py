@@ -4,8 +4,11 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.urls import reverse
 
 from admissions.models import CandidatureDocument
+from accounts.models import Profile, UserPreference
+from portal.models import AccountSupportState
 from portal.student.widgets.academics import get_student_academic_snapshot
 
 
@@ -159,6 +162,32 @@ def get_profile_data(user):
     enrollment = context.enrollment
     completion = get_profile_completion(user)
     documents = get_student_documents(user)
+    profile, _created = Profile.objects.get_or_create(user=user)
+    preference, _preference_created = UserPreference.objects.get_or_create(user=user)
+    support_state = AccountSupportState.objects.filter(user=user).first()
+
+    account_center = {
+        "full_name": user.get_full_name() or user.username,
+        "email": user.email or "",
+        "phone": profile.phone or "",
+        "location": profile.location or "",
+        "address": profile.address or "",
+        "avatar_url": profile.avatar_url,
+        "bio": profile.bio or "",
+        "main_domain": profile.main_domain or "",
+        "notify_email": preference.notify_email,
+        "notify_in_app": preference.notify_in_app,
+        "notify_sms": preference.notify_sms,
+        "ui_compact_mode": preference.ui_compact_mode,
+        "ui_sidebar_collapsed": preference.ui_sidebar_collapsed,
+        "must_change_password": getattr(support_state, "must_change_password", False),
+        "is_blocked": getattr(support_state, "is_blocked", False),
+        "is_suspended": getattr(support_state, "is_suspended", False),
+        "profile_url": reverse("accounts:profile"),
+        "edit_profile_url": reverse("accounts:edit_profile"),
+        "edit_preferences_url": reverse("accounts:edit_preferences"),
+        "password_change_url": reverse("password_change"),
+    }
 
     if student is None or candidature is None:
         return {
@@ -168,6 +197,7 @@ def get_profile_data(user):
             "documents": [],
             "completion": completion,
             "alerts": completion["missing_fields"],
+            "account_center": account_center,
         }
 
     return {
@@ -193,6 +223,7 @@ def get_profile_data(user):
         "documents": documents,
         "completion": completion,
         "alerts": completion["missing_fields"],
+        "account_center": account_center,
     }
 
 
@@ -231,6 +262,9 @@ def update_editable_fields(user, data):
         user.save(update_fields=["email"])
     if "phone" in cleaned:
         candidature.phone = cleaned["phone"]
+        profile, _created = Profile.objects.get_or_create(user=user)
+        profile.phone = cleaned["phone"]
+        profile.save(update_fields=["phone", "updated_at"])
 
     candidature.save(update_fields=["email", "phone", "updated_at"])
     return get_profile_data(user)

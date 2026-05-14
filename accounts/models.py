@@ -138,6 +138,19 @@ class Profile(models.Model):
         db_index=True,
     )
 
+    phone = models.CharField(
+        max_length=30,
+        blank=True,
+        db_index=True,
+        help_text="Numero de contact principal de l'utilisateur.",
+    )
+
+    address = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Adresse postale ou administrative principale.",
+    )
+
     website = models.URLField(blank=True)
 
     main_domain = models.CharField(
@@ -200,6 +213,29 @@ class Profile(models.Model):
     @property
     def is_teacher(self):
         return self.role == "teacher"
+
+
+class UserPreference(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="user_preference",
+        db_index=True,
+    )
+    notify_email = models.BooleanField(default=True)
+    notify_in_app = models.BooleanField(default=True)
+    notify_sms = models.BooleanField(default=False)
+    ui_sidebar_collapsed = models.BooleanField(default=False)
+    ui_compact_mode = models.BooleanField(default=False)
+    ui_autorefresh = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Preference utilisateur"
+        verbose_name_plural = "Preferences utilisateurs"
+
+    def __str__(self):
+        return f"Preferences de {self.user.username}"
 
 
 class PayrollEntry(models.Model):

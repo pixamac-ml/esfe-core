@@ -1,0 +1,84 @@
+<div class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4" onclick="if(event.target===this){this.innerHTML='';}">
+  <div class="w-full max-w-4xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+    <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+      <div>
+        <p class="text-[11px] font-black uppercase tracking-[0.24em] text-blue-600">Rattrapage</p>
+        <h3 class="mt-1 text-2xl font-black text-slate-900">Verification avant activation</h3>
+        <p class="mt-2 text-sm font-semibold text-slate-500">
+          {% if academic_class and semester %}
+            {{ academic_class.display_name }} · Semestre {{ semester.number }}
+          {% else %}
+            Selection incomplete
+          {% endif %}
+        </p>
+      </div>
+      <button type="button" class="rounded-full border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600" onclick="document.getElementById('it-modal-root').innerHTML=''">Fermer</button>
+    </div>
+
+    <div class="grid gap-4 border-b border-slate-200 bg-slate-50 px-6 py-5 md:grid-cols-3">
+      <article class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Etudiants concernes</p>
+        <p class="mt-2 text-3xl font-black text-slate-900">{{ candidates|length }}</p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Matieres a reprendre</p>
+        <p class="mt-2 text-3xl font-black text-slate-900">{{ subject_count }}</p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Etat actuel</p>
+        <p class="mt-2 text-lg font-black text-slate-900">{{ state.label|default:"Indisponible" }}</p>
+      </article>
+    </div>
+
+    <div class="max-h-[55vh] space-y-4 overflow-y-auto px-6 py-5">
+      {% if candidates %}
+        {% for candidate in candidates %}
+          <article class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h4 class="text-base font-black text-slate-900">{{ candidate.student_name }}</h4>
+                <p class="mt-1 text-sm font-semibold text-slate-500">Moyenne actuelle: {{ candidate.average|default:"-" }}</p>
+              </div>
+              <span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                {{ candidate.failed_subjects|length }} matiere(s)
+              </span>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              {% for subject in candidate.failed_subjects %}
+                <span class="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                  {{ subject.ue_code }} · {{ subject.ec_title }} · N {{ subject.normal_score|default:"-" }}
+                </span>
+              {% endfor %}
+            </div>
+          </article>
+        {% endfor %}
+      {% else %}
+        <div class="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-6 text-sm font-semibold text-emerald-700">
+          Aucun etudiant n'est actuellement concerne par le rattrapage.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-6 py-5">
+      <p class="text-sm font-semibold text-slate-500">Les notes normales restent visibles. Seules les notes de rattrapage seront ensuite modifiables.</p>
+      {% if candidates %}
+        <form
+          method="post"
+          action="{% url 'accounts_portal:it_notes_workflow_action' %}"
+          hx-post="{% url 'accounts_portal:it_notes_workflow_action' %}"
+          hx-target="#it-workspace"
+          hx-swap="innerHTML"
+          hx-on::after-request="if(event.detail.successful){document.getElementById('it-modal-root').innerHTML='';}"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="class_id" value="{{ academic_class.id }}">
+          <input type="hidden" name="semester_id" value="{{ semester.id }}">
+          <input type="hidden" name="action" value="activer_rattrapage">
+          <button type="submit" class="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white">
+            Activer rattrapage
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>

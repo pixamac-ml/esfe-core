@@ -1,106 +1,274 @@
-Analyse entièrement le projet Django avant toute modification.
+CONTEXTE :
 
-Objectif : corriger et renforcer le workflow planning côté Directeur des Études pour éviter toute duplication d’emploi du temps avec le Surveillant Général.
+Projet Django : Félix Santé
 
-RÈGLE MÉTIER ABSOLUE :
-Il ne doit jamais exister deux plannings concurrents pour la même classe, la même semaine ou la même période.
-Le planning est unique, partagé et officiel.
-Le Surveillant Général et le Directeur des Études doivent travailler sur la même source de données.
+Le dashboard informaticien et le système de notes EXISTENT déjà et sont STABLES.
 
-Contexte métier :
-Dans l’école, le Surveillant Général et le Directeur des Études interviennent tous les deux sur l’emploi du temps.
-Le Surveillant Général peut préparer la grille hebdomadaire, créer les créneaux, gérer les salles et organiser les classes.
-Le Directeur des Études peut programmer les enseignants, affecter les cours, compléter les heures pédagogiques, vérifier les disponibilités et éviter les chevauchements.
-Mais les deux doivent toujours manipuler le même planning officiel.
+IMPORTANT :
+NE PAS refaire le module notes.
+NE PAS casser les templates existants.
+NE PAS modifier les calculs métiers existants.
+NE PAS toucher compute_semester_result.
 
-À FAIRE :
+Objectif :
+ENRICHIR le système actuel.
 
-1. Auditer l’existant
-- Vérifier les modèles liés au planning, créneaux, classes, salles, enseignants, affectations, matières/EC, semaines et mois.
-- Identifier si le dashboard directeur crée une copie ou un planning séparé.
-- Identifier les vues, services, selectors, urls et templates déjà branchés récemment :
-  - portal/urls.py
-  - portal/views/views.py
-  - templates/portal/staff/director/partials/workspace.html
-  - templates/portal/staff/director/modals/teacher_assign_modal.html
-  - templates/portal/staff/supervisor/partials/planner_class_hub.html
-  - templates/portal/staff/supervisor/partials/planner_view_workspace.html
-  - templates/portal/staff/supervisor/partials/planner_workspace.html
-  - templates/portal/staff/supervisor/partials/weekly_slots_workspace.html
+---
 
-2. Corriger l’architecture fonctionnelle
-- Le Directeur des Études doit ouvrir le planning existant de la classe.
-- S’il existe déjà une grille hebdomadaire ou mensuelle pour la classe, il doit la réutiliser.
-- S’il n’existe aucune grille, il peut initialiser une grille officielle, mais sans créer de doublon.
-- La clé logique doit être : branch/annexe + classe + année académique + semaine/période.
-- Toute création doit passer par un service centralisé qui fait get_or_create proprement.
+PARTIE 1 — WORKFLOW SESSION NORMALE / RATTRAPAGE
 
-3. Empêcher les chevauchements
-Avant de programmer un enseignant, vérifier :
-- que la classe est libre sur ce créneau ;
-- que la salle est libre sur ce créneau ;
-- que l’enseignant est libre sur ce créneau ;
-- que l’EC/cours correspond bien à l’affectation pédagogique ;
-- que le nombre d’heures planifiées ne dépasse pas les heures prévues pour l’affectation si cette règle existe déjà.
+Le système actuel permet déjà :
 
-Si conflit :
-- ne pas enregistrer ;
-- retourner une erreur claire dans l’interface HTMX ;
-- indiquer précisément le conflit : classe occupée, salle occupée, enseignant déjà programmé, ou heures dépassées.
+- saisie notes
+- calculs
+- relevés
+- exports
 
-4. Interface directeur
-Dans le dashboard directeur :
-- afficher l’emploi du temps officiel de la classe ;
-- distinguer visuellement les créneaux occupés et libres ;
-- permettre de cliquer sur un créneau libre pour programmer un enseignant ;
-- préremplir le formulaire avec la classe, la semaine, la salle ou le créneau si disponible ;
-- afficher les affectations existantes de l’enseignant ;
-- permettre une génération semaine/mois uniquement sur la base du planning officiel partagé.
+Mais il manque le workflow métier de publication.
 
-5. Impression
-Ajouter une fonctionnalité d’impression professionnelle :
-- imprimer l’emploi du temps d’une classe ;
-- imprimer l’emploi du temps d’un enseignant ;
-- imprimer la semaine ;
-- imprimer le mois si la génération mensuelle existe déjà ;
-- prévoir une vue/template print propre, sans sidebar ni dashboard ;
-- ajouter un bouton “Imprimer” dans l’espace planning.
+---
 
-6. Dashboard enseignant
-Préparer les données pour que le dashboard enseignant puisse ensuite afficher uniquement :
-- ses cours planifiés ;
-- ses créneaux de la semaine ;
-- ses salles ;
-- ses classes ;
-- ses horaires ;
-- sans voir tout le planning général.
+OBJECTIF :
 
-Ne pas encore refaire tout le dashboard enseignant, mais structurer les selectors/services pour qu’il puisse consommer ces données proprement.
+Ajouter un workflow intelligent :
 
-7. Contraintes techniques
-- Respecter l’architecture existante.
-- Ne pas mettre de logique métier lourde dans les templates.
-- Utiliser services.py et selectors.py si disponibles.
-- Garder les vues minces.
-- Respecter le filtrage par branch/annexe.
-- Ne pas casser le workflow du Surveillant Général.
-- Ne pas dupliquer les templates inutilement : rendre les partials réutilisables entre surveillant/directeur quand c’est logique.
-- Utiliser HTMX pour les chargements dynamiques.
-- Ajouter ou corriger les tests nécessaires.
+1. Session normale
+2. Publication session normale
+3. Ouverture rattrapage
+4. Publication finale
 
-8. Tests obligatoires
-Ajouter ou corriger des tests pour vérifier :
-- le directeur ouvre le planning officiel existant d’une classe ;
-- le directeur ne crée pas un second planning pour la même classe/semaine ;
-- un enseignant ne peut pas être programmé sur deux créneaux qui se chevauchent ;
-- une salle ne peut pas être utilisée par deux classes au même moment ;
-- une classe ne peut pas avoir deux cours au même moment ;
-- le directeur peut programmer un enseignant dans un créneau libre ;
-- l’impression d’un emploi du temps classe fonctionne ;
-- l’impression d’un emploi du temps enseignant fonctionne.
+---
 
-Commande de test attendue :
-python manage.py test accounts.tests.PortalPhaseOneTests --verbosity 2
+RÈGLES MÉTIER :
 
-Résultat attendu :
-Un workflow planning unique, partagé, propre, sans duplication entre Directeur des Études et Surveillant Général, avec programmation intelligente des enseignants, prévention des conflits et impression des emplois du temps.
+SESSION NORMALE :
+
+- les notes sont saisies normalement
+- quand terminé :
+    bouton :
+    "Publier session normale"
+
+ACTION :
+
+- verrouiller session normale
+- afficher résultats session normale
+- débloquer session rattrapage
+
+---
+
+SESSION RATTRAPAGE :
+
+Le système doit :
+
+- conserver les notes normales visibles
+- détecter automatiquement :
+    → étudiants non validés
+    → matières non validées
+
+Créer automatiquement une liste :
+
+[
+    {
+        student,
+        failed_subjects,
+    }
+]
+
+---
+
+INTERFACE :
+
+Quand on clique :
+
+"Ouvrir rattrapage"
+
+Afficher modal HTMX moderne :
+
+- liste étudiants concernés
+- matières concernées
+- statistiques rapides
+
+Puis :
+
+bouton :
+"Activer rattrapage"
+
+---
+
+APRÈS ACTIVATION :
+
+- la zone rattrapage devient éditable
+- les notes normales restent visibles
+- seules les notes rattrapage sont modifiables
+
+---
+
+PUBLICATION FINALE :
+
+Quand terminé :
+
+bouton :
+"Publier résultats finaux"
+
+ACTION :
+
+- recalcul final
+- génération relevés
+- déblocage exports PDF
+- déblocage relevés individuels
+
+---
+
+IMPORTANT :
+
+- aucun relevé téléchargeable avant publication finale
+- aucun export avant publication finale
+
+---
+
+PARTIE 2 — PARAMÉTRAGE ACADÉMIQUE
+
+Créer une NOUVELLE SECTION indépendante dans le dashboard informaticien :
+
+"Paramétrage académique"
+
+ATTENTION :
+Cette section est indépendante du module notes existant.
+
+NE PAS mélanger.
+
+---
+
+OBJECTIF :
+
+Permettre à l’informaticien de gérer :
+
+- classes
+- UE
+- EC/matières
+- seuils validation
+- coefficients
+- crédits
+- affectation étudiants
+
+---
+
+UI DEMANDÉE :
+
+- tableaux modernes style Excel
+- HTMX
+- modales professionnelles
+- CRUD fluide
+- responsive
+
+UTILISER :
+- modales
+- tableaux stylisés
+- actions inline
+
+PAS :
+- pages lourdes
+- vieux formulaires Django admin
+
+---
+
+FONCTIONNALITÉS :
+
+1. Gestion classes
+
+- créer classe
+- modifier classe
+- archiver classe
+- définir seuil validation
+
+Le seuil validation est STOCKÉ PAR CLASSE.
+
+---
+
+2. Gestion matières / EC
+
+- ajouter matière
+- modifier matière
+- supprimer matière
+- définir :
+    → coefficient
+    → crédit requis
+
+---
+
+3. Gestion UE
+
+- créer UE
+- modifier UE
+- rattacher matières
+
+---
+
+4. Affectation étudiants
+
+Afficher :
+
+- étudiants sans classe
+- affecter étudiant à une classe
+
+Interface simple avec tableau + modal.
+
+---
+
+CONTRAINTES TECHNIQUES :
+
+- utiliser services.py
+- utiliser HTMX
+- garder views légères
+- logique métier séparée
+- aucun calcul dans templates
+
+---
+
+STYLE UI :
+
+Inspirations :
+- Notion
+- Airtable
+- ERP moderne
+- tableaux Excel premium
+
+---
+
+IMPORTANT :
+
+NE PAS TOUCHER :
+
+- module notes existant
+- calculs existants
+- relevés existants
+- exports existants
+
+UNIQUEMENT ENRICHIR.
+
+---
+
+FORMAT DE SORTIE :
+
+- fichiers modifiés
+- nouveaux services
+- nouveaux templates
+- nouvelles modales
+- urls
+- views
+
+avec commentaires clairs.
+
+---
+
+OBJECTIF FINAL :
+
+Transformer le dashboard informaticien en :
+
+- centre de contrôle académique
+- gestionnaire workflow notes
+- gestionnaire maquettes
+- gestionnaire classes
+- gestionnaire rattrapage
+
+sans casser le système actuel.

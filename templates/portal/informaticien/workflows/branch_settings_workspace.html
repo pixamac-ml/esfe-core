@@ -4,9 +4,17 @@
     <div>
       <p class="workflow-kicker">Parametres</p>
       <h3>{{ request.user.get_full_name|default:request.user.username }}</h3>
-      <p>Profil utilisateur, securite, apparence et informations personnelles.</p>
+      <p>Profil, securite et parametres d'annexe dans un seul panneau.</p>
     </div>
     <span>{{ branch.name|default:"Annexe" }}</span>
+  </div>
+
+  <div class="workflow-actions">
+    <button type="button" class="workflow-btn workflow-btn-primary" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+      Modifier mon profil
+    </button>
+    <a class="workflow-btn workflow-btn-secondary" href="{% url 'accounts:edit_preferences' %}">Preferences communes</a>
+    <a class="workflow-btn workflow-btn-secondary" href="{% url 'password_change' %}">Mot de passe</a>
   </div>
 
   <div class="workflow-table-shell">
@@ -44,11 +52,30 @@
   </div>
 
   <section class="workflow-table-shell">
-    <div class="workflow-table-head"><div><p class="workflow-kicker">Informations personnelles</p><h3>Profil staff</h3></div></div>
+    <div class="workflow-table-head"><div><p class="workflow-kicker">Profil staff</p><h3>Resume utile</h3></div></div>
     <div class="workflow-list">
       <article><div><strong>Annexe</strong><span>{{ profile.branch.name|default:"Non rattache" }}</span></div></article>
       <article><div><strong>Poste</strong><span>{{ profile.get_position_display|default:"Informaticien" }}</span></div></article>
       <article><div><strong>Salaire</strong><span>{% if profile.salary_base %}{{ profile.salary_base }} FCFA{% else %}Non renseigne{% endif %}</span></div></article>
     </div>
+  </section>
+
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head"><div><p class="workflow-kicker">Annexe</p><h3>Reglages techniques essentiels</h3></div></div>
+    <form method="post" hx-post="{% url 'accounts_portal:it_branch_settings_save' %}" hx-target="#it-workspace" hx-swap="innerHTML" class="workflow-context">
+      {% csrf_token %}
+      <label>Seuil validation
+        <input name="validation_threshold" type="number" min="0" value="{{ settings.validation_threshold|default:'' }}">
+      </label>
+      <label>Annee academique active
+        <input name="active_academic_year" value="{{ settings.active_academic_year|default:'' }}">
+      </label>
+      <label style="grid-column: 1 / -1;">Configuration locale (JSON)
+        <input name="local_config" value="{{ settings.local_config|default:'' }}">
+      </label>
+      <div style="grid-column: 1 / -1; display:flex; justify-content:flex-end;">
+        <button class="workflow-btn workflow-btn-primary" type="submit">Enregistrer les parametres d'annexe</button>
+      </div>
+    </form>
   </section>
 </section>

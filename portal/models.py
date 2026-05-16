@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from academics.models import AcademicClass, EC
+from academics.models import AcademicClass, AcademicYear, EC
 from branches.models import Branch
 
 
@@ -228,6 +228,75 @@ class SupportTicketComment(models.Model):
 
     def __str__(self):
         return f"Commentaire ticket #{self.ticket_id}"
+
+
+class ArchiveBatch(models.Model):
+    TYPE_CLASS = "class"
+    TYPE_YEAR = "year"
+    TYPE_CHOICES = [
+        (TYPE_CLASS, "Classe"),
+        (TYPE_YEAR, "Annee academique"),
+    ]
+
+    STATUS_ARCHIVED = "archived"
+    STATUS_RESTORED = "restored"
+    STATUS_CHOICES = [
+        (STATUS_ARCHIVED, "Archivee"),
+        (STATUS_RESTORED, "Restauree"),
+    ]
+
+    archive_type = models.CharField(max_length=20, choices=TYPE_CHOICES, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ARCHIVED, db_index=True)
+    branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="archive_batches", db_index=True)
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.PROTECT,
+        related_name="archive_batches",
+        db_index=True,
+    )
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="archive_batches",
+    )
+    reason = models.TextField()
+    snapshot = models.JSONField(default=dict, blank=True)
+    classes_count = models.PositiveIntegerField(default=0)
+    enrollments_count = models.PositiveIntegerField(default=0)
+    inscriptions_count = models.PositiveIntegerField(default=0)
+    students_count = models.PositiveIntegerField(default=0)
+    grades_count = models.PositiveIntegerField(default=0)
+    payments_count = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_archive_batches",
+    )
+    restored_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="restored_archive_batches",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    restored_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Lot d'archivage"
+        verbose_name_plural = "Lots d'archivage"
+        indexes = [
+            models.Index(fields=["branch", "status", "created_at"], name="portal_arch_branch__a07eb8_idx"),
+            models.Index(fields=["academic_year", "status"], name="portal_arch_academi_0f41bc_idx"),
+            models.Index(fields=["archive_type", "status"], name="portal_arch_archive_735844_idx"),
+        ]
+
+    def __str__(self):
+        class_label = f" - {self.academic_class}" if self.academic_class_id else ""
+        return f"{self.get_archive_type_display()} {self.academic_year}{class_label}"
 
 
 class AccountSupportState(models.Model):

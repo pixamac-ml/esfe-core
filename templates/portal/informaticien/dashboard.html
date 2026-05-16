@@ -191,6 +191,7 @@
         { key: 'notes', label: 'Notes & Resultats', icon: 'file-spreadsheet', kicker: 'Classe -> Semestre -> Etat -> Action' },
         { key: 'structure', label: 'Parametrage academique', icon: 'blocks', kicker: 'Classes -> UE -> EC -> Affectations' },
         { key: 'import', label: 'Import / export', icon: 'upload-cloud', kicker: 'Excel notes et export classe' },
+        { key: 'archives', label: 'Archives', icon: 'folder-archive', kicker: 'Annees, classes et dossiers consultables' },
         { key: 'cards', label: 'Cartes etudiants', icon: 'badge', kicker: 'Classe -> Etudiant -> PDF' },
         { key: 'accounts', label: 'Utilisateurs', icon: 'shield-check', kicker: 'Utilisateur -> Etat compte -> Action' },
         { key: 'support', label: 'Support', icon: 'life-buoy', kicker: 'Tickets de l annexe' },
@@ -202,6 +203,7 @@
         this.applyTheme();
         this.$nextTick(() => this.renderIcons());
         document.body.addEventListener('htmx:afterSwap', () => this.renderIcons());
+        document.body.addEventListener('it-modal-close', () => this.closeModal());
       },
       currentModule() {
         return this.modules.find((item) => item.key === this.activeModule) || this.modules[0];
@@ -214,11 +216,13 @@
       },
       openModule(moduleKey) {
         this.activeModule = moduleKey;
+        this.closeModal();
         const urls = {
           home: "{% url 'accounts_portal:it_home_workspace' %}",
           notes: "{% url 'accounts_portal:it_notes_flow_workspace' %}",
           structure: "{% url 'accounts_portal:it_structure_workspace' %}",
           import: "{% url 'accounts_portal:it_import_workspace' %}",
+          archives: "{% url 'accounts_portal:it_archives_workspace' %}",
           accounts: "{% url 'accounts_portal:it_accounts_flow_workspace' %}",
           cards: "{% url 'accounts_portal:it_cards_workspace' %}",
           support: "{% url 'accounts_portal:it_support_flow_workspace' %}",
@@ -244,6 +248,12 @@
       renderIcons() {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();
+        }
+      },
+      closeModal() {
+        const modalRoot = document.getElementById('it-modal-root');
+        if (modalRoot) {
+          modalRoot.innerHTML = '';
         }
       },
     };

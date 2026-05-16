@@ -1,274 +1,912 @@
-CONTEXTE :
-
-Projet Django : Félix Santé
-
-Le dashboard informaticien et le système de notes EXISTENT déjà et sont STABLES.
-
-IMPORTANT :
-NE PAS refaire le module notes.
-NE PAS casser les templates existants.
-NE PAS modifier les calculs métiers existants.
-NE PAS toucher compute_semester_result.
-
-Objectif :
-ENRICHIR le système actuel.
-
----
-
-PARTIE 1 — WORKFLOW SESSION NORMALE / RATTRAPAGE
-
-Le système actuel permet déjà :
-
-- saisie notes
-- calculs
-- relevés
-- exports
-
-Mais il manque le workflow métier de publication.
-
----
-
-OBJECTIF :
-
-Ajouter un workflow intelligent :
-
-1. Session normale
-2. Publication session normale
-3. Ouverture rattrapage
-4. Publication finale
-
----
-
-RÈGLES MÉTIER :
-
-SESSION NORMALE :
-
-- les notes sont saisies normalement
-- quand terminé :
-    bouton :
-    "Publier session normale"
-
-ACTION :
-
-- verrouiller session normale
-- afficher résultats session normale
-- débloquer session rattrapage
-
----
-
-SESSION RATTRAPAGE :
-
-Le système doit :
-
-- conserver les notes normales visibles
-- détecter automatiquement :
-    → étudiants non validés
-    → matières non validées
-
-Créer automatiquement une liste :
-
-[
-    {
-        student,
-        failed_subjects,
-    }
-]
-
----
-
-INTERFACE :
-
-Quand on clique :
-
-"Ouvrir rattrapage"
-
-Afficher modal HTMX moderne :
-
-- liste étudiants concernés
-- matières concernées
-- statistiques rapides
-
-Puis :
-
-bouton :
-"Activer rattrapage"
-
----
-
-APRÈS ACTIVATION :
-
-- la zone rattrapage devient éditable
-- les notes normales restent visibles
-- seules les notes rattrapage sont modifiables
-
----
-
-PUBLICATION FINALE :
-
-Quand terminé :
-
-bouton :
-"Publier résultats finaux"
-
-ACTION :
-
-- recalcul final
-- génération relevés
-- déblocage exports PDF
-- déblocage relevés individuels
-
----
-
-IMPORTANT :
-
-- aucun relevé téléchargeable avant publication finale
-- aucun export avant publication finale
-
----
-
-PARTIE 2 — PARAMÉTRAGE ACADÉMIQUE
-
-Créer une NOUVELLE SECTION indépendante dans le dashboard informaticien :
-
-"Paramétrage académique"
-
-ATTENTION :
-Cette section est indépendante du module notes existant.
-
-NE PAS mélanger.
-
----
-
-OBJECTIF :
-
-Permettre à l’informaticien de gérer :
-
-- classes
-- UE
-- EC/matières
-- seuils validation
-- coefficients
-- crédits
-- affectation étudiants
-
----
-
-UI DEMANDÉE :
-
-- tableaux modernes style Excel
-- HTMX
-- modales professionnelles
-- CRUD fluide
-- responsive
-
-UTILISER :
-- modales
-- tableaux stylisés
-- actions inline
-
-PAS :
-- pages lourdes
-- vieux formulaires Django admin
-
----
-
-FONCTIONNALITÉS :
-
-1. Gestion classes
-
-- créer classe
-- modifier classe
-- archiver classe
-- définir seuil validation
-
-Le seuil validation est STOCKÉ PAR CLASSE.
-
----
-
-2. Gestion matières / EC
-
-- ajouter matière
-- modifier matière
-- supprimer matière
-- définir :
-    → coefficient
-    → crédit requis
-
----
-
-3. Gestion UE
-
-- créer UE
-- modifier UE
-- rattacher matières
-
----
-
-4. Affectation étudiants
-
-Afficher :
-
-- étudiants sans classe
-- affecter étudiant à une classe
-
-Interface simple avec tableau + modal.
-
----
-
-CONTRAINTES TECHNIQUES :
-
-- utiliser services.py
-- utiliser HTMX
-- garder views légères
-- logique métier séparée
-- aucun calcul dans templates
-
----
-
-STYLE UI :
-
-Inspirations :
-- Notion
-- Airtable
-- ERP moderne
-- tableaux Excel premium
-
----
-
-IMPORTANT :
-
-NE PAS TOUCHER :
-
-- module notes existant
-- calculs existants
-- relevés existants
-- exports existants
-
-UNIQUEMENT ENRICHIR.
-
----
-
-FORMAT DE SORTIE :
-
-- fichiers modifiés
-- nouveaux services
-- nouveaux templates
-- nouvelles modales
-- urls
-- views
-
-avec commentaires clairs.
-
----
-
-OBJECTIF FINAL :
-
-Transformer le dashboard informaticien en :
-
-- centre de contrôle académique
-- gestionnaire workflow notes
-- gestionnaire maquettes
-- gestionnaire classes
-- gestionnaire rattrapage
-
-sans casser le système actuel.
+(process:12836): GLib-GIO-WARNING **: 14:45:47.627: Unexpectedly, UWP app `Clipchamp.Clipchamp_4.5.10520.0_x64__yxz26nhyzhsrt' (AUMId `Clipchamp.Cli
+pchamp_yxz26nhyzhsrt!App') supports 41 extensions but has no verbs
+CancelledError exception in shielded future                                                                  
+future: <Future finished exception=CancelledError()>                                                         
+Traceback (most recent call last):                                                                           
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)                                                                    
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                                                    
+asyncio.exceptions.CancelledError                                                                            
+                                                                                                             
+During handling of the above exception, another exception occurred:                                          
+
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 321, in __acall__
+    response = await sync_to_async(
+               ^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )(request)
+    ^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 523, in __call__
+    ret = await exec_coro
+          ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 321, in __acall__
+    response = await sync_to_async(
+               ^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )(request)
+    ^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django_htmx\middleware.py", line 43, in __acall__
+    return await self.get_response(request)  # type: ignore [no-any-return, misc]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\base.py", line 254, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 523, in __call__
+    ret = await exec_coro
+          ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django_htmx\middleware.py", line 43, in __acall__
+    return await self.get_response(request)  # type: ignore [no-any-return, misc]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\base.py", line 254, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 523, in __call__
+    ret = await exec_coro
+          ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+HTTP GET /portal/dashboard/ 200 [1.60, 127.0.0.1:57681]
+HTTP GET /static/core/css/esfe_theme.css 200 [0.12, 127.0.0.1:57682]
+HTTP GET /static/core/js/cookie_consent.js 200 [0.12, 127.0.0.1:57684]
+HTTP GET /static/public/css/main.css 200 [0.15, 127.0.0.1:57681]
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django_htmx\middleware.py", line 43, in __acall__
+    return await self.get_response(request)  # type: ignore [no-any-return, misc]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\base.py", line 254, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 523, in __call__
+    ret = await exec_coro
+          ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:57686]
+WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:57686]
+404 fallback | Path=/favicon.ico
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 321, in __acall__
+    response = await sync_to_async(
+               ^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )(request)
+    ^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django_htmx\middleware.py", line 43, in __acall__
+    return await self.get_response(request)  # type: ignore [no-any-return, misc]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\base.py", line 254, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 523, in __call__
+    ret = await exec_coro
+          ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 321, in __acall__
+    response = await sync_to_async(
+               ^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )(request)
+    ^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django_htmx\middleware.py", line 43, in __acall__
+    return await self.get_response(request)  # type: ignore [no-any-return, misc]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\base.py", line 254, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 523, in __call__
+    ret = await exec_coro
+          ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 321, in __acall__
+    response = await sync_to_async(
+               ^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )(request)
+    ^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django_htmx\middleware.py", line 43, in __acall__
+    return await self.get_response(request)  # type: ignore [no-any-return, misc]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\base.py", line 254, in _get_response_async
+    response = await wrapped_callback(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+        request, *callback_args, **callback_kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 523, in __call__
+    ret = await exec_coro
+          ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+CancelledError exception in shielded future
+future: <Future finished exception=CancelledError()>
+Traceback (most recent call last):
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 561, in thread_handler
+    return func(*args, **kwargs)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 309, in __call__
+    response = response or self.get_response(request)
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\whitenoise\middleware.py", line 123, in __call__
+    return self.get_response(request)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 325, in __call__
+    return call_result.result()
+           ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\HP\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 365, in main_wrap
+    result = await awaitable
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 325, in __acall__
+    response = response or await self.get_response(request)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\core\handlers\exception.py", line 42, in inner
+    response = await get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\django\utils\deprecation.py", line 321, in __acall__
+    response = await sync_to_async(
+               ^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )(request)
+    ^^^^^^^^^^
+  File "C:\Users\HP\PycharmProjects\esfe-core\.venv\Lib\site-packages\asgiref\sync.py", line 506, in __call__
+    ret = await asyncio.shield(exec_coro)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+Not Found: /favicon.ico
+HTTP GET /favicon.ico 404 [1.59, 127.0.0.1:57682]
+HTTP GET /portal/it/workflows/home/ 200 [2.01, 127.0.0.1:57681]
+HTTP GET /portal/dashboard/ 200 [0.90, 127.0.0.1:57700]
+WebSocket DISCONNECT /ws/communication/notifications/ [127.0.0.1:57686]
+HTTP GET /static/public/css/main.css 200 [0.01, 127.0.0.1:57700]
+HTTP GET /static/core/js/cookie_consent.js 200 [0.01, 127.0.0.1:57682]
+HTTP GET /static/core/css/esfe_theme.css 200 [0.01, 127.0.0.1:57681]
+WebSocket HANDSHAKING /ws/communication/notifications/ [127.0.0.1:57703]
+WebSocket CONNECT /ws/communication/notifications/ [127.0.0.1:57703]
+HTTP GET /portal/it/workflows/home/ 200 [0.69, 127.0.0.1:57681]
+HTTP GET /portal/it/workflows/notes/ 200 [0.20, 127.0.0.1:57681]
+HTTP GET /portal/it/workflows/structure/ 200 [0.26, 127.0.0.1:57681]
+HTTP GET /portal/it/workflows/import/ 200 [0.20, 127.0.0.1:57681]
+HTTP GET /portal/it/workflows/import/?class_id=2&class_id= 200 [0.15, 127.0.0.1:57681]
+HTTP GET /portal/it/workflows/import/?class_id=2&class_id= 200 [0.27, 127.0.0.1:57681]
+HTTP GET /portal/it/workflows/import/?class_id=4&class_id= 200 [0.16, 127.0.0.1:57681]
+HTTP GET /portal/it/workflows/import/?class_id=3&class_id= 200 [0.16, 127.0.0.1:57681]
+HTTP GET /portal/it/workflows/import/?class_id=1&class_id= 200 [0.15, 127.0.0.1:57681]

@@ -1,0 +1,68 @@
+<div class="workflow-stack">
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Detail archive</p>
+        <h3>{{ batch }}</h3>
+        <p class="workflow-muted">{{ batch.reason }}</p>
+      </div>
+      <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_archives_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" type="button">Retour</button>
+    </div>
+    <div class="mt-4 grid gap-3 md:grid-cols-5">
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Classes</p><h3>{{ batch.classes_count }}</h3></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Etudiants</p><h3>{{ batch.students_count }}</h3></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Notes</p><h3>{{ batch.grades_count }}</h3></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Paiements</p><h3>{{ batch.payments_count }}</h3></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Statut</p><h3>{{ batch.get_status_display }}</h3></article>
+    </div>
+  </section>
+
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head"><h3>Etudiants et affectations</h3></div>
+    <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-900 text-white">
+          <tr>
+            <th class="px-3 py-3 text-left">Etudiant</th>
+            <th class="px-3 py-3 text-left">Classe</th>
+            <th class="px-3 py-3 text-left">Programme</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for enrollment in enrollments %}
+          <tr class="border-b border-slate-100 last:border-b-0">
+            <td class="px-3 py-3 font-bold text-slate-900">{{ enrollment.student.get_full_name|default:enrollment.student.username }}</td>
+            <td class="px-3 py-3 text-slate-700">{{ enrollment.academic_class.display_name }}</td>
+            <td class="px-3 py-3 text-slate-700">{{ enrollment.programme }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="px-3 py-8 text-center font-bold text-slate-500">Aucune affectation.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="workflow-split">
+    <div class="workflow-table-shell">
+      <div class="workflow-table-head"><h3>Paiements conserves</h3></div>
+      <div class="workflow-list">
+        {% for payment in payments|slice:":12" %}
+        <article><div><strong>{{ payment.amount }} FCFA</strong><span>{{ payment.get_status_display }} - {{ payment.paid_at|date:"d/m/Y" }}</span></div></article>
+        {% empty %}
+        <p class="workflow-muted">Aucun paiement lie.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="workflow-table-shell">
+      <div class="workflow-table-head"><h3>Notes conservees</h3></div>
+      <div class="workflow-list">
+        {% for grade in grades|slice:":12" %}
+        <article><div><strong>{{ grade.ec.title }}</strong><span>{{ grade.enrollment.student.get_full_name|default:grade.enrollment.student.username }} - {{ grade.normal_score|default:"-" }}</span></div></article>
+        {% empty %}
+        <p class="workflow-muted">Aucune note liee.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>

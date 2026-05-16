@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from portal.models import AccountSupportState, BranchITSettings, SupportAuditLog, SupportTicket, SupportTicketComment, TeacherDashboardPreference
+from portal.models import (
+    AccountSupportState,
+    ArchiveBatch,
+    BranchITSettings,
+    SupportAuditLog,
+    SupportTicket,
+    SupportTicketComment,
+    TeacherDashboardPreference,
+)
 
 
 @admin.register(SupportAuditLog)
@@ -38,6 +46,44 @@ class AccountSupportStateAdmin(admin.ModelAdmin):
 class BranchITSettingsAdmin(admin.ModelAdmin):
     list_display = ("branch", "validation_threshold", "active_academic_year", "updated_at")
     search_fields = ("branch__name", "branch__code", "active_academic_year")
+
+
+@admin.register(ArchiveBatch)
+class ArchiveBatchAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "archive_type",
+        "status",
+        "branch",
+        "academic_year",
+        "academic_class",
+        "classes_count",
+        "students_count",
+        "created_by",
+        "created_at",
+    )
+    list_filter = ("status", "archive_type", "branch", "academic_year", "created_at")
+    search_fields = ("reason", "created_by__username", "academic_class__level", "academic_year__name")
+    readonly_fields = (
+        "archive_type",
+        "status",
+        "branch",
+        "academic_year",
+        "academic_class",
+        "reason",
+        "snapshot",
+        "classes_count",
+        "enrollments_count",
+        "inscriptions_count",
+        "students_count",
+        "grades_count",
+        "payments_count",
+        "created_by",
+        "restored_by",
+        "created_at",
+        "restored_at",
+    )
+    date_hierarchy = "created_at"
 
 
 @admin.register(TeacherDashboardPreference)

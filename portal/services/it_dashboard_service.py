@@ -43,15 +43,20 @@ def build_it_dashboard_context(request, *, branch, base_context_builder):
 
     staff_users = get_scoped_staff_queryset(branch=branch)
     students_users = user_model.objects.filter(student_profile__isnull=False)
-    active_classes = AcademicClass.objects.select_related("branch", "programme", "academic_year").filter(is_active=True)
+    active_classes = AcademicClass.objects.select_related("branch", "programme", "academic_year").filter(
+        is_active=True,
+        is_archived=False,
+    )
     enrollments = AcademicEnrollment.objects.select_related(
         "student__student_profile__inscription__candidature",
         "academic_class",
         "branch",
         "academic_year",
-    ).filter(is_active=True)
-    inscriptions = Inscription.objects.select_related("candidature__branch", "candidature__programme")
-    students = Student.objects.select_related("user", "inscription__candidature__branch", "inscription__candidature__programme")
+    ).filter(is_active=True, is_archived=False, inscription__is_archived=False)
+    inscriptions = Inscription.objects.select_related("candidature__branch", "candidature__programme").filter(is_archived=False)
+    students = Student.objects.select_related("user", "inscription__candidature__branch", "inscription__candidature__programme").filter(
+        inscription__is_archived=False,
+    )
     semesters = Semester.objects.select_related("academic_class", "academic_class__branch")
     grade_entries = ECGrade.objects.select_related("enrollment__branch", "ec__ue__semester")
     recent_events = AcademicScheduleEvent.objects.select_related("branch", "academic_class", "teacher").filter(

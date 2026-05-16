@@ -5,6 +5,7 @@ from decimal import Decimal, InvalidOperation
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicEnrollment, AcademicYear, EC, Semester, UE
 from formations.models import Programme
@@ -20,6 +21,7 @@ def build_academic_structure_context(*, branch, selected_class_id=None, student_
     classes = list(
         AcademicClass.objects.select_related("programme", "academic_year", "branch")
         .filter(branch=branch)
+        .filter(is_archived=False)
         .order_by("-is_active", "programme__title", "level", "id")
     )
     selected_class = next((item for item in classes if str(item.id) == str(selected_class_id)), None)
@@ -46,6 +48,7 @@ def build_academic_structure_context(*, branch, selected_class_id=None, student_
         .filter(
             inscription__candidature__branch=branch,
             inscription__status__in=[Inscription.STATUS_PARTIAL, Inscription.STATUS_ACTIVE],
+            inscription__is_archived=False,
             user__academic_enrollments__isnull=True,
         )
         .order_by("inscription__candidature__last_name", "inscription__candidature__first_name", "matricule")
@@ -125,7 +128,9 @@ def archive_academic_class(*, branch, class_id):
     if academic_class is None:
         raise ValidationError("Classe introuvable.")
     academic_class.is_active = False
-    academic_class.save(update_fields=["is_active"])
+    academic_class.is_archived = True
+    academic_class.archived_at = timezone.now()
+    academic_class.save(update_fields=["is_active", "is_archived", "archived_at"])
     return academic_class
 
 

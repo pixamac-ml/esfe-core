@@ -93,6 +93,7 @@ def upload_grades(request):
                 "skipped_unknown_columns": result.skipped_unknown_columns,
                 "skipped_unknown_students": result.skipped_unknown_students,
                 "skipped_invalid_scores": result.skipped_invalid_scores,
+                "unknown_columns": result.unknown_columns,
                 "student_issues": result.student_issues,
             },
         }

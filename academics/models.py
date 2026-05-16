@@ -150,6 +150,8 @@ class AcademicClass(models.Model):
     )
 
     is_active = models.BooleanField(default=True, db_index=True)
+    is_archived = models.BooleanField(default=False, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         ordering = ["programme__title", "branch__name", "level"]
@@ -223,6 +225,8 @@ class AcademicEnrollment(models.Model):
     )
 
     is_active = models.BooleanField(default=True, db_index=True)
+    is_archived = models.BooleanField(default=False, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

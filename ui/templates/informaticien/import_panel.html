@@ -1,53 +1,278 @@
-{% if feedback %}
-<div class="workflow-toast workflow-toast-{{ feedback.level }}">{{ feedback.message }}</div>
-{% endif %}
-
-<form class="workflow-context" method="get" hx-get="{% url 'accounts_portal:it_import_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
-  <label>Classe
-    <select name="class_id" hx-trigger="change">
-      <option value="">Selectionner</option>
-      {% for class in classes %}
-        <option value="{{ class.id }}" {% if selected_class and selected_class.id == class.id %}selected{% endif %}>{{ class.display_name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Semestre
-    <select name="semester_id" hx-trigger="change" hx-include="[name='class_id']">
-      <option value="">Selectionner</option>
-      {% for semester in semesters %}
-        <option value="{{ semester.id }}" {% if selected_semester and selected_semester.id == semester.id %}selected{% endif %}>Semestre {{ semester.number }}</option>
-      {% endfor %}
-    </select>
-  </label>
-</form>
-
-<form class="workflow-table-shell" method="post" enctype="multipart/form-data" hx-post="{% url 'accounts_portal:it_import_upload' %}" hx-target="#it-workspace" hx-swap="innerHTML">
-  {% csrf_token %}
-  <input type="hidden" name="class_id" value="{{ selected_class.id|default:'' }}">
-  <input type="hidden" name="semester_id" value="{{ selected_semester.id|default:'' }}">
-  <div class="workflow-context">
-    <label>Fichier Excel <input type="file" name="file" accept=".xlsx,.xls" required></label>
-    <label>Export notes
-      {% if selected_class %}
-        {% if selected_semester %}
-          <a class="workflow-btn workflow-btn-secondary" href="{% url 'academics:download_import_template' selected_class.id selected_semester.id %}">Modele Excel</a>
-        {% endif %}
-        <a class="workflow-btn workflow-btn-secondary" href="{% url 'accounts_portal:it_export_notes_excel' %}?class_id={{ selected_class.id }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}">Exporter Excel</a>
-      {% else %}
-        <span class="workflow-muted">Selectionne une classe</span>
+<div x-data="{ previewOpen: false }" class="workflow-stack">
+  {% if feedback %}
+  <section class="workflow-toast workflow-toast-{{ feedback.level }}">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p class="workflow-kicker">{% if feedback.level == "success" %}Import termine{% else %}Import a verifier{% endif %}</p>
+        <p class="mt-1 font-black">{{ feedback.message }}</p>
+      </div>
+      {% if selected_class and selected_semester %}
+      <a
+        class="workflow-btn workflow-btn-secondary"
+        hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}?classe={{ selected_class.id }}&semester={{ selected_semester.id }}"
+        hx-target="#it-workspace"
+        hx-swap="innerHTML"
+      >
+        Ouvrir la grille
+      </a>
       {% endif %}
-    </label>
-  </div>
-  <button class="workflow-btn workflow-btn-primary" type="submit">Importer</button>
-</form>
+    </div>
+  </section>
+  {% endif %}
 
-{% if feedback.invalid_lines %}
-<div class="workflow-table-shell">
-  <div class="workflow-table-head"><h3>Lignes invalides</h3></div>
-  <div class="workflow-list">
-    {% for line in feedback.invalid_lines %}
-      <article><div><strong>Ligne {{ line.row_number }}</strong><span>{{ line.nom }} {{ line.prenom }} - {{ line.message }}</span></div></article>
-    {% endfor %}
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Selection</p>
+        <h3>Classe et semestre a importer</h3>
+      </div>
+    </div>
+
+    <form
+      class="workflow-context"
+      method="get"
+      hx-get="{% url 'accounts_portal:it_import_workspace' %}"
+      hx-trigger="change from:select"
+      hx-target="#it-workspace"
+      hx-swap="innerHTML"
+    >
+      <label>Classe
+        <select name="class_id">
+          <option value="">Selectionner une classe</option>
+          {% for class in classes %}
+            <option value="{{ class.id }}" {% if selected_class and selected_class.id == class.id %}selected{% endif %}>{{ class.display_name }} - {{ class.academic_year.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Semestre
+        <select name="semester_id" {% if not selected_class %}disabled{% endif %}>
+          <option value="">Selectionner un semestre</option>
+          {% for semester in semesters %}
+            <option value="{{ semester.id }}" {% if selected_semester and selected_semester.id == semester.id %}selected{% endif %}>Semestre {{ semester.number }} - {{ semester.get_status_display }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+  </section>
+
+  <div class="grid gap-4 xl:grid-cols-4">
+    <article class="workflow-table-shell">
+      <p class="workflow-kicker">Etudiants</p>
+      <h3>{{ student_count }}</h3>
+      <p class="workflow-muted">Inscriptions academiques actives.</p>
+    </article>
+    <article class="workflow-table-shell">
+      <p class="workflow-kicker">Matieres</p>
+      <h3>{{ ec_count }}</h3>
+      <p class="workflow-muted">Colonnes EC attendues.</p>
+    </article>
+    <article class="workflow-table-shell">
+      <p class="workflow-kicker">Etat</p>
+      <h3>{% if notes_state %}{{ notes_state.label }}{% else %}-{% endif %}</h3>
+      <p class="workflow-muted">Workflow du semestre.</p>
+    </article>
+    <article class="workflow-table-shell">
+      <p class="workflow-kicker">Session</p>
+      <h3>{% if workflow_permissions and workflow_permissions.can_enter_normal %}Normale{% elif workflow_permissions and workflow_permissions.can_enter_retake %}Rattrapage{% else %}-{% endif %}</h3>
+      <p class="workflow-muted">Import actuel: notes normales.</p>
+    </article>
   </div>
+
+  <section class="workflow-split">
+    <div class="workflow-table-shell">
+      <div class="workflow-table-head">
+        <div>
+          <p class="workflow-kicker">Preparation</p>
+          <h3>Modele Excel officiel</h3>
+          <p class="workflow-muted">Le modele contient ENROLLMENT_ID masque, MATRICULE, NOM, PRENOM puis une colonne par EC.</p>
+        </div>
+      </div>
+
+      <div class="workflow-actions mt-4">
+        {% if selected_class and selected_semester %}
+          <a class="workflow-btn workflow-btn-primary" href="{% url 'academics:download_import_template' selected_class.id selected_semester.id %}">Telecharger le modele</a>
+          <a class="workflow-btn workflow-btn-secondary" href="{% url 'accounts_portal:it_export_notes_excel' %}?class_id={{ selected_class.id }}&semester_id={{ selected_semester.id }}">Exporter les notes</a>
+          <button type="button" class="workflow-btn workflow-btn-secondary" @click="previewOpen = true">Voir le format</button>
+        {% else %}
+          <span class="workflow-muted">Selectionne une classe et un semestre pour activer les actions.</span>
+        {% endif %}
+      </div>
+
+      {% if selected_class and selected_semester %}
+      <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+        <table class="min-w-full text-sm">
+          <tbody>
+            <tr class="border-b border-slate-100"><th class="bg-slate-50 px-3 py-3 text-left text-slate-500">Classe</th><td class="px-3 py-3 font-black text-slate-900">{{ selected_class.display_name }}</td></tr>
+            <tr class="border-b border-slate-100"><th class="bg-slate-50 px-3 py-3 text-left text-slate-500">Annee</th><td class="px-3 py-3 font-semibold text-slate-700">{{ selected_class.academic_year.name }}</td></tr>
+            <tr><th class="bg-slate-50 px-3 py-3 text-left text-slate-500">Semestre</th><td class="px-3 py-3 font-semibold text-slate-700">S{{ selected_semester.number }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+
+    <form
+      class="workflow-table-shell"
+      method="post"
+      enctype="multipart/form-data"
+      hx-post="{% url 'accounts_portal:it_import_upload' %}"
+      hx-target="#it-workspace"
+      hx-swap="innerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="class_id" value="{{ selected_class.id|default:'' }}">
+      <input type="hidden" name="semester_id" value="{{ selected_semester.id|default:'' }}">
+      <div class="workflow-table-head">
+        <div>
+          <p class="workflow-kicker">Import</p>
+          <h3>Fichier rempli par l'equipe</h3>
+          <p class="workflow-muted">Format accepte: .xlsx ou .xls. Les notes doivent rester entre 0 et 20.</p>
+        </div>
+      </div>
+      <label class="mt-4 grid gap-2 text-sm font-black text-slate-700">
+        Fichier Excel
+        <input
+          type="file"
+          name="file"
+          accept=".xlsx,.xls"
+          required
+          class="min-h-[50px] rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-xs file:font-black file:text-white"
+        >
+      </label>
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p class="workflow-muted">Les erreurs critiques bloquent tout l'import pour eviter les donnees partielles.</p>
+        <button class="workflow-btn workflow-btn-primary" type="submit" {% if not selected_class or not selected_semester %}disabled{% endif %}>Verifier et importer</button>
+      </div>
+    </form>
+  </section>
+
+  {% if selected_class and selected_semester %}
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Maquette Excel</p>
+        <h3>UE et EC attendus dans le fichier</h3>
+      </div>
+      <span class="rounded-full bg-blue-50 px-3 py-2 text-xs font-black text-blue-700">{{ ec_count }} colonne(s) EC</span>
+    </div>
+    <div class="mt-4 grid gap-3 lg:grid-cols-2">
+      {% for ue in ues %}
+      <article class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="font-black text-slate-900">{{ ue.code }} - {{ ue.title }}</p>
+            <p class="workflow-muted">{{ ue.ecs.all|length }} EC</p>
+          </div>
+        </div>
+        <div class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-900 text-white">
+              <tr><th class="px-3 py-2 text-left">Colonne Excel</th><th class="px-3 py-2 text-left">Coef.</th><th class="px-3 py-2 text-left">Credits</th></tr>
+            </thead>
+            <tbody>
+              {% for ec in ue.ecs.all %}
+              <tr class="border-b border-slate-100 last:border-b-0">
+                <td class="px-3 py-2 font-semibold text-slate-800">{{ ue.code }} - {{ ec.title }}</td>
+                <td class="px-3 py-2 text-slate-600">{{ ec.coefficient }}</td>
+                <td class="px-3 py-2 text-slate-600">{{ ec.credit_required }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+      {% empty %}
+      <p class="workflow-muted">Aucune UE/EC configuree pour ce semestre.</p>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if feedback %}
+  <section class="workflow-table-shell">
+    <div class="workflow-table-head">
+      <div>
+        <p class="workflow-kicker">Resultat import</p>
+        <h3>Controle du fichier</h3>
+      </div>
+    </div>
+    <div class="mt-4 grid gap-3 md:grid-cols-5">
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Importees</p><h3>{{ feedback.updated|default:0 }}</h3></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Vides</p><h3>{{ feedback.skipped_empty|default:0 }}</h3></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Notes invalides</p><h3>{{ feedback.skipped_invalid_scores|default:0 }}</h3></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Etudiants</p><h3>{{ feedback.skipped_unknown_students|default:0 }}</h3></article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Colonnes</p><h3>{{ feedback.skipped_unknown_columns|default:0 }}</h3></article>
+    </div>
+
+    {% if feedback.unknown_columns %}
+    <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+      Colonnes ignorees: {{ feedback.unknown_columns|join:", " }}
+    </div>
+    {% endif %}
+
+    {% if feedback.invalid_lines %}
+    <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
+      <table class="min-w-full text-sm">
+        <thead class="bg-rose-50 text-rose-800">
+          <tr>
+            <th class="px-3 py-3 text-left">Ligne</th>
+            <th class="px-3 py-3 text-left">Etudiant</th>
+            <th class="px-3 py-3 text-left">Type</th>
+            <th class="px-3 py-3 text-left">Correction attendue</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in feedback.invalid_lines %}
+          <tr class="border-b border-slate-100 last:border-b-0">
+            <td class="px-3 py-3 font-black text-slate-900">{{ line.row_number }}</td>
+            <td class="px-3 py-3 text-slate-700">{{ line.nom }} {{ line.prenom }}</td>
+            <td class="px-3 py-3 text-slate-600">{{ line.reason|default:"erreur" }}</td>
+            <td class="px-3 py-3 font-semibold text-slate-800">{{ line.message }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if import_preview %}
+  <div x-show="previewOpen" x-cloak class="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4" @keydown.escape.window="previewOpen = false" @click.self="previewOpen = false">
+    <section class="w-full max-w-5xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+      <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+        <div>
+          <p class="workflow-kicker">Apercu Excel</p>
+          <h3 class="mt-1 text-2xl font-black text-slate-900">Structure du modele d'import</h3>
+          <p class="workflow-muted">ENROLLMENT_ID est masque dans le fichier telecharge mais visible ici pour expliquer le matching.</p>
+        </div>
+        <button type="button" class="workflow-btn workflow-btn-secondary" @click="previewOpen = false">Fermer</button>
+      </div>
+      <div class="max-h-[65vh] overflow-auto p-6">
+        <table class="min-w-full border-collapse text-sm">
+          <thead>
+            <tr>
+              {% for header in import_preview.headers %}
+              <th class="whitespace-nowrap border border-slate-300 bg-slate-900 px-3 py-2 text-left font-black text-white">{{ header }}</th>
+              {% endfor %}
+              {% if import_preview.subject_count > 4 %}
+              <th class="whitespace-nowrap border border-slate-300 bg-slate-900 px-3 py-2 text-left font-black text-white">...</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {% for value in import_preview.sample_row %}
+              <td class="whitespace-nowrap border border-slate-200 px-3 py-2 font-semibold text-slate-700">{{ value }}</td>
+              {% endfor %}
+              {% if import_preview.subject_count > 4 %}
+              <td class="whitespace-nowrap border border-slate-200 px-3 py-2 font-semibold text-slate-400">autres matieres...</td>
+              {% endif %}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  {% endif %}
 </div>
-{% endif %}

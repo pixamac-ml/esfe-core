@@ -1,0 +1,34 @@
+PLAN ARCHIVAGE COMPLET ESFE - V1
+
+Objectif
+Mettre en place un archivage logique, reversible et journalise pour cloturer une annee academique ou une classe sans supprimer les donnees.
+
+Perimetre V1
+- Archivage par classe academique.
+- Archivage par annee academique pour une annexe.
+- Consultation interne depuis le dashboard informaticien.
+- Restauration possible.
+- Conservation des notes, paiements, inscriptions, etudiants et historiques.
+
+Regles metier
+- L'informaticien d'annexe peut archiver/restaurer les archives de son annexe.
+- Les donnees archivees ne doivent plus apparaitre dans les workflows actifs.
+- Aucune suppression physique n'est faite.
+- Une raison d'archivage est obligatoire.
+- Chaque archivage cree un lot ArchiveBatch avec acteur, date, compteurs et snapshot technique.
+
+Implementation
+- AcademicClass et AcademicEnrollment recoivent is_archived et archived_at.
+- Inscription utilise ses champs existants is_archived et archived_at.
+- Student est desactive via is_active=False pendant l'archivage, puis reactive en restauration.
+- ArchiveBatch journalise l'operation.
+- Le service central portal.services.archive_service gere archive classe, archive annee, restauration, preview et detail.
+- Le dashboard informaticien contient un module Archives.
+
+Tests a valider
+- Archiver une classe avec etudiants, inscriptions, notes et paiements.
+- Archiver une annee avec plusieurs classes.
+- Restaurer une archive.
+- Verifier que les donnees archivees disparaissent des workflows actifs.
+- Verifier que les notes et paiements restent consultables dans le detail archive.
+- Verifier les permissions informaticien.

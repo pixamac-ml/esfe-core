@@ -18,6 +18,7 @@ class ImportGradesResult:
     skipped_unknown_columns: int = 0
     skipped_unknown_students: int = 0
     skipped_invalid_scores: int = 0
+    unknown_columns: list[str] = field(default_factory=list)
     student_issues: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -38,6 +39,9 @@ def _resolve_ec_column(header: str, ecs: list[EC]) -> EC | None:
     normalized_header = _normalize_text(header)
     if not normalized_header:
         return None
+    for prefix in ("NOTE /20 - ", "NOTE SUR 20 - ", "NOTE - "):
+        if normalized_header.startswith(prefix):
+            normalized_header = normalized_header[len(prefix):].strip()
 
     exact_label_map = {
         _normalize_text(_get_ec_human_label(ec)): ec
@@ -124,19 +128,24 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
 
     nom_column = normalized_columns["NOM"]
     prenom_column = normalized_columns["PRENOM"]
+    enrollment_id_column = normalized_columns.get("ENROLLMENT_ID")
+    matricule_column = normalized_columns.get("MATRICULE")
 
     semester_ecs = list(EC.objects.filter(ue__semester=semester).select_related("ue").order_by("ue__id", "id"))
     ec_col_map: dict[str, EC] = {}
     for header in headers:
-        if header in {nom_column, prenom_column}:
+        if header in {nom_column, prenom_column, enrollment_id_column, matricule_column}:
             continue
         ec = _resolve_ec_column(header, semester_ecs)
         if ec is None:
             result.skipped_unknown_columns += 1
+            result.unknown_columns.append(header)
             continue
         ec_col_map[header] = ec
 
     enrollments_by_name: dict[tuple[str, str], list[AcademicEnrollment]] = {}
+    enrollments_by_id: dict[str, AcademicEnrollment] = {}
+    enrollments_by_matricule: dict[str, AcademicEnrollment] = {}
     for enr in AcademicEnrollment.objects.select_related(
         "student__student_profile__inscription__candidature",
         "inscription__candidature",
@@ -151,6 +160,11 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
             _normalize_text(getattr(candidature, "first_name", "")),
         )
         enrollments_by_name.setdefault(key, []).append(enr)
+        enrollments_by_id[str(enr.id)] = enr
+        student_profile = getattr(enr.student, "student_profile", None)
+        matricule = _normalize_text(getattr(student_profile, "matricule", ""))
+        if matricule:
+            enrollments_by_matricule[matricule] = enr
 
     def _row_has_data(row) -> bool:
         for column_name in ec_col_map.keys():
@@ -164,10 +178,14 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
         excel_row_number = int(_idx) + 6
         nom = _normalize_text(row.get(nom_column))
         prenom = _normalize_text(row.get(prenom_column))
+        enrollment_id = str(row.get(enrollment_id_column) or "").strip() if enrollment_id_column else ""
+        if enrollment_id.endswith(".0"):
+            enrollment_id = enrollment_id[:-2]
+        matricule = _normalize_text(row.get(matricule_column)) if matricule_column else ""
         display_nom = str(row.get(nom_column) or "").strip()
         display_prenom = str(row.get(prenom_column) or "").strip()
 
-        if not nom and not prenom:
+        if not enrollment_id and not matricule and not nom and not prenom:
             if _row_has_data(row):
                 result.skipped_unknown_students += 1
                 result.student_issues.append({
@@ -175,12 +193,39 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
                     "nom": display_nom,
                     "prenom": display_prenom,
                     "reason": "missing_identity",
-                    "message": "Ligne avec notes mais sans NOM/PRENOM.",
+                    "message": "Ligne avec notes mais sans ENROLLMENT_ID, MATRICULE, NOM ou PRENOM.",
                 })
             continue
 
-        matching_enrollments = enrollments_by_name.get((nom, prenom), [])
-        if not matching_enrollments:
+        enrollment = None
+        if enrollment_id:
+            enrollment = enrollments_by_id.get(enrollment_id)
+            if enrollment is None:
+                result.skipped_unknown_students += 1
+                result.student_issues.append({
+                    "row_number": excel_row_number,
+                    "nom": display_nom,
+                    "prenom": display_prenom,
+                    "reason": "enrollment_not_found",
+                    "message": "Identifiant d'inscription academique introuvable dans la classe selectionnee.",
+                })
+                continue
+
+        if enrollment is None and matricule:
+            enrollment = enrollments_by_matricule.get(matricule)
+            if enrollment is None:
+                result.skipped_unknown_students += 1
+                result.student_issues.append({
+                    "row_number": excel_row_number,
+                    "nom": display_nom,
+                    "prenom": display_prenom,
+                    "reason": "matricule_not_found",
+                    "message": "Matricule introuvable dans la classe selectionnee.",
+                })
+                continue
+
+        matching_enrollments = [] if enrollment is not None else enrollments_by_name.get((nom, prenom), [])
+        if enrollment is None and not matching_enrollments:
             result.skipped_unknown_students += 1
             result.student_issues.append({
                 "row_number": excel_row_number,
@@ -191,7 +236,7 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
             })
             continue
 
-        if len(matching_enrollments) > 1:
+        if enrollment is None and len(matching_enrollments) > 1:
             result.skipped_unknown_students += 1
             result.student_issues.append({
                 "row_number": excel_row_number,
@@ -203,7 +248,8 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
             })
             continue
 
-        enrollment = matching_enrollments[0]
+        if enrollment is None:
+            enrollment = matching_enrollments[0]
 
         for column_name, ec in ec_col_map.items():
             value = row.get(column_name)

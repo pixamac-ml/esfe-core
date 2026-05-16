@@ -31,6 +31,15 @@ from portal.services.academic_structure_service import (
     save_ec,
     save_ue,
 )
+from portal.services.archive_service import (
+    archive_batches_for_branch,
+    archive_candidates_for_branch,
+    archive_class,
+    archive_detail,
+    archive_year,
+    preview_archive,
+    restore_archive_batch,
+)
 from portal.services.notes_workflow import (
     apply_notes_workflow_action,
     get_available_actions,
@@ -153,6 +162,7 @@ def it_notes_workflow_action(request):
 
     context = _resolve_workflow_selection(request)
     toast = None
+    successful = False
     try:
         action = (request.POST.get("action") or "").strip()
         apply_notes_workflow_action(
@@ -161,6 +171,7 @@ def it_notes_workflow_action(request):
             semester=context["selected_semester"],
             action=action,
         )
+        successful = True
         messages = {
             "verifier_notes": "Controle termine: aucune note manquante bloquante.",
             "publier_session_normale": "Session normale publiee. Le rattrapage peut maintenant etre prepare.",
@@ -169,13 +180,37 @@ def it_notes_workflow_action(request):
         }
         toast = {"level": "success", "message": messages.get(action, "Workflow notes mis a jour.")}
     except ValidationError as exc:
+        if request.POST.get("from_modal") == "retake":
+            modal_context = _build_retake_modal_context(request)
+            modal_context["form_error"] = " ".join(exc.messages)
+            response = render(request, "portal/informaticien/workflows/retake_modal.html", modal_context)
+            response["HX-Retarget"] = "#it-modal-root"
+            return response
         toast = {"level": "error", "message": " ".join(exc.messages)}
 
-    return render(
+    response = render(
         request,
         "portal/informaticien/workflows/notes_workspace.html",
         _build_notes_workflow_context(request, toast=toast),
     )
+    if successful:
+        response["HX-Trigger"] = "it-modal-close"
+    return response
+
+
+def _build_retake_modal_context(request):
+    context = _resolve_workflow_selection(request)
+    academic_class = context["selected_class"]
+    semester = context["selected_semester"]
+    state = get_notes_state(academic_class=academic_class, semester=semester)
+    candidates = get_retake_candidates(academic_class=academic_class, semester=semester)
+    return {
+        "academic_class": academic_class,
+        "semester": semester,
+        "state": state,
+        "candidates": candidates,
+        "subject_count": sum(len(candidate.failed_subjects) for candidate in candidates),
+    }
 
 
 @login_required
@@ -338,7 +373,17 @@ def it_import_upload(request):
         )
     except (ValidationError, ValueError) as exc:
         message = " ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
-        feedback = type("Feedback", (), {"level": "error", "message": message, "invalid_lines": []})()
+        feedback = type("Feedback", (), {
+            "level": "error",
+            "message": message,
+            "invalid_lines": [],
+            "updated": 0,
+            "skipped_empty": 0,
+            "skipped_unknown_columns": 0,
+            "skipped_unknown_students": 0,
+            "skipped_invalid_scores": 0,
+            "unknown_columns": [],
+        })()
     return render(
         request,
         "portal/informaticien/workflows/import_workspace.html",
@@ -486,6 +531,48 @@ def it_structure_modal(request):
     return render(request, "portal/informaticien/workflows/structure_modal.html", context)
 
 
+def _render_structure_modal_from_post(request, *, branch, message):
+    action = (request.POST.get("action") or "").strip()
+    section = (request.POST.get("section") or "classes").strip()
+    kind = {
+        "save_class": "class",
+        "save_ue": "ue",
+        "save_ec": "ec",
+        "assign_student": "assign",
+    }.get(action, "class")
+    object_id = {
+        "save_class": request.POST.get("class_id"),
+        "save_ue": request.POST.get("ue_id"),
+        "save_ec": request.POST.get("ec_id"),
+    }.get(action)
+    class_id = request.POST.get("selected_class_id") or request.POST.get("class_id")
+    semester_id = request.POST.get("semester_id")
+    ue_id = request.POST.get("ue_id")
+    student_id = request.POST.get("student_id")
+
+    context = build_academic_structure_context(branch=branch, selected_class_id=class_id, section=section)
+    context.update(
+        {
+            "kind": kind,
+            "target_id": object_id,
+            "target_class": AcademicClass.objects.filter(pk=object_id, branch=branch).first() if kind == "class" and object_id else None,
+            "target_ue": UE.objects.filter(pk=object_id, semester__academic_class__branch=branch).first() if kind == "ue" and object_id else None,
+            "target_ec": EC.objects.filter(pk=object_id, ue__semester__academic_class__branch=branch).first() if kind == "ec" and object_id else None,
+            "target_student": Student.objects.select_related("inscription__candidature").filter(
+                pk=student_id,
+                inscription__candidature__branch=branch,
+            ).first() if kind == "assign" and student_id else None,
+            "selected_semester": Semester.objects.filter(pk=semester_id, academic_class__branch=branch).first() if semester_id else None,
+            "selected_ue": UE.objects.filter(pk=ue_id, semester__academic_class__branch=branch).first() if ue_id else None,
+            "form_error": message,
+            "form_values": request.POST,
+        }
+    )
+    response = render(request, "portal/informaticien/workflows/structure_modal.html", context)
+    response["HX-Retarget"] = "#it-modal-root"
+    return response
+
+
 @login_required
 def it_structure_action(request):
     if not _require_it_support(request):
@@ -555,7 +642,11 @@ def it_structure_action(request):
         else:
             raise ValidationError("Action de parametrage inconnue.")
     except ValidationError as exc:
-        toast = {"level": "error", "message": " ".join(exc.messages)}
+        return _render_structure_modal_from_post(
+            request,
+            branch=branch,
+            message=" ".join(exc.messages),
+        )
 
     context = build_academic_structure_context(
         branch=branch,
@@ -564,7 +655,107 @@ def it_structure_action(request):
         section=section,
     )
     context["toast"] = toast
-    return render(request, "portal/informaticien/workflows/structure_workspace.html", context)
+    response = render(request, "portal/informaticien/workflows/structure_workspace.html", context)
+    response["HX-Trigger"] = "it-modal-close"
+    return response
+
+
+@login_required
+def it_archives_workspace(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    branch = get_user_branch(request.user)
+    academic_year_id = (request.GET.get("academic_year_id") or "").strip()
+    class_id = (request.GET.get("class_id") or "").strip()
+    candidates = archive_candidates_for_branch(branch=branch)
+    preview = None
+    if academic_year_id or class_id:
+        preview = preview_archive(
+            branch=branch,
+            academic_year_id=academic_year_id or None,
+            class_id=class_id or None,
+        )
+    return render(
+        request,
+        "portal/informaticien/workflows/archive_workspace.html",
+        {
+            "branch": branch,
+            "archive_batches": archive_batches_for_branch(branch=branch)[:40],
+            "academic_years": candidates["academic_years"],
+            "classes": candidates["classes"],
+            "selected_academic_year_id": academic_year_id,
+            "selected_class_id": class_id,
+            "preview": preview,
+            "toast": None,
+        },
+    )
+
+
+@login_required
+def it_archives_action(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    if request.method != "POST":
+        return HttpResponseForbidden("Methode non autorisee.")
+    branch = get_user_branch(request.user)
+    action = (request.POST.get("action") or "").strip()
+    toast = {"level": "success", "message": "Archive mise a jour."}
+    try:
+        if action == "archive_class":
+            archive_class(
+                branch=branch,
+                class_id=request.POST.get("class_id"),
+                actor=request.user,
+                reason=request.POST.get("reason"),
+            )
+            toast = {"level": "success", "message": "Classe archivee avec succes."}
+        elif action == "archive_year":
+            archive_year(
+                branch=branch,
+                academic_year_id=request.POST.get("academic_year_id"),
+                actor=request.user,
+                reason=request.POST.get("reason"),
+            )
+            toast = {"level": "success", "message": "Annee academique archivee avec succes."}
+        elif action == "restore":
+            restore_archive_batch(
+                branch=branch,
+                batch_id=request.POST.get("batch_id"),
+                actor=request.user,
+            )
+            toast = {"level": "success", "message": "Archive restauree."}
+        else:
+            raise ValidationError("Action d'archivage inconnue.")
+    except ValidationError as exc:
+        toast = {"level": "error", "message": " ".join(exc.messages)}
+
+    candidates = archive_candidates_for_branch(branch=branch)
+    return render(
+        request,
+        "portal/informaticien/workflows/archive_workspace.html",
+        {
+            "branch": branch,
+            "archive_batches": archive_batches_for_branch(branch=branch)[:40],
+            "academic_years": candidates["academic_years"],
+            "classes": candidates["classes"],
+            "selected_academic_year_id": "",
+            "selected_class_id": "",
+            "preview": None,
+            "toast": toast,
+        },
+    )
+
+
+@login_required
+def it_archive_detail(request, batch_id):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    branch = get_user_branch(request.user)
+    try:
+        context = archive_detail(branch=branch, batch_id=batch_id)
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=404)
+    return render(request, "portal/informaticien/workflows/archive_detail.html", context)
 
 
 @login_required
@@ -818,23 +1009,10 @@ def it_notes_retake_modal(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
 
-    context = _resolve_workflow_selection(request)
-    academic_class = context["selected_class"]
-    semester = context["selected_semester"]
-    state = get_notes_state(academic_class=academic_class, semester=semester)
-    candidates = get_retake_candidates(academic_class=academic_class, semester=semester)
-    subject_count = sum(len(candidate.failed_subjects) for candidate in candidates)
-
     return render(
         request,
         "portal/informaticien/workflows/retake_modal.html",
-        {
-            "academic_class": academic_class,
-            "semester": semester,
-            "state": state,
-            "candidates": candidates,
-            "subject_count": subject_count,
-        },
+        _build_retake_modal_context(request),
     )
 
 

@@ -1,15 +1,17 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, cast
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from branches.models import Branch
-from payments.models import PaymentAgent
+from payments.models import Payment, PaymentAgent
 from students.models import Student, StudentAttendance, TeacherAttendance
 from inscriptions.models import Inscription
 from admissions.models import Candidature
@@ -28,7 +30,7 @@ from accounts.models import BranchCashMovement, PayrollEntry, UserPreference
 from communication.models import CommunicationNotification
 from portal.permissions import get_user_role as get_portal_user_role
 from portal.permissions import get_post_login_portal_url
-from portal.models import AccountSupportState, DirectorTeacherAssignment, SupportAuditLog, TeacherDashboardPreference
+from portal.models import AccountSupportState, ArchiveBatch, DirectorTeacherAssignment, SupportAuditLog, TeacherDashboardPreference
 
 
 User = get_user_model()
@@ -1654,6 +1656,187 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, "Classe academique enregistree.")
 		self.assertTrue(created_class.semesters.filter(number=1).exists())
 		self.assertTrue(created_class.semesters.filter(number=2).exists())
+
+	def test_it_structure_action_keeps_modal_open_on_validation_error(self):
+		it_user = self._create_user("portal_it_structure_modal_error", position="it_support")
+		academic_year = AcademicYear.objects.create(
+			name="26-27E",
+			start_date="2026-10-01",
+			end_date="2027-07-31",
+			is_active=False,
+		)
+		self.client.force_login(it_user)
+
+		response = self.client.post(
+			reverse("accounts_portal:it_structure_action"),
+			{
+				"action": "save_class",
+				"section": "classes",
+				"programme_id": self.programme.id,
+				"academic_year_id": academic_year.id,
+				"level": "L4",
+				"validation_threshold": "dix",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.headers.get("HX-Retarget"), "#it-modal-root")
+		self.assertNotIn("HX-Trigger", response.headers)
+		self.assertContains(response, "Seuil de validation invalide.")
+		self.assertContains(response, "Enregistrer la classe")
+		self.assertContains(response, 'value="dix"', html=False)
+
+	def test_it_import_workspace_renders_professional_excel_panel(self):
+		it_user = self._create_user("portal_it_import_panel", position="it_support")
+		_academic_year, academic_class, _ec = self._create_academic_class_bundle("L4I")
+		semester = academic_class.semesters.get(number=1)
+		self.client.force_login(it_user)
+
+		response = self.client.get(
+			reverse("accounts_portal:it_import_workspace"),
+			{"class_id": academic_class.id, "semester_id": semester.id},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Modele Excel officiel")
+		self.assertContains(response, "Verifier et importer")
+		self.assertContains(response, "ENROLLMENT_ID")
+		self.assertContains(response, "MATRICULE")
+		self.assertContains(response, "Maquette Excel")
+
+	def test_it_import_upload_imports_template_by_enrollment_id(self):
+		it_user = self._create_user("portal_it_import_upload", position="it_support")
+		student_user = self._create_user("portal_it_import_student", role="student")
+		student = self._create_student_record(student_user, inscription_status=Inscription.STATUS_ACTIVE)
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L4U")
+		semester = academic_class.semesters.get(number=1)
+		enrollment = AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		self.client.force_login(it_user)
+
+		template_response = self.client.get(
+			reverse("academics:download_import_template", args=[academic_class.id, semester.id])
+		)
+		self.assertEqual(template_response.status_code, 200)
+
+		from io import BytesIO
+		from openpyxl import load_workbook
+
+		workbook_buffer = BytesIO(template_response.content)
+		workbook = load_workbook(workbook_buffer)
+		sheet = workbook.active
+		self.assertEqual(sheet["A5"].value, "ENROLLMENT_ID")
+		self.assertEqual(sheet["B5"].value, "MATRICULE")
+		self.assertTrue(str(sheet["E5"].value).startswith("NOTE /20 - "))
+		self.assertEqual(str(sheet["A6"].value), str(enrollment.id))
+		self.assertEqual(sheet["E6"].fill.fgColor.rgb, "00FEF3C7")
+		sheet["E6"] = "14,5"
+		output = BytesIO()
+		workbook.save(output)
+		output.seek(0)
+
+		response = self.client.post(
+			reverse("accounts_portal:it_import_upload"),
+			{
+				"class_id": academic_class.id,
+				"semester_id": semester.id,
+				"file": SimpleUploadedFile(
+					"notes.xlsx",
+					output.getvalue(),
+					content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+				),
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "1 note(s) importee(s)")
+		grade = ECGrade.objects.get(enrollment=enrollment, ec=ec)
+		self.assertEqual(grade.normal_score, Decimal("14.5"))
+
+	def test_it_archives_class_and_restores_it(self):
+		it_user = self._create_user("portal_it_archive", position="it_support")
+		student_user = self._create_user("portal_archive_student", role="student")
+		student = self._create_student_record(student_user, inscription_status=Inscription.STATUS_ACTIVE)
+		academic_year, academic_class, ec = self._create_academic_class_bundle("L4A")
+		enrollment = AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		ECGrade.objects.create(enrollment=enrollment, ec=ec, normal_score=Decimal("13.00"))
+		Payment.objects.create(
+			inscription=student.inscription,
+			amount=10000,
+			method=Payment.METHOD_CASH,
+			status=Payment.STATUS_PENDING,
+		)
+		self.client.force_login(it_user)
+
+		preview = self.client.get(
+			reverse("accounts_portal:it_archives_workspace"),
+			{"class_id": academic_class.id},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertEqual(preview.status_code, 200)
+		self.assertContains(preview, "Archiver maintenant")
+		self.assertContains(preview, "Notes")
+
+		response = self.client.post(
+			reverse("accounts_portal:it_archives_action"),
+			{
+				"action": "archive_class",
+				"class_id": academic_class.id,
+				"reason": "Cloture test",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Classe archivee avec succes.")
+		academic_class.refresh_from_db()
+		enrollment.refresh_from_db()
+		student.refresh_from_db()
+		student.inscription.refresh_from_db()
+		self.assertTrue(academic_class.is_archived)
+		self.assertFalse(academic_class.is_active)
+		self.assertTrue(enrollment.is_archived)
+		self.assertFalse(enrollment.is_active)
+		self.assertTrue(student.inscription.is_archived)
+		self.assertFalse(student.is_active)
+		batch = ArchiveBatch.objects.get(academic_class=academic_class)
+		self.assertEqual(batch.grades_count, 1)
+		self.assertEqual(batch.payments_count, 1)
+
+		restore = self.client.post(
+			reverse("accounts_portal:it_archives_action"),
+			{"action": "restore", "batch_id": batch.id},
+			HTTP_HX_REQUEST="true",
+		)
+		self.assertEqual(restore.status_code, 200)
+		self.assertContains(restore, "Archive restauree.")
+		academic_class.refresh_from_db()
+		enrollment.refresh_from_db()
+		student.refresh_from_db()
+		student.inscription.refresh_from_db()
+		batch.refresh_from_db()
+		self.assertFalse(academic_class.is_archived)
+		self.assertTrue(academic_class.is_active)
+		self.assertFalse(enrollment.is_archived)
+		self.assertTrue(enrollment.is_active)
+		self.assertFalse(student.inscription.is_archived)
+		self.assertTrue(student.is_active)
+		self.assertEqual(batch.status, ArchiveBatch.STATUS_RESTORED)
 
 	def test_it_dashboard_can_toggle_scoped_staff_account(self):
 		it_user = self._create_user("portal_it_toggle", position="it_support")

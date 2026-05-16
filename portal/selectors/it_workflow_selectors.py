@@ -9,7 +9,7 @@ from students.models import Student
 def get_it_academic_classes(*, branch) -> QuerySet[AcademicClass]:
     queryset = (
         AcademicClass.objects.select_related("programme", "branch", "academic_year")
-        .filter(is_active=True)
+        .filter(is_active=True, is_archived=False)
         .annotate(student_count=Count("enrollments", distinct=True))
         .order_by("branch__name", "level", "programme__title")
     )
@@ -33,7 +33,12 @@ def get_it_students_for_class(*, academic_class):
         "inscription__candidature__programme",
     )
     if academic_class:
-        queryset = queryset.filter(user__academic_enrollments__academic_class=academic_class)
+        queryset = queryset.filter(
+            user__academic_enrollments__academic_class=academic_class,
+            user__academic_enrollments__is_archived=False,
+            inscription__is_archived=False,
+            is_active=True,
+        )
     return queryset.distinct().order_by(
         "inscription__candidature__last_name",
         "inscription__candidature__first_name",

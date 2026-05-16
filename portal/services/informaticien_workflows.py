@@ -9,6 +9,7 @@ from django.urls import reverse
 
 from academics.imports.import_service import import_grades
 from academics.models import Language, Profession
+from academics.services.workflow import get_semester_permissions
 from portal.models import AccountSupportState
 from portal.models import BranchITSettings, SupportAuditLog, SupportTicket
 from portal.selectors.informaticien import (
@@ -34,6 +35,30 @@ class ImportFeedback:
     level: str
     message: str
     invalid_lines: list[dict]
+    updated: int = 0
+    skipped_empty: int = 0
+    skipped_unknown_columns: int = 0
+    skipped_unknown_students: int = 0
+    skipped_invalid_scores: int = 0
+    unknown_columns: list[str] | None = None
+
+
+def _build_import_preview(*, selected_class, selected_semester, ues):
+    if not selected_class or not selected_semester:
+        return None
+    subject_headers = []
+    for ue in ues:
+        for ec in ue.ecs.all():
+            subject_headers.append(f"NOTE /20 - {ue.code} - {ec.title}")
+    sample_headers = ["ENROLLMENT_ID", "MATRICULE", "NOM", "PRENOM", *subject_headers[:4]]
+    sample_row = ["1024", "ESFE-0001", "CAMARA", "BOUBACAR", *(["12,50"] if subject_headers else [])]
+    if len(sample_headers) > len(sample_row):
+        sample_row.extend([""] * (len(sample_headers) - len(sample_row)))
+    return {
+        "headers": sample_headers,
+        "sample_row": sample_row,
+        "subject_count": len(subject_headers),
+    }
 
 
 def build_home_context(*, branch):
@@ -126,12 +151,35 @@ def build_audit_context(*, branch):
 
 
 def build_import_context(*, branch, classes, selected_class=None, selected_semester=None, feedback=None):
+    semesters = list(selected_class.semesters.order_by("number")) if selected_class else []
+    ues = list(selected_semester.ues.prefetch_related("ecs").order_by("id")) if selected_semester else []
+    student_count = (
+        selected_class.enrollments.filter(
+            academic_year=selected_class.academic_year,
+            is_active=True,
+        ).count()
+        if selected_class
+        else 0
+    )
+    ec_count = sum(ue.ecs.count() for ue in ues)
+    permissions = get_semester_permissions(selected_semester) if selected_semester else None
+    state = get_notes_state(academic_class=selected_class, semester=selected_semester) if selected_class and selected_semester else None
     return {
         "branch": branch,
         "classes": classes,
         "selected_class": selected_class,
-        "semesters": list(selected_class.semesters.order_by("number")) if selected_class else [],
+        "semesters": semesters,
         "selected_semester": selected_semester,
+        "ues": ues,
+        "student_count": student_count,
+        "ec_count": ec_count,
+        "workflow_permissions": permissions,
+        "notes_state": state,
+        "import_preview": _build_import_preview(
+            selected_class=selected_class,
+            selected_semester=selected_semester,
+            ues=ues,
+        ),
         "feedback": feedback,
     }
 
@@ -163,6 +211,12 @@ def import_notes_file(*, actor, branch, academic_class, semester, file):
         level="error" if has_critical_errors or not result.updated else "success",
         message=message,
         invalid_lines=result.student_issues,
+        updated=result.updated,
+        skipped_empty=result.skipped_empty,
+        skipped_unknown_columns=result.skipped_unknown_columns,
+        skipped_unknown_students=result.skipped_unknown_students,
+        skipped_invalid_scores=result.skipped_invalid_scores,
+        unknown_columns=result.unknown_columns,
     )
 
 

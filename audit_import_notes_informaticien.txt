@@ -1,0 +1,213 @@
+AUDIT IMPORT DES NOTES - DASHBOARD INFORMATICIEN
+Date: 2026-05-15
+
+Objectif
+Analyser l'existant sur l'import Excel des notes, juger la fiabilite du backend et proposer un template/workflow plus professionnel, fidele a la maquette notes.
+
+1. Fichiers analyses
+
+- templates/portal/informaticien/workflows/import_workspace.html
+- ui/templates/informaticien/import_panel.html
+- portal/templates/portal/staff/it_grades_import.html
+- portal/views/it_workflows.py
+- portal/views/it_grades_import.py
+- portal/services/informaticien_workflows.py
+- academics/views_import.py
+- academics/imports/import_service.py
+- academics/imports/template_service.py
+- portal/templates/portal/admin/grades/partials/notes_grid.html
+
+2. Etat actuel
+
+Il existe deux experiences d'import:
+
+1. Workflow informaticien integre
+   - URL: accounts_portal:it_import_workspace
+   - Template: templates/portal/informaticien/workflows/import_workspace.html
+   - Composant: ui/templates/informaticien/import_panel.html
+   - Upload: accounts_portal:it_import_upload
+   - Retour: HTML dans le workspace.
+
+2. Ancienne page autonome d'import
+   - URL: accounts_portal:it_grades_import
+   - Template: portal/templates/portal/staff/it_grades_import.html
+   - Upload: academics:upload_grades
+   - Retour: JSON traite en JavaScript.
+
+Le backend commun repose sur:
+- academics.imports.template_service.generate_import_template
+- academics.imports.import_service.import_grades
+
+3. Ce qui marche bien
+
+- Le template Excel est genere dynamiquement par classe et semestre.
+- Le fichier attendu contient 4 lignes de contexte, puis NOM, PRENOM, puis une colonne par EC.
+- Les colonnes matieres sont mappees avec tolerance:
+  - libelle exact "UE - EC";
+  - titre EC seul si non ambigu;
+  - correspondance partielle si unique.
+- Les noms/prenoms sont normalises avec unidecode, uppercase et trim, ce qui limite les erreurs d'accents/casse.
+- Les notes sont converties avec support de la virgule francaise.
+- Les scores hors 0-20 sont detectes.
+- L'import est atomique: si des erreurs critiques existent, aucune note n'est inseree.
+- Les imports sont limites a l'annexe de l'informaticien.
+- Le service applique apply_ec_grade apres creation/mise a jour de chaque note.
+
+4. Risques et limites fonctionnelles
+
+- L'import ecrit toujours dans normal_score.
+  Il ne tient pas compte de la session active normale/rattrapage. Si l'objectif est aussi d'importer des notes de rattrapage, il manque un champ session_type et une logique retake_score.
+
+- Le matching etudiant repose uniquement sur NOM/PRENOM.
+  C'est fragile en cas d'homonymes, de changement d'orthographe, ou de saisie approximative. Le template devrait inclure une colonne technique stable: matricule ou enrollment_id, meme si elle est masquee/verrouillee.
+
+- skipped_empty compte chaque cellule vide par EC.
+  Ce n'est pas faux techniquement, mais en interface cela peut donner un chiffre tres eleve et peu utile. Mieux vaut afficher "cellules vides ignorees" en secondaire, pas comme anomalie forte.
+
+- skipped_unknown_columns n'est pas critique.
+  Aujourd'hui le workflow integre peut afficher peu d'explication. Il faut differencier les colonnes ignorees non bloquantes des erreurs bloquantes.
+
+- Les erreurs critiques sont groupees sous "ligne invalide", mais le rendu actuel ne donne pas une lecture assez operationnelle: ligne, etudiant, type d'erreur, action attendue.
+
+- Le workflow integre HTML et l'ancien workflow JSON ne sont pas alignes.
+  L'ancien ecran autonome est plus explicatif et affiche plus de preview; le workflow integre est plus pauvre visuellement.
+
+5. Limites UI actuelles
+
+Le composant ui/templates/informaticien/import_panel.html est trop minimal:
+- selection classe/semestre basique;
+- pas de resume clair du contexte;
+- pas de preview du format Excel attendu;
+- pas de liste UE/EC lisible avant telechargement;
+- pas de zone "controle avant import";
+- feedback trop simple;
+- pas de separation entre "succes", "avertissements" et "erreurs bloquantes";
+- pas de vraie coherence visuelle avec la maquette notes/resultats.
+
+Le template portal/staff/it_grades_import.html est plus complet, mais:
+- il est hors du nouveau dashboard informaticien;
+- il presente des textes avec problemes d'encodage visibles dans le fichier source;
+- il utilise du JavaScript fetch autonome, alors que le workflow informaticien principal est HTMX;
+- il duplique une partie de l'experience au lieu de servir de base unique.
+
+6. Template recommande pour le workflow import
+
+Je recommande de remplacer le panneau actuel par une interface en 4 blocs, dans le style du dashboard informaticien et de la maquette notes.
+
+Bloc A - Contexte
+- Classe selectionnee
+- Annee academique
+- Semestre
+- Etat workflow du semestre
+- Nombre d'etudiants actifs
+- Nombre d'UE / EC attendus
+- Badge indiquant si l'import est autorise pour la session normale ou le rattrapage.
+
+Bloc B - Preparation du fichier
+- Bouton principal: Telecharger le modele Excel
+- Bouton secondaire: Exporter les notes existantes
+- Mini-table preview:
+  NOM | PRENOM | UE1 - EC1 | UE1 - EC2 | ...
+- Liste compacte UE -> EC avec coefficient et credits.
+- Message clair: "Ne renommez pas les colonnes matieres; conservez NOM/PRENOM."
+
+Bloc C - Import
+- Dropzone fichier Excel .xlsx
+- Nom du fichier selectionne
+- Bouton "Verifier et importer"
+- Etat loading HTMX
+- Protection si classe/semestre non selectionnes.
+
+Bloc D - Resultat
+- KPI:
+  - Notes importees
+  - Lignes bloquees
+  - Notes invalides
+  - Etudiants introuvables
+  - Colonnes ignorees
+- Tableau des erreurs:
+  - Ligne Excel
+  - Etudiant
+  - Type
+  - Message
+  - Action conseillee
+- Si succes: bouton "Ouvrir la grille des notes" vers accounts_portal:it_notes_flow_workspace avec class_id + semester_id.
+
+7. Ameliorations backend recommandees
+
+Priorite 1
+- Unifier les deux chemins d'import.
+  Le dashboard informaticien devrait consommer une seule logique de contexte et un seul service d'import.
+
+- Ajouter une colonne stable dans le template Excel:
+  MATRICULE ou ENROLLMENT_ID.
+  Le matching devrait tenter:
+  1. enrollment_id/matricule;
+  2. NOM/PRENOM en fallback;
+  3. erreur si ambigu.
+
+- Ajouter des tests dedies a import_grades:
+  - import nominal;
+  - note virgule "12,5";
+  - note hors 0-20;
+  - etudiant inconnu;
+  - colonne inconnue;
+  - rollback si erreur critique;
+  - semestre hors classe.
+
+Priorite 2
+- Prendre en compte la session cible:
+  - normal -> normal_score;
+  - retake -> retake_score uniquement si le workflow autorise le rattrapage.
+
+- Retourner un objet feedback plus riche dans import_notes_file:
+  - updated
+  - skipped_empty
+  - skipped_unknown_columns
+  - skipped_unknown_students
+  - skipped_invalid_scores
+  - student_issues
+  - unknown_columns
+  - blocking_errors_count
+  - warnings_count
+
+Priorite 3
+- Ajouter validation MIME/extension stricte .xlsx.
+- Ajouter une limite de taille claire.
+- Ajouter un onglet "Instructions" dans le fichier Excel genere.
+- Verrouiller les colonnes NOM/PRENOM et les entetes dans le template Excel.
+
+8. Proposition de prochaine implementation
+
+Je propose de proceder en deux passes.
+
+Passe 1 - UI professionnelle sans changer la logique metier
+- Refaire ui/templates/informaticien/import_panel.html.
+- Enrichir build_import_context avec:
+  - ues;
+  - import_preview;
+  - workflow_permissions;
+  - student_count;
+  - ec_count;
+  - notes_state.
+- Garder accounts_portal:it_import_upload.
+- Ameliorer l'affichage du feedback existant.
+
+Passe 2 - Robustesse import
+- Ajouter matricule/enrollment_id au template Excel.
+- Adapter import_grades.
+- Ajouter tests unitaires et tests endpoint.
+- Ajouter support session normale/rattrapage si valide pour le processus pedagogique.
+
+9. Verdict
+
+Le moteur d'import actuel n'est pas mauvais; il est meme plutot prudent grace au rollback implicite avant insertion si des erreurs critiques sont detectees.
+
+Le probleme principal est l'experience utilisateur:
+- trop brute;
+- pas assez guidee;
+- pas assez proche de la maquette notes;
+- feedback insuffisamment lisible;
+- deux interfaces d'import coexistent.
+
+La bonne direction est donc de professionnaliser le panneau import du dashboard informaticien, en s'appuyant sur la logique existante, puis de renforcer le matching etudiant avec une cle stable.

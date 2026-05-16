@@ -32,6 +32,7 @@ def academic_classes_for_branch(*, branch):
     queryset = (
         AcademicClass.objects.select_related("programme", "branch", "academic_year")
         .prefetch_related("semesters")
+        .filter(is_archived=False)
         .annotate(effectif=Count("enrollments", filter=Q(enrollments__is_active=True), distinct=True))
     )
     if branch:

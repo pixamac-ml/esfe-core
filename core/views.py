@@ -542,30 +542,37 @@ def contact_view(request):
             contact_message.ip_address = request.META.get("REMOTE_ADDR")
             contact_message.user_agent = request.META.get("HTTP_USER_AGENT", "")
             contact_message.save()
+            message_context = contact_message.to_email_context()
 
-            EmailService.send_transactional(
-                subject=f"[CONTACT] {contact_message.get_subject_display()}",
-                recipient_email=settings.DEFAULT_FROM_EMAIL,
-                source_app="core",
-                event_type="contact_internal",
-                html_template="emails/contact_internal.html",
-                context={"message_obj": contact_message},
-                dispatch_on_commit=False,
-                legacy_source="core.contact_view",
-                legacy_object_id=getattr(contact_message, "pk", ""),
-            )
+            try:
+                EmailService.send_transactional(
+                    subject=f"[CONTACT] {contact_message.get_subject_display()}",
+                    recipient_email=settings.DEFAULT_FROM_EMAIL,
+                    source_app="core",
+                    event_type="contact_internal",
+                    html_template="emails/contact_internal.html",
+                    context={"message_obj": message_context},
+                    dispatch_on_commit=False,
+                    legacy_source="core.contact_view",
+                    legacy_object_id=getattr(contact_message, "pk", ""),
+                )
+            except Exception:
+                logger.exception("Echec notification interne contact id=%s", contact_message.pk)
 
-            EmailService.send_transactional(
-                subject="Votre demande a bien ete recue",
-                recipient_email=contact_message.email,
-                source_app="core",
-                event_type="contact_received",
-                html_template="emails/contact_received.html",
-                context={"message_obj": contact_message},
-                dispatch_on_commit=False,
-                legacy_source="core.contact_view",
-                legacy_object_id=getattr(contact_message, "pk", ""),
-            )
+            try:
+                EmailService.send_transactional(
+                    subject="Votre demande a bien ete recue",
+                    recipient_email=contact_message.email,
+                    source_app="core",
+                    event_type="contact_received",
+                    html_template="emails/contact_received.html",
+                    context={"message_obj": message_context},
+                    dispatch_on_commit=False,
+                    legacy_source="core.contact_view",
+                    legacy_object_id=getattr(contact_message, "pk", ""),
+                )
+            except Exception:
+                logger.exception("Echec accuse reception contact id=%s", contact_message.pk)
 
             return render(
                 request,

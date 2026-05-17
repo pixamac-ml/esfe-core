@@ -782,7 +782,7 @@ class ContactMessageAdmin(admin.ModelAdmin):
         if reply_added and not already_answered:
             staff_name = request.user.get_full_name() or request.user.username
             context = {
-                "message_obj": obj,
+                "message_obj": obj.to_email_context(),
                 "institution_name": "École de Santé Félix Houphouët Boigny",
                 "staff_name": staff_name,
                 "contact_email": settings.DEFAULT_FROM_EMAIL,

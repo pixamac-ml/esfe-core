@@ -23,7 +23,7 @@
                 :class="String(formData.branch_id) === '{{ branch.id }}' ? 'border-[#1db5b0] bg-[#1db5b0]/10 ring-1 ring-[#1db5b0]/35' : (errors.branch_id ? 'border-red-400 ring-1 ring-red-300/60' : 'border-slate-200 hover:border-[#1db5b0]/60')"
                 @click="formData.branch_id='{{ branch.id }}'; formData.branch_name='{{ branch.name|escapejs }}'; formData.branch_city='{{ branch.city|default:''|escapejs }}'; formData.campus_image='{% if branch.image %}{{ branch.image.url }}{% endif %}'; formData.formation=''; formData.formation_slug=''; activeCycle = formData.current_level || activeCycle || 'all'; errors.documents=''; subStep = 'program'; step3Phase = 'program';"
                 hx-get="{% url 'admissions:admission_step3_formations' %}"
-                hx-vals='{"branch_id": "{{ branch.id }}"}'
+                hx-vals='js:{branch_id: "{{ branch.id }}", current_level: document.querySelector("[name=current_level]") ? document.querySelector("[name=current_level]").value : ""}'
                 hx-include="[name='current_level']"
                 hx-target="#step3-formations-list"
                 hx-indicator="#step3-formations-loading"
@@ -68,14 +68,14 @@
       </div>
 
       <div class="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 pr-1 custom-scrollbar" data-aos="fade-up" data-aos-delay="300">
-        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'all' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='all'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "all"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Tous les programmes</button>
-        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'licence' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='licence'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "licence"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Licence</button>
-        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'master' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='master'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='{"cycle": "master"}' hx-include="[name='branch_id']" hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Master</button>
+        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'all' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='all'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='js:{cycle: "all", branch_id: document.querySelector("[name=branch_id]") ? document.querySelector("[name=branch_id]").value : ""}' hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Tous les programmes</button>
+        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'licence' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='licence'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='js:{cycle: "licence", branch_id: document.querySelector("[name=branch_id]") ? document.querySelector("[name=branch_id]").value : ""}' hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Licence</button>
+        <button type="button" class="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition" :class="activeCycle === 'master' ? 'bg-[#1e4f6f] text-white border-[#1e4f6f]' : 'border-slate-300 text-slate-700 hover:border-[#1db5b0]'" @click="activeCycle='master'" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='js:{cycle: "master", branch_id: document.querySelector("[name=branch_id]") ? document.querySelector("[name=branch_id]").value : ""}' hx-target="#step3-formations-list" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">Master</button>
       </div>
 
       <div class="relative" data-aos="fade-up" data-aos-delay="300">
         <span id="step3-formations-loading" class="htmx-indicator htmx-loading-indicator" aria-hidden="true"></span>
-        <div id="step3-formations-list" data-field="formation_slug" class="htmx-fade-zone rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-include="[name='branch_id'],[name='current_level']" hx-trigger="admission-step-3 from:body" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">
+        <div id="step3-formations-list" data-field="formation_slug" class="htmx-fade-zone rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600" hx-get="{% url 'admissions:admission_step3_formations' %}" hx-vals='js:{branch_id: document.querySelector("[name=branch_id]") ? document.querySelector("[name=branch_id]").value : "", current_level: document.querySelector("[name=current_level]") ? document.querySelector("[name=current_level]").value : ""}' hx-trigger="admission-step-3 from:body" hx-indicator="#step3-formations-loading" hx-swap="innerHTML">
           Selectionnez un campus pour afficher ses formations.
         </div>
       </div>
@@ -112,7 +112,7 @@
         <div id="step3-documents-list"
              class="htmx-fade-zone rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-5 text-sm text-slate-600"
              hx-get="{% url 'admissions:admission_step3_documents' %}"
-             hx-include="[name='formation_slug']"
+             hx-vals='js:{formation_slug: document.querySelector("[name=formation_slug]") ? document.querySelector("[name=formation_slug]").value : ""}'
              hx-trigger="load, admission-step-3-documents from:body, change from:[name='formation_slug']"
              hx-indicator="#step3-documents-loading"
              hx-swap="innerHTML">

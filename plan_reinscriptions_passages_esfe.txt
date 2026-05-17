@@ -1,0 +1,254 @@
+PLAN REINSCRIPTIONS, PASSAGES, REDOUBLEMENTS ET CAS ETUDIANTS - ESFE V1
+
+Objectif
+Mettre en place un workflow propre pour faire passer les etudiants d'une annee academique a l'autre apres archivage/cloture, sans perdre l'historique des inscriptions, paiements, notes, classes et dossiers.
+
+Constat actuel
+- AcademicEnrollment peut deja representer une affectation academique par annee/classe pour un utilisateur.
+- Inscription est liee en OneToOne a une Candidature.
+- Student est lie en OneToOne a une Inscription, ce qui pose probleme pour une vraie scolarite multi-annees.
+- Les notes, paiements et archives doivent rester consultables sur l'annee d'origine.
+- L'archivage V1 doit etre considere comme la cloture technique avant de lancer les passages/reinscriptions.
+
+Principe directeur
+Ne pas ecraser l'ancienne inscription.
+Chaque nouvelle annee doit creer une nouvelle inscription administrative et une nouvelle AcademicEnrollment, mais l'etudiant conserve le meme compte utilisateur et le meme matricule.
+
+Termes metier a stabiliser
+- Reinscription : creation du dossier administratif de l'etudiant pour une nouvelle annee academique.
+- Passage : l'etudiant valide son annee et monte au niveau superieur.
+- Redoublement : l'etudiant reste dans le meme niveau sur la nouvelle annee.
+- Reorientation : l'etudiant change de programme/filiere.
+- Transfert : l'etudiant change d'annexe/campus.
+- Suspension / abandon : l'etudiant ne continue pas l'annee suivante.
+
+Decision technique recommandee
+V1 pragmatique :
+- Garder User comme identite etudiant principale.
+- Garder Student comme profil etudiant/matricule.
+- Ajouter a Student un champ current_inscription nullable ou current_academic_enrollment nullable serait ideal, mais cela demande une migration.
+- En attendant, utiliser AcademicEnrollment comme source principale de l'historique academique.
+- Pour les nouveaux dossiers, creer une nouvelle Candidature interne et une nouvelle Inscription, puis creer une nouvelle AcademicEnrollment rattachee au meme User.
+
+Evolution modele recommandee
+1. Student
+   - Ajouter current_inscription = ForeignKey(Inscription, null=True, blank=True, related_name="current_students")
+   - Garder inscription historique actuel pour compatibilite temporaire.
+   - A terme, renommer l'actuel Student.inscription en initial_inscription ou le remplacer par une relation historique.
+
+2. Nouveau modele StudentYearDecision
+   Champs proposes :
+   - student_user / student_profile
+   - source_enrollment
+   - source_academic_year
+   - source_class
+   - decision: promoted, repeated, reoriented, transferred, suspended, abandoned, completed
+   - target_academic_year
+   - target_class nullable
+   - target_programme nullable
+   - target_branch nullable
+   - reason / notes
+   - decided_by
+   - decided_at
+   - status: draft, validated, applied, cancelled
+
+3. Nouveau modele ReEnrollmentBatch
+   Sert a traiter une classe ou une annee en lot.
+   Champs proposes :
+   - branch
+   - source_academic_year
+   - target_academic_year
+   - source_class nullable
+   - status: draft, validated, applied, cancelled
+   - created_by
+   - applied_by
+   - counters: promoted_count, repeated_count, suspended_count, errors_count
+   - snapshot JSON
+
+Workflow V1 recommande
+Etape 1 - Cloture / archivage
+- Archiver la classe ou l'annee terminee.
+- Les anciennes classes, affectations et inscriptions sortent des workflows actifs.
+- Les notes et paiements restent consultables dans le detail archive.
+
+Etape 2 - Preparation des decisions
+- Depuis le module informaticien ou direction pedagogique, choisir :
+  - annee source
+  - classe source
+  - annee cible
+- Charger tous les AcademicEnrollment archives ou finalises de la classe source.
+- Afficher pour chaque etudiant :
+  - matricule
+  - nom
+  - ancienne classe
+  - moyenne annuelle si disponible
+  - statut financier
+  - decision proposee
+
+Etape 3 - Calcul de proposition automatique
+Regles simples V1 :
+- Si moyenne annuelle >= seuil classe : proposer passage.
+- Si moyenne annuelle < seuil classe : proposer redoublement.
+- Si notes absentes ou incomplete : decision manuelle requise.
+- Si solde financier non regle : autoriser decision, mais bloquer activation finale ou marquer "sous reserve".
+
+Etape 4 - Validation manuelle
+- L'utilisateur peut changer la proposition :
+  - passage niveau superieur
+  - redoublement meme niveau
+  - suspension
+  - abandon
+  - transfert
+  - reorientation
+- Une justification est obligatoire pour redoublement, suspension, abandon, transfert et reorientation.
+
+Etape 5 - Application
+Pour chaque decision validee :
+- Creer une Candidature interne pour la nouvelle annee si necessaire.
+- Creer une Inscription pour la nouvelle annee.
+- Calculer les frais selon programme/niveau cible.
+- Creer AcademicEnrollment cible avec :
+  - meme User etudiant
+  - nouvelle Inscription
+  - nouvelle AcademicYear
+  - nouvelle AcademicClass
+  - programme/branch cible
+- Mettre a jour Student.current_inscription si ce champ est ajoute.
+- Garder le matricule et le compte utilisateur existants.
+
+Etape 6 - Paiement et activation
+- La nouvelle inscription demarre en awaiting_payment ou partial_paid selon les regles finance.
+- L'etudiant devient actif dans la nouvelle classe seulement si :
+  - decision appliquee
+  - inscription creee
+  - conditions financieres minimum respectees
+- Les anciennes inscriptions restent archivees ou completed.
+
+Cas metier a couvrir
+1. Passage normal
+- L1 2025-2026 vers L2 2026-2027.
+- Nouvelle inscription, nouvelle AcademicEnrollment, meme compte, meme matricule.
+
+2. Redoublement
+- L1 2025-2026 vers L1 2026-2027.
+- Nouvelle classe cible dans nouvelle annee, meme niveau.
+- Historique de notes conserve sur ancienne annee.
+
+3. Passage sous reserve
+- Moyenne validee mais solde financier restant.
+- Decision creee, inscription cible creee en attente, activation bloquee jusqu'au paiement minimum.
+
+4. Reorientation
+- Ancien programme A vers programme B.
+- Requiert validation manuelle et recalcul frais.
+- La classe cible doit correspondre au nouveau programme.
+
+5. Transfert d'annexe
+- Meme programme/niveau ou niveau superieur, mais autre branch.
+- Requiert permission direction/superadmin ou informaticien habilite.
+
+6. Suspension temporaire
+- Pas de nouvelle inscription active.
+- Student peut rester inactif ou en statut suspendu selon modele ajoute.
+
+7. Fin de cycle
+- L3 ou M2 valide.
+- Decision completed.
+- Pas de classe superieure obligatoire.
+- Possibilite de generer attestation/diplome plus tard.
+
+Permissions recommandees
+- Informaticien d'annexe :
+  - preparer les lots
+  - voir les etudiants de son annexe
+  - appliquer les passages simples dans son annexe
+- Direction pedagogique :
+  - valider redoublements, reorientations et fins de cycle
+  - forcer decision manuelle
+- Gestionnaire :
+  - confirmer conditions financieres
+  - activer inscription apres paiement
+- Superadmin :
+  - tout voir, tout restaurer, corriger un lot applique.
+
+Ecrans a creer
+1. Module "Passages & reinscriptions"
+- Filtres : annee source, classe source, annee cible.
+- Liste etudiants avec decision proposee.
+- Actions de masse : proposer passage, proposer redoublement, appliquer.
+
+2. Detail etudiant
+- Historique des inscriptions.
+- Historique des classes.
+- Notes par annee.
+- Paiements par inscription.
+- Decisions prises.
+
+3. Detail lot de reinscription
+- Compteurs.
+- Erreurs.
+- Decisions appliquees.
+- Liens vers nouvelles inscriptions.
+
+Services a creer
+- portal.services.reenrollment_service
+  - build_reenrollment_candidates(...)
+  - propose_student_decision(...)
+  - create_reenrollment_batch(...)
+  - validate_decision(...)
+  - apply_reenrollment_batch(...)
+  - apply_single_decision(...)
+  - rollback_unapplied_decision(...)
+
+Regles de securite
+- Interdire deux inscriptions actives pour le meme etudiant sur la meme annee academique et le meme programme.
+- Interdire une AcademicEnrollment cible si la classe cible est archivee ou inactive.
+- Interdire l'application d'un lot si l'annee source n'est pas archivee/finalisee.
+- Garder toutes les operations dans transaction.atomic.
+- Journaliser acteur, date, source, cible, decision et snapshot.
+
+Ordre d'implementation conseille
+Phase 1 - Socle donnees
+- Ajouter Student.current_inscription ou current_academic_enrollment.
+- Ajouter StudentYearDecision.
+- Ajouter ReEnrollmentBatch.
+- Ajouter contraintes anti-doublons.
+
+Phase 2 - Service metier
+- Candidats par classe source.
+- Proposition automatique passage/redoublement.
+- Application d'une decision simple.
+- Tests unitaires passage normal et redoublement.
+
+Phase 3 - Interface informaticien/direction
+- Ecran liste candidats.
+- Edition decision.
+- Application lot.
+- Detail lot.
+
+Phase 4 - Finance
+- Liaison nouvelle inscription -> paiement minimum.
+- Blocage activation si conditions non respectees.
+- Statut "sous reserve".
+
+Phase 5 - Cas avances
+- Transfert annexe.
+- Reorientation.
+- Suspension/abandon.
+- Fin de cycle.
+
+Tests prioritaires
+- Passage L1 vers L2 cree nouvelle inscription et nouvelle AcademicEnrollment.
+- Redoublement L1 vers L1 nouvelle annee conserve ancien historique.
+- Ancienne archive reste consultable.
+- Meme user et meme matricule conserves.
+- Paiements anciens non deplaces.
+- Notes anciennes non deplacees.
+- Blocage si classe cible inactive/archivee.
+- Blocage doublon meme annee/programme.
+- Permission annexe respectee.
+
+Point important avant codage
+Le choix critique est le modele Student.
+Si on garde Student.inscription comme inscription unique principale, les reinscriptions seront fragiles.
+La solution propre est de faire porter l'historique par Inscription + AcademicEnrollment, et de donner a Student un pointeur "current" vers l'inscription/enrollment active.

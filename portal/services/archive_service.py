@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, QuerySet
+from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicEnrollment, AcademicYear, ECGrade
@@ -90,22 +91,28 @@ def restore_archive_batch(*, branch, batch_id, actor):
     enrollment_ids = batch.snapshot.get("enrollment_ids", [])
     inscription_ids = batch.snapshot.get("inscription_ids", [])
     student_ids = batch.snapshot.get("student_ids", [])
+    state = batch.snapshot.get("state") or {}
 
-    AcademicClass.objects.filter(pk__in=class_ids, branch=branch).update(
-        is_archived=False,
-        archived_at=None,
-        is_active=True,
+    _restore_academic_classes(
+        class_ids=class_ids,
+        branch=branch,
+        state_map=state.get("classes") or {},
     )
-    AcademicEnrollment.objects.filter(pk__in=enrollment_ids, branch=branch).update(
-        is_archived=False,
-        archived_at=None,
-        is_active=True,
+    _restore_academic_enrollments(
+        enrollment_ids=enrollment_ids,
+        branch=branch,
+        state_map=state.get("enrollments") or {},
     )
-    Inscription.objects.filter(pk__in=inscription_ids, candidature__branch=branch).update(
-        is_archived=False,
-        archived_at=None,
+    _restore_inscriptions(
+        inscription_ids=inscription_ids,
+        branch=branch,
+        state_map=state.get("inscriptions") or {},
     )
-    Student.objects.filter(pk__in=student_ids, inscription__candidature__branch=branch).update(is_active=True)
+    _restore_students(
+        student_ids=student_ids,
+        branch=branch,
+        state_map=state.get("students") or {},
+    )
 
     batch.status = ArchiveBatch.STATUS_RESTORED
     batch.restored_by = actor
@@ -121,6 +128,7 @@ def archive_detail(*, branch, batch_id):
     class_ids = batch.snapshot.get("class_ids", [])
     enrollment_ids = batch.snapshot.get("enrollment_ids", [])
     inscription_ids = batch.snapshot.get("inscription_ids", [])
+    student_ids = batch.snapshot.get("student_ids", [])
     return {
         "batch": batch,
         "classes": AcademicClass.objects.select_related("programme", "academic_year").filter(pk__in=class_ids),
@@ -130,6 +138,7 @@ def archive_detail(*, branch, batch_id):
             "programme",
         ).filter(pk__in=enrollment_ids),
         "inscriptions": Inscription.objects.select_related("candidature", "academic_class").filter(pk__in=inscription_ids),
+        "students": Student.objects.select_related("user", "inscription__candidature").filter(pk__in=student_ids),
         "payments": Payment.objects.select_related("inscription", "agent").filter(inscription_id__in=inscription_ids),
         "grades": ECGrade.objects.select_related("enrollment", "ec", "ec__ue").filter(enrollment_id__in=enrollment_ids),
     }
@@ -201,11 +210,44 @@ def _build_snapshot(classes):
     student_user_ids = [item.student_id for item in enrollments if item.student_id]
     students = list(Student.objects.filter(user_id__in=student_user_ids))
     student_ids = [item.id for item in students]
+    inscriptions = list(Inscription.objects.filter(pk__in=inscription_ids))
     return {
         "class_ids": class_ids,
         "enrollment_ids": enrollment_ids,
         "inscription_ids": inscription_ids,
         "student_ids": student_ids,
+        "class_labels": {str(item.id): item.display_name for item in classes},
+        "state": {
+            "classes": {
+                str(item.id): {
+                    "is_active": item.is_active,
+                    "is_archived": item.is_archived,
+                    "archived_at": item.archived_at.isoformat() if item.archived_at else None,
+                }
+                for item in classes
+            },
+            "enrollments": {
+                str(item.id): {
+                    "is_active": item.is_active,
+                    "is_archived": item.is_archived,
+                    "archived_at": item.archived_at.isoformat() if item.archived_at else None,
+                }
+                for item in enrollments
+            },
+            "inscriptions": {
+                str(item.id): {
+                    "is_archived": item.is_archived,
+                    "archived_at": item.archived_at.isoformat() if item.archived_at else None,
+                }
+                for item in inscriptions
+            },
+            "students": {
+                str(item.id): {
+                    "is_active": item.is_active,
+                }
+                for item in students
+            },
+        },
         "classes_count": len(class_ids),
         "enrollments_count": len(enrollment_ids),
         "inscriptions_count": len(inscription_ids),
@@ -213,3 +255,50 @@ def _build_snapshot(classes):
         "grades_count": ECGrade.objects.filter(enrollment_id__in=enrollment_ids).count(),
         "payments_count": Payment.objects.filter(inscription_id__in=inscription_ids).count(),
     }
+
+
+def _ids_for_state(ids, state_map, field_name, expected, default):
+    resolved_ids = []
+    for object_id in ids:
+        item_state = state_map.get(str(object_id), {})
+        if item_state.get(field_name, default) is expected:
+            resolved_ids.append(object_id)
+    return resolved_ids
+
+
+def _snapshot_datetime(value):
+    return parse_datetime(value) if value else None
+
+
+def _restore_academic_classes(*, class_ids, branch, state_map):
+    for academic_class in AcademicClass.objects.filter(pk__in=class_ids, branch=branch):
+        item_state = state_map.get(str(academic_class.pk), {})
+        academic_class.is_active = item_state.get("is_active", True)
+        academic_class.is_archived = item_state.get("is_archived", False)
+        academic_class.archived_at = _snapshot_datetime(item_state.get("archived_at"))
+        academic_class.save(update_fields=["is_active", "is_archived", "archived_at"])
+
+
+def _restore_academic_enrollments(*, enrollment_ids, branch, state_map):
+    for enrollment in AcademicEnrollment.objects.filter(pk__in=enrollment_ids, branch=branch):
+        item_state = state_map.get(str(enrollment.pk), {})
+        enrollment.is_active = item_state.get("is_active", True)
+        enrollment.is_archived = item_state.get("is_archived", False)
+        enrollment.archived_at = _snapshot_datetime(item_state.get("archived_at"))
+        enrollment.save(update_fields=["is_active", "is_archived", "archived_at"])
+
+
+def _restore_inscriptions(*, inscription_ids, branch, state_map):
+    for inscription in Inscription.objects.filter(pk__in=inscription_ids, candidature__branch=branch):
+        item_state = state_map.get(str(inscription.pk), {})
+        inscription.is_archived = item_state.get("is_archived", False)
+        inscription.archived_at = _snapshot_datetime(item_state.get("archived_at"))
+        inscription.save(update_fields=["is_archived", "archived_at"])
+
+
+def _restore_students(*, student_ids, branch, state_map):
+    queryset = Student.objects.filter(pk__in=student_ids, inscription__candidature__branch=branch)
+    active_ids = _ids_for_state(student_ids, state_map, "is_active", True, True)
+    inactive_ids = [object_id for object_id in student_ids if object_id not in set(active_ids)]
+    queryset.filter(pk__in=active_ids).update(is_active=True)
+    queryset.filter(pk__in=inactive_ids).update(is_active=False)

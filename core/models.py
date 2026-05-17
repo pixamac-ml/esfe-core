@@ -803,6 +803,28 @@ class ContactMessage(models.Model):
         except Group.DoesNotExist:
             pass
 
+    def to_email_context(self):
+        return {
+            "id": self.id,
+            "reference": str(self.reference),
+            "full_name": self.full_name,
+            "email": self.email,
+            "phone": self.phone,
+            "subject": self.subject,
+            "get_subject_display": self.get_subject_display(),
+            "message": self.message,
+            "reply": self.reply,
+            "priority": self.priority,
+            "status": self.status,
+            "ip_address": self.ip_address,
+            "user_agent": self.user_agent,
+            "is_read": self.status != "new",
+            "created_at": self.created_at.isoformat() if self.created_at else "",
+            "created_at_display": self.created_at.strftime("%d/%m/%Y a %H:%M") if self.created_at else "",
+            "created_date_display": self.created_at.strftime("%d/%m/%Y") if self.created_at else "",
+            "created_time_display": self.created_at.strftime("%H:%M") if self.created_at else "",
+        }
+
     def save(self, *args, **kwargs):
         if self.subject == "payment":
             self.priority = "high"

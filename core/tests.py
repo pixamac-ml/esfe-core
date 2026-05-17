@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.urls import reverse
+from unittest.mock import patch
 
-from core.models import LegalPage, LegalSection
+from core.models import ContactMessage, LegalPage, LegalSection
 
 
 class LegalPagesTests(TestCase):
@@ -76,4 +77,24 @@ class SeoPlatformTests(TestCase):
 		response = self.client.get("/sitemap.xml")
 		self.assertEqual(response.status_code, 200)
 		self.assertIn("xml", response["Content-Type"])
+
+
+class ContactFormTests(TestCase):
+	@patch("core.views.EmailService.send_transactional")
+	def test_contact_post_creates_message_without_serialization_error(self, mock_send):
+		response = self.client.post(
+			reverse("core:contact"),
+			data={
+				"full_name": "Awa Traore",
+				"email": "awa@example.com",
+				"phone": "+22370000000",
+				"subject": "admission",
+				"message": "Je souhaite contacter l'ecole.",
+			},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(ContactMessage.objects.count(), 1)
+		self.assertContains(response, "Votre message a bien ete transmis", html=False)
+		self.assertEqual(mock_send.call_count, 2)
 

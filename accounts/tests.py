@@ -1765,11 +1765,23 @@ class PortalPhaseOneTests(TestCase):
 	def test_it_archives_class_and_restores_it(self):
 		it_user = self._create_user("portal_it_archive", position="it_support")
 		student_user = self._create_user("portal_archive_student", role="student")
+		inactive_user = self._create_user("portal_archive_inactive", role="student")
 		student = self._create_student_record(student_user, inscription_status=Inscription.STATUS_ACTIVE)
+		inactive_student = self._create_student_record(inactive_user, inscription_status=Inscription.STATUS_ACTIVE)
+		inactive_student.is_active = False
+		inactive_student.save(update_fields=["is_active"])
 		academic_year, academic_class, ec = self._create_academic_class_bundle("L4A")
 		enrollment = AcademicEnrollment.objects.create(
 			inscription=student.inscription,
 			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		AcademicEnrollment.objects.create(
+			inscription=inactive_student.inscription,
+			student=inactive_user,
 			programme=self.programme,
 			branch=self.branch,
 			academic_year=academic_year,
@@ -1817,6 +1829,8 @@ class PortalPhaseOneTests(TestCase):
 		batch = ArchiveBatch.objects.get(academic_class=academic_class)
 		self.assertEqual(batch.grades_count, 1)
 		self.assertEqual(batch.payments_count, 1)
+		self.assertIn(str(inactive_student.id), batch.snapshot["state"]["students"])
+		self.assertFalse(batch.snapshot["state"]["students"][str(inactive_student.id)]["is_active"])
 
 		restore = self.client.post(
 			reverse("accounts_portal:it_archives_action"),
@@ -1828,6 +1842,7 @@ class PortalPhaseOneTests(TestCase):
 		academic_class.refresh_from_db()
 		enrollment.refresh_from_db()
 		student.refresh_from_db()
+		inactive_student.refresh_from_db()
 		student.inscription.refresh_from_db()
 		batch.refresh_from_db()
 		self.assertFalse(academic_class.is_archived)
@@ -1836,6 +1851,7 @@ class PortalPhaseOneTests(TestCase):
 		self.assertTrue(enrollment.is_active)
 		self.assertFalse(student.inscription.is_archived)
 		self.assertTrue(student.is_active)
+		self.assertFalse(inactive_student.is_active)
 		self.assertEqual(batch.status, ArchiveBatch.STATUS_RESTORED)
 
 	def test_it_dashboard_can_toggle_scoped_staff_account(self):

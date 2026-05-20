@@ -27,7 +27,8 @@ POSITION_TO_CANONICAL = {
     "secretary": "staff_admin",
     "admissions": "staff_admin",
     "director_of_studies": "directeur_etudes",
-    "executive_director": "directeur_etudes",
+    "executive_director": "directeur_general",
+    "deputy_executive_director": "directeur_general",
     "branch_manager": "staff_admin",
     "academic_supervisor": "staff_admin",
     "it_support": "staff_admin",
@@ -38,6 +39,7 @@ GROUP_COMPAT_CLUSTERS = (
     ("admissions_managers", "admissions"),
     ("finance_agents", "finance"),
     ("executive_director", "executive"),
+    ("deputy_executive_director", "executive_director", "executive"),
     ("gestionnaire", "manager"),
 )
 
@@ -48,7 +50,8 @@ GROUP_TO_CANONICAL = {
     "finance": "staff_admin",
     "gestionnaire": "staff_admin",
     "manager": "staff_admin",
-    "executive_director": "directeur_etudes",
+    "executive_director": "directeur_general",
+    "deputy_executive_director": "directeur_general",
     "executive": "directeur_etudes",
 }
 
@@ -68,11 +71,18 @@ ACCESS_RULES = {
         "allow_global": True,
     },
     ("view_dashboard", "executive"): {
-        "groups": {"executive_director", "executive"},
-        "profile_roles": {"executive", "superadmin"},
-        "positions": {"director_of_studies", "executive_director", "super_admin"},
-        "canonical_roles": {"directeur_etudes", "super_admin"},
+        "groups": {"executive_director", "deputy_executive_director"},
+        "profile_roles": set(),
+        "positions": {"executive_director", "deputy_executive_director"},
+        "canonical_roles": {"directeur_general"},
         "allow_global": True,
+    },
+    ("view_dashboard", "director_studies"): {
+        "groups": set(),
+        "profile_roles": {"executive"},
+        "positions": {"director_of_studies"},
+        "canonical_roles": {"directeur_etudes"},
+        "allow_global": False,
     },
     ("view_dashboard", "manager"): {
         "groups": {"gestionnaire", "manager"},
@@ -103,7 +113,6 @@ ACCESS_RULES = {
             "finance",
             "gestionnaire",
             "manager",
-            "executive_director",
             "executive",
             "secretary",
             "secretaries",
@@ -116,11 +125,12 @@ ACCESS_RULES = {
             "admissions",
             "director_of_studies",
             "executive_director",
+            "deputy_executive_director",
             "branch_manager",
             "academic_supervisor",
             "super_admin",
         },
-        "canonical_roles": {"staff_admin", "directeur_etudes", "super_admin"},
+        "canonical_roles": {"staff_admin", "directeur_etudes", "directeur_general", "super_admin"},
         "allow_global": True,
     },
     ("view_portal", "dashboard"): {
@@ -174,9 +184,9 @@ def _is_global_user(user, *, profile_role=None, groups=None, canonical_role=None
 
     return bool(
         user.is_superuser
-        or profile_role in {"executive", "superadmin"}
-        or "executive_director" in groups
-        or canonical_role in {"directeur_etudes", "super_admin"}
+        or profile_role in {"superadmin"}
+        or bool({"executive_director", "deputy_executive_director"}.intersection(groups))
+        or canonical_role in {"directeur_general", "super_admin"}
     )
 
 
@@ -231,6 +241,8 @@ def get_user_position(user):
         position = "branch_manager"
     elif PaymentAgent.objects.filter(user=user).exists():
         position = "payment_agent"
+    elif "deputy_executive_director" in get_user_groups(user):
+        position = "deputy_executive_director"
     elif "executive_director" in get_user_groups(user):
         position = "executive_director"
     else:
@@ -272,6 +284,10 @@ def get_user_role(user):
     role = None
 
     if user.is_superuser:
+        role = "super_admin"
+    elif position in {"executive_director", "deputy_executive_director"}:
+        role = "directeur_general"
+    elif position == "super_admin":
         role = "super_admin"
     elif profile_role in PROFILE_ROLE_TO_CANONICAL:
         role = PROFILE_ROLE_TO_CANONICAL[profile_role]

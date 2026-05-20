@@ -10,6 +10,7 @@ from datetime import timedelta
 
 from payments.models import Payment, CashPaymentSession, PaymentAgent
 from inscriptions.models import Inscription
+from students.models import StudentYearDecision
 
 from .permissions import check_finance_access, is_global_viewer
 from .helpers import get_user_branch
@@ -165,6 +166,25 @@ def finance_dashboard(request):
         )
 
     # =====================================================
+    # VISAS FINANCE REINSCRIPTIONS
+    # =====================================================
+
+    reenrollment_decisions = StudentYearDecision.objects.select_related(
+        "student",
+        "source_enrollment",
+        "source_enrollment__branch",
+    )
+    if not is_global and branch is not None:
+        reenrollment_decisions = reenrollment_decisions.filter(source_enrollment__branch=branch)
+
+    reenrollment_finance_pending_count = reenrollment_decisions.filter(
+        workflow_status=StudentYearDecision.WORKFLOW_ACADEMIC_VALIDATED,
+    ).count()
+    reenrollment_finance_applied_count = reenrollment_decisions.filter(
+        workflow_status=StudentYearDecision.WORKFLOW_APPLIED,
+    ).count()
+
+    # =====================================================
     # TRI
     # =====================================================
 
@@ -211,6 +231,8 @@ def finance_dashboard(request):
 
         "branch": branch,
         "is_global": is_global,
+        "reenrollment_finance_pending_count": reenrollment_finance_pending_count,
+        "reenrollment_finance_applied_count": reenrollment_finance_applied_count,
 
         "dashboard_type": "finance"
 

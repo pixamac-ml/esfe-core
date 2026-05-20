@@ -19,7 +19,7 @@ def get_user_role(user):
     canonical_role = get_canonical_user_role(user)
     if canonical_role == "student":
         return "student"
-    if canonical_role in {"staff_admin", "directeur_etudes", "teacher"}:
+    if canonical_role in {"staff_admin", "directeur_etudes", "directeur_general", "teacher"}:
         return "staff"
     if canonical_role == "super_admin":
         return "admin"
@@ -46,6 +46,7 @@ def get_user_role(user):
             "manager",
             "executive",
             "executive_director",
+            "deputy_executive_director",
             "secretary",
             "secretaries",
         }
@@ -75,6 +76,12 @@ def role_required(expected_role):
 def get_post_login_portal_url(user):
     if not getattr(user, "is_authenticated", False):
         return reverse("accounts_portal:portal_home")
+
+    position = get_user_position(user)
+    if getattr(user, "is_superuser", False) or position == "super_admin":
+        return reverse("superadmin:dashboard")
+    if position in {"executive_director", "deputy_executive_director"}:
+        return reverse("accounts_portal:portal_dg")
 
     return reverse("accounts_portal:portal_dashboard")
 

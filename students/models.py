@@ -37,6 +37,15 @@ class Student(models.Model):
         db_index=True
     )
 
+    current_academic_enrollment = models.ForeignKey(
+        "academics.AcademicEnrollment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="current_students",
+        help_text="Inscription academique courante. L'ancien lien inscription reste conserve pour compatibilite.",
+    )
+
     # =====================================================
     # IDENTITÉ ACADÉMIQUE
     # =====================================================
@@ -148,6 +157,217 @@ class Student(models.Model):
 
         self.is_active = True
         self.save(update_fields=["is_active"])
+
+
+class StudentYearDecision(models.Model):
+    DECISION_PROMOTED = "promoted"
+    DECISION_PROMOTED_WITH_DEBT = "promoted_with_debt"
+    DECISION_REPEATED = "repeated"
+    DECISION_TRANSFERRED = "transferred"
+    DECISION_SUSPENDED = "suspended"
+    DECISION_ABANDONED = "abandoned"
+    DECISION_COMPLETED = "completed"
+
+    DECISION_CHOICES = [
+        (DECISION_PROMOTED, "Passage"),
+        (DECISION_PROMOTED_WITH_DEBT, "Passage avec dette"),
+        (DECISION_REPEATED, "Redoublement"),
+        (DECISION_TRANSFERRED, "Transfert"),
+        (DECISION_SUSPENDED, "Suspension"),
+        (DECISION_ABANDONED, "Abandon"),
+        (DECISION_COMPLETED, "Cycle termine"),
+    ]
+
+    WORKFLOW_DRAFT = "draft"
+    WORKFLOW_ACADEMIC_VALIDATED = "academic_validated"
+    WORKFLOW_FINANCE_VALIDATED = "finance_validated"
+    WORKFLOW_APPLIED = "applied"
+    WORKFLOW_REJECTED = "rejected"
+
+    WORKFLOW_STATUS_CHOICES = [
+        (WORKFLOW_DRAFT, "Brouillon"),
+        (WORKFLOW_ACADEMIC_VALIDATED, "Validee pedagogiquement"),
+        (WORKFLOW_FINANCE_VALIDATED, "Validee finance"),
+        (WORKFLOW_APPLIED, "Appliquee"),
+        (WORKFLOW_REJECTED, "Rejetee"),
+    ]
+
+    student = models.ForeignKey(
+        "students.Student",
+        on_delete=models.CASCADE,
+        related_name="year_decisions",
+    )
+    source_enrollment = models.ForeignKey(
+        "academics.AcademicEnrollment",
+        on_delete=models.PROTECT,
+        related_name="year_decisions",
+    )
+    source_academic_year = models.ForeignKey(
+        "academics.AcademicYear",
+        on_delete=models.PROTECT,
+        related_name="student_year_decisions_as_source",
+    )
+    source_class = models.ForeignKey(
+        "academics.AcademicClass",
+        on_delete=models.PROTECT,
+        related_name="student_year_decisions_as_source",
+    )
+    target_academic_year = models.ForeignKey(
+        "academics.AcademicYear",
+        on_delete=models.PROTECT,
+        related_name="student_year_decisions_as_target",
+        null=True,
+        blank=True,
+    )
+    target_class = models.ForeignKey(
+        "academics.AcademicClass",
+        on_delete=models.PROTECT,
+        related_name="student_year_decisions_as_target",
+        null=True,
+        blank=True,
+    )
+    decision = models.CharField(max_length=20, choices=DECISION_CHOICES, db_index=True)
+    workflow_status = models.CharField(
+        max_length=30,
+        choices=WORKFLOW_STATUS_CHOICES,
+        default=WORKFLOW_DRAFT,
+        db_index=True,
+    )
+    annual_average = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    decision_payload = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Trace de la regle academique automatique utilisee pour proposer la decision.",
+    )
+    note = models.TextField(blank=True)
+    proposed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="proposed_student_year_decisions",
+    )
+    academic_validated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="academic_validated_student_year_decisions",
+    )
+    academic_validated_at = models.DateTimeField(null=True, blank=True)
+    finance_validated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="finance_validated_student_year_decisions",
+    )
+    finance_validated_at = models.DateTimeField(null=True, blank=True)
+    applied_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applied_student_year_decisions",
+    )
+    applied_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rejected_student_year_decisions",
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    target_inscription = models.OneToOneField(
+        "inscriptions.Inscription",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_year_decision",
+    )
+    target_enrollment = models.OneToOneField(
+        "academics.AcademicEnrollment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_year_decision",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Decision annuelle etudiant"
+        verbose_name_plural = "Decisions annuelles etudiants"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "source_enrollment"],
+                name="students_unique_year_decision_per_enrollment",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["source_academic_year", "decision"]),
+            models.Index(fields=["source_class", "decision"]),
+            models.Index(fields=["target_academic_year", "decision"]),
+            models.Index(fields=["workflow_status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.student} - {self.source_academic_year} - {self.get_decision_display()}"
+
+    @property
+    def can_academic_validate(self):
+        return self.workflow_status == self.WORKFLOW_DRAFT
+
+    @property
+    def can_finance_validate(self):
+        return self.workflow_status == self.WORKFLOW_ACADEMIC_VALIDATED
+
+    @property
+    def can_apply(self):
+        return self.workflow_status == self.WORKFLOW_FINANCE_VALIDATED
+
+    @property
+    def can_reject(self):
+        return self.workflow_status not in {self.WORKFLOW_APPLIED, self.WORKFLOW_REJECTED}
+
+    def clean(self):
+        errors = {}
+
+        if self.source_enrollment_id and self.student_id:
+            if self.source_enrollment.student_id != self.student.user_id:
+                errors["source_enrollment"] = "L'inscription academique source ne correspond pas a l'etudiant."
+
+        if self.source_enrollment_id and self.source_class_id:
+            if self.source_enrollment.academic_class_id != self.source_class_id:
+                errors["source_class"] = "La classe source ne correspond pas a l'inscription academique."
+
+        if self.source_enrollment_id and self.source_academic_year_id:
+            if self.source_enrollment.academic_year_id != self.source_academic_year_id:
+                errors["source_academic_year"] = "L'annee source ne correspond pas a l'inscription academique."
+
+        if self.target_class_id:
+            if not self.target_class.is_active or self.target_class.is_archived:
+                errors["target_class"] = "La classe cible doit etre active et non archivee."
+            if self.target_academic_year_id and self.target_class.academic_year_id != self.target_academic_year_id:
+                errors["target_class"] = "La classe cible ne correspond pas a l'annee cible."
+            if self.source_enrollment_id:
+                if self.target_class.programme_id != self.source_enrollment.programme_id:
+                    errors["target_class"] = "La classe cible doit rester dans le meme programme en phase 1."
+                if self.target_class.branch_id != self.source_enrollment.branch_id:
+                    errors["target_class"] = "La classe cible doit rester dans la meme annexe en phase 1."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.source_enrollment_id:
+            self.source_academic_year = self.source_enrollment.academic_year
+            self.source_class = self.source_enrollment.academic_class
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class StudentAttendance(models.Model):

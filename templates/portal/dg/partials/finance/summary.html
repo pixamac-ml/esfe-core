@@ -1,0 +1,44 @@
+{% load humanize %}
+<div class="dg-card dg-card-pad">
+  <div class="dg-section-head">
+    <div>
+      <h3 class="dg-title">Finance consolidee</h3>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" class="dg-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance')" title="Detail"><i class="fa-regular fa-eye"></i></button>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div class="h-[220px]">
+      <canvas id="dgFinanceChart"></canvas>
+    </div>
+    <div class="space-y-3">
+      <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+        <p class="text-xs font-bold text-emerald-700">Revenus valides</p>
+        <p class="mt-1 text-lg font-black text-slate-900">{{ finance.revenue|intcomma }} FCFA</p>
+      </div>
+      <div class="rounded-xl border border-rose-100 bg-rose-50 p-3">
+        <p class="text-xs font-bold text-rose-700">Depenses suivies</p>
+        <p class="mt-1 text-lg font-black text-slate-900">{{ finance.expenses|intcomma }} FCFA</p>
+      </div>
+      <div class="rounded-xl border border-blue-100 bg-blue-50 p-3">
+        <p class="text-xs font-bold text-blue-700">Solde estime</p>
+        <p class="mt-1 text-lg font-black {% if finance.balance < 0 %}text-rose-700{% else %}text-slate-900{% endif %}">{{ finance.balance|intcomma }} FCFA</p>
+      </div>
+    </div>
+  </div>
+  <div class="mt-4 grid grid-cols-2 gap-3">
+    <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <p class="text-xs font-bold text-slate-500">Paiements valides</p>
+      <p class="mt-1 text-xl font-black text-slate-900">{{ finance.validated_payments|intcomma }}</p>
+    </div>
+    <div class="rounded-xl border border-amber-100 bg-amber-50 p-3">
+      <p class="text-xs font-bold text-amber-700">Paiements en attente</p>
+      <p class="mt-1 text-xl font-black text-amber-800">{{ finance.pending_payments|intcomma }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-100 bg-white p-3">
+      <p class="text-xs font-bold text-slate-500">Paiements annules</p>
+      <p class="mt-1 text-xl font-black text-slate-900">{{ finance.cancelled_payments|intcomma }}</p>
+    </div>
+  </div>
+</div>

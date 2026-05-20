@@ -1,0 +1,92 @@
+<div class="p-6">
+  <div class="mb-5 flex items-start justify-between gap-4">
+    <div>
+      <p class="text-xs font-black uppercase tracking-[.18em] text-emerald-600">RH / Staff</p>
+      <h3 class="mt-1 text-2xl font-black text-slate-950">Recruter un staff</h3>
+      <p class="mt-2 text-sm font-semibold text-slate-500">Creation employe, affectation annexe, generation d'acces et onboarding.</p>
+    </div>
+    <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50" onclick="dgCloseModal()">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+
+  {% if form and form.errors %}
+  <div class="mb-4 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+    Merci de corriger les champs signales.
+  </div>
+  {% endif %}
+
+  <form
+    method="post"
+    action="{% url 'accounts_portal:dg_recruit_staff' %}"
+    class="space-y-5"
+    onsubmit="return dgSubmitModalForm(this)"
+  >
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <label class="block">
+        <span class="text-xs font-black text-slate-500">Prenom</span>
+        <input name="first_name" value="{{ form.first_name.value|default:'' }}" class="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold" required>
+      </label>
+      <label class="block">
+        <span class="text-xs font-black text-slate-500">Nom</span>
+        <input name="last_name" value="{{ form.last_name.value|default:'' }}" class="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold" required>
+      </label>
+      <label class="block">
+        <span class="text-xs font-black text-slate-500">Email personnel</span>
+        <input type="email" name="personal_email" value="{{ form.personal_email.value|default:'' }}" class="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold">
+      </label>
+      <label class="block">
+        <span class="text-xs font-black text-slate-500">Email professionnel</span>
+        <input type="email" name="professional_email" value="{{ form.professional_email.value|default:'' }}" class="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold">
+      </label>
+      <label class="block">
+        <span class="text-xs font-black text-slate-500">Telephone</span>
+        <input name="phone" value="{{ form.phone.value|default:'' }}" class="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold">
+      </label>
+      <label class="block">
+        <span class="text-xs font-black text-slate-500">Salaire base</span>
+        <input type="number" min="0" name="salary_base" value="{{ form.salary_base.value|default:'' }}" class="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold">
+      </label>
+      <label class="block">
+        <span class="text-xs font-black text-slate-500">Annexe</span>
+        {{ form.branch }}
+      </label>
+      <label class="block">
+        <span class="text-xs font-black text-slate-500">Poste</span>
+        <select id="dg-recruit-position" name="position" class="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold" required>
+          {% for value,label in form.POSITION_CHOICES %}
+          <option value="{{ value }}" {% if form.position.value == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-bold">
+        <input type="checkbox" name="generate_access" checked>
+        Generer les acces
+      </label>
+      <label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-bold">
+        <input type="checkbox" name="send_access_email" checked>
+        Envoyer les acces par email
+      </label>
+    </div>
+
+    <div id="dg-recruit-other-fields" style="display:none" class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+      <p class="mb-3 text-sm font-black text-amber-800">Autre poste : cadrage metier obligatoire</p>
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <textarea name="business_description" class="min-h-24 rounded-xl border border-amber-200 px-3 py-2 text-sm font-semibold" placeholder="Description metier">{{ form.business_description.value|default:'' }}</textarea>
+        <textarea name="responsibilities" class="min-h-24 rounded-xl border border-amber-200 px-3 py-2 text-sm font-semibold" placeholder="Responsabilites">{{ form.responsibilities.value|default:'' }}</textarea>
+        <textarea name="expected_dashboard" class="min-h-24 rounded-xl border border-amber-200 px-3 py-2 text-sm font-semibold" placeholder="Dashboard souhaite">{{ form.expected_dashboard.value|default:'' }}</textarea>
+        <textarea name="required_permissions" class="min-h-24 rounded-xl border border-amber-200 px-3 py-2 text-sm font-semibold" placeholder="Permissions necessaires">{{ form.required_permissions.value|default:'' }}</textarea>
+        <textarea name="concerned_branches" class="md:col-span-2 min-h-20 rounded-xl border border-amber-200 px-3 py-2 text-sm font-semibold" placeholder="Annexes concernees">{{ form.concerned_branches.value|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
+      <button type="button" class="dg-action" onclick="dgCloseModal()">Annuler</button>
+      <button type="submit" class="dg-action dg-action-dark">Creer employe et acces</button>
+    </div>
+  </form>
+</div>

@@ -1,4 +1,5 @@
 from collections import defaultdict
+import csv
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -8,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db.models import Count, Q, Sum
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.urls.exceptions import NoReverseMatch
@@ -96,9 +97,22 @@ from portal.services.it_support_service import (
     update_account_email,
     update_support_ticket_status,
 )
-from portal.models import DirectorTeacherAssignment, SupportTicket
+from portal.models import DirectorTeacherAssignment, SupportAuditLog, SupportTicket
 from portal.views.it_grades_import import build_it_grade_selection_context
-from students.models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, StudentCase
+from portal.dg.services import (
+    build_dg_dashboard_context,
+    build_dg_drawer_context,
+    build_dg_section_context,
+)
+from portal.dg.forms import DgRecruitmentForm
+from portal.dg.rh_service import create_staff_from_recruitment
+from portal.dg.actions_service import (
+    create_finance_followup,
+    escalate_student_case,
+    resolve_attendance_alert,
+    resolve_student_case,
+)
+from students.models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, StudentCase, StudentYearDecision
 from students.services.attendance_service import (
     bulk_mark_student_attendance,
     get_student_attendance_history,
@@ -835,13 +849,13 @@ def _build_director_workspace_context(request, *, toast=None):
     return context
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_workspace(request):
     context = _build_director_workspace_context(request)
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_drawer(request):
     panel = (request.GET.get("panel") or "").strip().lower()
     section_map = {
@@ -878,7 +892,7 @@ def director_drawer(request):
     return render(request, template_name, context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_results_action(request):
     if request.method != "POST":
         return _deny_portal_access(request)
@@ -927,7 +941,7 @@ def director_results_action(request):
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_teacher_create(request):
     branch = _resolve_academic_branch(request)
     base_context = _build_director_workspace_context(request)
@@ -983,7 +997,7 @@ def director_teacher_create(request):
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_teacher_assign(request):
     """Modale d'affectation enseignant -> classe/EC/salle (GET: modal, POST: sauvegarde)."""
     branch = _resolve_academic_branch(request)
@@ -1120,7 +1134,7 @@ def director_teacher_assign(request):
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_teacher_contract_download(request, teacher_id: int):
     branch = _resolve_academic_branch(request)
     User = get_user_model()
@@ -1144,7 +1158,7 @@ def director_teacher_contract_download(request, teacher_id: int):
     return response
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_teacher_document_upload(request):
     base_context = _build_director_workspace_context(request)
     teacher_id_raw = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
@@ -1197,7 +1211,7 @@ def director_teacher_document_upload(request):
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_teacher_documents_modal(request):
     base_context = _build_director_workspace_context(request)
     teacher_id_raw = (request.GET.get("teacher_id") or "").strip()
@@ -1219,7 +1233,7 @@ def director_teacher_documents_modal(request):
     )
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_transfer_create(request):
     base_context = _build_director_workspace_context(request)
     if request.method == "GET":
@@ -1270,7 +1284,7 @@ def director_transfer_create(request):
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_teacher_document_review(request):
     if request.method != "POST":
         return _deny_portal_access(request)
@@ -1296,7 +1310,7 @@ def director_teacher_document_review(request):
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_transfer_review(request):
     if request.method != "POST":
         return _deny_portal_access(request)
@@ -2004,7 +2018,9 @@ def portal_dashboard(request):
         return redirect("secretary:secretary_dashboard")
     if position == "admissions":
         return redirect("accounts:admissions_dashboard")
-    if position in {"executive_director", "super_admin"}:
+    if position == "super_admin" or request.user.is_superuser:
+        return redirect("superadmin:dashboard")
+    if position in {"executive_director", "deputy_executive_director"}:
         return dg_portal(request)
     if position == "director_of_studies":
         return _render_director_dashboard(request)
@@ -2402,7 +2418,7 @@ def admissions_portal(request):
     return redirect("accounts_portal:portal_dashboard")
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_portal(request):
     return redirect("accounts_portal:portal_dashboard")
 
@@ -4223,7 +4239,7 @@ def _parse_director_planner_request(request):
     return branch, class_id, week_start
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_planner_hub(request):
     branch, class_id, week_start = _parse_director_planner_request(request)
     if branch is None:
@@ -4235,7 +4251,7 @@ def director_planner_hub(request):
     return render(request, "portal/staff/supervisor/partials/planner_class_hub.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_planner_view_workspace(request):
     branch, class_id, week_start = _parse_director_planner_request(request)
     if branch is None:
@@ -4247,7 +4263,7 @@ def director_planner_view_workspace(request):
     return render(request, "portal/staff/supervisor/partials/planner_view_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_planner_workspace(request):
     branch, class_id, week_start = _parse_director_planner_request(request)
     if branch is None:
@@ -4260,7 +4276,7 @@ def director_planner_workspace(request):
     return render(request, "portal/staff/supervisor/partials/planner_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_weekly_slots_workspace(request, class_id: int):
     branch = _resolve_academic_branch(request)
     if branch is None:
@@ -4286,7 +4302,7 @@ def director_weekly_slots_workspace(request, class_id: int):
     return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_weekly_slot_save(request, class_id: int):
     if request.method != "POST":
         return _deny_portal_access(request)
@@ -4380,7 +4396,7 @@ def director_weekly_slot_save(request, class_id: int):
     return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_week_materialize(request, class_id: int):
     if request.method != "POST":
         return _deny_portal_access(request)
@@ -4405,7 +4421,7 @@ def director_week_materialize(request, class_id: int):
     return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_month_materialize(request, class_id: int):
     if request.method != "POST":
         return _deny_portal_access(request)
@@ -4430,7 +4446,7 @@ def director_month_materialize(request, class_id: int):
     return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_create_schedule_event(request, class_id: int):
     if request.method != "POST":
         return _deny_portal_access(request)
@@ -4499,7 +4515,7 @@ def director_create_schedule_event(request, class_id: int):
     return render(request, "portal/staff/supervisor/partials/planner_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "academic_supervisor", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "academic_supervisor", "executive_director", "deputy_executive_director", "super_admin"})
 def schedule_class_print(request, class_id: int):
     branch = _resolve_academic_branch(request)
     if branch is None:
@@ -4528,7 +4544,7 @@ def schedule_class_print(request, class_id: int):
     )
 
 
-@_position_required({"director_of_studies", "academic_supervisor", "executive_director", "super_admin"})
+@_position_required({"director_of_studies", "academic_supervisor", "executive_director", "deputy_executive_director", "super_admin"})
 def schedule_teacher_print(request, teacher_id: int):
     branch = _resolve_academic_branch(request)
     if branch is None:
@@ -4560,126 +4576,282 @@ def schedule_teacher_print(request, teacher_id: int):
 @login_required
 def dg_portal(request):
     position = get_user_position(request.user)
-    if position not in {"executive_director", "super_admin"}:
+    if position not in {"executive_director", "deputy_executive_director"}:
         return HttpResponseForbidden("Accès réservé au Directeur Général.")
-    branches = list(
-        Branch.objects.filter(is_active=True)
-        .select_related("manager")
-        .order_by("name")
-    )
-    branch_ids = [branch.id for branch in branches]
+    context = build_dg_dashboard_context(request, _build_portal_context)
+    return render(request, "portal/dg/dashboard.html", context)
 
-    active_students_qs = Student.objects.filter(
-        is_active=True,
-        inscription__candidature__branch_id__in=branch_ids,
-    )
-    active_classes_qs = AcademicClass.objects.filter(
-        is_active=True,
-        branch_id__in=branch_ids,
-    )
-    active_inscriptions_qs = Inscription.objects.filter(
-        status__in={"partial_paid", "active"},
-        candidature__branch_id__in=branch_ids,
-    )
-    validated_payments_qs = Payment.objects.filter(
-        status=Payment.STATUS_VALIDATED,
-        inscription__candidature__branch_id__in=branch_ids,
-    )
-    alerts_qs = AttendanceAlert.objects.filter(
-        is_resolved=False,
-        branch_id__in=branch_ids,
-    )
 
-    last_30_days = timezone.now() - timedelta(days=30)
-    new_candidatures_30d = Candidature.objects.filter(
-        submitted_at__gte=last_30_days,
-        branch_id__in=branch_ids,
-        is_deleted=False,
-    ).count()
+@login_required
+def dg_section(request, section: str):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    context = build_dg_section_context(request, section, _build_portal_context)
+    template_map = {
+        "kpis": "portal/dg/partials/kpis/overview.html",
+        "alerts": "portal/dg/partials/alerts/priority_table.html",
+        "workflows": "portal/dg/partials/workflows/reenrollment.html",
+        "finance": "portal/dg/partials/finance/summary.html",
+        "annexes": "portal/dg/partials/annexes/performance_table.html",
+        "analytics": "portal/dg/partials/analytics/charts.html",
+        "schedule": "portal/dg/partials/schedule/overview.html",
+        "realtime": "portal/dg/partials/realtime/monitoring.html",
+        "rh": "portal/dg/partials/rh/staff.html",
+    }
+    template = template_map.get(section)
+    if not template:
+        return HttpResponseBadRequest("Section DG inconnue.")
+    return render(request, template, context)
 
-    branch_summaries = []
-    for branch in branches:
-        classes_for_branch = list(
-            AcademicClass.objects.filter(branch=branch, is_active=True)
-            .annotate(student_count=Count("enrollments", filter=Q(enrollments__is_active=True)))
-            .order_by("-student_count", "level", "programme__title")[:5]
-        )
-        top_programmes = list(
-            Candidature.objects.filter(branch=branch, is_deleted=False)
-            .values("programme__title")
-            .annotate(total=Count("id"))
-            .order_by("-total", "programme__title")[:3]
-        )
-        latest_payments = list(
-            Payment.objects.filter(
-                status=Payment.STATUS_VALIDATED,
-                inscription__candidature__branch=branch,
-            )
-            .select_related("inscription__candidature")
-            .order_by("-paid_at")[:5]
-        )
 
-        branch_summaries.append(
+@login_required
+def dg_drawer(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    return render(request, "portal/dg/drawers/detail.html", build_dg_drawer_context(request))
+
+
+@login_required
+def dg_modal(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    modal = (request.GET.get("modal") or "recruitment").strip().lower()
+    if modal == "recruitment":
+        return render(request, "portal/dg/modals/recruitment.html", {"form": DgRecruitmentForm()})
+    if modal in {"branch", "alert", "case", "workflow", "finance", "analytics", "realtime", "rh"}:
+        context = build_dg_drawer_context(request)
+        context.update(
             {
-                "branch": branch,
-                "manager_name": (
-                    branch.manager.get_full_name() or branch.manager.username
-                    if branch.manager
-                    else "Non assigne"
-                ),
-                "student_count": active_students_qs.filter(inscription__candidature__branch=branch).count(),
-                "class_count": active_classes_qs.filter(branch=branch).count(),
-                "active_inscription_count": active_inscriptions_qs.filter(candidature__branch=branch).count(),
-                "candidature_count": Candidature.objects.filter(branch=branch, is_deleted=False).count(),
-                "accepted_candidature_count": Candidature.objects.filter(
-                    branch=branch,
-                    status__in={"accepted", "accepted_with_reserve"},
-                    is_deleted=False,
-                ).count(),
-                "revenue_total": (
-                    validated_payments_qs.filter(inscription__candidature__branch=branch).aggregate(
-                        total=Sum("amount")
-                    )["total"]
-                    or 0
-                ),
-                "pending_expense_count": BranchExpense.objects.filter(
-                    branch=branch,
-                    status__in={BranchExpense.STATUS_SUBMITTED, BranchExpense.STATUS_APPROVED},
-                ).count(),
-                "open_alert_count": alerts_qs.filter(branch=branch).count(),
-                "top_classes": classes_for_branch,
-                "top_programmes": top_programmes,
-                "latest_payments": latest_payments,
+                "modal_kind": modal,
+                "modal_title": {
+                    "branch": "Fiche annexe detaillee",
+                    "alert": "Alerte detaillee",
+                    "case": "Dossier etudiant detaille",
+                    "workflow": "Workflow detaille",
+                    "finance": "Synthese financiere detaillee",
+                    "analytics": "Lecture analytique detaillee",
+                    "realtime": "Vue live detaillee",
+                    "rh": "Lecture RH detaillee",
+                }[modal],
+                "modal_finance": context.get("drawer_branch_finance") or context.get("drawer_finance") or context.get("finance"),
             }
         )
+        return render(request, "portal/dg/modals/detail.html", context)
+    return HttpResponseBadRequest("Modal DG inconnue.")
 
-    context = _build_portal_context(
-        request,
-        page_title="Dashboard Directeur Général",
-        module_cards=[
-            "Pilotage multi-annexes",
-            "Vue hierarchisee par annexe",
-            "Performance academique et financiere",
-            "Alertes operationnelles",
-        ],
-    )
-    context.update(
-        {
-            "dashboard_kind": "Direction generale",
-            "total_branches": len(branches),
-            "total_students": active_students_qs.count(),
-            "total_classes": active_classes_qs.count(),
-            "total_active_inscriptions": active_inscriptions_qs.count(),
-            "total_staff": Profile.objects.filter(
-                user_type="staff",
-                employment_status="active",
-            ).count(),
-            "total_validated_payments": validated_payments_qs.count(),
-            "total_revenue": validated_payments_qs.aggregate(total=Sum("amount"))["total"] or 0,
-            "open_alerts": alerts_qs.count(),
-            "new_candidatures_30d": new_candidatures_30d,
-            "branch_summaries": branch_summaries,
-            "generated_at": timezone.now(),
-        }
-    )
-    return render(request, "portal/dg/dashboard.html", context)
+
+@login_required
+def dg_recruit_staff(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    if request.method != "POST":
+        return HttpResponseBadRequest("Methode invalide.")
+    form = DgRecruitmentForm(request.POST)
+    if not form.is_valid():
+        return render(request, "portal/dg/modals/recruitment.html", {"form": form}, status=400)
+    result = create_staff_from_recruitment(actor=request.user, form=form)
+    return render(request, "portal/dg/modals/recruitment_success.html", result)
+
+
+@login_required
+def dg_action(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Acces reserve au Directeur General.")
+    if request.method != "POST":
+        return HttpResponseBadRequest("Methode invalide.")
+
+    action = (request.POST.get("action") or "").strip()
+    object_id = (request.POST.get("object_id") or "").strip()
+    if action not in {"resolve_alert", "resolve_case", "escalate_case", "followup_finance"}:
+        return JsonResponse({"ok": False, "message": "Action DG inconnue."}, status=400)
+    if not object_id.isdigit():
+        return JsonResponse({"ok": False, "message": "Reference invalide."}, status=400)
+
+    try:
+        if action == "resolve_alert":
+            result = resolve_attendance_alert(actor=request.user, alert_id=int(object_id))
+        elif action == "resolve_case":
+            result = resolve_student_case(actor=request.user, case_id=int(object_id))
+        elif action == "escalate_case":
+            result = escalate_student_case(actor=request.user, case_id=int(object_id))
+        else:
+            branch = Branch.objects.get(id=int(object_id), is_active=True)
+            result = create_finance_followup(actor=request.user, branch=branch)
+    except (AttendanceAlert.DoesNotExist, StudentCase.DoesNotExist, Branch.DoesNotExist):
+        return JsonResponse({"ok": False, "message": "Element introuvable."}, status=404)
+    return JsonResponse({"ok": True, **result})
+
+
+@login_required
+def dg_export(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Acces reserve au Directeur General.")
+    kind = (request.GET.get("kind") or "branches").strip().lower()
+    export_format = (request.GET.get("format") or "csv").strip().lower()
+    context = build_dg_dashboard_context(request, _build_portal_context)
+    rows = []
+
+    class _RowWriter:
+        def writerow(self, row):
+            rows.append([str(value) if value is not None else "" for value in row])
+
+    writer = _RowWriter()
+
+    if kind == "finance":
+        writer.writerow(["Annexe", "Revenus", "Depenses", "Solde", "Paiements valides", "Alertes ouvertes"])
+        for item in context["branch_summaries"]:
+            writer.writerow([
+                item["branch"].name,
+                item["revenue_total"],
+                item["expense_total"],
+                item["balance_total"],
+                len(item["latest_payments"]),
+                item["open_alert_count"],
+            ])
+    elif kind == "alerts":
+        writer.writerow(["Gravite", "Type", "Annexe", "Description", "Responsable", "Statut", "Age"])
+        for alert in context["priority_alerts"]:
+            writer.writerow([
+                alert.severity,
+                alert.type,
+                alert.branch_name,
+                alert.description,
+                alert.owner,
+                alert.status,
+                alert.age,
+            ])
+    elif kind == "students":
+        writer.writerow(["Matricule", "Nom", "Email", "Annexe", "Formation", "Classe", "Inscription", "Solde"])
+        branch_ids = [item["branch"].id for item in context["branch_summaries"]]
+        students_qs = (
+            Student.objects.filter(is_active=True, inscription__candidature__branch_id__in=branch_ids)
+            .select_related(
+                "inscription",
+                "inscription__candidature",
+                "inscription__candidature__branch",
+                "inscription__candidature__programme",
+                "current_academic_enrollment__academic_class",
+            )
+            .order_by("inscription__candidature__last_name", "inscription__candidature__first_name")
+        )
+        for student in students_qs:
+            candidature = student.inscription.candidature
+            writer.writerow([
+                student.matricule,
+                student.full_name,
+                candidature.email,
+                candidature.branch.name if candidature.branch else "",
+                candidature.programme.title if candidature.programme else "",
+                student.current_academic_enrollment.academic_class if student.current_academic_enrollment else "",
+                student.inscription.reference,
+                student.inscription.balance,
+            ])
+    elif kind == "payments":
+        writer.writerow(["Date", "Annexe", "Candidat", "Reference", "Methode", "Statut", "Montant", "Agent"])
+        branch_ids = [item["branch"].id for item in context["branch_summaries"]]
+        payments_qs = (
+            Payment.objects.filter(inscription__candidature__branch_id__in=branch_ids)
+            .select_related("agent__user", "inscription__candidature", "inscription__candidature__branch")
+            .order_by("-paid_at", "-id")
+        )
+        for payment in payments_qs:
+            candidature = payment.inscription.candidature
+            writer.writerow([
+                payment.paid_at.strftime("%Y-%m-%d %H:%M") if payment.paid_at else "",
+                candidature.branch.name if candidature.branch else "",
+                str(candidature),
+                payment.reference,
+                payment.get_method_display(),
+                payment.get_status_display(),
+                payment.amount,
+                payment.agent.user.get_full_name() or payment.agent.user.username if payment.agent else "",
+            ])
+    elif kind == "staff":
+        writer.writerow(["Nom", "Email", "Poste", "Role", "Annexe", "Statut", "Salaire", "Derniere activite"])
+        branch_ids = [item["branch"].id for item in context["branch_summaries"]]
+        staff_qs = (
+            Profile.objects.filter(user_type="staff")
+            .filter(Q(branch_id__in=branch_ids) | Q(branch__isnull=True))
+            .select_related("user", "branch")
+            .order_by("branch__name", "position", "user__last_name")
+        )
+        for profile in staff_qs:
+            writer.writerow([
+                profile.user.get_full_name() or profile.user.username,
+                profile.user.email,
+                profile.get_position_display() or profile.position,
+                profile.get_role_display() or profile.role,
+                profile.branch.name if profile.branch else "Global",
+                profile.get_employment_status_display(),
+                profile.salary_base,
+                profile.last_seen.strftime("%Y-%m-%d %H:%M") if profile.last_seen else "",
+            ])
+    elif kind == "audit":
+        writer.writerow(["Date", "Action", "Acteur", "Annexe", "Cible", "Details"])
+        branch_ids = [item["branch"].id for item in context["branch_summaries"]]
+        audit_qs = (
+            SupportAuditLog.objects.select_related("actor", "branch")
+            .filter(Q(branch_id__in=branch_ids) | Q(branch__isnull=True))
+            .order_by("-created_at")[:1000]
+        )
+        for row in audit_qs:
+            writer.writerow([
+                row.created_at.strftime("%Y-%m-%d %H:%M"),
+                row.get_action_type_display(),
+                row.actor.get_full_name() or row.actor.username if row.actor else "",
+                row.branch.name if row.branch else "",
+                row.target_label,
+                row.details,
+            ])
+    else:
+        writer.writerow(["Annexe", "Manager", "Etudiants", "Classes", "Inscriptions", "Candidatures", "Revenus", "Depenses", "Solde", "Performance"])
+        for item in context["branch_summaries"]:
+            writer.writerow([
+                item["branch"].name,
+                item["manager_name"],
+                item["student_count"],
+                item["class_count"],
+                item["active_inscription_count"],
+                item["candidature_count"],
+                item["revenue_total"],
+                item["expense_total"],
+                item["balance_total"],
+                item["performance_label"],
+            ])
+    if export_format == "xlsx":
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = f"DG {kind}"[:31]
+        for row in rows:
+            sheet.append(row)
+        if rows:
+            header_fill = PatternFill("solid", fgColor="0F172A")
+            for cell in sheet[1]:
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = header_fill
+            sheet.freeze_panes = "A2"
+            for column_cells in sheet.columns:
+                max_length = max(len(str(cell.value or "")) for cell in column_cells)
+                sheet.column_dimensions[column_cells[0].column_letter].width = min(max(max_length + 2, 12), 42)
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = f'attachment; filename="dg-{kind}.xlsx"'
+        workbook.save(response)
+        return response
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="dg-{kind}.csv"'
+    csv_writer = csv.writer(response)
+    for row in rows:
+        csv_writer.writerow(row)
+    return response

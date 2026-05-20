@@ -131,14 +131,11 @@ def calculate_ec_grade(note, coefficient, credit_required, threshold):
 
     note_coefficient = note_for_math * coefficient
 
-    if note_value is None:
-        credit_obtained = Decimal("0.00")
-        is_validated = False
-    elif note_for_math >= threshold:
+    if note_value is not None and note_for_math >= threshold:
         credit_obtained = credit_required
         is_validated = True
     else:
-        credit_obtained = (note_for_math * credit_required) / threshold
+        credit_obtained = Decimal("0.00")
         is_validated = False
 
     if credit_obtained < Decimal("0.00"):
@@ -197,7 +194,9 @@ def calculate_semester_summary(enrollment, semester):
     credits_obtained = result["credit_obtained"]
     threshold = resolve_threshold(enrollment)
     statut = "EN COURS"
-    if moyenne is not None and total_credits > Decimal("0.00"):
+    if result.get("is_complete") is False:
+        statut = "INCOMPLET"
+    elif moyenne is not None and total_credits > Decimal("0.00"):
         if moyenne >= threshold and credits_obtained >= total_credits:
             statut = "VALIDE"
         elif moyenne < threshold or credits_obtained < total_credits:
@@ -208,6 +207,7 @@ def calculate_semester_summary(enrollment, semester):
         "credits_obtenus": credits_obtained,
         "credits_requis": total_credits,
         "statut": statut,
+        "semester_result": result,
     }
 
 
@@ -224,9 +224,16 @@ def calculate_academic_year_summary(enrollment):
     total_credits = Decimal('0.00')
     credits_obtained = Decimal('0.00')
     threshold = resolve_threshold(enrollment)
+    missing_grades = 0
+    blocking_reasons = []
+    semester_summaries = []
     for semester in semesters:
         sem_summary = calculate_semester_summary(enrollment, semester)
+        semester_result = sem_summary.get("semester_result")
         semester_credits = sem_summary["credits_requis"]
+        semester_summaries.append(sem_summary)
+        if semester_result:
+            missing_grades += semester_result.get("missing_grades", 0)
         if sem_summary["moyenne"] is not None:
             total_note_coef += sem_summary["moyenne"] * semester_credits
             total_coef += semester_credits
@@ -234,7 +241,10 @@ def calculate_academic_year_summary(enrollment):
         credits_obtained += sem_summary["credits_obtenus"]
     moyenne = (total_note_coef / total_coef) if total_coef > 0 else None
     statut = "EN COURS"
-    if moyenne is not None:
+    if missing_grades:
+        statut = "INCOMPLET"
+        blocking_reasons.append(f"{missing_grades} note(s) manquante(s).")
+    elif moyenne is not None:
         if moyenne >= threshold and credits_obtained >= total_credits:
             statut = "VALIDE"
         elif moyenne < threshold or credits_obtained < total_credits:
@@ -245,4 +255,8 @@ def calculate_academic_year_summary(enrollment):
         "credits_obtenus": credits_obtained,
         "credits_requis": total_credits,
         "statut": statut,
+        "is_complete": missing_grades == 0,
+        "missing_grades": missing_grades,
+        "blocking_reasons": blocking_reasons,
+        "semester_summaries": semester_summaries,
     }

@@ -39,6 +39,7 @@ class Profile(models.Model):
         ("admissions", "Admissions"),
         ("director_of_studies", "Directeur des etudes"),
         ("executive_director", "Direction executive"),
+        ("deputy_executive_director", "Direction generale adjointe"),
         ("branch_manager", "Gestionnaire annexe"),
         ("academic_supervisor", "Surveillant academique"),
         ("it_support", "Informaticien"),

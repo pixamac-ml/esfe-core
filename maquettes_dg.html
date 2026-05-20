@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Direction Générale — Félix Santé</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--navy:#07162d;--navy2:#0b2343;--blue:#2563eb;--line:#e5e7eb;--soft:#f8fafc;--text:#0f172a}
+    *{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{background:#f6f8fc;color:var(--text)}
+    .scrollbar-thin::-webkit-scrollbar{width:7px;height:7px}.scrollbar-thin::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px}
+    .sidebar{background:linear-gradient(180deg,#08172d 0%,#081b36 47%,#061326 100%)}
+    .sidebar-link{display:flex;align-items:center;gap:.85rem;padding:.72rem .9rem;border-radius:.75rem;color:#dbe7ff;font-weight:600;font-size:.86rem;transition:.2s}.sidebar-link:hover{background:rgba(255,255,255,.075);color:#fff}.sidebar-link.active{background:linear-gradient(135deg,#3257ff,#4f46e5);color:#fff;box-shadow:0 14px 24px rgba(37,99,235,.25)}
+    .side-ico{width:1.25rem;text-align:center;font-size:.95rem}.badge-pill{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;font-size:.72rem;font-weight:800;padding:.2rem .48rem}
+    .card{background:white;border:1px solid #dfe7f3;border-radius:1rem;box-shadow:0 10px 30px rgba(15,23,42,.035)}
+    .kpi-card{height:145px;padding:1.15rem;border-radius:.9rem;position:relative;overflow:hidden;background:white;border:1px solid #dce6f3;box-shadow:0 10px 24px rgba(15,23,42,.035)}
+    .kpi-card:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(15,23,42,.07)}
+    .kpi-icon{position:absolute;right:1rem;top:1rem;width:3.25rem;height:3.25rem;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:1.15rem}.spark{position:absolute;left:.75rem;right:.75rem;bottom:.15rem;height:42px}
+    .filter{height:3.7rem;min-width:10.6rem;border:1px solid #dbe3ef;border-radius:.55rem;background:#fff;padding:.55rem .8rem}.filter label{display:block;font-size:.68rem;font-weight:700;color:#64748b;margin-bottom:.25rem}.filter select{width:100%;font-size:.88rem;font-weight:800;color:#0f172a;background:transparent;outline:none}
+    .status-dot{width:.55rem;height:.55rem;border-radius:999px;background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.12)}
+    table{border-collapse:collapse;width:100%} th{font-size:.69rem;color:#64748b;font-weight:800;text-align:left;background:#fbfcff;border-bottom:1px solid #e7edf6}td{font-size:.72rem;color:#0f172a;border-bottom:1px solid #edf2f7}th,td{padding:.62rem .62rem;white-space:nowrap}.row-hover:hover{background:#f8fbff}
+    .sev{font-size:.68rem;font-weight:800;border:1px solid;border-radius:.32rem;padding:.25rem .55rem}.sev-red{color:#ef233c;background:#fff5f5;border-color:#ef233c}.sev-orange{color:#f97316;background:#fff7ed;border-color:#fb923c}.sev-amber{color:#f59e0b;background:#fffbeb;border-color:#fbbf24}.tag{border-radius:.32rem;padding:.25rem .55rem;font-size:.68rem;font-weight:800}.tag-red{background:#fff1f2;color:#f43f5e}.tag-orange{background:#fff7ed;color:#f97316}.tag-green{background:#ecfdf5;color:#059669}.tag-blue{background:#eff6ff;color:#2563eb}.tag-cyan{background:#ecfeff;color:#0891b2}.tag-gray{background:#f1f5f9;color:#64748b}
+    .step{height:118px;border:1px solid #dfe7f3;border-radius:.75rem;background:#fff;padding:1rem;position:relative}.step-no{width:1.42rem;height:1.42rem;border-radius:.32rem;display:flex;align-items:center;justify-content:center;color:white;font-size:.75rem;font-weight:900}.arrow{display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:1.4rem}
+    .quick-action{display:flex;align-items:center;justify-content:space-between;border:1px solid #dce6f3;border-radius:.6rem;padding:.82rem .9rem;background:#fff;color:#2563eb;font-weight:800;font-size:.78rem}.quick-action:hover{background:#f8fbff;border-color:#bfdbfe}
+    .collapsed{width:86px}.collapsed .hide-on-collapse{display:none}.collapsed .sidebar-link{justify-content:center}.collapsed .sidebar-link span:not(.badge-pill){display:none}.collapsed .sidebar-link .ml-auto{display:none}.collapsed .logo-text{display:none}.collapsed .quick-box{display:none}
+    @media (max-width:1400px){.main-grid{grid-template-columns:1fr!important}.span-7,.span-5,.span-6,.span-4,.span-8{grid-column:span 12/span 12!important}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}.topbar{height:auto;align-items:flex-start;gap:1rem;flex-wrap:wrap}.filters{flex-wrap:wrap}.content{padding:1rem}.sidebar{position:fixed;z-index:80;height:100vh}.page-main{margin-left:0}.hide-mobile{display:none}}
+    @media (max-width:900px){.kpis{grid-template-columns:repeat(1,minmax(0,1fr))!important}.workflow-grid{grid-template-columns:1fr!important}.arrow{display:none}.filter{min-width:100%}.filters{width:100%}.topbar{padding:1rem}.content{padding:.75rem}.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}}
+  </style>
+</head>
+<body>
+<div class="min-h-screen flex overflow-hidden">
+  <aside id="sidebar" class="sidebar w-[260px] min-h-screen text-white flex flex-col transition-all duration-300">
+    <div class="h-[78px] px-5 flex items-center border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-sky-500 flex items-center justify-center shadow-lg"><i class="fa-solid fa-user-doctor text-xl"></i></div>
+        <div class="logo-text">
+          <div class="text-xl font-extrabold tracking-wide leading-tight">FÉLIX SANTÉ</div>
+          <div class="text-[11px] text-slate-300 mt-1">École de Santé FHB - Mali</div>
+        </div>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto scrollbar-thin py-5">
+      <div class="px-5 mb-3 text-[11px] uppercase tracking-[.18em] text-slate-400 hide-on-collapse">Pilotage exécutif</div>
+      <nav class="px-3 space-y-1.5">
+        <a class="sidebar-link active" href="#"><i class="side-ico fa-solid fa-network-wired"></i><span>Vue globale</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-table-columns"></i><span>Tableau de bord</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-regular fa-building"></i><span>Annexes</span><i class="fa-solid fa-chevron-down ml-auto text-xs hide-on-collapse"></i></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-hand-holding-dollar"></i><span>Finance</span><i class="fa-solid fa-chevron-down ml-auto text-xs hide-on-collapse"></i></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-cube"></i><span>Académique</span><i class="fa-solid fa-chevron-down ml-auto text-xs hide-on-collapse"></i></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-arrows-rotate"></i><span>Passages & Réinscriptions</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-triangle-exclamation"></i><span>Alertes & Risques</span><span class="badge-pill bg-rose-500 text-white ml-auto">12</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-regular fa-calendar-days"></i><span>Calendrier académique</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-user-group"></i><span>RH / Staff</span><span class="badge-pill bg-indigo-500 text-white ml-auto hide-on-collapse">Nouveau</span></a>
+        <a class="sidebar-link text-emerald-300" href="#"><i class="side-ico fa-solid fa-user-plus"></i><span>Recruter un staff</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-pen-nib"></i><span>Validations</span><span class="badge-pill bg-orange-400 text-white ml-auto">7</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-download"></i><span>Exports & Rapports</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-gear"></i><span>Paramètres</span><i class="fa-solid fa-chevron-down ml-auto text-xs hide-on-collapse"></i></a>
+      </nav>
+      <div class="px-5 mt-8 mb-3 text-[11px] uppercase tracking-[.18em] text-slate-400 hide-on-collapse">Outils rapides</div>
+      <nav class="px-3 space-y-1.5 quick-box">
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-magnifying-glass"></i><span>Recherche globale</span><span class="ml-auto text-[10px] border border-white/20 rounded px-1.5 py-0.5 text-slate-400">⌘K</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-regular fa-envelope"></i><span>Messagerie interne</span><span class="badge-pill bg-rose-500 text-white ml-auto">8</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-regular fa-file-lines"></i><span>Documents partagés</span></a>
+        <a class="sidebar-link" href="#"><i class="side-ico fa-solid fa-shield-halved"></i><span>Audit & Traçabilité</span></a>
+      </nav>
+    </div>
+    <div class="h-14 px-5 border-t border-white/10 flex items-center justify-between text-xs text-slate-300"><span class="font-bold hide-on-collapse"><i class="fa-solid fa-square-plus text-sky-400 mr-2"></i>FÉLIX SANTÉ</span><span>v2.0.0</span></div>
+  </aside>
+
+  <main class="page-main flex-1 h-screen overflow-y-auto scrollbar-thin">
+    <header class="topbar h-[78px] bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-40">
+      <div class="flex items-center gap-4">
+        <button id="toggleSidebar" class="w-10 h-10 rounded-lg hover:bg-slate-100 text-slate-900"><i class="fa-solid fa-bars-staggered text-lg"></i></button>
+        <div><h1 class="text-xl font-extrabold text-slate-950">Dashboard Direction Générale</h1><p class="text-sm text-slate-500 mt-1">Vue globale de l'ensemble des annexes</p></div>
+      </div>
+      <div class="filters flex items-center gap-3 hide-mobile">
+        <div class="filter"><label>Année académique</label><select><option>2024 - 2025</option></select></div>
+        <div class="filter"><label>Période</label><select><option>Ce mois</option></select></div>
+        <div class="filter"><label>Domaine</label><select><option>Vue globale</option></select></div>
+        <button class="h-[3.7rem] px-5 rounded-lg border border-slate-200 bg-white text-sm font-bold hover:bg-slate-50"><i class="fa-solid fa-rotate-right mr-2"></i>Réinitialiser</button>
+      </div>
+      <div class="flex items-center gap-5">
+        <button class="relative w-10 h-10 rounded-lg hover:bg-slate-100"><i class="fa-regular fa-bell text-lg"></i><span class="absolute -right-1 -top-1 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center">12</span></button>
+        <div class="flex items-center gap-3"><div class="text-right hide-mobile"><p class="text-sm font-extrabold">Directeur Général</p><p class="text-xs text-slate-500">PDG / Fondateur</p></div><img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=120&h=120&fit=crop&crop=faces" class="w-11 h-11 rounded-full object-cover border-2 border-white shadow" alt="Profil"></div>
+      </div>
+    </header>
+
+    <div class="content p-6 space-y-5">
+      <div class="flex items-center justify-end gap-4 text-xs text-slate-500"><div class="status-dot"></div><span>Système opérationnel</span><span>Mise à jour : 10:45:30</span><button class="h-10 px-4 rounded-lg bg-slate-950 text-white font-bold hover:bg-slate-800"><i class="fa-solid fa-download mr-2"></i>Exporter <i class="fa-solid fa-chevron-down ml-2 text-[10px]"></i></button></div>
+
+      <section class="kpis grid grid-cols-6 gap-4">
+        <div class="kpi-card"><div class="kpi-icon bg-blue-50 text-blue-600"><i class="fa-solid fa-users"></i></div><p class="text-sm font-extrabold text-blue-600">Étudiants totaux</p><h2 class="mt-3 text-2xl font-black">5 742</h2><p class="mt-2 text-xs text-slate-600">+12.4% vs mois dernier</p><canvas id="spark1" class="spark"></canvas></div>
+        <div class="kpi-card"><div class="kpi-icon bg-emerald-50 text-emerald-600"><i class="fa-solid fa-dollar-sign"></i></div><p class="text-sm font-extrabold text-emerald-600">Revenus consolidés</p><h2 class="mt-3 text-2xl font-black">142 850 000 <span class="text-sm font-semibold text-slate-500">FCFA</span></h2><p class="mt-2 text-xs text-slate-600">+18.7% vs mois dernier</p><canvas id="spark2" class="spark"></canvas></div>
+        <div class="kpi-card"><div class="kpi-icon bg-violet-50 text-violet-600"><i class="fa-regular fa-building"></i></div><p class="text-sm font-extrabold text-violet-600">Annexes actives</p><h2 class="mt-3 text-2xl font-black">6</h2><p class="mt-2 text-xs text-slate-600">1 en création</p></div>
+        <div class="kpi-card"><div class="kpi-icon bg-orange-50 text-orange-500"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-sm font-extrabold text-orange-500">Alertes critiques</p><h2 class="mt-3 text-2xl font-black text-orange-500">12</h2><p class="mt-2 text-xs text-rose-600">5 non résolues</p></div>
+        <div class="kpi-card"><div class="kpi-icon bg-rose-50 text-red-600"><i class="fa-regular fa-folder-open"></i></div><p class="text-sm font-extrabold text-red-600">Dossiers bloqués</p><h2 class="mt-3 text-2xl font-black text-red-600">18</h2><p class="mt-2 text-xs text-slate-600">Passages / Réinscriptions</p></div>
+        <div class="kpi-card"><div class="kpi-icon bg-cyan-50 text-cyan-600"><i class="fa-solid fa-chart-pie"></i></div><p class="text-sm font-extrabold text-cyan-600">Taux remplissage classes</p><h2 class="mt-3 text-2xl font-black text-cyan-600">76%</h2><p class="mt-2 text-xs text-slate-600">Bon niveau global</p></div>
+      </section>
+
+      <section class="main-grid grid grid-cols-12 gap-4">
+        <div class="card span-7 col-span-7 p-4">
+          <div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><h2 class="font-extrabold text-lg">Alertes prioritaires</h2><span class="badge-pill bg-rose-500 text-white">12</span></div><button class="h-8 px-3 rounded-md border border-slate-200 text-xs font-bold hover:bg-slate-50">Voir toutes</button></div>
+          <div class="overflow-auto scrollbar-thin"><table><thead><tr><th>Gravité</th><th>Type</th><th>Annexe</th><th>Description</th><th>Responsable</th><th>Statut</th><th>Âge</th></tr></thead><tbody>
+            <tr class="row-hover"><td><span class="sev sev-red">Critique</span></td><td>Finance</td><td>Annexe Kalaban</td><td>Paiements en attente élevés</td><td>Comptable</td><td><span class="tag tag-red">Nouveau</span></td><td>2h</td></tr>
+            <tr class="row-hover"><td><span class="sev sev-orange">Élevée</span></td><td>Académique</td><td>Annexe Sikasso</td><td>Classes surchargées (3)</td><td>Directeur des études</td><td><span class="tag tag-orange">En cours</span></td><td>5h</td></tr>
+            <tr class="row-hover"><td><span class="sev sev-orange">Élevée</span></td><td>Inscriptions</td><td>Annexe Bamako</td><td>Inscriptions non validées (27)</td><td>Scolarité</td><td><span class="tag tag-red">Nouveau</span></td><td>1j</td></tr>
+            <tr class="row-hover"><td><span class="sev sev-amber">Moyenne</span></td><td>Résultats</td><td>Annexe Kayes</td><td>Résultats non publiés (4)</td><td>Chef département</td><td><span class="tag tag-orange">En cours</span></td><td>1j</td></tr>
+            <tr class="row-hover"><td><span class="sev sev-amber">Moyenne</span></td><td>Système</td><td>Siège</td><td>Sauvegarde en retard</td><td>Informaticien</td><td><span class="tag tag-red">Nouveau</span></td><td>2j</td></tr>
+          </tbody></table></div><a href="#" class="inline-flex items-center gap-2 mt-3 text-xs text-blue-600 font-extrabold">Voir toutes les alertes <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+
+        <div class="card span-5 col-span-5 p-4">
+          <div class="flex items-center justify-between mb-6"><h2 class="font-extrabold text-lg">Workflow Passages & Réinscriptions</h2><button class="h-8 px-3 rounded-md border border-slate-200 text-xs font-bold hover:bg-slate-50">Voir le détail</button></div>
+          <div class="workflow-grid grid grid-cols-[1fr_32px_1fr_32px_1fr_32px_1fr] gap-2 items-center">
+            <div class="step"><div class="step-no bg-emerald-500">1</div><p class="text-[11px] mt-3 text-slate-600 font-semibold">Décision académique</p><h3 class="text-2xl font-black mt-3">156</h3><p class="text-xs text-slate-500">dossiers</p></div><div class="arrow">→</div>
+            <div class="step"><div class="step-no bg-blue-600">2</div><p class="text-[11px] mt-3 text-slate-600 font-semibold">Validation finance</p><h3 class="text-2xl font-black mt-3">98</h3><p class="text-xs text-slate-500">dossiers</p></div><div class="arrow">→</div>
+            <div class="step"><div class="step-no bg-orange-500">3</div><p class="text-[11px] mt-3 text-slate-600 font-semibold">Application du passage</p><h3 class="text-2xl font-black mt-3">64</h3><p class="text-xs text-slate-500">dossiers</p></div><div class="arrow">→</div>
+            <div class="step"><div class="step-no bg-violet-600">4</div><p class="text-[11px] mt-3 text-slate-600 font-semibold">Réinscription confirmée</p><h3 class="text-2xl font-black mt-3">112</h3><p class="text-xs text-slate-500">dossiers</p></div>
+          </div>
+          <div class="mt-4 rounded-lg border border-rose-100 bg-rose-50 p-3 flex items-center justify-between"><div class="flex items-center gap-3"><i class="fa-solid fa-users-gear text-rose-500"></i><div><p class="text-sm font-extrabold text-rose-600">Dossiers bloqués</p><p class="text-xs text-rose-700">18 dossiers nécessitent une action</p></div></div><button class="h-9 px-4 bg-white border border-rose-200 text-rose-600 rounded-md text-xs font-extrabold">Voir les dossiers</button></div>
+        </div>
+      </section>
+
+      <section class="main-grid grid grid-cols-12 gap-4">
+        <div class="card span-7 col-span-7 p-4">
+          <div class="flex items-center justify-between mb-3"><div><h2 class="font-extrabold text-lg">Performance des annexes</h2><p class="text-xs text-slate-500">Comparaison globale</p></div><div class="flex gap-2"><button class="h-9 px-3 border rounded-md text-xs font-bold">Toutes les annexes</button><button class="h-9 px-3 border rounded-md text-xs font-bold"><i class="fa-solid fa-table-columns mr-1"></i> Colonnes</button><button class="h-9 px-3 border rounded-md text-xs font-bold">Voir tout</button></div></div>
+          <div class="overflow-auto scrollbar-thin"><table><thead><tr><th>Annexe</th><th>Responsable</th><th>Étudiants</th><th>Classes</th><th>Inscriptions<br>actives</th><th>Revenus<br>(FCFA)</th><th>Dépenses<br>(FCFA)</th><th>Solde</th><th>Alertes</th><th>Performance</th><th>Action</th></tr></thead><tbody>
+            <tr class="row-hover"><td class="font-extrabold">Annexe Bamako</td><td>M. Diakité</td><td>2 156</td><td>38</td><td>1 892</td><td>58 450 000</td><td>32 150 000</td><td class="text-emerald-600 font-extrabold">26 300 000</td><td class="text-red-600 font-extrabold">2</td><td><span class="tag tag-green">Excellent</span></td><td><button><i class="fa-regular fa-eye"></i></button></td></tr>
+            <tr class="row-hover"><td class="font-extrabold">Annexe Kalaban</td><td>Mme Traoré</td><td>1 124</td><td>22</td><td>980</td><td>28 750 000</td><td>21 300 000</td><td class="text-emerald-600 font-extrabold">7 450 000</td><td class="text-red-600 font-extrabold">5</td><td><span class="tag tag-orange">Moyen</span></td><td><button><i class="fa-regular fa-eye"></i></button></td></tr>
+            <tr class="row-hover"><td class="font-extrabold">Annexe Sikasso</td><td>M. Coulibaly</td><td>876</td><td>18</td><td>742</td><td>18 300 000</td><td>16 750 000</td><td class="text-emerald-600 font-extrabold">1 550 000</td><td class="text-red-600 font-extrabold">3</td><td><span class="tag tag-orange">Attention</span></td><td><button><i class="fa-regular fa-eye"></i></button></td></tr>
+            <tr class="row-hover"><td class="font-extrabold">Annexe Kayes</td><td>Mme Diallo</td><td>652</td><td>14</td><td>510</td><td>12 450 000</td><td>11 800 000</td><td class="text-emerald-600 font-extrabold">650 000</td><td>1</td><td><span class="tag tag-blue">Correct</span></td><td><button><i class="fa-regular fa-eye"></i></button></td></tr>
+            <tr class="row-hover"><td class="font-extrabold">Annexe Ségou</td><td>M. Kouyaté</td><td>534</td><td>12</td><td>420</td><td>9 800 000</td><td>9 100 000</td><td class="text-emerald-600 font-extrabold">700 000</td><td>1</td><td><span class="tag tag-blue">Correct</span></td><td><button><i class="fa-regular fa-eye"></i></button></td></tr>
+            <tr class="row-hover"><td class="font-extrabold">Annexe Mopti</td><td>M. Dembélé</td><td>400</td><td>10</td><td>310</td><td>6 900 000</td><td>6 200 000</td><td class="text-emerald-600 font-extrabold">700 000</td><td>0</td><td><span class="tag tag-green">Bon</span></td><td><button><i class="fa-regular fa-eye"></i></button></td></tr>
+          </tbody></table></div><a href="#" class="inline-flex items-center gap-2 mt-3 text-xs text-blue-600 font-extrabold">Voir toutes les annexes <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+
+        <div class="card span-5 col-span-5 p-4">
+          <h2 class="font-extrabold text-lg mb-4">Revenus vs Dépenses (Ce mois)</h2>
+          <div class="grid grid-cols-2 gap-4 items-center"><div class="h-[220px]"><canvas id="donutFinance"></canvas></div><div class="space-y-3">
+            <div class="border rounded-lg p-3"><p class="text-xs text-slate-500"><span class="inline-block w-2 h-2 bg-emerald-500 rounded-full mr-2"></span>Revenus totaux</p><p class="text-lg font-black">142 850 000 <span class="text-xs text-slate-500">FCFA</span></p></div>
+            <div class="border rounded-lg p-3"><p class="text-xs text-slate-500"><span class="inline-block w-2 h-2 bg-rose-500 rounded-full mr-2"></span>Dépenses totales</p><p class="text-lg font-black">97 300 000 <span class="text-xs text-slate-500">FCFA</span></p></div>
+            <div class="border rounded-lg p-3"><p class="text-xs text-slate-500"><span class="inline-block w-2 h-2 bg-blue-600 rounded-full mr-2"></span>Solde estimé</p><p class="text-lg font-black">45 550 000 <span class="text-xs text-slate-500">FCFA</span></p></div>
+          </div></div>
+        </div>
+      </section>
+
+      <section class="main-grid grid grid-cols-12 gap-4">
+        <div class="card span-7 col-span-7 p-4"><div class="flex items-center justify-between mb-3"><h2 class="font-extrabold text-lg">Évolution mensuelle</h2><button class="h-8 px-3 border rounded-md text-xs text-blue-600 font-bold">Voir l'analyse complète</button></div><div class="h-[235px]"><canvas id="monthlyChart"></canvas></div></div>
+        <div class="card span-5 col-span-5 p-4"><div class="grid grid-cols-2 gap-4 h-full"><div><h2 class="font-extrabold text-lg mb-3">Taux de remplissage des classes</h2><div class="h-[210px]"><canvas id="fillChart"></canvas></div></div><div class="self-center space-y-3 text-sm"><div class="flex justify-between"><span><i class="fa-solid fa-circle text-emerald-500 text-[9px] mr-2"></i>Classes normales</span><b>128 (65%)</b></div><div class="flex justify-between"><span><i class="fa-solid fa-circle text-orange-500 text-[9px] mr-2"></i>Classes pleines</span><b>48 (24%)</b></div><div class="flex justify-between"><span><i class="fa-solid fa-circle text-rose-500 text-[9px] mr-2"></i>Classes surchargées</span><b>20 (10%)</b></div><div class="flex justify-between"><span><i class="fa-solid fa-circle text-slate-400 text-[9px] mr-2"></i>Classes vides</span><b>4 (2%)</b></div></div></div></div>
+      </section>
+
+      <section class="main-grid grid grid-cols-12 gap-4">
+        <div class="card span-8 col-span-8 p-4"><h2 class="font-extrabold text-lg mb-4">Inscriptions en temps réel</h2><div class="grid grid-cols-[170px_1fr] gap-4"><div><p class="text-xs text-slate-500">Aujourd'hui</p><h3 class="text-4xl text-blue-600 font-black mt-1">128</h3><p class="text-sm text-slate-500 mt-1">Nouvelles inscriptions</p><p class="mt-5 text-emerald-600 text-sm font-extrabold"><i class="fa-solid fa-arrow-trend-up mr-1"></i> +32% vs hier</p></div><div class="h-[210px]"><canvas id="realtimeChart"></canvas></div></div></div>
+        <div class="card span-4 col-span-4 p-4"><h2 class="font-extrabold text-lg mb-4">Actions rapides</h2><div class="space-y-2">
+          <a href="#" class="quick-action"><span><i class="fa-solid fa-user-plus mr-2"></i>Recruter un nouveau staff</span><i class="fa-solid fa-chevron-right"></i></a>
+          <a href="#" class="quick-action"><span><i class="fa-regular fa-building mr-2"></i>Créer une nouvelle annexe</span><i class="fa-solid fa-chevron-right"></i></a>
+          <a href="#" class="quick-action"><span><i class="fa-regular fa-file-lines mr-2"></i>Générer un rapport personnalisé</span><i class="fa-solid fa-chevron-right"></i></a>
+          <a href="#" class="quick-action"><span><i class="fa-regular fa-calendar-days mr-2"></i>Consulter le calendrier académique</span><i class="fa-solid fa-chevron-right"></i></a>
+        </div></div>
+      </section>
+
+      <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-slate-600"><i class="fa-regular fa-circle-question text-blue-600 mr-2"></i><b class="text-blue-700">Astuce :</b> Cliquez sur une annexe, un KPI ou une alerte pour voir les détails et agir rapidement.</div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const sidebar=document.getElementById('sidebar');document.getElementById('toggleSidebar').addEventListener('click',()=>{if(window.innerWidth<900){sidebar.classList.toggle('open')}else{sidebar.classList.toggle('collapsed')}});
+  const gridColor='#e5e7eb';
+  const chartFont={family:'Inter'};
+  Chart.defaults.font=chartFont;Chart.defaults.color='#475569';
+  function spark(id,data,color){new Chart(document.getElementById(id),{type:'line',data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:color,backgroundColor:color+'18',fill:true,tension:.42,borderWidth:2,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}},elements:{line:{capBezierPoints:true}}}})}
+  spark('spark1',[12,16,15,20,18,24,23,25,24,22,26,31,35,32,40,47],'#2563eb');
+  spark('spark2',[8,8,10,9,13,12,16,17,17,16,20,25,31,26,36,44],'#16a34a');
+  new Chart(document.getElementById('donutFinance'),{type:'doughnut',data:{labels:['Revenus','Dépenses','Solde'],datasets:[{data:[142.85,97.3,45.55],backgroundColor:['#22c55e','#f43f5e','#2563eb'],borderColor:'#fff',borderWidth:4,cutout:'68%'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.raw+'M'}}}}});
+  new Chart(document.getElementById('monthlyChart'),{type:'bar',data:{labels:['Sept','Oct','Nov','Déc','Jan','Fév','Mars','Avr','Mai','Juin','Juil','Août'],datasets:[{type:'bar',label:'Inscriptions',data:[120,155,126,158,145,132,80,110,160,108,102,100],backgroundColor:'#2563eb',borderRadius:3,barPercentage:.42},{type:'line',label:'Revenus (FCFA)',data:[32,36,52,62,48,47,70,44,39,38,41,51],borderColor:'#16a34a',backgroundColor:'#16a34a',tension:.35,pointRadius:3,borderWidth:2},{type:'line',label:'Dépenses (FCFA)',data:[25,28,43,72,50,49,76,48,34,33,34,56],borderColor:'#f43f5e',backgroundColor:'#f43f5e',tension:.35,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',align:'start',labels:{boxWidth:10,usePointStyle:true,font:{size:10}}}},scales:{x:{grid:{display:false}},y:{grid:{color:gridColor},ticks:{callback:v=>v+'M'}}}}});
+  new Chart(document.getElementById('fillChart'),{type:'doughnut',data:{labels:['Normales','Pleines','Surchargées','Vides'],datasets:[{data:[65,24,10,2],backgroundColor:['#22c55e','#f97316','#f43f5e','#94a3b8'],borderColor:'#fff',borderWidth:4,cutout:'67%'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:true}}},plugins:[{id:'centerText',afterDraw(chart){const{ctx,chartArea:{left,right,top,bottom}}=chart;ctx.save();ctx.textAlign='center';ctx.fillStyle='#0f172a';ctx.font='800 28px Inter';ctx.fillText('76%',(left+right)/2,(top+bottom)/2-2);ctx.fillStyle='#64748b';ctx.font='600 12px Inter';ctx.fillText('Global',(left+right)/2,(top+bottom)/2+18);}}]});
+  new Chart(document.getElementById('realtimeChart'),{type:'line',data:{labels:['00:00','02:00','04:00','06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00','24:00'],datasets:[{label:'Inscriptions',data:[0,25,35,52,54,82,88,105,116,126,135,151,160],borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.08)',fill:true,tension:.34,pointRadius:3,borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:gridColor},beginAtZero:true}}}});
+</script>
+</body>
+</html>

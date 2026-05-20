@@ -1,0 +1,91 @@
+<div class="dg-card dg-card-pad">
+  <div class="dg-section-head">
+    <div>
+      <div class="flex items-center gap-3">
+        <h3 class="dg-title">Centre des alertes prioritaires</h3>
+        <span class="dg-badge bg-rose-500 text-white">{{ open_alerts }}</span>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" class="dg-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')" title="Detail"><i class="fa-regular fa-eye"></i></button>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+    <div class="xl:col-span-8 overflow-x-auto">
+      <table class="dg-table">
+        <thead>
+          <tr>
+            <th>Gravite</th>
+            <th>Type</th>
+            <th>Annexe</th>
+            <th>Description</th>
+            <th>Responsable</th>
+            <th>Statut</th>
+            <th>Age</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alert in priority_alerts %}
+          <tr>
+            <td>
+              <span class="dg-badge {% if alert.tone == 'red' %}bg-rose-100 text-rose-700{% else %}bg-orange-100 text-orange-700{% endif %}">{{ alert.severity }}</span>
+            </td>
+            <td class="font-black">{{ alert.type }}</td>
+            <td>{{ alert.branch_name }}</td>
+            <td>{{ alert.description }}</td>
+            <td>{{ alert.owner }}</td>
+            <td><span class="dg-badge bg-slate-100 text-slate-700">{{ alert.status }}</span></td>
+            <td>{{ alert.age }}</td>
+            <td>
+              <div class="flex gap-2">
+                <button type="button" class="dg-action" onclick="dgOpenDrawer('{{ alert.drawer_url }}')">
+                  <i class="fa-regular fa-eye"></i>
+                  Voir
+                </button>
+                <button type="button" class="dg-action" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal={% if alert.action_name == 'followup_finance' %}finance&kind=finance&branch_id={{ alert.action_id }}{% elif alert.action_name == 'resolve_alert' %}alert&kind=alert&id={{ alert.action_id }}{% else %}case&kind=case&id={{ alert.action_id }}{% endif %}')" title="Ouvrir">
+                  <i class="fa-regular fa-window-restore"></i>
+                </button>
+                {% if alert.action_id %}
+                <form method="post" action="{% url 'accounts_portal:dg_action' %}" onsubmit="return dgSubmitAction(this)">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="{{ alert.action_name }}">
+                  <input type="hidden" name="object_id" value="{{ alert.action_id }}">
+                  <button type="submit" class="dg-action">
+                    {% if alert.action_name == "resolve_alert" %}Resoudre{% elif alert.action_name == "escalate_case" %}Escalader{% else %}Suivre{% endif %}
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="py-8 text-center font-semibold text-slate-500">Aucune alerte prioritaire ouverte.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <aside class="xl:col-span-4 space-y-4">
+      <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <h4 class="text-base font-black text-slate-950">Repartition des risques</h4>
+            <p class="text-xs font-semibold text-slate-500">Par categorie d'alerte</p>
+          </div>
+        </div>
+        <div class="h-[210px]">
+          <canvas id="dgRiskChart"></canvas>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-100 bg-white p-5">
+        <h4 class="mb-3 text-base font-black text-slate-950">Alertes</h4>
+        <div class="space-y-2">
+          <button type="button" class="dg-quick-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')"><span><i class="fa-solid fa-user-shield mr-2"></i>Voir les responsables</span><i class="fa-solid fa-chevron-right"></i></button>
+          <button type="button" class="dg-quick-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=case')"><span><i class="fa-solid fa-arrow-up-right-dots mr-2"></i>Cas escalades</span><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>

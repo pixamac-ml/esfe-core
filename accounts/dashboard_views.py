@@ -88,7 +88,7 @@ def is_global_viewer(user):
     if hasattr(user, "profile") and user.profile.role == "executive":
         return True
 
-    if user_has_group(user, "executive_director"):
+    if user_has_group(user, "executive_director") or user_has_group(user, "deputy_executive_director"):
         return True
 
     return False
@@ -115,6 +115,7 @@ def check_executive_access(user):
     return (
         user.is_superuser
         or user_has_group(user, "executive_director")
+        or user_has_group(user, "deputy_executive_director")
         or getattr(user.profile, "role", None) == "executive"
     )
 # =====================================================

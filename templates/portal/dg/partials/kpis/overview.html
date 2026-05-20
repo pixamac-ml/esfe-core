@@ -1,0 +1,53 @@
+{% load humanize %}
+<div class="dg-kpis">
+  <article class="dg-card dg-kpi">
+    <div class="dg-kpi-icon bg-blue-50 text-blue-600"><i class="fa-solid fa-users"></i></div>
+    <p class="text-sm font-black text-blue-600">Etudiants totaux</p>
+    <h3 class="mt-4 text-3xl font-black text-slate-950">{{ total_students|intcomma }}</h3>
+    <p class="mt-3 text-xs font-bold text-slate-500">{{ analytics.total_enrollments|intcomma }} inscriptions academiques</p>
+    <canvas id="dgSparkStudents" class="dg-spark"></canvas>
+  </article>
+  <article class="dg-card dg-kpi">
+    <div class="dg-kpi-icon bg-emerald-50 text-emerald-600"><i class="fa-solid fa-sack-dollar"></i></div>
+    <p class="text-sm font-black text-emerald-600">Revenus consolides</p>
+    <h3 class="mt-4 text-3xl font-black text-slate-950">{{ finance.revenue|intcomma }}</h3>
+    <p class="mt-3 text-xs font-bold text-slate-500">{{ finance.validated_payments|intcomma }} paiements valides</p>
+    <canvas id="dgSparkRevenue" class="dg-spark"></canvas>
+  </article>
+  <article class="dg-card dg-kpi">
+    <div class="dg-kpi-icon bg-violet-50 text-violet-600"><i class="fa-regular fa-building"></i></div>
+    <p class="text-sm font-black text-violet-600">Annexes actives</p>
+    <h3 class="mt-4 text-3xl font-black text-slate-950">{{ total_branches|intcomma }}</h3>
+    <p class="mt-3 text-xs font-bold text-slate-500">{{ total_classes|intcomma }} classes actives</p>
+    <div class="absolute bottom-4 left-5 right-5 flex gap-1">
+      <span class="h-1.5 flex-1 rounded-full bg-violet-500"></span>
+      <span class="h-1.5 flex-1 rounded-full bg-blue-300"></span>
+      <span class="h-1.5 flex-1 rounded-full bg-cyan-300"></span>
+    </div>
+  </article>
+  <article class="dg-card dg-kpi">
+    <div class="dg-kpi-icon bg-orange-50 text-orange-500"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <p class="text-sm font-black text-orange-500">Alertes critiques</p>
+    <h3 class="mt-4 text-3xl font-black {% if critical_alerts %}text-orange-500{% else %}text-emerald-600{% endif %}">{{ critical_alerts|intcomma }}</h3>
+    <p class="mt-3 text-xs font-bold text-rose-600">{{ open_alerts|intcomma }} alertes ouvertes</p>
+    <canvas id="dgSparkAlerts" class="dg-spark"></canvas>
+  </article>
+  <article class="dg-card dg-kpi">
+    <div class="dg-kpi-icon bg-rose-50 text-rose-600"><i class="fa-regular fa-folder-open"></i></div>
+    <p class="text-sm font-black text-rose-600">Dossiers bloques</p>
+    <h3 class="mt-4 text-3xl font-black text-rose-600">{{ workflow.blocked_count|intcomma }}</h3>
+    <p class="mt-3 text-xs font-bold text-slate-500">Passages / reinscriptions</p>
+    <div class="absolute bottom-4 left-5 right-5 h-2 overflow-hidden rounded-full bg-rose-100">
+      <span class="block h-full w-2/3 rounded-full bg-rose-500"></span>
+    </div>
+  </article>
+  <article class="dg-card dg-kpi">
+    <div class="dg-kpi-icon bg-cyan-50 text-cyan-600"><i class="fa-solid fa-chart-pie"></i></div>
+    <p class="text-sm font-black text-cyan-600">Remplissage classes</p>
+    <h3 class="mt-4 text-3xl font-black text-cyan-600">{{ analytics.class_fill_rate }}%</h3>
+    <p class="mt-3 text-xs font-bold text-slate-500">Global</p>
+    <div class="absolute bottom-4 left-5 right-5 h-2 overflow-hidden rounded-full bg-cyan-100">
+      <span class="block h-full rounded-full bg-cyan-500" style="width: {{ analytics.class_fill_rate }}%"></span>
+    </div>
+  </article>
+</div>

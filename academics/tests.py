@@ -15,10 +15,14 @@ from academics.models import (
     AcademicScheduleEvent,
     AcademicYear,
     EC,
+    ECGrade,
     LessonLog,
     Semester,
     UE,
 )
+from academics.services.grading import calculate_ec_grade
+from academics.services.semester import compute_semester_result
+from academics.services.year import compute_annual_decision, compute_annual_result
 from academics.services.lesson_log_service import (
     create_lesson_log,
     get_class_lesson_logs,
@@ -49,6 +53,169 @@ from students.models import Student, TeacherAttendance
 
 
 User = get_user_model()
+
+
+class AcademicResultCalculationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="result_student", password="pass1234")
+        self.branch = Branch.objects.create(name="Annexe Resultats", code="RES", slug="annexe-resultats")
+        cycle = Cycle.objects.create(name="Licence Resultats", theme="accent", min_duration_years=1, max_duration_years=3)
+        diploma = Diploma.objects.create(name="Diplome Resultats", level="superieur")
+        filiere = Filiere.objects.create(name="Filiere Resultats")
+        self.programme = Programme.objects.create(
+            title="Programme Resultats",
+            filiere=filiere,
+            cycle=cycle,
+            diploma_awarded=diploma,
+            duration_years=3,
+            short_description="Resultats",
+            description="Resultats",
+        )
+        self.academic_year = AcademicYear.objects.create(
+            name="2035-2036",
+            start_date=date(2035, 10, 1),
+            end_date=date(2036, 7, 31),
+            is_active=True,
+        )
+        self.academic_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        self.semester = Semester.objects.create(
+            academic_class=self.academic_class,
+            number=1,
+            total_required_credits=Decimal("6.00"),
+        )
+        ue = UE.objects.create(semester=self.semester, code="RES101", title="Calcul")
+        self.ec_one = EC.objects.create(ue=ue, title="Matiere A", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        self.ec_two = EC.objects.create(ue=ue, title="Matiere B", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        candidature = Candidature.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year.name,
+            entry_year=1,
+            first_name="Awa",
+            last_name="Resultat",
+            birth_date=date(2001, 1, 1),
+            birth_place="Bamako",
+            gender="female",
+            phone="71000000",
+            email="awa.resultat@example.com",
+            status="accepted",
+        )
+        inscription = Inscription.objects.create(
+            candidature=candidature,
+            academic_class=self.academic_class,
+            amount_due=100000,
+            status=Inscription.STATUS_ACTIVE,
+        )
+        Student.objects.create(user=self.user, inscription=inscription, matricule="MAT-RES-001", is_active=True)
+        self.enrollment = AcademicEnrollment.objects.create(
+            inscription=inscription,
+            student=self.user,
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            academic_class=self.academic_class,
+        )
+
+    def test_ec_below_threshold_gets_no_credit(self):
+        result = calculate_ec_grade(
+            note=Decimal("8.00"),
+            coefficient=Decimal("3.00"),
+            credit_required=Decimal("3.00"),
+            threshold=Decimal("10.00"),
+        )
+
+        self.assertEqual(result["credit_obtained"], Decimal("0.00"))
+        self.assertFalse(result["is_validated"])
+
+    def test_semester_result_blocks_average_when_grade_missing(self):
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("14.00"))
+
+        result = compute_semester_result(self.semester, self.enrollment)
+
+        self.assertIsNone(result["average"])
+        self.assertFalse(result["is_complete"])
+        self.assertEqual(result["missing_grades"], 1)
+        self.assertEqual(result["status"], "incomplete")
+
+    def test_semester_requires_all_credits_not_only_average(self):
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("20.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_two, normal_score=Decimal("8.00"))
+
+        result = compute_semester_result(self.semester, self.enrollment)
+
+        self.assertEqual(result["average"], Decimal("14.00"))
+        self.assertEqual(result["credit_obtained"], Decimal("3.00"))
+        self.assertFalse(result["is_validated"])
+        self.assertEqual(result["status"], "failed")
+
+    def test_retake_uses_best_score_and_restores_credit(self):
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("20.00"))
+        ECGrade.objects.create(
+            enrollment=self.enrollment,
+            ec=self.ec_two,
+            normal_score=Decimal("8.00"),
+            retake_score=Decimal("12.00"),
+        )
+
+        result = compute_semester_result(self.semester, self.enrollment)
+
+        self.assertEqual(result["credit_obtained"], Decimal("6.00"))
+        self.assertTrue(result["is_validated"])
+
+    def test_annual_result_reports_incomplete_until_all_semesters_ready(self):
+        result = compute_annual_result(self.enrollment)
+
+        self.assertFalse(result["is_complete"])
+        self.assertEqual(result["status"], "incomplete")
+        self.assertGreater(result["missing_grades"], 0)
+
+    def test_annual_decision_promotes_with_debt_when_one_semester_is_close_to_threshold(self):
+        second_semester = Semester.objects.create(
+            academic_class=self.academic_class,
+            number=2,
+            total_required_credits=Decimal("6.00"),
+        )
+        ue = UE.objects.create(semester=second_semester, code="RES201", title="Compensation")
+        ec_three = EC.objects.create(ue=ue, title="Matiere C", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        ec_four = EC.objects.create(ue=ue, title="Matiere D", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("10.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_two, normal_score=Decimal("10.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=ec_three, normal_score=Decimal("9.50"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=ec_four, normal_score=Decimal("9.50"))
+
+        decision = compute_annual_decision(self.enrollment)
+
+        self.assertEqual(decision["decision"], "promoted_with_debt")
+        self.assertEqual(decision["rule_code"], "compensated_semester_debt")
+        self.assertTrue(decision["requires_academic_debt"])
+        self.assertEqual(len(decision["debt_subjects"]), 2)
+
+    def test_annual_decision_repeats_when_semester_gap_is_too_large(self):
+        second_semester = Semester.objects.create(
+            academic_class=self.academic_class,
+            number=2,
+            total_required_credits=Decimal("6.00"),
+        )
+        ue = UE.objects.create(semester=second_semester, code="RES202", title="Gap")
+        ec_three = EC.objects.create(ue=ue, title="Matiere C", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        ec_four = EC.objects.create(ue=ue, title="Matiere D", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("10.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_two, normal_score=Decimal("10.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=ec_three, normal_score=Decimal("9.40"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=ec_four, normal_score=Decimal("9.40"))
+
+        decision = compute_annual_decision(self.enrollment)
+
+        self.assertEqual(decision["decision"], "repeated")
+        self.assertEqual(decision["rule_code"], "semester_gap_too_large")
 
 
 class AcademicContextResolverTests(TestCase):

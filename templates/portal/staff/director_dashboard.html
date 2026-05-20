@@ -257,7 +257,7 @@
           <template x-for="module in primaryModules" :key="module.key">
             <button
               type="button"
-              @click="openModule(module.key)"
+              @click="module.url ? window.location.href = module.url : openModule(module.key)"
               :class="activeModule === module.key ? 'bg-blue-600 text-white' : 'hover:bg-white/10 text-slate-100'"
               class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition text-left"
             >
@@ -539,7 +539,7 @@
             <h3 class="font-bold text-lg mb-5">Actions rapides</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
               <template x-for="action in quickActions" :key="action.label">
-                <button type="button" @click="openModule(action.key)" class="rounded-2xl border border-slate-200 p-4 hover:bg-slate-50 text-center">
+                <button type="button" @click="action.url ? window.location.href = action.url : openModule(action.key)" class="rounded-2xl border border-slate-200 p-4 hover:bg-slate-50 text-center">
                   <i :data-lucide="action.icon" class="w-7 h-7 mx-auto" :class="action.color"></i>
                   <p class="text-sm font-semibold mt-3" x-text="action.label"></p>
                 </button>
@@ -633,6 +633,7 @@
         { key: 'students', label: 'Etudiants', icon: 'users' },
         { key: 'teachers', label: 'Enseignants', icon: 'user-check' },
         { key: 'assignments', label: 'Emploi du temps', icon: 'calendar-days' },
+        { key: 'reenrollment', label: 'Passages', icon: 'repeat-2', url: '{% url "accounts_portal:reenrollment_workspace" %}' },
         { key: 'documents', label: 'Transferts', icon: 'repeat-2' }
       ],
       secondaryModules: [
@@ -659,6 +660,7 @@
         { key: 'assignments', label: 'Verifier anomalies', icon: 'triangle-alert', color: 'text-red-600' },
         { key: 'academic', label: 'Gerer classes', icon: 'school', color: 'text-blue-600' },
         { key: 'students', label: 'Gerer etudiants', icon: 'users', color: 'text-emerald-600' },
+        { key: 'reenrollment', label: 'Passages', icon: 'repeat-2', color: 'text-slate-700', url: '{% url "accounts_portal:reenrollment_workspace" %}' },
         { key: 'assignments', label: 'Planifier cours', icon: 'calendar-plus', color: 'text-orange-600' },
         { key: 'stats', label: 'Notifier', icon: 'send', color: 'text-sky-600' },
         { key: 'publications', label: 'Exporter', icon: 'download', color: 'text-green-600' },

@@ -1,0 +1,201 @@
+{% load humanize %}
+
+<div class="space-y-4">
+  {% if toast %}
+  <div class="rounded-2xl border px-4 py-3 text-sm font-semibold {% if toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-rose-200 bg-rose-50 text-rose-800{% endif %}">
+    {{ toast.message }}
+  </div>
+  {% endif %}
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.14em] text-slate-400">Transitions academiques</p>
+        <h3 class="mt-1 text-xl font-black text-slate-900">Passages & reinscriptions</h3>
+        <p class="mt-1 text-sm font-semibold text-slate-500">{{ branch.name|default:"Vue globale" }}</p>
+      </div>
+      <form
+        class="grid gap-3 md:grid-cols-3 xl:min-w-[680px]"
+        hx-get="{% url 'accounts_portal:reenrollment_workspace' %}"
+        hx-target="#reenrollment-workspace"
+        hx-swap="innerHTML"
+      >
+        <select name="source_year" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+          <option value="">Annee source</option>
+          {% for year in academic_years %}
+          <option value="{{ year.id }}" {% if source_year and source_year.id == year.id %}selected{% endif %}>{{ year.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="source_class" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+          <option value="">Classe source</option>
+          {% for class in classes %}
+          <option value="{{ class.id }}" {% if source_class and source_class.id == class.id %}selected{% endif %}>{{ class.display_name }} - {{ class.academic_year }}</option>
+          {% endfor %}
+        </select>
+        <select name="target_year" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+          <option value="">Annee cible</option>
+          {% for year in academic_years %}
+          <option value="{{ year.id }}" {% if target_year and target_year.id == year.id %}selected{% endif %}>{{ year.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white md:col-span-3">Charger</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="border-b border-slate-100 px-5 py-4">
+      <h4 class="font-black text-slate-900">Etudiants candidats</h4>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-100 text-sm">
+        <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-500">
+          <tr>
+            <th class="px-5 py-3">Etudiant</th>
+            <th class="px-5 py-3">Classe</th>
+            <th class="px-5 py-3">Moyenne</th>
+            <th class="px-5 py-3">Finance</th>
+            <th class="px-5 py-3">Decision</th>
+            <th class="px-5 py-3">Cible</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for row in candidates %}
+          <tr>
+            <td class="px-5 py-4">
+              <p class="font-black text-slate-900">{{ row.full_name }}</p>
+              <p class="text-xs font-semibold text-slate-500">{{ row.matricule|default:"-" }}</p>
+            </td>
+            <td class="px-5 py-4 text-slate-700">{{ row.source_class.display_name }}</td>
+            <td class="px-5 py-4 font-black text-slate-900">{{ row.annual_average|default:"-" }}</td>
+            <td class="px-5 py-4">
+              <span class="rounded-full px-3 py-1 text-xs font-black {% if row.financial_status.status == 'paid' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                {{ row.financial_status.label }}{% if row.financial_status.balance %} - {{ row.financial_status.balance|intcomma }}{% endif %}
+              </span>
+            </td>
+            <td class="px-5 py-4">
+              {% if row.year_decision %}
+              <p class="font-black text-slate-900">{{ row.year_decision.get_decision_display }}</p>
+              <p class="text-xs font-semibold text-slate-500">{{ row.year_decision.get_workflow_status_display }}</p>
+              {% if row.year_decision.decision_payload.rule_label %}
+              <p class="mt-1 text-xs font-semibold text-blue-700">{{ row.year_decision.decision_payload.rule_label }}</p>
+              {% endif %}
+              {% else %}
+              <p class="font-black text-slate-900">{{ row.proposed_decision_label }}</p>
+              <p class="text-xs font-semibold text-blue-700">{{ row.annual_decision.rule_label }}</p>
+              {% if row.annual_decision.requires_academic_debt %}
+              <p class="mt-1 text-xs font-semibold text-amber-700">Dette: {{ row.annual_decision.debt_subjects|length }} EC a reprendre</p>
+              {% endif %}
+              {% endif %}
+            </td>
+            <td class="px-5 py-4">
+              {% if row.year_decision and row.year_decision.workflow_status == 'applied' %}
+              <span class="inline-flex rounded-full bg-slate-900 px-3 py-1 text-xs font-black text-white">Appliquee</span>
+              {% else %}
+              <form
+                class="flex min-w-[360px] flex-col gap-2"
+                hx-post="{% url 'accounts_portal:reenrollment_propose' %}"
+                hx-target="#reenrollment-workspace"
+                hx-swap="innerHTML"
+              >
+                {% csrf_token %}
+                <input type="hidden" name="enrollment_id" value="{{ row.enrollment.id }}">
+                {% if source_year %}<input type="hidden" name="source_year" value="{{ source_year.id }}">{% endif %}
+                {% if source_class %}<input type="hidden" name="source_class" value="{{ source_class.id }}">{% endif %}
+                {% if target_year %}<input type="hidden" name="target_year" value="{{ target_year.id }}">{% endif %}
+                <div class="grid grid-cols-2 gap-2">
+                  <select name="decision" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold">
+                    {% for value, label in decision_choices %}
+                    <option value="{{ value }}" {% if row.proposed_decision == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <select name="target_class" class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold">
+                    <option value="">Classe cible</option>
+                    {% for class in target_classes %}
+                    <option value="{{ class.id }}" {% if row.year_decision and row.year_decision.target_class_id == class.id %}selected{% endif %}>{{ class.display_name }} - {{ class.academic_year }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <button type="submit" class="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white">Proposer</button>
+              </form>
+              {% endif %}
+            </td>
+            <td class="px-5 py-4"></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="px-5 py-8 text-center text-sm font-semibold text-slate-400">
+              {% if candidate_filters_required %}Choisis une annee ou une classe source pour calculer les candidats.{% else %}Aucun candidat dans cette selection.{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="border-b border-slate-100 px-5 py-4">
+      <h4 class="font-black text-slate-900">File de decisions</h4>
+    </div>
+    <div class="grid gap-3 p-5">
+      {% for decision in decisions %}
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <p class="font-black text-slate-900">{{ decision.student.full_name }} - {{ decision.get_decision_display }}</p>
+            <p class="text-xs font-semibold text-slate-500">{{ decision.source_class.display_name }} -> {{ decision.target_class.display_name|default:"Cible non definie" }} | {{ decision.get_workflow_status_display }}</p>
+            {% if decision.rejection_reason %}
+            <p class="mt-1 text-xs font-semibold text-rose-600">{{ decision.rejection_reason }}</p>
+            {% endif %}
+            {% if decision.decision_payload.rule_label %}
+            <p class="mt-1 text-xs font-semibold text-blue-700">{{ decision.decision_payload.rule_label }}</p>
+            {% endif %}
+            {% if decision.decision_payload.requires_academic_debt %}
+            <p class="mt-1 text-xs font-semibold text-amber-700">Dette academique: {{ decision.decision_payload.debt_subjects|length }} EC a rattraper.</p>
+            {% endif %}
+          </div>
+          <div class="flex flex-wrap gap-2">
+            {% if can_academic_validate and decision.can_academic_validate %}
+            <form hx-post="{% url 'accounts_portal:reenrollment_decision_action' %}" hx-target="#reenrollment-workspace" hx-swap="innerHTML">
+              {% csrf_token %}
+              <input type="hidden" name="decision_id" value="{{ decision.id }}">
+              <input type="hidden" name="action" value="academic_validate">
+              <button class="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700">Valider DE</button>
+            </form>
+            {% endif %}
+            {% if can_finance_validate and decision.can_finance_validate %}
+            <form hx-post="{% url 'accounts_portal:reenrollment_decision_action' %}" hx-target="#reenrollment-workspace" hx-swap="innerHTML">
+              {% csrf_token %}
+              <input type="hidden" name="decision_id" value="{{ decision.id }}">
+              <input type="hidden" name="action" value="finance_validate">
+              <button class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">Visa finance</button>
+            </form>
+            {% endif %}
+            {% if can_apply and decision.can_apply %}
+            <form hx-post="{% url 'accounts_portal:reenrollment_decision_action' %}" hx-target="#reenrollment-workspace" hx-swap="innerHTML">
+              {% csrf_token %}
+              <input type="hidden" name="decision_id" value="{{ decision.id }}">
+              <input type="hidden" name="action" value="apply">
+              <button class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white">Appliquer</button>
+            </form>
+            {% endif %}
+            {% if decision.can_reject %}
+            <form class="flex gap-2" hx-post="{% url 'accounts_portal:reenrollment_decision_action' %}" hx-target="#reenrollment-workspace" hx-swap="innerHTML">
+              {% csrf_token %}
+              <input type="hidden" name="decision_id" value="{{ decision.id }}">
+              <input type="hidden" name="action" value="reject">
+              <input name="reason" class="w-44 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold" placeholder="Motif">
+              <button class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700">Rejeter</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <p class="py-6 text-center text-sm font-semibold text-slate-400">Aucune decision proposee.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>

@@ -1,0 +1,360 @@
+{% load humanize %}
+<div class="p-6">
+  <div class="mb-5 flex items-start justify-between gap-4">
+    <div>
+      <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Detail executif</p>
+      <h3 class="mt-1 text-2xl font-black text-slate-950">{{ modal_title|default:"Detail" }}</h3>
+    </div>
+    <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50" onclick="dgCloseModal()">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+
+  {% if modal_kind == "branch" and drawer_branch %}
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-black uppercase tracking-wide text-blue-600">Annexe</p>
+          <h4 class="mt-1 text-2xl font-black text-slate-900">{{ drawer_branch.name }}</h4>
+          <p class="mt-2 text-sm font-semibold text-slate-600">{{ drawer_branch.city|default:"Ville non renseignee" }}</p>
+        </div>
+        <div class="flex flex-wrap justify-end gap-2">
+          <span class="dg-badge bg-emerald-100 text-emerald-700">Active</span>
+          <a class="dg-action" href="{% url 'accounts_portal:dg_export' %}?kind=branches&branch_id={{ drawer_branch.id }}&format=xlsx">Excel</a>
+          <button type="button" class="dg-action" onclick="window.print()">Imprimer</button>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Code</p><p class="mt-1 text-lg font-black text-slate-950">{{ drawer_branch.code }}</p></div>
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Manager</p><p class="mt-1 text-sm font-black text-slate-950">{% if drawer_branch.manager %}{{ drawer_branch.manager.get_full_name|default:drawer_branch.manager.username }}{% else %}Non assigne{% endif %}</p></div>
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Ville</p><p class="mt-1 text-lg font-black text-slate-950">{{ drawer_branch.city|default:"-" }}</p></div>
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Statut</p><p class="mt-1 text-sm font-black text-emerald-700">Sous supervision</p></div>
+      </div>
+      {% if drawer_branch_finance %}
+      <div class="mt-4 grid grid-cols-3 gap-3">
+        <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p class="text-xs font-bold text-emerald-700">Revenus</p><p class="mt-1 text-lg font-black text-slate-900">{{ drawer_branch_finance.revenue|intcomma }} FCFA</p></div>
+        <div class="rounded-xl border border-rose-100 bg-rose-50 p-3"><p class="text-xs font-bold text-rose-700">Depenses</p><p class="mt-1 text-lg font-black text-slate-900">{{ drawer_branch_finance.expenses|intcomma }} FCFA</p></div>
+        <div class="rounded-xl border border-blue-100 bg-blue-50 p-3"><p class="text-xs font-bold text-blue-700">Solde</p><p class="mt-1 text-lg font-black text-slate-900">{{ drawer_branch_finance.balance|intcomma }} FCFA</p></div>
+      </div>
+      {% endif %}
+      {% if drawer_branch_summary %}
+      <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div class="rounded-xl border border-blue-100 bg-blue-50 p-3">
+          <p class="text-xs font-bold text-blue-700">Etudiants</p>
+          <p class="mt-1 text-2xl font-black text-slate-950">{{ drawer_branch_summary.student_count|intcomma }}</p>
+        </div>
+        <div class="rounded-xl border border-cyan-100 bg-cyan-50 p-3">
+          <p class="text-xs font-bold text-cyan-700">Classes</p>
+          <p class="mt-1 text-2xl font-black text-slate-950">{{ drawer_branch_summary.class_count|intcomma }}</p>
+        </div>
+        <div class="rounded-xl border border-violet-100 bg-violet-50 p-3">
+          <p class="text-xs font-bold text-violet-700">Inscriptions</p>
+          <p class="mt-1 text-2xl font-black text-slate-950">{{ drawer_branch_summary.active_inscription_count|intcomma }}</p>
+        </div>
+        <div class="rounded-xl border border-rose-100 bg-rose-50 p-3">
+          <p class="text-xs font-bold text-rose-700">Alertes</p>
+          <p class="mt-1 text-2xl font-black text-slate-950">{{ drawer_branch_summary.open_alert_count|intcomma }}</p>
+        </div>
+        <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+          <p class="text-xs font-bold text-emerald-700">Revenus</p>
+          <p class="mt-1 text-2xl font-black text-slate-950">{{ drawer_branch_summary.revenue_total|intcomma }}</p>
+        </div>
+        <div class="rounded-xl border border-orange-100 bg-orange-50 p-3">
+          <p class="text-xs font-bold text-orange-700">Depenses</p>
+          <p class="mt-1 text-2xl font-black text-slate-950">{{ drawer_branch_summary.expense_total|intcomma }}</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-3">
+          <p class="text-xs font-bold text-slate-500">Solde</p>
+          <p class="mt-1 text-2xl font-black {% if drawer_branch_summary.balance_total < 0 %}text-rose-700{% else %}text-emerald-700{% endif %}">{{ drawer_branch_summary.balance_total|intcomma }}</p>
+        </div>
+        <div class="rounded-xl border border-violet-100 bg-violet-50 p-3">
+          <p class="text-xs font-bold text-violet-700">Staff</p>
+          <p class="mt-1 text-2xl font-black text-slate-950">{{ drawer_staff_rows|length|intcomma }}</p>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+          <p class="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">Classes principales</p>
+          <div class="space-y-2">
+            {% for academic_class in drawer_branch_summary.top_classes|slice:":5" %}
+            <div class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm">
+              <span class="font-bold text-slate-700">{{ academic_class.display_name|default:academic_class }}</span>
+              <span class="font-black text-slate-900">{{ academic_class.student_count|default:0|intcomma }}</span>
+            </div>
+            {% empty %}
+            <p class="text-sm font-semibold text-slate-500">Aucune classe active.</p>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+          <p class="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">Programmes</p>
+          <div class="space-y-2">
+            {% for programme in drawer_branch_summary.top_programmes|slice:":5" %}
+            <div class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm">
+              <span class="font-bold text-slate-700">{{ programme.programme__title|default:"Programme non renseigne" }}</span>
+              <span class="font-black text-slate-900">{{ programme.total|default:0|intcomma }}</span>
+            </div>
+            {% empty %}
+            <p class="text-sm font-semibold text-slate-500">Aucun programme actif.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <p class="text-xs font-black uppercase tracking-wide text-slate-500">Etudiants</p>
+            <a class="dg-action" href="{% url 'accounts_portal:dg_export' %}?kind=students&branch_id={{ drawer_branch.id }}&format=xlsx">Excel</a>
+          </div>
+          <div class="max-h-[320px] overflow-y-auto dg-scroll">
+            <table class="dg-table">
+              <thead><tr><th>Nom</th><th>Matricule</th><th>Classe</th><th>Solde</th></tr></thead>
+              <tbody>
+                {% for student in drawer_student_rows|slice:":10" %}
+                <tr class="cursor-pointer" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=student&id={{ student.id }}')">
+                  <td class="font-black">{{ student.full_name }}</td>
+                  <td>{{ student.matricule }}</td>
+                  <td>{{ student.current_academic_enrollment.academic_class|default:"-" }}</td>
+                  <td class="font-black">{{ student.inscription.balance|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="py-5 text-center font-semibold text-slate-500">Aucun etudiant actif.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <p class="text-xs font-black uppercase tracking-wide text-slate-500">Paiements</p>
+            <a class="dg-action" href="{% url 'accounts_portal:dg_export' %}?kind=payments&branch_id={{ drawer_branch.id }}&format=xlsx">Excel</a>
+          </div>
+          <div class="max-h-[320px] overflow-y-auto dg-scroll">
+            <table class="dg-table">
+              <thead><tr><th>Date</th><th>Candidat</th><th>Statut</th><th>Montant</th></tr></thead>
+              <tbody>
+                {% for payment in drawer_payment_rows|slice:":10" %}
+                <tr class="cursor-pointer" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=payment&id={{ payment.id }}')">
+                  <td>{{ payment.paid_at|date:"d/m/Y" }}</td>
+                  <td class="font-black">{{ payment.inscription.candidature }}</td>
+                  <td>{{ payment.get_status_display }}</td>
+                  <td class="font-black text-emerald-700">{{ payment.amount|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="py-5 text-center font-semibold text-slate-500">Aucun paiement.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </section>
+    <aside class="space-y-4">
+      <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Actions</p>
+        <div class="mt-3 space-y-2">
+          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=branch&branch_id={{ drawer_branch.id }}')">Ouvrir</button>
+          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff&branch_id={{ drawer_branch.id }}')">Staff</button>
+          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=audit&branch_id={{ drawer_branch.id }}')">Audit</button>
+          <form method="post" action="{% url 'accounts_portal:dg_action' %}" onsubmit="return dgSubmitAction(this)">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="followup_finance">
+            <input type="hidden" name="object_id" value="{{ drawer_branch.id }}">
+            <button type="submit" class="dg-action w-full">Suivi finance</button>
+          </form>
+          {% if drawer_branch_summary.open_alert_count %}
+          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert&branch_id={{ drawer_branch.id }}')">Alertes</button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Performance</p>
+        {% if drawer_branch_summary %}
+        <span class="mt-3 inline-flex dg-badge {% if drawer_branch_summary.performance_tone == 'green' %}bg-emerald-100 text-emerald-700{% elif drawer_branch_summary.performance_tone == 'orange' %}bg-orange-100 text-orange-700{% elif drawer_branch_summary.performance_tone == 'blue' %}bg-blue-100 text-blue-700{% else %}bg-slate-100 text-slate-600{% endif %}">{{ drawer_branch_summary.performance_label }}</span>
+        <div class="mt-4 space-y-2 text-sm">
+          <div class="flex justify-between"><span class="font-semibold text-slate-500">Candidatures</span><span class="font-black text-slate-900">{{ drawer_branch_summary.candidature_count|intcomma }}</span></div>
+          <div class="flex justify-between"><span class="font-semibold text-slate-500">Acceptees</span><span class="font-black text-slate-900">{{ drawer_branch_summary.accepted_candidature_count|intcomma }}</span></div>
+          <div class="flex justify-between"><span class="font-semibold text-slate-500">Depenses en cours</span><span class="font-black text-slate-900">{{ drawer_branch_summary.pending_expense_count|intcomma }}</span></div>
+        </div>
+        {% endif %}
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">Staff</p>
+        <div class="space-y-2">
+          {% for profile in drawer_staff_rows|slice:":6" %}
+          <button type="button" class="w-full rounded-xl bg-slate-50 px-3 py-2 text-left" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff&id={{ profile.id }}')">
+            <span class="block text-sm font-black text-slate-900">{{ profile.user.get_full_name|default:profile.user.username }}</span>
+            <span class="block text-xs font-semibold text-slate-500">{{ profile.get_position_display|default:profile.position }}</span>
+          </button>
+          {% empty %}
+          <p class="text-sm font-semibold text-slate-500">Aucun staff actif.</p>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">Logs recents</p>
+        <div class="space-y-2">
+          {% for log in drawer_audit_rows|slice:":5" %}
+          <div class="rounded-xl bg-slate-50 px-3 py-2">
+            <p class="text-xs font-black text-slate-700">{{ log.get_action_type_display }}</p>
+            <p class="mt-1 text-xs font-semibold text-slate-500">{{ log.created_at|date:"d/m H:i" }} - {{ log.target_label|default:"-" }}</p>
+          </div>
+          {% empty %}
+          <p class="text-sm font-semibold text-slate-500">Aucun log.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </aside>
+  </div>
+  {% elif modal_kind == "alert" or modal_kind == "case" %}
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+      {% if drawer_alert %}
+      <p class="text-xs font-black uppercase tracking-wide text-rose-600">Alerte</p>
+      <h4 class="mt-1 text-2xl font-black text-slate-900">{{ drawer_alert.get_alert_type_display }}</h4>
+      <p class="mt-2 text-sm font-semibold text-slate-600">{{ drawer_alert.student }} - {{ drawer_alert.branch.name }}</p>
+      <div class="mt-4 rounded-xl bg-white p-4">
+        <p class="text-sm font-semibold text-slate-600">{{ drawer_alert.get_alert_type_display }}</p>
+        <p class="mt-2 text-lg font-black text-slate-950">Occurrences : {{ drawer_alert.count }}</p>
+      </div>
+      {% else %}
+      <p class="text-xs font-black uppercase tracking-wide text-orange-600">Dossier etudiant</p>
+      <h4 class="mt-1 text-2xl font-black text-slate-900">{{ drawer_case.title }}</h4>
+      <p class="mt-2 text-sm font-semibold text-slate-600">{{ drawer_case.student }} - {{ drawer_case.branch.name }}</p>
+      <div class="mt-4 rounded-xl bg-white p-4">
+        <p class="text-sm font-semibold text-slate-600">{{ drawer_case.description }}</p>
+      </div>
+      {% endif %}
+    </section>
+    <aside class="space-y-4">
+      <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Actions</p>
+        <div class="mt-3 space-y-2">
+          {% if drawer_alert %}
+          <form method="post" action="{% url 'accounts_portal:dg_action' %}" onsubmit="return dgSubmitAction(this)">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="resolve_alert">
+            <input type="hidden" name="object_id" value="{{ drawer_alert.id }}">
+            <button type="submit" class="dg-action w-full">Resoudre l'alerte</button>
+          </form>
+          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert&id={{ drawer_alert.id }}')">Ouvrir</button>
+          {% else %}
+          <form method="post" action="{% url 'accounts_portal:dg_action' %}" onsubmit="return dgSubmitAction(this)">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="escalate_case">
+            <input type="hidden" name="object_id" value="{{ drawer_case.id }}">
+            <button type="submit" class="dg-action w-full">Escalader</button>
+          </form>
+          <form method="post" action="{% url 'accounts_portal:dg_action' %}" onsubmit="return dgSubmitAction(this)">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="resolve_case">
+            <input type="hidden" name="object_id" value="{{ drawer_case.id }}">
+            <button type="submit" class="dg-action w-full">Resoudre</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </aside>
+  </div>
+  {% elif modal_kind == "workflow" %}
+  <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <p class="text-xs font-black uppercase tracking-wide text-violet-600">Workflow detaille</p>
+    <div class="mt-3 overflow-x-auto">
+      <table class="dg-table">
+        <thead><tr><th>Etudiant</th><th>Annexe</th><th>Etape</th><th>Classe</th></tr></thead>
+        <tbody>
+          {% for row in drawer_workflow_rows %}
+          <tr>
+            <td>{% if row.student.full_name %}{{ row.student.full_name }}{% else %}{{ row.student }}{% endif %}</td>
+            <td>{{ row.source_enrollment.branch.name }}</td>
+            <td>{{ row.get_workflow_status_display }}</td>
+            <td>{{ row.source_class.display_name }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="py-6 text-center text-sm font-semibold text-slate-500">Aucun dossier bloque.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% elif modal_kind == "finance" %}
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+      <p class="text-xs font-black uppercase tracking-wide text-emerald-600">Finance detaillee</p>
+      <h4 class="mt-1 text-2xl font-black text-slate-900">Synthese financiere</h4>
+      <div class="mt-4 grid grid-cols-3 gap-3">
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Revenus</p><p class="mt-1 text-lg font-black text-emerald-700">{{ modal_finance.revenue|default:0|intcomma }} FCFA</p></div>
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Depenses</p><p class="mt-1 text-lg font-black text-rose-700">{{ modal_finance.expenses|default:0|intcomma }} FCFA</p></div>
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Solde</p><p class="mt-1 text-lg font-black text-blue-700">{{ modal_finance.balance|default:0|intcomma }} FCFA</p></div>
+      </div>
+    </section>
+    <aside class="space-y-3">
+      <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance')">Ouvrir</button>
+    </aside>
+  </div>
+  {% elif modal_kind == "analytics" %}
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+      <p class="text-xs font-black uppercase tracking-wide text-blue-600">Analytics</p>
+      <h4 class="mt-1 text-2xl font-black text-slate-900">Sante des annexes</h4>
+      <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Conversion</p><p class="mt-1 text-xl font-black text-blue-700">{{ drawer_analytics.admission_conversion_rate|default:0 }}%</p></div>
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Inscriptions</p><p class="mt-1 text-xl font-black text-emerald-700">{{ drawer_analytics.active_inscriptions|default:0|intcomma }}</p></div>
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Paiements attente</p><p class="mt-1 text-xl font-black text-amber-700">{{ drawer_analytics.pending_payments|default:0|intcomma }}</p></div>
+        <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Risques</p><p class="mt-1 text-xl font-black text-rose-700">{{ drawer_analytics.risk_total|default:0|intcomma }}</p></div>
+      </div>
+      <div class="mt-4 overflow-x-auto">
+        <table class="dg-table">
+          <thead><tr><th>Annexe</th><th>Score</th><th>Etudiants</th><th>Solde</th><th>Alertes</th></tr></thead>
+          <tbody>
+            {% for item in drawer_analytics.branch_health_rows|slice:":6" %}
+            <tr>
+              <td class="font-black">{{ item.branch.name }}</td>
+              <td><span class="dg-badge {% if item.analytics_risk_score >= 30 %}bg-rose-100 text-rose-700{% elif item.analytics_risk_score >= 12 %}bg-orange-100 text-orange-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.analytics_risk_score }}</span></td>
+              <td>{{ item.student_count|intcomma }}</td>
+              <td class="{% if item.balance_total < 0 %}text-rose-700{% else %}text-emerald-700{% endif %} font-black">{{ item.balance_total|intcomma }}</td>
+              <td>{{ item.open_alert_count|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="py-6 text-center font-semibold text-slate-500">Aucune annexe active.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <aside class="space-y-3">
+      <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=analytics')">Ouvrir</button>
+    </aside>
+  </div>
+  {% elif modal_kind == "rh" %}
+  <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <p class="text-xs font-black uppercase tracking-wide text-violet-600">RH</p>
+    <h4 class="mt-1 text-2xl font-black text-slate-900">Staff et affectations</h4>
+    <div class="mt-4 grid grid-cols-3 gap-3">
+      <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Staff actif</p><p class="mt-1 text-xl font-black">{{ drawer_rh.active_staff|default:0|intcomma }}</p></div>
+      <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Avec manager</p><p class="mt-1 text-xl font-black text-emerald-700">{{ drawer_rh.branches_with_manager|default:0|intcomma }}</p></div>
+      <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">A affecter</p><p class="mt-1 text-xl font-black text-amber-700">{{ drawer_rh.branches_without_manager|default:0|intcomma }}</p></div>
+    </div>
+  </div>
+  {% elif modal_kind == "realtime" %}
+  <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <p class="text-xs font-black uppercase tracking-wide text-emerald-600">Live</p>
+    <h4 class="mt-1 text-2xl font-black text-slate-900">Activite du jour</h4>
+    <div class="mt-4 grid grid-cols-3 gap-3">
+      <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Cours semaine</p><p class="mt-1 text-xl font-black">{{ drawer_schedule.total_events|default:0|intcomma }}</p></div>
+      <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Cours jour</p><p class="mt-1 text-xl font-black text-blue-700">{{ drawer_schedule.today_events_count|default:0|intcomma }}</p></div>
+      <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Alertes planning</p><p class="mt-1 text-xl font-black text-rose-700">{{ drawer_schedule.missing_lesson_logs_count|default:0|intcomma }}</p></div>
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <p class="text-sm font-semibold text-slate-600">Aucun contenu disponible.</p>
+  </div>
+  {% endif %}
+
+  <div class="mt-5 flex justify-end">
+    <button type="button" class="dg-action dg-action-dark" onclick="dgCloseModal()">Fermer</button>
+  </div>
+</div>

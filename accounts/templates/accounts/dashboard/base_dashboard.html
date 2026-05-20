@@ -953,6 +953,19 @@
                 </a>
                 {% endif %}
 
+                {% if request.user|has_group:'finance_agents' or request.user|has_group:'gestionnaire' or request.user|has_group:'executive_director' or request.user.profile.position == 'finance_manager' or request.user.profile.position == 'payment_agent' or request.user.profile.position == 'branch_manager' or request.user.profile.position == 'executive_director' or request.user.profile.position == 'director_of_studies' or request.user.is_superuser %}
+                <a href="{% url 'accounts_portal:reenrollment_workspace' %}"
+                   class="sidebar-link {% if dashboard_type == 'reenrollment' %}active{% endif %}">
+                    <div class="sidebar-link-icon">
+                        <i class="fas fa-repeat"></i>
+                    </div>
+                    <span class="sidebar-link-text">Passages</span>
+                    {% if reenrollment_finance_pending_count %}
+                    <span class="sidebar-link-badge">{{ reenrollment_finance_pending_count }}</span>
+                    {% endif %}
+                </a>
+                {% endif %}
+
                 {% if request.user|has_group:'gestionnaire' or request.user|has_group:'manager' %}
                 <a href="{% url 'accounts:manager_dashboard' %}"
                    class="sidebar-link {% if dashboard_type == 'manager' %}active{% endif %}">

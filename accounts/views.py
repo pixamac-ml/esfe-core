@@ -34,7 +34,6 @@ from .forms import CustomUserCreationForm, ProfileForm, EmailUpdateForm, UserPre
 from .dashboards.permissions import (
     check_admissions_access,
     check_finance_access,
-    check_executive_access,
 )
 
 
@@ -94,10 +93,17 @@ def dashboard_redirect(request):
     """
 
     user = request.user
+    position = get_user_position(user)
 
     # Ordre de priorité
-    if check_executive_access(user):
-        return redirect("accounts:executive_dashboard")
+    if user.is_superuser or position == "super_admin":
+        return redirect("superadmin:dashboard")
+
+    if position in {"executive_director", "deputy_executive_director"}:
+        return redirect("accounts_portal:portal_dg")
+
+    if position == "director_of_studies":
+        return redirect("accounts_portal:portal_director")
 
     if check_finance_access(user):
         return redirect("accounts:finance_dashboard")
@@ -105,7 +111,7 @@ def dashboard_redirect(request):
     if is_manager(user):
         return redirect("accounts:manager_dashboard")
 
-    if get_user_position(user) == "secretary":
+    if position == "secretary":
         return redirect("accounts_portal:portal_secretary")
 
     if check_admissions_access(user):

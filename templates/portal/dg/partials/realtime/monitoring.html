@@ -1,0 +1,62 @@
+{% load humanize %}
+<div class="dg-card dg-card-pad">
+  <div class="dg-section-head">
+    <div>
+      <h3 class="dg-title">Monitoring temps reel</h3>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="dg-badge bg-emerald-100 text-emerald-700">Live</span>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+    <div class="xl:col-span-8">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+          <p class="text-sm font-black text-blue-700">Flux etudiants</p>
+          <p class="mt-3 text-4xl font-black text-blue-700">{{ realtime.today_inscriptions|intcomma }}</p>
+          <p class="mt-2 text-xs font-bold text-blue-700/70">Nouvelles inscriptions</p>
+        </div>
+        <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
+          <p class="text-sm font-black text-emerald-700">Flux paiements</p>
+          <p class="mt-3 text-4xl font-black text-emerald-700">{{ realtime.today_payments|intcomma }}</p>
+          <p class="mt-2 text-xs font-bold text-emerald-700/70">Paiements valides</p>
+        </div>
+        <div class="rounded-2xl border border-orange-100 bg-orange-50 p-5">
+          <p class="text-sm font-black text-orange-700">Saturation</p>
+          <p class="mt-3 text-4xl font-black text-orange-700">{{ analytics.class_fill_rate }}%</p>
+          <p class="mt-2 text-xs font-bold text-orange-700/70">Remplissage global</p>
+        </div>
+        <div class="rounded-2xl border border-rose-100 bg-rose-50 p-5">
+          <p class="text-sm font-black text-rose-700">Alertes live</p>
+          <p class="mt-3 text-4xl font-black text-rose-700">{{ open_alerts|intcomma }}</p>
+          <p class="mt-2 text-xs font-bold text-rose-700/70">A surveiller</p>
+        </div>
+      </div>
+      <div class="mt-5 h-[260px] rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <canvas id="dgRealtimeChart"></canvas>
+      </div>
+    </div>
+    <aside class="xl:col-span-4 space-y-4">
+      <div class="rounded-2xl border border-slate-100 bg-white p-5">
+        <h4 class="text-base font-black text-slate-950">Objectifs de la journee</h4>
+        <div class="mt-4 space-y-4">
+          <div>
+            <div class="mb-2 flex justify-between text-xs font-black text-slate-600"><span>Inscriptions</span><span>{{ realtime.today_inscriptions|intcomma }} / 150</span></div>
+            <div class="h-2 rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-600" style="width: {% widthratio realtime.today_inscriptions 150 100 %}%"></div></div>
+          </div>
+          <div>
+            <div class="mb-2 flex justify-between text-xs font-black text-slate-600"><span>Paiements</span><span>{{ realtime.today_payments|intcomma }} / 120</span></div>
+            <div class="h-2 rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width: {% widthratio realtime.today_payments 120 100 %}%"></div></div>
+          </div>
+          <div>
+            <div class="mb-2 flex justify-between text-xs font-black text-slate-600"><span>Alertes traitees</span><span>76%</span></div>
+            <div class="h-2 rounded-full bg-slate-100"><div class="h-full w-[76%] rounded-full bg-orange-500"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5 text-sm font-semibold text-blue-700">
+        Derniere synchronisation : {{ generated_at|date:"d/m/Y H:i:s" }}
+      </div>
+    </aside>
+  </div>
+</div>

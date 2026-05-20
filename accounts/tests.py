@@ -160,10 +160,26 @@ class AccessCompatibilityTests(TestCase):
 		scope = get_user_scope(executive_user)
 
 		self.assertTrue(scope["is_global"])
-		self.assertEqual(scope["role"], "directeur_etudes")
+		self.assertEqual(scope["role"], "directeur_general")
 		self.assertTrue(can_access(executive_user, "view_dashboard", "executive"))
+		self.assertFalse(can_access(executive_user, "view_dashboard", "director_studies"))
 		self.assertTrue(can_access(executive_user, "view_dashboard", "finance"))
 		self.assertTrue(can_access(executive_user, "view_dashboard", "admissions"))
+
+	def test_director_of_studies_scope_is_not_global(self):
+		director = self._create_user(
+			"director_studies",
+			role="executive",
+			position="director_of_studies",
+			branch=self.branch_profile,
+		)
+
+		scope = get_user_scope(director)
+
+		self.assertFalse(scope["is_global"])
+		self.assertEqual(scope["role"], "directeur_etudes")
+		self.assertFalse(can_access(director, "view_dashboard", "executive"))
+		self.assertTrue(can_access(director, "view_dashboard", "director_studies"))
 
 	def test_manager_rule_is_explicit(self):
 		manager_user = self._create_user(
@@ -204,7 +220,7 @@ class DashboardRedirectCompatibilityTests(TestCase):
 		profile.save(update_fields=["role", "position", "branch", "updated_at"])
 		return user
 
-	def test_dashboard_redirect_prioritizes_executive(self):
+	def test_dashboard_redirect_sends_dg_to_dg_portal(self):
 		user = self._create_user(
 			"redirect_executive",
 			groups=["executive_director", "finance_agents", "gestionnaire"],
@@ -216,7 +232,40 @@ class DashboardRedirectCompatibilityTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			reverse("accounts:executive_dashboard"),
+			reverse("accounts_portal:portal_dg"),
+			fetch_redirect_response=False,
+		)
+
+	def test_dashboard_redirect_sends_superadmin_to_superadmin_dashboard(self):
+		user = USER_MANAGER.create_superuser(
+			username="redirect_superadmin",
+			email="redirect_superadmin@example.com",
+			password="pass1234",
+		)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("accounts:dashboard_redirect"))
+
+		self.assertRedirects(
+			response,
+			reverse("superadmin:dashboard"),
+			fetch_redirect_response=False,
+		)
+
+	def test_dashboard_redirect_sends_director_of_studies_to_director_portal(self):
+		user = self._create_user(
+			"redirect_director_studies",
+			role="executive",
+			position="director_of_studies",
+			branch=self.branch,
+		)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse("accounts:dashboard_redirect"))
+
+		self.assertRedirects(
+			response,
+			reverse("accounts_portal:portal_director"),
 			fetch_redirect_response=False,
 		)
 
@@ -928,6 +977,12 @@ class PortalPhaseOneTests(TestCase):
 	def test_post_login_portal_url_uses_single_portal_entry(self):
 		student = self._create_user("post_login_student", role="student")
 		staff_user = self._create_user("post_login_staff", groups=["finance_agents"])
+		dg_user = self._create_user("post_login_dg", groups=["executive_director"])
+		superadmin = USER_MANAGER.create_superuser(
+			username="post_login_superadmin",
+			email="post_login_superadmin@example.com",
+			password="pass1234",
+		)
 
 		self.assertEqual(
 			get_post_login_portal_url(student),
@@ -936,6 +991,14 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(
 			get_post_login_portal_url(staff_user),
 			reverse("accounts_portal:portal_dashboard"),
+		)
+		self.assertEqual(
+			get_post_login_portal_url(dg_user),
+			reverse("accounts_portal:portal_dg"),
+		)
+		self.assertEqual(
+			get_post_login_portal_url(superadmin),
+			reverse("superadmin:dashboard"),
 		)
 
 	def test_student_dashboard_requires_student_role(self):
@@ -1100,6 +1163,32 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, "Dashboard Direction des Etudes")
 		self.assertContains(response, "Pilotage de la qualite academique et des charges")
 		self.assertContains(response, reverse("accounts:logout"))
+
+	def test_portal_dashboard_renders_dg_dashboard_from_single_entry(self):
+		dg_user = self._create_user("portal_dg", position="executive_director")
+		self.client.force_login(dg_user)
+
+		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Dashboard Directeur")
+		self.assertContains(response, "Direction generale")
+
+	def test_portal_dashboard_redirects_superadmin_to_superadmin_dashboard(self):
+		superadmin = USER_MANAGER.create_superuser(
+			username="portal_superadmin",
+			email="portal_superadmin@example.com",
+			password="pass1234",
+		)
+		self.client.force_login(superadmin)
+
+		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+
+		self.assertRedirects(
+			response,
+			reverse("superadmin:dashboard"),
+			fetch_redirect_response=False,
+		)
 
 	def test_director_can_create_teacher_with_initial_room_assignment(self):
 		director = self._create_user("portal_director_create_teacher", role="executive", position="director_of_studies")

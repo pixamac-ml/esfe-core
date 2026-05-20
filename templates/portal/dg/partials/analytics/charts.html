@@ -1,0 +1,230 @@
+{% load humanize %}
+<div class="dg-card dg-card-pad">
+  <div class="dg-section-head">
+    <div>
+      <h3 class="dg-title">Analytics institutionnelles</h3>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" class="dg-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=analytics')" title="Detail"><i class="fa-regular fa-eye"></i></button>
+    </div>
+  </div>
+  <div class="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+    <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+      <p class="text-xs font-black uppercase tracking-wide text-blue-700">Conversion admissions</p>
+      <p class="mt-2 text-3xl font-black text-slate-950">{{ analytics.admission_conversion_rate }}%</p>
+      <p class="mt-1 text-xs font-bold text-slate-500">{{ analytics.accepted_candidatures|intcomma }} acceptees / {{ analytics.total_candidatures|intcomma }}</p>
+    </div>
+    <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+      <p class="text-xs font-black uppercase tracking-wide text-emerald-700">Inscription effective</p>
+      <p class="mt-2 text-3xl font-black text-slate-950">{{ analytics.inscription_conversion_rate }}%</p>
+      <p class="mt-1 text-xs font-bold text-slate-500">{{ analytics.active_inscriptions|intcomma }} dossiers actifs</p>
+    </div>
+    <div class="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+      <p class="text-xs font-black uppercase tracking-wide text-violet-700">Paiements valides</p>
+      <p class="mt-2 text-3xl font-black text-slate-950">{{ analytics.payment_conversion_rate }}%</p>
+      <p class="mt-1 text-xs font-bold text-slate-500">{{ analytics.validated_payments|intcomma }} operations</p>
+    </div>
+    <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+      <p class="text-xs font-black uppercase tracking-wide text-amber-700">Paiements en attente</p>
+      <p class="mt-2 text-3xl font-black text-amber-800">{{ analytics.pending_payments|intcomma }}</p>
+      <p class="mt-1 text-xs font-bold text-slate-500">{{ analytics.pending_payment_amount|intcomma }} FCFA</p>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+      <p class="text-xs font-black uppercase tracking-wide text-slate-500">Moyenne / classe</p>
+      <p class="mt-2 text-3xl font-black text-slate-950">{{ analytics.average_students_per_class|intcomma }}</p>
+      <p class="mt-1 text-xs font-bold text-slate-500">{{ analytics.total_enrollments|intcomma }} inscriptions academiques</p>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+    <div class="xl:col-span-8">
+      <div class="h-[335px]">
+        <canvas id="dgMonthlyChart"></canvas>
+      </div>
+      <div class="mt-5 overflow-x-auto rounded-2xl border border-slate-100">
+        <table class="dg-table">
+          <thead>
+            <tr>
+              <th>Mois</th>
+              <th>Candidatures</th>
+              <th>Paiements</th>
+              <th>Revenus</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in analytics.monthly_table %}
+            <tr>
+              <td class="font-black">{{ row.label }}</td>
+              <td>{{ row.candidatures|intcomma }}</td>
+              <td>{{ row.payments|intcomma }}</td>
+              <td>{{ row.revenue|intcomma }} FCFA</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="py-6 text-center font-semibold text-slate-500">Aucune donnee mensuelle.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="xl:col-span-4 space-y-4">
+      <div>
+        <div class="mb-2 flex justify-between text-sm font-bold">
+          <span>Remplissage global</span>
+          <span class="text-blue-600">{{ analytics.class_fill_rate }}%</span>
+        </div>
+        <div class="h-3 overflow-hidden rounded-full bg-slate-100">
+          <div class="h-full rounded-full bg-blue-600" style="width: {{ analytics.class_fill_rate }}%"></div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+          <p class="text-xs font-black text-emerald-700">Normales</p>
+          <p class="mt-2 text-2xl font-black text-slate-950">{{ analytics.classes_normal|intcomma }}</p>
+        </div>
+        <div class="rounded-2xl border border-orange-100 bg-orange-50 p-4">
+          <p class="text-xs font-black text-orange-700">Attention</p>
+          <p class="mt-2 text-2xl font-black text-orange-800">{{ analytics.classes_attention|intcomma }}</p>
+        </div>
+        <div class="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+          <p class="text-xs font-black text-rose-700">Surchargees</p>
+          <p class="mt-2 text-2xl font-black text-rose-800">{{ analytics.classes_overloaded|intcomma }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-100 bg-white p-4">
+          <p class="text-xs font-black text-slate-500">Vides</p>
+          <p class="mt-2 text-2xl font-black text-slate-950">{{ analytics.classes_empty|intcomma }}</p>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="mb-3 text-sm font-black text-slate-800">Annexes les plus sensibles</p>
+        <div class="space-y-3">
+          {% for item in analytics.sensitive_branches %}
+          <div>
+            <div class="mb-1 flex justify-between text-xs font-bold text-slate-600">
+              <span>{{ item.branch.name }}</span>
+              <span>{{ item.open_alert_count }} alertes</span>
+            </div>
+            <div class="h-2 overflow-hidden rounded-full bg-white">
+              <div class="h-full rounded-full bg-rose-500" style="width: {% widthratio item.open_alert_count open_alerts 100 %}%"></div>
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-sm font-semibold text-slate-500">Aucune annexe sensible.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-12">
+    <div class="xl:col-span-7 rounded-2xl border border-slate-100 bg-white p-5">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h4 class="text-base font-black text-slate-950">Sante operationnelle des annexes</h4>
+        </div>
+        <button type="button" class="dg-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=analytics')" title="Detail"><i class="fa-regular fa-eye"></i></button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="dg-table">
+          <thead>
+            <tr>
+              <th>Annexe</th>
+              <th>Score</th>
+              <th>Etudiants</th>
+              <th>Solde</th>
+              <th>Alertes</th>
+              <th>Attente</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in analytics.branch_health_rows %}
+            <tr>
+              <td class="font-black">{{ item.branch.name }}</td>
+              <td><span class="dg-badge {% if item.analytics_risk_score >= 30 %}bg-rose-100 text-rose-700{% elif item.analytics_risk_score >= 12 %}bg-orange-100 text-orange-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.analytics_risk_score }}</span></td>
+              <td>{{ item.student_count|intcomma }}</td>
+              <td class="{% if item.balance_total < 0 %}font-black text-rose-700{% else %}font-black text-emerald-700{% endif %}">{{ item.balance_total|intcomma }} FCFA</td>
+              <td>{{ item.open_alert_count|intcomma }}</td>
+              <td>{{ item.analytics_pending_payment_count|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="py-6 text-center font-semibold text-slate-500">Aucune annexe active.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="xl:col-span-5 space-y-4">
+      <div class="rounded-2xl border border-slate-100 bg-white p-5">
+        <h4 class="mb-4 text-base font-black text-slate-950">Repartition des risques</h4>
+        <div class="space-y-3">
+          {% for row in analytics.risk_breakdown %}
+          <div>
+            <div class="mb-1 flex justify-between text-xs font-bold text-slate-600">
+              <span>{{ row.label }}</span>
+              <span>{{ row.value|intcomma }} - {{ row.percent }}%</span>
+            </div>
+            <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div class="h-full rounded-full {% if row.tone == 'rose' %}bg-rose-500{% elif row.tone == 'amber' %}bg-amber-500{% elif row.tone == 'orange' %}bg-orange-500{% else %}bg-blue-500{% endif %}" style="width: {{ row.percent }}%"></div>
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-sm font-semibold text-slate-500">Aucun risque consolide.</p>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-100 bg-white p-5">
+        <h4 class="mb-4 text-base font-black text-slate-950">Pipeline candidatures</h4>
+        <div class="space-y-3">
+          {% for row in analytics.candidature_status_rows %}
+          <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+            <div>
+              <p class="text-sm font-black text-slate-900">{{ row.label }}</p>
+              <p class="text-xs font-semibold text-slate-500">{{ row.percent }}% du flux</p>
+            </div>
+            <span class="dg-badge {% if row.tone == 'emerald' %}bg-emerald-100 text-emerald-700{% elif row.tone == 'amber' %}bg-amber-100 text-amber-700{% else %}bg-rose-100 text-rose-700{% endif %}">{{ row.count|intcomma }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
+    <div class="rounded-2xl border border-slate-100 bg-white p-5">
+      <h4 class="mb-4 text-base font-black text-slate-950">Programmes les plus demandes</h4>
+      <div class="space-y-3">
+        {% for row in analytics.top_programmes %}
+        <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+          <span class="text-sm font-black text-slate-800">{{ row.programme__title|default:"Programme non renseigne" }}</span>
+          <span class="dg-badge bg-blue-100 text-blue-700">{{ row.total|intcomma }}</span>
+        </div>
+        {% empty %}
+        <p class="text-sm font-semibold text-slate-500">Aucune candidature en base.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="rounded-2xl border border-slate-100 bg-white p-5">
+      <h4 class="mb-4 text-base font-black text-slate-950">Classes les plus chargees</h4>
+      <div class="space-y-3">
+        {% for academic_class in analytics.overloaded_classes %}
+        <div class="rounded-xl bg-slate-50 px-4 py-3">
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-sm font-black text-slate-800">{{ academic_class }}</span>
+            <span class="dg-badge bg-orange-100 text-orange-700">{{ academic_class.active_students|intcomma }}</span>
+          </div>
+          <p class="mt-1 text-xs font-semibold text-slate-500">{{ academic_class.branch.name }}</p>
+        </div>
+        {% empty %}
+        <p class="text-sm font-semibold text-slate-500">Aucune classe active chargee.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="rounded-2xl border border-slate-100 bg-white p-5">
+      <h4 class="mb-4 text-base font-black text-slate-950">Workflow passages</h4>
+      <div class="space-y-3">
+        {% for row in analytics.workflow_status_rows %}
+        <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+          <span class="text-sm font-black text-slate-800">{{ row.label }}</span>
+          <span class="dg-badge {% if row.tone == 'emerald' %}bg-emerald-100 text-emerald-700{% elif row.tone == 'blue' %}bg-blue-100 text-blue-700{% elif row.tone == 'orange' %}bg-orange-100 text-orange-700{% elif row.tone == 'rose' %}bg-rose-100 text-rose-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ row.count|intcomma }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>

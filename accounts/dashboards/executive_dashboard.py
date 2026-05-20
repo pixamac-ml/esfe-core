@@ -13,6 +13,7 @@ from inscriptions.models import Inscription
 from payments.models import Payment, PaymentAgent
 from branches.models import Branch
 from formations.models import Programme
+from students.models import StudentYearDecision
 
 from .permissions import check_executive_access
 
@@ -266,6 +267,14 @@ def executive_dashboard(request):
         [:10]
     )
 
+    reenrollment_stats = StudentYearDecision.objects.aggregate(
+        draft=Count("id", filter=Q(workflow_status=StudentYearDecision.WORKFLOW_DRAFT)),
+        academic_validated=Count("id", filter=Q(workflow_status=StudentYearDecision.WORKFLOW_ACADEMIC_VALIDATED)),
+        finance_validated=Count("id", filter=Q(workflow_status=StudentYearDecision.WORKFLOW_FINANCE_VALIDATED)),
+        applied=Count("id", filter=Q(workflow_status=StudentYearDecision.WORKFLOW_APPLIED)),
+        rejected=Count("id", filter=Q(workflow_status=StudentYearDecision.WORKFLOW_REJECTED)),
+    )
+
     # =====================================================
     # CONTEXTE
     # =====================================================
@@ -297,6 +306,7 @@ def executive_dashboard(request):
         "recent_inscriptions": recent_inscriptions,
 
         "recent_payments": recent_payments,
+        "reenrollment_stats": reenrollment_stats,
 
         "dashboard_type": "executive"
 

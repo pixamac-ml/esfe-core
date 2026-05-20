@@ -7,6 +7,7 @@ from django.contrib.sitemaps.views import sitemap
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import HttpResponse
 from core import views as core_views
 from core.sitemaps import build_sitemaps
 from portal.views.it_surveillance import surveillance_general_api_view
@@ -29,6 +30,7 @@ handler400 = "core.views.custom_400"
 urlpatterns = [
 
     # Admin Django (protégé par défaut)
+    path("favicon.ico", lambda request: HttpResponse(status=204), name="favicon_ico"),
     path("admin/", admin.site.urls),
     path("surveillance/general/", surveillance_general_api_view, name="surveillance_general_api"),
     path("accounts/", include("accounts.urls")),

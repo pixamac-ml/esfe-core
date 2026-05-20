@@ -1,8 +1,11 @@
 from io import StringIO
 from datetime import date, datetime
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
@@ -15,7 +18,17 @@ from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
 from payments.models import Payment
-from students.models import AttendanceAlert, Student, StudentAttendance, TeacherAttendance
+from students.models import AttendanceAlert, Student, StudentAttendance, StudentYearDecision, TeacherAttendance
+from portal.services.reenrollment_service import (
+    apply_student_decision,
+    build_reenrollment_candidates,
+    can_user_handle_reenrollment,
+    propose_student_decision,
+    reject_student_decision,
+    validate_student_decision_academic,
+    validate_student_decision_finance,
+)
+from portal.models import SupportAuditLog
 from students.services.attendance_service import (
     detect_repeated_absences,
     detect_repeated_lates,
@@ -317,6 +330,337 @@ class StudentCreationWorkflowTests(TestCase):
         recreated = Student.objects.select_related("user__profile").get(inscription=self.inscription)
         self.assertEqual(recreated.user_id, user.id)
         self.assertEqual(recreated.user.profile.role, "student")
+
+
+class ReenrollmentPhaseOneTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="reenrollment_student",
+            email="reenrollment_student@example.com",
+            password="pass1234",
+            first_name="Awa",
+            last_name="Traore",
+        )
+        self.branch = Branch.objects.create(name="Annexe Reinscription", code="RIN", slug="annexe-reinscription")
+        self.cycle = Cycle.objects.create(name="Licence Reinscription", theme="accent", min_duration_years=1, max_duration_years=3)
+        self.diploma = Diploma.objects.create(name="Diplome Reinscription", level="superieur")
+        self.filiere = Filiere.objects.create(name="Filiere Reinscription")
+        self.programme = Programme.objects.create(
+            title="Programme Reinscription",
+            filiere=self.filiere,
+            cycle=self.cycle,
+            diploma_awarded=self.diploma,
+            duration_years=3,
+            short_description="Reinscription",
+            description="Reinscription",
+        )
+        self.source_year = AcademicYear.objects.create(
+            name="2031-2032",
+            start_date=date(2031, 10, 1),
+            end_date=date(2032, 7, 31),
+            is_active=True,
+        )
+        self.target_year = AcademicYear.objects.create(
+            name="2032-2033",
+            start_date=date(2032, 10, 1),
+            end_date=date(2033, 7, 31),
+            is_active=False,
+        )
+        self.source_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.source_year,
+            level="L1",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        self.target_l2 = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.target_year,
+            level="L2",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        self.target_l1 = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.target_year,
+            level="L1",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        self.candidature = Candidature.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year="2031-2032",
+            entry_year=1,
+            first_name="Awa",
+            last_name="Traore",
+            birth_date="2001-01-01",
+            birth_place="Bamako",
+            gender="female",
+            phone="70000002",
+            email="awa.reinscription@example.com",
+            status="accepted",
+        )
+        self.inscription = Inscription.objects.create(
+            candidature=self.candidature,
+            academic_class=self.source_class,
+            amount_due=100000,
+            status=Inscription.STATUS_ACTIVE,
+        )
+        self.student = Student.objects.create(
+            user=self.user,
+            inscription=self.inscription,
+            matricule="MAT-RIN-001",
+            is_active=True,
+        )
+        self.enrollment = AcademicEnrollment.objects.create(
+            inscription=self.inscription,
+            student=self.user,
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.source_year,
+            academic_class=self.source_class,
+        )
+        self.student.current_academic_enrollment = self.enrollment
+        self.student.save(update_fields=["current_academic_enrollment"])
+
+    def test_promoted_decision_keeps_student_identity_and_history(self):
+        decision = propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            target_academic_year=self.target_year,
+            target_class=self.target_l2,
+            annual_average=Decimal("12.50"),
+        )
+
+        self.student.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        self.assertEqual(decision.decision, StudentYearDecision.DECISION_PROMOTED)
+        self.assertEqual(decision.target_class, self.target_l2)
+        self.assertEqual(self.student.matricule, "MAT-RIN-001")
+        self.assertEqual(self.student.user, self.user)
+        self.assertEqual(self.student.current_academic_enrollment, self.enrollment)
+        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_ACTIVE)
+
+    def test_repeated_decision_can_resolve_same_level_target_class(self):
+        decision = propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            target_academic_year=self.target_year,
+            annual_average=Decimal("8.25"),
+        )
+
+        self.assertEqual(decision.decision, StudentYearDecision.DECISION_REPEATED)
+        self.assertEqual(decision.target_class, self.target_l1)
+
+    def test_duplicate_active_enrollment_same_year_programme_is_rejected(self):
+        candidature = Candidature.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year="2031-2032",
+            entry_year=1,
+            first_name="Awa",
+            last_name="Traore",
+            birth_date="2001-01-01",
+            birth_place="Bamako",
+            gender="female",
+            phone="70000003",
+            email="awa.reinscription.2@example.com",
+            status="accepted",
+        )
+        inscription = Inscription.objects.create(
+            candidature=candidature,
+            academic_class=self.source_class,
+            amount_due=100000,
+            status=Inscription.STATUS_ACTIVE,
+        )
+        Payment.objects.create(
+            inscription=inscription,
+            amount=100000,
+            method=Payment.METHOD_CASH,
+            status=Payment.STATUS_VALIDATED,
+        )
+
+        with self.assertRaises(ValidationError):
+            AcademicEnrollment.objects.create(
+                inscription=inscription,
+                student=self.user,
+                programme=self.programme,
+                branch=self.branch,
+                academic_year=self.source_year,
+                academic_class=self.source_class,
+            )
+
+    def test_candidates_include_finance_and_proposed_decision(self):
+        candidates = build_reenrollment_candidates(source_year=self.source_year, source_class=self.source_class)
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]["matricule"], "MAT-RIN-001")
+        self.assertIn(candidates[0]["proposed_decision"], {
+            StudentYearDecision.DECISION_PROMOTED,
+            StudentYearDecision.DECISION_REPEATED,
+        })
+        self.assertEqual(candidates[0]["financial_status"]["status"], "debt")
+
+    def test_validated_transition_creates_new_inscription_and_enrollment(self):
+        actor = User.objects.create_user(username="reenrollment_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        Payment.objects.create(
+            inscription=self.inscription,
+            amount=100000,
+            method=Payment.METHOD_CASH,
+            status=Payment.STATUS_VALIDATED,
+        )
+        self.inscription.update_financial_state()
+        decision = propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            target_academic_year=self.target_year,
+            target_class=self.target_l2,
+            decision=StudentYearDecision.DECISION_PROMOTED,
+            annual_average=Decimal("13.00"),
+            proposed_by=actor,
+        )
+
+        actor.profile.position = "director_of_studies"
+        actor.profile.save(update_fields=["position", "updated_at"])
+        validate_student_decision_academic(decision=decision, actor=actor)
+        actor.profile.position = "branch_manager"
+        actor.profile.save(update_fields=["position", "updated_at"])
+        validate_student_decision_finance(decision=decision, actor=actor)
+        applied = apply_student_decision(decision=decision, actor=actor)
+
+        self.student.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        self.assertEqual(applied.workflow_status, StudentYearDecision.WORKFLOW_APPLIED)
+        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_ARCHIVED)
+        self.assertEqual(self.student.current_academic_enrollment, applied.target_enrollment)
+        self.assertEqual(applied.target_enrollment.student, self.user)
+        self.assertEqual(applied.target_enrollment.academic_class, self.target_l2)
+        self.assertEqual(self.student.matricule, "MAT-RIN-001")
+        self.assertTrue(
+            SupportAuditLog.objects.filter(
+                action_type=SupportAuditLog.ACTION_REENROLLMENT_APPLIED,
+                target_user=self.user,
+            ).exists()
+        )
+
+    def test_finance_validation_requires_academic_validation(self):
+        actor = User.objects.create_user(username="reenrollment_finance_guard", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            target_academic_year=self.target_year,
+            target_class=self.target_l2,
+            decision=StudentYearDecision.DECISION_PROMOTED,
+            annual_average=Decimal("13.00"),
+            proposed_by=actor,
+        )
+
+        with self.assertRaises(ValidationError):
+            validate_student_decision_finance(decision=decision, actor=actor)
+
+    def test_rejected_decision_cannot_be_applied(self):
+        actor = User.objects.create_user(username="reenrollment_reject_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "director_of_studies"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            target_academic_year=self.target_year,
+            target_class=self.target_l2,
+            decision=StudentYearDecision.DECISION_PROMOTED,
+            annual_average=Decimal("13.00"),
+            proposed_by=actor,
+        )
+
+        rejected = reject_student_decision(decision=decision, actor=actor, reason="Cible a verifier")
+
+        self.assertEqual(rejected.workflow_status, StudentYearDecision.WORKFLOW_REJECTED)
+        self.assertEqual(rejected.rejection_reason, "Cible a verifier")
+        with self.assertRaises(ValidationError):
+            apply_student_decision(decision=rejected, actor=actor)
+
+    def test_gestionnaire_group_can_access_reenrollment_without_position(self):
+        actor = User.objects.create_user(username="reenrollment_group_manager", password="pass1234", is_staff=True)
+        Group.objects.get_or_create(name="gestionnaire")[0].user_set.add(actor)
+
+        self.assertTrue(can_user_handle_reenrollment(actor))
+
+    def test_suspension_can_be_applied_without_creating_target_enrollment(self):
+        actor = User.objects.create_user(username="reenrollment_suspend_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "director_of_studies"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            decision=StudentYearDecision.DECISION_SUSPENDED,
+            annual_average=Decimal("9.00"),
+            proposed_by=actor,
+        )
+
+        validate_student_decision_academic(decision=decision, actor=actor)
+        actor.profile.position = "branch_manager"
+        actor.profile.save(update_fields=["position", "updated_at"])
+        validate_student_decision_finance(decision=decision, actor=actor)
+        applied = apply_student_decision(decision=decision, actor=actor)
+
+        self.student.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        self.inscription.refresh_from_db()
+        self.assertEqual(applied.workflow_status, StudentYearDecision.WORKFLOW_APPLIED)
+        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_SUSPENDED)
+        self.assertEqual(self.inscription.status, Inscription.STATUS_SUSPENDED)
+        self.assertIsNone(self.student.current_academic_enrollment)
+        self.assertFalse(self.student.is_active)
+        self.assertIsNone(applied.target_enrollment)
+
+    def test_completed_decision_requires_finance_clearance_then_closes_source(self):
+        actor = User.objects.create_user(username="reenrollment_complete_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "director_of_studies"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        Payment.objects.create(
+            inscription=self.inscription,
+            amount=100000,
+            method=Payment.METHOD_CASH,
+            status=Payment.STATUS_VALIDATED,
+        )
+        self.inscription.update_financial_state()
+        decision = propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            decision=StudentYearDecision.DECISION_COMPLETED,
+            annual_average=Decimal("14.00"),
+            proposed_by=actor,
+        )
+
+        validate_student_decision_academic(decision=decision, actor=actor)
+        actor.profile.position = "branch_manager"
+        actor.profile.save(update_fields=["position", "updated_at"])
+        validate_student_decision_finance(decision=decision, actor=actor)
+        apply_student_decision(decision=decision, actor=actor)
+
+        self.student.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        self.inscription.refresh_from_db()
+        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_COMPLETED)
+        self.assertEqual(self.inscription.status, Inscription.STATUS_COMPLETED)
+        self.assertIsNone(self.student.current_academic_enrollment)
+        self.assertTrue(self.student.is_active)
 
 
 class AttendanceServiceTests(TestCase):

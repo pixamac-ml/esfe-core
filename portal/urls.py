@@ -16,6 +16,11 @@ from portal.views.it_surveillance import (
     it_surveillance_workspace_view,
     surveillance_general_api_view,
 )
+from portal.views.reenrollment import (
+    reenrollment_decision_action,
+    reenrollment_propose,
+    reenrollment_workspace,
+)
 from portal.views.it_workflows import (
     it_accounts_flow_workspace,
     it_accounts_flow_action,
@@ -59,7 +64,13 @@ from portal.views.supervisor_cases import (
 )
 from portal.views.views import (
     admissions_portal,
+    dg_action,
+    dg_drawer,
+    dg_export,
+    dg_modal,
     dg_portal,
+    dg_recruit_staff,
+    dg_section,
     director_portal,
     director_drawer,
     schedule_class_print,
@@ -193,6 +204,12 @@ urlpatterns = [
         name="director_create_schedule_event",
     ),
     path("dg/", dg_portal, name="portal_dg"),
+    path("dg/section/<str:section>/", dg_section, name="dg_section"),
+    path("dg/drawer/", dg_drawer, name="dg_drawer"),
+    path("dg/modal/", dg_modal, name="dg_modal"),
+    path("dg/recruit-staff/", dg_recruit_staff, name="dg_recruit_staff"),
+    path("dg/action/", dg_action, name="dg_action"),
+    path("dg/export/", dg_export, name="dg_export"),
     path("supervisor/", supervisor_portal, name="portal_supervisor"),
     path("supervisor/search/", supervisor_quick_search, name="supervisor_quick_search"),
     path(
@@ -275,6 +292,9 @@ urlpatterns = [
     path("it/panels/accounts/", it_accounts_panel, name="it_accounts_panel"),
     path("it/panels/support/", it_support_panel, name="it_support_panel"),
     path("it/workflows/notes/", it_notes_flow_workspace, name="it_notes_flow_workspace"),
+    path("workflows/reenrollment/", reenrollment_workspace, name="reenrollment_workspace"),
+    path("workflows/reenrollment/propose/", reenrollment_propose, name="reenrollment_propose"),
+    path("workflows/reenrollment/action/", reenrollment_decision_action, name="reenrollment_decision_action"),
     path("it/workflows/home/", it_home_workspace, name="it_home_workspace"),
     path("it/workflows/notes/action/", it_notes_workflow_action, name="it_notes_workflow_action"),
     path("it/workflows/notes/retake-modal/", it_notes_retake_modal, name="it_notes_retake_modal"),

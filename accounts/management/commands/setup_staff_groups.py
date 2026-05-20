@@ -27,6 +27,7 @@ class Command(BaseCommand):
             "admissions_managers": "Responsable des dossiers - Validation des candidatures",
             "finance_agents": "Agent de paiement - Gestion des encaissements",
             "executive_director": "Directeur Général - Vue globale",
+            "deputy_executive_director": "Directrice Générale Adjointe - Vue globale",
         }
 
         created_groups = {}
@@ -59,6 +60,10 @@ class Command(BaseCommand):
         executive_perms = self._get_executive_permissions()
         executive_group.permissions.set(executive_perms)
         self.stdout.write(f"   ✅ Permissions assignées à {executive_group.name}")
+
+        deputy_executive_group = created_groups["deputy_executive_director"]
+        deputy_executive_group.permissions.set(executive_perms)
+        self.stdout.write(f"   ✅ Permissions assignées à {deputy_executive_group.name}")
 
         # =====================================================
         # 3. RÉCAPITULATIF

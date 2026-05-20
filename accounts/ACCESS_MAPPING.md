@@ -25,6 +25,7 @@ Ce document décrit la couche de compatibilité introduite dans `accounts/access
 - `teacher`
 - `staff_admin`
 - `directeur_etudes`
+- `directeur_general`
 - `super_admin`
 
 ## Mapping `profile.role` -> rôle canonique
@@ -44,7 +45,7 @@ Ce document décrit la couche de compatibilité introduite dans `accounts/access
 - `finance` -> `staff_admin` *(alias legacy)*
 - `gestionnaire` -> `staff_admin`
 - `manager` -> `staff_admin` *(alias legacy)*
-- `executive_director` -> `directeur_etudes`
+- `executive_director` -> `directeur_general`
 - `executive` -> `directeur_etudes` *(alias legacy)*
 
 ## Expansion de compatibilité des groupes
@@ -75,7 +76,7 @@ Cas particulier :
 `get_user_scope(user)` retourne :
 
 - `branch` / `annexe` : annexe détectée
-- `is_global` : `True` si superuser, `profile.role in {executive, superadmin}` ou groupe `executive_director`
+- `is_global` : `True` si superuser, `profile.role=superadmin`, groupe `executive_director` ou rôle canonique `directeur_general`
 - `role` : rôle canonique
 - `profile_role` : rôle brut
 - `groups` : groupes expansés de compatibilité
@@ -97,10 +98,16 @@ Cas particulier :
 
 ### `("view_dashboard", "executive")`
 
-- groupes compatibles : `executive_director`, `executive`
-- rôles profil : `executive`, `superadmin`
-- rôles canoniques : `directeur_etudes`, `super_admin`
+- groupes compatibles : `executive_director`
+- rôles canoniques : `directeur_general`
 - accès global autorisé : oui
+
+### `("view_dashboard", "director_studies")`
+
+- rôles profil : `executive`
+- positions : `director_of_studies`
+- rôles canoniques : `directeur_etudes`
+- accès global autorisé : non
 
 ### `("view_dashboard", "manager")`
 

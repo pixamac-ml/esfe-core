@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from branches.models import Branch
 from formations.models import Programme
@@ -187,6 +188,22 @@ class AcademicClass(models.Model):
 
 
 class AcademicEnrollment(models.Model):
+    STATUS_ACTIVE = "ACTIVE"
+    STATUS_ARCHIVED = "ARCHIVED"
+    STATUS_COMPLETED = "COMPLETED"
+    STATUS_SUSPENDED = "SUSPENDED"
+    STATUS_TRANSFERRED = "TRANSFERRED"
+    STATUS_ABANDONED = "ABANDONED"
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_ARCHIVED, "Archivee"),
+        (STATUS_COMPLETED, "Terminee"),
+        (STATUS_SUSPENDED, "Suspendue"),
+        (STATUS_TRANSFERRED, "Transferee"),
+        (STATUS_ABANDONED, "Abandonnee"),
+    ]
+
     """
     Pont entre l'inscription administrative et le système académique.
     """
@@ -224,6 +241,12 @@ class AcademicEnrollment(models.Model):
         related_name="enrollments",
     )
 
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+        db_index=True,
+    )
     is_active = models.BooleanField(default=True, db_index=True)
     is_archived = models.BooleanField(default=False, db_index=True)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -268,6 +291,9 @@ class AcademicEnrollment(models.Model):
         #         errors["academic_year"] = "Incohérence avec l'année académique."
 
         if self.academic_class_id:
+            if not self.academic_class.is_active or self.academic_class.is_archived:
+                errors["academic_class"] = "La classe academique cible doit etre active et non archivee."
+
             if self.academic_class.programme != self.programme:
                 errors["academic_class"] = "La classe ne correspond pas au programme."
 
@@ -277,10 +303,38 @@ class AcademicEnrollment(models.Model):
             if self.academic_class.academic_year != self.academic_year:
                 errors["academic_class"] = "La classe ne correspond pas à l'année académique."
 
+        if self.status == self.STATUS_ACTIVE and self.student_id and self.programme_id and self.academic_year_id:
+            duplicate_active = AcademicEnrollment.objects.filter(
+                student=self.student,
+                programme=self.programme,
+                academic_year=self.academic_year,
+                status=self.STATUS_ACTIVE,
+            ).exclude(pk=self.pk)
+            if duplicate_active.exists():
+                errors["status"] = (
+                    "Un etudiant ne peut pas avoir deux inscriptions academiques actives "
+                    "pour la meme annee et le meme programme."
+                )
+
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        sync_fields = {"is_active", "is_archived", "archived_at"}
+        if self.status == self.STATUS_ACTIVE:
+            self.is_active = True
+            self.is_archived = False
+            self.archived_at = None
+        elif self.status == self.STATUS_ARCHIVED:
+            self.is_active = False
+            self.is_archived = True
+            if not self.archived_at:
+                self.archived_at = timezone.now()
+        else:
+            self.is_active = False
+            sync_fields = {"is_active"}
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | sync_fields
         self.full_clean()
         super().save(*args, **kwargs)
 

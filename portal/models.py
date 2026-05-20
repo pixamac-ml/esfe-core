@@ -34,6 +34,10 @@ class SupportAuditLog(models.Model):
     ACTION_EXCEL_EXPORTED = "excel_exported"
     ACTION_STUDENT_CARD_GENERATED = "student_card_generated"
     ACTION_BRANCH_SETTINGS_UPDATED = "branch_settings_updated"
+    ACTION_REENROLLMENT_PROPOSED = "reenrollment_proposed"
+    ACTION_REENROLLMENT_VALIDATED = "reenrollment_validated"
+    ACTION_REENROLLMENT_APPLIED = "reenrollment_applied"
+    ACTION_REENROLLMENT_REJECTED = "reenrollment_rejected"
 
     ACTION_CHOICES = [
         (ACTION_PASSWORD_RESET, "Reinitialisation mot de passe"),
@@ -55,6 +59,10 @@ class SupportAuditLog(models.Model):
         (ACTION_EXCEL_EXPORTED, "Export Excel"),
         (ACTION_STUDENT_CARD_GENERATED, "Carte etudiant generee"),
         (ACTION_BRANCH_SETTINGS_UPDATED, "Parametres annexe modifies"),
+        (ACTION_REENROLLMENT_PROPOSED, "Passage propose"),
+        (ACTION_REENROLLMENT_VALIDATED, "Passage valide"),
+        (ACTION_REENROLLMENT_APPLIED, "Passage applique"),
+        (ACTION_REENROLLMENT_REJECTED, "Passage rejete"),
     ]
 
     branch = models.ForeignKey(

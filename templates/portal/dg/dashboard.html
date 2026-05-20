@@ -1,178 +1,1287 @@
-{% extends "portal/staff/dashboard_shell.html" %}
+{% extends "base.html" %}
 {% load humanize %}
 
-{% block sidebar_nav %}
-<a class="portal-list-link active" href="#overview"><i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i><span>Vue globale</span></a>
-<a class="portal-list-link" href="#branches"><i data-lucide="building-2" style="width:18px;height:18px;"></i><span>Annexes</span></a>
-<a class="portal-list-link" href="#finance"><i data-lucide="wallet" style="width:18px;height:18px;"></i><span>Finance</span></a>
-<a class="portal-list-link" href="#alerts"><i data-lucide="triangle-alert" style="width:18px;height:18px;"></i><span>Alertes</span></a>
+{% block public_navbar %}{% endblock %}
+{% block public_footer %}{% endblock %}
+{% block public_floating_widget %}{% endblock %}
+{% block public_cookie_consent %}{% endblock %}
+{% block title %}Dashboard Direction Generale{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --dg-navy: #07162d;
+    --dg-navy-2: #0b2343;
+    --dg-blue: #2563eb;
+    --dg-line: #dfe7f3;
+    --dg-soft: #f6f8fc;
+    --dg-text: #0f172a;
+  }
+  body { background: var(--dg-soft); color: var(--dg-text); }
+  .dg-scroll::-webkit-scrollbar { width: 7px; height: 7px; }
+  .dg-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+  .dg-shell { min-height: 100vh; display: flex; overflow: hidden; background: var(--dg-soft); }
+  .dg-sidebar {
+    width: 270px;
+    min-height: 100vh;
+    flex: 0 0 270px;
+    background: linear-gradient(180deg, #08172d 0%, #081b36 48%, #061326 100%);
+    color: #fff;
+    transition: width .22s ease, flex-basis .22s ease, transform .22s ease;
+  }
+  .dg-sidebar.collapsed { width: 86px; flex-basis: 86px; }
+  .dg-sidebar.collapsed .dg-hide-compact { display: none; }
+  .dg-sidebar.collapsed .dg-link { justify-content: center; }
+  .dg-sidebar.collapsed .dg-link span:not(.dg-badge) { display: none; }
+  .dg-logo { height: 78px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .dg-link {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: .85rem;
+    border-radius: .85rem;
+    padding: .72rem .9rem;
+    color: #dbe7ff;
+    font-size: .86rem;
+    font-weight: 800;
+    transition: background .18s ease, color .18s ease, transform .18s ease;
+  }
+  .dg-link:hover { background: rgba(255,255,255,.075); color: #fff; transform: translateX(2px); }
+  .dg-link.active { background: linear-gradient(135deg, #3257ff, #4f46e5); color: #fff; box-shadow: 0 14px 24px rgba(37,99,235,.25); }
+  .dg-main { height: 100vh; min-width: 0; flex: 1; overflow-y: auto; }
+  .dg-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    min-height: 72px;
+    border-bottom: 1px solid #e2e8f0;
+    background: rgba(255,255,255,.96);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+  }
+  .dg-filter {
+    height: 46px;
+    min-width: 160px;
+    border: 1px solid #dbe3ef;
+    border-radius: .7rem;
+    background: #fff;
+    padding: .45rem .75rem;
+  }
+  .dg-filter label { display: none; }
+  .dg-filter select { width: 100%; border: 0; outline: 0; background: transparent; color: #0f172a; font-size: .85rem; font-weight: 900; }
+  .dg-search {
+    height: 46px;
+    min-width: 280px;
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    border: 1px solid #dbe3ef;
+    border-radius: .85rem;
+    background: #fff;
+    padding: 0 .9rem;
+    color: #64748b;
+  }
+  .dg-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #0f172a;
+    font-size: .88rem;
+    font-weight: 750;
+  }
+  .dg-notif {
+    position: relative;
+    display: grid;
+    height: 46px;
+    width: 46px;
+    place-items: center;
+    border: 1px solid #dbe3ef;
+    border-radius: .85rem;
+    background: #fff;
+    color: #0f172a;
+  }
+  .dg-notif span {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: grid;
+    height: 22px;
+    min-width: 22px;
+    place-items: center;
+    border-radius: 999px;
+    background: #f43f5e;
+    color: #fff;
+    font-size: .65rem;
+    font-weight: 950;
+  }
+  .dg-avatar {
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    border: 1px solid #dbe3ef;
+    border-radius: .95rem;
+    background: #fff;
+    padding: .35rem .65rem .35rem .45rem;
+  }
+  .dg-avatar-img {
+    display: grid;
+    height: 36px;
+    width: 36px;
+    place-items: center;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    color: #fff;
+    font-weight: 950;
+    box-shadow: 0 8px 20px rgba(37,99,235,.22);
+  }
+  .dg-content { padding: 24px; }
+  .dg-section { margin-top: 24px; }
+  .dg-card {
+    background: #fff;
+    border: 1px solid var(--dg-line);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, .035);
+  }
+  .dg-card-pad { padding: 22px; }
+  .dg-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 22px;
+  }
+  .dg-title { font-size: 1.35rem; line-height: 1.2; font-weight: 900; color: #0f172a; }
+  .dg-subtitle { margin-top: .35rem; color: #64748b; font-size: .9rem; font-weight: 650; }
+  .dg-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+  .dg-kpi {
+    min-height: 145px;
+    position: relative;
+    overflow: hidden;
+    padding: 20px;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .dg-kpi:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(15,23,42,.07); }
+  .dg-kpi-icon {
+    position: absolute;
+    right: 18px;
+    top: 18px;
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    font-size: 1.1rem;
+  }
+  .dg-spark {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 4px;
+    height: 38px;
+    opacity: .9;
+  }
+  .dg-table { width: 100%; border-collapse: collapse; }
+  .dg-table th {
+    padding: 13px 12px;
+    border-bottom: 1px solid #e7edf6;
+    background: #fbfcff;
+    color: #64748b;
+    font-size: .7rem;
+    font-weight: 950;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .dg-table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #edf2f7;
+    color: #0f172a;
+    font-size: .82rem;
+    white-space: nowrap;
+  }
+  .dg-table tr:hover td { background: #f8fbff; }
+  .dg-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: .28rem .62rem;
+    font-size: .7rem;
+    font-weight: 950;
+    white-space: nowrap;
+  }
+  .dg-action {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    border: 1px solid #dbe3ef;
+    border-radius: .72rem;
+    background: #fff;
+    padding: 0 .92rem;
+    color: #2563eb;
+    font-size: .78rem;
+    font-weight: 950;
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
+  }
+  .dg-action:hover { background: #f8fbff; border-color: #bfdbfe; }
+  .dg-action-dark { background: #0f172a; border-color: #0f172a; color: #fff; }
+  .dg-action-dark:hover { background: #1e293b; border-color: #1e293b; }
+  .dg-workflow-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+  .dg-workflow-card { min-height: 150px; border: 1px solid #dfe7f3; border-radius: 16px; background: #fff; padding: 20px; text-align: left; }
+  .dg-quick-action {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #dce6f3;
+    border-radius: .9rem;
+    background: #fff;
+    padding: 0 1rem;
+    color: #2563eb;
+    font-size: .85rem;
+    font-weight: 950;
+    transition: border-color .18s ease, background .18s ease, transform .18s ease;
+  }
+  .dg-quick-action:hover { border-color: #bfdbfe; background: #f8fbff; transform: translateY(-1px); }
+  .dg-drawer-overlay { position: fixed; inset: 0; z-index: 90; background: rgba(15,23,42,.34); }
+  .dg-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 91;
+    width: min(680px, 100vw);
+    height: 100vh;
+    background: #fff;
+    box-shadow: -28px 0 60px rgba(15,23,42,.18);
+    overflow-y: auto;
+  }
+  #dg-modal-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #dg-modal-shell:not(.hidden) { display: flex; }
+  #dg-modal-shell.hidden,
+  #dg-drawer-shell.hidden { display: none !important; }
+  .dg-modal-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: rgba(15,23,42,.42);
+  }
+  .dg-modal {
+    position: relative;
+    z-index: 1;
+    width: min(1360px, calc(100vw - 28px));
+    max-height: calc(100vh - 28px);
+    overflow-y: auto;
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: 0 32px 80px rgba(15,23,42,.28);
+  }
+  .dg-search-hit {
+    outline: 2px solid rgba(37,99,235,.24);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+  }
+  [x-cloak] { display: none !important; }
+  @media (max-width: 1500px) {
+    .dg-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 980px) {
+    .dg-sidebar { position: fixed; z-index: 80; transform: translateX(-100%); }
+    .dg-sidebar.open { transform: translateX(0); }
+    .dg-topbar { align-items: flex-start; flex-direction: column; }
+    .dg-filter-row { width: 100%; flex-wrap: wrap; }
+    .dg-filter { flex: 1 1 180px; }
+    .dg-search { min-width: 100%; }
+    .dg-avatar { width: 100%; justify-content: space-between; }
+    .dg-kpis, .dg-workflow-grid { grid-template-columns: 1fr; }
+    .dg-content { padding: 14px; }
+  }
+</style>
 {% endblock %}
 
-{% block topbar_actions %}
-<span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">{{ total_branches }} annexes</span>
-<span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">Maj: {{ generated_at|date:"d/m/Y H:i" }}</span>
+{% block content %}
+<div class="dg-shell" x-data="{ activeSection: window.location.hash ? window.location.hash.replace('#', '') : 'overview' }" @dg-set-section.window="activeSection = $event.detail.section">
+  <aside id="dg-sidebar" class="dg-sidebar dg-scroll">
+    <div class="dg-logo">
+      <div class="flex items-center gap-3">
+        <div class="grid h-10 w-10 place-items-center rounded-xl bg-sky-500 shadow-lg">
+          <i class="fa-solid fa-user-doctor text-xl"></i>
+        </div>
+        <div class="dg-hide-compact">
+          <div class="text-xl font-black tracking-wide leading-tight">FELIX SANTE</div>
+          <div class="mt-1 text-[11px] font-semibold text-slate-300">Ecole de Sante FHB - Mali</div>
+        </div>
+      </div>
+    </div>
+    <div class="flex h-[calc(100vh-78px)] flex-col overflow-y-auto px-3 py-5 dg-scroll">
+      <div class="dg-hide-compact mb-3 px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Pilotage executif</div>
+      <nav class="space-y-1.5">
+        <button type="button" :class="activeSection === 'overview' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('overview')"><i class="fa-solid fa-network-wired w-5 text-center"></i><span>Vue globale</span></button>
+        <button type="button" :class="activeSection === 'alerts' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('alerts')"><i class="fa-solid fa-triangle-exclamation w-5 text-center"></i><span>Alertes & Risques</span><span class="dg-badge ml-auto bg-rose-500 text-white">{{ open_alerts }}</span></button>
+        <button type="button" :class="activeSection === 'workflows' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('workflows')"><i class="fa-solid fa-arrows-rotate w-5 text-center"></i><span>Passages & Reinscriptions</span></button>
+        <button type="button" :class="activeSection === 'schedule' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('schedule')"><i class="fa-regular fa-calendar-days w-5 text-center"></i><span>Emploi du temps</span></button>
+        <button type="button" :class="activeSection === 'annexes' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('annexes')"><i class="fa-regular fa-building w-5 text-center"></i><span>Annexes</span></button>
+        <button type="button" :class="activeSection === 'finance' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('finance')"><i class="fa-solid fa-sack-dollar w-5 text-center"></i><span>Finance</span></button>
+        <button type="button" :class="activeSection === 'analytics' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('analytics')"><i class="fa-solid fa-chart-line w-5 text-center"></i><span>Analytics</span></button>
+        <button type="button" :class="activeSection === 'realtime' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('realtime')"><i class="fa-solid fa-wave-square w-5 text-center"></i><span>Temps reel</span></button>
+        <button type="button" :class="activeSection === 'rh' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('rh')"><i class="fa-solid fa-user-group w-5 text-center"></i><span>RH / Staff</span></button>
+      </nav>
+      <div class="mt-auto"></div>
+      <form method="post" action="{% url 'accounts:logout' %}" class="mt-3">
+        {% csrf_token %}
+        <button type="submit" class="dg-link w-full border border-rose-400/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20">
+          <i class="fa-solid fa-arrow-right-from-bracket w-5 text-center"></i>
+          <span>Deconnexion</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <main class="dg-main dg-scroll">
+    <header class="dg-topbar">
+      <div class="flex min-w-0 items-center gap-4">
+        <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-800 hover:bg-slate-50" onclick="dgToggleSidebar()">
+          <i class="fa-solid fa-bars-staggered"></i>
+        </button>
+        <div class="min-w-0">
+          <h1 class="truncate text-xl font-black text-slate-950">{{ executive_display_name }}</h1>
+          <p class="mt-1 text-sm font-semibold text-slate-500">{{ dashboard_scope_label }} - {{ dashboard_period_label }}</p>
+        </div>
+      </div>
+        <div class="dg-filter-row flex items-center gap-3">
+          <label class="dg-search" title="Recherche">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="dg-search-input" type="search" placeholder="Rechercher" oninput="dgSearchCurrentSection(this.value)" onkeydown="if (event.key === 'Enter') { event.preventDefault(); dgSearchCurrentSection(this.value); }">
+          </label>
+          <div class="dg-filter">
+            <label>Annexe</label>
+          <select id="dg-branch-select" onchange="dgHandleBranchChange(this.value)">
+            <option value="">Toutes les annexes</option>
+            {% for branch in all_branches %}
+            <option value="{{ branch.id }}" {% if selected_branch_id == branch.id|stringformat:"s" %}selected{% endif %}>{{ branch.name }}</option>
+            {% endfor %}
+          </select>
+          </div>
+          <div class="dg-filter">
+            <label>Periode</label>
+          <select id="dg-period-select" onchange="dgHandlePeriodChange(this.value)">
+            <option value="month" {% if dashboard_period == "month" %}selected{% endif %}>Ce mois</option>
+            <option value="today" {% if dashboard_period == "today" %}selected{% endif %}>Aujourd'hui</option>
+            <option value="week" {% if dashboard_period == "week" %}selected{% endif %}>Cette semaine</option>
+          </select>
+          </div>
+        <button type="button" class="dg-notif" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')">
+          <i class="fa-regular fa-bell text-lg"></i>
+          <span>{{ open_alerts }}</span>
+        </button>
+        <div class="dg-avatar">
+          <div class="hidden text-right xl:block">
+            <p class="text-sm font-black text-slate-950">{{ executive_display_name }}</p>
+            <p class="text-xs font-semibold text-slate-500">{{ executive_display_subtitle }}</p>
+          </div>
+          <div class="dg-avatar-img">{{ executive_display_short }}</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dg-content">
+      <section class="mb-5 flex flex-wrap items-center gap-2 text-xs font-black">
+        <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700">{{ dashboard_scope_label }}</span>
+        <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700">{{ total_branches|intcomma }} annexe{% if total_branches > 1 %}s{% endif %}</span>
+        <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700">{{ total_students|intcomma }} etudiants</span>
+        <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700">{{ schedule.total_events|intcomma }} cours semaine</span>
+      </section>
+      <section id="overview" x-show="activeSection === 'overview'" x-cloak class="dg-card dg-card-pad">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Direction generale</p>
+            <h2 class="mt-2 text-3xl font-black leading-tight text-slate-950">Cockpit executif institutionnel</h2>
+          </div>
+          <div class="flex items-center gap-3 text-xs font-semibold text-slate-500">
+            <span class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+            <span>Systeme operationnel</span>
+            <span>Maj : {{ generated_at|date:"H:i:s" }}</span>
+          </div>
+        </div>
+        <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {% for card in executive_summary.executive_cards %}
+          <div class="rounded-2xl border p-4 {% if card.tone == 'blue' %}border-blue-100 bg-blue-50{% elif card.tone == 'emerald' %}border-emerald-100 bg-emerald-50{% elif card.tone == 'amber' %}border-amber-100 bg-amber-50{% elif card.tone == 'rose' %}border-rose-100 bg-rose-50{% elif card.tone == 'orange' %}border-orange-100 bg-orange-50{% elif card.tone == 'cyan' %}border-cyan-100 bg-cyan-50{% elif card.tone == 'violet' %}border-violet-100 bg-violet-50{% else %}border-slate-200 bg-white{% endif %}">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-xs font-black uppercase tracking-wide {% if card.tone == 'blue' %}text-blue-700{% elif card.tone == 'emerald' %}text-emerald-700{% elif card.tone == 'amber' %}text-amber-700{% elif card.tone == 'rose' %}text-rose-700{% elif card.tone == 'orange' %}text-orange-700{% elif card.tone == 'cyan' %}text-cyan-700{% elif card.tone == 'violet' %}text-violet-700{% else %}text-slate-500{% endif %}">{{ card.label }}</p>
+                <p class="mt-3 text-3xl font-black text-slate-950">{{ card.value|intcomma }}</p>
+                <p class="mt-2 text-xs font-bold text-slate-500">{{ card.detail }}</p>
+              </div>
+              <div class="grid h-10 w-10 place-items-center rounded-xl bg-white text-slate-700 shadow-sm">
+                <i class="fa-solid {{ card.icon }}"></i>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-5">
+          {% for flag in executive_summary.operational_flags %}
+          <div class="rounded-xl border border-slate-200 bg-white p-3">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-xs font-black text-slate-500">{{ flag.label }}</span>
+              <span class="dg-badge {% if flag.tone == 'rose' %}bg-rose-100 text-rose-700{% elif flag.tone == 'amber' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ flag.value|intcomma }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div class="xl:col-span-7 rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="mb-4 flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Apercu des annexes</h3>
+              </div>
+              <button type="button" class="dg-action" onclick="dgShowSection('annexes')" title="Annexes"><i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="dg-table">
+                <thead>
+                  <tr>
+                    <th>Annexe</th>
+                    <th>Etudiants</th>
+                    <th>Classes</th>
+                    <th>Alertes</th>
+                    <th>Solde</th>
+                    <th>Perf.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in branch_summaries|slice:":5" %}
+                  <tr>
+                    <td class="font-black">{{ item.branch.name }}</td>
+                    <td>{{ item.student_count|intcomma }}</td>
+                    <td>{{ item.class_count|intcomma }}</td>
+                    <td class="{% if item.open_alert_count %}text-rose-700{% endif %} font-black">{{ item.open_alert_count|intcomma }}</td>
+                    <td class="{% if item.balance_total < 0 %}text-rose-700{% else %}text-emerald-700{% endif %} font-black">{{ item.balance_total|intcomma }}</td>
+                    <td><span class="dg-badge {% if item.performance_tone == 'green' %}bg-emerald-100 text-emerald-700{% elif item.performance_tone == 'orange' %}bg-orange-100 text-orange-700{% elif item.performance_tone == 'blue' %}bg-blue-100 text-blue-700{% else %}bg-slate-100 text-slate-600{% endif %}">{{ item.performance_label }}</span></td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="6" class="py-6 text-center text-sm font-semibold text-slate-500">Aucune annexe active chargee.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="xl:col-span-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Synthese</h3>
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <div class="rounded-xl bg-white p-3">
+                <p class="text-xs font-bold text-slate-500">Revenus</p>
+                <p class="mt-1 text-xl font-black text-emerald-700">{{ finance.revenue|intcomma }}</p>
+              </div>
+              <div class="rounded-xl bg-white p-3">
+                <p class="text-xs font-bold text-slate-500">Solde</p>
+                <p class="mt-1 text-xl font-black {% if finance.balance < 0 %}text-rose-700{% else %}text-slate-900{% endif %}">{{ finance.balance|intcomma }}</p>
+              </div>
+              <div class="rounded-xl bg-white p-3">
+                <p class="text-xs font-bold text-slate-500">Dossiers bloques</p>
+                <p class="mt-1 text-xl font-black text-rose-700">{{ workflow.blocked_count|intcomma }}</p>
+              </div>
+              <div class="rounded-xl bg-white p-3">
+                <p class="text-xs font-bold text-slate-500">Remplissage</p>
+                <p class="mt-1 text-xl font-black text-blue-700">{{ analytics.class_fill_rate }}%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div class="xl:col-span-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Admissions</h3>
+            <div class="mt-4 space-y-3">
+              {% for row in analytics.candidature_status_rows %}
+              <div>
+                <div class="mb-1 flex justify-between text-xs font-bold text-slate-600">
+                  <span>{{ row.label }}</span>
+                  <span>{{ row.count|intcomma }} · {{ row.percent }}%</span>
+                </div>
+                <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div class="h-full rounded-full {% if row.tone == 'emerald' %}bg-emerald-500{% elif row.tone == 'amber' %}bg-amber-500{% else %}bg-rose-500{% endif %}" style="width: {{ row.percent }}%"></div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="xl:col-span-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Planning semaine</h3>
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <div class="rounded-xl bg-slate-50 p-3"><p class="text-xs font-bold text-slate-500">Cours</p><p class="mt-1 text-2xl font-black">{{ schedule.total_events|intcomma }}</p></div>
+              <div class="rounded-xl bg-slate-50 p-3"><p class="text-xs font-bold text-slate-500">Aujourd'hui</p><p class="mt-1 text-2xl font-black">{{ schedule.today_events_count|intcomma }}</p></div>
+              <div class="rounded-xl bg-amber-50 p-3"><p class="text-xs font-bold text-amber-700">Cahiers manquants</p><p class="mt-1 text-2xl font-black text-amber-800">{{ schedule.missing_lesson_logs_count|intcomma }}</p></div>
+              <div class="rounded-xl bg-blue-50 p-3"><p class="text-xs font-bold text-blue-700">Appels valides</p><p class="mt-1 text-2xl font-black text-blue-800">{{ schedule.roll_validation_rate }}%</p></div>
+            </div>
+          </div>
+          <div class="xl:col-span-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Risques</h3>
+            <div class="mt-4 space-y-3">
+              {% for row in analytics.risk_breakdown %}
+              <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <span class="text-sm font-bold text-slate-700">{{ row.label }}</span>
+                <span class="dg-badge {% if row.tone == 'rose' %}bg-rose-100 text-rose-700{% elif row.tone == 'amber' %}bg-amber-100 text-amber-700{% elif row.tone == 'orange' %}bg-orange-100 text-orange-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ row.value|intcomma }}</span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="mb-4 flex items-center justify-between">
+              <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Annexes a risque</h3>
+              <button type="button" class="dg-action" onclick="dgShowSection('alerts')" title="Alertes"><i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="dg-table">
+                <thead><tr><th>Annexe</th><th>Alertes</th><th>Paiements</th><th>Depenses</th><th>Solde</th></tr></thead>
+                <tbody>
+                  {% for item in executive_summary.top_risk_branches %}
+                  <tr class="cursor-pointer" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=branch&kind=branch&branch_id={{ item.branch.id }}')">
+                    <td class="font-black text-blue-700">{{ item.branch.name }}</td>
+                    <td class="font-black text-rose-700">{{ item.open_alert_count|intcomma }}</td>
+                    <td>{{ item.analytics_pending_payment_count|default:0|intcomma }}</td>
+                    <td>{{ item.pending_expense_count|intcomma }}</td>
+                    <td class="{% if item.balance_total < 0 %}text-rose-700{% else %}text-emerald-700{% endif %} font-black">{{ item.balance_total|intcomma }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr><td colspan="5" class="py-6 text-center font-semibold text-slate-500">Aucun risque annexe.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="mb-4 flex items-center justify-between">
+              <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Solde par annexe</h3>
+              <button type="button" class="dg-action" onclick="dgShowSection('finance')" title="Finance"><i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+            <div class="space-y-3">
+              {% for item in executive_summary.top_balance_branches %}
+              <button type="button" class="w-full rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-left" onclick="dgOpenDrawer('{{ item.drawer_url }}')">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-sm font-black text-slate-800">{{ item.branch.name }}</span>
+                  <span class="{% if item.balance_total < 0 %}text-rose-700{% else %}text-emerald-700{% endif %} text-sm font-black">{{ item.balance_total|intcomma }} FCFA</span>
+                </div>
+                <div class="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                  <span class="block h-full rounded-full {% if item.balance_total < 0 %}bg-rose-500{% else %}bg-emerald-500{% endif %}" style="width: {% widthratio item.revenue_total finance.revenue 100 %}%"></span>
+                </div>
+              </button>
+              {% empty %}
+              <p class="text-sm font-semibold text-slate-500">Aucune donnee financiere.</p>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="dg-workspace" class="dg-section" x-show="activeSection !== 'overview'" x-cloak>
+        <div class="dg-card dg-card-pad">
+          <div class="dg-section-head">
+            <div>
+              <h3 class="dg-title">Chargement</h3>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="dg-section dg-card dg-card-pad" x-show="activeSection === 'overview'" x-cloak>
+        <div class="dg-section-head">
+          <div>
+            <h3 class="dg-title">Actions rapides</h3>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {% for action in executive_summary.action_center %}
+          <button type="button" class="dg-quick-action" onclick="{% if action.drawer_url %}dgOpenDrawer('{{ action.drawer_url }}'){% else %}dgShowSection('{{ action.section }}'){% endif %}">
+            <span>
+              <i class="fa-solid {{ action.icon }} mr-2"></i>{{ action.label }}
+              <span class="mt-1 block text-xs font-bold text-slate-500">{{ action.detail }}</span>
+            </span>
+            <span class="dg-badge {% if action.tone == 'rose' %}bg-rose-100 text-rose-700{% elif action.tone == 'amber' %}bg-amber-100 text-amber-700{% elif action.tone == 'emerald' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ action.count|intcomma }}</span>
+          </button>
+          {% endfor %}
+          <button type="button" class="dg-quick-action" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
+            <span><i class="fa-solid fa-user-plus mr-2"></i>Recruter un staff</span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <div id="dg-drawer-shell" class="hidden">
+    <div class="dg-drawer-overlay" onclick="dgCloseDrawer()"></div>
+    <aside class="dg-drawer dg-scroll">
+      <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-5">
+        <div class="flex min-w-0 items-center gap-3">
+          <button id="dg-drawer-back" type="button" class="hidden grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50" onclick="dgDrawerBack()" title="Retour">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+          <div class="min-w-0">
+            <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Detail executif</p>
+            <h3 class="mt-1 truncate text-xl font-black text-slate-950">Analyse rapide</h3>
+          </div>
+        </div>
+        <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50" onclick="dgCloseDrawer()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="dg-drawer-content" class="p-6">
+        <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm font-semibold text-slate-500">
+          Aucun detail ouvert.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div id="dg-modal-shell" class="hidden">
+    <div class="dg-modal-overlay" onclick="dgCloseModal()"></div>
+    <section class="dg-modal dg-scroll">
+      <div id="dg-modal-content">
+        <div class="p-6 text-sm font-semibold text-slate-500">
+          Chargement
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
 {% endblock %}
 
-{% block dashboard_content %}
-<section id="overview" class="portal-card portal-hero">
-  <div class="portal-card-pad flex flex-col justify-between gap-4">
-    <div>
-      <p class="portal-section-kicker">Direction generale</p>
-      <h2 class="mt-2 text-2xl font-black text-slate-900 leading-tight">Pilotage global des annexes</h2>
-      <p class="mt-3 max-w-2xl text-sm text-slate-600">Vue consolidee pour organiser et superviser les annexes: activite academique, inscriptions, finances et alertes operationnelles.</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-      {% for module in module_cards %}
-      <span class="portal-pill">{{ module }}</span>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="border-l border-slate-100 bg-slate-50 p-5">
-    <div class="grid grid-cols-2 gap-3">
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Etudiants</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_students|intcomma }}</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Classes</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_classes|intcomma }}</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Inscriptions actives</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ total_active_inscriptions|intcomma }}</p>
-      </div>
-      <div class="portal-card portal-stat p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Nouvelles candidatures (30j)</p>
-        <p class="mt-2 text-2xl font-black text-slate-900">{{ new_candidatures_30d|intcomma }}</p>
-      </div>
-    </div>
-  </div>
-</section>
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+  function dgToggleSidebar() {
+    const sidebar = document.getElementById('dg-sidebar');
+    if (!sidebar) return;
+    if (window.innerWidth < 980) sidebar.classList.toggle('open');
+    else sidebar.classList.toggle('collapsed');
+  }
 
-<section class="mt-4 portal-grid-two" id="finance">
-  <div class="portal-card portal-card-pad">
-    <p class="portal-section-kicker">Indicateurs transverses</p>
-    <h3 class="portal-section-title">Performance institutionnelle</h3>
-    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Revenus valides</p>
-        <p class="mt-2 text-xl font-black text-slate-900">{{ total_revenue|intcomma }} FCFA</p>
-      </article>
-      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Paiements valides</p>
-        <p class="mt-2 text-xl font-black text-slate-900">{{ total_validated_payments|intcomma }}</p>
-      </article>
-      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Staff actif</p>
-        <p class="mt-2 text-xl font-black text-slate-900">{{ total_staff|intcomma }}</p>
-      </article>
-      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4" id="alerts">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Alertes ouvertes</p>
-        <p class="mt-2 text-xl font-black {% if open_alerts > 0 %}text-rose-700{% else %}text-emerald-700{% endif %}">{{ open_alerts|intcomma }}</p>
-      </article>
-    </div>
-  </div>
+  function dgShowSection(section) {
+    const allowed = new Set(['overview', 'kpis', 'alerts', 'workflows', 'schedule', 'annexes', 'finance', 'analytics', 'realtime', 'rh']);
+    const normalized = allowed.has(section) ? section : 'overview';
+    dgCloseDrawer();
+    dgCloseModal();
+    window.dispatchEvent(new CustomEvent('dg-set-section', { detail: { section: normalized } }));
+    window.location.hash = normalized;
+    const domain = document.getElementById('dg-domain-select');
+    if (domain) domain.value = normalized;
+    if (normalized === 'overview') {
+      const period = (window.dgToolbarState && window.dgToolbarState.period) || (document.getElementById('dg-period-select') && document.getElementById('dg-period-select').value) || 'month';
+      const url = dgBuildScopedUrl(window.location.href, { period: period });
+      url.hash = 'overview';
+      const currentUrl = new URL(window.location.href);
+      const currentBranch = currentUrl.searchParams.get('branch_id') || '';
+      if (window.location.hash === '#overview' && currentUrl.searchParams.get('period') === period && currentBranch === dgGetSelectedBranchId()) {
+        return;
+      }
+      window.location.href = url.toString();
+      return;
+    }
+    dgLoadSection(normalized, true);
+  }
 
-  <div class="portal-card portal-card-pad">
-    <p class="portal-section-kicker">Lecture hierarchique</p>
-    <h3 class="portal-section-title">Organisation par annexe</h3>
-    <p class="mt-3 text-sm text-slate-600">Chaque bloc annexe ci-dessous regroupe les indicateurs academiques, administratifs et financiers pour un pilotage decentralise.</p>
-  </div>
-</section>
+  function dgGetCurrentSection() {
+    return (window.location.hash || '#overview').replace('#', '') || 'overview';
+  }
 
-<section class="mt-4 space-y-4" id="branches">
-  {% for item in branch_summaries %}
-  <article class="portal-card portal-card-pad">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <div>
-        <p class="portal-section-kicker">Annexe</p>
-        <h3 class="portal-section-title">{{ item.branch.name }} ({{ item.branch.code }})</h3>
-        <p class="mt-1 text-sm text-slate-500">Responsable: {{ item.manager_name }}</p>
-      </div>
-      <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{{ item.branch.city|default:"-" }}</span>
-    </div>
+  function dgGetSelectedBranchId() {
+    const branch = document.getElementById('dg-branch-select');
+    return branch ? branch.value : '';
+  }
 
-    <div class="mt-4 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
-      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Etudiants</p>
-        <p class="mt-1 text-lg font-black text-slate-900">{{ item.student_count|intcomma }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Classes</p>
-        <p class="mt-1 text-lg font-black text-slate-900">{{ item.class_count|intcomma }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Inscriptions actives</p>
-        <p class="mt-1 text-lg font-black text-slate-900">{{ item.active_inscription_count|intcomma }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Candidatures</p>
-        <p class="mt-1 text-lg font-black text-slate-900">{{ item.candidature_count|intcomma }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Acceptees</p>
-        <p class="mt-1 text-lg font-black text-emerald-700">{{ item.accepted_candidature_count|intcomma }}</p>
-      </div>
-      <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Revenus</p>
-        <p class="mt-1 text-lg font-black text-slate-900">{{ item.revenue_total|intcomma }} FCFA</p>
-      </div>
-    </div>
+  function dgBuildScopedUrl(baseUrl, params) {
+    const url = new URL(baseUrl, window.location.origin);
+    const hadBranchParam = url.searchParams.has('branch_id');
+    Object.entries(params || {}).forEach(function(entry) {
+      const key = entry[0];
+      const value = entry[1];
+      if (value === undefined || value === null || value === '') url.searchParams.delete(key);
+      else url.searchParams.set(key, value);
+    });
+    const branchId = dgGetSelectedBranchId();
+    if (!hadBranchParam) {
+      if (branchId) url.searchParams.set('branch_id', branchId);
+      else url.searchParams.delete('branch_id');
+    }
+    return url;
+  }
 
-    <div class="mt-4 grid grid-cols-1 xl:grid-cols-3 gap-3">
-      <div class="rounded-xl border border-slate-100 p-3">
-        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Classes les plus chargees</p>
-        <div class="mt-2 space-y-2">
-          {% for cls in item.top_classes %}
-          <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            <span class="font-semibold">{{ cls.display_name }}</span>
-            <span class="text-slate-500"> - {{ cls.student_count|default:0 }} etudiants</span>
-          </div>
-          {% empty %}
-          <p class="text-sm text-slate-400">Aucune classe active.</p>
-          {% endfor %}
-        </div>
-      </div>
+  function dgGetSectionFromDomain(value) {
+    const map = {
+      overview: 'overview',
+      annexes: 'annexes',
+      finance: 'finance',
+      alerts: 'alerts',
+      workflows: 'workflows',
+      schedule: 'schedule',
+      rh: 'rh',
+      analytics: 'analytics',
+      realtime: 'realtime',
+    };
+    return map[value] || 'overview';
+  }
 
-      <div class="rounded-xl border border-slate-100 p-3">
-        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Programmes dominants</p>
-        <div class="mt-2 space-y-2">
-          {% for programme in item.top_programmes %}
-          <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            <span class="font-semibold">{{ programme.programme__title }}</span>
-            <span class="text-slate-500"> - {{ programme.total }} candidatures</span>
-          </div>
-          {% empty %}
-          <p class="text-sm text-slate-400">Aucune candidature enregistree.</p>
-          {% endfor %}
-        </div>
-      </div>
+  function dgHandleDomainChange(value) {
+    const section = dgGetSectionFromDomain(value);
+    const periodSelect = document.getElementById('dg-period-select');
+    window.dgToolbarState = window.dgToolbarState || {};
+    window.dgToolbarState.domain = value;
+    dgShowSection(section);
+    if (periodSelect) window.dgToolbarState.period = periodSelect.value;
+  }
 
-      <div class="rounded-xl border border-slate-100 p-3">
-        <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Derniers paiements valides</p>
-        <div class="mt-2 space-y-2">
-          {% for payment in item.latest_payments %}
-          <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            <span class="font-semibold">{{ payment.amount|intcomma }} FCFA</span>
-            <span class="text-slate-500"> - {{ payment.paid_at|date:"d/m H:i" }}</span>
-          </div>
-          {% empty %}
-          <p class="text-sm text-slate-400">Aucun paiement valide recent.</p>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
+  function dgHandleBranchChange(value) {
+    window.dgToolbarState = window.dgToolbarState || {};
+    window.dgToolbarState.branchId = value || '';
+    const currentSection = dgGetCurrentSection();
+    if (currentSection === 'overview') {
+      const period = (window.dgToolbarState && window.dgToolbarState.period) || (document.getElementById('dg-period-select') && document.getElementById('dg-period-select').value) || 'month';
+      const url = dgBuildScopedUrl(window.location.href, { period: period });
+      url.hash = 'overview';
+      window.location.href = url.toString();
+      return;
+    }
+    dgRefreshSection(currentSection);
+  }
 
-    <div class="mt-3 flex flex-wrap gap-2 text-xs">
-      <span class="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-700">Depenses en attente: {{ item.pending_expense_count }}</span>
-      <span class="rounded-full {% if item.open_alert_count > 0 %}bg-rose-100 text-rose-700{% else %}bg-emerald-100 text-emerald-700{% endif %} px-3 py-1 font-bold">Alertes ouvertes: {{ item.open_alert_count }}</span>
-    </div>
-  </article>
-  {% empty %}
-  <div class="portal-card portal-card-pad">
-    <p class="text-sm text-slate-500">Aucune annexe active n'est disponible.</p>
-  </div>
-  {% endfor %}
-</section>
+  function dgLoadScheduleWeek(weekStart) {
+    window.dgToolbarState = window.dgToolbarState || {};
+    window.dgToolbarState.weekStart = weekStart || '';
+    const target = document.getElementById('dg-workspace');
+    if (target) target.dataset.section = '';
+    dgLoadSection('schedule', true);
+  }
+
+  function dgHandlePeriodChange(value) {
+    window.dgToolbarState = window.dgToolbarState || {};
+    window.dgToolbarState.period = value;
+    const currentSection = dgGetCurrentSection();
+    if (currentSection === 'overview') {
+      const url = dgBuildScopedUrl(window.location.href, { period: value });
+      url.hash = 'overview';
+      window.location.href = url.toString();
+    } else {
+      dgRefreshSection(currentSection);
+    }
+  }
+
+  function dgResetToolbar() {
+    const search = document.getElementById('dg-search-input');
+    const domain = document.getElementById('dg-domain-select');
+    const period = document.getElementById('dg-period-select');
+    const branch = document.getElementById('dg-branch-select');
+    if (search) search.value = '';
+    if (domain) domain.value = 'overview';
+    if (period) period.value = 'month';
+    if (branch) branch.value = '';
+    window.dgToolbarState = { domain: 'overview', period: 'month', branchId: '' };
+    dgClearSearchHits();
+    const url = new URL(window.location.href);
+    url.searchParams.delete('period');
+    url.searchParams.delete('branch_id');
+    url.hash = 'overview';
+    window.location.href = url.toString();
+  }
+
+  function dgExportCurrentSection() {
+    const currentSection = dgGetCurrentSection();
+    const exportKind = {
+      overview: 'branches',
+      kpis: 'branches',
+      alerts: 'alerts',
+      workflows: 'branches',
+      schedule: 'branches',
+      annexes: 'branches',
+      finance: 'finance',
+      analytics: 'branches',
+      realtime: 'branches',
+      rh: 'branches',
+    }[currentSection] || 'branches';
+    const url = dgBuildScopedUrl("{% url 'accounts_portal:dg_export' %}", { kind: exportKind });
+    window.location.href = url.toString();
+  }
+
+  function dgClearSearchHits() {
+    document.querySelectorAll('.dg-search-hit').forEach(function(node) {
+      node.classList.remove('dg-search-hit');
+    });
+  }
+
+  function dgSearchCurrentSection(query) {
+    const term = (query || '').trim().toLowerCase();
+    dgClearSearchHits();
+    if (!term) return;
+    const currentSection = dgGetCurrentSection();
+    const scope = currentSection === 'overview' ? document.getElementById('overview') : document.getElementById('dg-workspace');
+    if (!scope) return;
+    const candidates = scope.querySelectorAll('tr, .dg-card, .dg-workflow-card, .dg-quick-action, .rounded-2xl, .rounded-xl, button, a');
+    const matches = [];
+    candidates.forEach(function(node) {
+      const text = (node.textContent || '').toLowerCase();
+      if (text.includes(term)) matches.push(node);
+    });
+    if (matches.length) {
+      matches.slice(0, 6).forEach(function(node) {
+        node.classList.add('dg-search-hit');
+      });
+      matches[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const mapped = dgGetSectionFromKeyword(term);
+    if (mapped) dgShowSection(mapped);
+  }
+
+  function dgGetSectionFromKeyword(term) {
+    if (!term) return '';
+    if (term.includes('finance') || term.includes('caiss') || term.includes('revenue')) return 'finance';
+    if (term.includes('alert') || term.includes('risque') || term.includes('risk')) return 'alerts';
+    if (term.includes('workflow') || term.includes('passage') || term.includes('reinscription')) return 'workflows';
+    if (term.includes('emploi') || term.includes('planning') || term.includes('schedule') || term.includes('cours') || term.includes('cahier')) return 'schedule';
+    if (term.includes('annexe') || term.includes('academ') || term.includes('classe')) return 'annexes';
+    if (term.includes('rh') || term.includes('staff') || term.includes('recrut')) return 'rh';
+    if (term.includes('live') || term.includes('reel') || term.includes('temps')) return 'realtime';
+    if (term.includes('analyt') || term.includes('audit') || term.includes('graph')) return 'analytics';
+    return '';
+  }
+
+  const DG_SECTION_BASE = "{% url 'accounts_portal:dg_section' 'kpis' %}".replace(/kpis\/?$/, '');
+  window.dgToolbarState = window.dgToolbarState || {
+    domain: (document.getElementById('dg-domain-select') && document.getElementById('dg-domain-select').value) || 'overview',
+    period: (document.getElementById('dg-period-select') && document.getElementById('dg-period-select').value) || '{{ dashboard_period|default:"month" }}',
+    branchId: (document.getElementById('dg-branch-select') && document.getElementById('dg-branch-select').value) || '{{ selected_branch_id|default:"" }}',
+  };
+  window.dgUIState = window.dgUIState || {
+    modalOpen: false,
+    drawerOpen: false,
+    modalRequest: null,
+    drawerRequest: null,
+    drawerUrl: '',
+    modalUrl: '',
+    drawerHistory: [],
+  };
+
+  function dgSyncBodyLock() {
+    document.body.style.overflow = (window.dgUIState.modalOpen || window.dgUIState.drawerOpen) ? 'hidden' : '';
+  }
+
+  function dgUpdateDrawerBack() {
+    const back = document.getElementById('dg-drawer-back');
+    if (!back) return;
+    back.classList.toggle('hidden', !(window.dgUIState.drawerHistory && window.dgUIState.drawerHistory.length));
+  }
+
+  function dgResetOverlayState(clearHistory) {
+    const shouldClearHistory = clearHistory !== false;
+    window.dgUIState.modalOpen = false;
+    window.dgUIState.drawerOpen = false;
+    dgAbortOverlayRequest('modal');
+    dgAbortOverlayRequest('drawer');
+    const modalShell = document.getElementById('dg-modal-shell');
+    const drawerShell = document.getElementById('dg-drawer-shell');
+    const modalTarget = document.getElementById('dg-modal-content');
+    const drawerTarget = document.getElementById('dg-drawer-content');
+    if (modalShell) modalShell.classList.add('hidden');
+    if (drawerShell) drawerShell.classList.add('hidden');
+    if (modalTarget) modalTarget.innerHTML = '';
+    if (drawerTarget) drawerTarget.innerHTML = '';
+    window.dgUIState.drawerUrl = '';
+    window.dgUIState.modalUrl = '';
+    if (shouldClearHistory) window.dgUIState.drawerHistory = [];
+    dgUpdateDrawerBack();
+    document.body.style.overflow = '';
+  }
+
+  function dgAbortOverlayRequest(kind) {
+    const key = kind === 'modal' ? 'modalRequest' : 'drawerRequest';
+    const request = window.dgUIState[key];
+    if (request && typeof request.abort === 'function') {
+      request.abort();
+    }
+    window.dgUIState[key] = null;
+  }
+
+  function dgLoadOverlayContent(url, targetId, kind) {
+    const target = document.getElementById(targetId);
+    if (!target || !url) return;
+    dgAbortOverlayRequest(kind);
+    const controller = new AbortController();
+    window.dgUIState[kind === 'modal' ? 'modalRequest' : 'drawerRequest'] = controller;
+    target.innerHTML = '<div class="p-6 text-sm font-bold text-slate-500">Chargement...</div>';
+    const scopedUrl = dgBuildScopedUrl(url, {});
+    if (kind === 'drawer') {
+      window.dgUIState.drawerUrl = scopedUrl.toString();
+      dgUpdateDrawerBack();
+    }
+    if (kind === 'modal') window.dgUIState.modalUrl = scopedUrl.toString();
+    fetch(scopedUrl.toString(), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      signal: controller.signal,
+    })
+      .then(response => response.text().then(html => ({ ok: response.ok, html })))
+      .then(({ ok, html }) => {
+        if (controller.signal.aborted) return;
+        if (!ok) throw new Error('overlay load failed');
+        target.innerHTML = html;
+        dgWireRecruitmentModal();
+        dgBuildCharts();
+      })
+      .catch(error => {
+        if (error && error.name === 'AbortError') return;
+        if (kind === 'modal') dgCloseModal();
+        else dgCloseDrawer();
+        dgShowNotice('Impossible de charger le contenu.', true);
+      });
+  }
+
+  function dgLoadSection(section, force) {
+    const allowed = new Set(['kpis', 'alerts', 'workflows', 'schedule', 'annexes', 'finance', 'analytics', 'realtime', 'rh']);
+    const normalized = allowed.has(section) ? section : 'overview';
+    const target = document.getElementById('dg-workspace');
+    if (!target) return;
+    if (normalized === 'overview') {
+      target.innerHTML = '';
+      return;
+    }
+    if (!force && target.dataset.section === normalized) return;
+    target.dataset.section = normalized;
+    const period = (window.dgToolbarState && window.dgToolbarState.period) || 'month';
+    const scopedUrl = dgBuildScopedUrl(`${DG_SECTION_BASE}${normalized}/`, {
+      period: period,
+      week_start: normalized === 'schedule' ? (window.dgToolbarState && window.dgToolbarState.weekStart) || '' : '',
+    });
+    target.innerHTML = '<div class="dg-card dg-card-pad"><div class="text-sm font-bold text-slate-500">Chargement de la section...</div></div>';
+    fetch(scopedUrl.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(response => response.text())
+      .then(html => {
+        target.innerHTML = html;
+        dgWireRecruitmentModal();
+        dgBuildCharts();
+      })
+      .catch(() => {
+        target.innerHTML = '<div class="dg-card dg-card-pad"><div class="text-sm font-bold text-rose-600">Impossible de charger cette section.</div></div>';
+      });
+  }
+
+  function dgRefreshSection(section) {
+    const allowed = new Set(['overview', 'kpis', 'alerts', 'workflows', 'schedule', 'annexes', 'finance', 'analytics', 'realtime', 'rh']);
+    const normalized = allowed.has(section) ? section : 'overview';
+    if (normalized === 'overview') {
+      window.location.reload();
+      return;
+    }
+    dgLoadSection(normalized, true);
+  }
+
+  function dgSubmitAction(form) {
+    const formData = new FormData(form);
+    const csrf = formData.get('csrfmiddlewaretoken') || '';
+    const submit = form.querySelector('button[type="submit"]');
+    const originalHtml = submit ? submit.innerHTML : '';
+    if (submit) {
+      submit.disabled = true;
+      submit.classList.add('opacity-60', 'cursor-wait');
+      submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    }
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      credentials: 'same-origin',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(csrf ? { 'X-CSRFToken': csrf } : {})
+      }
+    })
+      .then(response => response.json().then(data => ({ ok: response.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok || !data.ok) throw new Error(data.message || 'Action impossible.');
+        dgShowNotice(data.message || 'Action executee.');
+        if (submit) {
+          submit.classList.remove('cursor-wait');
+          submit.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+          submit.innerHTML = '<i class="fa-solid fa-check"></i>';
+        }
+        const currentSection = (window.location.hash || '#overview').replace('#', '') || 'overview';
+        dgRefreshSection(currentSection);
+        if (window.dgUIState.drawerOpen && window.dgUIState.drawerUrl) {
+          window.setTimeout(function() {
+            dgLoadOverlayContent(window.dgUIState.drawerUrl, 'dg-drawer-content', 'drawer');
+          }, 350);
+        } else if (window.dgUIState.modalOpen && window.dgUIState.modalUrl) {
+          window.setTimeout(function() {
+            dgLoadOverlayContent(window.dgUIState.modalUrl, 'dg-modal-content', 'modal');
+          }, 350);
+        }
+      })
+      .catch(error => {
+        if (submit) {
+          submit.disabled = false;
+          submit.classList.remove('opacity-60', 'cursor-wait');
+          submit.innerHTML = originalHtml;
+        }
+        dgShowNotice(error.message || 'Action impossible.', true);
+      });
+    return false;
+  }
+
+  function dgSubmitModalForm(form) {
+    const target = document.getElementById('dg-modal-content');
+    const formData = new FormData(form);
+    const csrf = formData.get('csrfmiddlewaretoken') || '';
+    fetch(form.action || form.getAttribute('hx-post'), {
+      method: 'POST',
+      body: formData,
+      credentials: 'same-origin',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(csrf ? { 'X-CSRFToken': csrf } : {})
+      }
+    })
+      .then(response => response.text().then(html => ({ ok: response.ok, html })))
+      .then(({ html }) => {
+        if (target) target.innerHTML = html;
+        dgWireRecruitmentModal();
+        if (html.includes('Compte cree') || html.includes('data-dg-modal-close="1"')) {
+          dgRefreshCurrentSection();
+          window.setTimeout(function() {
+            dgCloseModal();
+          }, 180);
+        }
+      })
+      .catch(() => dgShowNotice('Impossible de soumettre le formulaire.', true));
+    return false;
+  }
+
+  function dgShowNotice(message, isError) {
+    let notice = document.getElementById('dg-notice');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'dg-notice';
+      notice.className = 'fixed bottom-5 right-5 z-[120] rounded-xl px-4 py-3 text-sm font-black shadow-xl';
+      document.body.appendChild(notice);
+    }
+    notice.textContent = message;
+    notice.classList.toggle('bg-rose-600', Boolean(isError));
+    notice.classList.toggle('bg-slate-950', !isError);
+    notice.classList.add('text-white');
+    clearTimeout(window.dgNoticeTimer);
+    window.dgNoticeTimer = setTimeout(() => notice.remove(), 3200);
+  }
+
+  function dgOpenDrawer(url, options) {
+    const opts = options || {};
+    if (!opts.replace) {
+      if (window.dgUIState.drawerOpen && window.dgUIState.drawerUrl) {
+        window.dgUIState.drawerHistory.push({ type: 'drawer', url: window.dgUIState.drawerUrl });
+      } else if (window.dgUIState.modalOpen && window.dgUIState.modalUrl) {
+        window.dgUIState.drawerHistory.push({ type: 'modal', url: window.dgUIState.modalUrl });
+      }
+    }
+    dgResetOverlayState(false);
+    const shell = document.getElementById('dg-drawer-shell');
+    if (shell) shell.classList.remove('hidden');
+    window.dgUIState.drawerOpen = true;
+    dgSyncBodyLock();
+    dgLoadOverlayContent(url, 'dg-drawer-content', 'drawer');
+  }
+
+  function dgCloseDrawer() {
+    dgResetOverlayState();
+  }
+
+  function dgDrawerBack() {
+    const previous = window.dgUIState.drawerHistory.pop();
+    if (!previous) {
+      dgUpdateDrawerBack();
+      return;
+    }
+    if (previous.type === 'modal') {
+      dgOpenModal(previous.url, { replace: true });
+      return;
+    }
+    dgOpenDrawer(previous.url, { replace: true });
+  }
+
+  function dgOpenModal(url, options) {
+    const opts = options || {};
+    dgResetOverlayState(opts.replace ? false : true);
+    const shell = document.getElementById('dg-modal-shell');
+    if (shell) shell.classList.remove('hidden');
+    window.dgUIState.modalOpen = true;
+    dgSyncBodyLock();
+    dgLoadOverlayContent(url, 'dg-modal-content', 'modal');
+  }
+
+  function dgCloseModal() {
+    dgResetOverlayState();
+  }
+
+  function dgRefreshCurrentSection() {
+    const currentSection = (window.location.hash || '#overview').replace('#', '') || 'overview';
+    dgRefreshSection(currentSection);
+  }
+
+  function dgWireRecruitmentModal() {
+    const position = document.getElementById('dg-recruit-position');
+    const other = document.getElementById('dg-recruit-other-fields');
+    if (!position || !other) return;
+    const sync = () => { other.style.display = position.value === 'other' ? 'block' : 'none'; };
+    position.addEventListener('change', sync);
+    sync();
+  }
+  function dgBuildCharts() {
+    if (!window.Chart) return;
+    function spark(id, data, color) {
+      const canvas = document.getElementById(id);
+      if (!canvas || canvas.dataset.chartReady) return;
+      canvas.dataset.chartReady = '1';
+      new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: data.map((_, i) => i),
+          datasets: [{ data: data, borderColor: color, backgroundColor: color + '18', fill: true, tension: .42, borderWidth: 2, pointRadius: 0 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: { x: { display: false }, y: { display: false } }
+        }
+      });
+    }
+    spark('dgSparkStudents', [12, 16, 15, 20, 18, 24, 23, 25, 31, 35, 32, 40], '#2563eb');
+    spark('dgSparkRevenue', [8, 10, 9, 13, 12, 16, 17, 20, 25, 31, 36, 44], '#16a34a');
+    spark('dgSparkAlerts', [5, 8, 6, 11, 9, 7, 12, 8, 6, 5, 7, 9], '#f43f5e');
+
+    const risk = document.getElementById('dgRiskChart');
+    if (risk && !risk.dataset.chartReady) {
+      risk.dataset.chartReady = '1';
+      new Chart(risk, {
+        type: 'doughnut',
+        data: {
+          labels: {{ analytics.risk_labels_json|safe }},
+          datasets: [{
+            data: {{ analytics.risk_values_json|safe }},
+            backgroundColor: ['#ef4444', '#f97316', '#2563eb', '#64748b'],
+            borderColor: '#fff',
+            borderWidth: 4,
+            cutout: '68%'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '72%',
+          animation: { duration: 900, easing: 'easeOutQuart' },
+          plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } }
+        }
+      });
+    }
+    const finance = document.getElementById('dgFinanceChart');
+    if (finance && !finance.dataset.chartReady) {
+      finance.dataset.chartReady = '1';
+      new Chart(finance, {
+        type: 'doughnut',
+        data: {
+          labels: ['Revenus', 'Depenses', 'Solde'],
+          datasets: [{
+            data: [{{ finance.revenue|default:0 }}, {{ finance.expenses|default:0 }}, {{ finance.balance_chart|default:0 }}],
+            backgroundColor: ['#22c55e', '#f43f5e', '#2563eb'],
+            borderColor: '#fff',
+            borderWidth: 4,
+            cutout: '68%'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '72%',
+          animation: { duration: 900, easing: 'easeOutQuart' },
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } }
+        }
+      });
+    }
+    const monthly = document.getElementById('dgMonthlyChart');
+    if (monthly && !monthly.dataset.chartReady) {
+      monthly.dataset.chartReady = '1';
+      new Chart(monthly, {
+        type: 'bar',
+        data: {
+          labels: {{ analytics.monthly_labels_json|safe }},
+          datasets: [
+            { label: 'Candidatures', data: {{ analytics.monthly_candidatures_json|safe }}, backgroundColor: '#2563eb', borderRadius: 4 },
+            { type: 'line', label: 'Revenus', data: {{ analytics.monthly_revenue_json|safe }}, borderColor: '#16a34a', backgroundColor: '#16a34a', tension: .35, borderWidth: 3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 900, easing: 'easeOutQuart' },
+          plugins: { legend: { position: 'top', align: 'start', labels: { boxWidth: 10, usePointStyle: true } } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: '#e5e7eb' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+    const realtime = document.getElementById('dgRealtimeChart');
+    if (realtime && !realtime.dataset.chartReady) {
+      realtime.dataset.chartReady = '1';
+      new Chart(realtime, {
+        type: 'line',
+        data: {
+          labels: ['00:00','02:00','04:00','06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00'],
+          datasets: [
+            { label: 'Inscriptions', data: [0, 8, 12, 18, 34, 52, 64, 81, 92, 108, 118, 128], borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)', fill: true, tension: .34, borderWidth: 3 },
+            { label: 'Paiements', data: [0, 5, 9, 13, 24, 37, 46, 58, 73, 84, 96, 110], borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.08)', fill: true, tension: .34, borderWidth: 3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 900, easing: 'easeOutQuart' },
+          plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' }, beginAtZero: true } }
+        }
+      });
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    dgBuildCharts();
+    dgWireRecruitmentModal();
+    const initialSection = (window.location.hash || '#overview').replace('#', '');
+    if (initialSection && initialSection !== 'overview') {
+      dgShowSection(initialSection);
+    }
+    dgResetOverlayState();
+  });
+  window.addEventListener('pageshow', function() {
+    dgResetOverlayState();
+  });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      dgResetOverlayState();
+    }
+  });
+</script>
 {% endblock %}
-

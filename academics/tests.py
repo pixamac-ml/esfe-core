@@ -19,6 +19,7 @@ from academics.models import (
     LessonLog,
     Semester,
     UE,
+    WeeklyScheduleSlot,
 )
 from academics.services.grading import calculate_ec_grade
 from academics.services.semester import compute_semester_result
@@ -983,6 +984,87 @@ class AcademicScheduleServiceTests(TestCase):
         self.assertEqual(len(schedule["slots"]), 4)
         self.assertEqual(len(schedule["empty_days"]), 6)
         self.assertFalse(schedule["has_extra_slots"])
+
+    def test_get_student_week_schedule_falls_back_to_weekly_slots(self):
+        WeeklyScheduleSlot.objects.create(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            weekday=0,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            room="Salle grille",
+            is_active=True,
+        )
+
+        schedule = get_student_week_schedule(self.student, self.week_start)
+
+        self.assertTrue(schedule["is_weekly_template"])
+        self.assertEqual(schedule["summary"]["planned"], 1)
+        self.assertEqual(schedule["events"][0]["title"], "Algorithmique")
+        self.assertEqual(schedule["events"][0]["source"], "weekly_slot")
+        self.assertEqual(schedule["slots"][0]["cells"][0]["events"][0]["location"], "Salle grille")
+
+    def test_get_student_week_schedule_merges_unmaterialized_weekly_slots(self):
+        create_schedule_event(
+            user=self.director,
+            title="Cours deja date",
+            description="",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            start_datetime=self._aware_dt(0, 8),
+            end_datetime=self._aware_dt(0, 10),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle A1",
+            is_online=False,
+            meeting_link="",
+            is_active=True,
+        )
+        WeeklyScheduleSlot.objects.create(
+            academic_class=self.academic_class,
+            ec=self.ec_two,
+            teacher=self.teacher_two,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            weekday=1,
+            start_time=time(10, 0),
+            end_time=time(12, 0),
+            room="Salle grille",
+            is_active=True,
+        )
+
+        schedule = get_student_week_schedule(self.student, self.week_start)
+
+        self.assertTrue(schedule["has_weekly_template_fallback"])
+        self.assertEqual(schedule["summary"]["planned"], 2)
+        self.assertEqual({event.get("source") for event in schedule["events"]}, {None, "weekly_slot"})
+        self.assertTrue(schedule["slots"][1]["cells"][1]["events"])
+
+    def test_get_student_week_schedule_displays_sunday_slots_when_used(self):
+        WeeklyScheduleSlot.objects.create(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            weekday=6,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            room="Salle dimanche",
+            is_active=True,
+        )
+
+        schedule = get_student_week_schedule(self.student, self.week_start)
+
+        self.assertEqual(len(schedule["days"]), 7)
+        self.assertEqual(schedule["days"][6]["label"], "Dim")
+        self.assertEqual(schedule["slots"][0]["cells"][6]["events"][0]["location"], "Salle dimanche")
 
     def test_get_student_week_schedule_exposes_non_standard_slots(self):
         create_schedule_event(

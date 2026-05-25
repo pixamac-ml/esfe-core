@@ -11,7 +11,8 @@ from branches.models import Branch
 from communication.models import CommunicationNotification
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
-from payments.models import CashPaymentSession, Payment, PaymentAgent
+from payments.models import CashPaymentSession, FinancialLog, Payment, PaymentAgent
+from payments.services.corrections import correct_validated_payment_amount
 from students.models import Student
 
 
@@ -250,3 +251,71 @@ class StudentPaymentViewTests(TestCase):
         )
         send_credentials.assert_called_once()
         send_confirmation.assert_not_called()
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_controlled_payment_correction_updates_finance_and_logs(self, send_credentials, send_confirmation):
+        manager_user = User.objects.create_user(
+            username="manager_corrector",
+            password="pass1234",
+            is_staff=True,
+        )
+        manager_profile = manager_user.profile
+        manager_profile.position = "branch_manager"
+        manager_profile.branch = self.branch
+        manager_profile.save(update_fields=["position", "branch", "updated_at"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            payment = Payment.objects.create(
+                inscription=self.inscription,
+                amount=130000,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+
+        correction = correct_validated_payment_amount(
+            payment=payment,
+            new_amount=120000,
+            reason="Erreur de saisie, montant recu en caisse 120000 FCFA.",
+            actor=manager_user,
+        )
+
+        payment.refresh_from_db()
+        self.inscription.refresh_from_db()
+        movement = BranchCashMovement.objects.get(
+            branch=self.branch,
+            source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+            source_reference=payment.reference,
+        )
+
+        self.assertEqual(payment.amount, 120000)
+        self.assertEqual(self.inscription.amount_paid, 120000)
+        self.assertEqual(movement.amount, 120000)
+        self.assertEqual(correction.old_amount, 130000)
+        self.assertEqual(correction.new_amount, 120000)
+        self.assertEqual(correction.delta_amount, -10000)
+        self.assertTrue(
+            FinancialLog.objects.filter(
+                payment=payment,
+                correction=correction,
+                action=FinancialLog.ACTION_PAYMENT_CORRECTED,
+                old_amount=130000,
+                new_amount=120000,
+                actor=manager_user,
+            ).exists()
+        )
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_validated_payment_still_rejects_direct_save_edits(self, send_credentials, send_confirmation):
+        with self.captureOnCommitCallbacks(execute=True):
+            payment = Payment.objects.create(
+                inscription=self.inscription,
+                amount=50000,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+
+        payment.amount = 40000
+        with self.assertRaises(ValueError):
+            payment.save()

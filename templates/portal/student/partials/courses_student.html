@@ -1,62 +1,79 @@
+{% load component_tags %}
+
 <div class="student-inline-head">
   <div>
-    <p class="student-section-kicker">Cours</p>
-    <h3 class="student-section-title">Matieres et contenus</h3>
+    <p class="student-section-kicker">Academy</p>
+    <h3 class="student-section-title">Mes cours</h3>
+    <p class="mt-1 text-sm text-[color:var(--muted)]">Catalogue de vos matieres, resultats et credits.</p>
   </div>
   <div class="flex items-center gap-2">
-    <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-1.5 text-[11px] font-extrabold text-[color:var(--muted)]">
-      {{ courses|length }} element{{ courses|length|pluralize }}
-    </span>
-    <button type="button" @click="goToSection('courses', 'Mes cours')" class="rounded-full border border-[color:var(--line)] bg-white px-3 py-1.5 text-[11px] font-extrabold text-[color:var(--school-primary)]">
-      Voir tout
-    </button>
+    {% with course_count=courses|length|stringformat:"s"|add:" cours" %}
+      {% component "status_badge" label=course_count tone="neutral" icon="book-open" %}{% endcomponent %}
+    {% endwith %}
   </div>
 </div>
 
+{{ courses|json_script:"student-courses-section-data" }}
+
 {% if courses %}
   <div
-    class="student-course-list"
+    class="student-academy"
     x-data="{
-      coursesData: parseDashboardData('student-courses-data', []),
+      coursesData: parseDashboardData('student-courses-section-data', parseDashboardData('student-courses-data', [])),
       semesterFilter: 'all',
+      statusFilter: 'all',
+      query: '',
       page: 0,
-      pageSize: 4,
+      pageSize: 6,
       availableSemesters: [],
       init() {
-        this.availableSemesters = Array.from(new Set(this.coursesData.map(c => String(c.semester)))).sort((a, b) => Number(a) - Number(b));
-      },
-      semesterProgress(semester) {
-        const scoped = this.coursesData.filter(c => String(c.semester) === String(semester));
-        if (!scoped.length) return 0;
-        const done = scoped.filter(c => Number(c.progress || 0) >= 100).length;
-        return Math.round((done / scoped.length) * 100);
-      },
-      isSemesterUnlocked(semester) {
-        const sem = Number(semester);
-        if (!Number.isFinite(sem) || sem <= 1) return true;
-        for (let prev = 1; prev < sem; prev += 1) {
-          if (this.semesterProgress(prev) < 100) {
-            return false;
+        const semesters = new Map();
+        this.coursesData.forEach((course) => {
+          const number = String(parseInt(course.semester, 10));
+          if (!number || number === 'NaN') return;
+          if (!semesters.has(number)) {
+            semesters.set(number, { number, label: `S${number}`, unlocked: Boolean(course.semester_unlocked), total: 0, validated: 0 });
           }
-        }
-        return true;
+          const row = semesters.get(number);
+          row.total += 1;
+          if (course.is_validated) row.validated += 1;
+          row.unlocked = row.unlocked || Boolean(course.semester_unlocked);
+        });
+        this.availableSemesters = Array.from(semesters.values()).sort((a, b) => Number(a.number) - Number(b.number));
+      },
+      courseStatus(course) {
+        if (course.has_content) return 'content';
+        if (course.is_validated) return 'validated';
+        if (course.has_grade) return 'failed';
+        return 'pending';
+      },
+      matchesQuery(course) {
+        const q = this.query.trim().toLowerCase();
+        if (!q) return true;
+        return [course.title, course.code, course.ue, course.final_score, course.status_label].join(' ').toLowerCase().includes(q);
       },
       filteredIndexes() {
         const indexes = [];
         this.coursesData.forEach((course, idx) => {
-          const sem = String(course.semester);
-          if (!this.isSemesterUnlocked(sem)) return;
-          if (this.semesterFilter !== 'all' && this.semesterFilter !== sem) return;
+          if (this.semesterFilter !== 'all' && String(course.semester) !== this.semesterFilter) return;
+          if (this.statusFilter !== 'all' && this.courseStatus(course) !== this.statusFilter) return;
+          if (!this.matchesQuery(course)) return;
           indexes.push(idx);
         });
         return indexes;
       },
+      visibleCount() {
+        return this.filteredIndexes().length;
+      },
       pageCount() {
-        return Math.max(1, Math.ceil(this.filteredIndexes().length / this.pageSize));
+        return Math.max(1, Math.ceil(this.visibleCount() / this.pageSize));
       },
       setSemesterFilter(value) {
-        if (value !== 'all' && !this.isSemesterUnlocked(value)) return;
         this.semesterFilter = value;
+        this.page = 0;
+      },
+      setStatusFilter(value) {
+        this.statusFilter = value;
         this.page = 0;
       },
       isVisible(idx) {
@@ -64,6 +81,14 @@
         const row = indexes.indexOf(idx);
         if (row < 0) return false;
         return row >= this.page * this.pageSize && row < (this.page + 1) * this.pageSize;
+      },
+      isSemesterUnlocked(value) {
+        const semester = this.availableSemesters.find(item => item.number === String(parseInt(value, 10)));
+        return semester ? semester.unlocked : true;
+      },
+      semesterHint(sem) {
+        if (sem.unlocked) return `${sem.validated}/${sem.total} EC valides`;
+        return `Verrouille - ${sem.validated}/${sem.total} EC valides`;
       },
       next() {
         if (this.page < this.pageCount() - 1) this.page += 1;
@@ -73,114 +98,145 @@
       }
     }"
   >
-    <div class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-2">
-      <button
-        type="button"
-        class="rounded-lg border border-[color:var(--line)] px-2.5 py-1 text-[11px] font-extrabold"
-        :class="semesterFilter === 'all' ? 'bg-[color:var(--school-primary)] text-white border-transparent' : 'bg-[color:var(--card)] text-[color:var(--text)]'"
-        @click="setSemesterFilter('all')"
-      >
-        Tous les semestres
-      </button>
-      <template x-for="sem in availableSemesters" :key="sem">
-        <div class="inline-flex items-center gap-1.5">
+    <section class="student-academy-toolbar">
+      <label class="student-academy-search">
+        <i data-lucide="search" style="width:16px;height:16px;"></i>
+        <input x-model.debounce.200ms="query" @input="page = 0" type="search" placeholder="Rechercher un cours..." />
+      </label>
+
+      <div class="student-academy-filters">
+        <button type="button" class="student-academy-chip" :class="{ 'is-active': semesterFilter === 'all' }" @click="setSemesterFilter('all')">Tous</button>
+        {% for semester in course_semesters %}
           <button
             type="button"
-            class="rounded-lg border border-[color:var(--line)] px-2.5 py-1 text-[11px] font-extrabold"
-            :class="semesterFilter === sem ? 'bg-[color:var(--school-primary)] text-white border-transparent' : (isSemesterUnlocked(sem) ? 'bg-[color:var(--card)] text-[color:var(--text)]' : 'bg-[color:var(--surface-2)] text-[color:var(--muted-2)] cursor-not-allowed')"
-            :disabled="!isSemesterUnlocked(sem)"
-            @click="setSemesterFilter(sem)"
-            :title="isSemesterUnlocked(sem) ? ('Filtrer sur le semestre ' + sem) : ('Semestre ' + sem + ' verrouille: terminez les semestres precedents')"
+            class="student-academy-chip"
+            :class="{ 'is-active': semesterFilter === '{{ semester.number }}', 'is-locked': !isSemesterUnlocked('{{ semester.number }}') }"
+            title="{{ semester.hint }}"
+            @click="setSemesterFilter('{{ semester.number }}')"
           >
-            <span x-text="'Semestre ' + sem"></span>
+            {% if not semester.unlocked %}
+              <i data-lucide="lock-keyhole" style="width:13px;height:13px;"></i>
+            {% endif %}
+            <span>{{ semester.label }}</span>
           </button>
-          <span
-            x-show="!isSemesterUnlocked(sem)"
-            x-cloak
-            class="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-700"
-          >
-            Verrouille
-          </span>
-        </div>
-      </template>
+        {% endfor %}
+      </div>
+
+      <div class="student-academy-filters">
+        <button type="button" class="student-academy-chip" :class="{ 'is-active': statusFilter === 'all' }" @click="setStatusFilter('all')">Tous les statuts</button>
+        <button type="button" class="student-academy-chip" :class="{ 'is-active': statusFilter === 'content' }" @click="setStatusFilter('content')">Contenus</button>
+        <button type="button" class="student-academy-chip" :class="{ 'is-active': statusFilter === 'validated' }" @click="setStatusFilter('validated')">Valides</button>
+        <button type="button" class="student-academy-chip" :class="{ 'is-active': statusFilter === 'failed' }" @click="setStatusFilter('failed')">A reprendre</button>
+        <button type="button" class="student-academy-chip" :class="{ 'is-active': statusFilter === 'pending' }" @click="setStatusFilter('pending')">En attente</button>
+      </div>
+    </section>
+
+    <div class="student-academy-count">
+      <strong x-text="visibleCount()"></strong>
+      <span>cours affiches</span>
     </div>
 
-    {% for course in courses %}
-      <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3" x-data="{ previewOpen: false }" x-show="isVisible({{ forloop.counter0 }})" x-cloak>
-        <div class="student-course-row">
-          <div class="flex min-w-0 items-center gap-3">
-            <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
-              <i data-lucide="{{ course.icon }}" style="width:18px;height:18px;"></i>
+    <section class="student-academy-grid">
+      {% for course in courses %}
+        {% cycle "academy-cover-1" "academy-cover-2" "academy-cover-3" "academy-cover-4" as cover_class silent %}
+        <article
+          class="student-academy-card"
+          :class="{ 'is-locked': !isSemesterUnlocked('{{ course.semester }}') }"
+          x-show="isVisible({{ forloop.counter0 }})"
+          x-cloak
+        >
+          <div class="student-academy-cover {{ cover_class }}">
+            <div class="student-academy-cover-top">
+              <span class="student-academy-cover-badge">{{ course.semester_label }} - {{ course.code }}</span>
+              <span x-show="!isSemesterUnlocked('{{ course.semester }}')" class="student-academy-lock-badge" x-cloak>
+                <i data-lucide="lock-keyhole" style="width:12px;height:12px;"></i>
+                Verrouille
+              </span>
+              <span x-show="isSemesterUnlocked('{{ course.semester }}')">
+                {% component "status_badge" label=course.status_label tone=course.status_tone %}{% endcomponent %}
+              </span>
             </div>
+            <i data-lucide="{{ course.icon }}" style="width:34px;height:34px;"></i>
+          </div>
+
+          <div class="student-academy-body">
             <div class="min-w-0">
-              <h4 class="truncate text-sm font-black tracking-tight text-[color:var(--text)]">{{ course.title }}</h4>
-              <p class="truncate text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted-2)]">S{{ course.semester }} · {{ course.code }}{% if course.ue %} · {{ course.ue }}{% endif %}</p>
+              <h4 class="student-academy-title">{{ course.title }}</h4>
+              <p class="student-academy-subtitle">{{ course.ue }}</p>
+            </div>
+
+            <div class="student-academy-meta">
+              <span><i data-lucide="graduation-cap" style="width:13px;height:13px;"></i>{{ course.final_score }}</span>
+              <span><i data-lucide="badge-check" style="width:13px;height:13px;"></i>{{ course.credit_obtained }}/{{ course.credit_required }} credits</span>
+              <span><i data-lucide="scale" style="width:13px;height:13px;"></i>Coef. {{ course.coefficient }}</span>
+            </div>
+
+            <div class="student-academy-progress">
+              <div class="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--muted)]">
+                {% if not course.semester_unlocked %}
+                  <span>Semestre verrouille</span>
+                  <span>0%</span>
+                {% elif course.has_content %}
+                  <span>Progression pedagogique</span>
+                  <span>{{ course.progress }}%</span>
+                {% else %}
+                  <span>Progression academique</span>
+                  <span>{% if course.is_validated %}100{% elif course.has_grade %}50{% else %}0{% endif %}%</span>
+                {% endif %}
+              </div>
+              <progress class="student-mini-meter" max="100" value="{% if not course.semester_unlocked %}0{% elif course.has_content %}{{ course.progress }}{% elif course.is_validated %}100{% elif course.has_grade %}50{% else %}0{% endif %}"></progress>
+              <p class="mt-1 text-[11px] font-semibold text-[color:var(--muted)]">
+                {% if not course.semester_unlocked %}
+                  {{ course.semester_lock_message }}
+                {% elif course.has_content %}
+                  {{ course.content_count }} contenu{{ course.content_count|pluralize }} publie{{ course.content_count|pluralize }}
+                {% else %}
+                  Contenus non publies pour cette matiere.
+                {% endif %}
+              </p>
+            </div>
+
+            <div class="student-academy-actions">
+              <button
+                type="button"
+                class="student-academy-secondary"
+                :disabled="!isSemesterUnlocked('{{ course.semester }}')"
+                @click="isSemesterUnlocked('{{ course.semester }}') && openCoursePreview('{% url 'portal_student:ec_preview' course.id %}', '{{ course.title|escapejs }}')"
+              >
+                <i data-lucide="eye" style="width:14px;height:14px;"></i>
+                Apercu
+              </button>
+              <button
+                type="button"
+                :disabled="!isSemesterUnlocked('{{ course.semester }}')"
+                @click="isSemesterUnlocked('{{ course.semester }}') && openCourseDetail('{% url 'portal_student:ec_detail' course.id %}', '{{ course.title|escapejs }}')"
+                class="student-academy-primary"
+              >
+                <i data-lucide="play-circle" style="width:15px;height:15px;"></i>
+                Continuer
+              </button>
             </div>
           </div>
+        </article>
+      {% endfor %}
+    </section>
 
-          <div class="min-w-0">
-            <p class="truncate text-sm font-semibold text-[color:var(--text)]">{{ course.teacher }}</p>
-            <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">{{ course.content_count }} contenu{{ course.content_count|pluralize }}</span>
-          </div>
+    <div x-show="visibleCount() === 0" x-cloak>
+      {% component "empty_state" title="Aucun cours trouve" message="Aucune matiere ne correspond aux filtres actifs." icon="search-x" %}{% endcomponent %}
+    </div>
 
-          <div class="student-course-progress">
-            <div class="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--muted)]">
-              <span>Progression</span>
-              <span>{{ course.progress }}%</span>
-            </div>
-            <progress class="student-mini-meter" max="100" value="{{ course.progress }}"></progress>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-[11px] font-bold text-[color:var(--text)]"
-              @click="previewOpen = !previewOpen"
-              :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': previewOpen }"
-            >
-              <span x-text="previewOpen ? 'Masquer l\\'aperçu' : 'Aperçu'"></span>
-            </button>
-            <button type="button" @click="openCourseDetail('{% url 'portal_student:ec_detail' course.id %}', '{{ course.title|escapejs }}')" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-[11px] font-bold text-white transition hover:bg-primary-600">
-              Voir le contenu
-            </button>
-          </div>
-        </div>
-
-        <div x-show="previewOpen" x-cloak class="mt-3" id="ecPreviewWrap{{ course.id }}">
-          <div
-            id="ecPreview{{ course.id }}"
-            class="student-scroll"
-            data-preview-loaded="0"
-            hx-get="{% url 'portal_student:ec_preview' course.id %}"
-            hx-trigger="revealed"
-            hx-target="this"
-            hx-swap="innerHTML"
-          >
-            <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-4 text-sm text-[color:var(--muted)]">
-              Chargement de l'aperçu...
-            </div>
-          </div>
-        </div>
-      </article>
-    {% endfor %}
-
-    <div
-      class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs text-[color:var(--muted)]"
-      x-show="filteredIndexes().length > pageSize"
-    >
+    <div class="student-academy-pager" x-show="visibleCount() > pageSize">
       <span>Page <strong x-text="page + 1"></strong> / <strong x-text="pageCount()"></strong></span>
       <div class="flex items-center gap-2">
-        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="prev()" :disabled="page === 0">Precedent</button>
-        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="next()" :disabled="page >= pageCount() - 1">Suivant</button>
+        <button type="button" class="student-academy-secondary" @click="prev()" :disabled="page === 0">Precedent</button>
+        <button type="button" class="student-academy-secondary" @click="next()" :disabled="page >= pageCount() - 1">Suivant</button>
       </div>
     </div>
   </div>
 {% else %}
-  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">
-    {% if academic_status == "assigned" %}
-      Aucun EC n'est encore configure pour votre classe academique.
-    {% else %}
-      {{ academic_status_message }}
-    {% endif %}
-  </div>
+  {% if academic_status == "assigned" %}
+    {% component "empty_state" title="Aucun cours configure" message="Aucun EC n'est encore configure pour votre classe academique." icon="book-open" %}{% endcomponent %}
+  {% else %}
+    {% component "empty_state" title="Cours indisponibles" message=academic_status_message icon="clock-3" %}{% endcomponent %}
+  {% endif %}
 {% endif %}

@@ -1,39 +1,100 @@
+{% load component_tags %}
+
 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
   <div>
-    <p class="student-section-kicker">Calendrier</p>
-    <h3 class="mt-1 student-section-title">Planning hebdomadaire</h3>
-    <p class="mt-1 text-sm text-[color:var(--muted)]">Vue semaine par creneau, avec gestion des statuts, des jours vides et des horaires hors grille.</p>
+    <h3 class="student-section-title">Planning hebdomadaire</h3>
+    <p class="mt-1 text-sm text-[color:var(--muted)]">Votre semaine academique, organisee par jour et par creneau.</p>
+    {% if timetable.is_weekly_template %}
+      <p class="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">
+        Affichage de la grille hebdomadaire officielle. Les seances datees de cette semaine ne sont pas encore materialisees.
+      </p>
+    {% elif timetable.has_weekly_template_fallback %}
+      <p class="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">
+        Les creneaux officiels non encore materialises sont affiches avec les cours deja programmes.
+      </p>
+    {% elif timetable.is_nearest_available_week %}
+      <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+        {{ timetable.week_notice }}
+      </p>
+    {% endif %}
   </div>
   {% if timetable.week_start %}
-    <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-extrabold text-[color:var(--muted)]">
-      Semaine du {{ timetable.week_start|date:"d/m/Y" }}
-    </span>
+    {% with week_date=timetable.week_start|date:"d/m/Y" %}
+      {% with week_label="Semaine du "|add:week_date %}
+        {% component "status_badge" label=week_label tone="neutral" icon="calendar-days" %}{% endcomponent %}
+      {% endwith %}
+    {% endwith %}
   {% endif %}
 </div>
 
 {% if timetable.events %}
-  <div class="mb-4 grid gap-3 lg:grid-cols-5">
-    <div class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3">
-      <span class="block text-[10px] font-black uppercase tracking-[0.18em] text-sky-700">Planifies</span>
-      <strong class="mt-1 block text-2xl font-black text-sky-800">{{ timetable.summary.planned }}</strong>
-    </div>
-    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
-      <span class="block text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">En cours</span>
-      <strong class="mt-1 block text-2xl font-black text-emerald-800">{{ timetable.summary.ongoing }}</strong>
-    </div>
-    <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-      <span class="block text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">Reportes</span>
-      <strong class="mt-1 block text-2xl font-black text-amber-800">{{ timetable.summary.postponed }}</strong>
-    </div>
-    <div class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-3">
-      <span class="block text-[10px] font-black uppercase tracking-[0.18em] text-rose-700">Annules</span>
-      <strong class="mt-1 block text-2xl font-black text-rose-800">{{ timetable.summary.cancelled }}</strong>
-    </div>
-    <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-      <span class="block text-[10px] font-black uppercase tracking-[0.18em] text-slate-700">Termines</span>
-      <strong class="mt-1 block text-2xl font-black text-slate-800">{{ timetable.summary.completed }}</strong>
-    </div>
+  <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2">
+    <span class="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-[11px] font-extrabold text-[color:var(--text)]">
+      <i data-lucide="calendar-clock" style="width:13px;height:13px;"></i>
+      {{ timetable.summary.planned }} planifie(s)
+    </span>
+    {% if timetable.summary.ongoing %}
+      <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700">
+        <i data-lucide="activity" style="width:13px;height:13px;"></i>
+        {{ timetable.summary.ongoing }} en cours
+      </span>
+    {% endif %}
+    {% if timetable.summary.postponed %}
+      <span class="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-extrabold text-amber-700">
+        <i data-lucide="clock-3" style="width:13px;height:13px;"></i>
+        {{ timetable.summary.postponed }} reporte(s)
+      </span>
+    {% endif %}
+    {% if timetable.summary.cancelled %}
+      <span class="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1 text-[11px] font-extrabold text-rose-700">
+        <i data-lucide="circle-x" style="width:13px;height:13px;"></i>
+        {{ timetable.summary.cancelled }} annule(s)
+      </span>
+    {% endif %}
+    {% if timetable.summary.completed %}
+      <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1 text-[11px] font-extrabold text-slate-700">
+        <i data-lucide="check-circle-2" style="width:13px;height:13px;"></i>
+        {{ timetable.summary.completed }} termine(s)
+      </span>
+    {% endif %}
   </div>
+
+  <section class="mb-4 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--school-primary)]">Cours planifies</p>
+        <h4 class="mt-1 text-sm font-black text-[color:var(--text)]">Liste lisible de la semaine affichee</h4>
+      </div>
+      {% with event_count=timetable.events|length|stringformat:"s"|add:" cours" %}
+        {% component "status_badge" label=event_count tone="neutral" icon="book-open-check" %}{% endcomponent %}
+      {% endwith %}
+    </div>
+    <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      {% for event in timetable.events %}
+        <article class="rounded-lg border px-3 py-2.5 {% if event.status_theme == 'rose' %}border-rose-200 bg-rose-50{% elif event.status_theme == 'amber' %}border-amber-200 bg-amber-50{% elif event.status_theme == 'emerald' %}border-emerald-200 bg-emerald-50{% elif event.status_theme == 'slate' %}border-slate-200 bg-slate-50{% else %}border-sky-200 bg-sky-50{% endif %}">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <strong class="block truncate text-sm font-black text-[color:var(--text)]">{{ event.title }}</strong>
+              <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">{{ event.weekday_label }} - {{ event.time_range }}</p>
+            </div>
+            <span class="shrink-0 rounded-full px-2 py-1 text-[10px] font-bold {% if event.status_theme == 'rose' %}bg-rose-100 text-rose-700{% elif event.status_theme == 'amber' %}bg-amber-100 text-amber-700{% elif event.status_theme == 'emerald' %}bg-emerald-100 text-emerald-700{% elif event.status_theme == 'slate' %}bg-slate-100 text-slate-700{% else %}bg-sky-100 text-sky-700{% endif %}">
+              {{ event.status_label }}
+            </span>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[color:var(--muted)]">
+            <span class="inline-flex items-center gap-1.5">
+              <i data-lucide="user-round" style="width:12px;height:12px;"></i>
+              {{ event.teacher_name }}
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <i data-lucide="{% if event.is_online %}video{% else %}map-pin{% endif %}" style="width:12px;height:12px;"></i>
+              {{ event.location }}
+            </span>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
 
   <div class="overflow-x-auto rounded-xl border border-[color:var(--line)] bg-[color:var(--card)]">
     <table class="min-w-[860px] w-full table-fixed border-collapse">
@@ -132,7 +193,29 @@
     </div>
   {% endif %}
 {% else %}
-  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-6 text-sm text-[color:var(--muted)]">
-    Aucun cours programme pour cette periode.
-  </div>
+  {% if timetable.has_unplanned_assignments %}
+    <section class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <div class="mb-3 flex items-start gap-3">
+        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700">
+          <i data-lucide="calendar-clock" style="width:18px;height:18px;"></i>
+        </div>
+        <div>
+          <h4 class="text-sm font-black text-amber-900">Planning horaire en attente</h4>
+          <p class="mt-1 text-sm font-semibold leading-6 text-amber-800">{{ timetable.week_notice }}</p>
+        </div>
+      </div>
+      <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {% for item in timetable.unplanned_assignments %}
+          <article class="rounded-lg border border-amber-200 bg-white/80 p-3">
+            <p class="text-[11px] font-black uppercase tracking-wide text-amber-700">{{ item.code|default:"EC" }}</p>
+            <h5 class="mt-1 text-sm font-black text-[color:var(--text)]">{{ item.title }}</h5>
+            <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">{{ item.teacher_name }}</p>
+            <p class="mt-2 text-[11px] font-bold text-amber-700">{{ item.room }}{% if item.planned_hours %} · {{ item.planned_hours }} h prevues{% endif %}</p>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% else %}
+    {% component "empty_state" title="Aucun cours programme" message="Aucun cours programme pour cette periode." icon="calendar-x" %}{% endcomponent %}
+  {% endif %}
 {% endif %}

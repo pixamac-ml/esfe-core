@@ -43,6 +43,76 @@
                 <div class="flex justify-between gap-4"><span class="text-slate-500">Montant du dossier</span><span class="text-slate-900">{{ payment.inscription.amount_due|floatformat:0 }} FCFA</span></div>
                 <div class="flex justify-between gap-4"><span class="text-slate-500">Token public</span><span class="font-mono text-slate-900">{{ payment.inscription.public_token }}</span></div>
             </div>
+
+            {% if payment.status == 'validated' %}
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
+                <div>
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-amber-800">Correction controlee</h3>
+                    <p class="mt-1 text-sm text-amber-800">Toute correction met a jour la caisse, le solde du dossier et l'historique financier.</p>
+                </div>
+                {% if correction_error %}
+                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{{ correction_error }}</div>
+                {% endif %}
+                {% if correction_success %}
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{{ correction_success }}</div>
+                {% endif %}
+                <form
+                    hx-post="{% url 'accounts:htmx_payment_correct' payment.id %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Ancienne valeur</label>
+                        <input type="text" value="{{ payment.amount|floatformat:0 }} FCFA" readonly class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nouvelle valeur</label>
+                        <input id="payment-correction-new-amount" type="number" min="1" name="new_amount" value="{{ correction_new_amount }}" data-old-amount="{{ payment.amount }}" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900" required>
+                    </div>
+                    <div class="md:col-span-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                        <span class="text-slate-500">Difference calculee : </span>
+                        <span id="payment-correction-delta" class="font-bold text-slate-900">-</span>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Motif correction</label>
+                        <textarea name="reason" rows="3" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" required>{{ correction_reason }}</textarea>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Utilisateur responsable</label>
+                        <input type="text" value="{{ request.user.get_full_name|default:request.user.username }}" readonly class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Confirmation</label>
+                        <input type="text" name="confirmation" placeholder="CORRIGER" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900" required>
+                    </div>
+                    <div class="md:col-span-2 flex justify-end">
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700">
+                            <i class="fas fa-pen-to-square"></i>
+                            Corriger paiement
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Historique financier</h3>
+                <div class="space-y-3">
+                    {% for correction in corrections %}
+                    <div class="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm">
+                        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <p class="font-semibold text-slate-900">{{ correction.old_amount|floatformat:0 }} -> {{ correction.new_amount|floatformat:0 }} FCFA</p>
+                            <p class="text-xs text-slate-500">{{ correction.corrected_at|date:"d/m/Y H:i" }}</p>
+                        </div>
+                        <p class="mt-1 text-slate-600">{{ correction.reason }}</p>
+                        <p class="mt-1 text-xs text-slate-500">Par {{ correction.corrected_by.get_full_name|default:correction.corrected_by.username|default:"Systeme" }}</p>
+                    </div>
+                    {% empty %}
+                    <p class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">Aucune correction enregistree.</p>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
 
         <div class="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex items-center justify-between rounded-b-3xl">
@@ -58,3 +128,25 @@
         </div>
     </div>
 </div>
+<script>
+(function () {
+    const input = document.getElementById("payment-correction-new-amount");
+    const output = document.getElementById("payment-correction-delta");
+    if (!input || !output) {
+        return;
+    }
+    function refreshDelta() {
+        const oldAmount = Number(input.dataset.oldAmount || 0);
+        const newAmount = Number(input.value || 0);
+        if (!newAmount) {
+            output.textContent = "-";
+            return;
+        }
+        const delta = newAmount - oldAmount;
+        output.textContent = `${delta > 0 ? "+" : ""}${delta.toLocaleString("fr-FR")} FCFA`;
+        output.className = delta < 0 ? "font-bold text-rose-700" : "font-bold text-emerald-700";
+    }
+    input.addEventListener("input", refreshDelta);
+    refreshDelta();
+})();
+</script>

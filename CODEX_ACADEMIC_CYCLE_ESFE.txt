@@ -1,0 +1,1510 @@
+DOCUMENT DE CADRAGE ET D'IMPLEMENTATION POUR CODEX
+PROJET : ESFE CORE / FELIX SANTE
+MODULE : academic_cycle
+OBJET : moteur de cloture, transition, reinscription et ouverture d'annee academique
+VERSION : V1 INDUSTRIELLE
+LANGUE : FRANCAIS
+
+======================================================================
+0. CONSIGNE GENERALE POUR CODEX
+======================================================================
+
+Tu vas travailler dans le projet Django ESFE Core / Felix Sante.
+Le but est de creer une nouvelle application Django dediee appelee :
+
+    academic_cycle
+
+Cette app ne remplace pas l'app academics.
+Elle ne doit pas casser les apps existantes.
+Elle doit orchestrer le cycle de vie annuel de l'ecole : cloture progressive, validation, migration, reinscriptions, activation de nouvelle annee, acces dashboard, dettes academiques, dettes financieres, logs, audit, notifications, et taches asynchrones.
+
+Tu dois analyser le projet existant avant de modifier.
+Tu dois respecter l'architecture actuelle : services.py pour la logique metier, selectors.py pour les requetes, views fines, templates sans logique metier lourde, filtrage par annexe obligatoire, pas de melange entre les roles.
+
+Ne fais pas une implementation superficielle.
+Ne fais pas un simple bouton "cloturer l'annee".
+On veut un moteur institutionnel robuste.
+
+Important :
+- Ne jamais supprimer les donnees historiques.
+- Ne jamais faire de reset brutal.
+- Ne jamais bloquer toute la plateforme parce qu'une annexe n'est pas prete.
+- Ne jamais melanger les donnees des annexes.
+- Ne jamais dupliquer inutilement les UE, EC, matieres, formations ou structures pedagogiques.
+- Ne jamais mettre toute la logique dans les views.
+- Ne jamais faire de longues operations synchrones dans une requete HTTP.
+
+Objectif final V1 :
+- Creer l'app academic_cycle.
+- Mettre en place les modeles de cycle, cloture, dette academique, dette financiere, reinscription, transfert, logs et etats.
+- Mettre en place les services principaux.
+- Prevoir les tasks Celery, meme si certaines restent simples au debut.
+- Connecter progressivement avec academics, students, inscriptions, payments, branches, accounts, communication.
+- Preparer les endpoints/views de base pour les dashboards DG, staff, informaticien, gestionnaire et etudiant.
+- Avoir une base stable, testable, evolutive.
+
+======================================================================
+1. VISION METIER DU MODULE academic_cycle
+======================================================================
+
+Le module academic_cycle est le moteur institutionnel de cycle academique.
+Il gere la vie annuelle de l'etablissement sans interrompre la plateforme.
+
+La plateforme ESFE Core est permanente.
+Elle ne s'arrete jamais.
+Pendant les vacances, les modules administratifs continuent de fonctionner : inscriptions, reinscriptions, paiements, demandes, support, tickets, consultation d'historique, preparation de rentree.
+
+Ce qui change, ce n'est pas la plateforme.
+Ce qui change, c'est le contexte academique actif.
+
+Il faut donc separer :
+
+1. Plateforme institutionnelle : toujours active.
+2. Annee academique : active, en preparation, en deliberation, cloturee, archivee.
+3. Cycle d'une annexe : chaque annexe avance a son rythme.
+4. Cycle d'une classe : chaque classe doit finaliser ses semestres.
+5. Acces utilisateur : complet, limite, bloque partiellement, alumni, vacances.
+
+L'app academic_cycle ne doit pas devenir une app de notes.
+Les notes, UE, EC, bulletins, relevés, moyennes et calculs pedagogiques restent dans academics.
+academic_cycle orchestre les decisions finales : qui passe, qui redouble, qui passe avec dette, qui devient diplome, qui doit se reinscrire, qui peut acceder au dashboard, qui doit regulariser une dette.
+
+======================================================================
+2. RESPONSABILITES DES APPS
+======================================================================
+
+2.1 academics
+academics reste responsable de :
+- AcademicYear existant si deja utilise par le projet.
+- AcademicClass.
+- Semestres.
+- UE / EC / matieres.
+- Notes.
+- Sessions normales de semestre.
+- Rattrapage classique du semestre si deja prevu.
+- Calcul des moyennes.
+- Bulletins.
+- Releves de notes.
+- Emplois du temps academiques.
+- Cours et contenus pedagogiques.
+
+2.2 academic_cycle
+academic_cycle devient responsable de :
+- Cycle annuel par annexe.
+- Etat de cloture par annexe.
+- Verification de readiness avant cloture.
+- Deliberation finale.
+- Promotion automatique.
+- Redoublement.
+- Passage conditionnel avec dette academique.
+- Diplome / alumni.
+- Abandon.
+- Transfert.
+- Reinscription.
+- Activation nouvelle annee.
+- Restrictions d'acces selon dette financiere ou statut de reinscription.
+- Audit logs.
+- Corrections post-publication.
+- Taches Celery longues.
+- Notifications de transition.
+
+2.3 payments
+payments reste responsable de :
+- Encaissements.
+- Paiements.
+- Reçus.
+- Validation des paiements.
+- Agents de paiement.
+- Sessions cash.
+
+Mais academic_cycle peut lire les donnees financieres via des selectors/services pour determiner :
+- dette totale.
+- dette reportee.
+- statut financier annuel.
+- niveau d'acces dashboard.
+- verrouillage bulletin/diplome/documents.
+
+2.4 inscriptions
+inscriptions reste responsable de :
+- Inscription initiale.
+- Candidature.
+- Statuts d'inscription.
+
+academic_cycle ajoute un workflow de reinscription pour les anciens etudiants.
+La reinscription n'est pas une nouvelle candidature classique.
+C'est un workflow specifique pour un etudiant deja connu.
+
+2.5 students
+students reste responsable du profil etudiant officiel.
+academic_cycle ne doit pas recreer un nouveau Student a chaque annee.
+Il doit creer un contexte annuel, une reinscription ou un enrollment selon l'architecture existante.
+Le meme Student, le meme User et le meme matricule doivent etre conserves.
+
+======================================================================
+3. PHILOSOPHIE PRINCIPALE
+======================================================================
+
+Le systeme doit respecter ces principes :
+
+1. Competence academique et situation financiere sont separees.
+   Un etudiant competent ne doit pas etre declare non competent parce qu'il doit de l'argent.
+
+2. La dette financiere ne bloque pas automatiquement la progression academique.
+   Elle limite l'acces a certains documents et services.
+
+3. La dette academique est differente de la dette financiere.
+   La dette academique concerne les credits, UE/EC non valides et matieres a reprendre.
+
+4. Le rattrapage classique du semestre est different de la dette academique annuelle.
+   Ne jamais les melanger.
+
+5. Chaque annexe peut cloturer son annee independamment.
+   Il ne faut pas attendre toutes les annexes.
+
+6. La cloture est une consequence logique de la finalisation des semestres, notes, bulletins et validations.
+   Ce n'est pas une action arbitraire.
+
+7. La nouvelle annee ne demarre pas par un reset.
+   Elle demarre par activation institutionnelle, preparation de reinscriptions et migration des dashboards.
+
+8. Le systeme doit rester operationnel pendant les vacances.
+
+9. Les donnees historiques restent consultables.
+
+10. Toute modification post-publication doit etre auditee.
+
+======================================================================
+4. NOUVELLE APP A CREER
+======================================================================
+
+Creer :
+
+    python manage.py startapp academic_cycle
+
+Ajouter l'app dans INSTALLED_APPS.
+
+Structure recommandee :
+
+academic_cycle/
+    __init__.py
+    apps.py
+    admin.py
+    urls.py
+    models.py
+    constants.py
+    permissions.py
+    selectors.py
+    services/
+        __init__.py
+        branch_cycle_service.py
+        closure_service.py
+        readiness_service.py
+        deliberation_service.py
+        promotion_service.py
+        academic_debt_service.py
+        financial_policy_service.py
+        reenrollment_service.py
+        transfer_service.py
+        dashboard_access_service.py
+        activation_service.py
+        audit_service.py
+        correction_service.py
+        notification_service.py
+    tasks/
+        __init__.py
+        closure_tasks.py
+        promotion_tasks.py
+        reenrollment_tasks.py
+        notification_tasks.py
+        document_tasks.py
+        audit_tasks.py
+    workflows/
+        __init__.py
+        closure_workflow.py
+        reenrollment_workflow.py
+        activation_workflow.py
+        correction_workflow.py
+    views.py
+    forms.py
+    templates/academic_cycle/
+        dg/
+        student/
+        staff/
+        it/
+        manager/
+    tests/
+        __init__.py
+        test_promotion.py
+        test_academic_debt.py
+        test_financial_policy.py
+        test_reenrollment.py
+        test_branch_closure.py
+        test_permissions.py
+
+Si le projet prefere des fichiers models separes, possible :
+academic_cycle/models/
+    __init__.py
+    branch_cycle.py
+    closure.py
+    debt.py
+    reenrollment.py
+    transfer.py
+    audit.py
+    access.py
+
+Mais si le projet utilise encore un models.py simple, commencer par models.py est acceptable en V1.
+
+======================================================================
+5. ETATS ACADEMIQUES
+======================================================================
+
+Il faut definir des etats clairs.
+
+5.1 Etat general d'une annee academique
+L'annee academique existante dans academics peut garder is_active.
+Mais academic_cycle doit ajouter une couche de cycle par annexe.
+Ne pas casser AcademicYear existant sans analyse.
+
+Etats proposes :
+- draft : annee creee mais non preparee.
+- preparation : preparation de rentree.
+- registration_open : inscriptions/reinscriptions ouvertes.
+- active : cours actifs.
+- exams : examens en cours.
+- deliberation : traitement final des resultats.
+- closing : cloture en cours.
+- closed : cloturee pour l'annexe ou le contexte concerne.
+- archived : archivee, lecture seule.
+
+5.2 Etat d'une annexe pour une annee
+Chaque annexe doit avoir son propre cycle.
+Modele recommande : BranchAcademicCycle.
+
+Une annexe peut etre :
+- active pendant qu'une autre est closing.
+- closed pendant qu'une autre est still_active.
+- archived pendant qu'une autre n'a pas encore cloture.
+
+C'est obligatoire.
+
+5.3 Etat d'une classe
+Une classe peut etre :
+- teaching.
+- semester_1_completed.
+- semester_2_completed.
+- grades_completed.
+- bulletins_generated.
+- ready_for_deliberation.
+- deliberated.
+- closed.
+
+La cloture d'une annexe doit verifier que toutes les classes de cette annexe sont pretes.
+
+======================================================================
+6. MODELES RECOMMANDES
+======================================================================
+
+ATTENTION : avant de coder, inspecter les modeles existants pour ne pas dupliquer.
+Utiliser les relations vers :
+- academics.AcademicYear
+- academics.AcademicClass
+- branches.Branch
+- students.Student
+- inscriptions.Inscription
+- accounts.Profile / User
+- payments.Payment
+
+6.1 BranchAcademicCycle
+Objectif : suivre l'etat d'une annexe pour une annee academique.
+
+Champs recommandes :
+- branch : FK Branch
+- academic_year : FK academics.AcademicYear
+- status : CharField choices
+- registration_open_at : DateTime nullable
+- activated_at : DateTime nullable
+- deliberation_started_at : DateTime nullable
+- closed_at : DateTime nullable
+- archived_at : DateTime nullable
+- activated_by : FK User nullable
+- closed_by : FK User nullable
+- archived_by : FK User nullable
+- notes : TextField blank
+- created_at, updated_at
+
+Contraintes :
+- unique_together branch + academic_year
+- index branch, academic_year, status
+
+6.2 ClassCycleStatus
+Objectif : suivre l'etat de preparation/cloture d'une classe dans une annexe.
+
+Champs :
+- academic_class : FK AcademicClass
+- branch_cycle : FK BranchAcademicCycle
+- status
+- semester_1_done : Boolean
+- semester_2_done : Boolean
+- grades_done : Boolean
+- bulletins_done : Boolean
+- has_blocking_anomaly : Boolean
+- readiness_score : Decimal/Integer
+- last_checked_at : DateTime
+- checked_by : FK User nullable
+- created_at, updated_at
+
+6.3 AcademicClosureReport
+Objectif : rapport automatique avant cloture.
+
+Champs :
+- branch_cycle : FK BranchAcademicCycle
+- generated_by : FK User nullable
+- status : draft/valid/invalid
+- total_classes
+- completed_classes
+- blocked_classes
+- missing_grades_count
+- anomaly_count
+- bulletin_missing_count
+- financial_summary_snapshot : JSONField blank/null
+- academic_summary_snapshot : JSONField blank/null
+- details : JSONField
+- generated_at
+
+6.4 StudentYearDecision
+Objectif : decision annuelle officielle de progression.
+
+Champs :
+- student : FK Student
+- academic_year : FK AcademicYear source
+- branch : FK Branch
+- current_class : FK AcademicClass
+- target_year : FK AcademicYear nullable
+- target_class : FK AcademicClass nullable
+- decision : promoted / promoted_with_academic_debt / repeated / graduated / dropped / transferred / pending
+- reason : TextField
+- decided_by : FK User nullable
+- decided_at : DateTime
+- is_final : Boolean
+- created_at, updated_at
+
+Important :
+Cette decision ne doit pas supprimer l'ancien parcours.
+Elle doit seulement enregistrer la conclusion annuelle.
+
+6.5 StudentAcademicDebt
+Objectif : dette academique annuelle.
+
+Ce n'est pas une dette financiere.
+Ce n'est pas le rattrapage classique du semestre.
+
+Champs :
+- student : FK Student
+- source_academic_year : FK AcademicYear
+- source_class : FK AcademicClass
+- current_academic_year : FK AcademicYear nullable
+- current_class : FK AcademicClass nullable
+- branch : FK Branch
+- debt_type : credits / ue / ec / semester
+- semester_label : CharField nullable
+- ue_id : FK vers UE si modele existe, nullable
+- ec_id : FK vers EC si modele existe, nullable
+- required_credits : Decimal
+- earned_credits : Decimal
+- missing_credits : Decimal
+- validation_threshold : Decimal
+- status : pending / scheduled / in_progress / resolved / cancelled
+- resolved_at : DateTime nullable
+- resolution_note : TextField blank
+- created_at, updated_at
+
+Important :
+Une dette academique suit l'etudiant dans la nouvelle annee.
+Il peut passer en classe superieure avec cette dette.
+Il devra valider les UE/EC/matieres non validees via evaluation speciale.
+
+6.6 AcademicDebtEvaluationSession
+Objectif : session speciale de regularisation pour les ajournes avec dette academique.
+
+Champs :
+- branch : FK Branch
+- academic_year : FK AcademicYear
+- title
+- session_type : vacation / yearly / special
+- starts_at
+- ends_at
+- status : planned / open / closed / validated
+- created_by
+- created_at, updated_at
+
+6.7 AcademicDebtEvaluation
+Objectif : evaluation speciale d'une dette academique.
+
+Champs :
+- debt : FK StudentAcademicDebt
+- session : FK AcademicDebtEvaluationSession
+- student : FK Student
+- grade : Decimal nullable
+- is_validated : Boolean
+- validated_at : DateTime nullable
+- validated_by : FK User nullable
+- notes : TextField
+- created_at, updated_at
+
+Regle :
+Quand la note ou validation permet de combler la dette, marquer StudentAcademicDebt comme resolved et recalculer les credits.
+
+6.8 StudentFinancialPosition
+Objectif : position financiere annuelle et cumulative.
+
+Attention : ne pas remplacer payments.
+Ce modele est un resume/calcul/cache de la situation financiere.
+
+Champs :
+- student : FK Student
+- academic_year : FK AcademicYear
+- branch : FK Branch
+- previous_debt_amount : PositiveBigIntegerField default 0
+- current_year_due_amount : PositiveBigIntegerField default 0
+- current_year_paid_amount : PositiveBigIntegerField default 0
+- total_due_amount : PositiveBigIntegerField default 0
+- total_paid_amount : PositiveBigIntegerField default 0
+- remaining_amount : PositiveBigIntegerField default 0
+- status : clear / light_debt / medium_debt / critical_debt / blocked_documents
+- last_computed_at
+- created_at, updated_at
+
+Regle :
+La dette financiere est cumulative.
+La dette precedente est reportee sur la nouvelle annee.
+La dette financiere ne bloque pas la progression academique.
+Mais elle bloque ou limite certains acces.
+
+6.9 StudentAccessPolicy
+Objectif : politique d'acces dynamique du dashboard etudiant.
+
+Champs :
+- student : FK Student
+- academic_year : FK AcademicYear
+- branch : FK Branch
+- access_level : full / vacation / reenrollment_required / limited / restricted / alumni / suspended
+- can_access_dashboard : Boolean
+- can_access_courses : Boolean
+- can_access_schedule : Boolean
+- can_download_bulletin : Boolean
+- can_download_transcript : Boolean
+- can_download_certificate : Boolean
+- can_download_diploma : Boolean
+- reason : TextField
+- computed_at
+- created_at, updated_at
+
+Regles :
+- Un etudiant non reinscrit peut voir l'historique, mais doit finaliser la reinscription pour l'annee active.
+- Un etudiant avec dette financiere peut continuer academiquement, mais bulletins/diplomes/documents peuvent etre verrouilles.
+- Un alumni garde acces a historique, documents autorises, communaute.
+
+6.10 AcademicReEnrollment
+Objectif : reinscription annuelle preparee automatiquement, mais finalisee par etudiant ou gestionnaire.
+
+Champs :
+- student : FK Student
+- source_academic_year : FK AcademicYear
+- target_academic_year : FK AcademicYear
+- source_class : FK AcademicClass
+- target_class : FK AcademicClass nullable
+- branch : FK Branch
+- status : prepared / notified / started / pending_payment / payment_validated / activated / cancelled / transfer_requested / abandoned
+- token : CharField unique
+- token_expires_at : DateTime nullable
+- prepared_by_system : Boolean default True
+- started_at
+- submitted_at
+- payment_validated_at
+- activated_at
+- created_at, updated_at
+
+Regle :
+Le systeme prepare la reinscription, mais ne l'active pas totalement sans action et paiement minimum.
+
+6.11 TransferRequest
+Objectif : demande de transfert separee de la reinscription.
+
+Champs :
+- student
+- source_academic_year
+- target_academic_year
+- source_branch
+- target_branch nullable
+- source_class
+- requested_programme nullable
+- requested_class nullable
+- requested_branch nullable
+- reason
+- status : draft / submitted / under_review / approved / rejected / cancelled
+- submitted_at
+- reviewed_by
+- reviewed_at
+- decision_note
+- created_at, updated_at
+
+Regle :
+Le transfert n'est pas une reinscription.
+Sur la page de pre-rentree, l'etudiant peut choisir : me reinscrire, demander un transfert, signaler abandon/pause, contacter administration.
+
+6.12 AcademicCorrectionRequest
+Objectif : demande officielle de correction apres publication.
+
+Champs :
+- student nullable
+- academic_year
+- branch
+- academic_class nullable
+- request_type : identity_error / grade_error / bulletin_error / transcript_error / diploma_error / other
+- description
+- status : submitted / assigned / in_progress / resolved / rejected
+- submitted_by : FK User
+- assigned_to : FK User nullable
+- resolved_by : FK User nullable
+- resolved_at
+- resolution_note
+- created_at, updated_at
+
+6.13 AcademicAuditLog
+Objectif : journalisation obligatoire.
+
+Champs :
+- actor : FK User nullable
+- branch nullable
+- academic_year nullable
+- student nullable
+- action : CharField
+- object_type : CharField
+- object_id : CharField
+- old_values : JSONField nullable
+- new_values : JSONField nullable
+- reason : TextField blank
+- ip_address nullable
+- user_agent nullable
+- created_at
+
+Regle :
+Toute action sensible doit etre loggee : cloture, activation, modification post-publication, correction note/bulletin, regeneration PDF, migration, reinscription, transfert, paiement impactant acces.
+
+======================================================================
+7. REGLES DE PROGRESSION ETUDIANTE
+======================================================================
+
+7.1 Etudiant admis
+Condition :
+- Les deux semestres sont valides selon le seuil applicable.
+- Les credits requis sont valides.
+- Les calculs sont finalises.
+
+Action :
+- StudentYearDecision = promoted.
+- Target class = classe superieure.
+- Preparer AcademicReEnrollment vers la nouvelle annee.
+- Aucune dette academique.
+
+7.2 Etudiant ajourne avec dette academique
+Condition :
+- L'etudiant a valide une partie du parcours, mais pas tous les credits requis.
+- Exemple : il a valide un semestre mais pas l'autre, ou certaines UE/EC restent non validees.
+- L'institution peut autoriser un passage conditionnel.
+
+Action :
+- StudentYearDecision = promoted_with_academic_debt.
+- Creer StudentAcademicDebt pour les credits/UE/EC manquants.
+- Target class = classe superieure si autorise.
+- Preparer reinscription avec dette academique visible.
+- L'etudiant devra passer une evaluation speciale ulterieure pour combler la dette.
+
+7.3 Etudiant redoublant
+Condition :
+- Non validation suffisante.
+- Decision de redoublement.
+
+Action :
+- StudentYearDecision = repeated.
+- Target class = meme classe/niveau dans la nouvelle annee.
+- Preparer reinscription vers meme niveau.
+- Les dettes financieres sont reportees.
+
+7.4 Etudiant diplome
+Condition :
+- Fin de cycle.
+- Validation du parcours.
+- Eventuellement resultats nationaux pour classes d'examen.
+
+Action :
+- StudentYearDecision = graduated.
+- Statut dashboard = alumni.
+- Pas de nouvelle inscription active sauf nouveau cycle.
+- Le compte reste actif.
+- L'etudiant garde acces a son historique, bulletins, releves et documents autorises.
+- Diplome verrouille si dette financiere non regularisee.
+
+7.5 Etudiant abandonne
+Condition :
+- Abandon declare ou absence prolongee selon politique.
+
+Action :
+- StudentYearDecision = dropped.
+- Pas de suppression de compte.
+- Historique conserve.
+- Acces limite.
+
+7.6 Etudiant transfere
+Condition :
+- Demande de transfert approuvee.
+
+Action :
+- StudentYearDecision = transferred.
+- Creer TransferRequest approuvee.
+- Mettre a jour le contexte de parcours selon destination.
+- Ne pas traiter comme inscription normale.
+
+======================================================================
+8. DETTE ACADEMIQUE VS RATTRAPAGE
+======================================================================
+
+Regle absolue : ne pas confondre rattrapage classique et dette academique annuelle.
+
+8.1 Rattrapage classique
+Le rattrapage classique appartient au semestre.
+Il intervient avant validation finale du semestre.
+Il est gere par academics si deja prevu.
+Workflow :
+- Session normale.
+- Rattrapage semestre.
+- Calcul final semestre.
+- Validation semestre.
+
+8.2 Dette academique annuelle
+La dette academique intervient apres bilan annuel.
+Elle concerne les etudiants ajournes autorises a passer conditionnellement.
+Elle suit l'etudiant dans la nouvelle annee.
+Elle concerne les credits/UE/EC/matieres non valides.
+
+Workflow :
+- Bilan annuel.
+- Decision promoted_with_academic_debt.
+- Creation StudentAcademicDebt.
+- Reinscription vers classe superieure.
+- Evaluation speciale pendant vacances ou annee suivante.
+- Validation credits manquants.
+- Dette resolved.
+
+8.3 Evaluation speciale
+L'evaluation speciale n'est pas la meme chose que le rattrapage du semestre.
+Elle est creee pour combler une dette academique.
+Elle peut etre programmee pendant les vacances ou pendant l'annee suivante.
+
+======================================================================
+9. DETTE FINANCIERE ET ACCES
+======================================================================
+
+9.1 Principe
+La dette financiere ne doit pas invalider les competences academiques.
+Un etudiant qui a reussi academiquement passe, meme s'il doit encore de l'argent.
+
+Mais la dette financiere limite certains services.
+
+9.2 Dette cumulative
+Si un etudiant doit 150 000 FCFA en 2025-2026 et que la nouvelle annee coute 300 000 FCFA, sa position financiere cumule les montants.
+Le systeme doit reporter la dette precedente.
+
+9.3 Restrictions progressives
+Ne pas bloquer brutalement toute l'etude.
+Mettre en place un soft lock intelligent.
+
+Acces possible selon situation :
+- Dashboard basique : oui.
+- Historique : oui.
+- Alertes dette : oui.
+- Emploi du temps : selon politique.
+- Cours : possible mais peut etre limite selon niveau de dette.
+- Bulletin PDF : bloque si dette.
+- Releve : bloque si dette.
+- Diplome : bloque si dette.
+- Attestation : bloque si dette.
+
+9.4 Bulletin visible mais verrouille
+L'etudiant peut voir qu'un bulletin existe.
+Mais le telechargement est verrouille avec message :
+"Veuillez regulariser votre situation financiere pour telecharger ce document."
+
+9.5 Diplome
+Aucun diplome telechargeable tant que la dette financiere n'est pas soldee.
+
+9.6 Notifications
+Le systeme doit envoyer des rappels pendant vacances et periode de reinscription.
+Frequence V1 recommandee : tous les 3 ou 4 jours, parametrable.
+Canaux :
+- Notification dashboard.
+- Email via communication/Brevo.
+- SMS plus tard.
+- WhatsApp plus tard.
+
+9.7 Parents
+Ne pas surcharger V1 avec compte parent complet.
+Mais prevoir dans le modele etudiant/candidature la possibilite d'utiliser contact parent pour notifications futures.
+Un portail parent peut etre V2.
+
+======================================================================
+10. CLOTURE PAR ANNEXE
+======================================================================
+
+10.1 Regle majeure
+Chaque annexe peut cloturer independamment.
+Il ne faut pas attendre toutes les annexes.
+
+Exemple :
+- Bamako peut etre closed.
+- Sikasso peut etre active.
+- Segou peut etre deliberation.
+
+10.2 Pourquoi
+Les annexes ne finissent pas toujours au meme rythme.
+Le systeme ne doit pas bloquer une annexe prete parce qu'une autre est en retard.
+
+10.3 Workflow d'une annexe
+- Les classes terminent leurs deux semestres.
+- Les notes sont finalisees.
+- Les bulletins sont generes.
+- Les anomalies critiques sont corrigees.
+- Les decisions annuelles sont preparees.
+- Le cycle de l'annexe passe a ready_for_closure.
+- Apres deliberation, DG/DA/SuperAdmin cloture l'annexe.
+
+10.4 Classe incomplete
+Normalement, une classe incomplete bloque la cloture de l'annexe.
+Mais ce cas doit etre rare, car la cloture signifie que toute l'annee est terminee.
+Le systeme doit quand meme detecter et afficher le blocage.
+
+10.5 Dashboard DG
+Le DG doit voir :
+- Annexes pretes.
+- Annexes cloturees.
+- Annexes en retard.
+- Classes incompletes.
+- Statistiques par annexe.
+- Taux de reussite.
+- Meilleurs etudiants.
+- Comparaison inter-annexes.
+- Anomalies restantes.
+
+======================================================================
+11. ROLES ET PERMISSIONS
+======================================================================
+
+11.1 Cloture officielle
+Peuvent cloturer :
+- Directeur General.
+- Directrice Adjointe.
+- SuperAdmin.
+
+La cloture intervient apres deliberation.
+
+11.2 Corrections post-publication
+Peuvent corriger certaines donnees apres publication :
+- Informaticien de l'annexe.
+- SuperAdmin.
+
+Ils ne doivent pas avoir un pouvoir illimite dangereux.
+Ils peuvent corriger des erreurs controlees :
+- erreur nom/prenom.
+- erreur document.
+- erreur bulletin.
+- regeneration PDF.
+- correction technique.
+- correction encadree de note si autorisee par workflow.
+
+11.3 Directeur des etudes
+Responsable de :
+- validation pedagogique.
+- finalisation des classes.
+- suivi notes/bulletins.
+- readiness pedagogique.
+
+11.4 Gestionnaire
+Responsable de :
+- paiements.
+- dettes financieres.
+- reinscriptions administratives.
+- validation paiement minimum.
+- suivi financier annexe.
+
+11.5 Informaticien
+Responsable de :
+- support.
+- corrections techniques.
+- imports/exports.
+- generation/regeneration documents.
+- tickets correction.
+- operations encadrees post-publication.
+
+11.6 Etudiant
+Peut :
+- consulter historique.
+- voir decision annuelle.
+- voir dette academique.
+- voir dette financiere.
+- demander reinscription.
+- demander transfert.
+- signaler abandon/pause.
+- demander correction.
+
+======================================================================
+12. NOTES, BULLETINS, RELEVES, PUBLICATION
+======================================================================
+
+12.1 Notes
+Quand les resultats des deux semestres sont publies et valides, les notes deviennent verrouillees.
+Les enseignants ne doivent plus modifier librement.
+
+12.2 Bulletins
+Les bulletins sont generes automatiquement par academics.
+academic_cycle verifie qu'ils existent avant cloture.
+
+12.3 Releves annuels
+Les releves annuels sont issus des resultats deja calcules.
+Ne pas recalculer de maniere incoherente dans academic_cycle.
+Utiliser les services existants d'academics.
+
+12.4 Publication officielle
+La publication officielle doit etre inmodifiable sauf correction controlee.
+Le systeme doit historiser les versions.
+
+12.5 Correction apres publication
+Workflow :
+- Etudiant ou staff soumet AcademicCorrectionRequest.
+- Informaticien ou SuperAdmin prend en charge.
+- Correction encadree.
+- Audit log.
+- Regeneration document si necessaire.
+- Notification de resolution.
+
+12.6 Classes d'examen national
+Les classes d'examen doivent pouvoir avoir un workflow specifique :
+- attente resultats nationaux.
+- assise resultats nationaux.
+- classement / recompenses.
+- passage en alumni/diplome apres confirmation.
+
+V1 : prevoir le champ is_exam_class ou workflow_type si l'information existe dans AcademicClass/Programme.
+Ne pas forcer si le modele actuel ne le permet pas, mais preparer la structure.
+
+======================================================================
+13. NOUVELLE ANNEE ET REINSCRIPTION
+======================================================================
+
+13.1 Principe
+La nouvelle annee est activee manuellement.
+Le systeme ne doit pas deviner automatiquement la date de rentree.
+Les rentrees sont souvent en octobre mais la date exacte change.
+
+Peuvent activer :
+- DG.
+- Directrice Adjointe.
+- SuperAdmin.
+
+13.2 Vacances
+Pendant les vacances :
+- La plateforme reste active.
+- Les etudiants peuvent consulter l'historique.
+- Les dashboards etudiants peuvent etre en mode vacances.
+- Les gestionnaires continuent inscriptions/reinscriptions/paiements.
+- Les informaticiens continuent support.
+- Les nouveaux candidats peuvent s'inscrire.
+
+13.3 Preparation automatique
+Apres cloture, le systeme prepare automatiquement :
+- decisions annuelles.
+- reinscriptions possibles.
+- tokens de reinscription.
+- notifications.
+- contexte cible : classe superieure, meme classe, alumni, transfert, dette.
+
+13.4 Reinscription semi-automatique
+Le systeme prepare, mais l'etudiant finalise.
+
+Workflow etudiant :
+- Connexion.
+- Dashboard bloque doucement par un panneau pre-rentree.
+- Choix : me reinscrire / demander transfert / signaler abandon-pause / contacter administration.
+- Clic sur me reinscrire.
+- Formulaire de confirmation.
+- Paiement minimum.
+- Validation gestionnaire ou paiement valide.
+- Activation dashboard nouvelle annee.
+
+13.5 Paiement et activation dashboard
+Le dashboard de la nouvelle annee devient operationnel apres paiement minimum valide.
+C'est coherent avec la logique existante du projet : creation/acces apres premier paiement valide.
+
+13.6 Periode de reinscription
+Le systeme doit permettre :
+- Lancement 1 a 2 semaines avant rentree.
+- Periode de regularisation apres rentree, par exemple 30 jours.
+- Relances automatiques.
+
+13.7 Nouveaux inscrits vs anciens etudiants
+Nouveaux inscrits : tunnel inscription/admission classique.
+Anciens etudiants : tunnel reinscription academic_cycle.
+Ne pas melanger les deux.
+
+13.8 Non reinscrit
+Si un ancien etudiant ne se reinscrit pas :
+- rester en pending_reenrollment.
+- acces historique seulement.
+- pas d'acces complet aux cours de nouvelle annee.
+- notifications de rappel.
+
+======================================================================
+14. MIGRATION DES DASHBOARDS
+======================================================================
+
+14.1 Principe
+La migration dashboard se fait lors de l'activation officielle de la nouvelle annee.
+
+Avant activation :
+- Mode vacances.
+- Historique ancienne annee.
+- Reinscription possible.
+
+Apres activation :
+- Les promus voient leur nouvelle classe.
+- Les redoublants restent dans leur niveau.
+- Les promus avec dette voient leur dette academique.
+- Les alumni voient le dashboard alumni.
+- Les non reinscrits restent limites.
+
+14.2 Pas de duplication inutile
+Ne pas dupliquer UE/EC/matieres.
+Les structures pedagogiques sont rattachees aux classes/niveaux/programmes.
+L'etudiant promu change simplement de contexte/enrollment.
+
+14.3 Anciennes notes
+Les anciennes notes restent dans l'historique.
+La nouvelle annee commence proprement.
+Ne pas afficher les anciennes notes comme notes de la nouvelle annee.
+
+======================================================================
+15. TRANSFERT
+======================================================================
+
+Le transfert est separe de la reinscription.
+
+Sur la page pre-rentree, l'etudiant doit voir :
+- Me reinscrire.
+- Demander un transfert.
+- Signaler abandon/pause.
+- Contacter administration.
+
+Le transfert peut concerner :
+- changement de formation.
+- changement de classe/niveau si autorise.
+- changement d'annexe.
+
+Workflow :
+- Student cree TransferRequest.
+- Staff examine.
+- Verification compatibilite formation/niveau/credits/dettes.
+- Approbation/rejet.
+- Si approuve, mise a jour du contexte cible de reinscription.
+
+======================================================================
+16. ALUMNI / DIPLOMES
+======================================================================
+
+Un etudiant diplome ne doit pas perdre son compte.
+Il devient alumni.
+
+Il garde :
+- historique.
+- bulletins.
+- releves.
+- documents autorises.
+- communaute/messagerie selon regles.
+
+Il n'a plus :
+- cours actifs.
+- evaluations actives.
+- nouvelle inscription active sauf nouveau cycle.
+
+Diplome :
+- disponible dans dashboard.
+- verrouille si dette financiere.
+- telechargeable apres regularisation.
+
+======================================================================
+17. ACTIVATION NOUVELLE ANNEE
+======================================================================
+
+Workflow :
+1. Creer ou selectionner AcademicYear cible.
+2. Verifier que l'ancienne annee est cloturee pour l'annexe concernee.
+3. Mettre BranchAcademicCycle de la nouvelle annee en registration_open ou active selon phase.
+4. Generer/recalculer AcademicReEnrollment.
+5. Appliquer StudentAccessPolicy.
+6. Notifier etudiants/staff.
+7. Activer dashboards selon paiements/reinscriptions.
+
+Important :
+Le systeme peut avoir plusieurs etats :
+- registration_open avant cours.
+- active quand les cours commencent.
+
+======================================================================
+18. REDIS ET CELERY
+======================================================================
+
+Redis + Celery doivent etre prevus pour eviter les traitements lourds en HTTP.
+
+18.1 Taches candidates
+- Verification readiness d'une annexe.
+- Generation rapports de cloture.
+- Preparation reinscriptions.
+- Envoi notifications.
+- Recalcul dettes financieres.
+- Creation StudentYearDecision en masse.
+- Creation StudentAcademicDebt en masse.
+- Migration dashboards.
+- Regeneration bulletins/releves.
+- Export statistiques DG.
+
+18.2 Celery Beat
+Prevoir plus tard :
+- Relances dettes tous les 3/4 jours.
+- Relances reinscription.
+- Verification quotidienne des classes incompletes.
+- Notifications avant rentree.
+
+18.3 Progression
+Pour les longues taches, prevoir un champ progress dans un modele ou Redis.
+Dashboard DG/IT peut afficher progression.
+
+V1 peut rester simple, mais ne pas fermer l'architecture.
+
+======================================================================
+19. SERVICES A IMPLEMENTER
+======================================================================
+
+19.1 readiness_service.py
+Fonctions :
+- check_class_readiness(academic_class)
+- check_branch_readiness(branch_cycle)
+- generate_closure_report(branch_cycle, actor=None)
+
+Doit verifier :
+- semestres termines.
+- notes finalisees.
+- bulletins generes.
+- anomalies critiques.
+- classes pretes.
+
+19.2 promotion_service.py
+Fonctions :
+- compute_student_year_decision(student, source_year)
+- promote_student(student, target_class)
+- repeat_student(student, target_class)
+- graduate_student(student)
+- mark_student_dropped(student)
+
+Ne pas modifier brutalement Student.
+Creer StudentYearDecision et contexte annuel.
+
+19.3 academic_debt_service.py
+Fonctions :
+- detect_academic_debts(student, source_year)
+- create_academic_debts_for_student(student, decision)
+- resolve_academic_debt(debt, evaluation, actor)
+- recompute_student_credits(student)
+
+19.4 financial_policy_service.py
+Fonctions :
+- compute_student_financial_position(student, academic_year)
+- carry_forward_debt(student, source_year, target_year)
+- determine_financial_status(position)
+
+19.5 dashboard_access_service.py
+Fonctions :
+- compute_student_access_policy(student, academic_year)
+- apply_student_access_policy(student, policy)
+- can_download_bulletin(student, academic_year)
+- can_download_diploma(student)
+
+19.6 reenrollment_service.py
+Fonctions :
+- prepare_reenrollment_for_student(student, decision, target_year)
+- prepare_reenrollments_for_branch(branch_cycle, target_year)
+- start_reenrollment(reenrollment, actor)
+- submit_reenrollment(reenrollment, data, actor)
+- mark_payment_validated(reenrollment, payment)
+- activate_reenrollment(reenrollment, actor)
+
+19.7 transfer_service.py
+Fonctions :
+- create_transfer_request(student, data)
+- review_transfer_request(request, actor)
+- approve_transfer_request(request, actor)
+- reject_transfer_request(request, actor, reason)
+
+19.8 closure_service.py
+Fonctions :
+- start_deliberation(branch_cycle, actor)
+- close_branch_cycle(branch_cycle, actor)
+- archive_branch_cycle(branch_cycle, actor)
+
+Cloture uniquement si permissions OK et readiness OK.
+
+19.9 activation_service.py
+Fonctions :
+- open_registration_for_year(branch, target_year, actor)
+- activate_academic_year_for_branch(branch, target_year, actor)
+- migrate_branch_dashboards(branch_cycle, target_year, actor)
+
+19.10 correction_service.py
+Fonctions :
+- submit_correction_request(...)
+- assign_correction_request(...)
+- resolve_correction_request(...)
+- apply_post_publication_correction(...)
+
+Toute correction doit logguer old_values/new_values.
+
+19.11 audit_service.py
+Fonction centrale :
+- log_action(actor, action, obj, old_values=None, new_values=None, reason='', branch=None, academic_year=None, student=None)
+
+======================================================================
+20. SELECTORS
+======================================================================
+
+Creer selectors.py pour centraliser les requetes :
+
+- get_branch_cycle(branch, academic_year)
+- get_active_branch_cycles()
+- get_students_for_branch_year(branch, academic_year)
+- get_students_pending_reenrollment(branch, target_year)
+- get_students_with_financial_debt(branch, academic_year)
+- get_students_with_academic_debt(branch, academic_year)
+- get_branch_classes(branch, academic_year)
+- get_ready_classes(branch_cycle)
+- get_blocked_classes(branch_cycle)
+- get_dg_cycle_overview()
+
+Toujours filtrer par annexe quand l'utilisateur n'est pas DG/SuperAdmin.
+
+======================================================================
+21. DASHBOARDS ET UX
+======================================================================
+
+21.1 DG / Direction
+Page : /portal/academic-cycle/dg/
+
+Afficher :
+- resume global.
+- annexes par statut.
+- progression cloture.
+- statistiques inter-annexes.
+- alertes.
+- classes bloquees.
+- boutons cloture si autorise.
+
+21.2 Directeur des etudes
+Afficher :
+- readiness classes.
+- notes finalisees.
+- bulletins generes.
+- anomalies pedagogiques.
+- validation pedagogique.
+
+21.3 Gestionnaire
+Afficher :
+- reinscriptions.
+- paiements.
+- dettes reportees.
+- etudiants pending_payment.
+- activation apres paiement.
+
+21.4 Informaticien
+Afficher :
+- tickets correction.
+- logs.
+- imports/exports.
+- regeneration documents.
+- anomalies techniques.
+
+21.5 Etudiant
+Page pre-rentree quand necessaire :
+- etat de l'annee.
+- decision annuelle.
+- dette academique.
+- dette financiere.
+- boutons : me reinscrire, demander transfert, signaler pause/abandon, contacter administration.
+- documents verrouilles si dette.
+
+UX recommandee :
+- Tableaux style Excel.
+- Actions rapides.
+- Modals HTMX.
+- Badges de statut.
+- Pas de page lourde.
+- Pas de logique metier dans templates.
+
+======================================================================
+22. URLS RECOMMANDEES
+======================================================================
+
+academic_cycle/urls.py :
+
+- /academic-cycle/dg/overview/
+- /academic-cycle/branch/<id>/overview/
+- /academic-cycle/branch/<id>/readiness/
+- /academic-cycle/branch/<id>/generate-report/
+- /academic-cycle/branch/<id>/start-deliberation/
+- /academic-cycle/branch/<id>/close/
+- /academic-cycle/branch/<id>/open-registration/
+- /academic-cycle/branch/<id>/activate-year/
+- /academic-cycle/student/pre-rentree/
+- /academic-cycle/student/reenrollment/<token>/
+- /academic-cycle/student/transfer/request/
+- /academic-cycle/corrections/
+- /academic-cycle/corrections/<id>/resolve/
+
+Adapter selon conventions du projet.
+
+======================================================================
+23. INTEGRATION COMMUNICATION
+======================================================================
+
+Utiliser l'app communication existante si disponible.
+Ne pas recreer un systeme de notification parallele.
+
+Evenements a emettre :
+- branch_cycle.ready
+- branch_cycle.closed
+- student.decision.created
+- student.academic_debt.created
+- student.financial_debt.detected
+- reenrollment.prepared
+- reenrollment.notified
+- reenrollment.payment_validated
+- reenrollment.activated
+- transfer.submitted
+- transfer.approved
+- correction.submitted
+- correction.resolved
+
+Canaux :
+- notification interne.
+- email.
+- SMS plus tard.
+
+======================================================================
+24. TESTS OBLIGATOIRES
+======================================================================
+
+Tests V1 minimaux :
+
+1. Une annexe peut cloturer sans attendre les autres.
+2. Une annexe ne peut pas cloturer si une classe est incomplete.
+3. DG/DA/SuperAdmin peuvent cloturer.
+4. Un informaticien ne peut pas cloturer.
+5. Un informaticien peut traiter une correction post-publication autorisee.
+6. Un etudiant admis recoit decision promoted.
+7. Un etudiant avec dette academique recoit promoted_with_academic_debt.
+8. Un etudiant redoublant recoit repeated.
+9. Un diplome devient alumni.
+10. Une dette financiere est reportee sur nouvelle annee.
+11. Une dette financiere bloque bulletin/diplome mais pas progression academique.
+12. Une reinscription preparee n'active pas le dashboard avant paiement minimum.
+13. Apres paiement valide, dashboard nouvelle annee s'active.
+14. Transfert cree un workflow separe.
+15. Toutes les actions sensibles creent AcademicAuditLog.
+
+======================================================================
+25. MIGRATIONS ET COMPATIBILITE
+======================================================================
+
+Avant toute migration :
+- Inspecter les modeles existants.
+- Verifier noms exacts des modeles UE/EC/Semester/Bulletin.
+- Verifier AcademicEnrollment deja present dans academics.
+- Si AcademicEnrollment existe deja, ne pas recreer un modele concurrent.
+- Utiliser AcademicEnrollment pour le contexte annuel si c'est deja prevu.
+- Sinon creer un modele minimal dans academic_cycle seulement si necessaire.
+
+Attention : il existe deja AcademicYear dans academics avec is_active.
+Ne pas le remplacer brutalement.
+Ajouter BranchAcademicCycle pour gerer le cycle par annexe.
+
+======================================================================
+26. PERFORMANCE ET POSTGRESQL
+======================================================================
+
+Regles :
+- Mettre des index sur branch, academic_year, student, status.
+- Eviter JSONField pour donnees relationnelles critiques, mais OK pour snapshots de rapports/audit.
+- Ne pas dupliquer les matieres.
+- Ne pas dupliquer les classes si une classe annuelle existe deja.
+- Prefetch/select_related dans selectors.
+- Taches lourdes via Celery.
+- Eviter N+1 queries dans dashboards.
+
+======================================================================
+27. ADMIN DJANGO
+======================================================================
+
+Enregistrer les modeles importants :
+- BranchAcademicCycle
+- ClassCycleStatus
+- AcademicClosureReport
+- StudentYearDecision
+- StudentAcademicDebt
+- AcademicDebtEvaluationSession
+- AcademicDebtEvaluation
+- StudentFinancialPosition
+- StudentAccessPolicy
+- AcademicReEnrollment
+- TransferRequest
+- AcademicCorrectionRequest
+- AcademicAuditLog
+
+Admin :
+- list_display utiles.
+- list_filter branch/year/status.
+- search_fields student/matricule/token.
+- readonly_fields pour logs.
+
+======================================================================
+28. SECURITE
+======================================================================
+
+1. Controle permissions dans services et views.
+2. Ne jamais se fier uniquement au template.
+3. Toute cloture doit verifier actor autorise.
+4. Toute correction doit etre tracee.
+5. Les etudiants ne doivent voir que leurs donnees.
+6. Staff annexe ne voit que son annexe sauf role global.
+7. Tokens de reinscription doivent etre uniques et expirables.
+8. Les documents verrouilles ne doivent pas etre accessibles par URL directe.
+
+======================================================================
+29. PLAN D'IMPLEMENTATION RECOMMANDE POUR CODEX
+======================================================================
+
+Phase 1 : Analyse
+- Lire settings.py, urls.py, apps existantes.
+- Lire academics/models.py.
+- Lire students/models.py.
+- Lire inscriptions/models.py.
+- Lire payments/models.py.
+- Lire accounts/models.py.
+- Identifier AcademicEnrollment, Bulletin, Semester, UE, EC.
+- Noter les relations existantes.
+
+Phase 2 : Creation app
+- startapp academic_cycle.
+- Ajouter INSTALLED_APPS.
+- Creer constants.py.
+- Creer models.py.
+- Creer migrations.
+- Admin.
+
+Phase 3 : Services coeur
+- audit_service.
+- selectors.
+- readiness_service.
+- closure_service.
+- promotion_service.
+- financial_policy_service.
+- reenrollment_service.
+- dashboard_access_service.
+
+Phase 4 : Tasks
+- structure tasks Celery.
+- Si Celery pas encore configure, ajouter structure sans casser.
+- Ne pas forcer installation si environnement non pret ; documenter TODO.
+
+Phase 5 : Views minimales
+- Vue DG overview.
+- Vue branch readiness.
+- Vue student pre-rentree.
+- Vue start reenrollment.
+- Vue correction requests.
+
+Phase 6 : Tests
+- Ajouter tests unitaires pour services.
+- Lancer manage.py check.
+- Lancer makemigrations --check si possible.
+- Lancer tests ciblés si DB disponible.
+
+======================================================================
+30. CE QU'IL NE FAUT PAS FAIRE
+======================================================================
+
+Ne pas faire :
+- Tout mettre dans academics.
+- Modifier massivement le modele Student sans necessite.
+- Supprimer des donnees.
+- Creer de nouveaux Students a chaque reinscription.
+- Dupliquer UE/EC/matieres.
+- Bloquer toute la plateforme pendant vacances.
+- Bloquer une annexe parce qu'une autre n'a pas fini.
+- Melanger dette financiere et dette academique.
+- Melanger rattrapage semestre et dette annuelle.
+- Donner aux informaticiens le droit de cloturer officiellement.
+- Donner aux enseignants le droit de modifier apres publication.
+- Faire de longs traitements dans views.
+- Ignorer les logs.
+- Ignorer le filtrage par annexe.
+
+======================================================================
+31. CRITERES D'ACCEPTATION V1
+======================================================================
+
+La V1 est acceptable si :
+
+1. L'app academic_cycle existe et est installee.
+2. Les modeles essentiels sont crees avec migrations.
+3. Une annexe peut avoir un cycle independant.
+4. Un rapport de readiness peut etre genere.
+5. La cloture d'une annexe est controlee par permissions.
+6. Les decisions annuelles etudiantes peuvent etre creees.
+7. Les dettes academiques peuvent etre creees et suivies.
+8. Les dettes financieres peuvent produire une politique d'acces.
+9. Les reinscriptions peuvent etre preparees avec token.
+10. L'etudiant a un workflow pre-rentree.
+11. Les transferts sont separes des reinscriptions.
+12. Les corrections post-publication sont journalisees.
+13. Les logs existent pour toutes les actions sensibles.
+14. Le systeme ne casse pas academics/students/payments.
+15. manage.py check passe.
+
+======================================================================
+32. MESSAGE FINAL POUR CODEX
+======================================================================
+
+Tu dois implementer cette app avec prudence.
+Commence par analyser les modeles existants.
+Ensuite implemente une V1 propre, modulaire, testable.
+Ne cherche pas a tout finir a 100 % en une seule passe si le projet existant impose des contraintes.
+Mais la structure doit etre industrielle et evolutive.
+
+Priorite absolue :
+- architecture propre.
+- pas de regression.
+- services metier.
+- audit.
+- filtrage annexe.
+- separation academic_cycle / academics.
+
+Le but n'est pas seulement de coder.
+Le but est de donner a ESFE Core un moteur de transition academique professionnel, adapte a une ecole superieure multi-annexes au Mali.
+
+FIN DU DOCUMENT.
+lis le fichier CODEX_ACADEMIC_CYCLE_ESFE.txt et execute les instructions que j'ai mise à l'intérieure.

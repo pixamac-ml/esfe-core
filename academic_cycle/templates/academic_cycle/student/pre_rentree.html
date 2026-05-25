@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="mx-auto max-w-4xl px-4 py-6">
+  <h1 class="text-2xl font-semibold">Pre-rentree</h1>
+  {% if student %}
+    {% for item in reenrollments %}
+      <section class="mt-4 border p-4">
+        <h2>{{ item.target_academic_year }}</h2>
+        <p>{{ item.get_status_display }}</p>
+        <a href="{% url 'academic_cycle:student_reenrollment' item.token %}">Me reinscrire</a>
+      </section>
+    {% empty %}
+      <p class="mt-4">Aucune reinscription preparee.</p>
+    {% endfor %}
+    <a class="mt-4 inline-block" href="{% url 'academic_cycle:student_transfer_request' %}">Demander un transfert</a>
+  {% else %}
+    <p>Profil etudiant introuvable.</p>
+  {% endif %}
+</main>
+{% endblock %}

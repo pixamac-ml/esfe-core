@@ -1,0 +1,980 @@
+﻿Oui, je peux le faire convenablement, mais la bonne approche n'est pas de "redesigner les templates" seulement.
+
+Pour que le dashboard devienne vraiment professionnel, il faut travailler sur 3 couches ensemble :
+
+1. Couche metier .py
+Les vues, services, querysets, managers, context builders, permissions, workflows HTMX, etc. doivent fournir des donnees propres, bien structurees et utiles au dashboard.
+
+Si necessaire, je peux enrichir cette couche, par exemple :
+- creer des services dedies au dashboard etudiant ;
+- eviter la logique metier directement dans les templates ;
+- centraliser les calculs : progression, echeances, activite recente, etat academique ;
+- optimiser les requetes ;
+- clarifier les permissions ;
+- preparer des contextes propres pour les composants UI ;
+- garder les vues lisibles et maintenables.
+
+2. Couche UI / composants
+Le dashboard doit s'appuyer sur l'app ui, pas sur des blocs Tailwind copies partout.
+
+Donc je peux :
+- auditer les composants existants ;
+- reutiliser ce qui existe ;
+- creer ou etendre proprement les composants manquants ;
+- remplacer les blocs custom dans les templates metier ;
+- harmoniser cards, boutons, badges, etats vides, loaders, tableaux, formulaires, etc.
+
+3. Couche experience dashboard
+La, l'objectif est d'organiser le dashboard comme un vrai outil metier :
+- apercu principal clair ;
+- actions prioritaires ;
+- activite recente ;
+- progression pedagogique ;
+- notifications et echeances ;
+- sections secondaires bien rangees ;
+- responsive propre ;
+- feedback HTMX fluide quand c'est pertinent.
+
+Ce que je ne ferai pas : transformer ca en page marketing, ajouter des animations gadget, ou maquiller l'interface sans ameliorer la structure metier derriere.
+
+La bonne premiere etape, selon moi, est :
+
+1. Auditer le dashboard etudiant actuel.
+2. Identifier les fichiers concernes : templates, vues, services, models/querysets, composants ui.
+3. Te revenir avec un diagnostic clair :
+- ce qui est deja bon ;
+- ce qui est fragile ;
+- ce qui doit etre deplace vers .py ;
+- ce qui doit devenir un composant ui ;
+- ce qui peut etre ameliore sans risque ;
+- les changements proposes par priorite.
+
+Ensuite seulement, on attaque la phase de modification proprement, progressivement, sans casser l'existant.
+
+
+============================================================
+AUDIT INITIAL - DASHBOARD ETUDIANT ESFE CORE
+Date : 22/05/2026
+============================================================
+
+1. Perimetre identifie
+
+Le dashboard etudiant est principalement porte par :
+
+- portal/student/views.py
+- portal/student/services.py
+- portal/student/profile_service.py
+- portal/student/widgets/
+- portal/student/urls.py
+- templates/portal/student/dashboard.html
+- templates/portal/student/courses.html
+- templates/portal/student/ec_detail.html
+- templates/portal/student/partials/*.html
+
+Les tests existants lies au dashboard etudiant sont dans :
+
+- accounts/tests.py
+
+Les composants UI reutilisables sont dans :
+
+- ui/components/
+- ui/templates/
+
+2. Etat general
+
+Le dashboard etudiant existe deja et il n'est pas vide ni purement maquettage.
+
+Il contient deja :
+
+- une route dediee /portal/student-dashboard/
+- une protection par role student
+- des partials HTMX
+- une separation partielle entre vues, services et widgets
+- une logique de cours, contenus, progression, messages, profil, finance, documents
+- des tests de base sur l'acces, l'affectation academique et la protection des cours par classe
+
+Conclusion : la base fonctionnelle est bonne. Le probleme principal n'est pas l'absence de logique, mais l'organisation, l'harmonisation UI et la maintenabilite.
+
+3. Points positifs
+
+3.1 Couche Python deja structuree
+
+portal/student/views.py joue surtout un role d'orchestration :
+
+- dashboard()
+- courses_partial()
+- messages_partial()
+- timetable_partial()
+- ec_detail()
+- ec_preview()
+- update_content_progress()
+- update_settings_profile()
+- upload_settings_document()
+
+portal/student/services.py centralise deja une partie importante des donnees dashboard :
+
+- get_student_overview_data()
+- get_student_dashboard_data()
+- get_student_courses()
+- get_student_stats()
+- get_student_events()
+- get_student_messages()
+- get_student_next_course()
+
+portal/student/profile_service.py isole correctement la logique profil/documents :
+
+- completion du profil
+- champs manquants
+- documents requis
+- upload de documents
+- synchronisation email/telephone
+
+Les widgets existent deja :
+
+- academics.py
+- finance.py
+- notifications.py
+- profile.py
+
+Cette base permet d'enrichir proprement les regles metier sans mettre les calculs dans les templates.
+
+3.2 HTMX deja present
+
+Le dashboard charge plusieurs sections a la demande :
+
+- cours
+- calendrier
+- messages
+- academique
+- finance
+- notifications
+- parametres
+
+Il y a aussi des actions partielles :
+
+- marquer un message comme lu/non lu
+- marquer tous les messages comme lus
+- mettre a jour le profil
+- uploader des documents
+- charger un apercu EC
+- ouvrir un detail de cours
+
+C'est une bonne direction pour donner une sensation d'application moderne.
+
+3.3 Tests metier deja presents
+
+accounts/tests.py couvre deja :
+
+- interdiction du dashboard etudiant aux non-etudiants
+- affichage d'une affectation academique reelle
+- message d'attente sans affectation
+- acces au detail EC uniquement pour la classe de l'etudiant
+- refus d'un EC d'une autre classe
+
+Ces tests sont importants pour securiser les changements.
+
+4. Problemes principaux identifies
+
+4.1 Le dashboard contourne trop l'app ui
+
+Le fichier instructions2.txt impose que l'app ui soit la source unique des composants.
+
+Actuellement, templates/portal/student/dashboard.html contient directement :
+
+- un gros bloc <style>
+- des variables CSS locales
+- des classes de cards custom
+- des boutons custom
+- des layouts custom
+- des panneaux custom
+- un shell dashboard complet custom
+- un gros bloc <script>
+
+Exemples :
+
+- templates/portal/student/dashboard.html ligne 11 : bloc <style> local
+- templates/portal/student/dashboard.html lignes 15-17 : couleurs hardcodees en variables CSS
+- templates/portal/student/dashboard.html ligne 151 : .student-card custom
+- templates/portal/student/dashboard.html ligne 258 : .student-action-btn custom
+- templates/portal/student/dashboard.html ligne 1043 : gros bloc <script>
+- templates/portal/student/dashboard.html ligne 1152 : fonction studentDashboard()
+
+Ce n'est pas conforme a la regle "ne pas recreer cards, boutons, modals, dropdowns, loaders dans les templates metiers".
+
+4.2 Trop de CSS local et de tokens dupliques
+
+Le dashboard redefinit localement les couleurs :
+
+- --school-primary: #1e4f6f
+- --school-primary-dark: #123145
+- --school-primary-soft: #eef4f7
+- --school-secondary: #1db5b0
+- --school-accent: #f39c12
+
+Ces valeurs existent deja dans tailwind.config.js sous :
+
+- primary
+- secondary
+- accent
+
+Le dashboard respecte visuellement la palette, mais techniquement il duplique les tokens au lieu de s'appuyer proprement sur le design system.
+
+4.3 Trop de logique JavaScript dans le template principal
+
+templates/portal/student/dashboard.html contient une fonction Alpine studentDashboard() tres large.
+
+Elle gere :
+
+- navigation
+- sidebar
+- dark mode local
+- recherche globale
+- chargement lazy HTMX
+- messages lus/non lus
+- calendrier miniature
+- detail de cours
+- tracking de progression de contenu
+
+Cette logique est utile, mais elle est trop concentree dans le template. Elle devrait etre progressivement extraite ou mieux organisee, au minimum en scripts dedies et en petits comportements par composant/section.
+
+4.4 Les partials reproduisent beaucoup de composants custom
+
+Plusieurs partials recreent eux-memes des elements qui devraient venir de ui :
+
+- cards
+- badges
+- boutons
+- onglets
+- etats vides
+- champs de formulaire
+- progress bars
+- listes d'items
+
+Exemples :
+
+- templates/portal/student/partials/courses_student.html
+- templates/portal/student/partials/settings_student.html
+- templates/portal/student/partials/messages_student.html
+- templates/portal/student/partials/academics.html
+- templates/portal/student/partials/finance.html
+- templates/portal/student/partials/notifications.html
+
+Ce n'est pas mauvais visuellement, mais ce n'est pas maintenable a l'echelle du projet.
+
+4.5 Les composants ui existants sont insuffisants pour ce dashboard
+
+L'app ui existe bien et contient plusieurs composants, mais elle semble surtout orientee :
+
+- site public
+- admissions
+- formations
+- notes
+- informaticien
+
+Elle ne contient pas encore un vrai kit dashboard generique pour :
+
+- dashboard shell
+- sidebar interne
+- topbar interne
+- dashboard card
+- metric card
+- section panel
+- empty state
+- loading state
+- badge/status
+- tabs
+- form field
+- progress bar
+- action button HTMX
+
+Le composant button existe, mais il est limite et son rendu actuel utilise par defaut rounded-2xl et des variantes orientees site public. Il n'est pas encore suffisant pour un dashboard institutionnel dense et professionnel.
+
+4.6 Le dashboard est deja fluide, mais pas encore assez robuste
+
+Il y a du lazy loading HTMX, mais les etats de chargement sont encore heterogenes :
+
+- certains endroits affichent seulement "Chargement..."
+- les skeleton loaders ne sont pas systematises
+- les actions messages utilisent fetch + refresh HTMX, mais sans vrai feedback utilisateur
+- les uploads et mises a jour profil ont un indicateur HTMX simple, mais pas de composant de feedback commun
+
+Il faut rendre cette fluidite coherente, pas seulement presente.
+
+4.7 Les donnees metier sont utiles mais encore perfectibles
+
+La couche Python peut etre enrichie proprement.
+
+Exemples d'ameliorations possibles :
+
+- creer un service dedie de composition du dashboard etudiant, par exemple student_dashboard_service.py
+- distinguer clairement overview, priority_actions, pedagogic_snapshot, recent_activity, secondary_info
+- construire des payloads normalises pour les composants UI
+- enrichir les actions prioritaires : cours suivant, documents manquants, messages non lus, paiement restant, contenus a reprendre
+- ajouter une activite recente reelle : derniers contenus consultes, derniers messages, dernier paiement, derniers documents, dernieres notes si disponibles
+- eviter les appels repetes a get_student_academic_snapshot() dans plusieurs fonctions
+- optimiser certaines requetes en regroupant les donnees du dashboard
+
+4.8 Quelques risques techniques a surveiller
+
+- get_student_courses() calcule la progression par EC a partir des contenus actifs, mais les regles de progression pedagogique peuvent devenir plus complexes.
+- get_student_stats() utilise des valeurs encore generiques comme "Non disponible" pour moyenne et rang.
+- get_student_events() ne filtre pas encore vraiment par annexe, meme si la branche est identifiee.
+- get_student_next_course() depend du format retourne par get_student_week_schedule().
+- Le template courses_student.html applique une logique de verrouillage des semestres cote front. Si cette regle devient une vraie regle metier, elle doit aussi exister cote Python.
+- Le tracking de progression contenu est deja controle cote serveur par classe de l'etudiant, ce qui est positif.
+
+5. Etat responsive
+
+Le dashboard contient deja plusieurs media queries et des adaptations mobile :
+
+- sidebar mobile
+- grilles qui passent en une colonne
+- detail de cours plein ecran sur mobile
+- cards adaptees
+
+Mais le responsive est gere dans un gros CSS local. Il faut le conserver fonctionnellement, mais le ramener progressivement dans des composants/classes coherents.
+
+6. Etat UI/UX
+
+Le dashboard donne deja une impression plus moderne qu'une page Django brute.
+
+Mais il souffre de :
+
+- trop de styles specifiques au dashboard
+- trop de blocs visuellement similaires mais non componentises
+- hierarchie encore parfois plate
+- sections nombreuses dans une seule experience
+- melange entre "overview" et fonctionnalites avancees
+- boutons et badges non standardises
+
+Il faut eviter de tout refaire d'un coup. La bonne strategie est de stabiliser l'architecture UI progressivement.
+
+7. Priorites recommandees
+
+Priorite 1 - Stabiliser l'architecture metier du dashboard
+
+Creer ou renforcer une couche service claire pour construire :
+
+- overview principal
+- actions prioritaires
+- apercu pedagogique
+- activite recente
+- infos secondaires
+
+Objectif : le template ne doit recevoir que des donnees deja organisees.
+
+Priorite 2 - Creer les composants ui manquants
+
+Dans ui, ajouter progressivement des composants dashboard generiques :
+
+- dashboard_card
+- dashboard_section
+- metric_card
+- status_badge
+- empty_state
+- progress_bar
+- loading_state / skeleton
+- dashboard_tabs
+- dashboard_action
+- dashboard_shell si necessaire
+
+Objectif : arreter de recreer des cards/boutons/badges dans templates/portal/student.
+
+Priorite 3 - Refactorer le template principal sans casser l'existant
+
+templates/portal/student/dashboard.html doit etre reduit progressivement :
+
+- moins de CSS local
+- moins de JS inline
+- plus d'includes propres
+- plus de composants ui
+- une structure de sections plus lisible
+
+Priorite 4 - Enrichir les regles metier utiles
+
+Ajouter uniquement les enrichissements qui apportent une vraie valeur :
+
+- actions prioritaires calculees cote Python
+- alertes documents manquants
+- message non lus
+- paiement restant
+- prochain cours
+- progression pedagogique exploitable
+- activite recente
+
+Priorite 5 - Uniformiser HTMX et feedback
+
+Standardiser :
+
+- loaders
+- disabled states
+- success/error states
+- empty states
+- refresh partiel
+- feedback apres action
+
+8. Ce qu'il ne faut pas faire
+
+- Ne pas supprimer brutalement le dashboard actuel.
+- Ne pas tout transformer en landing page.
+- Ne pas deplacer la logique metier dans les templates.
+- Ne pas casser les routes HTMX existantes.
+- Ne pas remplacer les vues sans tests.
+- Ne pas creer une nouvelle palette.
+- Ne pas contourner ui avec de nouveaux styles custom.
+
+9. Conclusion
+
+Oui, cette phase est faisable proprement.
+
+Le code actuel donne une bonne base fonctionnelle, mais il faut maintenant passer d'un dashboard "construit directement dans les templates" a un dashboard "alimente par des services metier propres et rendu par un vrai systeme de composants ui".
+
+La prochaine phase logique serait :
+
+1. definir la structure cible du dashboard etudiant ;
+2. creer les composants ui dashboard minimaux ;
+3. enrichir le service Python pour fournir des sections propres ;
+4. refactorer progressivement dashboard.html et ses partials ;
+5. lancer les tests existants et en ajouter pour les nouvelles regles metier.
+
+10. Intervention realisee sur le dashboard etudiant
+
+Constat apres verification de la page d'accueil :
+
+- le dashboard repondait parfois en 200, mais plusieurs cartes etaient vides ;
+- le composant ui dashboard_card rendait bien le conteneur, mais pas le contenu insere entre {% component %} et {% endcomponent %} ;
+- la cause etait le mauvais slot utilise dans les nouveaux composants : le projet alimente le slot "default", pas le slot "content" ;
+- une tentative intermediaire avec {% slot "content" %} sans chargement de component_tags provoquait une erreur template, confirmee par le rendu Django.
+
+Corrections appliquees :
+
+- ui/templates/dashboard/dashboard_card.html utilise maintenant {% load component_tags %} et le slot "default" ;
+- ui/templates/dashboard/empty_state.html utilise maintenant {% load component_tags %} et le slot "default" ;
+- le rendu de l'accueil etudiant affiche de nouveau les blocs attendus : Performance, Progression academique, Matieres et contenus, Evenements a venir, Messages recents, Enseignants lies et Boutique / Marketplace ;
+- les partials HTMX des sections principales repondent correctement : courses, timetable, messages, academics, finance, notifications et settings.
+
+Validations executees :
+
+- python manage.py check : OK ;
+- rendu serveur de portal_student:dashboard : HTTP 200, contenu complet ;
+- endpoints HTMX etudiant : tous HTTP 200 ;
+- tests cibles portail etudiant : 5 tests executes, OK.
+
+13. Audit metier reel pour repenser le dashboard etudiant
+
+Donnees constatees en base :
+
+- 14 etudiants actifs avec compte actif ;
+- affectations academiques presentes pour les etudiants audites ;
+- EC disponibles : 107 au total ;
+- chapitres EC : 0 ;
+- contenus pedagogiques EC : 0 ;
+- notes EC : 177, toutes avec final_score, 140 validees ;
+- moyenne globale observee sur les notes : environ 12.70/20 ;
+- credits obtenus cumules : 368.40 ;
+- evenements d'emploi du temps dates : 33, tous planifies ;
+- creneaux hebdomadaires officiels : 0 dans la base actuelle ;
+- presences etudiantes : 5, toutes presentes ;
+- cas etudiant : 1 ;
+- alertes d'assiduite ouvertes : 0 ;
+- paiements : 22, dont 21 valides ;
+- montant total valide : 4 697 566 ;
+- notifications : 247, dont 233 non lues ;
+- articles boutique : 4 actifs, dont 2 requis ;
+- commandes boutique : 2, dont 1 payee et 1 livree.
+
+Lecture technique :
+
+Le dashboard ne doit pas etre centre sur les contenus de cours pour l'instant, car les chapitres et contenus EC sont vides. Il doit plutot s'appuyer sur les donnees fortes deja presentes : affectation academique, EC, notes, credits, paiements, notifications, inscription, boutique et assiduite quand elle existe.
+
+Sections recommandees :
+
+1. Accueil intelligent
+- afficher statut academique, statut financier, messages non lus, moyenne, credits, prochain cours si disponible ;
+- afficher des actions prioritaires calculees en Python : lire messages, regulariser paiement, consulter resultats, verifier profil, commander article requis.
+
+2. Parcours academique
+- remplacer "cours/progression contenu" par une vraie vue EC/UE/semestres tant que les contenus sont vides ;
+- afficher EC par semestre, credits requis, coefficient, note finale, credit obtenu, validation ;
+- ajouter des badges : valide, non valide, incomplet, rattrapage si applicable.
+
+3. Resultats et credits
+- exploiter ECGrade comme source principale ;
+- calculer moyenne, EC valides, EC non valides, credits obtenus, credits restants ;
+- presenter une table resultats et un resume par semestre.
+
+4. Emploi du temps
+- afficher d'abord les AcademicScheduleEvent dates ;
+- fallback sur WeeklyScheduleSlot si des creneaux officiels existent ;
+- si rien n'existe, afficher un empty state explicite : "Aucun planning publie pour votre classe".
+
+5. Finance
+- afficher total a payer, total paye, reste, statut inscription ;
+- afficher derniers paiements et statut ;
+- mettre en avant les actions utiles seulement si un reste a payer existe.
+
+6. Messages / notifications
+- transformer les notifications nombreuses en inbox lisible ;
+- filtrer : non lus, paiement, inscription, boutique, systeme ;
+- afficher compteur, derniers messages, action tout marquer lu.
+
+7. Boutique
+- afficher les articles requis de l'annexe, commandes ouvertes, statut paiement/livraison ;
+- si aucun article pour l'annexe, afficher un message simple et non une section vide.
+
+8. Profil et documents
+- utiliser le profil pour calculer completion ;
+- afficher identite, matricule, contact, annexe, programme, classe ;
+- mettre en avant les champs manquants.
+
+9. Assiduite / suivi
+- afficher seulement si des presences, alertes ou cas existent ;
+- sinon intégrer un indicateur discret dans l'accueil au lieu d'une grande section vide.
+
+Enrichissements Python necessaires :
+
+- creer un service resultats etudiant qui consolide ECGrade par semestre ;
+- creer un service finance plus detaille avec derniers paiements ;
+- creer un service inbox qui groupe les CommunicationNotification par categorie ;
+- enrichir get_student_stats avec moyenne reelle, credits obtenus, credits restants et taux de validation ;
+- enrichir get_student_courses pour ne pas parler de progression contenu si ECContent est vide ;
+- creer un service dashboard_sections qui renvoie pour chaque section : visible, tone, count, empty_reason, primary_action.
+
+14. Premier enrichissement rapide applique
+
+Objectif :
+
+- reconnecter les sections du dashboard etudiant aux donnees fortes deja presentes en base ;
+- eviter de centrer le dashboard sur les contenus pedagogiques, car ECChapter et ECContent sont actuellement vides ;
+- rendre les sections plus riches sans inventer de donnees.
+
+Corrections et enrichissements :
+
+- portal/student/services.py enrichit les matieres avec note finale, credits obtenus, coefficient, statut valide/non valide/en attente ;
+- portal/student/services.py calcule une vraie synthese de resultats : moyenne, EC valides, EC non valides, credits obtenus/requis, taux de validation, resume par semestre ;
+- portal/student/services.py alimente les stats d'accueil avec la moyenne reelle et les credits obtenus ;
+- portal/student/services.py categorise les notifications : Finance, Boutique, Inscription, General ;
+- portal/student/widgets/academics.py expose moyenne, credits, EC valides, taux de validation, semestres et lignes de notes ;
+- portal/student/widgets/finance.py ajoute les dernieres operations de paiement ;
+- templates/portal/student/partials/courses_student.html devient une section "Matieres, credits et resultats" plutot qu'une section centree sur des contenus inexistants ;
+- templates/portal/student/partials/academics.html affiche moyenne, validation academique, resume par semestre et tableau de notes ;
+- templates/portal/student/partials/finance.html affiche les derniers paiements ;
+- templates/portal/student/partials/messages_student.html affiche des categories de messages et badges par message.
+
+Validation :
+
+- rendu dashboard : HTTP 200 ;
+- partials courses, academics, finance et messages : HTTP 200 ;
+- python manage.py check : OK ;
+- node --check dashboard.js : OK ;
+- tests cibles : 6 tests executes, OK.
+
+16. Correction des doublons et des erreurs de chargement dangereuses
+
+Constat depuis instructions2.txt :
+
+- erreur critique PostgreSQL : trop de connexions ouvertes ;
+- erreur 500 sur un chargement HTMX de detail cours ;
+- plusieurs processus runserver etaient actifs en meme temps sur la machine ;
+- le dashboard prechargeait automatiquement plusieurs sections HTMX au demarrage ;
+- l'accueil reutilisait le meme partial complet que la section Mes cours, avec les memes blocs de preview et des ids ecPreview potentiellement dupliques une fois la section chargee.
+
+Corrections appliquees :
+
+- suppression du prechargement automatique de toutes les sections dans static/portal/student/dashboard.js ;
+- les sections HTMX se chargent maintenant a la demande, quand l'utilisateur ouvre la section ;
+- creation d'un partial dedie a l'accueil : templates/portal/student/partials/courses_preview_student.html ;
+- l'accueil affiche seulement 3 cartes cours simples, sans preview HTMX et sans ids ecPreview ;
+- la section complete Mes cours garde le catalogue Academy complet avec recherche, filtres, pagination et apercu ;
+- dashboard.html utilise maintenant le partial preview pour l'accueil et le partial complet uniquement dans la section Mes cours.
+
+Impact :
+
+- moins de requetes simultanees au chargement du dashboard ;
+- moins de risque de saturation PostgreSQL ;
+- suppression du rendu double dangereux du catalogue cours ;
+- suppression des ids de preview dupliques entre accueil et section complete ;
+- les erreurs "Impossible de charger" devraient baisser car les sections ne sont plus toutes appelees en rafale.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check dashboard.js : OK ;
+- verification processus : plusieurs runserver etaient actifs, ce qui explique aussi la saturation de connexions cote PostgreSQL.
+
+17. Separation apercu / lecture cours facon Udemy Academy
+
+Demande :
+
+- utiliser le modal pour afficher les apercus de cours ;
+- creer un drawer/lecteur dedie pour la lecture concrete du cours, avec une experience proche Udemy ;
+- eviter les apercus inline dans les cartes, sources de doublons et de chargements inutiles.
+
+Corrections appliquees :
+
+- ajout d'un mode courseDetailMode dans static/portal/student/dashboard.js ;
+- openCoursePreview(url, title) charge maintenant ec_preview dans un modal centre ;
+- openCourseDetail(url, title) charge maintenant ec_detail?partial=1 dans un drawer lecteur lateral ;
+- dashboard.html applique deux styles differents : is-course-preview et is-course-reader ;
+- courses_student.html n'utilise plus de preview inline avec ids ecPreview ;
+- le bouton Apercu ouvre le modal ;
+- le bouton Continuer ouvre le drawer lecteur ;
+- courses_preview_student.html propose aussi Apercu et Lire sans dupliquer de blocs HTMX ;
+- ec_detail_panel.html est reformate en racine course-reader-root avec layout lecteur : sidebar plan de cours + zone lecture ;
+- dashboard.css ajoute le style modal apercu et drawer lecteur Academy.
+
+Validation :
+
+- ec_preview : HTTP 200 ;
+- ec_detail?partial=1 : HTTP 200 ;
+- courses_partial : HTTP 200 ;
+- plus aucun id ecPreview dans le catalogue cours rendu ;
+- python manage.py check : OK ;
+- node --check dashboard.js et course_immersive.js : OK ;
+- tests cibles detail cours : 3 tests executes, OK.
+
+18. Lecteur cours plein ecran type Udemy
+
+Objectif :
+
+- le drawer de lecture doit prendre toute la plage de l'ecran ;
+- il doit afficher une playlist claire, un suivi de progression, une zone de lecture adaptee aux types de contenus ;
+- l'experience doit se rapprocher d'Udemy : navigation lecon precedente/suivante, plan du cours, contenu central stable.
+
+Corrections appliquees :
+
+- le mode lecteur is-course-reader occupe maintenant 100vw x 100vh ;
+- le panel lecteur n'a plus de bordures/rayons de modal, il devient une vraie surface plein ecran ;
+- ec_detail_panel.html est reconstruit avec :
+  - header compact du cours ;
+  - sidebar playlist ;
+  - compteur de lecons ;
+  - barre de progression globale ;
+  - liste de sections/chapitres ;
+  - item de lecon avec type de contenu et progression ;
+  - zone principale de lecture ;
+  - navigation Precedent/Suivant ;
+- ec_content_lesson.html est reconstruit pour adapter l'espace de lecture :
+  - video locale ou embed dans un cadre media noir ;
+  - PDF/document dans iframe plein cadre ;
+  - image centree avec object-contain ;
+  - audio dans un cadre stable ;
+  - texte dans une surface lisible ;
+  - fichiers non previsualisables avec action ouvrir/telecharger ;
+- le lecteur gere proprement l'absence de chapitres ou de lecons publiees avec un etat vide explicite.
+
+Validation :
+
+- ec_detail?partial=1 : HTTP 200 ;
+- presence des blocs course-reader-root, course-reader-layout, course-reader-sidebar, course-reader-stage ;
+- python manage.py check : OK ;
+- node --check dashboard.js et course_immersive.js : OK ;
+- tests cibles detail cours : 2 tests executes, OK.
+
+19. Correction doublons semestres, pagination et verrouillage S2
+
+Problemes traites :
+
+- les filtres de semestres affichaient une information redondante et peu claire ;
+- le catalogue affichait trop de cartes avant pagination ;
+- le verrouillage des semestres etait insuffisant, car il dependait surtout de l'interface ;
+- un etudiant pouvait encore tenter d'ouvrir directement un cours de semestre avance par URL.
+
+Corrections appliquees :
+
+- le service cours ajoute maintenant semester_label, semester_unlocked et semester_lock_message pour chaque EC ;
+- S1 reste ouvert par defaut ;
+- S2 et les semestres suivants ne sont ouverts que si tous les EC des semestres precedents sont valides ;
+- la section Mes cours affiche uniquement des libelles courts et propres : S1, S2, etc. ;
+- les cartes des semestres verrouilles restent visibles mais grisées, avec badge Verrouille et boutons desactives ;
+- l'ouverture directe ec_detail/ec_preview verifie aussi le verrouillage cote serveur et renvoie 403 si le semestre est ferme ;
+- la pagination du catalogue passe a 6 cours par page pour eviter une page trop longue ;
+- un test de regression a ete ajoute pour verifier qu'un cours S2 est bloque tant que S1 n'est pas valide, puis ouvert apres validation.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- rendu direct du partial cours : OK sur un etudiant avec 8 cours, semestres S1/S2, pagination presente ;
+- tests cibles non executes completement car PostgreSQL refuse la creation de la base de test : "droit refuse pour creer une base de donnees".
+
+20. Nettoyage des contenus encore dupliques dans le dashboard etudiant
+
+Constat :
+
+- l'accueil affichait deja les apercus utiles : progression, evenements, cours et messages ;
+- certains onglets detailles reincluaient ensuite des panneaux secondaires deja presents ailleurs ;
+- l'onglet Messages affichait aussi les evenements ;
+- l'onglet Academique affichait aussi le bloc de statistiques d'accueil ;
+- l'onglet Encadrement affichait aussi le profil, deja porte par les parametres/profil.
+
+Correction appliquee :
+
+- l'accueil reste le seul espace de synthese mixte ;
+- l'onglet Messages affiche uniquement la messagerie ;
+- l'onglet Academique affiche uniquement la situation academique detaillee ;
+- l'onglet Encadrement affiche uniquement les enseignants ;
+- les parametres restent le point de gestion du profil ;
+- les panneaux secondaires redondants ont ete retires de dashboard.html.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- rendu dashboard etudiant via client Django : HTTP 200 ;
+- dans le HTML initial, les blocs "Evenements a venir", "Progression academique" et "Messages recents" apparaissent une seule fois chacun.
+
+21. Correction definitive du doublon S1/S2 dans Mes cours
+
+Constat :
+
+- le template Django ne contenait qu'une seule boucle de semestres ;
+- le doublon visible S1/S2 venait probablement du rendu Alpine apres chargement HTMX ;
+- Alpine observe deja les nouveaux noeuds, puis le dashboard relancait aussi Alpine.initTree apres htmx:afterSwap ;
+- ce double passage pouvait dupliquer les elements crees par x-for.
+
+Corrections appliquees :
+
+- static/portal/student/dashboard.js ne relance plus Alpine.initTree si Alpine a deja initialise le contenu HTMX ;
+- la section Mes cours ne depend plus seulement du JSON global de l'accueil ;
+- courses_student.html embarque maintenant son propre JSON de section ;
+- les boutons S1/S2 ne sont plus generes par x-for Alpine ;
+- les filtres de semestre sont rendus une seule fois cote Django via course_semesters ;
+- Alpine garde uniquement l'etat actif/verrouille.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- rendu courses_partial sur un etudiant avec S1/S2 : HTTP 200 ;
+- controle HTML : aucune boucle "sem in availableSemesters" restante pour les filtres ;
+- controle HTML : S1 apparait une seule fois comme filtre, S2 apparait une seule fois comme filtre.
+
+22. Simplification de la navigation et integration Finance dans Parametres
+
+Decision :
+
+- la finance n'est plus une section principale du dashboard etudiant ;
+- elle devient un onglet interne de Parametres ;
+- la navigation principale reste plus courte et plus lisible.
+
+Corrections appliquees :
+
+- suppression de Finance dans la navigation Alpine du dashboard ;
+- suppression du panneau principal Finance dans dashboard.html ;
+- suppression du chargement automatique finance/notifications lie a cette section ;
+- ajout d'un onglet Finance dans settings_student.html ;
+- settings_partial fournit maintenant aussi finance_widget ;
+- le partial finance.html reste reutilise dans Parametres ;
+- le bouton Actualiser de la finance rafraichit uniquement le bloc finance ;
+- les actions prioritaires de paiement pointent maintenant vers Parametres.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- rendu dashboard etudiant : HTTP 200 ;
+- controle rendu : aucune navigation Finance principale exposee ;
+- rendu settings_partial : HTTP 200 avec onglet Finance et bloc id="finance".
+
+23. Polishing de l'Overview etudiant
+
+Instruction lue :
+
+- travailler uniquement sur le dashboard etudiant ;
+- ne pas redesigner toute la plateforme ;
+- transformer l'accueil en overview rapide ;
+- retirer les sections metier lourdes de l'accueil ;
+- garder le focus sur salutation, heure, prochain cours, actions prioritaires et emploi du temps rapide.
+
+Corrections appliquees :
+
+- l'accueil ne contient plus les blocs detailles progression, evenements, cours, messages et marketplace ;
+- hero_student.html affiche maintenant l'heure courante via Alpine ;
+- le texte du hero est recentre sur l'usage cockpit rapide ;
+- ajout du partial overview_schedule_quick.html pour afficher les prochains creneaux sans ouvrir le planning complet ;
+- dashboard.html garde dans l'overview uniquement le hero et l'emploi du temps rapide.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- rendu dashboard etudiant : HTTP 200 ;
+- controle rendu : "Emploi du temps rapide" present ;
+- controle rendu : les anciens blocs lourds ne sont plus presents dans l'accueil.
+
+24. Section Mes cours - suppression du bouton global redondant
+
+Instruction lue :
+
+- travailler uniquement sur la section Mes cours ;
+- supprimer le bouton global "Mes cours" dans le header du dashboard.
+
+Correction appliquee :
+
+- suppression du bouton "Mes cours" dans topbar_student.html ;
+- conservation de l'entree Mes cours dans la navigation principale/sidebar, car elle reste le chemin normal vers la section.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- rendu dashboard etudiant : HTTP 200 ;
+- controle rendu : le bouton topbar Mes cours n'est plus present.
+
+25. Polishing de la section Planning / Calendrier
+
+Instruction lue :
+
+- travailler uniquement sur la section planning/calendrier du dashboard etudiant ;
+- ne pas redesign brutalement ;
+- supprimer le bruit visuel ;
+- supprimer le titre "Calendrier" ;
+- rendre la section plus claire, legere, utile et professionnelle.
+
+Corrections appliquees :
+
+- le libelle "Calendrier" a ete retire du header interne de la section ;
+- le kicker global Alpine de cette section devient "Planning" au lieu de "Calendrier" ;
+- le texte descriptif a ete raccourci pour une lecture plus directe ;
+- les 5 grosses cartes de statut ont ete remplacees par une barre de synthese compacte ;
+- les statuts absents ne sont plus affiches inutilement ;
+- le tableau metier, les statuts de cours, les jours vides, les cours hors grille et les fallbacks existants sont conserves.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- rendu timetable_partial : HTTP 200 ;
+- controle rendu : le titre/kicker "Calendrier" n'est plus present dans le header interne ;
+- controle rendu avec etudiant ayant un planning : la synthese compacte "planifie(s)" est presente et les anciennes cartes "Planifies" ne sont plus rendues.
+
+26. Correction affichage des cours planifies dans l'emploi du temps
+
+Probleme constate :
+
+- les cours planifies existent bien en base ;
+- la section etudiante affichait uniquement la semaine courante ;
+- si la semaine courante ne contenait aucun cours pour la classe de l'etudiant, la section affichait "Aucun cours programme" alors que des cours existaient sur une autre semaine ;
+- exemple observe : certains cours sont planifies sur la semaine du 04/05/2026, alors que la semaine courante est celle du 18/05/2026.
+
+Correction appliquee :
+
+- get_student_week_schedule cherche maintenant la semaine planifiee la plus proche quand la semaine courante est vide ;
+- la section affiche alors les cours disponibles au lieu d'un etat vide trompeur ;
+- un message informe l'etudiant : "Aucun cours sur la semaine courante. Affichage de la semaine planifiee la plus proche." ;
+- l'overview rapide signale aussi que la semaine affichee est la semaine planifiee la plus proche.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- etudiant avec cours hors semaine courante : timetable_partial affiche maintenant les cours ;
+- etudiant avec cours sur semaine courante : comportement conserve ;
+- etudiant sans affectation academique active : l'etat vide reste normal, car aucun planning actif ne peut etre rattache.
+
+27. Mise en evidence directe des cours dans le planning etudiant
+
+Probleme restant :
+
+- meme quand les cours etaient bien presents dans la grille, ils pouvaient etre difficiles a voir ;
+- sur mobile ou dans un tableau horizontal, l'etudiant devait parfois scroller pour tomber sur le bon jour/creneau ;
+- cela donnait l'impression que les cours planifies n'apparaissaient pas.
+
+Correction appliquee :
+
+- ajout d'un bloc "Cours planifies" au-dessus de la grille ;
+- chaque cours est liste en carte compacte avec titre, jour, horaire, enseignant, salle/visio et statut ;
+- la grille hebdomadaire reste disponible en dessous pour la lecture par creneau ;
+- l'etudiant voit donc immediatement les cours planifies avant de consulter le tableau.
+
+Validation :
+
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- etu_esfe10 : liste "Cours planifies" visible, cours de semaine courante affiche ;
+- etu_esfe3 : liste "Cours planifies" visible avec fallback semaine planifiee la plus proche ;
+- etu_esfe6 : etat vide normal, car sa classe active n'a actuellement aucun cours planifie en base.
+
+15. Style Udemy Academy applique a la section Mes cours
+
+Direction appliquee :
+
+- remplacement de l'affichage en lignes par un catalogue de cartes visuelles ;
+- chaque cours a une banniere type academy, un badge semestre/code, un statut, une note, des credits, un coefficient et une progression ;
+- la progression affiche la progression pedagogique si des contenus existent ;
+- si aucun contenu n'est publie, la carte affiche une progression academique basee sur la note/validation, avec le message "Contenus non publies" ;
+- ajout d'une recherche "Rechercher un cours..." ;
+- ajout de filtres : semestre, contenus, valides, a reprendre, en attente ;
+- bouton principal "Continuer" pour ouvrir le detail du cours ;
+- bouton secondaire "Apercu" pour charger le preview HTMX existant ;
+- en accueil, le meme composant passe en mode preview limite a 3 cartes pour ne pas surcharger le dashboard ;
+- dans la section complete Mes cours, le catalogue affiche jusqu'a 9 cartes par page avec pagination.
+
+Fichiers modifies :
+
+- templates/portal/student/partials/courses_student.html ;
+- static/portal/student/dashboard.css ;
+- templates/portal/student/dashboard.html.
+
+Validation :
+
+- portal_student:dashboard : HTTP 200 ;
+- portal_student:courses_partial : HTTP 200 ;
+- python manage.py check : OK ;
+- node --check dashboard.js : OK ;
+- tests cibles : 6 tests executes, OK.
+
+12. Correction supplementaire apres controle utilisateur
+
+Probleme confirme sur la section emploi du temps :
+
+- le rendu serveur seul ne suffisait pas a garantir que la section fonctionne dans le navigateur ;
+- le chargement front pouvait marquer une section comme chargee avant le vrai remplacement HTMX ;
+- l'emploi du temps etudiant ne lisait que les seances datees AcademicScheduleEvent ;
+- si une classe avait seulement une grille hebdomadaire officielle WeeklyScheduleSlot non materialisee en seances datees, l'etudiant voyait a tort "Aucun cours programme" ;
+- le badge de semaine pouvait aussi sortir vide a cause d'une expression template incorrecte.
+
+Corrections appliquees :
+
+- static/portal/student/dashboard.js marque maintenant une section comme chargee uniquement apres htmx:afterSwap ;
+- static/portal/student/dashboard.js remet la section en etat rechargeable si le chargement reste bloque ;
+- academics/services/schedule_service.py ajoute un fallback metier : evenements dates d'abord, puis grille hebdomadaire officielle si aucun evenement date n'existe ;
+- templates/portal/student/partials/calendar_student.html affiche maintenant clairement quand la grille hebdomadaire officielle est utilisee ;
+- templates/portal/student/partials/calendar_student.html corrige le libelle "Semaine du jj/mm/aaaa" ;
+- academics/tests.py ajoute un test sur le fallback WeeklyScheduleSlot vers l'emploi du temps etudiant.
+
+Validations :
+
+- test du fallback emploi du temps hebdomadaire : OK ;
+- simulation locale avec un creneau WeeklyScheduleSlot temporaire : la section affiche l'EC, la salle et ne montre plus "Aucun cours programme" ;
+- python manage.py check : OK ;
+- node --check static/portal/student/dashboard.js : OK ;
+- tests cibles portail etudiant : 5 tests executes, OK.
+
+Conclusion technique :
+
+Le probleme principal de la page d'accueil n'etait pas seulement un manque de donnees metier. Une partie importante venait du composant de carte qui avalait le contenu des sections. La base est maintenant corrigee pour continuer l'organisation des dashboards sans perdre les contenus.
+
+11. Verification des autres sections
+
+Controle effectue sur les sections chargees par HTMX :
+
+- courses : HTTP 200, titre et contenu "Matieres et contenus" presents, aucune carte vide ;
+- schedule : HTTP 200, titre "Calendrier / Planning hebdomadaire" present, empty state correct si aucun cours n'est programme sur la periode ;
+- messages : HTTP 200, section "Communication / Messages recents" presente, messages rendus ;
+- academics : HTTP 200, section "Academique / Ma situation academique" presente, progression administrative rendue ;
+- finance : HTTP 200, section "Finance / Situation financiere" presente, totaux rendus ;
+- notifications : HTTP 200, section "Notifications / Alertes et suivis" presente ;
+- settings : HTTP 200, centre de gestion du profil present avec Profil, Academique, Documents et Compte central.
+
+Correction complementaire :
+
+- portal/student/widgets/finance.py renvoie maintenant toujours le meme contrat de donnees, meme quand aucun profil etudiant n'est rattache : status_tone et metrics sont fournis. Cela evite une section finance partiellement vide sur les comptes incomplets.
+
+Validations complementaires :
+
+- toutes les sections principales ont ete controlees avec recherche de blocs attendus ;
+- aucune carte student-card vide detectee dans dashboard, courses, schedule, messages, academics, finance, notifications et settings ;
+- node --check sur dashboard.js et course_immersive.js : OK ;
+- tests cibles portail etudiant : 5 tests executes, OK.

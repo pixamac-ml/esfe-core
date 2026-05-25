@@ -11,6 +11,12 @@ from .ui.button.button import Button
 from .interactive.dropdown.dropdown import Dropdown
 from .interactive.modal.modal import Modal
 from .interactive.accordion.accordion import Accordion
+from .dashboard.dashboard_card import DashboardCard
+from .dashboard.empty_state import EmptyState
+from .dashboard.info_field import InfoField
+from .dashboard.metric_card import MetricCard
+from .dashboard.progress_bar import ProgressBar
+from .dashboard.status_badge import StatusBadge
 
 # Card components
 from .cards.base_card.base_card import BaseCard

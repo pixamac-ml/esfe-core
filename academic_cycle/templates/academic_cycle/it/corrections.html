@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="mx-auto max-w-6xl px-4 py-6">
+  <h1 class="text-2xl font-semibold">Corrections academiques</h1>
+  <table class="mt-4 w-full text-sm">
+    <thead><tr><th>Type</th><th>Etudiant</th><th>Annexe</th><th>Statut</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for correction in corrections %}
+      <tr>
+        <td>{{ correction.get_request_type_display }}</td>
+        <td>{{ correction.student|default:"-" }}</td>
+        <td>{{ correction.branch }}</td>
+        <td>{{ correction.get_status_display }}</td>
+        <td>
+          <form method="post" action="{% url 'academic_cycle:resolve_correction' correction.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="resolution_note" value="Correction resolue depuis le dashboard IT">
+            <button type="submit">Resoudre</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">Aucune correction.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</main>
+{% endblock %}

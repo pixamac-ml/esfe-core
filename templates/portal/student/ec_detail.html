@@ -1,21 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block extra_head %}
-<style>
-  :root {
-    --school-primary: #1e4f6f;
-    --school-primary-dark: #123145;
-    --school-primary-soft: #eef4f7;
-    --surface: #f4f6f9;
-    --card: #ffffff;
-    --card-soft: #f8fbfc;
-    --line: rgba(214, 228, 236, 0.95);
-    --text: #123145;
-    --muted: #64748b;
-  }
-</style>
+<link rel="stylesheet" href="{% static 'portal/student/dashboard.css' %}?v=student-dashboard-3">
 {% endblock %}
 
 {% block content %}
@@ -35,93 +24,11 @@
 {% endblock %}
 
 {% block extra_scripts %}
-{% include "portal/student/partials/student_course_immersive_script.html" %}
+<script src="{% static 'portal/student/course_immersive.js' %}?v=student-dashboard-3"></script>
 <script>
-  const studentContentProgressUrlTemplate = "{% url 'portal_student:content_progress' 0 %}";
-
-  function getCsrfToken() {
-    const match = document.cookie.match(/csrftoken=([^;]+)/);
-    return match ? decodeURIComponent(match[1]) : "";
-  }
-
-  async function updateStudentContentProgress(contentId, payload) {
-    const progressUrl = studentContentProgressUrlTemplate.replace("/0/", `/${contentId}/`);
-    const response = await fetch(progressUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCsrfToken(),
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error("progress-update-failed");
-    }
-
-    return response.json();
-  }
-
-  function initStudentContentTracking(root = document) {
-    root.querySelectorAll("[data-track-content]").forEach((node) => {
-      if (node.dataset.boundTrack === "1") return;
-      node.dataset.boundTrack = "1";
-
-      const sendProgress = () => {
-        updateStudentContentProgress(node.dataset.trackContent, {
-          progress_percent: Number(node.dataset.trackProgress || 10),
-        }).catch(() => {});
-      };
-
-      if (node.tagName === "IFRAME" || node.tagName === "IMG") {
-        node.addEventListener("load", sendProgress, { once: true });
-      } else if (node.tagName === "A") {
-        node.addEventListener("click", sendProgress);
-      } else if (node.tagName === "BUTTON") {
-        node.addEventListener("click", sendProgress);
-      } else {
-        sendProgress();
-      }
-    });
-
-    root.querySelectorAll("[data-complete-content]").forEach((node) => {
-      if (node.dataset.boundTrack === "1") return;
-      node.dataset.boundTrack = "1";
-      node.addEventListener("click", () => {
-        updateStudentContentProgress(node.dataset.completeContent, {
-          progress_percent: 100,
-          is_completed: true,
-        }).then(() => window.location.reload()).catch(() => {});
-      });
-    });
-
-    root.querySelectorAll("[data-media-progress-content]").forEach((node) => {
-      if (node.dataset.boundTrack === "1") return;
-      node.dataset.boundTrack = "1";
-      node.addEventListener("timeupdate", () => {
-        if (!node.duration || !Number.isFinite(node.duration) || node.duration <= 0) return;
-        const progressPercent = Math.min(100, Math.round((node.currentTime / node.duration) * 100));
-        const lastSent = Number(node.dataset.lastSentProgress || 0);
-        if (progressPercent < 100 && progressPercent - lastSent < 10) return;
-        node.dataset.lastSentProgress = String(progressPercent);
-        updateStudentContentProgress(node.dataset.mediaProgressContent, {
-          progress_percent: progressPercent,
-          last_position: Math.round(node.currentTime),
-          is_completed: progressPercent >= 100,
-        }).catch(() => {});
-      });
-      node.addEventListener("ended", () => {
-        updateStudentContentProgress(node.dataset.mediaProgressContent, {
-          progress_percent: 100,
-          is_completed: true,
-          last_position: Math.round(node.duration || 0),
-        }).then(() => window.location.reload()).catch(() => {});
-      });
-    });
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    initStudentContentTracking(document);
-  });
+  window.StudentDashboardConfig = {
+    contentProgressUrlTemplate: "{% url 'portal_student:content_progress' 0 %}"
+  };
 </script>
+<script src="{% static 'portal/student/dashboard.js' %}?v=student-dashboard-3"></script>
 {% endblock %}

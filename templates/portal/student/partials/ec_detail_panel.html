@@ -1,59 +1,64 @@
 {{ player_bundle|json_script:"ec-player-bundle-data" }}
 
-<div
-  class="ec-immersive-root flex h-full min-h-0 flex-col bg-[color:var(--surface)] text-[color:var(--text)]"
-  x-data="studentCourseImmersive()"
-  x-init="init()"
->
-  {# Lecteur document / URL plein ecran (meme onglet, sans target=_blank) #}
-  <div
-    x-show="docViewerUrl"
-    x-cloak
-    class="fixed inset-0 z-[90] flex flex-col bg-[color:var(--text)]"
-    role="dialog"
-    aria-modal="true"
-  >
+<div class="course-reader-root text-[color:var(--text)]" x-data="studentCourseImmersive()" x-init="init()">
+  <div x-show="docViewerUrl" x-cloak class="fixed inset-0 z-[90] flex flex-col bg-[color:var(--text)]" role="dialog" aria-modal="true">
     <div class="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[color:var(--school-primary-dark)] px-3 py-2 text-white">
       <span class="min-w-0 truncate text-sm font-bold">Lecteur integre</span>
-      <button
-        type="button"
-        class="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-extrabold uppercase tracking-wide hover:bg-white/20"
-        @click="closeDocViewer()"
-      >
+      <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-extrabold uppercase tracking-wide hover:bg-white/20" @click="closeDocViewer()">
         Fermer
       </button>
     </div>
     <iframe :src="docViewerUrl" class="min-h-0 w-full flex-1 border-0 bg-white" title="Document"></iframe>
   </div>
 
-  <header class="shrink-0 border-b border-[color:var(--line)] bg-[color:var(--card)] px-4 py-3 sm:px-5">
-    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">
-      S{{ ec.ue.semester.number }} · {{ ec.ue.code }} · {{ enrollment.academic_class.display_name }}
-    </p>
-    <h1 class="mt-1 text-lg font-black tracking-tight text-[color:var(--text)] sm:text-xl">{{ ec.title }}</h1>
-    <p class="mt-1 text-sm font-semibold text-[color:var(--muted)]">{{ ec.ue.title }}</p>
-    <p class="mt-1 text-sm text-[color:var(--muted)]">{{ subtitle }}</p>
-    <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-[color:var(--muted)]">
-      <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1">{{ total_completed_content_count }}/{{ total_active_content_count }} lecons</span>
-      <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1">{{ chapter_count }} chapitre{{ chapter_count|pluralize }}</span>
+  <header class="course-reader-header">
+    <div class="min-w-0">
+      <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--muted)]">
+        S{{ ec.ue.semester.number }} · {{ ec.ue.code }} · {{ enrollment.academic_class.display_name }}
+      </p>
+      <h1 class="mt-1 truncate text-lg font-black tracking-tight text-[color:var(--text)] sm:text-xl">{{ ec.title }}</h1>
+      <p class="mt-1 truncate text-sm font-semibold text-[color:var(--muted)]">{{ ec.ue.title }}</p>
+    </div>
+    <div class="flex shrink-0 flex-wrap gap-2 text-[11px] font-bold text-[color:var(--muted)]">
+      <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1">{{ total_completed_content_count }}/{{ total_active_content_count }} lecons terminees</span>
+      <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1">{{ chapter_count }} section{{ chapter_count|pluralize }}</span>
     </div>
   </header>
 
   {% if not chapters_available %}
-    <div class="flex flex-1 items-center justify-center p-6">
-      <div class="max-w-md rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
-        Les chapitres et contenus pedagogiques detailles ne sont pas encore disponibles dans cet environnement.
+    <div class="course-reader-empty">
+      <div class="max-w-lg rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
+        <p class="text-base font-black text-[color:var(--text)]">Lecteur non disponible</p>
+        <p class="mt-2">Les chapitres et contenus pedagogiques detailles ne sont pas encore disponibles dans cet environnement.</p>
       </div>
     </div>
   {% else %}
-    <div class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
-      <aside class="flex max-h-[min(38vh,320px)] min-h-0 flex-col border-b border-[color:var(--line)] bg-[color:var(--card)] lg:max-h-none lg:border-b-0 lg:border-r">
-        <div class="shrink-0 border-b border-[color:var(--line)] px-3 py-2 lg:hidden">
-          <span class="text-xs font-extrabold uppercase tracking-wide text-[color:var(--muted)]">Plan du cours</span>
+    <div class="course-reader-layout">
+      <aside class="course-reader-sidebar">
+        <div class="course-reader-sidebar-head">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--muted)]">Playlist</p>
+              <h2 class="mt-1 text-sm font-black text-[color:var(--text)]">Contenu du cours</h2>
+            </div>
+            <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1 text-[11px] font-black text-[color:var(--muted)]">
+              {{ total_active_content_count }} lecon{{ total_active_content_count|pluralize }}
+            </span>
+          </div>
+          <div>
+            <div class="mb-1 flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--muted)]">
+              <span>Progression</span>
+              <span>{{ total_completed_content_count }}/{{ total_active_content_count }}</span>
+            </div>
+            <div class="course-reader-progress-track">
+              <div class="course-reader-progress-value" style="width: {% if total_active_content_count %}{% widthratio total_completed_content_count total_active_content_count 100 %}{% else %}0{% endif %}%"></div>
+            </div>
+          </div>
         </div>
+
         <div class="student-scroll min-h-0 flex-1 overflow-y-auto p-3">
           {% for chapter in chapters %}
-            <div class="mb-4 last:mb-0">
+            <section class="mb-4 last:mb-0">
               <p class="px-2 pb-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-[color:var(--muted-2)]">{{ chapter.title }}</p>
               <div class="flex flex-col gap-1">
                 {% for content in chapter.active_contents %}
@@ -63,71 +68,64 @@
                     :class="activeId === {{ content.id }} ? 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary-dark)] ring-1 ring-[color:var(--school-primary)]/25' : 'text-[color:var(--text)] hover:bg-[color:var(--card-soft)]'"
                     @click="setActive({{ content.id }})"
                   >
-                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg border border-[color:var(--line)] bg-white text-[10px] font-black text-[color:var(--muted)]">
+                    <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-[color:var(--line)] bg-white text-[10px] font-black text-[color:var(--muted)]">
                       {% if content.student_is_completed %}
                         <i data-lucide="check" class="h-3.5 w-3.5 text-[color:var(--school-secondary)]"></i>
                       {% else %}
                         {{ forloop.counter }}
                       {% endif %}
                     </span>
-                    <span class="min-w-0 leading-snug">{{ content.title }}</span>
+                    <span class="min-w-0 leading-snug">
+                      <span class="block">{{ content.title }}</span>
+                      <span class="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">{{ content.get_content_type_display }} · {{ content.student_progress_percent }}%</span>
+                    </span>
                   </button>
+                {% empty %}
+                  <p class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--muted)]">Aucune lecon active.</p>
                 {% endfor %}
               </div>
-            </div>
+            </section>
           {% empty %}
-            <p class="p-3 text-sm text-[color:var(--muted)]">Aucun chapitre.</p>
+            <p class="p-3 text-sm text-[color:var(--muted)]">Aucune section.</p>
           {% endfor %}
         </div>
       </aside>
 
-      <main class="flex min-h-0 min-w-0 flex-col bg-[color:var(--surface)]">
-        <div
-          class="flex shrink-0 flex-wrap items-center gap-2 border-b border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 sm:px-4"
-          x-show="activeId !== null && orderedIds.length"
-          x-cloak
-        >
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-xs font-extrabold text-[color:var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
-            @click="prevLesson()"
-            :disabled="!canPrev"
-          >
+      <main class="course-reader-main">
+        <div class="course-reader-toolbar" x-show="activeId !== null && orderedIds.length" x-cloak>
+          <button type="button" class="inline-flex items-center gap-1 rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-xs font-extrabold text-[color:var(--text)] disabled:cursor-not-allowed disabled:opacity-40" @click="prevLesson()" :disabled="!canPrev">
             <i data-lucide="chevron-left" class="h-4 w-4"></i>
             Precedent
           </button>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-xs font-extrabold text-[color:var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
-            @click="nextLesson()"
-            :disabled="!canNext"
-          >
+          <button type="button" class="inline-flex items-center gap-1 rounded-xl border border-[color:var(--line)] bg-white px-3 py-2 text-xs font-extrabold text-[color:var(--text)] disabled:cursor-not-allowed disabled:opacity-40" @click="nextLesson()" :disabled="!canNext">
             Suivant
             <i data-lucide="chevron-right" class="h-4 w-4"></i>
           </button>
           <span class="ml-auto min-w-0 max-w-[55%] truncate text-xs font-bold text-[color:var(--muted)]" x-text="activeLessonTitle()"></span>
         </div>
 
-        <div class="student-scroll flex min-h-0 flex-1 flex-col overflow-y-auto p-3 sm:p-4">
+        <div class="student-scroll course-reader-stage">
           {% for chapter in chapters %}
             {% for content in chapter.active_contents %}
-              <div
-                x-show="activeId === {{ content.id }}"
-                x-cloak
-                class="flex min-h-0 flex-1 flex-col"
-              >
+              <div x-show="activeId === {{ content.id }}" x-cloak class="course-reader-lesson-wrap">
                 {% include "portal/student/partials/ec_content_lesson.html" with content=content only %}
               </div>
             {% endfor %}
           {% empty %}
-            <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
-              Aucun chapitre pedagogique n'est encore associe a cette matiere.
+            <div class="course-reader-empty">
+              <div class="max-w-lg rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
+                <p class="text-base font-black text-[color:var(--text)]">Aucun contenu publie</p>
+                <p class="mt-2">Cette matiere est bien rattachee a votre classe, mais les sections et lecons ne sont pas encore publiees.</p>
+              </div>
             </div>
           {% endfor %}
 
           {% if chapters and not total_active_content_count %}
-            <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
-              Aucun contenu actif dans les chapitres de ce cours.
+            <div class="course-reader-empty">
+              <div class="max-w-lg rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm text-[color:var(--muted)]">
+                <p class="text-base font-black text-[color:var(--text)]">Lecons non disponibles</p>
+                <p class="mt-2">Les sections existent, mais aucun contenu actif n'est encore visible pour les etudiants.</p>
+              </div>
             </div>
           {% endif %}
         </div>

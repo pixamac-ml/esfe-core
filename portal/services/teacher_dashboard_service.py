@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from django.core.exceptions import ValidationError
 from django.db import OperationalError, ProgrammingError
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicScheduleEvent, EC, ECChapter, ECContent, LessonLog, WeeklyScheduleSlot
@@ -13,7 +13,7 @@ from academics.services.lesson_log_service import get_teacher_lesson_logs
 from academics.services.schedule_service import get_teacher_next_events, get_teacher_week_schedule
 from accounts.models import UserPreference
 from portal.models import AccountSupportState
-from students.models import Student
+from students.models import Student, TeacherAttendance
 from portal.models import TeacherDashboardPreference
 
 WEEKDAY_LABELS = [
@@ -109,6 +109,7 @@ def _serialize_class_focus(academic_class, *, event_count, slot_count, subjects,
         "class_name": academic_class.display_name,
         "programme_title": getattr(academic_class.programme, "title", ""),
         "academic_year_name": getattr(academic_class.academic_year, "name", ""),
+        "student_count": getattr(academic_class, "student_count", 0),
         "event_count": event_count,
         "slot_count": slot_count,
         "subjects": sorted(subjects),
@@ -145,7 +146,7 @@ def _resolve_teacher_class(*, teacher, branch, class_id):
             "academic_year",
             "branch",
         )
-        .annotate(student_count=Count("enrollments"))
+        .annotate(student_count=Count("enrollments", filter=Q(enrollments__is_active=True), distinct=True))
         .filter(pk=class_id, is_active=True)
         .first()
     )
@@ -215,6 +216,8 @@ def _get_teacher_class_queryset(*, teacher, branch):
         "programme",
         "academic_year",
         "branch",
+    ).annotate(
+        student_count=Count("enrollments", filter=Q(enrollments__is_active=True), distinct=True),
     ).filter(
         pk__in=class_ids,
         is_active=True,
@@ -527,11 +530,13 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
                 "event_count": 0,
                 "slot_count": 0,
                 "subjects": set(),
+                "ec_ids": set(),
             },
         )
         class_entry["event_count"] += 1
         if event.ec_id:
             class_entry["subjects"].add(event.ec.title)
+            class_entry["ec_ids"].add(event.ec_id)
         if event.academic_class_id not in next_event_by_class and event.start_datetime >= now:
             next_event_by_class[event.academic_class_id] = event
 
@@ -543,11 +548,13 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
                 "event_count": 0,
                 "slot_count": 0,
                 "subjects": set(),
+                "ec_ids": set(),
             },
         )
         class_entry["slot_count"] += 1
         if slot.ec_id:
             class_entry["subjects"].add(slot.ec.title)
+            class_entry["ec_ids"].add(slot.ec_id)
 
     for assignment in director_assignments:
         if assignment.academic_class_id is None:
@@ -559,10 +566,21 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
                 "event_count": 0,
                 "slot_count": 0,
                 "subjects": set(),
+                "ec_ids": set(),
             },
         )
         if assignment.ec_id:
             class_entry["subjects"].add(assignment.ec.title)
+            class_entry["ec_ids"].add(assignment.ec_id)
+
+    class_student_counts = {
+        row["pk"]: row["student_count"]
+        for row in AcademicClass.objects.filter(pk__in=class_map.keys())
+        .annotate(student_count=Count("enrollments", filter=Q(enrollments__is_active=True), distinct=True))
+        .values("pk", "student_count")
+    }
+    for class_id, item in class_map.items():
+        setattr(item["academic_class"], "student_count", class_student_counts.get(class_id, 0))
 
     class_focus_rows = [
         _serialize_class_focus(
@@ -582,6 +600,12 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
             for subject in row["subjects"]
         }
     )
+    teacher_ec_ids = {
+        ec_id
+        for item in class_map.values()
+        for ec_id in item.get("ec_ids", set())
+        if ec_id
+    }
 
     lesson_logs = get_teacher_lesson_logs(teacher, branch=branch, limit=6)
     lesson_logs_this_week = [
@@ -614,6 +638,35 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
     if branch is not None:
         monthly_done_logs = monthly_done_logs.filter(branch=branch)
 
+    support_chapters_count = ECChapter.objects.filter(ec_id__in=teacher_ec_ids).count() if teacher_ec_ids else 0
+    support_contents_qs = ECContent.objects.filter(chapter__ec_id__in=teacher_ec_ids, is_active=True)
+    support_contents_count = support_contents_qs.count() if teacher_ec_ids else 0
+    support_file_count = (
+        support_contents_qs.exclude(file="").filter(file__isnull=False).count()
+        if teacher_ec_ids
+        else 0
+    )
+    support_video_count = (
+        support_contents_qs.exclude(video_url="").filter(video_url__isnull=False).count()
+        if teacher_ec_ids
+        else 0
+    )
+    support_text_count = support_contents_qs.filter(content_type=ECContent.CONTENT_TYPE_TEXT).count() if teacher_ec_ids else 0
+
+    teacher_attendance_month_qs = TeacherAttendance.objects.filter(
+        teacher=teacher,
+        date__year=today.year,
+        date__month=today.month,
+    )
+    if branch is not None:
+        teacher_attendance_month_qs = teacher_attendance_month_qs.filter(branch=branch)
+    teacher_attendance_summary = {
+        "present": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_PRESENT).count(),
+        "late": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_LATE).count(),
+        "absent": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_ABSENT).count(),
+        "total": teacher_attendance_month_qs.count(),
+    }
+
     preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
     status_summary = {
         "employment_status": getattr(getattr(teacher, "profile", None), "get_employment_status_display", lambda: "Inconnu")(),
@@ -643,6 +696,50 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
                 "date": day["date"],
                 "is_today": day["is_today"],
                 "events": day_buckets.get(offset, []),
+            }
+        )
+
+    completed_or_past_count = len(completed_or_past_week_events)
+    lesson_completion_rate = round(
+        ((completed_or_past_count - len(pending_lesson_logs)) / completed_or_past_count) * 100
+    ) if completed_or_past_count else 100
+    total_students_visible = sum(row.get("student_count", 0) for row in class_focus_rows)
+    next_event_focus = upcoming_events[0] if upcoming_events else None
+    teacher_insights = []
+    if pending_lesson_logs:
+        teacher_insights.append(
+            {
+                "tone": "danger",
+                "label": "Cahiers en attente",
+                "message": f"{len(pending_lesson_logs)} seance(s) terminee(s) attendent un cahier de texte.",
+                "section": "logs",
+            }
+        )
+    if today_events:
+        teacher_insights.append(
+            {
+                "tone": "primary",
+                "label": "Cours aujourd'hui",
+                "message": f"{len(today_events)} cours programme(s) aujourd'hui.",
+                "section": "schedule",
+            }
+        )
+    if support_contents_count == 0 and class_focus_rows:
+        teacher_insights.append(
+            {
+                "tone": "warning",
+                "label": "Supports",
+                "message": "Aucun support actif n'est encore visible pour vos matieres.",
+                "section": "supports",
+            }
+        )
+    if not teacher_insights:
+        teacher_insights.append(
+            {
+                "tone": "success",
+                "label": "Situation stable",
+                "message": "Aucune action urgente detectee sur le perimetre enseignant.",
+                "section": "overview",
             }
         )
 
@@ -683,11 +780,25 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
             "today_courses": len(today_events),
             "week_courses": len(week_events),
             "active_classes": len(class_focus_rows),
+            "visible_students": total_students_visible,
             "month_done_logs": monthly_done_logs.count(),
             "subjects_count": len(subject_titles),
             "scheduled_days": scheduled_days_count,
             "weekly_rooms": len(weekly_rooms),
+            "support_chapters": support_chapters_count,
+            "support_contents": support_contents_count,
+            "lesson_completion_rate": lesson_completion_rate,
         },
+        "teacher_support_stats": {
+            "chapters": support_chapters_count,
+            "contents": support_contents_count,
+            "files": support_file_count,
+            "videos": support_video_count,
+            "texts": support_text_count,
+        },
+        "teacher_attendance_summary": teacher_attendance_summary,
+        "next_event_focus": next_event_focus,
+        "teacher_insights": teacher_insights,
     }
     return context
 

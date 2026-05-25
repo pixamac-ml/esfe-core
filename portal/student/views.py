@@ -3,10 +3,12 @@ from urllib.parse import parse_qs, urlparse
 from urllib.parse import quote as urlquote
 
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import update_session_auth_hash
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 
 from django.db.models import Prefetch
@@ -21,10 +23,14 @@ from .services import (
     get_student_courses_context,
     get_student_messages_context,
     get_student_timetable_context,
+    is_semester_unlocked_for_enrollment,
 )
 from .profile_service import (
     get_profile_data,
     handle_document_upload,
+    update_account_center,
+    update_account_password,
+    update_account_preferences,
     update_editable_fields,
 )
 from .widgets.profile import get_profile_widget
@@ -252,6 +258,12 @@ def finance_partial(request):
 @role_required("student")
 def settings_partial(request):
     context = get_profile_data(request.user)
+    context["finance_widget"] = get_finance_widget(request.user)
+    return render(request, "portal/student/partials/settings_student.html", context)
+
+
+def _render_settings_response(request, context):
+    context["finance_widget"] = get_finance_widget(request.user)
     return render(request, "portal/student/partials/settings_student.html", context)
 
 
@@ -406,6 +418,8 @@ def ec_detail(request, ec_id):
         pk=ec_id,
         ue__semester__academic_class=enrollment.academic_class,
     )
+    if not is_semester_unlocked_for_enrollment(enrollment, ec.ue.semester.number):
+        raise PermissionDenied("Ce semestre est verrouille tant que les semestres precedents ne sont pas valides.")
 
     chapters = list(ec.chapters.all()) if _academic_chapters_available() else []
     _prepare_chapter_contents(request, request.user, chapters)
@@ -465,6 +479,8 @@ def ec_preview(request, ec_id):
         pk=ec_id,
         ue__semester__academic_class=enrollment.academic_class,
     )
+    if not is_semester_unlocked_for_enrollment(enrollment, ec.ue.semester.number):
+        raise PermissionDenied("Ce semestre est verrouille tant que les semestres precedents ne sont pas valides.")
 
     chapters = list(ec.chapters.all()) if _academic_chapters_available() else []
     _prepare_chapter_contents(request, request.user, chapters)
@@ -562,7 +578,7 @@ def update_settings_profile(request):
         context = get_profile_data(request.user)
         context["form_success"] = ""
         context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
-    return render(request, "portal/student/partials/settings_student.html", context)
+    return _render_settings_response(request, context)
 
 
 @login_required
@@ -584,4 +600,50 @@ def upload_settings_document(request):
         else:
             context["form_errors"] = {"document_type_id": ["Type de document invalide."]}
         context["form_success"] = ""
-    return render(request, "portal/student/partials/settings_student.html", context)
+    return _render_settings_response(request, context)
+
+
+@login_required
+@role_required("student")
+@require_POST
+def update_settings_account(request):
+    try:
+        context = update_account_center(request.user, request.POST)
+        context["form_success"] = "Informations du compte mises a jour."
+        context["form_errors"] = {}
+    except ValidationError as exc:
+        context = get_profile_data(request.user)
+        context["form_success"] = ""
+        context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
+    return _render_settings_response(request, context)
+
+
+@login_required
+@role_required("student")
+@require_POST
+def update_settings_preferences(request):
+    try:
+        context = update_account_preferences(request.user, request.POST)
+        context["form_success"] = "Preferences mises a jour."
+        context["form_errors"] = {}
+    except ValidationError as exc:
+        context = get_profile_data(request.user)
+        context["form_success"] = ""
+        context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
+    return _render_settings_response(request, context)
+
+
+@login_required
+@role_required("student")
+@require_POST
+def update_settings_password(request):
+    try:
+        context = update_account_password(request.user, request.POST)
+        update_session_auth_hash(request, request.user)
+        context["form_success"] = "Mot de passe mis a jour."
+        context["form_errors"] = {}
+    except ValidationError as exc:
+        context = get_profile_data(request.user)
+        context["form_success"] = ""
+        context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
+    return _render_settings_response(request, context)

@@ -1131,6 +1131,64 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertEqual(response.status_code, 404)
 
+	def test_student_semester_two_is_locked_until_semester_one_is_validated(self):
+		from portal.student.services import get_student_courses
+
+		student_user = self._create_user("student_s2_locked", role="student")
+		student = self._create_student_record(student_user)
+		academic_year = AcademicYear.objects.create(
+			name="2025-2026",
+			start_date="2025-10-01",
+			end_date="2026-07-31",
+			is_active=True,
+		)
+		academic_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			level="L1",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		enrollment = AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		semester_one = Semester.objects.create(academic_class=academic_class, number=1)
+		semester_two = Semester.objects.create(academic_class=academic_class, number=2)
+		ue_one = UE.objects.create(semester=semester_one, code="UE101", title="Bases")
+		ue_two = UE.objects.create(semester=semester_two, code="UE201", title="Suite")
+		ec_one = EC.objects.create(ue=ue_one, title="EC S1", credit_required=3, coefficient=2)
+		ec_two = EC.objects.create(ue=ue_two, title="EC S2", credit_required=3, coefficient=2)
+
+		courses = get_student_courses(student)
+		s2_course = next(course for course in courses if course["id"] == ec_two.id)
+		self.assertFalse(s2_course["semester_unlocked"])
+
+		self.client.force_login(student_user)
+		response = self.client.get(reverse("portal_student:ec_detail", args=[ec_two.id]))
+		self.assertEqual(response.status_code, 403)
+
+		ECGrade.objects.create(
+			enrollment=enrollment,
+			ec=ec_one,
+			normal_score=Decimal("14.00"),
+			final_score=Decimal("14.00"),
+			credit_obtained=Decimal("3.00"),
+			is_validated=True,
+		)
+
+		courses = get_student_courses(student)
+		s2_course = next(course for course in courses if course["id"] == ec_two.id)
+		self.assertTrue(s2_course["semester_unlocked"])
+
+		response = self.client.get(reverse("portal_student:ec_detail", args=[ec_two.id]))
+		self.assertEqual(response.status_code, 200)
+
 	def test_portal_role_falls_back_to_staff_from_groups(self):
 		staff_user = self._create_user("portal_role_group", groups=["finance_agents"], role="")
 		self.assertEqual(get_portal_user_role(staff_user), "staff")

@@ -17,7 +17,7 @@ from shop.services.shop_cash_session import manager_shop_sessions_for_agent
 from shop.services.shop_service import get_manager_shop_context
 from shop.views import get_branch_public_shop_identifier
 from inscriptions.models import Inscription
-from payments.models import CashPaymentSession, Payment, PaymentAgent
+from payments.models import CashPaymentSession, FinancialLog, Payment, PaymentAgent
 from students.models import Student
 
 from accounts.dashboards.helpers import get_user_branch, is_manager
@@ -505,6 +505,12 @@ def _manager_context(request, active_section="overview"):
         "expenses_paid_month": expense_stats["paid_month_amount"],
         "salary_paid_month": salary_paid_month,
     }
+    recent_financial_logs = (
+        FinancialLog.objects
+        .filter(branch=branch)
+        .select_related("actor", "payment", "correction")
+        .order_by("-created_at")[:25]
+    )
 
     payroll_entries_qs = (
         PayrollEntry.objects
@@ -746,6 +752,7 @@ def _manager_context(request, active_section="overview"):
         "expense_categories": BranchExpense.CATEGORY_CHOICES,
         "cash_movements": cash_movements_page,
         "cash_stats": cash_stats,
+        "recent_financial_logs": recent_financial_logs,
         "period_summary": period_summary,
         "demo_flow": demo_flow,
         "cash_type": cash_type,

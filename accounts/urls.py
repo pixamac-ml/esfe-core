@@ -384,6 +384,7 @@ urlpatterns = [
     path("htmx/manager/payment/<int:pk>/detail/", payment_detail, name="htmx_payment_detail"),
     path("htmx/manager/payment/<int:pk>/validate/", payment_validate, name="htmx_payment_validate"),
     path("htmx/manager/payment/<int:pk>/cancel/", payment_cancel, name="htmx_payment_cancel"),
+    path("htmx/manager/payment/<int:pk>/correct/", payment_correct, name="htmx_payment_correct"),
 
     # =============================================
     # HTMX ACTIONS - SESSIONS CASH GESTIONNAIRE

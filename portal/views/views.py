@@ -2116,6 +2116,13 @@ def teacher_support_workspace(request):
     class_id = request.POST.get("class_id") if request.method == "POST" else request.GET.get("class_id")
     ec_id = request.POST.get("ec_id") if request.method == "POST" else request.GET.get("ec_id")
     chapter_id = request.POST.get("chapter_id") if request.method == "POST" else request.GET.get("chapter_id")
+    support_target = (
+        request.POST.get("support_target")
+        or request.GET.get("support_target")
+        or "#teacher-modal-panel"
+    ).strip()
+    if not support_target.startswith("#"):
+        support_target = "#teacher-modal-panel"
 
     try:
         parsed_class_id = _parse_id(class_id)
@@ -2130,6 +2137,7 @@ def teacher_support_workspace(request):
                 ec_id=parsed_ec_id,
                 chapter_id=parsed_chapter_id,
             )
+            context["teacher_support_target"] = support_target
             selected_class = context["selected_class"]
             selected_ec = context["selected_ec"]
             selected_chapter = context["selected_chapter"]
@@ -2154,8 +2162,31 @@ def teacher_support_workspace(request):
                 parsed_chapter_id = created_chapter.id
                 toast_message = f"Chapitre '{chapter_title}' cree avec succes."
             elif action == "create_content":
-                if selected_chapter is None:
-                    raise ValidationError("Selectionnez ou creez d'abord un chapitre.")
+                new_chapter_title = (request.POST.get("new_chapter_title") or "").strip()
+                chapter_selection_blank = not (request.POST.get("chapter_id") or "").strip()
+                if new_chapter_title:
+                    selected_chapter = ECChapter.objects.create(
+                        ec=selected_ec,
+                        title=new_chapter_title,
+                        order=selected_ec.chapters.count() + 1,
+                    )
+                    parsed_chapter_id = selected_chapter.id
+                elif chapter_selection_blank:
+                    selected_chapter = selected_ec.chapters.filter(title="Supports de cours").first()
+                    if selected_chapter is None:
+                        selected_chapter = ECChapter.objects.create(
+                            ec=selected_ec,
+                            title="Supports de cours",
+                            order=selected_ec.chapters.count() + 1,
+                        )
+                    parsed_chapter_id = selected_chapter.id
+                elif selected_chapter is None:
+                    selected_chapter = ECChapter.objects.create(
+                        ec=selected_ec,
+                        title="Supports de cours",
+                        order=selected_ec.chapters.count() + 1,
+                    )
+                    parsed_chapter_id = selected_chapter.id
                 content_title = (request.POST.get("content_title") or "").strip()
                 if not content_title:
                     raise ValidationError("Le titre du support est obligatoire.")
@@ -2216,6 +2247,7 @@ def teacher_support_workspace(request):
                 chapter_id=parsed_chapter_id or getattr(selected_chapter, "id", None),
                 toast={"level": "success", "message": toast_message},
             )
+            context["teacher_support_target"] = support_target
             return render(request, "portal/partials/teacher_support_workspace.html", context)
 
         context = build_teacher_support_workspace_context(
@@ -2225,6 +2257,7 @@ def teacher_support_workspace(request):
             ec_id=parsed_ec_id,
             chapter_id=parsed_chapter_id,
         )
+        context["teacher_support_target"] = support_target
     except (ValidationError, ValueError, TypeError) as exc:
         error_message = exc.messages[0] if isinstance(exc, ValidationError) and exc.messages else str(exc)
         try:
@@ -2236,10 +2269,12 @@ def teacher_support_workspace(request):
                 chapter_id=None,
                 toast={"level": "error", "message": error_message},
             )
+            context["teacher_support_target"] = support_target
         except ValidationError:
             context = {
                 "branch": branch,
                 "toast": {"level": "error", "message": error_message},
+                "teacher_support_target": support_target,
                 "teacher_support_classes": [],
                 "selected_class": None,
                 "selected_ec": None,

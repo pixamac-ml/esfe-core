@@ -1,11 +1,13 @@
+{% load component_tags %}
+
 <div class="student-inline-head">
   <div>
     <p class="student-section-kicker">Agenda</p>
     <h3 class="student-section-title">Evenements a venir</h3>
   </div>
-  <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-1.5 text-[11px] font-extrabold text-[color:var(--muted)]">
-    {{ events|length }} element{{ events|length|pluralize }}
-  </span>
+  {% with event_count=events|length|stringformat:"s"|add:" element(s)" %}
+    {% component "status_badge" label=event_count tone="neutral" icon="calendar-days" %}{% endcomponent %}
+  {% endwith %}
 </div>
 
 {% if events %}
@@ -47,7 +49,5 @@
     </div>
   </div>
 {% else %}
-  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">
-    Aucun evenement n'est publie pour le moment.
-  </div>
+  {% component "empty_state" title="Aucun evenement" message="Aucun evenement n'est publie pour le moment." icon="calendar-days" %}{% endcomponent %}
 {% endif %}

@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "admissions.apps.AdmissionsConfig",
     "inscriptions.apps.InscriptionsConfig",
     "payments.apps.PaymentsConfig",
+    "academic_cycle.apps.AcademicCycleConfig",
     "students",
     "formations",
     "branches",

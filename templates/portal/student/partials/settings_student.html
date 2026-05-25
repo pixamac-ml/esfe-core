@@ -1,58 +1,39 @@
+{% load component_tags %}
+
 <div class="grid gap-4" x-data="{ tab: 'profile' }">
-  <div class="rounded-xl border {% if completion.alert_level == 'success' %}border-emerald-200 bg-emerald-50{% elif completion.alert_level == 'warning' %}border-amber-200 bg-amber-50{% else %}border-rose-200 bg-rose-50{% endif %} p-4">
+  <section class="rounded-xl border {% if completion.alert_level == 'success' %}border-emerald-200 bg-emerald-50{% elif completion.alert_level == 'warning' %}border-amber-200 bg-amber-50{% else %}border-rose-200 bg-rose-50{% endif %} p-4">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p class="student-section-kicker">Parametres</p>
-        <h3 class="mt-1 student-section-title">Centre de gestion du profil</h3>
-        <p class="mt-2 text-sm leading-6 {% if completion.alert_level == 'success' %}text-emerald-800{% elif completion.alert_level == 'warning' %}text-amber-800{% else %}text-rose-800{% endif %}">
-          {{ completion.message }}
-        </p>
+        <p class="student-section-kicker">Compte etudiant</p>
+        <h3 class="mt-1 student-section-title">Centre de gestion du compte</h3>
+        <p class="mt-2 text-sm leading-6 {% if completion.alert_level == 'success' %}text-emerald-800{% elif completion.alert_level == 'warning' %}text-amber-800{% else %}text-rose-800{% endif %}">{{ completion.message }}</p>
       </div>
-      <span class="rounded-full bg-white/80 px-3 py-2 text-sm font-black {% if completion.alert_level == 'success' %}text-emerald-700{% elif completion.alert_level == 'warning' %}text-amber-700{% else %}text-rose-700{% endif %}">
-        {{ completion.percent }}%
-      </span>
+      {% with completion_percent=completion.percent|stringformat:"s"|add:"%" %}
+        {% if completion.alert_level == 'success' %}
+          {% component "status_badge" label=completion_percent tone="success" icon="check-circle-2" %}{% endcomponent %}
+        {% elif completion.alert_level == 'warning' %}
+          {% component "status_badge" label=completion_percent tone="warning" icon="triangle-alert" %}{% endcomponent %}
+        {% else %}
+          {% component "status_badge" label=completion_percent tone="danger" icon="circle-alert" %}{% endcomponent %}
+        {% endif %}
+      {% endwith %}
     </div>
     <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/70">
       <div class="h-full rounded-full {% if completion.alert_level == 'success' %}bg-emerald-500{% elif completion.alert_level == 'warning' %}bg-amber-500{% else %}bg-rose-500{% endif %}" style="width: {{ completion.percent }}%"></div>
     </div>
-    {% if alerts %}
-      <div class="mt-4 flex flex-wrap gap-2">
-        {% for item in alerts %}
-          <span class="rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-[11px] font-bold text-[color:var(--text)]">{{ item }}</span>
-        {% endfor %}
-      </div>
-    {% endif %}
-  </div>
+  </section>
 
-  <div class="flex flex-wrap gap-2">
-    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]"
-      :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'profile' }"
-      @click="tab='profile'">
-      Profil
-    </button>
-    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]"
-      :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'academics' }"
-      @click="tab='academics'">
-      Academique
-    </button>
-    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]"
-      :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'documents' }"
-      @click="tab='documents'">
-      Documents
-    </button>
-    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]"
-      :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'account' }"
-      @click="tab='account'">
-      Compte central
-    </button>
-  </div>
+  <nav class="flex flex-wrap gap-2">
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]" :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'profile' }" @click="tab='profile'">Profil</button>
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]" :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'academics' }" @click="tab='academics'">Academique</button>
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]" :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'documents' }" @click="tab='documents'">Documents</button>
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]" :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'finance' }" @click="tab='finance'">Finance</button>
+    <button type="button" class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]" :class="{ 'bg-[color:var(--school-primary)] text-white border-transparent': tab === 'account' }" @click="tab='account'">Compte</button>
+  </nav>
 
   {% if form_success %}
-    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-      {{ form_success }}
-    </div>
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{{ form_success }}</div>
   {% endif %}
-
   {% if form_errors %}
     <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
       {% for field, errors in form_errors.items %}
@@ -61,215 +42,171 @@
     </div>
   {% endif %}
 
-  <div x-show="tab === 'profile' || tab === 'academics'" x-cloak class="grid gap-4 xl:grid-cols-2">
-    <section x-show="tab === 'profile'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
-      <div class="mb-4">
-        <p class="student-section-kicker">Profil</p>
-        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations personnelles</h4>
+  <section x-show="tab === 'profile'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+    <div class="mb-4">
+      <p class="student-section-kicker">Profil</p>
+      <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations personnelles</h4>
+    </div>
+    <form hx-post="{% url 'portal_student:update_settings_profile' %}" hx-target="#settings" hx-swap="innerHTML" hx-disabled-elt="find button" class="grid gap-4">
+      {% csrf_token %}
+      <div class="grid gap-3 md:grid-cols-2">
+        {% component "info_field" label="Nom complet" value=readonly_fields.full_name %}{% endcomponent %}
+        {% component "info_field" label="Matricule" value=readonly_fields.matricule %}{% endcomponent %}
+        <label class="grid gap-2">
+          <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Email</span>
+          <input type="email" name="email" value="{{ editable_fields.email }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
+        </label>
+        <label class="grid gap-2">
+          <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Telephone</span>
+          <input type="text" name="phone" value="{{ editable_fields.phone }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
+        </label>
+        {% component "info_field" label="Date de naissance" value=readonly_fields.birth_date %}{% endcomponent %}
+        {% component "info_field" label="Lieu de naissance" value=readonly_fields.birth_place %}{% endcomponent %}
       </div>
-      <form
-        hx-post="{% url 'portal_student:update_settings_profile' %}"
-        hx-target="#settings"
-        hx-swap="outerHTML"
-        hx-disabled-elt="find button"
-        class="grid gap-4"
-      >
-        <div class="grid gap-3 md:grid-cols-2">
-          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Nom complet</span>
-            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.full_name|default:"Non disponible" }}</strong>
-          </div>
-          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Matricule</span>
-            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.matricule|default:"Non disponible" }}</strong>
-          </div>
-          <label class="grid gap-2">
-            <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Email</span>
-            <input type="email" name="email" value="{{ editable_fields.email }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
-          </label>
-          <label class="grid gap-2">
-            <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Telephone</span>
-            <input type="text" name="phone" value="{{ editable_fields.phone }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
-          </label>
-          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Date de naissance</span>
-            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.birth_date|default:"Non renseignee" }}</strong>
-          </div>
-          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Lieu de naissance</span>
-            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ readonly_fields.birth_place|default:"Non renseigne" }}</strong>
-          </div>
-        </div>
-        <div class="flex items-center justify-end gap-3">
-          <span class="htmx-indicator text-xs font-bold text-[color:var(--muted)]">Enregistrement...</span>
-          <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-600">
-            Mettre a jour
-          </button>
-        </div>
-      </form>
-    </section>
+      <div class="flex justify-end">
+        <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white">Mettre a jour</button>
+      </div>
+    </form>
+  </section>
 
-    <section x-show="tab === 'academics'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
-      <div class="mb-4">
-        <p class="student-section-kicker">Academique</p>
-        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations en lecture seule</h4>
-      </div>
-      <div class="grid gap-3">
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Formation</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.formation|default:"Non disponible" }}</strong>
-        </div>
-        <div class="grid gap-3 md:grid-cols-2">
-          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Classe</span>
-            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.classroom|default:"Non disponible" }}</strong>
-          </div>
-          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Annee academique</span>
-            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.academic_year|default:"Non disponible" }}</strong>
-          </div>
-        </div>
-        <div class="grid gap-3 md:grid-cols-2">
-          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Statut inscription</span>
-            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.enrollment_status|default:"Non disponible" }}</strong>
-          </div>
-          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-            <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Annexe</span>
-            <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.annexe|default:"Non disponible" }}</strong>
-          </div>
-        </div>
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Statut academique</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ academic_fields.academic_status|default:"Non disponible" }}</strong>
-        </div>
-      </div>
-    </section>
-  </div>
+  <section x-show="tab === 'academics'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+    <div class="mb-4">
+      <p class="student-section-kicker">Academique</p>
+      <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations institutionnelles</h4>
+    </div>
+    <div class="grid gap-3 md:grid-cols-2">
+      {% component "info_field" label="Formation" value=academic_fields.formation %}{% endcomponent %}
+      {% component "info_field" label="Classe" value=academic_fields.classroom %}{% endcomponent %}
+      {% component "info_field" label="Annee academique" value=academic_fields.academic_year %}{% endcomponent %}
+      {% component "info_field" label="Statut inscription" value=academic_fields.enrollment_status %}{% endcomponent %}
+      {% component "info_field" label="Annexe" value=academic_fields.annexe %}{% endcomponent %}
+      {% component "info_field" label="Statut academique" value=academic_fields.academic_status %}{% endcomponent %}
+    </div>
+  </section>
 
   <section x-show="tab === 'documents'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
     <div class="mb-4">
       <p class="student-section-kicker">Documents</p>
-      <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Pieces et justificatifs etudiants</h4>
+      <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Pieces et justificatifs</h4>
     </div>
     <div class="grid gap-3">
       {% for document in documents %}
-        <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
+        <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
               <strong class="block text-sm text-[color:var(--text)]">{{ document.name }}</strong>
-              {% if document.description %}
-                <p class="mt-1 text-sm text-[color:var(--muted)]">{{ document.description }}</p>
-              {% endif %}
+              {% if document.description %}<p class="mt-1 text-sm text-[color:var(--muted)]">{{ document.description }}</p>{% endif %}
             </div>
-            <span class="rounded-full px-3 py-1 text-[11px] font-bold {% if document.status == 'valide' %}bg-emerald-100 text-emerald-700{% elif document.status == 'en_attente' %}bg-amber-100 text-amber-700{% else %}bg-rose-100 text-rose-700{% endif %}">
-              {{ document.status_label }}
-            </span>
-          </div>
-          <div class="mt-3 flex flex-wrap items-center gap-3">
-            {% if document.file_url %}
-              <a href="{{ document.file_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--text)]">
-                Consulter le fichier
-              </a>
+            {% if document.status == 'valide' %}
+              {% component "status_badge" label=document.status_label tone="success" icon="check-circle-2" %}{% endcomponent %}
+            {% elif document.status == 'en_attente' %}
+              {% component "status_badge" label=document.status_label tone="warning" icon="clock-3" %}{% endcomponent %}
+            {% else %}
+              {% component "status_badge" label=document.status_label tone="danger" icon="circle-alert" %}{% endcomponent %}
             {% endif %}
-            <form
-              hx-post="{% url 'portal_student:upload_settings_document' %}"
-              hx-target="#settings"
-              hx-swap="outerHTML"
-              hx-encoding="multipart/form-data"
-              hx-disabled-elt="find button"
-              class="flex flex-wrap items-center gap-3"
-            >
-              <input type="hidden" name="document_type_id" value="{{ document.id }}">
-              <input type="file" name="file" class="block text-sm text-[color:var(--muted)]" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
-              <span class="htmx-indicator text-xs font-bold text-[color:var(--muted)]">Televersement...</span>
-              <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-sm font-bold text-white transition hover:bg-primary-600">
-                Televerser
-              </button>
-            </form>
           </div>
-        </div>
+          <form hx-post="{% url 'portal_student:upload_settings_document' %}" hx-target="#settings" hx-swap="innerHTML" hx-encoding="multipart/form-data" hx-disabled-elt="find button" class="mt-3 flex flex-wrap items-center gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="document_type_id" value="{{ document.id }}">
+            <input type="file" name="file" class="block text-sm text-[color:var(--muted)]" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+            {% if document.file_url %}
+              <a href="{{ document.file_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--text)]">Consulter</a>
+            {% endif %}
+            <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-sm font-bold text-white">Televerser</button>
+          </form>
+        </article>
       {% empty %}
-        <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">
-          Aucun document n'est encore rattache a votre dossier.
-        </div>
+        {% component "empty_state" title="Aucun document" message="Aucun document n'est encore rattache a votre dossier." icon="file-text" %}{% endcomponent %}
       {% endfor %}
     </div>
   </section>
 
-  <section x-show="tab === 'account'" x-cloak class="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+  <section id="finance" data-section-url="{% url 'portal_student:finance_partial' %}" data-section-loaded="1" x-show="tab === 'finance'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+    {% include "portal/student/partials/finance.html" with status=finance_widget.status status_tone=finance_widget.status_tone metrics=finance_widget.metrics payments=finance_widget.payments only %}
+  </section>
+
+  <section x-show="tab === 'account'" x-cloak class="grid gap-4">
+    <div class="grid gap-3 md:grid-cols-3">
+      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+        <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Compte</p>
+        <p class="mt-1 text-sm font-black text-[color:var(--text)]">{{ account_center.full_name }}</p>
+        <p class="mt-1 truncate text-xs font-semibold text-[color:var(--muted)]">{{ account_center.email }}</p>
+      </div>
+      <div class="rounded-xl border {% if account_center.is_suspended or account_center.is_blocked %}border-rose-200 bg-rose-50{% else %}border-emerald-200 bg-emerald-50{% endif %} p-3">
+        <p class="text-[11px] font-black uppercase tracking-wide {% if account_center.is_suspended or account_center.is_blocked %}text-rose-700{% else %}text-emerald-700{% endif %}">Securite</p>
+        <p class="mt-1 text-sm font-black {% if account_center.is_suspended or account_center.is_blocked %}text-rose-700{% else %}text-emerald-700{% endif %}">{% if account_center.is_suspended or account_center.is_blocked %}Restriction active{% else %}Compte operationnel{% endif %}</p>
+      </div>
+      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+        <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Preferences</p>
+        <p class="mt-1 text-sm font-black text-[color:var(--text)]">Notifications et interface</p>
+      </div>
+    </div>
+
+    <div class="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+        <div class="mb-4">
+          <p class="student-section-kicker">Profil systeme</p>
+          <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Informations du compte</h4>
+        </div>
+        <form hx-post="{% url 'portal_student:update_settings_account' %}" hx-target="#settings" hx-swap="innerHTML" hx-disabled-elt="find button" class="grid gap-4">
+          {% csrf_token %}
+          <div class="grid gap-3 md:grid-cols-2">
+            {% component "info_field" label="Identite" value=account_center.full_name %}{% endcomponent %}
+            {% component "info_field" label="Email compte" value=account_center.email %}{% endcomponent %}
+            <label class="grid gap-2">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Localisation</span>
+              <input type="text" name="location" value="{{ account_center.location }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
+            </label>
+            <label class="grid gap-2">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Adresse</span>
+              <input type="text" name="address" value="{{ account_center.address }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
+            </label>
+            <label class="grid gap-2 md:col-span-2">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Bio courte</span>
+              <textarea name="bio" rows="3" class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-sm text-[color:var(--text)] outline-none">{{ account_center.bio }}</textarea>
+            </label>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white">Enregistrer</button>
+          </div>
+        </form>
+      </article>
+
+      <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+        <div class="mb-4">
+          <p class="student-section-kicker">Acces</p>
+          <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Mot de passe</h4>
+        </div>
+        <form hx-post="{% url 'portal_student:update_settings_password' %}" hx-target="#settings" hx-swap="innerHTML" hx-disabled-elt="find button" class="grid gap-3">
+          {% csrf_token %}
+          <input type="password" name="old_password" placeholder="Mot de passe actuel" autocomplete="current-password" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm outline-none">
+          <input type="password" name="new_password" placeholder="Nouveau mot de passe" autocomplete="new-password" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm outline-none">
+          <input type="password" name="confirm_password" placeholder="Confirmer le nouveau mot de passe" autocomplete="new-password" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm outline-none">
+          <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-xs font-semibold leading-5 text-[color:var(--muted)]">
+            Suspension: {% if account_center.is_suspended %}oui{% else %}non{% endif %} · Blocage: {% if account_center.is_blocked %}oui{% else %}non{% endif %} · Changement impose: {% if account_center.must_change_password %}oui{% else %}non{% endif %}
+          </div>
+          <button type="submit" class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-4 py-2.5 text-sm font-bold text-[color:var(--text)]">Mettre a jour</button>
+        </form>
+      </article>
+    </div>
+
     <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
       <div class="mb-4">
-        <p class="student-section-kicker">Compte</p>
-        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Centre de profil unifie</h4>
-        <p class="mt-2 text-sm text-[color:var(--muted)]">Les donnees ci-dessous sont partagees avec les autres espaces du compte.</p>
+        <p class="student-section-kicker">Preferences</p>
+        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Notifications et interface</h4>
       </div>
-
-      <div class="grid gap-3 md:grid-cols-2">
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Identite</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.full_name }}</strong>
+      <form hx-post="{% url 'portal_student:update_settings_preferences' %}" hx-target="#settings" hx-swap="innerHTML" hx-disabled-elt="find button" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {% csrf_token %}
+        <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">Email <input type="checkbox" name="notify_email" {% if account_center.notify_email %}checked{% endif %}></label>
+        <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">Plateforme <input type="checkbox" name="notify_in_app" {% if account_center.notify_in_app %}checked{% endif %}></label>
+        <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">SMS <input type="checkbox" name="notify_sms" {% if account_center.notify_sms %}checked{% endif %}></label>
+        <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">Mode compact <input type="checkbox" name="ui_compact_mode" {% if account_center.ui_compact_mode %}checked{% endif %}></label>
+        <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">Barre reduite <input type="checkbox" name="ui_sidebar_collapsed" {% if account_center.ui_sidebar_collapsed %}checked{% endif %}></label>
+        <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">Actualisation auto <input type="checkbox" name="ui_autorefresh" {% if account_center.ui_autorefresh %}checked{% endif %}></label>
+        <div class="md:col-span-2 xl:col-span-3 flex justify-end">
+          <button type="submit" class="rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white">Enregistrer les preferences</button>
         </div>
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Email compte</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.email|default:"Non renseigne" }}</strong>
-        </div>
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Telephone central</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.phone|default:"Non renseigne" }}</strong>
-        </div>
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Localisation</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.location|default:"Non renseignee" }}</strong>
-        </div>
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3 md:col-span-2">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Adresse</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">{{ account_center.address|default:"Non renseignee" }}</strong>
-        </div>
-      </div>
-
-      <div class="mt-4 flex flex-wrap gap-3">
-        <a href="{{ account_center.profile_url }}" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm font-bold text-[color:var(--text)]">Voir mon profil</a>
-        <a href="{{ account_center.edit_profile_url }}" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-600">Modifier mon profil central</a>
-        <a href="{{ account_center.edit_preferences_url }}" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm font-bold text-[color:var(--text)]">Preferences communes</a>
-      </div>
-    </article>
-
-    <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
-      <div class="mb-4">
-        <p class="student-section-kicker">Securite et preferences</p>
-        <h4 class="mt-1 text-base font-black text-[color:var(--text)]">Etat transversal du compte</h4>
-      </div>
-
-      <div class="grid gap-3">
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Notifications</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">
-            Email: {% if account_center.notify_email %}active{% else %}inactive{% endif %} ·
-            Plateforme: {% if account_center.notify_in_app %}active{% else %}inactive{% endif %} ·
-            SMS: {% if account_center.notify_sms %}active{% else %}inactive{% endif %}
-          </strong>
-        </div>
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Interface</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">
-            Compact: {% if account_center.ui_compact_mode %}oui{% else %}non{% endif %} ·
-            Barre reduite: {% if account_center.ui_sidebar_collapsed %}oui{% else %}non{% endif %}
-          </strong>
-        </div>
-        <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3">
-          <span class="block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Securite</span>
-          <strong class="mt-2 block text-sm text-[color:var(--text)]">
-            Suspension: {% if account_center.is_suspended %}oui{% else %}non{% endif %} ·
-            Blocage: {% if account_center.is_blocked %}oui{% else %}non{% endif %} ·
-            Changement MDP force: {% if account_center.must_change_password %}oui{% else %}non{% endif %}
-          </strong>
-        </div>
-      </div>
-
-      <div class="mt-4">
-        <a href="{{ account_center.password_change_url }}" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm font-bold text-[color:var(--text)]">Changer mon mot de passe</a>
-      </div>
+      </form>
     </article>
   </section>
 </div>

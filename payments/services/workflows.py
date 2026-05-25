@@ -48,6 +48,12 @@ def sync_payment_finance_history(*, payment, actor=None):
     if payment.reference and movement.reference != payment.reference:
         movement.reference = payment.reference
         changed_fields.append("reference")
+    if movement.amount != payment.amount:
+        movement.amount = payment.amount
+        changed_fields.append("amount")
+    if movement.movement_date != payment.paid_at.date():
+        movement.movement_date = payment.paid_at.date()
+        changed_fields.append("movement_date")
     if changed_fields:
         movement.save(update_fields=changed_fields)
     return movement

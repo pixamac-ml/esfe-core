@@ -184,6 +184,8 @@ def _serialize_event(event: AcademicScheduleEvent, *, highlight_today: date | No
         "status_label": status_labels.get(event.status, "Planifie"),
         "status_theme": status_theme.get(event.status, "sky"),
         "event_type": event.event_type,
+        "ec_id": event.ec_id,
+        "teacher_id": event.teacher_id,
         "start_datetime": event.start_datetime,
         "end_datetime": event.end_datetime,
         "start_time": local_start.strftime("%H:%M"),
@@ -207,10 +209,51 @@ def _serialize_event(event: AcademicScheduleEvent, *, highlight_today: date | No
     }
 
 
-def _build_week_grid(events, week_start: date):
+def _serialize_weekly_slot(slot: WeeklyScheduleSlot, week_start: date, *, highlight_today: date | None = None) -> dict:
+    today = timezone.localdate()
+    event_day = week_start + timedelta(days=int(slot.weekday))
+    start_dt = timezone.make_aware(datetime.combine(event_day, slot.start_time))
+    end_dt = timezone.make_aware(datetime.combine(event_day, slot.end_time))
+    slot_label = slot.start_time.strftime("%H:%M")
+    return {
+        "id": f"weekly-{slot.id}",
+        "title": slot.ec.title,
+        "event_title": f"{slot.ec.title} - {slot.academic_class.display_name}",
+        "description": "Creneau hebdomadaire officiel",
+        "status": AcademicScheduleEvent.STATUS_PLANNED,
+        "status_label": "Planifie",
+        "status_theme": "sky",
+        "event_type": AcademicScheduleEvent.EVENT_TYPE_COURSE,
+        "ec_id": slot.ec_id,
+        "teacher_id": slot.teacher_id,
+        "start_datetime": start_dt,
+        "end_datetime": end_dt,
+        "start_time": slot.start_time.strftime("%H:%M"),
+        "end_time": slot.end_time.strftime("%H:%M"),
+        "time_range": f"{slot.start_time.strftime('%H:%M')} - {slot.end_time.strftime('%H:%M')}",
+        "weekday_index": int(slot.weekday),
+        "weekday_label": slot.get_weekday_display(),
+        "teacher_name": (slot.teacher.get_full_name() or slot.teacher.username) if slot.teacher_id else "Enseignant non defini",
+        "location": slot.room or "Salle non precisee",
+        "branch_name": slot.branch.name,
+        "class_name": slot.academic_class.display_name,
+        "ec_code": slot.ec.ue.code if slot.ec_id else "",
+        "is_online": False,
+        "slot_label": slot_label,
+        "is_standard_slot": slot.start_time.replace(second=0, microsecond=0) in DEFAULT_TIME_SLOTS,
+        "duration_minutes": int((datetime.combine(event_day, slot.end_time) - datetime.combine(event_day, slot.start_time)).total_seconds() // 60),
+        "is_today": event_day == (highlight_today or today),
+        "is_postponed": False,
+        "is_cancelled": False,
+        "is_completed": False,
+        "source": "weekly_slot",
+    }
+
+
+def _build_week_grid_from_serialized(serialized_events, week_start: date):
     days = []
     day_labels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-    day_count = 6
+    day_count = 7 if any(event["weekday_index"] >= 6 for event in serialized_events) else 6
     today = timezone.localdate()
     for offset in range(day_count):
         current_day = week_start + timedelta(days=offset)
@@ -223,23 +266,25 @@ def _build_week_grid(events, week_start: date):
             }
         )
 
-    serialized_events = [_serialize_event(event, highlight_today=today) for event in events]
     standard_slot_labels = [slot.strftime("%H:%M") for slot in DEFAULT_TIME_SLOTS]
-    extra_slot_labels = sorted(
-        {
-            event["slot_label"]
-            for event in serialized_events
-            if event["weekday_index"] < 6 and event["slot_label"] not in standard_slot_labels
-        }
+    actual_slot_labels = {
+        event["slot_label"]
+        for event in serialized_events
+        if event["weekday_index"] < 6
+    }
+    all_slot_labels = sorted(
+        set(standard_slot_labels) | actual_slot_labels,
+        key=lambda value: datetime.strptime(value, "%H:%M").time(),
     )
 
     slots = []
-    for slot_label in standard_slot_labels:
+    for slot_label in all_slot_labels:
+        is_standard = slot_label in standard_slot_labels
         row = {
             "label": slot_label,
             "end_label": STANDARD_SLOT_END_BY_START.get(slot_label, ""),
             "time_range": f"{slot_label} - {STANDARD_SLOT_END_BY_START.get(slot_label, '')}".strip(" -"),
-            "is_standard": True,
+            "is_standard": is_standard,
             "cells": [],
         }
         for offset, current_day in enumerate(days):
@@ -252,20 +297,6 @@ def _build_week_grid(events, week_start: date):
                     cell_events.append(event)
             row["cells"].append({"day_index": offset, "day_date": day_date, "events": cell_events})
         slots.append(row)
-
-    extra_slots = []
-    for slot_label in extra_slot_labels:
-        row = {
-            "label": slot_label,
-            "end_label": "",
-            "time_range": slot_label,
-            "is_standard": False,
-            "cells": [],
-        }
-        for offset, current_day in enumerate(days):
-            cell_events = [event for event in serialized_events if event["weekday_index"] == offset and event["slot_label"] == slot_label]
-            row["cells"].append({"day_index": offset, "day_date": current_day["date"], "events": cell_events})
-        extra_slots.append(row)
 
     day_event_counts = []
     for offset, current_day in enumerate(days):
@@ -283,8 +314,8 @@ def _build_week_grid(events, week_start: date):
         "week_start": week_start,
         "days": days,
         "slots": slots,
-        "extra_slots": extra_slots,
-        "has_extra_slots": bool(extra_slots),
+        "extra_slots": [],
+        "has_extra_slots": False,
         "events": serialized_events,
         "empty_days": [item for item in day_event_counts if not item["has_events"]],
         "day_event_counts": day_event_counts,
@@ -296,6 +327,59 @@ def _build_week_grid(events, week_start: date):
             "completed": sum(1 for event in serialized_events if event["status"] == AcademicScheduleEvent.STATUS_COMPLETED),
         },
     }
+
+
+def _build_week_grid(events, week_start: date):
+    today = timezone.localdate()
+    serialized_events = [_serialize_event(event, highlight_today=today) for event in events]
+    return _build_week_grid_from_serialized(serialized_events, week_start)
+
+
+def _build_week_grid_from_weekly_slots(slots, week_start: date):
+    today = timezone.localdate()
+    serialized_events = [_serialize_weekly_slot(slot, week_start, highlight_today=today) for slot in slots]
+    grid = _build_week_grid_from_serialized(serialized_events, week_start)
+    grid["is_weekly_template"] = True
+    return grid
+
+
+def _merge_weekly_slots_into_grid(schedule: dict, weekly_slots, week_start: date):
+    """Show official weekly slots that have not yet been materialized as dated events."""
+    serialized_events = list(schedule.get("events") or [])
+    existing_keys = {
+        (
+            event.get("weekday_index"),
+            event.get("start_time"),
+            event.get("end_time"),
+            event.get("ec_id"),
+            event.get("teacher_id"),
+        )
+        for event in serialized_events
+    }
+    added = 0
+    today = timezone.localdate()
+    for slot in weekly_slots:
+        key = (
+            int(slot.weekday),
+            slot.start_time.strftime("%H:%M"),
+            slot.end_time.strftime("%H:%M"),
+            slot.ec_id,
+            slot.teacher_id,
+        )
+        if key in existing_keys:
+            continue
+        serialized_events.append(_serialize_weekly_slot(slot, week_start, highlight_today=today))
+        existing_keys.add(key)
+        added += 1
+
+    if not added:
+        return schedule
+
+    grid = _build_week_grid_from_serialized(serialized_events, week_start)
+    grid["has_weekly_template_fallback"] = True
+    grid["weekly_template_added_count"] = added
+    grid["is_weekly_template"] = not bool(schedule.get("events"))
+    return grid
 
 
 def get_schedule_conflicts(*, academic_class=None, teacher=None, branch=None, academic_year=None, ec=None, location="", start_datetime=None, end_datetime=None, exclude_event=None):
@@ -661,14 +745,69 @@ def get_class_week_schedule(academic_class: AcademicClass, week_start):
     return _build_week_grid(events, normalized)
 
 
+def _nearest_available_schedule_week(academic_class: AcademicClass, requested_week_start: date):
+    base_queryset = (
+        AcademicScheduleEvent.objects.filter(
+            academic_class=academic_class,
+            is_active=True,
+        )
+        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .order_by("start_datetime", "id")
+    )
+    current_week_start = timezone.make_aware(datetime.combine(requested_week_start, time.min))
+    upcoming_event = base_queryset.filter(start_datetime__gte=current_week_start).first()
+    if upcoming_event is not None:
+        return _normalize_week_start(upcoming_event.start_datetime)
+
+    previous_event = base_queryset.order_by("-start_datetime", "-id").first()
+    if previous_event is not None:
+        return _normalize_week_start(previous_event.start_datetime)
+    return None
+
+
 def get_student_week_schedule(student, week_start):
+    from portal.models import DirectorTeacherAssignment
+
     user = getattr(student, "user", student)
     snapshot = get_student_academic_snapshot(user)
     academic_class = snapshot["academic_class"]
     if academic_class is None:
         normalized = _normalize_week_start(week_start)
         return _build_week_grid([], normalized)
-    return get_class_week_schedule(academic_class, week_start)
+    schedule = get_class_week_schedule(academic_class, week_start)
+    weekly_slots = list_weekly_slots_for_class(academic_class, active_only=True)
+    if weekly_slots:
+        normalized = schedule.get("week_start") or _normalize_week_start(week_start)
+        return _merge_weekly_slots_into_grid(schedule, weekly_slots, normalized)
+    if week_start is None and not schedule.get("events"):
+        requested_week_start = schedule.get("week_start") or _normalize_week_start(None)
+        nearest_week_start = _nearest_available_schedule_week(academic_class, requested_week_start)
+        if nearest_week_start and nearest_week_start != requested_week_start:
+            fallback_schedule = get_class_week_schedule(academic_class, nearest_week_start)
+            fallback_schedule["is_nearest_available_week"] = True
+            fallback_schedule["requested_week_start"] = requested_week_start
+            fallback_schedule["week_notice"] = "Aucun cours sur la semaine courante. Affichage de la semaine planifiee la plus proche."
+            return fallback_schedule
+    if not schedule.get("events"):
+        assignments = list(
+            DirectorTeacherAssignment.objects.select_related("teacher", "ec", "ec__ue")
+            .filter(academic_class=academic_class, is_active=True)
+            .order_by("ec__ue__semester__number", "ec__title", "teacher__last_name", "teacher__first_name")
+        )
+        if assignments:
+            schedule["has_unplanned_assignments"] = True
+            schedule["unplanned_assignments"] = [
+                {
+                    "title": assignment.ec.title if assignment.ec_id else "Matiere non precisee",
+                    "code": assignment.ec.ue.code if assignment.ec_id else "",
+                    "teacher_name": assignment.teacher.get_full_name() or assignment.teacher.username,
+                    "room": assignment.room_label or "Salle non precisee",
+                    "planned_hours": assignment.planned_hours,
+                }
+                for assignment in assignments
+            ]
+            schedule["week_notice"] = "Des enseignants sont affectes aux matieres, mais aucun creneau horaire n'est encore publie pour cette semaine."
+    return schedule
 
 
 def get_teacher_week_schedule(user, week_start):

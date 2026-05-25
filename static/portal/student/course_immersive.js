@@ -1,5 +1,4 @@
-<script>
-  function studentCourseImmersive() {
+﻿  function studentCourseImmersive() {
     return {
       nav: [],
       activeId: null,
@@ -80,4 +79,3 @@
       },
     };
   }
-</script>

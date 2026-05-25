@@ -1,6 +1,7 @@
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -32,7 +33,8 @@ from accounts.services.manager_intelligence import (
     sync_student_payment_cash_movements,
 )
 from inscriptions.models import Inscription
-from payments.models import CashPaymentSession, Payment, PaymentAgent
+from payments.models import CashPaymentSession, FinancialLog, Payment, PaymentAgent
+from payments.services.corrections import correct_validated_payment_amount, financial_logs_for_payment
 
 from accounts.dashboards.helpers import get_user_branch, is_manager
 
@@ -344,8 +346,89 @@ def payment_detail(request, pk):
     return render(
         request,
         "accounts/dashboard/partials/payment_modal.html",
-        {"payment": payment},
+        {
+            "payment": payment,
+            "financial_logs": financial_logs_for_payment(payment)[:20],
+            "corrections": payment.corrections.select_related("corrected_by").all()[:10],
+        },
     )
+
+
+@manager_required
+@require_POST
+def payment_correct(request, pk):
+    payment = get_object_or_404(
+        Payment.objects.select_related(
+            "inscription",
+            "inscription__candidature",
+            "inscription__candidature__branch",
+        ),
+        pk=pk,
+        inscription__candidature__branch=request.branch,
+        status=Payment.STATUS_VALIDATED,
+    )
+    raw_amount = (request.POST.get("new_amount") or "").strip()
+    reason = (request.POST.get("reason") or "").strip()
+    confirmation = (request.POST.get("confirmation") or "").strip().upper()
+
+    try:
+        new_amount = int(raw_amount)
+    except (TypeError, ValueError):
+        new_amount = 0
+
+    if confirmation != "CORRIGER":
+        response = render(
+            request,
+            "accounts/dashboard/partials/payment_modal.html",
+            {
+                "payment": payment,
+                "financial_logs": financial_logs_for_payment(payment)[:20],
+                "corrections": payment.corrections.select_related("corrected_by").all()[:10],
+                "correction_error": "Tapez CORRIGER pour confirmer l'operation.",
+                "correction_new_amount": raw_amount,
+                "correction_reason": reason,
+            },
+        )
+        response.status_code = 400
+        return response
+
+    try:
+        correct_validated_payment_amount(
+            payment=payment,
+            new_amount=new_amount,
+            reason=reason,
+            actor=request.user,
+        )
+    except ValidationError as exc:
+        payment.refresh_from_db()
+        response = render(
+            request,
+            "accounts/dashboard/partials/payment_modal.html",
+            {
+                "payment": payment,
+                "financial_logs": financial_logs_for_payment(payment)[:20],
+                "corrections": payment.corrections.select_related("corrected_by").all()[:10],
+                "correction_error": " ".join(exc.messages),
+                "correction_new_amount": raw_amount,
+                "correction_reason": reason,
+            },
+        )
+        response.status_code = 400
+        return response
+
+    payment.refresh_from_db()
+    response = render(
+        request,
+        "accounts/dashboard/partials/payment_modal.html",
+        {
+            "payment": payment,
+            "financial_logs": financial_logs_for_payment(payment)[:20],
+            "corrections": payment.corrections.select_related("corrected_by").all()[:10],
+            "correction_success": "Correction enregistree et caisse synchronisee.",
+        },
+    )
+    response["HX-Trigger"] = '{"showToast": {"message": "Paiement corrige avec tracabilite.", "type": "success"}}'
+    return response
 
 
 @manager_required
@@ -377,6 +460,15 @@ def payment_validate(request, pk):
             notes=f"Synchronisation automatique paiement #{payment.pk}.",
             created_by=request.user,
         )
+    FinancialLog.objects.create(
+        branch=request.branch,
+        payment=payment,
+        action=FinancialLog.ACTION_PAYMENT_VALIDATED,
+        new_amount=payment.amount,
+        reason="Validation du paiement par la gestionnaire.",
+        actor=request.user,
+        metadata={"payment_reference": payment.reference, "inscription_id": payment.inscription_id},
+    )
     payment.refresh_from_db()
     return render(
         request,
@@ -397,6 +489,16 @@ def payment_cancel(request, pk):
     payment.status = Payment.STATUS_CANCELLED
     payment.save()
     payment.inscription.update_financial_state()
+    FinancialLog.objects.create(
+        branch=request.branch,
+        payment=payment,
+        action=FinancialLog.ACTION_PAYMENT_CANCELLED,
+        old_amount=payment.amount,
+        delta_amount=-payment.amount,
+        reason="Annulation du paiement en attente par la gestionnaire.",
+        actor=request.user,
+        metadata={"payment_reference": payment.reference, "inscription_id": payment.inscription_id},
+    )
     payment.refresh_from_db()
     return render(
         request,
@@ -604,6 +706,15 @@ def cash_session_complete(request, pk):
                 notes=f"Synchronisation automatique paiement #{payment.pk}.",
                 created_by=request.user,
             )
+        FinancialLog.objects.create(
+            branch=request.branch,
+            payment=payment,
+            action=FinancialLog.ACTION_PAYMENT_CREATED,
+            new_amount=payment.amount,
+            reason="Paiement espece cree et valide depuis le dashboard gestionnaire.",
+            actor=request.user,
+            metadata={"payment_reference": payment.reference, "inscription_id": payment.inscription_id},
+        )
         session.is_used = True
         session.save(update_fields=["is_used"])
 

@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import Payment
+from .models import FinancialLog, Payment, PaymentCorrection
 
 
 @admin.register(Payment)
@@ -273,3 +273,53 @@ class CashPaymentSessionAdmin(admin.ModelAdmin):
         return mark_safe(
             '<span style="color:#ffc107; font-weight:600;">Actif</span>'
         )
+
+
+@admin.register(PaymentCorrection)
+class PaymentCorrectionAdmin(admin.ModelAdmin):
+    list_display = ("payment", "old_amount", "new_amount", "delta_amount", "corrected_by", "corrected_at")
+    list_filter = ("corrected_at",)
+    search_fields = (
+        "payment__reference",
+        "payment__receipt_number",
+        "reason",
+        "corrected_by__username",
+    )
+    readonly_fields = ("payment", "old_amount", "new_amount", "delta_amount", "reason", "corrected_by", "corrected_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FinancialLog)
+class FinancialLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "branch", "action", "payment", "old_amount", "new_amount", "delta_amount", "actor")
+    list_filter = ("action", "branch", "created_at")
+    search_fields = (
+        "payment__reference",
+        "payment__receipt_number",
+        "reason",
+        "actor__username",
+    )
+    readonly_fields = (
+        "branch",
+        "payment",
+        "correction",
+        "action",
+        "old_amount",
+        "new_amount",
+        "delta_amount",
+        "reason",
+        "actor",
+        "created_at",
+        "metadata",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

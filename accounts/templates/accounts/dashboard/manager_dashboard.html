@@ -1059,6 +1059,35 @@
         </div>
 
         <div>
+            <div class="mb-4 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                <div class="px-6 py-4 border-b border-slate-100 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-900">Logs financiers</h3>
+                        <p class="text-sm text-slate-600">Corrections, validations et annulations tracees pour l'annexe.</p>
+                    </div>
+                    <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">25 derniers</span>
+                </div>
+                <div class="divide-y divide-slate-50">
+                    {% for log in recent_financial_logs %}
+                    <div class="px-6 py-4 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">{{ log.get_action_display }}{% if log.payment %} - {{ log.payment.reference }}{% endif %}</p>
+                            <p class="text-xs text-slate-500">{{ log.created_at|date:"d/m/Y H:i" }} par {{ log.actor.get_full_name|default:log.actor.username|default:"Systeme" }}</p>
+                            {% if log.reason %}<p class="mt-1 text-sm text-slate-600">{{ log.reason }}</p>{% endif %}
+                        </div>
+                        <div class="text-sm font-semibold lg:text-right">
+                            {% if log.old_amount or log.new_amount %}
+                            <span class="text-slate-500">{{ log.old_amount|default:"-" }}</span>
+                            <span class="text-slate-400">-></span>
+                            <span class="text-slate-900">{{ log.new_amount|default:"-" }} FCFA</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="px-6 py-8 text-center text-sm text-slate-400">Aucun log financier pour cette annexe.</p>
+                    {% endfor %}
+                </div>
+            </div>
 
             <div id="manager-cash-table" class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
                 <div class="px-6 py-4 border-b border-slate-100 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">

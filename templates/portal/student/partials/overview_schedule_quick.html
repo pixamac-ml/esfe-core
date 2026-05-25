@@ -1,0 +1,44 @@
+{% load component_tags %}
+
+{% component "dashboard_card" %}
+  <div class="student-inline-head">
+    <div>
+      <p class="student-section-kicker">Aujourd'hui</p>
+      <h3 class="student-section-title">Emploi du temps rapide</h3>
+      <p class="mt-1 text-sm text-[color:var(--muted)]">
+        {% if timetable.is_nearest_available_week %}
+          Semaine planifiee la plus proche.
+        {% else %}
+          Les prochains creneaux utiles, sans ouvrir le planning complet.
+        {% endif %}
+      </p>
+    </div>
+    <button
+      type="button"
+      @click="goToSection('schedule', 'Calendrier')"
+      class="inline-flex items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--school-primary)]"
+    >
+      <i data-lucide="calendar-days" style="width:14px;height:14px;"></i>
+      Voir tout
+    </button>
+  </div>
+
+  {% if timetable.events %}
+    <div class="grid gap-2">
+      {% for event in timetable.events|slice:":4" %}
+        <article class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+          <div class="min-w-0">
+            <strong class="block truncate text-sm text-[color:var(--text)]">{{ event.title }}</strong>
+            <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">{{ event.weekday_label }} - {{ event.time_range }}</p>
+          </div>
+          <span class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--text)]">
+            <i data-lucide="{% if event.is_online %}video{% else %}map-pin{% endif %}" style="width:13px;height:13px;"></i>
+            {{ event.location }}
+          </span>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% component "empty_state" title="Aucun cours proche" message="Aucun creneau n'est programme dans la vue rapide." icon="calendar-x" compact=True %}{% endcomponent %}
+  {% endif %}
+{% endcomponent %}

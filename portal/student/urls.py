@@ -12,6 +12,9 @@ from .views import (
     student_courses,
     timetable_partial,
     update_settings_profile,
+    update_settings_account,
+    update_settings_preferences,
+    update_settings_password,
     upload_settings_document,
     update_content_progress,
     ec_preview,
@@ -40,5 +43,8 @@ urlpatterns = [
     path("courses/ec/<int:ec_id>/preview/", ec_preview, name="ec_preview"),
     path("contents/<int:content_id>/progress/", update_content_progress, name="content_progress"),
     path("settings/profile/", update_settings_profile, name="update_settings_profile"),
+    path("settings/account/", update_settings_account, name="update_settings_account"),
+    path("settings/preferences/", update_settings_preferences, name="update_settings_preferences"),
+    path("settings/password/", update_settings_password, name="update_settings_password"),
     path("settings/documents/", upload_settings_document, name="upload_settings_document"),
 ]

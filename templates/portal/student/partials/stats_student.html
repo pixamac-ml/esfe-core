@@ -1,14 +1,18 @@
+{% load component_tags %}
 
-
-<article class="student-card student-card-pad" data-aos="fade-up" data-aos-delay="80">
+{% component "dashboard_card" %}
   <div class="student-inline-head">
     <div>
       <p class="student-section-kicker">Performance</p>
       <h3 class="student-section-title">Progression academique</h3>
     </div>
-    <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-1.5 text-[11px] font-extrabold text-[color:var(--muted)]">
-      {% if academic_status == "assigned" %}Affecte{% elif academic_status == "error" %}Erreur{% else %}En attente{% endif %}
-    </span>
+    {% if academic_status == "assigned" %}
+      {% component "status_badge" label="Affecte" tone="success" icon="check-circle-2" %}{% endcomponent %}
+    {% elif academic_status == "error" %}
+      {% component "status_badge" label="Erreur" tone="danger" icon="triangle-alert" %}{% endcomponent %}
+    {% else %}
+      {% component "status_badge" label="En attente" tone="warning" icon="clock-3" %}{% endcomponent %}
+    {% endif %}
   </div>
 
   <div class="mb-3 grid gap-2 sm:grid-cols-2">
@@ -24,29 +28,15 @@
 
   <div class="student-stat-grid mb-3">
     {% for stat in stats.mini_stats %}
-      <div class="student-stat-pill">
-        <div class="mb-2 grid h-8 w-8 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
-          <i data-lucide="{{ stat.icon }}" style="width:16px;height:16px;"></i>
-        </div>
-        <strong class="block truncate text-lg font-black tracking-tight text-[color:var(--text)]">{{ stat.value }}</strong>
-        <span class="mt-1 block text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">{{ stat.label }}</span>
-      </div>
+      {% component "metric_card" label=stat.label value=stat.value icon=stat.icon %}{% endcomponent %}
     {% endfor %}
   </div>
 
   <div class="student-progress-list">
     {% for bar in stats.progress_bars %}
-      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
-        <header class="student-progress-row text-[11px] font-extrabold uppercase tracking-wide text-[color:var(--muted)]">
-          <span>{{ bar.label }}</span>
-          <span>{{ bar.value }}%</span>
-        </header>
-        <progress class="student-progress-meter mt-2" max="100" value="{{ bar.value }}"></progress>
-      </div>
+      {% component "progress_bar" label=bar.label value=bar.value %}{% endcomponent %}
     {% empty %}
-      <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-4 text-sm text-[color:var(--muted)]">
-        Aucune statistique academique detaillee n'est disponible pour le moment.
-      </div>
+      {% component "empty_state" title="Aucune statistique" message="Aucune statistique academique detaillee n'est disponible pour le moment." icon="bar-chart-3" compact=True %}{% endcomponent %}
     {% endfor %}
   </div>
-</article>
+{% endcomponent %}

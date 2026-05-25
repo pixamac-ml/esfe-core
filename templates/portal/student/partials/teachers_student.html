@@ -1,26 +1,170 @@
-<div class="mb-5 flex items-start justify-between gap-3">
+{% load component_tags %}
+
+<div class="mb-5 flex flex-wrap items-start justify-between gap-3">
   <div>
-    <p class="text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--school-primary)]">Encadrement</p>
-    <h3 class="mt-1 text-xl font-black tracking-tight">Enseignants lies</h3>
+    <p class="student-section-kicker">Encadrement pedagogique</p>
+    <h3 class="mt-1 student-section-title">Equipe enseignante</h3>
+    <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">Enseignants rattaches a vos EC, prochains cours et informations utiles.</p>
   </div>
+  {% if teachers %}
+    {% component "status_badge" label=teachers|length|stringformat:"s"|add:" enseignant(s)" tone="primary" icon="users-round" %}{% endcomponent %}
+  {% endif %}
 </div>
 
 {% if teachers %}
+  <section class="mb-4 grid gap-3 md:grid-cols-3">
+    <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+      <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Intervenants</p>
+      <p class="mt-1 text-2xl font-black text-[color:var(--text)]">{{ teachers|length }}</p>
+    </div>
+    <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+      <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Affectations</p>
+      <p class="mt-1 text-sm font-black text-[color:var(--text)]">Matieres, classes et volumes prevus</p>
+    </div>
+    <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+      <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Actions rapides</p>
+      <p class="mt-1 text-sm font-black text-[color:var(--text)]">Profil, creneaux, contact</p>
+    </div>
+  </section>
+
   <div class="grid gap-3">
     {% for teacher in teachers %}
-      <div class="flex items-center gap-3 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
-        <div class="grid h-11 w-11 place-items-center rounded-xl bg-[color:var(--school-primary-soft)] font-black text-[color:var(--school-primary-dark)]">
-          {{ teacher.name|slice:":1"|upper }}
+      <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4" x-data="{ modal: false, tab: 'profile' }">
+        <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div class="flex min-w-0 items-start gap-3">
+            <div class="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-[color:var(--school-primary-soft)] font-black text-[color:var(--school-primary-dark)]">
+              {% if teacher.avatar_url %}
+                <img src="{{ teacher.avatar_url }}" alt="" class="h-full w-full object-cover">
+              {% else %}
+                {{ teacher.initials }}
+              {% endif %}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <h4 class="truncate text-sm font-black text-[color:var(--text)]">{{ teacher.name }}</h4>
+                {% component "status_badge" label=teacher.position tone="neutral" icon="badge-check" %}{% endcomponent %}
+              </div>
+              <p class="mt-1 text-xs font-semibold leading-5 text-[color:var(--muted)]">{{ teacher.subjects_label }}</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <span class="inline-flex items-center gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2 py-1 text-[11px] font-bold text-[color:var(--muted)]">
+                  <i data-lucide="book-open" style="width:12px;height:12px;"></i>{{ teacher.codes_label }}
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2 py-1 text-[11px] font-bold text-[color:var(--muted)]">
+                  <i data-lucide="layers-3" style="width:12px;height:12px;"></i>{{ teacher.semesters_label }}
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2 py-1 text-[11px] font-bold text-[color:var(--muted)]">
+                  <i data-lucide="clipboard-check" style="width:12px;height:12px;"></i>{{ teacher.assignment_count }} affectation(s)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2 lg:justify-end">
+            <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-extrabold text-[color:var(--school-primary)]" @click="tab = 'profile'; modal = true">
+              <i data-lucide="user-round-search" style="width:14px;height:14px;"></i>
+              Profil
+            </button>
+            <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-extrabold text-[color:var(--school-primary)]" @click="tab = 'schedule'; modal = true">
+              <i data-lucide="calendar-clock" style="width:14px;height:14px;"></i>
+              Creneaux
+            </button>
+            <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs font-extrabold text-primary-700" @click="tab = 'contact'; modal = true">
+              <i data-lucide="mail" style="width:14px;height:14px;"></i>
+              Contact
+            </button>
+          </div>
         </div>
-        <div class="min-w-0 flex-1">
-          <strong class="block truncate text-sm">{{ teacher.name }}</strong>
-          <span class="block truncate text-xs text-[color:var(--muted)]">{{ teacher.subject }}</span>
+
+        <div x-show="modal" x-cloak x-transition.opacity class="fixed inset-0 z-[90] grid place-items-center bg-slate-950/45 p-4" @keydown.escape.window="modal = false">
+          <section class="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-2xl" @click.outside="modal = false">
+            <header class="flex items-start justify-between gap-3 border-b border-[color:var(--line)] p-4">
+              <div class="flex min-w-0 items-start gap-3">
+                <div class="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-[color:var(--school-primary-soft)] font-black text-[color:var(--school-primary-dark)]">
+                  {% if teacher.avatar_url %}
+                    <img src="{{ teacher.avatar_url }}" alt="" class="h-full w-full object-cover">
+                  {% else %}
+                    {{ teacher.initials }}
+                  {% endif %}
+                </div>
+                <div class="min-w-0">
+                  <h4 class="truncate text-base font-black text-[color:var(--text)]">{{ teacher.name }}</h4>
+                  <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">{{ teacher.subjects_label }}</p>
+                </div>
+              </div>
+              <button type="button" class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] text-[color:var(--muted)]" @click="modal = false">
+                <i data-lucide="x" style="width:17px;height:17px;"></i>
+              </button>
+            </header>
+
+            <div class="border-b border-[color:var(--line)] px-4 py-3">
+              <div class="flex flex-wrap gap-2">
+                <button type="button" class="rounded-lg px-3 py-2 text-xs font-extrabold" :class="tab === 'profile' ? 'bg-primary-50 text-primary-700' : 'bg-[color:var(--card-soft)] text-[color:var(--muted)]'" @click="tab = 'profile'">Profil</button>
+                <button type="button" class="rounded-lg px-3 py-2 text-xs font-extrabold" :class="tab === 'schedule' ? 'bg-primary-50 text-primary-700' : 'bg-[color:var(--card-soft)] text-[color:var(--muted)]'" @click="tab = 'schedule'">Creneaux</button>
+                <button type="button" class="rounded-lg px-3 py-2 text-xs font-extrabold" :class="tab === 'contact' ? 'bg-primary-50 text-primary-700' : 'bg-[color:var(--card-soft)] text-[color:var(--muted)]'" @click="tab = 'contact'">Contact</button>
+              </div>
+            </div>
+
+            <div class="max-h-[62vh] overflow-y-auto p-4">
+              <div x-show="tab === 'profile'" class="grid gap-3 md:grid-cols-2">
+                <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+                  <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Matieres</p>
+                  <p class="mt-2 text-sm font-black text-[color:var(--text)]">{{ teacher.subjects_label }}</p>
+                  <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">{{ teacher.codes_label }} · {{ teacher.semesters_label }}</p>
+                </div>
+                <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+                  <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Affectation</p>
+                  <p class="mt-2 text-sm font-black text-[color:var(--text)]">{{ teacher.assignment_count }} affectation(s)</p>
+                  <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">{{ teacher.planned_hours_label }} · {{ teacher.rooms_label }}</p>
+                </div>
+                {% if teacher.next_course %}
+                  <div class="rounded-xl border border-primary-100 bg-primary-50 p-3 md:col-span-2">
+                    <p class="text-[11px] font-black uppercase tracking-wide text-primary-700">Prochain cours</p>
+                    <p class="mt-2 text-sm font-black text-primary-900">{{ teacher.next_course.title }}</p>
+                    <p class="mt-1 text-xs font-bold text-primary-700">{{ teacher.next_course.date }} · {{ teacher.next_course.time }} · {{ teacher.next_course.location }}</p>
+                  </div>
+                {% endif %}
+                {% if teacher.bio %}
+                  <p class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm leading-6 text-[color:var(--muted)] md:col-span-2">{{ teacher.bio|truncatechars:240 }}</p>
+                {% endif %}
+              </div>
+
+              <div x-show="tab === 'schedule'">
+                <h5 class="text-xs font-black uppercase tracking-wide text-[color:var(--muted)]">Creneaux pedagogiques</h5>
+                {% if teacher.weekly_slots %}
+                  <div class="mt-3 grid gap-2">
+                    {% for slot in teacher.weekly_slots %}
+                      <div class="grid gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-xs sm:grid-cols-[100px_100px_minmax(0,1fr)]">
+                        <span class="font-black text-[color:var(--text)]">{{ slot.day }}</span>
+                        <span class="font-bold text-[color:var(--muted)]">{{ slot.time }}</span>
+                        <span class="truncate font-semibold text-[color:var(--muted)]">{{ slot.subject }} · {{ slot.room }}</span>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <p class="mt-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-semibold text-[color:var(--muted)]">Aucun creneau recurrent publie. L'affectation enseignant-matiere est disponible, le planning sera complete ensuite.</p>
+                {% endif %}
+              </div>
+
+              <div x-show="tab === 'contact'" class="grid gap-3 md:grid-cols-2">
+                <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+                  <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Email</p>
+                  <p class="mt-2 break-all text-sm font-black text-[color:var(--text)]">{{ teacher.email }}</p>
+                </div>
+                <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+                  <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Telephone</p>
+                  <p class="mt-2 text-sm font-black text-[color:var(--text)]">{{ teacher.phone }}</p>
+                </div>
+                <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 md:col-span-2">
+                  <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Statut pedagogique</p>
+                  <p class="mt-2 text-sm font-semibold leading-6 text-[color:var(--text)]">{{ teacher.event_count }} seance(s) a venir · {{ teacher.weekly_count }} creneau(x) recurrent(s) · {{ teacher.planned_hours_label }}</p>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-      </div>
+      </article>
     {% endfor %}
   </div>
 {% else %}
-  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">
-    Les enseignants lies a vos EC ne sont pas encore renseignes dans le systeme.
-  </div>
+  {% component "empty_state" title="Encadrement en cours de publication" message="Les enseignants rattaches a vos EC seront visibles des que la planification pedagogique sera finalisee." icon="users-round" %}{% endcomponent %}
 {% endif %}

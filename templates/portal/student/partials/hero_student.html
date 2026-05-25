@@ -1,18 +1,16 @@
-<article class="student-card student-card-pad" data-aos="fade-up">
+{% load component_tags %}
+
+{% component "dashboard_card" %}
   <section class="mb-4 rounded-2xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4 sm:p-5">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <span class="student-pill">
         <i data-lucide="graduation-cap" style="width:15px;height:15px;"></i>
         ESFé Mali
       </span>
-      <button
-        type="button"
-        @click="goToSection('courses', 'Mes cours')"
-        class="inline-flex items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--school-primary)]"
-      >
-        <i data-lucide="book-open-check" style="width:14px;height:14px;"></i>
-        Mes cours
-      </button>
+      <span class="inline-flex items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--muted)]">
+        <i data-lucide="clock-3" style="width:14px;height:14px;"></i>
+        <span x-text="currentTimeLabel"></span>
+      </span>
     </div>
 
     <h2 class="text-[1.1rem] font-black tracking-tight text-[color:var(--text)] sm:text-[1.35rem]">
@@ -20,7 +18,7 @@
     </h2>
     <p class="mt-1 text-xs font-bold uppercase tracking-[0.15em] text-[color:var(--school-primary)]" x-text="greetingTone"></p>
     <p class="mt-2 text-sm text-[color:var(--muted)]">
-      Accueil simple et rapide: voici vos actions principales.
+      Accueil rapide: prochain cours, actions importantes et planning du jour.
     </p>
   </section>
 
@@ -100,25 +98,26 @@
           {% endif %}
         </div>
 
-        <div class="grid gap-2 sm:grid-cols-2">
-          <button type="button" @click="goToSection('courses', 'Mes cours')" class="inline-flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">
-            <span>Reprendre un cours</span>
-            <i data-lucide="book-open-check" style="width:15px;height:15px;"></i>
-          </button>
-          <button type="button" @click="goToSection('messages', 'Messages')" class="inline-flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">
-            <span>Voir mes messages</span>
-            <i data-lucide="messages-square" style="width:15px;height:15px;"></i>
-          </button>
-          <button type="button" @click="goToSection('academics', 'Academique')" class="inline-flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">
-            <span>Suivi academique</span>
-            <i data-lucide="graduation-cap" style="width:15px;height:15px;"></i>
-          </button>
-          <button type="button" @click="goToSection('finance', 'Finance')" class="inline-flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">
-            <span>Situation finance</span>
-            <i data-lucide="wallet" style="width:15px;height:15px;"></i>
-          </button>
-        </div>
+        {% if priority_actions %}
+          <div class="grid gap-2 sm:grid-cols-2">
+            {% for action in priority_actions %}
+              <button
+                type="button"
+                @click="goToSection('{{ action.target }}', '{{ action.nav_label|escapejs }}')"
+                class="inline-flex min-h-[58px] items-center justify-between gap-3 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-left text-xs font-extrabold text-[color:var(--text)] transition hover:bg-[color:var(--card-soft)]"
+              >
+                <span class="min-w-0">
+                  <span class="block truncate">{{ action.label }}</span>
+                  <span class="mt-0.5 block truncate text-[10px] font-bold text-[color:var(--muted)]">{{ action.description }}</span>
+                </span>
+                <i data-lucide="{{ action.icon }}" style="width:15px;height:15px;"></i>
+              </button>
+            {% endfor %}
+          </div>
+        {% else %}
+          {% component "empty_state" title="Aucune action prioritaire" message="Votre espace etudiant ne signale aucune priorite immediate." icon="check-circle-2" compact=True %}{% endcomponent %}
+        {% endif %}
       </aside>
     </div>
   </section>
-</article>
+{% endcomponent %}

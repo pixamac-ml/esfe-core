@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
+from django.contrib.auth import password_validation
 from django.core.validators import validate_email
 from django.urls import reverse
 
@@ -13,6 +14,15 @@ from portal.student.widgets.academics import get_student_academic_snapshot
 
 
 EDITABLE_PROFILE_FIELDS = {"email", "phone"}
+EDITABLE_ACCOUNT_FIELDS = {"location", "address", "bio"}
+PREFERENCE_FIELDS = {
+    "notify_email",
+    "notify_in_app",
+    "notify_sms",
+    "ui_sidebar_collapsed",
+    "ui_compact_mode",
+    "ui_autorefresh",
+}
 
 
 @dataclass
@@ -180,6 +190,7 @@ def get_profile_data(user):
         "notify_sms": preference.notify_sms,
         "ui_compact_mode": preference.ui_compact_mode,
         "ui_sidebar_collapsed": preference.ui_sidebar_collapsed,
+        "ui_autorefresh": preference.ui_autorefresh,
         "must_change_password": getattr(support_state, "must_change_password", False),
         "is_blocked": getattr(support_state, "is_blocked", False),
         "is_suspended": getattr(support_state, "is_suspended", False),
@@ -267,6 +278,51 @@ def update_editable_fields(user, data):
         profile.save(update_fields=["phone", "updated_at"])
 
     candidature.save(update_fields=["email", "phone", "updated_at"])
+    return get_profile_data(user)
+
+
+def update_account_center(user, data):
+    profile, _created = Profile.objects.get_or_create(user=user)
+    cleaned = {field: (data.get(field) or "").strip() for field in EDITABLE_ACCOUNT_FIELDS}
+    profile.location = cleaned["location"]
+    profile.address = cleaned["address"]
+    profile.bio = cleaned["bio"]
+    profile.save(update_fields=["location", "address", "bio", "updated_at"])
+    return get_profile_data(user)
+
+
+def update_account_preferences(user, data):
+    preference, _created = UserPreference.objects.get_or_create(user=user)
+    for field in PREFERENCE_FIELDS:
+        setattr(preference, field, data.get(field) == "on")
+    preference.save(update_fields=[*PREFERENCE_FIELDS, "updated_at"])
+    return get_profile_data(user)
+
+
+def update_account_password(user, data):
+    old_password = data.get("old_password") or ""
+    new_password = data.get("new_password") or ""
+    confirm_password = data.get("confirm_password") or ""
+    errors = {}
+
+    if not user.check_password(old_password):
+        errors["old_password"] = "Mot de passe actuel incorrect."
+    if new_password != confirm_password:
+        errors["confirm_password"] = "La confirmation ne correspond pas."
+    try:
+        password_validation.validate_password(new_password, user)
+    except ValidationError as exc:
+        errors["new_password"] = exc.messages
+
+    if errors:
+        raise ValidationError(errors)
+
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+    support_state = AccountSupportState.objects.filter(user=user).first()
+    if support_state and support_state.must_change_password:
+        support_state.must_change_password = False
+        support_state.save(update_fields=["must_change_password", "updated_at"])
     return get_profile_data(user)
 
 

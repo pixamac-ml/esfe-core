@@ -10,7 +10,10 @@ def get_notifications_widget(user):
         }
 
     items = [
-        item.title
+        {
+            "title": item.title,
+            "icon": "bell-ring",
+        }
         for item in get_user_notifications(user, limit=4)
     ]
 

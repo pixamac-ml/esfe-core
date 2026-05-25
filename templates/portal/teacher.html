@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load component_tags %}
 
 {% block public_navbar %}{% endblock %}
 {% block public_footer %}{% endblock %}
@@ -86,6 +87,44 @@
 
   .teacher-modal-shell.is-open {
     pointer-events: auto;
+  }
+
+  .teacher-dashboard-page {
+    --school-primary: #2563eb;
+    --school-primary-soft: #dbeafe;
+    --card: #ffffff;
+    --card-soft: #f8fafc;
+    --line: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+  }
+
+  .teacher-dashboard-page.dark-preview {
+    --card: #1e293b;
+    --card-soft: #0f172a;
+    --line: #334155;
+    --text: #f8fafc;
+    --muted: #cbd5e1;
+  }
+
+  .teacher-dashboard-page .student-card {
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 1.5rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+  }
+
+  .teacher-dashboard-page .student-card-pad {
+    padding: 1.25rem;
+  }
+
+  .teacher-dashboard-page .student-stat-pill {
+    min-height: 8.5rem;
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
   }
 </style>
 {% endblock %}
@@ -282,6 +321,51 @@
           </div>
         </div>
 
+        {% component "dashboard_card" %}
+          <div class="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
+            <div>
+              <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Vue production</p>
+              <h2 class="mt-2 text-2xl font-black text-slate-900">Activite enseignant alimentee par la base</h2>
+              <p class="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                Cours planifies, classes rattachees, supports publies, assiduite enseignant et cahiers de texte sont consolides sur votre annexe.
+              </p>
+              <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {% component "metric_card" label="Etudiants visibles" value=teacher_kpis.visible_students icon="users" hint="Sur vos classes actives" %}{% endcomponent %}
+                {% component "metric_card" label="Supports actifs" value=teacher_support_stats.contents icon="folder-open" hint="Fichiers, videos, textes" %}{% endcomponent %}
+                {% component "metric_card" label="Cahiers completes" value=teacher_kpis.lesson_completion_rate icon="notebook-pen" hint="Taux semaine (%)" %}{% endcomponent %}
+                {% component "metric_card" label="Presences mois" value=teacher_attendance_summary.total icon="user-check" hint="Pointages enseignant" %}{% endcomponent %}
+              </div>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Priorites</p>
+                  <h3 class="mt-2 text-lg font-black text-slate-900">A traiter maintenant</h3>
+                </div>
+                {% component "status_badge" label=status_summary.branch_name tone="primary" icon="map-pin" %}{% endcomponent %}
+              </div>
+              <div class="mt-4 space-y-3">
+                {% for insight in teacher_insights %}
+                <button type="button" @click="activeSection='{{ insight.section }}'" class="block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
+                  <span class="flex items-center justify-between gap-3">
+                    {% component "status_badge" label=insight.label tone=insight.tone %}{% endcomponent %}
+                    <i data-lucide="arrow-right" class="teacher-icon text-slate-400"></i>
+                  </span>
+                  <span class="mt-2 block text-sm font-semibold text-slate-600">{{ insight.message }}</span>
+                </button>
+                {% endfor %}
+              </div>
+              {% if next_event_focus %}
+              <div class="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+                <p class="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Prochain cours</p>
+                <p class="mt-2 text-sm font-black text-slate-900">{{ next_event_focus.title }}</p>
+                <p class="mt-1 text-xs font-semibold text-slate-600">{{ next_event_focus.class_name }} - {{ next_event_focus.weekday_label|title }} {{ next_event_focus.time_range }}</p>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endcomponent %}
+
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Cours aujourd'hui</p><h4 class="text-3xl font-black mt-2">{{ teacher_kpis.today_courses }}</h4><p class="text-xs text-emerald-600 mt-2">Journee en cours</p></div><div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="clock-3" class="teacher-icon"></i></div></div></div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Cours semaine</p><h4 class="text-3xl font-black mt-2">{{ teacher_kpis.week_courses }}</h4><p class="text-xs text-emerald-600 mt-2">Charge actuelle</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="calendar-days" class="teacher-icon"></i></div></div></div>
@@ -361,7 +445,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Classes</p><h2 class="text-4xl font-black mt-3">{{ class_focus_rows|length }}</h2><p class="text-sm text-emerald-600 mt-2">Actives</p></div><div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="folders" class="teacher-icon"></i></div></div></div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Matieres</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.subjects_count }}</h2><p class="text-sm text-slate-500 mt-2">Distinctes</p></div><div class="w-14 h-14 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center"><i data-lucide="book-open-text" class="teacher-icon"></i></div></div></div>
-          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Seances semaine</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.week_courses }}</h2><p class="text-sm text-emerald-600 mt-2">Programmees</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="presentation" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Etudiants</p><h2 class="text-4xl font-black mt-3">{{ teacher_kpis.visible_students }}</h2><p class="text-sm text-emerald-600 mt-2">Visibles</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="users" class="teacher-icon"></i></div></div></div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Annee</p><h2 class="text-2xl font-black mt-3">{{ week_start|date:"Y" }}</h2><p class="text-sm text-red-500 mt-2">{{ status_summary.branch_name }}</p></div><div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center"><i data-lucide="calendar-range" class="teacher-icon"></i></div></div></div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Statut</p><h2 class="text-2xl font-black mt-3">{{ status_summary.employment_status }}</h2><p class="text-sm text-slate-500 mt-2">Profil enseignant</p></div><div class="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center"><i data-lucide="badge-check" class="teacher-icon"></i></div></div></div>
         </div>
@@ -381,6 +465,7 @@
                 <tr>
                   <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Classe</th>
                   <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Programme</th>
+                  <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Effectif</th>
                   <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Matieres</th>
                   <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Seances</th>
                   <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">Prochaine</th>
@@ -392,6 +477,7 @@
                 <tr class="hover:bg-slate-50 transition">
                   <td class="px-5 py-4 font-semibold text-slate-900">{{ row.class_name }}</td>
                   <td class="px-5 py-4 text-slate-600">{{ row.programme_title }}</td>
+                  <td class="px-5 py-4 text-slate-600">{{ row.student_count }} etudiant(s)</td>
                   <td class="px-5 py-4 text-slate-600">{% for subject in row.subjects %}{{ subject }}{% if not forloop.last %}, {% endif %}{% empty %}A confirmer{% endfor %}</td>
                   <td class="px-5 py-4">{{ row.event_count }} datee(s) / {{ row.slot_count }} trame(s)</td>
                   <td class="px-5 py-4 text-slate-600">{% if row.next_event %}{{ row.next_event.start_datetime|date:"d/m H:i" }}{% else %}Non planifiee{% endif %}</td>
@@ -409,7 +495,7 @@
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="px-5 py-8 text-center text-slate-500">Aucune classe active rattachee a cet enseignant.</td></tr>
+                <tr><td colspan="7" class="px-5 py-8 text-center text-slate-500">Aucune classe active rattachee a cet enseignant.</td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -426,9 +512,9 @@
           </div>
           <div class="flex flex-wrap items-center gap-3">
             {% if teacher_support_workspace_url %}
-            <button hx-get="{{ teacher_support_workspace_url }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold">Aperçu des supports</button>
+            <button hx-get="{{ teacher_support_workspace_url }}?support_target=%23teacher-supports-workspace" hx-target="#teacher-supports-workspace" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold">Gerer les supports</button>
             {% if class_focus_rows %}
-            <button hx-get="{{ teacher_support_workspace_url }}?class_id={{ class_focus_rows.0.class_id }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700">Classe principale</button>
+            <button hx-get="{{ teacher_support_workspace_url }}?class_id={{ class_focus_rows.0.class_id }}&support_target=%23teacher-supports-workspace" hx-target="#teacher-supports-workspace" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700">Classe principale</button>
             {% endif %}
             {% endif %}
           </div>
@@ -436,11 +522,25 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
           <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Classes rattachees</p><h2 class="text-4xl font-black mt-3">{{ class_focus_rows|length }}</h2><p class="text-sm text-emerald-600 mt-2">Perimetre actif</p></div><div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="school" class="teacher-icon"></i></div></div></div>
-          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Formats geres</p><h2 class="text-4xl font-black mt-3">Fichier / URL / Texte</h2><p class="text-sm text-slate-500 mt-2">Selon le type de support</p></div><div class="w-14 h-14 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center"><i data-lucide="file-up" class="teacher-icon"></i></div></div></div>
-          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Organisation</p><h2 class="text-4xl font-black mt-3">Classe / EC / Chap.</h2><p class="text-sm text-slate-500 mt-2">Parcours hiérarchique clair</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="layers-3" class="teacher-icon"></i></div></div></div>
-          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Zone d'action</p><h2 class="text-4xl font-black mt-3">Panneau live</h2><p class="text-sm text-slate-500 mt-2">Aperçu et edition sans quitter l'ecran</p></div><div class="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center"><i data-lucide="refresh-cw" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Chapitres</p><h2 class="text-4xl font-black mt-3">{{ teacher_support_stats.chapters }}</h2><p class="text-sm text-slate-500 mt-2">Dans vos matieres</p></div><div class="w-14 h-14 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center"><i data-lucide="layers-3" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Supports actifs</p><h2 class="text-4xl font-black mt-3">{{ teacher_support_stats.contents }}</h2><p class="text-sm text-slate-500 mt-2">{{ teacher_support_stats.files }} fichier(s), {{ teacher_support_stats.videos }} video(s)</p></div><div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="file-up" class="teacher-icon"></i></div></div></div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Textes integres</p><h2 class="text-4xl font-black mt-3">{{ teacher_support_stats.texts }}</h2><p class="text-sm text-slate-500 mt-2">Consultables cote etudiant</p></div><div class="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center"><i data-lucide="file-text" class="teacher-icon"></i></div></div></div>
         </div>
 
+        <div
+          id="teacher-supports-workspace"
+          hx-get="{{ teacher_support_workspace_url }}?support_target=%23teacher-supports-workspace"
+          hx-trigger="load"
+          hx-target="this"
+          hx-swap="innerHTML"
+          class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+        >
+          <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-semibold text-slate-500">
+            Chargement des supports de cours...
+          </div>
+        </div>
+
+        {% comment %}
         <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div class="p-5 border-b border-slate-200 flex items-center justify-between">
             <div>
@@ -459,7 +559,7 @@
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 {% if teacher_support_workspace_url %}
-                <button hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Aperçu supports</button>
+                <button hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}&support_target=%23teacher-supports-workspace" hx-target="#teacher-supports-workspace" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Ajouter / gerer</button>
                 {% endif %}
                 <button hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700">Aperçu classe</button>
               </div>
@@ -469,6 +569,7 @@
             {% endfor %}
           </div>
         </div>
+        {% endcomment %}
       </section>
 
       <section id="teacher-schedule-section" x-show="activeSection === 'schedule'" x-cloak class="space-y-6">

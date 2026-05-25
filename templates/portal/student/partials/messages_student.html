@@ -1,86 +1,156 @@
-<div class="mb-5 flex items-start justify-between gap-3">
+{% load component_tags %}
+
+<div class="mb-5 flex flex-wrap items-start justify-between gap-3">
   <div>
-    <p class="student-section-kicker">Communication</p>
-    <h3 class="mt-1 student-section-title">Messages recents</h3>
+    <p class="student-section-kicker">Centre systeme</p>
+    <h3 class="mt-1 student-section-title">Notifications et activites</h3>
+    <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">Flux academique, financier, administratif et evenements importants.</p>
   </div>
-  <button
-    type="button"
-    class="inline-flex items-center gap-2 rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--muted)]"
-    @click="refreshSection('messages')"
-  >
-    <span class="htmx-indicator">Actualisation...</span>
-    <span>Actualiser</span>
-  </button>
-  <button
-    type="button"
-    class="inline-flex items-center gap-2 rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--school-primary)]"
-    @click="markAllMessagesRead()"
-    x-show="unreadMessages > 0"
-    x-cloak
-  >
-    Tout marquer lu
-  </button>
+  <div class="flex flex-wrap items-center gap-2">
+    <button
+      type="button"
+      class="inline-flex items-center gap-2 rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-extrabold text-[color:var(--muted)]"
+      @click="refreshSection('messages')"
+    >
+      <i data-lucide="refresh-cw" style="width:14px;height:14px;"></i>
+      <span class="htmx-indicator">Actualisation...</span>
+      <span>Actualiser</span>
+    </button>
+    <button
+      type="button"
+      class="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-2 text-xs font-extrabold text-primary-700"
+      @click="markAllMessagesRead()"
+      x-show="unreadMessages > 0"
+      x-cloak
+    >
+      <i data-lucide="check-check" style="width:14px;height:14px;"></i>
+      Tout marquer lu
+    </button>
+  </div>
 </div>
 
-{% if messages %}
-  <div
-    class="grid gap-3"
-    x-data="{
-      page: 0,
-      pageSize: 4,
-      total: {{ messages|length }},
-      pageCount() { return Math.max(1, Math.ceil(this.total / this.pageSize)); },
-      next() { if (this.page < this.pageCount() - 1) this.page += 1; },
-      prev() { if (this.page > 0) this.page -= 1; }
-    }"
-  >
-    {% for message in messages %}
-      <div class="flex items-start gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3.5" :class="{ 'opacity-70': {{ message.is_read|yesno:'true,false' }} }" x-show="{{ forloop.counter0 }} >= page * pageSize && {{ forloop.counter0 }} < (page + 1) * pageSize" x-cloak>
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] font-black text-[color:var(--school-primary-dark)]">
-          {{ message.name|slice:":1"|upper }}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <strong class="block truncate text-sm text-[color:var(--text)]">{{ message.name }}</strong>
-            {% if not message.is_read %}
-              <span class="inline-flex rounded-full bg-red-600/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-600">non lu</span>
-            {% endif %}
-          </div>
-          <span class="mt-1 block text-xs leading-5 text-[color:var(--muted)]">{{ message.text }}</span>
-        </div>
-        <div class="shrink-0 text-right">
-          <span class="block text-[11px] font-extrabold text-[color:var(--muted-2)]">{{ message.time }}</span>
-          {% if not message.is_read %}
-            <button
-              type="button"
-              class="mt-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2 py-1 text-[10px] font-extrabold text-[color:var(--school-primary)]"
-              @click="markMessageRead({{ message.id }})"
-            >
-              Marquer lu
-            </button>
-          {% else %}
-            <button
-              type="button"
-              class="mt-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2 py-1 text-[10px] font-extrabold text-[color:var(--muted)]"
-              @click="markMessageUnread({{ message.id }})"
-            >
-              Marquer non lu
-            </button>
-          {% endif %}
-        </div>
-      </div>
-    {% endfor %}
-
-    <div class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--muted)]" x-show="total > pageSize">
-      <span>Page <strong x-text="page + 1"></strong> / <strong x-text="pageCount()"></strong></span>
-      <div class="flex items-center gap-2">
-        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-white px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="prev()" :disabled="page === 0">Precedent</button>
-        <button type="button" class="rounded-lg border border-[color:var(--line)] bg-white px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="next()" :disabled="page >= pageCount() - 1">Suivant</button>
-      </div>
-    </div>
+<section class="mb-4 grid gap-3 lg:grid-cols-4">
+  <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+    <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Total</p>
+    <p class="mt-1 text-2xl font-black text-[color:var(--text)]">{{ message_summary.total|default:0 }}</p>
   </div>
-{% else %}
-  <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card-soft)] p-5 text-sm text-[color:var(--muted)]">
-    Aucun message recent.
+  <div class="rounded-xl border border-rose-100 bg-rose-50 p-3">
+    <p class="text-[11px] font-black uppercase tracking-wide text-rose-700">Non lues</p>
+    <p class="mt-1 text-2xl font-black text-rose-700">{{ message_summary.unread|default:0 }}</p>
+  </div>
+  <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+    <p class="text-[11px] font-black uppercase tracking-wide text-emerald-700">Traitees</p>
+    <p class="mt-1 text-2xl font-black text-emerald-700">{{ message_summary.read|default:0 }}</p>
+  </div>
+  <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+    <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Derniere activite</p>
+    <p class="mt-2 text-sm font-black text-[color:var(--text)]">{{ message_summary.last_activity }}</p>
+  </div>
+</section>
+
+{% if message_summary.categories %}
+  <div class="mb-4 flex flex-wrap gap-2">
+    {% for category in message_summary.categories %}
+      <span class="inline-flex items-center gap-2 rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-extrabold text-[color:var(--text)]">
+        <i data-lucide="{{ category.icon }}" style="width:14px;height:14px;"></i>
+        {{ category.label }}
+        <span class="text-[color:var(--muted)]">{{ category.unread }}/{{ category.count }}</span>
+      </span>
+    {% endfor %}
   </div>
 {% endif %}
+
+<div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+  <section>
+    <div class="mb-3 flex items-center justify-between gap-3">
+      <h4 class="text-xs font-black uppercase tracking-wide text-[color:var(--muted)]">Flux des notifications</h4>
+      {% component "status_badge" label=message_summary.unread|stringformat:"s"|add:" a traiter" tone="warning" icon="inbox" %}{% endcomponent %}
+    </div>
+
+    {% if messages %}
+      <div
+        class="grid gap-3"
+        x-data="{
+          page: 0,
+          pageSize: 6,
+          total: {{ messages|length }},
+          pageCount() { return Math.max(1, Math.ceil(this.total / this.pageSize)); },
+          next() { if (this.page < this.pageCount() - 1) this.page += 1; },
+          prev() { if (this.page > 0) this.page -= 1; }
+        }"
+      >
+        {% for message in messages %}
+          <article
+            class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3.5"
+            x-data="{ expanded: false, isRead: {{ message.is_read|yesno:'true,false' }} }"
+            :class="{ 'opacity-75': isRead }"
+            x-show="{{ forloop.counter0 }} >= page * pageSize && {{ forloop.counter0 }} < (page + 1) * pageSize"
+            x-cloak
+          >
+            <div class="flex items-start gap-3">
+              <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
+                <i data-lucide="{{ message.icon }}" style="width:18px;height:18px;"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <strong class="min-w-0 truncate text-sm text-[color:var(--text)]">{{ message.name }}</strong>
+                  {% component "status_badge" label=message.category tone=message.tone %}{% endcomponent %}
+                  <span x-show="!isRead">{% component "status_badge" label="Non lu" tone="danger" %}{% endcomponent %}</span>
+                </div>
+                <p class="mt-1 text-xs font-semibold leading-5 text-[color:var(--muted)]">{{ message.text }}</p>
+                <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[color:var(--muted-2)]">
+                  <span>{{ message.datetime }}</span>
+                  <span>Source: {{ message.source }}</span>
+                  <span>Priorite: {{ message.priority }}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1.5 text-[11px] font-extrabold text-[color:var(--school-primary)]"
+                @click="expanded = !expanded; if (!isRead) { isRead = true; markMessageRead({{ message.id }}); }"
+              >
+                <i data-lucide="panel-bottom-open" style="width:13px;height:13px;"></i>
+                Ouvrir
+              </button>
+            </div>
+            <div x-show="expanded" x-transition class="mt-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm leading-6 text-[color:var(--text)]">
+              {{ message.body|default:message.text }}
+            </div>
+          </article>
+        {% endfor %}
+
+        <div class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--muted)]" x-show="total > pageSize">
+          <span>Page <strong x-text="page + 1"></strong> / <strong x-text="pageCount()"></strong></span>
+          <div class="flex items-center gap-2">
+            <button type="button" class="rounded-lg border border-[color:var(--line)] bg-white px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="prev()" :disabled="page === 0">Precedent</button>
+            <button type="button" class="rounded-lg border border-[color:var(--line)] bg-white px-2.5 py-1 font-extrabold text-[color:var(--text)] disabled:opacity-50" @click="next()" :disabled="page >= pageCount() - 1">Suivant</button>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      {% component "empty_state" title="Aucune notification" message="Aucune activite systeme recente." icon="bell" %}{% endcomponent %}
+    {% endif %}
+  </section>
+
+  <aside class="space-y-3">
+    <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+      <div class="mb-3 flex items-center gap-2">
+        <i data-lucide="calendar-days" class="text-[color:var(--school-primary)]" style="width:16px;height:16px;"></i>
+        <h4 class="text-xs font-black uppercase tracking-wide text-[color:var(--muted)]">Evenements importants</h4>
+      </div>
+      {% if notification_events %}
+        <div class="space-y-2">
+          {% for event in notification_events %}
+            <div class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] p-3">
+              <p class="text-[11px] font-black uppercase tracking-wide text-[color:var(--school-primary)]">{{ event.time }}</p>
+              <p class="mt-1 text-sm font-black text-[color:var(--text)]">{{ event.title }}</p>
+              <p class="mt-1 text-xs leading-5 text-[color:var(--muted)]">{{ event.text }}</p>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-sm font-semibold leading-6 text-[color:var(--muted)]">Aucun evenement important publie.</p>
+      {% endif %}
+    </div>
+  </aside>
+</div>

@@ -1,0 +1,68 @@
+SUITE LOGIQUE APRES LA FONDATION academic_cycle
+
+La suite logique, c'est de passer de "fondation technique" a "workflow utilisable" sans tout brancher d'un coup.
+
+Priorite recommandee :
+
+1. Creer les cycles par annexe pour l'annee en cours
+
+Dans l'admin, cree un BranchAcademicCycle pour chaque annexe + annee academique actuelle.
+Exemple : Kalaban Coura / 2025-2026 / active.
+
+2. Brancher un vrai bouton dashboard staff/DG
+
+Actuellement les URLs existent, mais ce n'est pas encore integre proprement dans les dashboards existants.
+Il faut ajouter une entree "Cycle academique" dans le dashboard DG / directeur des etudes / gestionnaire.
+
+3. Fiabiliser le rapport readiness
+
+Le service existe deja, mais il faut l'adapter plus finement a tes vraies regles :
+- semestre finalise ou publie,
+- toutes les notes saisies,
+- bulletins generes,
+- anomalies bloquantes,
+- classe prete pour deliberation.
+
+4. Implementer le workflow reel de cloture
+
+Une annexe doit pouvoir :
+- generer son rapport,
+- corriger les blocages,
+- demarrer la deliberation,
+- cloturer uniquement si tout est pret,
+- ecrire les logs.
+
+5. Brancher les decisions etudiantes
+
+Apres cloture :
+- promu,
+- promu avec dette academique,
+- redoublant,
+- diplome,
+- abandon,
+- transfert.
+
+La, il faut relier le calcul aux vraies moyennes/resultats deja presents dans academics.
+
+6. Preparer la reinscription
+
+Une fois les decisions generees :
+- creer les AcademicReEnrollment,
+- generer les tokens,
+- afficher la page pre-rentree cote etudiant,
+- bloquer doucement l'acces si la reinscription n'est pas finalisee.
+
+7. Brancher paiement minimum + activation dashboard
+
+Quand un ancien etudiant paie le minimum :
+- marquer la reinscription comme paiement valide,
+- activer la reinscription,
+- appliquer StudentAccessPolicy,
+- basculer l'etudiant vers son nouveau contexte academique.
+
+Prochaine etape de developpement recommandee :
+
+Integrer le module dans les dashboards existants + rendre le rapport readiness vraiment exploitable visuellement.
+
+Apres ca, on peut faire le workflow complet :
+readiness -> deliberation -> cloture -> decisions -> reinscriptions.

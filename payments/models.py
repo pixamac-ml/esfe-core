@@ -383,3 +383,102 @@ class Payment(models.Model):
             payment=self,
             student_result=result,
         )
+
+
+class PaymentCorrection(models.Model):
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.PROTECT,
+        related_name="corrections",
+        db_index=True,
+    )
+    old_amount = models.PositiveBigIntegerField()
+    new_amount = models.PositiveBigIntegerField()
+    delta_amount = models.BigIntegerField()
+    reason = models.TextField()
+    corrected_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payment_corrections",
+    )
+    corrected_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-corrected_at"]
+        indexes = [
+            models.Index(fields=["payment", "corrected_at"]),
+            models.Index(fields=["corrected_by", "corrected_at"]),
+        ]
+
+    def __str__(self):
+        return f"Correction paiement #{self.payment_id}: {self.old_amount} -> {self.new_amount}"
+
+
+class FinancialLog(models.Model):
+    ACTION_PAYMENT_CREATED = "payment_created"
+    ACTION_PAYMENT_VALIDATED = "payment_validated"
+    ACTION_PAYMENT_CANCELLED = "payment_cancelled"
+    ACTION_PAYMENT_CORRECTED = "payment_corrected"
+    ACTION_EXPENSE = "expense"
+    ACTION_EXPORT = "export"
+    ACTION_PRINT = "print"
+
+    ACTION_CHOICES = (
+        (ACTION_PAYMENT_CREATED, "Paiement cree"),
+        (ACTION_PAYMENT_VALIDATED, "Paiement valide"),
+        (ACTION_PAYMENT_CANCELLED, "Paiement annule"),
+        (ACTION_PAYMENT_CORRECTED, "Paiement corrige"),
+        (ACTION_EXPENSE, "Depense"),
+        (ACTION_EXPORT, "Export"),
+        (ACTION_PRINT, "Impression"),
+    )
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="financial_logs",
+        db_index=True,
+    )
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="financial_logs",
+    )
+    correction = models.ForeignKey(
+        PaymentCorrection,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="financial_logs",
+    )
+    action = models.CharField(max_length=40, choices=ACTION_CHOICES, db_index=True)
+    old_amount = models.PositiveBigIntegerField(null=True, blank=True)
+    new_amount = models.PositiveBigIntegerField(null=True, blank=True)
+    delta_amount = models.BigIntegerField(default=0)
+    reason = models.TextField(blank=True)
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="financial_logs",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["branch", "created_at"]),
+            models.Index(fields=["action", "created_at"]),
+            models.Index(fields=["payment", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_action_display()} - {self.created_at:%Y-%m-%d %H:%M}"

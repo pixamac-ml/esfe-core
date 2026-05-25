@@ -3,308 +3,244 @@
   {{ toast.message }}
 </div>
 {% endif %}
+
 {% url 'accounts_portal:teacher_support_workspace' as teacher_support_workspace_url %}
 {% if not teacher_support_workspace_url %}{% url 'teacher_support_workspace' as teacher_support_workspace_url %}{% endif %}
+{% with support_target=teacher_support_target|default:"#teacher-modal-panel" %}
 
-<div
-  x-data="{
-    modalChapter: false,
-    modalSupport: false,
-    contentType: 'pdf',
-    ecId: '',
-    ecTitle: '',
-    classId: '{{ selected_class.id|default:'' }}',
-    chapterId: '',
-    chapterTitle: '',
-  }"
-  class="space-y-4"
->
-  <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="text-[11px] font-black uppercase tracking-widest text-slate-400">Classe</span>
+<div class="space-y-5" x-data="{ modalSupport: false, contentType: 'pdf', uploading: false, uploadPercent: 0 }">
+  <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Depot direct</p>
+        <h2 class="mt-1 text-xl font-black text-slate-900">Televerser un cours</h2>
+        <p class="mt-1 text-sm text-slate-500">Choisissez la classe, la matiere, puis deposez le fichier.</p>
+      </div>
+      {% if selected_class %}
+      <span class="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{{ selected_class.display_name }}</span>
+      {% endif %}
+    </div>
+
+    <div class="mt-4 flex flex-wrap gap-2">
       {% for row in teacher_support_classes %}
-      <button type="button" hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-8 rounded-lg border px-3 text-xs font-bold transition {% if selected_class and selected_class.id == row.class_id %}border-blue-500 bg-blue-600 text-white{% else %}border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100{% endif %}">
+      <button type="button" hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}&support_target={{ support_target|urlencode }}" hx-target="{{ support_target }}" hx-swap="innerHTML" class="min-h-9 rounded-xl border px-3 py-2 text-xs font-bold transition {% if selected_class and selected_class.id == row.class_id %}border-blue-500 bg-blue-600 text-white{% else %}border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100{% endif %}">
         {{ row.class_name }}
       </button>
       {% empty %}
-      <span class="text-xs text-slate-500">Aucune classe rattachee.</span>
+      <span class="text-sm font-semibold text-slate-500">Aucune classe rattachee a votre compte.</span>
       {% endfor %}
-      {% if selected_class %}
-      <span class="ml-auto text-[11px] text-slate-400">{{ branch.name|default:"" }}</span>
-      {% endif %}
     </div>
   </div>
 
   {% if selected_class %}
-  <div class="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-        <div>
-          <p class="text-sm font-bold text-slate-900">{{ selected_class.display_name }} - {{ selected_class.programme.title }}</p>
-          <p class="mt-1 text-xs text-slate-500">Choisissez une matiere pour ouvrir ses chapitres et supports.</p>
+    {% if teacher_support_ecs %}
+    <div class="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+      <aside class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 px-4 py-3">
+          <h3 class="text-sm font-black text-slate-900">Matieres</h3>
+          <p class="mt-1 text-xs text-slate-500">Cliquez sur la matiere du cours a deposer.</p>
         </div>
-        <span class="text-xs text-slate-500">{{ teacher_support_ecs|length }} matiere(s)</span>
+        <div class="divide-y divide-slate-100">
+          {% for ec in teacher_support_ecs %}
+          <button type="button" hx-get="{{ teacher_support_workspace_url }}?class_id={{ selected_class.id }}&ec_id={{ ec.id }}&support_target={{ support_target|urlencode }}" hx-target="{{ support_target }}" hx-swap="innerHTML" class="block w-full px-4 py-3 text-left transition hover:bg-slate-50 {% if selected_ec and selected_ec.id == ec.id %}bg-blue-50{% endif %}">
+            <span class="block text-sm font-bold text-slate-900">{{ ec.title }}</span>
+            <span class="mt-1 block text-xs text-slate-500">{{ ec.ue_code|default:"-" }} - {{ ec.chapter_count }} chapitre(s), {{ ec.content_count }} support(s)</span>
+          </button>
+          {% endfor %}
+        </div>
+      </aside>
+
+      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {% if selected_ec %}
+        <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Cours selectionne</p>
+            <h3 class="mt-1 text-xl font-black text-slate-900">{{ selected_ec.title }}</h3>
+            <p class="mt-1 text-sm text-slate-500">Le support sera visible dans le dashboard etudiant de cette classe.</p>
+          </div>
+          {% if selected_ec_summary %}
+          <span class="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">{{ selected_ec_summary.content_count }} support(s)</span>
+          {% endif %}
+        </div>
+
+        <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p class="text-sm font-black text-slate-900">Deposer un support pour ce cours</p>
+              <p class="mt-1 text-xs font-semibold text-slate-600">Fichier, video ou texte, avec chapitre existant ou nouveau chapitre.</p>
+            </div>
+            <button type="button" @click="modalSupport=true; contentType='pdf'; uploadPercent=0; uploading=false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700">
+              Televerser un cours
+            </button>
+          </div>
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
+          <p class="text-base font-black text-slate-900">Choisissez une matiere</p>
+          <p class="mt-1 text-sm text-slate-500">Le formulaire de depot apparaitra ici.</p>
+        </div>
+        {% endif %}
+      </section>
+    </div>
+
+    {% if selected_ec %}
+    <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div class="border-b border-slate-200 px-4 py-3">
+        <h3 class="text-sm font-black text-slate-900">Supports deja deposes</h3>
+        <p class="mt-1 text-xs text-slate-500">{{ selected_ec.title }}</p>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[680px] text-sm">
-          <thead class="bg-slate-100 text-[11px] font-black uppercase text-slate-600">
+        <table class="w-full min-w-[720px] text-sm">
+          <thead class="bg-slate-50 text-[11px] font-black uppercase text-slate-600">
             <tr>
-              <th class="px-3 py-2 text-left">Matiere</th>
-              <th class="px-3 py-2 text-left">Code UE</th>
-              <th class="px-3 py-2 text-center">Chapitres</th>
-              <th class="px-3 py-2 text-center">Supports</th>
-              <th class="px-3 py-2 text-right">Actions</th>
+              <th class="px-4 py-3 text-left">Support</th>
+              <th class="px-4 py-3 text-left">Chapitre</th>
+              <th class="px-4 py-3 text-left">Type</th>
+              <th class="px-4 py-3 text-right">Acces</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            {% for ec in teacher_support_ecs %}
-            <tr class="hover:bg-slate-50 {% if selected_ec and selected_ec.id == ec.id %}bg-blue-50{% endif %}">
-              <td class="px-3 py-3 font-semibold text-slate-900">{{ ec.title }}</td>
-              <td class="px-3 py-3 text-slate-500">{{ ec.ue_code|default:"-" }}</td>
-              <td class="px-3 py-3 text-center"><span class="inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{{ ec.chapter_count }}</span></td>
-              <td class="px-3 py-3 text-center"><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">{{ ec.content_count }}</span></td>
-              <td class="px-3 py-3">
-                <div class="flex justify-end gap-1.5">
-                  <button type="button" hx-get="{{ teacher_support_workspace_url }}?class_id={{ selected_class.id }}&ec_id={{ ec.id }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-7 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100">
-                    Aperçu
-                  </button>
-                  <button type="button" @click="ecId='{{ ec.id }}'; ecTitle='{{ ec.title|escapejs }}'; classId='{{ selected_class.id }}'; modalChapter=true" class="h-7 rounded-md bg-blue-600 px-2.5 text-xs font-bold text-white hover:bg-blue-700">
-                    + Chapitre
-                  </button>
-                </div>
-              </td>
-            </tr>
+            {% for chapter in teacher_support_chapters %}
+              {% for content in chapter.contents %}
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 font-semibold text-slate-900">{{ content.title }}</td>
+                <td class="px-4 py-3 text-slate-500">{{ chapter.title }}</td>
+                <td class="px-4 py-3 text-slate-500">{{ content.content_type_label }}</td>
+                <td class="px-4 py-3 text-right">
+                  {% if content.file_url %}
+                  <a href="{{ content.file_url }}" target="_blank" class="inline-flex h-8 items-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-blue-600 hover:bg-slate-50">Ouvrir</a>
+                  {% elif content.video_url %}
+                  <a href="{{ content.video_url }}" target="_blank" rel="noopener" class="inline-flex h-8 items-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-blue-600 hover:bg-slate-50">Video</a>
+                  {% elif content.has_text_content %}
+                  <span class="inline-flex h-8 items-center rounded-lg bg-slate-100 px-3 text-xs font-bold text-slate-700">Texte</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
             {% empty %}
-            <tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">Aucune matiere rattachee a cette classe.</td></tr>
+            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Aucun chapitre pour cette matiere.</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+    </section>
+    {% endif %}
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
+      <p class="text-base font-black text-slate-900">Aucune matiere rattachee</p>
+      <p class="mt-1 text-sm text-slate-500">La direction doit rattacher au moins une matiere a cette classe.</p>
     </div>
-
-    <div class="rounded-2xl border border-slate-200 bg-slate-950 px-5 py-5 text-white shadow-sm">
-      <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200">Workflow supports</p>
-      <h3 class="mt-2 text-xl font-black">Structuration pedagogique</h3>
-      <div class="mt-4 grid gap-3 sm:grid-cols-3">
-        <div class="rounded-2xl bg-white/10 px-4 py-3">
-          <p class="text-[11px] font-bold uppercase tracking-wide text-cyan-100">Classe</p>
-          <p class="mt-1 text-sm font-bold">{{ selected_class.display_name }}</p>
-        </div>
-        <div class="rounded-2xl bg-white/10 px-4 py-3">
-          <p class="text-[11px] font-bold uppercase tracking-wide text-cyan-100">Matiere</p>
-          <p class="mt-1 text-sm font-bold">{% if selected_ec %}{{ selected_ec.title }}{% else %}A choisir{% endif %}</p>
-        </div>
-        <div class="rounded-2xl bg-white/10 px-4 py-3">
-          <p class="text-[11px] font-bold uppercase tracking-wide text-cyan-100">Chapitre</p>
-          <p class="mt-1 text-sm font-bold">{% if selected_chapter %}{{ selected_chapter.title }}{% else %}A creer{% endif %}</p>
-        </div>
-      </div>
-      <div class="mt-4 rounded-2xl bg-white/10 px-4 py-4 text-sm text-slate-100">
-        <div>Fichier: PDF, Word, Excel, PowerPoint, image, audio.</div>
-        <div class="mt-1">Video: URL video.</div>
-        <div class="mt-1">Texte: contenu direct sans fichier.</div>
-      </div>
-    </div>
-  </div>
-
-  {% if selected_ec %}
-  <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-    <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-      <p class="text-sm font-bold text-slate-900">Chapitres - {{ selected_ec.title }}</p>
-      <div class="flex items-center gap-3">
-        {% if selected_ec_summary %}<span class="text-xs text-slate-500">{{ selected_ec_summary.chapter_count }} chap. - {{ selected_ec_summary.content_count }} supports</span>{% endif %}
-        <button type="button" @click="ecId='{{ selected_ec.id }}'; ecTitle='{{ selected_ec.title|escapejs }}'; classId='{{ selected_class.id }}'; modalChapter=true" class="h-7 rounded-md bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">
-          + Chapitre
-        </button>
-      </div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full min-w-[520px] text-sm">
-        <thead class="bg-slate-100 text-[11px] font-black uppercase text-slate-600">
-          <tr>
-            <th class="px-3 py-2 text-left">Ordre</th>
-            <th class="px-3 py-2 text-left">Titre</th>
-            <th class="px-3 py-2 text-center">Supports</th>
-            <th class="px-3 py-2 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for chapter in teacher_support_chapters %}
-          <tr class="hover:bg-slate-50 {% if selected_chapter and selected_chapter.id == chapter.id %}bg-blue-50{% endif %}">
-            <td class="px-3 py-3 text-slate-500">{{ chapter.order|add:1 }}</td>
-            <td class="px-3 py-3 font-semibold text-slate-900">{{ chapter.title }}</td>
-            <td class="px-3 py-3 text-center"><span class="inline-flex items-center justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">{{ chapter.content_count }}</span></td>
-            <td class="px-3 py-3">
-              <div class="flex justify-end gap-1.5">
-                <button type="button" hx-get="{{ teacher_support_workspace_url }}?class_id={{ selected_class.id }}&ec_id={{ selected_ec.id }}&chapter_id={{ chapter.id }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-7 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100">
-                  Aperçu
-                </button>
-                <button type="button" @click="ecId='{{ selected_ec.id }}'; classId='{{ selected_class.id }}'; chapterId='{{ chapter.id }}'; chapterTitle='{{ chapter.title|escapejs }}'; modalSupport=true" class="h-7 rounded-md bg-slate-900 px-2.5 text-xs font-bold text-white hover:bg-slate-700">
-                  + Support
-                </button>
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="4" class="px-3 py-8 text-center text-slate-500">Aucun chapitre. Creez le premier pour deposer vos supports.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if selected_chapter %}
-  <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-    <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-      <div>
-        <p class="text-sm font-bold text-slate-900">Supports - {{ selected_chapter.title }}</p>
-        <p class="mt-1 text-xs text-slate-500">Chaque support reste rattache a la classe, a la matiere et au chapitre selectionnes.</p>
-      </div>
-      <button type="button" @click="ecId='{{ selected_ec.id }}'; classId='{{ selected_class.id }}'; chapterId='{{ selected_chapter.id }}'; chapterTitle='{{ selected_chapter.title|escapejs }}'; modalSupport=true" class="h-8 rounded-md bg-slate-900 px-3 text-xs font-bold text-white hover:bg-slate-700">
-        + Ajouter un support
-      </button>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full min-w-[720px] text-sm">
-        <thead class="bg-slate-100 text-[11px] font-black uppercase text-slate-600">
-          <tr>
-            <th class="px-3 py-2 text-left">Titre</th>
-            <th class="px-3 py-2 text-left">Type</th>
-            <th class="px-3 py-2 text-left">Apercu</th>
-            <th class="px-3 py-2 text-center">Ordre</th>
-            <th class="px-3 py-2 text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for content in teacher_support_contents %}
-          <tr class="hover:bg-slate-50">
-            <td class="px-3 py-3 font-semibold text-slate-900">{{ content.title }}</td>
-            <td class="px-3 py-3 text-slate-500">{{ content.content_type_label }}</td>
-            <td class="px-3 py-3 text-slate-500">
-              {% if content.file_name %}
-              {{ content.file_name }}
-              {% elif content.has_video_url %}
-              URL video
-              {% elif content.has_text_content %}
-              {{ content.text_excerpt|default:"Texte integre" }}
-              {% else %}
-              -
-              {% endif %}
-            </td>
-            <td class="px-3 py-3 text-center text-slate-500">{{ content.order }}</td>
-            <td class="px-3 py-3 text-right">
-              {% if content.file_url %}
-              <a href="{{ content.file_url }}" target="_blank" class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-blue-600 hover:bg-slate-50">Aperçu</a>
-              {% elif content.video_url %}
-              <a href="{{ content.video_url }}" target="_blank" rel="noopener" class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-blue-600 hover:bg-slate-50">Aperçu vidéo</a>
-              {% elif content.has_text_content %}
-              <span class="inline-flex h-7 items-center rounded-md bg-slate-100 px-2.5 text-xs font-bold text-slate-700">Texte integre</span>
-              {% else %}
-              <span class="text-xs text-slate-400">Aucune action</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">Aucun support. Deposez le premier support de ce chapitre.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
+    {% endif %}
   {% else %}
   <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-    <p class="text-lg font-bold text-slate-900">Aucune classe rattachee</p>
-    <p class="mt-1 text-sm text-slate-500">Le compte enseignant n'a encore aucune classe visible dans son perimetre.</p>
+    <p class="text-base font-black text-slate-900">Aucune classe rattachee</p>
+    <p class="mt-1 text-sm text-slate-500">La direction doit rattacher une classe a cet enseignant.</p>
   </div>
   {% endif %}
 
-  <template x-teleport="body">
-    <div x-show="modalChapter" x-cloak @keydown.escape.window="modalChapter=false" class="fixed inset-0 z-[300] flex items-center justify-center">
-      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="modalChapter=false"></div>
-      <div class="relative w-full max-w-md rounded-2xl bg-white shadow-2xl p-6 m-4" @click.stop>
-        <div class="flex items-start justify-between mb-5">
+  {% if selected_class and selected_ec %}
+  <div x-show="modalSupport" x-cloak class="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/55 px-4 py-6" @keydown.escape.window="if (!uploading) modalSupport=false">
+    <div class="absolute inset-0" @click="if (!uploading) modalSupport=false"></div>
+    <section class="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" @click.stop>
+      <header class="border-b border-slate-200 px-5 py-4">
+        <div class="flex items-start justify-between gap-4">
           <div>
-            <h3 class="text-base font-black text-slate-900">Nouveau chapitre</h3>
-            <p class="text-xs text-slate-500 mt-0.5" x-text="ecTitle"></p>
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-blue-600">{{ selected_class.display_name }}</p>
+            <h3 class="mt-1 text-xl font-black text-slate-900">Televerser un cours</h3>
+            <p class="mt-1 text-sm text-slate-500">{{ selected_ec.title }}</p>
           </div>
-          <button type="button" @click="modalChapter=false" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100">x</button>
+          <button type="button" :disabled="uploading" @click="modalSupport=false" class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+            x
+          </button>
         </div>
-        <form method="post" enctype="multipart/form-data" hx-post="{{ teacher_support_workspace_url }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" hx-encoding="multipart/form-data" onsubmit="return false;">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_chapter">
-          <input type="hidden" name="class_id" :value="classId">
-          <input type="hidden" name="ec_id" :value="ecId">
-          <div class="space-y-3">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Titre du chapitre <span class="text-red-500">*</span></label>
-              <input type="text" name="chapter_title" placeholder="Ex: Introduction generale" required class="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-            </div>
-            <div class="flex gap-2 pt-1">
-              <button type="button" @click="modalChapter=false" class="flex-1 h-10 rounded-lg border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50">Annuler</button>
-              <button type="submit" class="flex-1 h-10 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">Ajouter</button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  </template>
+      </header>
 
-  <template x-teleport="body">
-    <div x-show="modalSupport" x-cloak @keydown.escape.window="modalSupport=false" class="fixed inset-0 z-[300] flex items-center justify-center">
-      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="modalSupport=false"></div>
-      <div class="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl p-6 m-4" @click.stop>
-        <div class="flex items-start justify-between mb-5">
+      <form
+        method="post"
+        enctype="multipart/form-data"
+        hx-post="{{ teacher_support_workspace_url }}"
+        hx-target="{{ support_target }}"
+        hx-swap="innerHTML"
+        hx-encoding="multipart/form-data"
+        hx-disabled-elt="find button[type='submit']"
+        hx-on:htmx:before-request="uploading=true; uploadPercent=0"
+        hx-on:htmx:xhr:progress="if(event.detail.lengthComputable){ uploadPercent=Math.round((event.detail.loaded/event.detail.total)*100) }"
+        hx-on:htmx:after-request="uploading=false"
+        class="overflow-y-auto px-5 py-5"
+      >
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_content">
+        <input type="hidden" name="support_target" value="{{ support_target }}">
+        <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+        <input type="hidden" name="ec_id" value="{{ selected_ec.id }}">
+
+        <div class="grid gap-4 lg:grid-cols-2">
           <div>
-            <h3 class="text-base font-black text-slate-900">Ajouter un support</h3>
-            <p class="text-xs text-slate-500 mt-0.5" x-text="chapterTitle ? 'Chapitre : ' + chapterTitle : ''"></p>
+            <label class="mb-1 block text-xs font-bold text-slate-700">Chapitre</label>
+            <select name="chapter_id" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+              {% for chapter in teacher_support_chapters %}
+              <option value="{{ chapter.id }}" {% if selected_chapter and selected_chapter.id == chapter.id %}selected{% endif %}>{{ chapter.title }}</option>
+              {% endfor %}
+              <option value="">Depot simple</option>
+            </select>
           </div>
-          <button type="button" @click="modalSupport=false" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-100">x</button>
+          <div>
+            <label class="mb-1 block text-xs font-bold text-slate-700">Nouveau chapitre</label>
+            <input type="text" name="new_chapter_title" placeholder="Ex: Chapitre 1 - Introduction" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+          </div>
         </div>
-        <form method="post" enctype="multipart/form-data" hx-post="{{ teacher_support_workspace_url }}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" hx-encoding="multipart/form-data" onsubmit="return false;">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_content">
-          <input type="hidden" name="class_id" :value="classId">
-          <input type="hidden" name="ec_id" :value="ecId">
-          <input type="hidden" name="chapter_id" :value="chapterId">
-          <div class="space-y-3">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Titre du support <span class="text-red-500">*</span></label>
-              <input type="text" name="content_title" placeholder="Ex: TD Chapitre 1" required class="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Type de contenu</label>
-                <select name="content_type" x-model="contentType" class="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500">
-                  {% for value, label in content_type_choices %}
-                  <option value="{{ value }}">{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div x-show="['pdf', 'doc', 'excel', 'ppt', 'image', 'audio'].includes(contentType)" x-cloak>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Fichier</label>
-                <input type="file" name="file" class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-semibold">
-              </div>
-              <div x-show="contentType === 'video'" x-cloak class="col-span-2">
-                <label class="block text-xs font-bold text-slate-700 mb-1">URL video</label>
-                <input type="url" name="video_url" placeholder="https://..." class="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-              </div>
-            </div>
-            <div x-show="contentType === 'text'" x-cloak>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Contenu texte</label>
-              <textarea name="text_content" rows="5" placeholder="Redigez directement le support..." class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></textarea>
-            </div>
-            <p class="text-[11px] text-slate-400" x-show="contentType === 'video'" x-cloak>Le type Video utilise une URL video.</p>
-            <p class="text-[11px] text-slate-400" x-show="contentType === 'text'" x-cloak>Le type Texte stocke le contenu directement dans la plateforme.</p>
-            <p class="text-[11px] text-slate-400" x-show="['pdf', 'doc', 'excel', 'ppt', 'image', 'audio'].includes(contentType)" x-cloak>Le type selectionne attend un fichier a deposer.</p>
-            <div class="flex gap-2 pt-1">
-              <button type="button" @click="modalSupport=false" class="flex-1 h-10 rounded-lg border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50">Annuler</button>
-              <button type="submit" class="flex-1 h-10 rounded-lg bg-slate-900 text-white text-sm font-bold hover:bg-slate-700">Deposer</button>
-            </div>
+
+        <div class="mt-4">
+          <label class="mb-1 block text-xs font-bold text-slate-700">Titre du support <span class="text-rose-500">*</span></label>
+          <input type="text" name="content_title" required placeholder="Ex: Cours 1 - Introduction generale" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+        </div>
+
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-xs font-bold text-slate-700">Type <span class="text-rose-500">*</span></label>
+            <select name="content_type" x-model="contentType" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+              {% for value, label in content_type_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
           </div>
-        </form>
-      </div>
-    </div>
-  </template>
+          <div x-show="['pdf', 'doc', 'excel', 'ppt', 'image', 'audio'].includes(contentType)" x-cloak>
+            <label class="mb-1 block text-xs font-bold text-slate-700">Fichier <span class="text-rose-500">*</span></label>
+            <input type="file" name="file" x-bind:required="['pdf', 'doc', 'excel', 'ppt', 'image', 'audio'].includes(contentType)" class="h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:text-xs file:font-bold">
+          </div>
+          <div x-show="contentType === 'video'" x-cloak>
+            <label class="mb-1 block text-xs font-bold text-slate-700">URL video <span class="text-rose-500">*</span></label>
+            <input type="url" name="video_url" x-bind:required="contentType === 'video'" placeholder="https://..." class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+          </div>
+        </div>
+
+        <div class="mt-4" x-show="contentType === 'text'" x-cloak>
+          <label class="mb-1 block text-xs font-bold text-slate-700">Texte du cours <span class="text-rose-500">*</span></label>
+          <textarea name="text_content" x-bind:required="contentType === 'text'" rows="6" placeholder="Redigez le contenu du cours..." class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></textarea>
+        </div>
+
+        <div x-show="uploading" x-cloak class="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+          <div class="flex items-center justify-between text-xs font-bold text-blue-700">
+            <span>Televersement en cours</span>
+            <span x-text="uploadPercent + '%'"></span>
+          </div>
+          <div class="mt-2 h-2 overflow-hidden rounded-full bg-white">
+            <div class="h-full rounded-full bg-blue-600 transition-all" :style="`width: ${uploadPercent}%`"></div>
+          </div>
+        </div>
+
+        <footer class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" :disabled="uploading" @click="modalSupport=false" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+            Annuler
+          </button>
+          <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">
+            <span x-show="!uploading">Deposer le support</span>
+            <span x-show="uploading" x-cloak>Envoi...</span>
+          </button>
+        </footer>
+      </form>
+    </section>
+  </div>
+  {% endif %}
 </div>
+{% endwith %}

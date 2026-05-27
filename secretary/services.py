@@ -5,6 +5,8 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from accounts.dashboards.helpers import get_user_branch
+from academics.services.schedule_service import get_student_week_schedule
+from students.models import StudentAttendance
 from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
 from .selectors import (
     get_active_students,
@@ -13,6 +15,8 @@ from .selectors import (
     get_recent_documents_queryset,
     get_recent_registry_entries,
     get_registry_queryset,
+    get_classes_queryset,
+    get_class_students_queryset,
     get_tasks_queryset,
     search_classes,
     get_student_active_enrollment,
@@ -32,6 +36,112 @@ def _clean_instance(instance):
     return instance
 
 
+REGISTRY_ROUTING_RULES = {
+    RegistryEntry.TYPE_SCHOOL_PAYMENT: {
+        "target_service": "Gestionnaire",
+        "priority": RegistryEntry.PRIORITY_IMMEDIATE,
+        "workflow_code": "financial",
+        "actions": ["Notifier la gestionnaire", "Ouvrir le dossier financier", "Preparer le recu"],
+    },
+    RegistryEntry.TYPE_PACKAGE_DEPOSIT: {
+        "target_service": "Surveillance",
+        "priority": RegistryEntry.PRIORITY_HIGH,
+        "workflow_code": "package_delivery",
+        "actions": ["Identifier l'etudiant", "Notifier surveillant/etudiant", "Confirmer la remise"],
+    },
+    RegistryEntry.TYPE_SCHOOL_DELIVERY: {
+        "target_service": "Gestionnaire / Logistique",
+        "priority": RegistryEntry.PRIORITY_HIGH,
+        "workflow_code": "logistics",
+        "actions": ["Verifier livraison", "Notifier logistique", "Archiver justificatif"],
+    },
+    RegistryEntry.TYPE_APPOINTMENT_REQUEST: {
+        "target_service": "Secretariat direction",
+        "priority": RegistryEntry.PRIORITY_NORMAL,
+        "workflow_code": "appointment",
+        "actions": ["Consulter agenda", "Valider creneau", "Envoyer confirmation"],
+    },
+    RegistryEntry.TYPE_DIPLOMA_WITHDRAWAL: {
+        "target_service": "Direction des etudes",
+        "priority": RegistryEntry.PRIORITY_HIGH,
+        "workflow_code": "diploma_withdrawal",
+        "actions": ["Verifier identite", "Verifier disponibilite", "Archiver signature"],
+    },
+    RegistryEntry.TYPE_COMPLAINT: {
+        "target_service": "Administration",
+        "priority": RegistryEntry.PRIORITY_HIGH,
+        "workflow_code": "complaint",
+        "actions": ["Qualifier reclamation", "Router service", "Suivre resolution"],
+    },
+    RegistryEntry.TYPE_EXTERNAL_VISITOR: {
+        "target_service": "Accueil / Administration",
+        "priority": RegistryEntry.PRIORITY_NORMAL,
+        "workflow_code": "external_visit",
+        "actions": ["Identifier visiteur", "Orienter service", "Tracer sortie"],
+    },
+    RegistryEntry.TYPE_PARENT_VISIT: {
+        "target_service": "Accueil / Pedagogie",
+        "priority": RegistryEntry.PRIORITY_NORMAL,
+        "workflow_code": "parent_visit",
+        "actions": ["Identifier enfant", "Orienter interlocuteur", "Tracer echange"],
+    },
+}
+
+
+def get_registry_routing_rules_for_ui():
+    choices = dict(RegistryEntry.ENTRY_TYPE_CHOICES)
+    priorities = dict(RegistryEntry.PRIORITY_CHOICES)
+    return {
+        entry_type: {
+            "label": choices.get(entry_type, entry_type),
+            "target_service": rule.get("target_service", "Accueil"),
+            "priority": rule.get("priority", RegistryEntry.PRIORITY_NORMAL),
+            "priority_label": priorities.get(rule.get("priority", RegistryEntry.PRIORITY_NORMAL), "Normale"),
+            "workflow_code": rule.get("workflow_code", "administrative"),
+            "actions": rule.get("actions", []),
+        }
+        for entry_type, rule in REGISTRY_ROUTING_RULES.items()
+    }
+
+
+def apply_registry_routing(data):
+    entry_type = data.get("entry_type")
+    rule = REGISTRY_ROUTING_RULES.get(entry_type, {})
+    if not data.get("target_service"):
+        data["target_service"] = rule.get("target_service", "Accueil")
+    data["priority"] = rule.get("priority", data.get("priority") or RegistryEntry.PRIORITY_NORMAL)
+    if not data.get("workflow_code"):
+        data["workflow_code"] = rule.get("workflow_code", "administrative")
+    if not data.get("linked_actions"):
+        data["linked_actions"] = rule.get("actions", [])
+    return data
+
+
+def _next_registry_numbers(*, branch):
+    today = timezone.localdate()
+    year = today.year
+    branch_code = (getattr(branch, "code", "") or "GLOBAL").upper()
+    branch_filter = {"branch": branch} if branch else {"branch__isnull": True}
+    day_sequence = (
+        RegistryEntry.objects.filter(created_at__date=today, **branch_filter).count() + 1
+    )
+    year_sequence = (
+        RegistryEntry.objects.filter(created_at__year=year, **branch_filter).count() + 1
+    )
+    registry_number = f"ESFE-{branch_code}-{year}-{year_sequence:06d}"
+    event_identifier = f"{registry_number}-{day_sequence:03d}"
+    return registry_number, day_sequence, event_identifier
+
+
+def _history_event(user, action, details=None):
+    return {
+        "at": timezone.now().isoformat(),
+        "by": getattr(user, "username", "") if user else "",
+        "action": action,
+        "details": details or {},
+    }
+
+
 def prevent_conflicts(*, scheduled_at, assigned_to=None, exclude_id=None):
     if scheduled_at < timezone.now():
         raise ValidationError("Un rendez-vous ne peut pas etre planifie dans le passe.")
@@ -48,6 +158,19 @@ def prevent_conflicts(*, scheduled_at, assigned_to=None, exclude_id=None):
 
 @transaction.atomic
 def create_registry_entry(*, created_by, **data):
+    branch = data.get("branch") or get_user_branch(created_by)
+    data["branch"] = branch
+    data = apply_registry_routing(data)
+    if not data.get("title"):
+        entry_type_labels = dict(RegistryEntry.ENTRY_TYPE_CHOICES)
+        visitor = data.get("visitor_name") or "Accueil"
+        data["title"] = f"{entry_type_labels.get(data.get('entry_type'), 'Entree registre')} - {visitor}"
+    if not data.get("registry_number"):
+        registry_number, daily_number, event_identifier = _next_registry_numbers(branch=branch)
+        data["registry_number"] = registry_number
+        data["daily_number"] = daily_number
+        data["event_identifier"] = event_identifier
+    data["history"] = [_history_event(created_by, "creation", {"entry_type": data.get("entry_type")})]
     entry = RegistryEntry(created_by=created_by, **data)
     return _clean_instance(entry)
 
@@ -60,13 +183,16 @@ def start_registry_entry_processing(entry):
         entry.status = RegistryEntry.STATUS_IN_PROGRESS
     elif entry.status == RegistryEntry.STATUS_COMPLETED:
         raise ValidationError("Cette entree a deja ete traitee.")
+    entry.history.append(_history_event(None, "prise_en_charge"))
     return _clean_instance(entry)
 
 
 @transaction.atomic
 def update_registry_entry(entry, **data):
+    data = apply_registry_routing(data)
     for field, value in data.items():
         setattr(entry, field, value)
+    entry.history.append(_history_event(None, "mise_a_jour"))
     return _clean_instance(entry)
 
 
@@ -75,6 +201,8 @@ def mark_registry_processed(entry):
     if entry.is_archived:
         raise ValidationError("Une entree archivee ne peut pas etre validee.")
     entry.status = RegistryEntry.STATUS_COMPLETED
+    entry.closed_at = timezone.now()
+    entry.history.append(_history_event(None, "traite"))
     return _clean_instance(entry)
 
 
@@ -84,8 +212,8 @@ def archive_registry_entry(entry):
         raise ValidationError("Cette entree est deja archivee.")
     entry.is_archived = True
     entry.is_active = False
-    if entry.status == RegistryEntry.STATUS_IN_PROGRESS:
-        entry.status = RegistryEntry.STATUS_COMPLETED
+    entry.status = RegistryEntry.STATUS_ARCHIVED
+    entry.history.append(_history_event(None, "archive"))
     return _clean_instance(entry)
 
 
@@ -265,11 +393,20 @@ def search_academic_classes(query, *, user=None, branch=None):
     return search_classes(query, user=user, branch=branch)
 
 
+def get_secretary_classes(*, user=None, branch=None, limit=24):
+    return get_classes_queryset(user=user, branch=branch)[:limit]
+
+
+def get_secretary_class_students(academic_class_id, *, user=None, branch=None):
+    return get_class_students_queryset(academic_class_id, user=user, branch=branch)
+
+
 def get_student_snapshot(student_id, *, user=None, branch=None):
     student = get_object_or_404(get_student_snapshot_queryset(student_id, user=user, branch=branch))
     enrollment = get_student_active_enrollment(student)
     inscription = getattr(student, "inscription", None)
     candidature = getattr(inscription, "candidature", None)
+    schedule = _get_secretary_student_schedule(student)
     return {
         "student_id": student.id,
         "full_name": student.full_name,
@@ -287,44 +424,88 @@ def get_student_snapshot(student_id, *, user=None, branch=None):
         ).count(),
         "documents_count": student.document_receipts.filter(is_archived=False).count(),
         "tasks_count": student.secretary_tasks.filter(is_archived=False).count(),
+        "schedule": schedule,
+        "today_events": schedule.get("today_events", []),
+        "current_event": schedule.get("current_event"),
+        "presence_state": schedule.get("presence_state", {}),
     }
 
 
-def get_academic_results(*, branch=None, limit=20):
-    from news.models import ResultSession
+def _get_secretary_student_schedule(student):
+    schedule = get_student_week_schedule(student, None)
+    today = timezone.localdate()
+    now = timezone.localtime(timezone.now())
+    events = list(schedule.get("events", []))
+    event_ids = [event["id"] for event in events if isinstance(event.get("id"), int)]
+    attendances = {
+        attendance.schedule_event_id: attendance
+        for attendance in StudentAttendance.objects.filter(
+            student=student,
+            date=today,
+            schedule_event_id__in=event_ids,
+        ).select_related("schedule_event")
+    }
 
-    queryset = ResultSession.objects.filter(is_published=True).order_by("-annee_academique", "-created_at")
-    if branch is not None:
-        branch_name = (getattr(branch, "name", "") or "").strip()
-        branch_code = (getattr(branch, "code", "") or "").strip()
-        branch_filters = Q()
-        if branch_name:
-            branch_filters |= Q(annexe__iexact=branch_name) | Q(annexe__icontains=branch_name)
-        if branch_code:
-            branch_filters |= Q(annexe__iexact=branch_code) | Q(annexe__icontains=branch_code)
-        if branch_filters:
-            queryset = queryset.filter(branch_filters)
-    return queryset[:limit]
+    current_event = None
+    today_events = []
+    for event in events:
+        duration_minutes = event.get("duration_minutes") or 0
+        event["duration_label"] = f"{duration_minutes} min" if duration_minutes else ""
+        attendance = attendances.get(event.get("id"))
+        event["attendance_status"] = getattr(attendance, "status", "")
+        event["attendance_label"] = attendance.get_status_display() if attendance else "Non pointe"
+        event["attendance_is_recorded"] = attendance is not None
+        if event.get("is_today"):
+            today_events.append(event)
+            start_dt = timezone.localtime(event["start_datetime"])
+            end_dt = timezone.localtime(event["end_datetime"])
+            if start_dt <= now <= end_dt and not event.get("is_cancelled"):
+                current_event = event
+
+    for day_index, day in enumerate(schedule.get("days", [])):
+        day_events = [
+            event for event in events
+            if event.get("weekday_index") == day_index
+        ]
+        day["events"] = day_events
+        day["events_count"] = len(day_events)
+
+    schedule["today_events"] = today_events
+    schedule["today_events_count"] = len(today_events)
+    schedule["current_event"] = current_event
+    schedule["week_end"] = schedule["days"][-1]["date"] if schedule.get("days") else schedule.get("week_start")
+    schedule["presence_state"] = {
+        "has_course_now": current_event is not None,
+        "label": _student_presence_label(current_event),
+        "tone": _student_presence_tone(current_event),
+    }
+    return schedule
 
 
-def get_pending_shop_orders(*, branch=None, limit=10):
-    from shop.models import ShopOrder
+def _student_presence_label(current_event):
+    if current_event is None:
+        return "Pas de cours en ce moment"
+    status = current_event.get("attendance_status")
+    if status == StudentAttendance.STATUS_PRESENT:
+        return "Declare present au cours"
+    if status == StudentAttendance.STATUS_LATE:
+        return "Declare en retard au cours"
+    if status == StudentAttendance.STATUS_ABSENT:
+        return "Declare absent au cours"
+    return "Cours en cours - presence non pointee"
 
-    queryset = (
-        ShopOrder.objects.select_related(
-            "branch",
-            "inscription__candidature__programme",
-            "inscription__candidature__branch",
-            "prepared_by",
-            "delivered_by",
-        )
-        .prefetch_related("items", "payments")
-        .filter(status__in=[ShopOrder.STATUS_PENDING_PAYMENT, ShopOrder.STATUS_READY])
-        .order_by("status", "-created_at")
-    )
-    if branch is not None:
-        queryset = queryset.filter(branch=branch)
-    return queryset[:limit]
+
+def _student_presence_tone(current_event):
+    if current_event is None:
+        return "slate"
+    status = current_event.get("attendance_status")
+    if status == StudentAttendance.STATUS_PRESENT:
+        return "green"
+    if status == StudentAttendance.STATUS_LATE:
+        return "amber"
+    if status == StudentAttendance.STATUS_ABSENT:
+        return "red"
+    return "blue"
 
 
 def get_secretary_dashboard_data(user):
@@ -334,6 +515,8 @@ def get_secretary_dashboard_data(user):
     today_visits = get_today_visits(user=user, branch=branch)
     active_visits = get_active_visits(user=user, branch=branch)
     pending_tasks = get_pending_tasks(user=user, branch=branch)
+    classes_queryset = get_classes_queryset(user=user, branch=branch)
+    classes = classes_queryset[:24]
     pending_registry_rows = get_registry_queryset(
         {
             "status": RegistryEntry.STATUS_PENDING,
@@ -356,6 +539,9 @@ def get_secretary_dashboard_data(user):
     return {
         "branch": branch,
         "students_count": active_students.count(),
+        "students_preview_rows": active_students[:12],
+        "classes_count": classes_queryset.count(),
+        "classes_rows": classes,
         "appointments_today": today_appointments.count(),
         "visits_today": today_visits.count(),
         "active_visits": active_visits.count(),
@@ -386,8 +572,6 @@ def get_secretary_dashboard_data(user):
         "pending_documents_rows": pending_documents_rows,
         "recent_registry": get_recent_registry_entries(limit=5, user=user, branch=branch),
         "recent_documents": get_recent_documents(limit=5, user=user, branch=branch),
-        "academic_results": get_academic_results(branch=branch, limit=20),
-        "pending_shop_orders": get_pending_shop_orders(branch=branch, limit=10),
         "messages_count": get_secretary_unread_messages(user),
         "recent_messages": get_secretary_recent_messages(user, limit=5),
         "notifications": get_secretary_notifications(user, limit=5),

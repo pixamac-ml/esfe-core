@@ -908,6 +908,7 @@
                 <th class="px-5 py-4">Semestre</th>
                 <th class="px-5 py-4">Etat</th>
                 <th class="px-5 py-4">Notes</th>
+                <th class="px-5 py-4">Bulletins</th>
                 <th class="px-5 py-4 text-right">Action</th>
               </tr>
             </thead>
@@ -919,9 +920,18 @@
                     <td class="px-5 py-4 font-semibold text-slate-600">S{{ row.semester.number }}</td>
                     <td class="px-5 py-4"><span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">{{ row.semester.get_status_display }}</span></td>
                     <td class="px-5 py-4 font-semibold text-slate-600">{{ row.entered }}/{{ row.expected }}</td>
+                    <td class="px-5 py-4 font-semibold text-slate-600">{{ row.bulletins_count }}/{{ row.student_count }}</td>
                     <td class="px-5 py-4">
-                      <div class="flex justify-end">
+                      <div class="flex justify-end gap-2">
                         <a class="director-btn director-btn-primary" href="{% url 'academics:class_reports_overview' row.semester.id %}" target="_blank">Ouvrir le releve</a>
+                        {% if can_manage_bulletins %}
+                          <form method="post" hx-post="{% url 'accounts_portal:director_bulletin_action' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="generate_semester_class">
+                            <input type="hidden" name="semester_id" value="{{ row.semester.id }}">
+                            <button type="submit" class="director-btn director-btn-secondary">Generer bulletins</button>
+                          </form>
+                        {% endif %}
                       </div>
                     </td>
                   </tr>
@@ -935,6 +945,52 @@
           </table>
         </div>
       </section>
+
+      {% if can_manage_bulletins %}
+      <section class="rounded-[30px] border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="border-b border-slate-200 px-6 py-5">
+          <h3 class="text-xl font-black text-slate-900">Bulletins annuels</h3>
+          <p class="mt-1 text-sm font-semibold text-slate-500">Generation par classe apres publication de tous les semestres.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full">
+            <thead class="bg-slate-100 text-left text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+              <tr>
+                <th class="px-5 py-4">Classe</th>
+                <th class="px-5 py-4">Etudiants</th>
+                <th class="px-5 py-4">Semestres publies</th>
+                <th class="px-5 py-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-sm">
+              {% for item in class_cards %}
+                {% if item.semester_count and item.published_count >= item.semester_count %}
+                  <tr class="hover:bg-slate-50">
+                    <td class="px-5 py-4 font-black text-slate-900">{{ item.class.display_name }}</td>
+                    <td class="px-5 py-4 font-semibold text-slate-600">{{ item.student_count }}</td>
+                    <td class="px-5 py-4 font-semibold text-slate-600">{{ item.published_count }}/{{ item.semester_count }}</td>
+                    <td class="px-5 py-4">
+                      <div class="flex justify-end">
+                        <form method="post" hx-post="{% url 'accounts_portal:director_bulletin_action' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="generate_annual_class">
+                          <input type="hidden" name="class_id" value="{{ item.class.id }}">
+                          <button type="submit" class="director-btn director-btn-primary">Generer annuels</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                {% endif %}
+              {% empty %}
+                <tr>
+                  <td colspan="4" class="px-5 py-10 text-center text-sm font-semibold text-slate-500">Aucune classe prete.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {% endif %}
     </section>
 
   {% elif section == "documents" %}

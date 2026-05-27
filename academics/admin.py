@@ -17,6 +17,8 @@ from .models import (
     AcademicScheduleEvent,
     AcademicScheduleChangeLog,
     AcademicScheduleExecutionLog,
+    AcademicBulletin,
+    AcademicDiplomaAward,
     LessonLog,
     WeeklyScheduleSlot,
     Language,
@@ -100,14 +102,48 @@ class ECGradeAdmin(admin.ModelAdmin):
         "credit_obtained",
         "is_validated"
     )
-
     list_filter = ("is_validated",)
-
     readonly_fields = (
         "note_coefficient",
         "credit_obtained",
-        "is_validated"
+        "is_validated",
     )
+
+
+@admin.register(AcademicBulletin)
+class AcademicBulletinAdmin(admin.ModelAdmin):
+    list_display = (
+        "reference",
+        "student",
+        "bulletin_type",
+        "academic_year",
+        "academic_class",
+        "status",
+        "average",
+        "decision",
+        "generated_at",
+    )
+    list_filter = ("bulletin_type", "status", "branch", "academic_year", "academic_class")
+    search_fields = ("reference", "student__matricule", "student__user__username", "student__user__email")
+    readonly_fields = ("reference", "snapshot", "generated_at", "published_at", "created_at", "updated_at")
+
+
+@admin.register(AcademicDiplomaAward)
+class AcademicDiplomaAwardAdmin(admin.ModelAdmin):
+    list_display = (
+        "reference",
+        "student",
+        "diploma",
+        "programme",
+        "academic_year",
+        "branch",
+        "status",
+        "final_average",
+        "mention",
+    )
+    list_filter = ("status", "branch", "academic_year", "programme", "diploma")
+    search_fields = ("reference", "student__matricule", "student__user__username", "programme__title", "diploma__name")
+    readonly_fields = ("reference", "snapshot", "delivered_at", "created_at", "updated_at")
 
 
 class ECContentInline(admin.StackedInline):

@@ -1,47 +1,143 @@
 {% load humanize %}
 <div class="dg-card dg-card-pad">
-  <div class="dg-section-head">
+  <div class="dg-section-hero">
     <div>
-      <h3 class="dg-title">RH / Staff</h3>
+      <div class="dg-section-hero-title">
+        <i class="fa-solid fa-user-group" style="color:#7c3aed; margin-right:8px;"></i>RH / Staff
+      </div>
+      <div class="dg-section-hero-sub">Gestion des ressources humaines · {{ rh.active_staff|default:0 }} staff actifs</div>
     </div>
-    <div class="flex gap-2">
-      <button type="button" class="dg-action dg-action-dark" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
-        <i class="fa-solid fa-user-plus"></i>
-        Recruter un staff
+    <div class="dg-section-actions">
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff')">
+        <i class="fa-solid fa-eye"></i>Vue detaillee
+      </button>
+      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
+        <i class="fa-solid fa-user-plus"></i>Recruter
       </button>
     </div>
   </div>
-  <div class="grid grid-cols-1 gap-5 lg:grid-cols-4">
-    <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
-      <p class="text-sm font-black text-slate-600">Staff actif</p>
-      <p class="mt-3 text-4xl font-black text-slate-950">{{ rh.active_staff|intcomma }}</p>
+
+  <div class="dg-context-bar">
+    <div>
+      <div class="dg-context-label">Perimetre RH</div>
+      <div class="dg-context-hint">Le filtre annexe du bandeau limite la liste aux personnels et managers concernés.</div>
     </div>
-    <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
-      <p class="text-sm font-black text-emerald-700">Annexes avec manager</p>
-      <p class="mt-3 text-4xl font-black text-emerald-800">{{ rh.branches_with_manager|intcomma }}</p>
-    </div>
-    <div class="rounded-2xl border border-orange-100 bg-orange-50 p-5">
-      <p class="text-sm font-black text-orange-700">Managers a affecter</p>
-      <p class="mt-3 text-4xl font-black text-orange-800">{{ rh.branches_without_manager|intcomma }}</p>
-    </div>
-    <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-      <p class="text-sm font-black text-blue-700">Workflow onboarding</p>
-      <p class="mt-3 text-4xl font-black text-blue-700">5</p>
-      <p class="mt-2 text-xs font-bold text-blue-700/70">etapes cible</p>
+    <div class="dg-context-main">
+      <span class="dg-scope-chip">{{ dashboard_scope_label|default:"Toutes les annexes" }}</span>
+      <span class="dg-scope-chip">{{ rh.active_staff|default:0|intcomma }} staff actifs</span>
+      <span class="dg-scope-chip">{{ rh.branches_without_manager|default:0|intcomma }} annexes sans manager</span>
     </div>
   </div>
-  <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-    <button type="button" class="dg-action h-14 justify-between px-4" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
-      <span><i class="fa-solid fa-user-plus mr-2"></i>Recrutement</span>
-      <i class="fa-solid fa-chevron-right"></i>
+
+  <!-- Stats row -->
+  <div class="dg-stat-grid" style="margin-bottom:16px;">
+    <div class="dg-stat-box" style="background:#f5f3ff;">
+      <div class="dg-stat-val" style="color:#7c3aed;">{{ rh.active_staff|default:0 }}</div>
+      <div class="dg-stat-lbl">Staff total</div>
+    </div>
+    <div class="dg-stat-box" style="background:#eff6ff;">
+      <div class="dg-stat-val" style="color:#2563eb;">{{ rh.active_staff|default:0 }}</div>
+      <div class="dg-stat-lbl">Enseignants</div>
+    </div>
+    <div class="dg-stat-box" style="background:#f0fdf4;">
+      <div class="dg-stat-val" style="color:#16a34a;">{{ rh.branches_with_manager|default:0 }}</div>
+      <div class="dg-stat-lbl">Managers assignes</div>
+    </div>
+    <div class="dg-stat-box" style="background:#fef3c7;">
+      <div class="dg-stat-val" style="color:#d97706;">{{ rh.branches_without_manager|default:0 }}</div>
+      <div class="dg-stat-lbl">Sans affectation</div>
+    </div>
+  </div>
+
+  <!-- Action filters -->
+  <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+    <button type="button" class="dg-btn dg-btn-primary" style="background:#7c3aed; border-color:#7c3aed;">
+      <i class="fa-solid fa-list"></i>Tous ({{ rh.active_staff|default:0 }})
     </button>
-    <button type="button" class="dg-action h-14 justify-between px-4" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
-      <span><i class="fa-solid fa-building-user mr-2"></i>Affectation annexe</span>
-      <i class="fa-solid fa-chevron-right"></i>
+    <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}')">
+      <i class="fa-solid fa-user-graduate"></i>Fiches RH
     </button>
-    <button type="button" class="dg-action h-14 justify-between px-4" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
-      <span><i class="fa-solid fa-key mr-2"></i>Generation acces</span>
-      <i class="fa-solid fa-chevron-right"></i>
+    <button type="button" class="dg-btn dg-btn-outline" onclick="dgShowSection('annexes')">
+      <i class="fa-solid fa-user-tie"></i>Managers par annexe
     </button>
+    <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
+      <i class="fa-solid fa-user-plus"></i>Recruter
+    </button>
+  </div>
+
+  <!-- Staff table -->
+  <div class="dg-panel">
+    <div class="dg-table-wrap">
+      <table class="dg-table">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>Poste</th>
+            <th>Annexe</th>
+            <th>Contrat</th>
+            <th>Statut</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for profile in drawer_staff_rows|default:empty_list %}
+          <tr>
+            <td class="font-black">{{ profile.user.get_full_name|default:profile.user.username }}</td>
+            <td>
+              <span class="dg-badge-sm dg-badge-blue">{{ profile.position|default:"Staff" }}</span>
+            </td>
+            <td>{{ profile.branch.name|default:"—" }}</td>
+            <td>
+              <span class="dg-badge-sm {% if profile.contract_type == 'CDI' %}dg-badge-green{% else %}dg-badge-amber{% endif %}">
+                {{ profile.contract_type|default:"—" }}
+              </span>
+            </td>
+            <td>
+              <span class="dg-badge-sm dg-badge-green">Actif</span>
+            </td>
+            <td>
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;"
+                  onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff&id={{ profile.id }}')">
+                  <i class="fa-solid fa-eye"></i>Fiche
+                </button>
+                <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;">
+                  <i class="fa-solid fa-calendar"></i>Affecter
+                </button>
+                <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;">
+                  <i class="fa-solid fa-file-lines"></i>Contrat
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="dg-empty">
+              <div class="dg-empty-icon"><i class="fa-solid fa-users"></i></div>
+              <div class="dg-empty-text">Aucun staff active dans le systeme</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recruit action card -->
+  <div style="margin-top:14px;" class="dg-panel">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <div>
+          <div style="font-size:.82rem; font-weight:900; color:#1d4ed8;">Recrutement en cours</div>
+          <div style="font-size:.62rem; color:#64748b; font-weight:600;">Lancez une procedure de recrutement pour un nouveau staff</div>
+        </div>
+      </div>
+      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
+        <i class="fa-solid fa-plus"></i>Nouveau recrutement
+      </button>
+    </div>
   </div>
 </div>

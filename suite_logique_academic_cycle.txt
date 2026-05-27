@@ -66,3 +66,634 @@ Integrer le module dans les dashboards existants + rendre le rapport readiness v
 
 Apres ca, on peut faire le workflow complet :
 readiness -> deliberation -> cloture -> decisions -> reinscriptions.
+
+
+======================================================================
+AUDIT INITIAL DE L'APP academics
+======================================================================
+
+J'ai commence l'audit de academics.
+Premier resultat : l'app demarre avec manage.py check, mais elle a des dettes importantes a corriger avant d'aller plus loin.
+
+Findings prioritaires :
+
+1. Code casse dans academics.forms et academics.services.surveillance
+
+academics/forms.py et academics/services/surveillance.py importent ClassPresenceCheck et SurveillanceNote, mais ces modeles ont ete supprimes par la migration 0014.
+
+Resultat :
+import academics.forms echoue.
+
+Il faut soit supprimer ces anciens formulaires/services, soit les migrer vers les nouveaux modeles :
+- StudentAttendance,
+- TeacherAttendance,
+- LessonLog,
+- StudentCase.
+
+2. Rapports academiques exposes sans login_required
+
+Les vues de releves/bulletins dans academics/views.py ne sont pas protegees par login ni filtrage annexe/etudiant.
+
+Vues concernees :
+- student_semester_report_view,
+- student_semester_pdf_view,
+- export_selected_reports_view,
+- export_class_reports_view,
+- class_reports_overview_view,
+- annual_class_report_view,
+- student_annual_report_view,
+- student_year_report_view.
+
+Risque :
+acces direct par URL a des releves publies d'autres etudiants/classes.
+
+3. Import Excel de notes trop permissif
+
+academics/views_import.py bloque seulement les informaticiens hors annexe, mais les autres utilisateurs connectes ne sont pas explicitement filtres par role.
+
+Il faut limiter clairement a :
+- DG / direction,
+- directeur des etudes,
+- informaticien autorise,
+- eventuellement staff academique autorise.
+
+Avec filtrage annexe obligatoire.
+
+4. Ancien service surveillance incoherent avec la nouvelle architecture
+
+academics/services/surveillance.py construit encore un dashboard base sur SurveillanceNote / ClassPresenceCheck.
+
+Or le projet a maintenant :
+- LessonLog,
+- StudentAttendance,
+- TeacherAttendance,
+- StudentCase.
+
+Il faut refaire ce service ou le retirer.
+
+5. Workflow semestre disperse
+
+La logique de changement de statut semestre existe a plusieurs endroits :
+- academics.services.workflow,
+- portal.views.views,
+- portal.services.notes_workflow,
+- portal.views.admin_grades.
+
+Il faut centraliser dans un service unique pour eviter les incoherences :
+DRAFT -> NORMAL_ENTRY -> NORMAL_LOCKED -> RETAKE_ENTRY -> FINALIZED -> PUBLISHED.
+
+Verifications faites :
+
+- python manage.py check : OK.
+- python manage.py makemigrations --check --dry-run : OK.
+- Import global services : seul academics.services.surveillance echoue.
+- Tests complets non relances, car PostgreSQL n'a pas le droit de creer une base de test.
+
+Suite logique recommandee :
+
+Commencer par corriger les 3 points bloquants :
+
+1. Nettoyer/remplacer academics.forms et academics.services.surveillance.
+2. Securiser les vues de rapports.
+3. Verrouiller l'import Excel par role + annexe.
+
+Ensuite on pourra terminer proprement le workflow :
+notes -> semestres -> rattrapage -> publication -> rapports.
+
+
+======================================================================
+CORRECTIONS EFFECTUEES SUR academics + VERIFICATION DASHBOARDS
+======================================================================
+
+Corrections effectuees :
+
+1. Nettoyage de academics.forms
+
+academics/forms.py ne depend plus des anciens modeles supprimes :
+- ClassPresenceCheck,
+- SurveillanceNote.
+
+Ces modeles avaient ete retires par la migration 0014, mais certains imports existaient encore.
+Le fichier s'importe maintenant correctement.
+
+2. Remplacement du vieux service surveillance
+
+academics/services/surveillance.py ne depend plus de ClassPresenceCheck / SurveillanceNote.
+
+Il utilise maintenant les modeles actuels :
+- StudentCase,
+- AttendanceRollSheet,
+- StudentAttendance,
+- TeacherAttendance,
+- LessonLog.
+
+Objectif :
+eviter que les dashboards surveillant / staff cassent a cause d'anciens modeles supprimes.
+
+3. Securisation des rapports academiques
+
+Les vues de rapports academics sont maintenant protegees par :
+- login_required,
+- controle role,
+- controle annexe,
+- controle etudiant proprietaire.
+
+Vues protegees :
+- student_semester_report_view,
+- student_semester_pdf_view,
+- export_selected_reports_view,
+- export_class_reports_view,
+- class_reports_overview_view,
+- annual_class_report_view,
+- student_annual_report_view,
+- student_year_report_view.
+
+4. Verrouillage de l'import Excel des notes
+
+academics/views_import.py utilise maintenant academics.permissions.
+
+Import autorise pour :
+- super_admin,
+- executive_director,
+- deputy_executive_director,
+- director_of_studies,
+- it_support.
+
+Regle importante :
+un informaticien ne peut importer que pour son annexe.
+Les profils globaux peuvent agir sur toutes les annexes.
+
+Le surveillant academique peut consulter les rapports selon annexe, mais ne peut pas importer les notes.
+
+5. Nouvelle couche de permissions academics
+
+Ajout de academics/permissions.py pour centraliser :
+- can_view_academic_class,
+- can_view_student_academic_report,
+- can_import_grades_for_class,
+- user_has_branch_scope,
+- is_global_academic_user.
+
+Verification effectuee sur les dashboards :
+
+Imports OK :
+- portal.views.it_grades_import,
+- portal.views.it_workflows,
+- portal.views.admin_grades,
+- portal.views.views,
+- portal.views.supervisor_cases,
+- portal.services.it_dashboard_service,
+- portal.services.notes_workflow,
+- portal.services.teacher_dashboard_service,
+- portal.student.views,
+- accounts.dashboards.manager_dashboard,
+- accounts.dashboards.htmx_manager.
+
+Routes academics verifiees OK :
+- academics:download_import_template,
+- academics:upload_grades,
+- academics:student_semester_report,
+- academics:student_semester_pdf,
+- academics:export_class_reports,
+- academics:class_reports_overview,
+- academics:annual_class_report,
+- academics:student_annual_report,
+- academics:student_year_report.
+
+Templates critiques charges OK :
+- portal/staff/it_grades_import.html,
+- portal/admin/grades/partials/notes_grid.html,
+- portal/admin/grades/partials/excel_row.html,
+- academics/reports/class_report_overview.html,
+- academics/reports/semester_report.html,
+- academics/reports/annual_class_report.html,
+- academics/reports/student_annual_report.html,
+- academics/reports/year_report.html,
+- portal/student/dashboard.html.
+
+Commandes lancees :
+
+- python manage.py check : OK.fai
+- python manage.py makemigrations --check --dry-run : OK.
+- imports cibles academics : OK.
+- imports dashboards lies a academics : OK.
+- reverse URLs academics : OK.
+- chargement templates critiques : OK.
+
+Limite de verification :
+
+Les tests Django complets n'ont pas ete lances, car PostgreSQL refuse toujours de creer la base de test.
+Il faudra donner le droit CREATEDB a l'utilisateur PostgreSQL ou configurer une base de test dediee pour valider automatiquement tous les parcours.
+
+
+======================================================================
+FONDATION BULLETINS ET DIPLOMES DANS academics
+======================================================================
+
+Objectif :
+
+Completer le systeme academique qui gerait deja les notes, les releves par classe et les releves individuels, en ajoutant des documents officiels persistants :
+- bulletins,
+- diplomes delivres.
+
+Ce travail prepare aussi la suite avec academic_cycle :
+- decisions annuelles,
+- cloture,
+- passage,
+- dette academique,
+- alumni,
+- documents verrouilles si dette financiere.
+
+Ajouts effectues :
+
+1. Modeles persistants
+
+Ajout de AcademicBulletin dans academics/models.py.
+
+Il permet de stocker :
+- etudiant,
+- inscription academique,
+- annee academique,
+- classe,
+- annexe,
+- semestre optionnel,
+- type de bulletin : semester / annual,
+- statut : draft / generated / published / cancelled,
+- reference unique,
+- moyenne,
+- credits requis,
+- credits obtenus,
+- decision,
+- mention,
+- snapshot JSON du calcul,
+- generateur,
+- date de generation,
+- publication,
+- fichier PDF optionnel.
+
+Ajout de AcademicDiplomaAward dans academics/models.py.
+
+Il permet de stocker :
+- etudiant,
+- inscription academique,
+- annee academique,
+- classe,
+- annexe,
+- programme,
+- diplome rattache au programme,
+- reference unique,
+- statut : draft / ready / delivered / cancelled,
+- moyenne finale,
+- mention,
+- decision,
+- date de delivrance,
+- snapshot JSON,
+- fichier PDF optionnel.
+
+2. Services metier
+
+Ajout de academics/services/documents.py.
+
+Fonctions principales :
+- generate_semester_bulletin,
+- generate_annual_bulletin,
+- build_bulletin_context,
+- prepare_diploma_award,
+- build_diploma_context.
+
+Regles importantes :
+- un bulletin semestriel ne peut etre genere qu'apres publication du semestre,
+- un bulletin annuel ne peut etre genere qu'apres publication de tous les semestres,
+- un diplome ne peut etre prepare que si compute_annual_decision retourne un cycle termine,
+- les documents gardent un snapshot pour eviter de tout recalculer sans trace.
+
+3. Admin Django
+
+Ajout dans academics/admin.py :
+- AcademicBulletinAdmin,
+- AcademicDiplomaAwardAdmin.
+
+4. Vues et URLs
+
+Ajout dans academics/views.py et academics/urls.py :
+- generation bulletin semestriel,
+- generation bulletin annuel,
+- affichage bulletin HTML,
+- affichage bulletin PDF,
+- preparation diplome,
+- affichage diplome HTML,
+- affichage diplome PDF.
+
+Routes ajoutees :
+- academics:generate_semester_bulletin,
+- academics:generate_annual_bulletin,
+- academics:bulletin_detail,
+- academics:bulletin_pdf,
+- academics:prepare_diploma_award,
+- academics:diploma_award_detail,
+- academics:diploma_award_pdf.
+
+5. Templates
+
+Ajout :
+- academics/reports/bulletin.html,
+- academics/reports/diploma_award.html,
+- academics/reports/partials/semester_rows.html.
+
+6. Migration
+
+Migration creee :
+- academics/migrations/0019_academicbulletin_academicdiplomaaward.py.
+
+Verifications effectuees :
+
+- python manage.py makemigrations academics : OK.
+- python manage.py check : OK.
+- python manage.py makemigrations --check --dry-run : OK.
+- imports academics.models/admin/services.documents/views/urls : OK.
+- reverse des nouvelles URLs bulletins/diplomes : OK.
+- chargement des nouveaux templates : OK.
+
+Limite :
+
+Les dashboards n'ont pas encore de boutons visibles pour generer ces bulletins/diplomes.
+La fondation backend est posee.
+La prochaine etape sera d'integrer ces actions proprement dans les dashboards directeur/informaticien/etudiant, avec verrouillage documentaire selon dette financiere via academic_cycle.
+
+
+======================================================================
+CE QUI A ETE FAIT CONCRETEMENT
+======================================================================
+
+1. Creation des vrais objets "bulletin" et "diplome delivre"
+
+Fichier modifie :
+- academics/models.py
+
+Ajoute :
+- AcademicBulletin
+- AcademicDiplomaAward
+
+Concretement, cela veut dire que les bulletins et diplomes ne sont plus seulement des pages HTML/PDF calculees a la volee.
+Ils peuvent maintenant exister comme documents officiels en base de donnees.
+
+AcademicBulletin stocke :
+- l'etudiant,
+- l'inscription academique,
+- l'annee academique,
+- la classe,
+- l'annexe,
+- le semestre si bulletin semestriel,
+- le type de bulletin : semestriel ou annuel,
+- la moyenne,
+- les credits requis,
+- les credits obtenus,
+- la decision,
+- la mention,
+- une reference unique,
+- un snapshot JSON du calcul,
+- le statut du document,
+- qui l'a genere,
+- qui l'a publie,
+- un fichier PDF optionnel.
+
+AcademicDiplomaAward stocke :
+- l'etudiant,
+- l'inscription academique,
+- l'annee academique,
+- la classe,
+- l'annexe,
+- le programme,
+- le diplome obtenu,
+- la moyenne finale,
+- la mention,
+- la decision,
+- une reference unique,
+- le statut du diplome,
+- qui l'a prepare,
+- qui l'a delivre,
+- un snapshot JSON,
+- un fichier PDF optionnel.
+
+2. Creation de la migration
+
+Fichier cree :
+- academics/migrations/0019_academicbulletin_academicdiplomaaward.py
+
+Cette migration cree les tables en base de donnees pour :
+- AcademicBulletin,
+- AcademicDiplomaAward.
+
+Commande a lancer si ce n'est pas encore fait :
+
+python manage.py migrate academics
+
+3. Creation du service metier des documents
+
+Fichier cree :
+- academics/services/documents.py
+
+Fonctions ajoutees :
+- generate_semester_bulletin
+- generate_annual_bulletin
+- build_bulletin_context
+- prepare_diploma_award
+- build_diploma_context
+
+Concretement :
+- generate_semester_bulletin cree un bulletin semestriel apres publication du semestre.
+- generate_annual_bulletin cree un bulletin annuel apres publication des semestres.
+- prepare_diploma_award prepare un diplome seulement si l'etudiant a termine le cycle.
+- build_bulletin_context prepare les donnees pour afficher/imprimer un bulletin.
+- build_diploma_context prepare les donnees pour afficher/imprimer un diplome.
+
+4. Ajout dans l'admin Django
+
+Fichier modifie :
+- academics/admin.py
+
+Ajoute :
+- AcademicBulletinAdmin
+- AcademicDiplomaAwardAdmin
+
+Concretement :
+les bulletins et les diplomes seront visibles et consultables dans l'admin Django.
+
+5. Ajout de vues et URLs pour les documents
+
+Fichiers modifies :
+- academics/views.py
+- academics/urls.py
+
+URLs ajoutees :
+- academics:generate_semester_bulletin
+- academics:generate_annual_bulletin
+- academics:bulletin_detail
+- academics:bulletin_pdf
+- academics:prepare_diploma_award
+- academics:diploma_award_detail
+- academics:diploma_award_pdf
+
+Concretement :
+le backend sait maintenant :
+- generer un bulletin semestriel,
+- generer un bulletin annuel,
+- afficher un bulletin,
+- produire un PDF de bulletin,
+- preparer un diplome,
+- afficher un diplome,
+- produire un PDF de diplome.
+
+6. Creation des templates
+
+Fichiers crees :
+- academics/templates/academics/reports/bulletin.html
+- academics/templates/academics/reports/diploma_award.html
+- academics/templates/academics/reports/partials/semester_rows.html
+
+Concretement :
+il y a maintenant une premiere version visuelle HTML/PDF pour :
+- bulletin,
+- diplome.
+
+7. Permissions deja prises en compte
+
+Fichier modifie :
+- academics/permissions.py
+
+Ajoute :
+- can_manage_academic_documents
+
+Concretement :
+la generation de bulletins/diplomes est reservee aux profils autorises :
+- direction generale,
+- super admin,
+- directeur des etudes,
+- informaticien selon annexe.
+
+8. Verifications faites
+
+Commandes lancees :
+
+python manage.py makemigrations academics
+python manage.py check
+python manage.py makemigrations --check --dry-run
+
+Resultat :
+- migrations creees correctement,
+- aucun probleme detecte par Django,
+- aucune migration oubliee,
+- imports des nouveaux modules OK,
+- nouvelles URLs OK,
+- nouveaux templates OK.
+
+9. Ce qui n'est pas encore fait
+
+Les boutons ne sont pas encore ajoutes dans les dashboards.
+
+Donc pour l'instant :
+- la fondation backend existe,
+- les modeles existent,
+- les services existent,
+- les URLs existent,
+- les templates existent,
+- l'admin verra les documents apres migration.
+
+Mais il faut encore brancher cela dans les interfaces :
+- dashboard directeur des etudes,
+- dashboard informaticien,
+- dashboard etudiant,
+- plus tard academic_cycle pour verrouillage selon dette financiere.
+
+
+======================================================================
+BRANCHEMENT DASHBOARDS BULLETINS ET DIPLOMES
+======================================================================
+
+Objectif :
+
+Brancher les nouveaux documents academiques dans les vrais espaces de travail, en respectant la responsabilite metier :
+- les bulletins sont geres par le Directeur des Etudes,
+- les diplomes sont geres par le Directeur General et la Directrice Adjointe,
+- l'informaticien ne delivre pas ces documents officiels.
+
+1. Permissions clarifiees
+
+Fichier modifie :
+- academics/permissions.py
+
+Regle appliquee :
+- can_manage_bulletins autorise le Directeur des Etudes et le super admin.
+- can_manage_diplomas autorise le Directeur General et la Directrice Adjointe.
+- l'informaticien garde son role technique, mais il n'est pas branche comme delivreur de bulletins ou de diplomes.
+
+Cela evite de melanger support technique et validation officielle.
+
+2. Branchement des bulletins dans le dashboard Directeur des Etudes
+
+Fichiers modifies :
+- portal/views/views.py
+- portal/urls.py
+- templates/portal/staff/director/partials/workspace.html
+
+Ajouts effectues :
+- ajout du compteur de bulletins deja generes par semestre,
+- ajout d'un bouton "Generer bulletins" dans la section Publications,
+- ajout d'une zone "Bulletins annuels" pour generer les bulletins annuels par classe,
+- ajout de la route accounts_portal:director_bulletin_action.
+
+Concretement :
+- quand un semestre est publie, le Directeur des Etudes peut generer les bulletins semestriels de toute la classe,
+- quand tous les semestres d'une classe sont publies, il peut generer les bulletins annuels,
+- le dashboard se met a jour apres action.
+
+3. Branchement des diplomes dans le dashboard Direction Generale
+
+Fichiers modifies :
+- portal/views/views.py
+- portal/urls.py
+- templates/portal/dg/partials/workflows/reenrollment.html
+
+Ajouts effectues :
+- ajout d'une section "Diplomes a preparer" dans les workflows DG,
+- affichage des classes terminales pretes,
+- affichage du nombre d'etudiants et du nombre de diplomes deja prepares,
+- ajout du bouton "Preparer diplomes",
+- ajout de la route accounts_portal:dg_diploma_action.
+
+Concretement :
+- le Directeur General et la Directrice Adjointe voient les classes terminales pretes,
+- ils peuvent preparer les diplomes par classe,
+- seuls les etudiants dont la decision annuelle indique un cycle termine sont pris,
+- les dossiers non eligibles sont ignores et retournes dans le resultat.
+
+4. Verification des dashboards existants
+
+Verification effectuee pour eviter de casser les espaces deja en place :
+- import portal.views.views : OK,
+- import portal.urls : OK,
+- reverse accounts_portal:director_bulletin_action : OK,
+- reverse accounts_portal:dg_diploma_action : OK,
+- chargement template portail Directeur des Etudes : OK,
+- chargement template portail DG workflows : OK.
+
+Commandes lancees :
+
+python manage.py check
+python manage.py makemigrations --check --dry-run
+
+Resultat :
+- aucun probleme Django detecte,
+- aucune migration oubliee,
+- les nouvelles routes dashboard sont resolues,
+- les templates concernes chargent correctement.
+
+5. Point important
+
+La migration academics/migrations/0019_academicbulletin_academicdiplomaaward.py existe deja.
+
+Si elle n'a pas encore ete appliquee sur ta base locale, il faut lancer :
+
+python manage.py migrate academics
+
+Sans cette migration, les boutons seront visibles mais la generation des bulletins/diplomes ne pourra pas enregistrer les nouveaux documents en base.

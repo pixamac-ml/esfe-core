@@ -1154,3 +1154,254 @@ class WeeklyScheduleSlot(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class AcademicBulletin(models.Model):
+    TYPE_SEMESTER = "semester"
+    TYPE_ANNUAL = "annual"
+    TYPE_CHOICES = [
+        (TYPE_SEMESTER, "Bulletin semestriel"),
+        (TYPE_ANNUAL, "Bulletin annuel"),
+    ]
+
+    STATUS_DRAFT = "draft"
+    STATUS_GENERATED = "generated"
+    STATUS_PUBLISHED = "published"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_GENERATED, "Genere"),
+        (STATUS_PUBLISHED, "Publie"),
+        (STATUS_CANCELLED, "Annule"),
+    ]
+
+    student = models.ForeignKey(
+        "students.Student",
+        on_delete=models.CASCADE,
+        related_name="academic_bulletins",
+    )
+    enrollment = models.ForeignKey(
+        AcademicEnrollment,
+        on_delete=models.PROTECT,
+        related_name="bulletins",
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.PROTECT,
+        related_name="bulletins",
+    )
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="bulletins",
+    )
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="academic_bulletins",
+    )
+    semester = models.ForeignKey(
+        Semester,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="bulletins",
+    )
+    bulletin_type = models.CharField(max_length=20, choices=TYPE_CHOICES, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+    reference = models.CharField(max_length=60, unique=True, blank=True, db_index=True)
+    average = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    total_credits = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("0.00"))
+    credits_obtained = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("0.00"))
+    decision = models.CharField(max_length=80, blank=True, db_index=True)
+    mention = models.CharField(max_length=80, blank=True)
+    snapshot = models.JSONField(default=dict, blank=True)
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="generated_academic_bulletins",
+    )
+    generated_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="published_academic_bulletins",
+    )
+    published_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    pdf_file = models.FileField(upload_to="academics/bulletins/", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "enrollment", "bulletin_type", "semester"],
+                condition=models.Q(bulletin_type="semester"),
+                name="academics_unique_semester_bulletin",
+            ),
+            models.UniqueConstraint(
+                fields=["student", "enrollment", "bulletin_type"],
+                condition=models.Q(bulletin_type="annual"),
+                name="academics_unique_annual_bulletin",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["branch", "academic_year", "status"]),
+            models.Index(fields=["academic_class", "bulletin_type", "status"]),
+            models.Index(fields=["student", "academic_year"]),
+        ]
+
+    def __str__(self):
+        return f"{self.reference} - {self.student}"
+
+    def save(self, *args, **kwargs):
+        if not self.reference and self.enrollment_id:
+            prefix = "BUL-S" if self.bulletin_type == self.TYPE_SEMESTER else "BUL-A"
+            suffix = f"-S{self.semester.number}" if self.semester_id else ""
+            self.reference = (
+                f"{prefix}-{self.enrollment.academic_year.name.replace('-', '')}-"
+                f"{self.enrollment.branch.code.upper()}-{str(self.enrollment_id).zfill(5)}{suffix}"
+            )
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        errors = {}
+        if self.bulletin_type == self.TYPE_SEMESTER and not self.semester_id:
+            errors["semester"] = "Un bulletin semestriel doit etre lie a un semestre."
+        if self.bulletin_type == self.TYPE_ANNUAL and self.semester_id:
+            errors["semester"] = "Un bulletin annuel ne doit pas etre lie a un semestre."
+        if self.enrollment_id:
+            if self.academic_year_id and self.enrollment.academic_year_id != self.academic_year_id:
+                errors["academic_year"] = "L'annee ne correspond pas a l'inscription academique."
+            if self.academic_class_id and self.enrollment.academic_class_id != self.academic_class_id:
+                errors["academic_class"] = "La classe ne correspond pas a l'inscription academique."
+            if self.branch_id and self.enrollment.branch_id != self.branch_id:
+                errors["branch"] = "L'annexe ne correspond pas a l'inscription academique."
+            if self.student_id and self.enrollment.student_id != self.student.user_id:
+                errors["student"] = "L'etudiant ne correspond pas a l'inscription academique."
+        if self.semester_id and self.academic_class_id and self.semester.academic_class_id != self.academic_class_id:
+            errors["semester"] = "Le semestre ne correspond pas a la classe."
+        if errors:
+            raise ValidationError(errors)
+
+
+class AcademicDiplomaAward(models.Model):
+    STATUS_DRAFT = "draft"
+    STATUS_READY = "ready"
+    STATUS_DELIVERED = "delivered"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_READY, "Pret"),
+        (STATUS_DELIVERED, "Delivre"),
+        (STATUS_CANCELLED, "Annule"),
+    ]
+
+    student = models.ForeignKey(
+        "students.Student",
+        on_delete=models.CASCADE,
+        related_name="academic_diploma_awards",
+    )
+    enrollment = models.ForeignKey(
+        AcademicEnrollment,
+        on_delete=models.PROTECT,
+        related_name="diploma_awards",
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.PROTECT,
+        related_name="diploma_awards",
+    )
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="diploma_awards",
+    )
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="academic_diploma_awards",
+    )
+    programme = models.ForeignKey(
+        Programme,
+        on_delete=models.PROTECT,
+        related_name="academic_diploma_awards",
+    )
+    diploma = models.ForeignKey(
+        "formations.Diploma",
+        on_delete=models.PROTECT,
+        related_name="academic_awards",
+    )
+    reference = models.CharField(max_length=60, unique=True, blank=True, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+    final_average = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    mention = models.CharField(max_length=80, blank=True)
+    decision = models.CharField(max_length=80, blank=True, db_index=True)
+    awarded_at = models.DateField(null=True, blank=True)
+    prepared_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prepared_academic_diplomas",
+    )
+    delivered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivered_academic_diplomas",
+    )
+    delivered_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    snapshot = models.JSONField(default=dict, blank=True)
+    pdf_file = models.FileField(upload_to="academics/diplomas/", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "programme", "academic_year"],
+                name="academics_unique_diploma_award_student_programme_year",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["branch", "academic_year", "status"]),
+            models.Index(fields=["student", "status"]),
+            models.Index(fields=["programme", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.reference} - {self.student}"
+
+    def save(self, *args, **kwargs):
+        if not self.reference and self.enrollment_id:
+            self.reference = (
+                f"DIP-{self.enrollment.academic_year.name.replace('-', '')}-"
+                f"{self.enrollment.branch.code.upper()}-{str(self.enrollment_id).zfill(5)}"
+            )
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        errors = {}
+        if self.enrollment_id:
+            if self.student_id and self.enrollment.student_id != self.student.user_id:
+                errors["student"] = "L'etudiant ne correspond pas a l'inscription academique."
+            if self.academic_year_id and self.enrollment.academic_year_id != self.academic_year_id:
+                errors["academic_year"] = "L'annee ne correspond pas a l'inscription academique."
+            if self.academic_class_id and self.enrollment.academic_class_id != self.academic_class_id:
+                errors["academic_class"] = "La classe ne correspond pas a l'inscription academique."
+            if self.branch_id and self.enrollment.branch_id != self.branch_id:
+                errors["branch"] = "L'annexe ne correspond pas a l'inscription academique."
+            if self.programme_id and self.enrollment.programme_id != self.programme_id:
+                errors["programme"] = "Le programme ne correspond pas a l'inscription academique."
+        if self.programme_id and self.diploma_id and self.programme.diploma_awarded_id != self.diploma_id:
+            errors["diploma"] = "Le diplome ne correspond pas au programme."
+        if errors:
+            raise ValidationError(errors)

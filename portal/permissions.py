@@ -49,6 +49,8 @@ def get_user_role(user):
             "deputy_executive_director",
             "secretary",
             "secretaries",
+            "marketing",
+            "marketing_manager",
         }
     ):
         return "staff"
@@ -82,6 +84,8 @@ def get_post_login_portal_url(user):
         return reverse("superadmin:dashboard")
     if position in {"executive_director", "deputy_executive_director"}:
         return reverse("accounts_portal:portal_dg")
+    if position == "marketing_manager":
+        return reverse("marketing:dashboard")
 
     return reverse("accounts_portal:portal_dashboard")
 

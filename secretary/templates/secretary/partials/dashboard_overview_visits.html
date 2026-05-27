@@ -1,0 +1,17 @@
+<div id="sg-overview-visits"
+     class="sg-panel"
+     hx-get="{% url 'secretary:htmx_overview_visits' %}"
+     hx-trigger="secretary:visits-updated from:body"
+     hx-swap="outerHTML">
+  <div class="sg-panel-title">Visites ouvertes</div>
+  <div class="message-list">
+    {% for item in open_visits_rows %}
+    <div class="sg-action-card">
+      <div><div class="sg-action-label">{{ item.full_name }}</div><div class="sg-action-sub">{{ item.arrived_at|date:"H:i" }} - {{ item.reason|default:"Accueil" }}</div></div>
+      <form method="post" hx-post="{% url 'secretary:visitor_complete' item.id %}" hx-target="closest .sg-action-card" hx-swap="outerHTML swap:180ms" data-sg-optimistic="fade-remove">{% csrf_token %}
+        <button class="sg-btn sg-btn-outline" style="height:28px;font-size:.65rem;">Sortie</button>
+      </form>
+    </div>
+    {% empty %}<div class="sg-empty">Aucune visite ouverte.</div>{% endfor %}
+  </div>
+</div>

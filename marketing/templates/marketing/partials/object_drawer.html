@@ -1,0 +1,128 @@
+<div class="mk-drawer-backdrop" onclick="document.getElementById('mk-drawer-host').innerHTML=''"></div>
+<aside class="mk-drawer" x-data="{tab:'overview',modal:false}">
+  <div class="mk-drawer-shell">
+    <header class="mk-drawer-hero">
+      <div class="mk-panel-head" style="margin-bottom:0">
+        <div>
+          <div class="mk-drawer-title">{% if object_type == "campaign" %}{{ object.name }}{% else %}{{ object.title }}{% endif %}</div>
+          <div class="mk-item-sub" style="color:#cbd5e1;margin-top:5px">{{ object.audience_label }} - {{ object.get_status_display }}</div>
+        </div>
+        <div class="mk-actions">
+          <button class="mk-btn" type="button" @click="modal=true"><i class="fa-solid fa-circle-info"></i> Infos</button>
+          <button class="mk-btn icon" type="button" onclick="document.getElementById('mk-drawer-host').innerHTML=''"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <nav class="mk-tabs">
+        <button class="mk-tab" type="button" :class="{active:tab==='overview'}" @click="tab='overview'">Vue stable</button>
+        <button class="mk-tab" type="button" :class="{active:tab==='audience'}" @click="tab='audience'">Ciblage</button>
+        <button class="mk-tab" type="button" :class="{active:tab==='content'}" @click="tab='content'">Contenu</button>
+        <button class="mk-tab" type="button" :class="{active:tab==='history'}" @click="tab='history'">Historique</button>
+      </nav>
+    </header>
+
+    <div class="mk-drawer-body">
+      <main>
+        <section class="mk-drawer-section" x-show="tab==='overview'">
+          <div class="mk-panel-head">
+            <div><div class="mk-panel-title">Diagnostic backend</div><div class="mk-flow-sub">Points de controle calcules avant action.</div></div>
+            <span class="mk-badge">Lecture</span>
+          </div>
+          <div class="mk-list">
+            {% for title, body, state in checks %}
+              <div class="mk-list-item">
+                <div><div class="mk-item-title">{{ title }}</div><div class="mk-item-sub">{{ body }}</div></div>
+                <span class="mk-badge {% if state == 'a faire' %}amber{% elif state == 'pret' or state == 'forte' %}green{% endif %}">{{ state }}</span>
+              </div>
+            {% empty %}
+              <div class="mk-list-item"><div class="mk-item-sub">Aucun diagnostic particulier.</div></div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="mk-drawer-section" x-show="tab==='audience'">
+          <div class="mk-panel-title">Ciblage complet</div>
+          <div class="mk-grid-2" style="margin-top:12px">
+            <div class="mk-summary-box"><div class="mk-summary-label">Scope</div><div class="mk-summary-value">{{ object.get_audience_scope_display }}</div></div>
+            <div class="mk-summary-box"><div class="mk-summary-label">Audience</div><div class="mk-summary-value">{{ object.audience_label }}</div></div>
+          </div>
+          <div class="mk-table-wrap">
+            <table class="mk-table">
+              <thead><tr><th>Dimension</th><th>Volume</th><th>Lecture</th></tr></thead>
+              <tbody>
+                <tr><td>Annexes</td><td>{{ object.branches.count }}</td><td>{{ object.audience_label }}</td></tr>
+                <tr><td>Formations</td><td>{{ object.formations.count }}</td><td>Filtre formation applique si selectionne</td></tr>
+                <tr><td>Cycles</td><td>{{ object.cycles.count }}</td><td>Filtre cycle applique si selectionne</td></tr>
+                <tr><td>Classes</td><td>{{ object.classes.count }}</td><td>Filtre classe applique si selectionne</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="mk-drawer-section" x-show="tab==='content'">
+          <div class="mk-panel-title">Contenu</div>
+          <div class="mk-summary-box" style="margin-top:12px;white-space:pre-wrap;line-height:1.55">{{ object.content|default:"Aucun contenu redige." }}</div>
+        </section>
+
+        <section class="mk-drawer-section" x-show="tab==='history'">
+          <div class="mk-panel-title">Historique diffusion</div>
+          <div class="mk-table-wrap" style="margin-top:12px">
+            <table class="mk-table">
+              <thead><tr><th>Canal</th><th>Statut</th><th>Volume</th><th>Ouverts</th><th>Date</th></tr></thead>
+              <tbody>
+                {% for log in logs %}
+                  <tr><td>{{ log.channel }}</td><td><span class="mk-badge {% if log.status == "sent" %}green{% elif log.status == "failed" %}red{% endif %}">{{ log.get_status_display }}</span></td><td>{{ log.recipients_count }}</td><td>{{ log.opened_count }}</td><td>{{ log.created_at|date:"d/m/Y H:i" }}</td></tr>
+                {% empty %}
+                  <tr><td colspan="5">Aucun historique de diffusion.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <aside>
+        <section class="mk-drawer-section">
+          <div class="mk-panel-title">Actions coherentes</div>
+          <div class="mk-actions" style="margin-top:12px">
+            {% if object_type == "campaign" %}
+              <a class="mk-btn success" href="{% url 'marketing:campaign_prepare_brevo' object.id %}"><i class="fa-solid fa-envelope"></i> Preparer Brevo</a>
+            {% else %}
+              <a class="mk-btn success" href="{% url 'marketing:announcement_publish' object.id %}"><i class="fa-solid fa-broadcast-tower"></i> Diffuser</a>
+            {% endif %}
+          </div>
+        </section>
+        <section class="mk-drawer-section">
+          <div class="mk-panel-title">Meta</div>
+          <div class="mk-list" style="margin-top:10px">
+            <div class="mk-list-item"><span>Statut</span><strong>{{ object.get_status_display }}</strong></div>
+            {% if object_type == "campaign" %}
+              <div class="mk-list-item"><span>Canal</span><strong>{{ object.get_channel_display }}</strong></div>
+              <div class="mk-list-item"><span>Progression</span><strong>{{ object.progress }}%</strong></div>
+            {% else %}
+              <div class="mk-list-item"><span>Priorite</span><strong>{{ object.get_priority_display }}</strong></div>
+              <div class="mk-list-item"><span>Popup</span><strong>{% if object.show_popup %}Oui{% else %}Non{% endif %}</strong></div>
+            {% endif %}
+            <div class="mk-list-item"><span>Debut</span><strong>{{ object.starts_at|date:"d/m/Y H:i"|default:"-" }}</strong></div>
+            <div class="mk-list-item"><span>Fin</span><strong>{{ object.ends_at|date:"d/m/Y H:i"|default:"-" }}</strong></div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <template x-if="modal">
+    <div class="mk-modal">
+      <div class="mk-modal-card">
+        <div class="mk-panel-head">
+          <div><div class="mk-drawer-title">Informations rapides</div><div class="mk-item-sub">Resume compact sans quitter la lecture stable.</div></div>
+          <button class="mk-btn icon" type="button" @click="modal=false"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="mk-list">
+          <div class="mk-list-item"><span>Objet</span><strong>{% if object_type == "campaign" %}Campagne{% else %}Annonce{% endif %}</strong></div>
+          <div class="mk-list-item"><span>Audience</span><strong>{{ object.audience_label }}</strong></div>
+          <div class="mk-list-item"><span>Statut</span><strong>{{ object.get_status_display }}</strong></div>
+        </div>
+      </div>
+    </div>
+  </template>
+</aside>

@@ -7,19 +7,21 @@
     <div class="page-header">
         <div>
             <h1>Registre administratif</h1>
-            <p class="help-text">Suivi traceable des demandes et dossiers.</p>
+            <p class="help-text">Moteur central des evenements administratifs, avec routage et numerotation automatique.</p>
         </div>
-        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#secretary-modal-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">Nouvelle entree</button>
+        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Nouvelle entree</button>
     </div>
 
     <form method="get" class="filters">
-        <input class="secretary-input" type="text" name="q" value="{{ filters.q }}" placeholder="Titre, type, matricule...">
+        <input class="secretary-input" type="text" name="q" value="{{ filters.q }}" placeholder="Numero, visiteur, type, service, matricule...">
         <select class="secretary-input" name="status">
             <option value="">Tous statuts</option>
             <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>En attente</option>
             <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>En cours</option>
-            <option value="completed" {% if filters.status == "completed" %}selected{% endif %}>Termine</option>
+            <option value="transferred" {% if filters.status == "transferred" %}selected{% endif %}>Transfere</option>
+            <option value="completed" {% if filters.status == "completed" %}selected{% endif %}>Traite</option>
             <option value="cancelled" {% if filters.status == "cancelled" %}selected{% endif %}>Annule</option>
+            <option value="archived" {% if filters.status == "archived" %}selected{% endif %}>Archive</option>
         </select>
         <button class="btn" type="submit">Filtrer</button>
     </form>
@@ -27,9 +29,12 @@
     <table>
         <thead>
             <tr>
-                <th>Titre</th>
+                <th>N</th>
                 <th>Type</th>
+                <th>Visiteur</th>
                 <th>Etudiant</th>
+                <th>Service</th>
+                <th>Priorite</th>
                 <th>Statut</th>
                 <th>Date</th>
                 <th>Actions</th>
@@ -38,9 +43,12 @@
         <tbody>
             {% for entry in page_obj %}
                 <tr>
-                    <td>{{ entry.title }}<div class="help-text">{{ entry.description|default:"-" }}</div></td>
-                    <td>{{ entry.entry_type }}</td>
+                    <td>{{ entry.registry_number|default:entry.pk }}<div class="help-text">{{ entry.event_identifier|default:"-" }}</div></td>
+                    <td>{{ entry.get_entry_type_display }}</td>
+                    <td>{{ entry.visitor_name|default:"-" }}<div class="help-text">{{ entry.visitor_phone|default:"" }}</div></td>
                     <td>{% if entry.related_student %}{{ entry.related_student.full_name }}{% else %}-{% endif %}</td>
+                    <td>{{ entry.target_service|default:"Accueil" }}<div class="help-text">{{ entry.workflow_code|default:"administrative" }}</div></td>
+                    <td><span class="badge {% if entry.priority == 'immediate' %}badge-rose{% elif entry.priority == 'high' %}badge-amber{% else %}badge-slate{% endif %}">{{ entry.get_priority_display }}</span></td>
                     <td><span class="badge">{{ entry.get_status_display }}</span></td>
                     <td>{{ entry.created_at|date:"d/m/Y H:i" }}</td>
                     <td>
@@ -67,7 +75,7 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="6">Aucune entree.</td></tr>
+                <tr><td colspan="9">Aucune entree.</td></tr>
             {% endfor %}
         </tbody>
     </table>

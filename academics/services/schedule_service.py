@@ -745,6 +745,15 @@ def get_class_week_schedule(academic_class: AcademicClass, week_start):
     return _build_week_grid(events, normalized)
 
 
+def get_class_week_schedule_with_weekly_slots(academic_class: AcademicClass, week_start):
+    schedule = get_class_week_schedule(academic_class, week_start)
+    weekly_slots = list_weekly_slots_for_class(academic_class, active_only=True)
+    if weekly_slots:
+        normalized = schedule.get("week_start") or _normalize_week_start(week_start)
+        return _merge_weekly_slots_into_grid(schedule, weekly_slots, normalized)
+    return schedule
+
+
 def _nearest_available_schedule_week(academic_class: AcademicClass, requested_week_start: date):
     base_queryset = (
         AcademicScheduleEvent.objects.filter(
@@ -774,11 +783,7 @@ def get_student_week_schedule(student, week_start):
     if academic_class is None:
         normalized = _normalize_week_start(week_start)
         return _build_week_grid([], normalized)
-    schedule = get_class_week_schedule(academic_class, week_start)
-    weekly_slots = list_weekly_slots_for_class(academic_class, active_only=True)
-    if weekly_slots:
-        normalized = schedule.get("week_start") or _normalize_week_start(week_start)
-        return _merge_weekly_slots_into_grid(schedule, weekly_slots, normalized)
+    schedule = get_class_week_schedule_with_weekly_slots(academic_class, week_start)
     if week_start is None and not schedule.get("events"):
         requested_week_start = schedule.get("week_start") or _normalize_week_start(None)
         nearest_week_start = _nearest_available_schedule_week(academic_class, requested_week_start)

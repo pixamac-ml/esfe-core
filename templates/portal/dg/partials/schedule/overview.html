@@ -1,281 +1,159 @@
 {% load humanize %}
-<div class="space-y-6">
-  <div class="dg-card dg-card-pad">
-    <div class="dg-section-head">
-      <div>
-        <div class="flex flex-wrap items-center gap-3">
-          <h3 class="dg-title">Emploi du temps institutionnel</h3>
-          <span class="dg-badge bg-blue-100 text-blue-700">Semaine du {{ schedule.week_start|date:"d/m" }} au {{ schedule.week_end|date:"d/m" }}</span>
-        </div>
+<div class="dg-card dg-card-pad">
+  <div class="dg-section-hero">
+    <div>
+      <div class="dg-section-hero-title">
+        <i class="fa-regular fa-calendar-days" style="color:#2563eb; margin-right:8px;"></i>Emploi du temps
       </div>
-      <div class="flex flex-wrap gap-2">
-        <button type="button" class="dg-action" onclick="dgLoadScheduleWeek('{{ schedule.prev_week_start|date:'Y-m-d' }}')" title="Semaine precedente">
-          <i class="fa-solid fa-chevron-left"></i>
-        </button>
-        <button type="button" class="dg-action" onclick="dgLoadScheduleWeek('{{ schedule.next_week_start|date:'Y-m-d' }}')" title="Semaine suivante">
-          <i class="fa-solid fa-chevron-right"></i>
-        </button>
-        <button type="button" class="dg-action" onclick="dgShowSection('analytics')">
-          <i class="fa-solid fa-chart-line"></i>
-          Analytics
-        </button>
+      <div class="dg-section-hero-sub">
+        {% if schedule.selected_class %}
+          {{ schedule.selected_class.display_name }} - Semaine du {{ schedule.week_start|date:"d/m" }} au {{ schedule.week_end|date:"d/m/Y" }}
+        {% else %}
+          Choisissez d'abord une ecole/annexe, puis une classe pour afficher son emploi du temps officiel.
+        {% endif %}
       </div>
     </div>
-
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-      <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-        <p class="text-xs font-black uppercase tracking-wide text-blue-700">Cours semaine</p>
-        <p class="mt-2 text-3xl font-black text-slate-950">{{ schedule.total_events|intcomma }}</p>
-        <p class="mt-1 text-xs font-bold text-slate-500">{{ schedule.weekly_slot_count|intcomma }} creneaux officiels</p>
-      </div>
-      <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-        <p class="text-xs font-black uppercase tracking-wide text-emerald-700">Cours aujourd'hui</p>
-        <p class="mt-2 text-3xl font-black text-slate-950">{{ schedule.today_events_count|intcomma }}</p>
-        <p class="mt-1 text-xs font-bold text-slate-500">{{ schedule.today|date:"d/m/Y" }}</p>
-      </div>
-      <div class="rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
-        <p class="text-xs font-black uppercase tracking-wide text-cyan-700">Couverture cahiers</p>
-        <p class="mt-2 text-3xl font-black text-slate-950">{{ schedule.lesson_log_coverage_rate }}%</p>
-        <p class="mt-1 text-xs font-bold text-slate-500">{{ schedule.lesson_logs_count|intcomma }} cahiers saisis</p>
-      </div>
-      <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-        <p class="text-xs font-black uppercase tracking-wide text-amber-700">Cahiers manquants</p>
-        <p class="mt-2 text-3xl font-black text-amber-800">{{ schedule.missing_lesson_logs_count|intcomma }}</p>
-        <p class="mt-1 text-xs font-bold text-slate-500">Cours passes sans trace</p>
-      </div>
-      <div class="rounded-2xl border border-rose-100 bg-rose-50 p-4">
-        <p class="text-xs font-black uppercase tracking-wide text-rose-700">Absences enseignants</p>
-        <p class="mt-2 text-3xl font-black text-rose-800">{{ schedule.teacher_absences|intcomma }}</p>
-        <p class="mt-1 text-xs font-bold text-slate-500">{{ schedule.teacher_lates|intcomma }} retards enseignants</p>
-      </div>
-      <div class="rounded-2xl border border-slate-200 bg-white p-4">
-        <p class="text-xs font-black uppercase tracking-wide text-slate-500">Appels valides</p>
-        <p class="mt-2 text-3xl font-black text-slate-950">{{ schedule.roll_validation_rate }}%</p>
-        <p class="mt-1 text-xs font-bold text-slate-500">{{ schedule.roll_sheets_validated|intcomma }} / {{ schedule.roll_sheets_total|intcomma }}</p>
-      </div>
+    <div class="dg-section-actions">
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgLoadScheduleWeek('{{ schedule.prev_week_start|date:'Y-m-d' }}')">
+        <i class="fa-solid fa-chevron-left"></i>Precedent
+      </button>
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgLoadScheduleWeek('')">Semaine en cours</button>
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgLoadScheduleWeek('{{ schedule.next_week_start|date:'Y-m-d' }}')">
+        Suivant <i class="fa-solid fa-chevron-right"></i>
+      </button>
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=schedule')">
+        <i class="fa-solid fa-eye"></i>Vue execution
+      </button>
     </div>
   </div>
 
-  <div class="dg-card dg-card-pad">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h4 class="text-base font-black text-slate-950">Calendrier hebdomadaire</h4>
-      </div>
-      <span class="dg-badge bg-slate-100 text-slate-700">{{ schedule.total_events|intcomma }} cours</span>
+  <div class="dg-panel" style="margin-bottom:14px;">
+    <div class="dg-row-2">
+      <label class="dg-form-group">
+        <span class="dg-form-label">Ecole / annexe</span>
+        <select class="dg-form-select" onchange="dgScheduleBranchChange(this.value)">
+          <option value="">Toutes les annexes</option>
+          {% for branch in all_branches %}
+          <option value="{{ branch.id }}" {% if selected_branch_id == branch.id|stringformat:"s" %}selected{% endif %}>{{ branch.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="dg-form-group">
+        <span class="dg-form-label">Classe</span>
+        <select class="dg-form-select" onchange="dgScheduleClassChange(this.value)" {% if not schedule.class_options %}disabled{% endif %}>
+          <option value="">Selectionner une classe</option>
+          {% for academic_class in schedule.class_options %}
+          <option value="{{ academic_class.id }}" {% if schedule.selected_class_id == academic_class.id|stringformat:"s" %}selected{% endif %}>
+            {{ academic_class.display_name }}{% if not selected_branch_id %} - {{ academic_class.branch.name }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
     </div>
+    {% if not selected_branch_id %}
+    <div style="margin-top:10px; font-size:.72rem; font-weight:700; color:#d97706;">
+      Filtre conseille : choisissez une annexe pour reduire la liste des classes.
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="dg-stat-grid" style="margin-bottom:16px;">
+    <div class="dg-stat-box" style="background:#eff6ff;">
+      <div class="dg-stat-val" style="color:#2563eb;">{{ schedule.total_events|intcomma }}</div>
+      <div class="dg-stat-lbl">Cours semaine</div>
+    </div>
+    <div class="dg-stat-box" style="background:#f0fdf4;">
+      <div class="dg-stat-val" style="color:#16a34a;">{{ schedule.today_events_count|intcomma }}</div>
+      <div class="dg-stat-lbl">Aujourd'hui</div>
+    </div>
+    <div class="dg-stat-box" style="background:#fef3c7;">
+      <div class="dg-stat-val" style="color:#d97706;">{{ schedule.missing_lesson_logs_count|intcomma }}</div>
+      <div class="dg-stat-lbl">Cahiers manquants</div>
+    </div>
+    <div class="dg-stat-box" style="background:#dbeafe;">
+      <div class="dg-stat-val" style="color:#2563eb;">{{ schedule.roll_validation_rate }}%</div>
+      <div class="dg-stat-lbl">Appels valides</div>
+    </div>
+  </div>
+
+  <div class="dg-panel" style="margin-bottom:14px;">
+    <div class="dg-section-header">
+      <div>
+        <div class="dg-panel-title" style="margin:0;">Emploi du temps officiel</div>
+        <div class="dg-section-header-sub">
+          {% if schedule.selected_class %}
+            {{ schedule.selected_class.branch.name }} - {{ schedule.selected_class.display_name }}
+          {% else %}
+            Aucune classe selectionnee
+          {% endif %}
+        </div>
+      </div>
+      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px;">
+        <i class="fa-solid fa-download"></i>Exporter
+      </button>
+    </div>
+    {% if schedule.requires_class_selection %}
+    <div class="dg-empty">
+      <div class="dg-empty-icon"><i class="fa-regular fa-calendar-days"></i></div>
+      <div class="dg-empty-text">Selectionnez une classe pour afficher son emploi du temps.</div>
+    </div>
+    {% else %}
     <div class="overflow-x-auto rounded-2xl border border-slate-200">
-      <div class="min-w-[1180px] bg-white">
-        <div class="grid grid-cols-[120px_repeat(6,minmax(180px,1fr))] border-b border-slate-200 bg-slate-50">
-          <div class="sticky left-0 z-20 border-r border-slate-200 bg-slate-50 px-4 py-4 text-xs font-black uppercase tracking-[0.24em] text-slate-500">Heure</div>
-          {% for day in schedule.calendar.days %}
-          <div class="border-r border-slate-200 px-4 py-4 last:border-r-0 {% if day.is_today %}bg-blue-50{% endif %}">
-            <p class="text-[11px] font-black uppercase tracking-[0.24em] {% if day.is_today %}text-blue-700{% else %}text-slate-500{% endif %}">{{ day.label }}</p>
-            <p class="mt-1 text-sm font-extrabold text-slate-900">{{ day.date|date:"d/m/Y" }}</p>
-          </div>
-          {% endfor %}
-        </div>
-        {% for slot in schedule.calendar.slots %}
-        <div class="grid grid-cols-[120px_repeat(6,minmax(180px,1fr))] border-b border-slate-200 last:border-b-0">
-          <div class="sticky left-0 z-10 flex min-h-[122px] items-start border-r border-slate-200 bg-white px-4 py-4">
+      {% include "portal/staff/supervisor/partials/schedule_week_grid.html" with schedule=schedule.calendar academic_class=schedule.selected_class only %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="dg-row-2">
+    <div class="dg-panel">
+      <div class="dg-panel-title">Charge hebdomadaire - Top enseignants</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        {% for row in schedule.teacher_load_rows|default:empty_list %}
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#f8fafc; border-radius:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600" style="font-size:.78rem;">
+              <i class="fa-solid fa-user"></i>
+            </div>
             <div>
-              <p class="text-sm font-black text-slate-900">{{ slot.label }}</p>
+              <div style="font-size:.75rem; font-weight:800; color:#0f172a;">{{ row.teacher_name }}</div>
+              <div style="font-size:.6rem; color:#94a3b8; font-weight:600;">{{ row.count|intcomma }} cours cette semaine</div>
             </div>
           </div>
-          {% for cell in slot.cells %}
-          <div class="min-h-[122px] border-r border-slate-200 p-3 last:border-r-0">
-            <div class="space-y-2">
-              {% for event in cell.events %}
-              <div class="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-3 shadow-sm">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-black text-slate-900">{{ event.title }}</p>
-                    <p class="mt-1 truncate text-xs font-semibold text-slate-600">{{ event.class_name }}</p>
-                    <p class="mt-1 truncate text-xs font-semibold text-slate-500">{{ event.branch_name }}</p>
-                  </div>
-                  <span class="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">{{ event.time_range }}</span>
-                </div>
-                <div class="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-500">
-                  <span class="rounded-full bg-white/80 px-2.5 py-1">{{ event.teacher_name }}</span>
-                  <span class="rounded-full bg-white/80 px-2.5 py-1">{{ event.location }}</span>
-                  <span class="rounded-full bg-white/80 px-2.5 py-1">{{ event.status_label }}</span>
-                </div>
-              </div>
-              {% empty %}
-              <div class="flex min-h-[96px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-3 text-center text-xs font-semibold text-slate-400">Libre</div>
-              {% endfor %}
-            </div>
-          </div>
-          {% endfor %}
+          <span class="dg-badge bg-blue-100 text-blue-700">{{ row.hours }} h</span>
         </div>
         {% empty %}
-        <div class="p-8 text-center text-sm font-semibold text-slate-500">Aucun creneau calendrier pour cette semaine.</div>
+        <div style="text-align:center; padding:20px; color:#94a3b8; font-size:.78rem; font-weight:700;">
+          Aucun enseignant charge cette semaine
+        </div>
         {% endfor %}
       </div>
+    </div>
+    <div class="dg-panel">
+      <div class="dg-panel-title">Statuts des cours</div>
+      {% for row in schedule.event_status_rows|default:empty_list %}
+      <div class="dg-bar-item">
+        <div class="dg-bar-label"><span>{{ row.label }}</span><span>{{ row.count|intcomma }}</span></div>
+        <div class="dg-bar-track">
+          <div class="dg-bar-fill
+            {% if row.tone == 'emerald' %}bg-emerald-500{% elif row.tone == 'amber' %}bg-amber-500{% elif row.tone == 'rose' %}bg-rose-500{% elif row.tone == 'slate' %}bg-slate-400{% else %}bg-blue-500{% endif %}"
+            style="width:{% widthratio row.count schedule.total_events|default:1 100 %}%"></div>
+        </div>
+      </div>
+      {% empty %}
+      <div style="text-align:center; padding:16px; color:#94a3b8; font-size:.72rem;">Aucune donnee planning</div>
+      {% endfor %}
     </div>
   </div>
 
-  <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
-    <div class="xl:col-span-8 dg-card dg-card-pad">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h4 class="text-base font-black text-slate-950">Charge hebdomadaire par jour</h4>
-        </div>
-        <span class="dg-badge bg-slate-100 text-slate-700">{{ schedule.total_events|intcomma }} evenements</span>
-      </div>
-      <div class="grid grid-cols-7 gap-2">
-        {% for day in schedule.weekday_rows %}
-        <div class="min-h-[150px] rounded-2xl border border-slate-100 bg-slate-50 p-3">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-sm font-black text-slate-900">{{ day.label }}</span>
-            <span class="text-xs font-bold text-slate-500">{{ day.date|date:"d/m" }}</span>
-          </div>
-          <div class="mt-5 flex h-16 items-end rounded-xl bg-white px-2 pb-2">
-            <div class="w-full rounded-t-lg bg-blue-500" style="height: {% if day.percent %}{{ day.percent }}{% else %}4{% endif %}%"></div>
-          </div>
-          <p class="mt-3 text-center text-2xl font-black text-slate-950">{{ day.count|intcomma }}</p>
-        </div>
-        {% endfor %}
-      </div>
+  {% if schedule.missing_lesson_rows %}
+  <div class="dg-panel" style="margin-top:14px;">
+    <div class="dg-section-header">
+      <div class="dg-panel-title" style="margin:0;">Cahiers manquants prioritaires</div>
+      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px;" onclick="dgShowSection('analytics')">
+        <i class="fa-solid fa-chart-line"></i>Voir analytiques
+      </button>
     </div>
-    <aside class="xl:col-span-4 space-y-4">
-      <div class="dg-card dg-card-pad">
-        <h4 class="mb-4 text-base font-black text-slate-950">Statuts des cours</h4>
-        <div class="space-y-3">
-          {% for row in schedule.event_status_rows %}
-          <div>
-            <div class="mb-1 flex justify-between text-xs font-bold text-slate-600">
-              <span>{{ row.label }}</span>
-              <span>{{ row.count|intcomma }}</span>
-            </div>
-            <div class="h-2 overflow-hidden rounded-full bg-slate-100">
-              <div class="h-full rounded-full {% if row.tone == 'emerald' %}bg-emerald-500{% elif row.tone == 'amber' %}bg-amber-500{% elif row.tone == 'rose' %}bg-rose-500{% elif row.tone == 'slate' %}bg-slate-500{% else %}bg-blue-500{% endif %}" style="width: {% widthratio row.count schedule.total_events 100 %}%"></div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="rounded-2xl border border-rose-100 bg-rose-50 p-5">
-        <h4 class="text-base font-black text-rose-900">Assiduite liee au planning</h4>
-        <div class="mt-4 grid grid-cols-2 gap-3">
-          <div class="rounded-xl bg-white p-3">
-            <p class="text-xs font-bold text-slate-500">Absences etudiants</p>
-            <p class="mt-1 text-2xl font-black text-rose-700">{{ schedule.student_absences|intcomma }}</p>
-          </div>
-          <div class="rounded-xl bg-white p-3">
-            <p class="text-xs font-bold text-slate-500">Retards etudiants</p>
-            <p class="mt-1 text-2xl font-black text-amber-700">{{ schedule.student_lates|intcomma }}</p>
-          </div>
-        </div>
-      </div>
-    </aside>
-  </div>
-
-  <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
-    <div class="xl:col-span-7 dg-card dg-card-pad">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h4 class="text-base font-black text-slate-950">Annexes a surveiller</h4>
-        </div>
-        <button type="button" class="dg-action" onclick="dgShowSection('annexes')" title="Annexes"><i class="fa-solid fa-arrow-right"></i></button>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="dg-table">
-          <thead>
-            <tr>
-              <th>Annexe</th>
-              <th>Score</th>
-              <th>Cours</th>
-              <th>Aujourd'hui</th>
-              <th>Couverture</th>
-              <th>Cahiers manquants</th>
-              <th>Abs. profs</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in schedule.branch_rows %}
-            <tr>
-              <td class="font-black">{{ row.branch.name }}</td>
-              <td><span class="dg-badge {% if row.risk_score >= 30 %}bg-rose-100 text-rose-700{% elif row.risk_score >= 10 %}bg-orange-100 text-orange-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ row.risk_score }}</span></td>
-              <td>{{ row.events|intcomma }}</td>
-              <td>{{ row.today_events|intcomma }}</td>
-              <td>{{ row.coverage_rate }}%</td>
-              <td>{{ row.missing_lesson_logs|intcomma }}</td>
-              <td>{{ row.teacher_absences|intcomma }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7" class="py-6 text-center font-semibold text-slate-500">Aucune donnee d'emploi du temps.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="xl:col-span-5 dg-card dg-card-pad">
-      <h4 class="mb-4 text-base font-black text-slate-950">Charge enseignants</h4>
-      <div class="space-y-3">
-        {% for row in schedule.teacher_load_rows %}
-        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-sm font-black text-slate-900">{{ row.teacher_name }}</span>
-            <span class="dg-badge bg-blue-100 text-blue-700">{{ row.hours }} h</span>
-          </div>
-          <p class="mt-1 text-xs font-semibold text-slate-500">{{ row.count|intcomma }} cours cette semaine</p>
-        </div>
-        {% empty %}
-        <p class="text-sm font-semibold text-slate-500">Aucune charge enseignant cette semaine.</p>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-    <div class="dg-card dg-card-pad">
-      <h4 class="mb-4 text-base font-black text-slate-950">Cours du jour</h4>
-      <div class="space-y-3">
-        {% for event in schedule.today_events %}
-        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p class="text-sm font-black text-slate-900">{{ event.title }}</p>
-              <p class="mt-1 text-xs font-semibold text-slate-500">{{ event.class_name }} - {{ event.branch_name }}</p>
-              <p class="mt-1 text-xs font-semibold text-slate-500">{{ event.teacher_name }} - {{ event.location }}</p>
-            </div>
-            <span class="dg-badge bg-blue-100 text-blue-700">{{ event.time_range }}</span>
-          </div>
-        </div>
-        {% empty %}
-        <p class="text-sm font-semibold text-slate-500">Aucun cours programme aujourd'hui.</p>
-        {% endfor %}
-      </div>
-    </div>
-    <div class="dg-card dg-card-pad">
-      <h4 class="mb-4 text-base font-black text-slate-950">Cahiers manquants prioritaires</h4>
-      <div class="space-y-3">
-        {% for event in schedule.missing_lesson_rows %}
-        <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p class="text-sm font-black text-slate-900">{{ event.title }}</p>
-              <p class="mt-1 text-xs font-semibold text-slate-600">{{ event.class_name }} - {{ event.branch_name }}</p>
-              <p class="mt-1 text-xs font-semibold text-slate-600">{{ event.teacher_name }}</p>
-            </div>
-            <span class="dg-badge bg-white text-amber-700">{{ event.date|date:"d/m" }} {{ event.time_range }}</span>
-          </div>
-        </div>
-        {% empty %}
-        <p class="text-sm font-semibold text-slate-500">Aucun cahier manquant sur les cours passes de la semaine.</p>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-
-  <div class="dg-card dg-card-pad">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h4 class="text-base font-black text-slate-950">Prochains cours</h4>
-      </div>
-      <button type="button" class="dg-action" onclick="dgShowSection('realtime')">Live</button>
-    </div>
-    <div class="overflow-x-auto">
+    <div class="dg-table-wrap">
       <table class="dg-table">
         <thead>
           <tr>
@@ -285,25 +163,22 @@
             <th>Classe</th>
             <th>Annexe</th>
             <th>Enseignant</th>
-            <th>Statut</th>
           </tr>
         </thead>
         <tbody>
-          {% for event in schedule.upcoming_events %}
+          {% for event in schedule.missing_lesson_rows %}
           <tr>
-            <td>{{ event.date|date:"d/m/Y" }}</td>
+            <td class="text-xs font-semibold text-slate-500">{{ event.date|date:"d/m" }}</td>
             <td class="font-black">{{ event.time_range }}</td>
             <td>{{ event.title }}</td>
             <td>{{ event.class_name }}</td>
             <td>{{ event.branch_name }}</td>
             <td>{{ event.teacher_name }}</td>
-            <td><span class="dg-badge bg-slate-100 text-slate-700">{{ event.status_label }}</span></td>
           </tr>
-          {% empty %}
-          <tr><td colspan="7" class="py-6 text-center font-semibold text-slate-500">Aucun prochain cours programme.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
+  {% endif %}
 </div>

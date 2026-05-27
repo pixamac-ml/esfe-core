@@ -1,0 +1,56 @@
+<div id="sg-overview-registry"
+     class="sg-panel"
+     hx-get="{% url 'secretary:htmx_overview_registry' %}"
+     hx-trigger="secretary:registry-updated from:body"
+     hx-swap="outerHTML">
+  <div class="sg-section-header">
+    <div>
+      <div class="sg-section-header-title">Flux administratif du jour</div>
+      <div class="sg-section-header-sub">Registre, rendez-vous, visites et taches urgentes</div>
+    </div>
+    <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+      <i class="fa-solid fa-plus"></i>Nouvelle entree
+    </button>
+  </div>
+  <div class="sg-table-wrap">
+    <table class="sg-table">
+      <thead><tr><th>N</th><th>Type</th><th>Visiteur</th><th>Service</th><th>Priorite</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for item in pending_registry_rows %}
+        <tr>
+          <td style="font-family:monospace;">{{ item.registry_number|default:item.pk }}</td>
+          <td style="font-weight:900;">{{ item.get_entry_type_display }}</td>
+          <td>{{ item.visitor_name|default:item.title }}</td>
+          <td>{{ item.target_service|default:"Accueil" }}</td>
+          <td><span class="sg-badge-sm {% if item.priority == 'immediate' %}sg-badge-red{% elif item.priority == 'high' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ item.get_priority_display }}</span></td>
+          <td>
+            <form method="post" hx-post="{% url 'secretary:registry_mark_processed' item.id %}" hx-target="closest tr" hx-swap="outerHTML swap:180ms" data-sg-optimistic="fade-remove">{% csrf_token %}
+              <button class="sg-btn sg-btn-success" style="height:30px;font-size:.68rem;" type="submit"><i class="fa-solid fa-check"></i>Traiter</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="sg-empty">Aucune entree en attente.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if dashboard_pending_registry_page.has_other_pages %}
+    <div class="sg-pagination">
+      <div class="sg-pagination-info">Page {{ dashboard_pending_registry_page.number }} / {{ dashboard_pending_registry_page.paginator.num_pages }} - {{ dashboard_pending_registry_page.paginator.count }} entree(s)</div>
+      <div class="sg-pagination-actions">
+        {% if dashboard_pending_registry_page.has_previous %}
+          <button class="sg-page-link" type="button" hx-get="{% url 'secretary:htmx_overview_registry' %}?overview_registry_page={{ dashboard_pending_registry_page.previous_page_number }}" hx-target="#sg-overview-registry" hx-swap="outerHTML"><i class="fa-solid fa-chevron-left"></i>Precedent</button>
+        {% else %}
+          <span class="sg-page-link is-disabled"><i class="fa-solid fa-chevron-left"></i>Precedent</span>
+        {% endif %}
+        <span class="sg-page-link is-current">{{ dashboard_pending_registry_page.number }}</span>
+        {% if dashboard_pending_registry_page.has_next %}
+          <button class="sg-page-link" type="button" hx-get="{% url 'secretary:htmx_overview_registry' %}?overview_registry_page={{ dashboard_pending_registry_page.next_page_number }}" hx-target="#sg-overview-registry" hx-swap="outerHTML">Suivant<i class="fa-solid fa-chevron-right"></i></button>
+        {% else %}
+          <span class="sg-page-link is-disabled">Suivant<i class="fa-solid fa-chevron-right"></i></span>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>

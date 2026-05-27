@@ -88,51 +88,6 @@ def superuser_required(user):
     return bool(user.is_authenticated and user.is_superuser)
 
 
-def _missing_superadmin_view(name):
-    @user_passes_test(superuser_required, login_url='/accounts/login/')
-    def _view(request, *args, **kwargs):
-        if request.headers.get('HX-Request'):
-            return HttpResponse(status=204)
-        messages.warning(
-            request,
-            f"La fonctionnalite '{name}' est temporairement indisponible.",
-        )
-        return redirect('superadmin:dashboard')
-
-    _view.__name__ = name
-    return _view
-
-
-# Keep URL imports stable even if some optional modules/views are not yet restored.
-_MISSING_SUPERADMIN_VIEWS = [
-    'branch_create', 'branch_delete', 'branch_edit', 'branch_list',
-    'bulk_action',
-    'community_answer_delete', 'community_answer_detail', 'community_answer_edit', 'community_answer_list',
-    'community_category_create', 'community_category_delete', 'community_category_edit', 'community_category_list',
-    'community_topic_delete', 'community_topic_detail', 'community_topic_edit', 'community_topic_list',
-    'competence_block_create', 'competence_block_delete', 'competence_block_edit', 'competence_block_list',
-    'competence_item_create', 'competence_item_delete', 'competence_item_edit', 'competence_item_list',
-    'export_data',
-    'message_delete', 'message_detail', 'message_list',
-    'partner_create', 'partner_delete', 'partner_edit', 'partner_list',
-    'programme_required_document_create', 'programme_required_document_delete', 'programme_required_document_list',
-    'programme_section_create', 'programme_section_delete', 'programme_section_edit', 'programme_section_list',
-    'programme_tab_create', 'programme_tab_delete', 'programme_tab_edit', 'programme_tab_list',
-    'programme_year_create', 'programme_year_delete', 'programme_year_edit', 'programme_year_list',
-    'quick_fact_create', 'quick_fact_delete', 'quick_fact_edit', 'quick_fact_list',
-    'required_document_create', 'required_document_delete', 'required_document_edit', 'required_document_list',
-    'search_global', 'settings',
-    'testimonial_create', 'testimonial_delete', 'testimonial_edit', 'testimonial_list',
-    'toggle_branch', 'toggle_community_answer', 'toggle_community_category', 'toggle_community_topic',
-    'toggle_partner', 'toggle_testimonial',
-    'update_message_status',
-]
-
-for _missing_name in _MISSING_SUPERADMIN_VIEWS:
-    if _missing_name not in globals():
-        globals()[_missing_name] = _missing_superadmin_view(_missing_name)
-
-
 def _get_cockpit_pref(user):
     pref, _ = SuperadminCockpitPreference.objects.get_or_create(user=user)
     return pref
@@ -181,6 +136,12 @@ def _daily_series(model, field_name, is_datetime, day_list):
     for day in day_list:
         series.append(model.objects.filter(**{lookup: day}).count())
     return series
+
+
+def _percent(part, total):
+    if not total:
+        return 0
+    return round((part / total) * 100)
 
 
 def _log_inscription_history(inscription, previous_status, new_status, comment=''):
@@ -321,27 +282,40 @@ def dashboard(request):
         'page_title': 'Tableau de bord',
         'active_menu': 'dashboard',
         'dashboard_period': period,
+        'comparison_label': 'periode precedente',
         'period_choices': SuperadminCockpitPreference.PERIOD_CHOICES,
         'cockpit_pref': pref,
         'formations_count': Programme.objects.count(),
         'formations_published': Programme.objects.filter(is_active=True).count(),
     }
+    context['formations_published_percent'] = _percent(context['formations_published'], context['formations_count'])
 
     try:
-        context['candidatures_count'] = Candidature.objects.count()
-        context['candidatures_pending'] = Candidature.objects.filter(status='submitted').count()
+        candidatures_count = Candidature.objects.count()
+        candidatures_pending = Candidature.objects.filter(status='submitted').count()
+        candidatures_processed = Candidature.objects.exclude(status__in=['submitted', 'under_review']).count()
+        context['candidatures_count'] = candidatures_count
+        context['candidatures_pending'] = candidatures_pending
+        context['candidatures_processed'] = candidatures_processed
+        context['candidatures_processed_percent'] = _percent(candidatures_processed, candidatures_count)
         context['recent_candidatures'] = Candidature.objects.order_by('-submitted_at')[:5]
     except Exception:
         context['candidatures_count'] = 0
         context['candidatures_pending'] = 0
+        context['candidatures_processed'] = 0
+        context['candidatures_processed_percent'] = 0
         context['recent_candidatures'] = []
 
     try:
-        context['inscriptions_count'] = Inscription.objects.count()
-        context['inscriptions_active'] = Inscription.objects.filter(status='active').count()
+        inscriptions_count = Inscription.objects.count()
+        inscriptions_active = Inscription.objects.filter(status=Inscription.STATUS_ACTIVE).count()
+        context['inscriptions_count'] = inscriptions_count
+        context['inscriptions_active'] = inscriptions_active
+        context['inscriptions_active_percent'] = _percent(inscriptions_active, inscriptions_count)
     except Exception:
         context['inscriptions_count'] = 0
         context['inscriptions_active'] = 0
+        context['inscriptions_active_percent'] = 0
 
     try:
         context['students_count'] = Student.objects.count()
@@ -370,7 +344,7 @@ def dashboard(request):
         context['missing_student_accounts_count'] = 0
 
     try:
-        context['payments_total'] = Payment.objects.filter(status='validated').aggregate(total=Sum('amount'))['total'] or 0
+        context['payments_total'] = Payment.objects.filter(status=Payment.STATUS_VALIDATED).aggregate(total=Sum('amount'))['total'] or 0
     except Exception:
         context['payments_total'] = 0
 
@@ -470,24 +444,37 @@ def dashboard_widgets_fragment(request):
         inscription_id=OuterRef('pk'),
         status=Payment.STATUS_VALIDATED,
     )
+    missing_student_inscriptions_qs = (
+        Inscription.objects.select_related('candidature', 'candidature__programme')
+        .annotate(has_validated_payment=Exists(validated_payment_exists))
+        .filter(
+            status__in=[Inscription.STATUS_PARTIAL, Inscription.STATUS_ACTIVE],
+            has_validated_payment=True,
+            student__isnull=True,
+        )
+        .filter(
+            Q(candidature__status='accepted')
+            | Q(candidature__status='accepted_with_reserve')
+        )
+        .order_by('-updated_at')
+    )
+    recent_cash_sessions_qs = (
+        CashPaymentSession.objects.select_related(
+            'inscription__candidature',
+            'agent__user',
+        )
+        .filter(
+            is_used=False,
+            expires_at__gt=timezone.now(),
+        )
+        .order_by('-created_at')
+    )
     context = {
         'candidatures_pending': Candidature.objects.filter(status='submitted').count(),
         'messages_unread': ContactMessage.objects.filter(status='pending').count(),
-        'inscriptions_active': Inscription.objects.filter(status='active').count(),
-        'missing_student_inscriptions': (
-            Inscription.objects.select_related('candidature', 'candidature__programme')
-            .annotate(has_validated_payment=Exists(validated_payment_exists))
-            .filter(
-                status__in=[Inscription.STATUS_PARTIAL, Inscription.STATUS_ACTIVE],
-                has_validated_payment=True,
-                student__isnull=True,
-            )
-            .filter(
-                Q(candidature__status='accepted')
-                | Q(candidature__status='accepted_with_reserve')
-            )
-            .order_by('-updated_at')[:5]
-        ),
+        'inscriptions_active': Inscription.objects.filter(status=Inscription.STATUS_ACTIVE).count(),
+        'missing_student_inscriptions_count': missing_student_inscriptions_qs.count(),
+        'missing_student_inscriptions': missing_student_inscriptions_qs[:5],
         'blog_drafts_count': Article.objects.filter(status='draft', is_deleted=False).count(),
         'blog_recent_published': (
             Article.objects.select_related('author', 'category')
@@ -546,18 +533,8 @@ def dashboard_widgets_fragment(request):
         'branches_recent': Branch.objects.order_by('-created_at')[:4],
     }
 
-    recent_cash_sessions = (
-        CashPaymentSession.objects.select_related(
-            'inscription__candidature',
-            'agent__user',
-        )
-        .filter(
-            is_used=False,
-            expires_at__gt=timezone.now(),
-        )
-        .order_by('-created_at')[:5]
-    )
-    context['recent_cash_sessions'] = recent_cash_sessions
+    context['recent_cash_sessions_count'] = recent_cash_sessions_qs.count()
+    context['recent_cash_sessions'] = recent_cash_sessions_qs[:5]
     pending_notifications_qs = CommunicationNotification.objects.filter(
         channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
         status__in=[
@@ -852,20 +829,31 @@ def toggle_formation(request, pk):
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def cycle_list(request):
-    cycles = Cycle.objects.annotate(formations_count=Count('programmes')).order_by('order', 'name')
-    return render(request, 'superadmin/cycles/list.html', {'page_title': 'Cycles', 'cycles': cycles})
+    cycles = Cycle.objects.annotate(formations_count=Count('programmes')).order_by('min_duration_years', 'name')
+    return render(
+        request,
+        'superadmin/cycles/list.html',
+        {'page_title': 'Cycles', 'cycles': cycles, 'active_menu': 'cycles'},
+    )
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def cycle_create(request):
     if request.method == 'POST':
-        name = request.POST.get('name')
+        name = (request.POST.get('name') or '').strip()
         if name:
-            Cycle.objects.create(name=name, description=request.POST.get('description', ''), order=request.POST.get('order', 0))
+            Cycle.objects.create(
+                name=name,
+                description=request.POST.get('description', ''),
+                min_duration_years=request.POST.get('min_duration_years') or 1,
+                max_duration_years=request.POST.get('max_duration_years') or request.POST.get('min_duration_years') or 1,
+                theme=request.POST.get('theme') or 'accent',
+                is_active=request.POST.get('is_active') == 'on',
+            )
             messages.success(request, f"Cycle '{name}' créé!")
             return redirect('superadmin:cycle_list')
         messages.error(request, "Le nom est obligatoire.")
-    return render(request, 'superadmin/cycles/form.html', {'page_title': 'Nouveau Cycle'})
+    return render(request, 'superadmin/cycles/form.html', {'page_title': 'Nouveau cycle', 'active_menu': 'cycles'})
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -874,11 +862,14 @@ def cycle_edit(request, pk):
     if request.method == 'POST':
         cycle.name = request.POST.get('name', cycle.name)
         cycle.description = request.POST.get('description', '')
-        cycle.order = request.POST.get('order', 0)
+        cycle.min_duration_years = request.POST.get('min_duration_years') or cycle.min_duration_years
+        cycle.max_duration_years = request.POST.get('max_duration_years') or cycle.max_duration_years
+        cycle.theme = request.POST.get('theme') or cycle.theme
+        cycle.is_active = request.POST.get('is_active') == 'on'
         cycle.save()
         messages.success(request, f"Cycle '{cycle.name}' mis à jour!")
         return redirect('superadmin:cycle_list')
-    return render(request, 'superadmin/cycles/form.html', {'page_title': f'Modifier: {cycle.name}', 'cycle': cycle})
+    return render(request, 'superadmin/cycles/form.html', {'page_title': f'Modifier: {cycle.name}', 'cycle': cycle, 'active_menu': 'cycles'})
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -904,7 +895,7 @@ def cycle_delete(request, pk):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def filiere_list(request):
     filieres = Filiere.objects.annotate(formations_count=Count('programmes')).order_by('name')
-    return render(request, 'superadmin/filieres/list.html', {'page_title': 'Filières', 'filieres': filieres})
+    return render(request, 'superadmin/filieres/list.html', {'page_title': 'Filières', 'filieres': filieres, 'active_menu': 'filieres'})
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -915,7 +906,7 @@ def filiere_create(request):
             Filiere.objects.create(name=name, description=request.POST.get('description', ''))
             messages.success(request, f"Filière '{name}' créée!")
             return redirect('superadmin:filiere_list')
-    return render(request, 'superadmin/filieres/form.html', {'page_title': 'Nouvelle Filière'})
+    return render(request, 'superadmin/filieres/form.html', {'page_title': 'Nouvelle filière', 'active_menu': 'filieres'})
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -927,7 +918,7 @@ def filiere_edit(request, pk):
         filiere.save()
         messages.success(request, f"Filière '{filiere.name}' mise à jour!")
         return redirect('superadmin:filiere_list')
-    return render(request, 'superadmin/filieres/form.html', {'page_title': f'Modifier: {filiere.name}', 'filiere': filiere})
+    return render(request, 'superadmin/filieres/form.html', {'page_title': f'Modifier: {filiere.name}', 'filiere': filiere, 'active_menu': 'filieres'})
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -953,7 +944,7 @@ def filiere_delete(request, pk):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def diploma_list(request):
     diplomas = Diploma.objects.all().order_by('name')
-    return render(request, 'superadmin/diplomas/list.html', {'page_title': 'Diplômes', 'diplomas': diplomas})
+    return render(request, 'superadmin/diplomas/list.html', {'page_title': 'Diplômes', 'diplomas': diplomas, 'active_menu': 'diplomas'})
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -961,10 +952,10 @@ def diploma_create(request):
     if request.method == 'POST':
         name = request.POST.get('name')
         if name:
-            Diploma.objects.create(name=name, abbreviation=request.POST.get('abbreviation', ''))
-            messages.success(request, f"Diplôme '{name}' créé!")
+            Diploma.objects.create(name=name, level=request.POST.get('level') or 'superieur')
+            messages.success(request, f"Diplôme '{name}' créé.")
             return redirect('superadmin:diploma_list')
-    return render(request, 'superadmin/diplomas/form.html', {'page_title': 'Nouveau Diplôme'})
+    return render(request, 'superadmin/diplomas/form.html', {'page_title': 'Nouveau diplôme', 'active_menu': 'diplomas'})
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -972,11 +963,11 @@ def diploma_edit(request, pk):
     diploma = get_object_or_404(Diploma, pk=pk)
     if request.method == 'POST':
         diploma.name = request.POST.get('name', diploma.name)
-        diploma.abbreviation = request.POST.get('abbreviation', '')
+        diploma.level = request.POST.get('level') or diploma.level
         diploma.save()
-        messages.success(request, f"Diplôme '{diploma.name}' mis à jour!")
+        messages.success(request, f"Diplôme '{diploma.name}' mis à jour.")
         return redirect('superadmin:diploma_list')
-    return render(request, 'superadmin/diplomas/form.html', {'page_title': f'Modifier: {diploma.name}', 'diploma': diploma})
+    return render(request, 'superadmin/diplomas/form.html', {'page_title': f'Modifier: {diploma.name}', 'diploma': diploma, 'active_menu': 'diplomas'})
 
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
@@ -1442,12 +1433,16 @@ def inscription_create(request):
 
         from inscriptions.services import create_inscription_from_candidature
 
-        inscription = create_inscription_from_candidature(
-            candidature=candidature,
-            amount_due=int(amount_due),
-            academic_class=academic_class,
-            status=status,
-        )
+        try:
+            inscription = create_inscription_from_candidature(
+                candidature=candidature,
+                amount_due=int(amount_due),
+                academic_class=academic_class,
+                status=status,
+            )
+        except (ValidationError, ValueError) as exc:
+            messages.error(request, str(exc))
+            return redirect(f"{reverse('superadmin:inscription_create')}?candidature={candidature_id}")
 
         messages.success(request, f"Inscription créée avec succès ! Référence : {inscription.public_token}")
         return redirect('superadmin:inscription_detail', pk=inscription.pk)

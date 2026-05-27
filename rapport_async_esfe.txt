@@ -1,0 +1,164 @@
+RAPPORT ASYNC ESFE CORE
+Date: 2026-05-26
+
+1. Diagnostic
+
+Le probleme asyncio.exceptions.CancelledError ne vient pas d'une vue Django async mal ecrite.
+Audit du code: les seules fonctions async trouvees sont les consumers WebSocket Channels dans
+communication/realtime/consumers.py. Les vues HTTP du projet sont essentiellement synchrones.
+
+La cause reelle la plus probable est l'annulation de requetes HTTP par le navigateur pendant:
+- fermeture de modales/drawers;
+- navigation HTMX rapide;
+- remplacement de fragments pendant qu'une requete precedente est encore en cours;
+- deconnexion client normale en ASGI.
+
+Sous ASGI, quand le client ferme la connexion avant la fin de la reponse, la tache serveur peut etre
+annulee et Python remonte asyncio.CancelledError. Ce n'est pas une erreur metier si la requete a ete
+interrompue par le client. Le probleme etait amplifie dans le dashboard DG par l'usage explicite de
+AbortController.abort() a la fermeture des overlays.
+
+2. Python 3.14
+
+Python 3.14 n'est pas identifie comme cause directe.
+Django 6.0 supporte officiellement Python 3.12, 3.13 et 3.14:
+https://docs.djangoproject.com/en/6.0/faq/install/#what-python-version-can-i-use-with-django
+
+Point de prudence production:
+- Django 6.0 est compatible Python 3.14.
+- django-htmx 1.27.0 declare Python 3.14 et Django 6.0.
+- WhiteNoise 6.12.0 declare Django 6.0, mais ses classifiers Python visibles vont jusqu'a 3.13.
+- asgiref 3.11.1 requiert Python >=3.9 mais ses classifiers visibles vont jusqu'a 3.13.
+- Channels 4.3.2 declare Django 6.0 et Python >=3.9.
+
+Conclusion: Python 3.14 est acceptable avec Django 6, mais pour une production tres conservative,
+Python 3.13 derniere micro-version reste plus prudent tant que tout l'ecosysteme tiers n'affiche pas
+clairement Python 3.14.
+
+3. Fichiers modifies
+
+- config/settings.py
+  Ajout d'une configuration LOGGING avec filtre cible sur CancelledError.
+  Objectif: ne plus traiter les deconnexions client ASGI comme des erreurs applicatives.
+  Le filtre couvre aussi les loggers Daphne/Uvicorn/Channels les plus courants.
+
+- config/asgi.py
+  Ajout d'un wrapper ASGI global ClientDisconnectSafeASGIApp.
+  Objectif: absorber proprement les asyncio.CancelledError des requetes HTTP quand le client
+  ferme la connexion avant la fin de la reponse. Les annulations WebSocket ne sont pas masquees.
+  Renforcement ajoute: installation d'un exception handler asyncio pour ignorer le bruit
+  "CancelledError exception in shielded future" emis par asgiref quand une requete sync est annulee
+  au milieu du pont ASGI/sync.
+
+- core/logging.py
+  Nouveau filtre IgnoreClientCancelledError.
+  Il supprime uniquement les logs lies a asyncio.CancelledError.
+  Les vraies erreurs HTTP, template, ORM ou metier continuent a remonter.
+
+- templates/portal/dg/dashboard.html
+  Remplacement de l'annulation AbortController.abort() par un marquage local de requete ignoree.
+  Objectif: quand un drawer/modal se ferme, le navigateur n'annule plus volontairement la requete en cours.
+  La reponse tardive est simplement ignoree si l'overlay n'est plus ouvert.
+  Correction ajoutee: les fetch POST utilisent form.getAttribute("action") au lieu de form.action.
+  Raison: un champ input name="action" masque la propriete form.action en JavaScript et provoquait
+  des POST vers /portal/dg/[object HTMLInputElement].
+
+- templates/portal/dg/partials/workflows/reenrollment.html
+  Meme correction sur le formulaire de preparation des diplomes.
+
+- requirements.txt
+  Alignement des pins sur l'environnement installe et teste:
+  Django==6.0.5
+  asgiref==3.11.1
+
+4. Strategie production recommandee
+
+Python:
+- Recommande production conservative: Python 3.13 derniere micro-version.
+- Acceptable si staging valide: Python 3.14 derniere micro-version avec Django 6.0.x.
+
+Versions stables recommandees:
+- Django==6.0.5
+- asgiref==3.11.1
+- django-htmx==1.27.0
+- whitenoise==6.12.0
+- channels==4.3.2
+- channels_redis==4.3.0
+- daphne==4.2.1 ou uvicorn==0.42.0, choisir un serveur ASGI principal et s'y tenir.
+
+ASGI / HTTP:
+- Garder ASGI si les WebSockets sont requis.
+- Garder les vues HTTP en sync tant que le projet utilise majoritairement ORM Django classique.
+- Ne convertir une vue en async que si elle fait vraiment de l'I/O async non bloquante.
+- Ne pas appeler ORM Django directement dans un vrai contexte async sans sync_to_async/thread_sensitive.
+
+WhiteNoise:
+- Ordre middleware actuel correct: SecurityMiddleware puis WhiteNoiseMiddleware.
+- En production, executer collectstatic et utiliser CompressedManifestStaticFilesStorage.
+
+HTMX / fetch:
+- Eviter AbortController.abort() pour les overlays si le serveur est ASGI.
+- Preferer ignorer la reponse cote client quand l'UI a change.
+- Garder hx-disabled-elt sur les formulaires longs pour eviter les doubles soumissions.
+- Pour les recherches HTMX rapides, utiliser delay/debounce deja present dans plusieurs templates.
+
+Channels:
+- En production, utiliser Redis via channels_redis.
+- Ne pas utiliser InMemoryChannelLayer en multi-worker production.
+- Garder ENABLE_WEBSOCKETS configurable.
+
+5. Commandes exactes
+
+Installer les versions alignees:
+python -m pip install -r requirements.txt
+
+Verifier la configuration Django:
+python manage.py check
+
+Verifier les migrations:
+python manage.py makemigrations --check --dry-run
+
+Collecter les statics en production:
+python manage.py collectstatic --noinput
+
+Lancer en ASGI avec Daphne:
+daphne -b 0.0.0.0 -p 8000 config.asgi:application
+
+Ou lancer en ASGI avec Uvicorn:
+uvicorn config.asgi:application --host 0.0.0.0 --port 8000
+
+Variables production importantes:
+DEBUG=False
+SECRET_KEY=<valeur forte>
+ALLOWED_HOSTS=<domaines>
+CSRF_TRUSTED_ORIGINS=https://www.esfe-mali.org
+DATABASE_URL=<postgresql>
+REDIS_URL=<redis>
+ENABLE_WEBSOCKETS=True
+
+6. Verification effectuee
+
+Commandes executees:
+- python manage.py check: OK
+- python manage.py makemigrations --check --dry-run: OK
+- test du filtre logging: CancelledError filtre, erreur normale conservee
+- test du wrapper ASGI: annulation HTTP absorbee, annulation WebSocket conservee
+- test du handler asyncio: message "CancelledError exception in shielded future" absorbe
+- verification grep: plus de fetch(form.action) dans les templates/scripts audites
+- rendu HTTP dashboard DG, section alertes et drawer alerte: 200 OK
+
+7. Decision technique
+
+La correction principale n'est pas de cacher toutes les erreurs async.
+Elle separe deux choses:
+- les deconnexions client normales, filtrees proprement;
+- les vraies erreurs applicatives, conservees dans les logs.
+
+La stabilisation a ensuite ete renforcee au niveau global ASGI:
+- toute requete HTTP annulee par le navigateur est terminee proprement au bord de l'application;
+- les WebSockets restent controles par Channels et ne sont pas silencieusement avales;
+- le correctif s'applique a tout le projet, pas seulement au dashboard DG.
+
+La pile actuelle peut aller en production apres staging, mais il faut valider le choix Python 3.14
+avec les memes workers, le meme serveur ASGI et le meme proxy que la production. Pour une mise en
+production plus prudente, Python 3.13 est le choix recommande.

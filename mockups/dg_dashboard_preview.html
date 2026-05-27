@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard DG — Maquette Complète</title>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f6f8fc; color: #0f172a; overflow: hidden; }
+  canvas { display: block; max-width: 100%; }
+
+  .dg-shell { display: flex; height: 100vh; min-height: 0; overflow: hidden; }
+
+  /* SIDEBAR */
+  .dg-sidebar { width: 270px; height: 100vh; flex: 0 0 270px; background: linear-gradient(180deg, #08172d 0%, #081b36 48%, #061326 100%); color: #fff; overflow: hidden; }
+  .dg-logo { height: 78px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .dg-logo-mark { width: 40px; height: 40px; background: linear-gradient(135deg, #2563eb, #4f46e5); border-radius: 10px; display: grid; place-items: center; }
+  .dg-logo-text { font-size: 1.1rem; font-weight: 900; letter-spacing: -.02em; }
+  .dg-logo-sub { font-size: .65rem; font-weight: 600; color: #94a3b8; margin-top: 1px; }
+  .dg-sidebar-scroll { height: calc(100vh - 78px); overflow-y: auto; overflow-x: hidden; padding: 1rem .75rem; }
+  .dg-cluster-label { font-size: .6rem; font-weight: 900; text-transform: uppercase; letter-spacing: .18em; color: #475569; padding: .5rem .5rem .2rem; }
+  .dg-link { display: flex; align-items: center; gap: .75rem; min-height: 42px; padding: .5rem .75rem; border-radius: .75rem; color: #94a3b8; font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; width: 100%; border: none; background: none; text-align: left; }
+  .dg-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .dg-link.active { background: linear-gradient(135deg, #3257ff, #4f46e5); color: #fff; box-shadow: 0 8px 20px rgba(37,99,235,.25); }
+  .dg-badge { margin-left: auto; font-size: .6rem; font-weight: 950; padding: .15rem .45rem; border-radius: 999px; }
+  .dg-badge-red { background: #f43f5e; color: #fff; }
+  .dg-badge-blue { background: #2563eb; color: #fff; }
+  .dg-badge-amber { background: #f59e0b; color: #fff; }
+  .dg-sidebar-divider { height: 1px; background: rgba(255,255,255,.08); margin: .5rem 0; }
+  .dg-logout { margin-top: auto; }
+  .dg-logout-btn { display: flex; align-items: center; gap: .75rem; min-height: 42px; padding: .5rem .75rem; border-radius: .75rem; color: #fca5a5; font-size: .82rem; font-weight: 700; width: 100%; cursor: pointer; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2); }
+
+  /* MAIN */
+  .dg-main { flex: 1; min-width: 0; min-height: 0; height: 100vh; display: flex; flex-direction: column; }
+
+  /* TOPBAR */
+  .dg-topbar { min-height: 72px; border-bottom: 1px solid #e2e8f0; background: rgba(255,255,255,.97); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 18px; position: sticky; top: 0; z-index: 40; }
+  .dg-topbar-left { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+  .dg-topbar-right { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
+  .dg-btn-icon { width: 44px; height: 44px; border: 1px solid #e2e8f0; border-radius: .75rem; background: #fff; display: grid; place-items: center; cursor: pointer; color: #475569; transition: background .15s; flex-shrink: 0; }
+  .dg-btn-icon:hover { background: #f8fafc; }
+  .dg-avatar { height: 44px; display: flex; align-items: center; gap: .75rem; border: 1px solid #e2e8f0; border-radius: .85rem; background: #fff; padding: .35rem .65rem .35rem .45rem; }
+  .dg-avatar-img { width: 36px; height: 36px; border-radius: 999px; background: linear-gradient(135deg, #2563eb, #4f46e5); display: grid; place-items: center; color: #fff; font-weight: 900; font-size: .8rem; }
+  .dg-filter { height: 44px; min-width: 150px; border: 1px solid #dbe3ef; border-radius: .7rem; background: #fff; padding: .4rem .75rem; display: flex; align-items: center; }
+  .dg-filter select { width: 100%; border: 0; outline: 0; background: transparent; color: #0f172a; font-size: .82rem; font-weight: 700; }
+  .dg-search { height: 44px; min-width: 240px; display: flex; align-items: center; gap: .5rem; border: 1px solid #dbe3ef; border-radius: .85rem; background: #fff; padding: 0 .9rem; }
+  .dg-search input { border: 0; outline: 0; background: transparent; width: 100%; font-size: .85rem; font-weight: 600; }
+
+  /* CONTENT */
+  .dg-scroll-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  .dg-content-wrap { width: 100%; padding: 20px 24px; }
+  .dg-section-block { margin-bottom: 20px; }
+  .dg-section-block:last-child { margin-bottom: 0; }
+  .dg-scope-bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: 20px; }
+  .dg-scope-chip { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: .4rem .75rem; font-size: .72rem; font-weight: 700; color: #475569; }
+
+  /* TABS NAV */
+  .dg-nav-tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .dg-nav-tab { padding: .45rem .9rem; border-radius: .6rem; border: 1px solid #e2e8f0; background: #fff; font-size: .75rem; font-weight: 800; color: #64748b; cursor: pointer; transition: all .15s; }
+  .dg-nav-tab:hover { background: #f1f5f9; }
+  .dg-nav-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+  /* PANELS */
+  .dg-panel { background: #fff; border: 1px solid #dfe7f3; border-radius: 16px; padding: 18px; box-shadow: 0 4px 16px rgba(15,23,42,.04); }
+  .dg-panel-title { font-size: .75rem; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; color: #64748b; margin-bottom: 14px; }
+  .dg-section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .dg-section-header-title { font-size: .9rem; font-weight: 900; color: #0f172a; }
+  .dg-section-header-sub { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
+
+  /* KPI GRID */
+  .dg-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; overflow: hidden; }
+  .dg-kpi-card { background: #fff; border: 1px solid #dfe7f3; border-radius: 16px; padding: 18px; min-height: 152px; position: relative; overflow: hidden; cursor: pointer; }
+  .dg-kpi-card:hover { box-shadow: 0 8px 24px rgba(15,23,42,.08); }
+  .dg-kpi-icon-wrap { position: absolute; right: 14px; top: 14px; width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; font-size: .95rem; }
+  .dg-kpi-label { font-size: .7rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+  .dg-kpi-value { font-size: 1.9rem; font-weight: 900; color: #0f172a; line-height: 1.1; margin-top: .4rem; }
+  .dg-kpi-detail { font-size: .65rem; font-weight: 700; color: #94a3b8; margin-top: .25rem; }
+  .dg-kpi-trend { position: absolute; bottom: 8px; right: 8px; left: 8px; height: 30px; opacity: .85; }
+
+  /* GRID LAYOUTS */
+  .dg-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dg-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .dg-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+  /* TABLE */
+  .dg-table-wrap { overflow-x: auto; max-width: 100%; }
+  .dg-table { width: min-content; min-width: 100%; border-collapse: collapse; }
+  .dg-table th { padding: 9px 11px; border-bottom: 1px solid #e7edf6; background: #fbfcff; color: #64748b; font-size: .62rem; font-weight: 950; text-transform: uppercase; text-align: left; white-space: nowrap; }
+  .dg-table td { padding: 11px 11px; border-bottom: 1px solid #f1f5f9; font-size: .78rem; white-space: nowrap; }
+  .dg-table tr:hover td { background: #f8fbff; }
+  .dg-table tr { cursor: pointer; }
+
+  /* BADGES */
+  .dg-badge-sm { font-size: .6rem; font-weight: 950; padding: .2rem .45rem; border-radius: 999px; white-space: nowrap; }
+  .dg-badge-green { background: #dcfce7; color: #16a34a; }
+  .dg-badge-red { background: #fee2e2; color: #ef4444; }
+  .dg-badge-amber { background: #fef3c7; color: #d97706; }
+  .dg-badge-blue { background: #dbeafe; color: #2563eb; }
+  .dg-badge-gray { background: #f1f5f9; color: #64748b; }
+
+  /* BARS */
+  .dg-bar-item { margin-bottom: 8px; }
+  .dg-bar-label { display: flex; justify-content: space-between; font-size: .68rem; font-weight: 700; color: #64748b; margin-bottom: 3px; }
+  .dg-bar-track { height: 6px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+  .dg-bar-fill { height: 100%; border-radius: 999px; }
+
+  /* PILLS */
+  .dg-pill-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dg-pill { border-radius: 10px; padding: 10px 12px; }
+  .dg-pill-label { font-size: .6rem; font-weight: 800; text-transform: uppercase; }
+  .dg-pill-value { font-size: 1.3rem; font-weight: 900; margin-top: 2px; }
+
+  /* RISK ROWS */
+  .dg-risk-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .dg-risk-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #f8fafc; border-radius: 8px; }
+  .dg-risk-label { font-size: .72rem; font-weight: 700; color: #475569; }
+  .dg-risk-val { font-size: .65rem; font-weight: 950; padding: .15rem .45rem; border-radius: 999px; }
+
+  /* ACTION CARDS */
+  .dg-action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dg-action-card { display: flex; align-items: center; justify-content: space-between; border: 1px solid #dce6f3; border-radius: .75rem; background: #fff; padding: 10px 14px; cursor: pointer; transition: all .15s; }
+  .dg-action-card:hover { border-color: #bfdbfe; background: #f8fbff; transform: translateY(-1px); }
+  .dg-action-label { font-size: .78rem; font-weight: 800; }
+  .dg-action-sub { font-size: .62rem; color: #94a3b8; font-weight: 600; margin-top: 1px; }
+  .dg-action-count { font-size: .68rem; font-weight: 950; padding: .2rem .5rem; border-radius: 999px; flex-shrink: 0; }
+
+  /* DONUT */
+  .dg-donut-row { display: flex; gap: 16px; align-items: center; }
+  .dg-donut-wrap { text-align: center; }
+  .dg-donut-val { font-size: 1rem; font-weight: 900; color: #0f172a; }
+  .dg-donut-lbl { font-size: .65rem; font-weight: 700; color: #64748b; }
+
+  /* SECTION CONTENT */
+  .dg-section-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #f1f5f9; }
+  .dg-section-hero-title { font-size: 1.2rem; font-weight: 900; color: #0f172a; }
+  .dg-section-hero-sub { font-size: .78rem; color: #64748b; margin-top: .2rem; }
+  .dg-section-actions { display: flex; gap: 8px; }
+
+  /* BUTTONS */
+  .dg-btn { display: inline-flex; align-items: center; gap: .4rem; min-height: 36px; border-radius: .6rem; padding: 0 .85rem; font-size: .75rem; font-weight: 800; cursor: pointer; transition: all .15s; border: 1px solid; white-space: nowrap; }
+  .dg-btn-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .dg-btn-primary:hover { background: #1d4ed8; }
+  .dg-btn-outline { background: #fff; border-color: #dbe3ef; color: #475569; }
+  .dg-btn-outline:hover { background: #f8fafc; border-color: #bfdbfe; }
+  .dg-btn-danger { background: #fff; border-color: #fecaca; color: #ef4444; }
+  .dg-btn-danger:hover { background: #fef2f2; }
+  .dg-btn-success { background: #fff; border-color: #bbf7d0; color: #16a34a; }
+  .dg-btn-success:hover { background: #f0fdf4; }
+  .dg-btn-warning { background: #fff; border-color: #fde68a; color: #d97706; }
+  .dg-btn-warning:hover { background: #fffbeb; }
+
+  /* FORMS */
+  .dg-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .dg-form-group { display: flex; flex-direction: column; gap: 4px; }
+  .dg-form-label { font-size: .7rem; font-weight: 800; color: #475569; }
+  .dg-form-input { height: 38px; border: 1px solid #dbe3ef; border-radius: .6rem; padding: 0 .75rem; font-size: .82rem; background: #fff; color: #0f172a; outline: none; transition: border-color .15s; }
+  .dg-form-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+  .dg-form-select { height: 38px; border: 1px solid #dbe3ef; border-radius: .6rem; padding: 0 .75rem; font-size: .82rem; background: #fff; color: #0f172a; outline: none; }
+
+  /* STAT ROW */
+  .dg-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .dg-stat-box { text-align: center; padding: 12px; border-radius: 10px; }
+  .dg-stat-val { font-size: 1.4rem; font-weight: 900; }
+  .dg-stat-lbl { font-size: .62rem; font-weight: 800; text-transform: uppercase; margin-top: 2px; }
+
+  /* EMPTY STATE */
+  .dg-empty { text-align: center; padding: 32px 16px; color: #94a3b8; }
+  .dg-empty-icon { font-size: 2rem; margin-bottom: 8px; opacity: .4; }
+  .dg-empty-text { font-size: .8rem; font-weight: 700; }
+
+  /* DIVIDER */
+  .dg-divider { height: 1px; background: #f1f5f9; margin: 16px 0; }
+
+  /* FOOTER */
+  .dg-footer { text-align: center; padding: 10px; color: #94a3b8; font-size: .68rem; font-weight: 600; }
+
+  /* RESPONSIVE */
+  @media (max-width: 1200px) { .dg-kpi-grid { grid-template-columns: repeat(2, 1fr); } .dg-row-3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 768px) { .dg-sidebar { display: none; } .dg-kpi-grid { grid-template-columns: 1fr 1fr; } .dg-row-2, .dg-row-3, .dg-row-4 { grid-template-columns: 1fr; } .dg-risk-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="dg-shell" x-data="{ section: 'overview' }">
+
+  <!-- ======================== SIDEBAR ======================== -->
+  <aside class="dg-sidebar">
+    <div class="dg-logo">
+      <div class="dg-logo-mark"><i class="fa-solid fa-user-doctor text-white"></i></div>
+      <div style="margin-left: .75rem;">
+        <div class="dg-logo-text">FELIX SANTE</div>
+        <div class="dg-logo-sub">Ecole de Santé FHB - Mali</div>
+      </div>
+    </div>
+    <div class="dg-sidebar-scroll">
+
+      <div class="dg-cluster-label">Pilotage</div>
+      <button type="button" :class="section === 'overview' ? 'dg-link active' : 'dg-link'" @click="section = 'overview'">
+        <i class="fa-solid fa-home w-4 text-center"></i><span>Vue globale</span>
+      </button>
+      <button type="button" :class="section === 'analytics' ? 'dg-link active' : 'dg-link'" @click="section = 'analytics'">
+        <i class="fa-solid fa-chart-line w-4 text-center"></i><span>Analytics</span>
+      </button>
+      <button type="button" :class="section === 'realtime' ? 'dg-link active' : 'dg-link'" @click="section = 'realtime'">
+        <i class="fa-solid fa-wave-square w-4 text-center"></i><span>Temps réel</span>
+        <span class="dg-badge dg-badge-blue">LIVE</span>
+      </button>
+
+      <div class="dg-sidebar-divider"></div>
+      <div class="dg-cluster-label">Opérations</div>
+      <button type="button" :class="section === 'alerts' ? 'dg-link active' : 'dg-link'" @click="section = 'alerts'">
+        <i class="fa-solid fa-triangle-exclamation w-4 text-center"></i><span>Alertes & Risques</span>
+        <span class="dg-badge dg-badge-red">12</span>
+      </button>
+      <button type="button" :class="section === 'workflows' ? 'dg-link active' : 'dg-link'" @click="section = 'workflows'">
+        <i class="fa-solid fa-arrows-rotate w-4 text-center"></i><span>Passages & Réins.</span>
+        <span class="dg-badge dg-badge-amber">7</span>
+      </button>
+      <button type="button" :class="section === 'schedule' ? 'dg-link active' : 'dg-link'" @click="section = 'schedule'">
+        <i class="fa-regular fa-calendar-days w-4 text-center"></i><span>Emploi du temps</span>
+      </button>
+
+      <div class="dg-sidebar-divider"></div>
+      <div class="dg-cluster-label">Ressources</div>
+      <button type="button" :class="section === 'annexes' ? 'dg-link active' : 'dg-link'" @click="section = 'annexes'">
+        <i class="fa-regular fa-building w-4 text-center"></i><span>Annexes</span>
+      </button>
+      <button type="button" :class="section === 'rh' ? 'dg-link active' : 'dg-link'" @click="section = 'rh'">
+        <i class="fa-solid fa-user-group w-4 text-center"></i><span>RH / Staff</span>
+      </button>
+
+      <div class="dg-sidebar-divider"></div>
+      <div class="dg-cluster-label">Finance</div>
+      <button type="button" :class="section === 'finance' ? 'dg-link active' : 'dg-link'" @click="section = 'finance'">
+        <i class="fa-solid fa-sack-dollar w-4 text-center"></i><span>Finance</span>
+      </button>
+
+      <div class="dg-sidebar-divider"></div>
+      <div class="dg-logout">
+        <button type="button" class="dg-logout-btn">
+          <i class="fa-solid fa-arrow-right-from-bracket w-4 text-center"></i><span>Déconnexion</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======================== MAIN ======================== -->
+  <main class="dg-main">
+    <header class="dg-topbar">
+      <div class="dg-topbar-left">
+        <button type="button" class="dg-btn-icon"><i class="fa-solid fa-bars-staggered"></i></button>
+        <div>
+          <div style="font-size: 1.1rem; font-weight: 900; color: #0f172a;">Dr. Boubacar Koné</div>
+          <div style="font-size: .72rem; font-weight: 600; color: #94a3b8;">Directeur Exécutif — Mai 2026</div>
+        </div>
+      </div>
+      <div class="dg-topbar-right">
+        <div class="dg-search">
+          <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
+          <input type="search" placeholder="Rechercher...">
+        </div>
+        <div class="dg-filter">
+          <select><option>Toutes les annexes</option><option>Bamako</option><option>Ségou</option><option>Mopti</option></select>
+        </div>
+        <div class="dg-filter">
+          <select><option>Ce mois</option><option>Cette semaine</option><option>Aujourd'hui</option></select>
+        </div>
+        <button type="button" class="dg-btn-icon" title="Actualiser"><i class="fa-solid fa-rotate-right"></i></button>
+        <button type="button" class="dg-btn-icon" style="position:relative;">
+          <i class="fa-regular fa-bell"></i>
+          <span style="position:absolute; top:-4px; right:-4px; width:18px; height:18px; background:#f43f5e; color:#fff; font-size:.55rem; font-weight:950; border-radius:999px; display:grid; place-items:center;">12</span>
+        </button>
+        <div class="dg-avatar">
+          <div>
+            <div style="font-size:.8rem; font-weight:900; color:#0f172a;">Dr. Boubacar Koné</div>
+            <div style="font-size:.62rem; font-weight:600; color:#94a3b8;">DG</div>
+          </div>
+          <div class="dg-avatar-img">BK</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dg-scroll-area">
+    <div class="dg-content-wrap">
+
+      <!-- SCOPE BAR -->
+      <div class="dg-scope-bar">
+        <span class="dg-scope-chip"><i class="fa-solid fa-globe" style="margin-right:4px;"></i>Toutes les annexes</span>
+        <span class="dg-scope-chip"><i class="fa-solid fa-building" style="margin-right:4px;"></i>6 annexes</span>
+        <span class="dg-scope-chip"><i class="fa-solid fa-users" style="margin-right:4px;"></i>1 847 étudiants</span>
+        <span class="dg-scope-chip"><i class="fa-solid fa-calendar" style="margin-right:4px;"></i>218 cours / semaine</span>
+      </div>
+
+      <!-- NAV TABS -->
+      <div class="dg-nav-tabs">
+        <template x-for="s in ['overview','alerts','workflows','schedule','annexes','finance','rh','analytics','realtime']" :key="s">
+          <button type="button" :class="section === s ? 'dg-nav-tab active' : 'dg-nav-tab'" @click="section = s" x-text="{
+            overview:'Vue globale',alerts:'Alertes',workflows:'Passages',schedule:'EDT',
+            annexes:'Annexes',finance:'Finance',rh:'RH',analytics:'Analytics',realtime:'Temps réel'
+          }[s]"></button>
+        </template>
+      </div>
+
+      <!-- ======================== SECTION: OVERVIEW ======================== -->
+      <template x-if="section === 'overview'">
+      <div>
+        <!-- KPIs -->
+        <div class="dg-kpi-grid">
+          <div class="dg-kpi-card" style="border-top: 3px solid #2563eb;">
+            <div class="dg-kpi-icon-wrap" style="background:#eff6ff; color:#2563eb;"><i class="fa-solid fa-users"></i></div>
+            <div class="dg-kpi-label" style="color:#2563eb;">Étudiants</div>
+            <div class="dg-kpi-value">1 847</div>
+            <div class="dg-kpi-detail">Inscrits 2026</div>
+          </div>
+          <div class="dg-kpi-card" style="border-top: 3px solid #16a34a;">
+            <div class="dg-kpi-icon-wrap" style="background:#f0fdf4; color:#16a34a;"><i class="fa-solid fa-sack-dollar"></i></div>
+            <div class="dg-kpi-label" style="color:#16a34a;">Revenus</div>
+            <div class="dg-kpi-value" style="color:#16a34a;">45.2M</div>
+            <div class="dg-kpi-detail">FCFA ce mois</div>
+          </div>
+          <div class="dg-kpi-card" style="border-top: 3px solid #ef4444;">
+            <div class="dg-kpi-icon-wrap" style="background:#fff1f2; color:#ef4444;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div class="dg-kpi-label" style="color:#ef4444;">Alertes</div>
+            <div class="dg-kpi-value" style="color:#ef4444;">12</div>
+            <div class="dg-kpi-detail">À traiter</div>
+          </div>
+          <div class="dg-kpi-card" style="border-top: 3px solid #7c3aed;">
+            <div class="dg-kpi-icon-wrap" style="background:#f5f3ff; color:#7c3aed;"><i class="fa-solid fa-building"></i></div>
+            <div class="dg-kpi-label" style="color:#7c3aed;">Annexes</div>
+            <div class="dg-kpi-value">6</div>
+            <div class="dg-kpi-detail">4 performantes</div>
+          </div>
+        </div>
+
+        <!-- Tendance + Admissions -->
+        <div class="dg-row-2" style="margin-bottom:16px;">
+          <div class="dg-panel">
+            <div class="dg-section-header">
+              <div>
+                <div class="dg-section-header-title">Tendances mensuelles</div>
+                <div class="dg-section-header-sub">Candidatures vs Revenus</div>
+              </div>
+              <div style="display:flex; gap:10px; font-size:.68rem; font-weight:800;">
+                <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:3px; background:#2563eb; border-radius:2px; display:inline-block;"></span>Candidatures</span>
+                <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:3px; background:#16a34a; border-radius:2px; display:inline-block;"></span>Revenus</span>
+              </div>
+            </div>
+            <div style="height:120px; background:#f8fafc; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:.78rem; font-weight:700;">
+              <i class="fa-solid fa-chart-bar" style="margin-right:8px; opacity:.5;"></i>Graphique barres — Candidatures & Revenus
+            </div>
+          </div>
+          <div class="dg-panel">
+            <div class="dg-panel-title">Admissions</div>
+            <div class="dg-bar-item">
+              <div class="dg-bar-label"><span>Acceptées</span><span>847 · 46%</span></div>
+              <div class="dg-bar-track"><div class="dg-bar-fill" style="width:46%; background:#16a34a;"></div></div>
+            </div>
+            <div class="dg-bar-item">
+              <div class="dg-bar-label"><span>En attente</span><span>312 · 17%</span></div>
+              <div class="dg-bar-track"><div class="dg-bar-fill" style="width:17%; background:#f59e0b;"></div></div>
+            </div>
+            <div class="dg-bar-item">
+              <div class="dg-bar-label"><span>Refusées</span><span>89 · 5%</span></div>
+              <div class="dg-bar-track"><div class="dg-bar-fill" style="width:5%; background:#ef4444;"></div></div>
+            </div>
+            <div class="dg-bar-item">
+              <div class="dg-bar-label"><span>Non finalisées</span><span>599 · 32%</span></div>
+              <div class="dg-bar-track"><div class="dg-bar-fill" style="width:32%; background:#94a3b8;"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Risks + Planning -->
+        <div class="dg-row-2" style="margin-bottom:16px;">
+          <div class="dg-panel">
+            <div class="dg-section-header">
+              <div class="dg-panel-title" style="margin:0;">Répartition des risques</div>
+              <button type="button" class="dg-btn dg-btn-outline" @click="section = 'alerts'"><i class="fa-solid fa-arrow-right"></i>Détail</button>
+            </div>
+            <div class="dg-risk-grid">
+              <div class="dg-risk-row"><span class="dg-risk-label">Absences rép.</span><span class="dg-risk-val" style="background:#fee2e2; color:#ef4444;">3</span></div>
+              <div class="dg-risk-row"><span class="dg-risk-label">Paiements retard</span><span class="dg-risk-val" style="background:#ffedd5; color:#ea580c;">7</span></div>
+              <div class="dg-risk-row"><span class="dg-risk-label">Sous-effectif</span><span class="dg-risk-val" style="background:#fef9c3; color:#ca8a04;">2</span></div>
+              <div class="dg-risk-row"><span class="dg-risk-label">Alertes santé</span><span class="dg-risk-val" style="background:#dbeafe; color:#1d4ed8;">0</span></div>
+            </div>
+          </div>
+          <div class="dg-panel">
+            <div class="dg-panel-title">Planning semaine</div>
+            <div class="dg-pill-grid">
+              <div class="dg-pill" style="background:#f8fafc;"><div class="dg-pill-label" style="color:#64748b;">Cours</div><div class="dg-pill-value">218</div></div>
+              <div class="dg-pill" style="background:#f8fafc;"><div class="dg-pill-label" style="color:#64748b;">Aujourd'hui</div><div class="dg-pill-value">34</div></div>
+              <div class="dg-pill" style="background:#fef3c7;"><div class="dg-pill-label" style="color:#b45309;">Cahiers manq.</div><div class="dg-pill-value" style="color:#b45309;">8</div></div>
+              <div class="dg-pill" style="background:#dbeafe;"><div class="dg-pill-label" style="color:#1d4ed8;">Appels validés</div><div class="dg-pill-value" style="color:#1d4ed8;">94%</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table + Actions + Finance -->
+        <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:16px;">
+          <div class="dg-panel">
+            <div class="dg-section-header">
+              <div class="dg-panel-title" style="margin:0;">Performance par annexe</div>
+              <button type="button" class="dg-btn dg-btn-outline" @click="section = 'annexes'"><i class="fa-solid fa-arrow-right"></i>Toutes</button>
+            </div>
+            <div class="dg-table-wrap">
+              <table class="dg-table">
+                <thead><tr><th>Annexe</th><th>Étuds</th><th>Solde</th><th>Alertes</th><th>Perf.</th></tr></thead>
+                <tbody>
+                  <tr><td style="font-weight:900;">Bamako Centre</td><td>642</td><td style="color:#16a34a; font-weight:900;">+12.4M</td><td>2</td><td><span class="dg-badge-sm dg-badge-green">Haute</span></td></tr>
+                  <tr><td style="font-weight:900;">Ségou</td><td>398</td><td style="color:#16a34a; font-weight:900;">+8.1M</td><td>1</td><td><span class="dg-badge-sm dg-badge-green">Haute</span></td></tr>
+                  <tr><td style="font-weight:900;">Mopti</td><td>289</td><td style="color:#ef4444; font-weight:900;">-1.2M</td><td>5</td><td><span class="dg-badge-sm dg-badge-red">Critique</span></td></tr>
+                  <tr><td style="font-weight:900;">Kayes</td><td>218</td><td style="color:#16a34a; font-weight:900;">+4.3M</td><td>0</td><td><span class="dg-badge-sm dg-badge-blue">Bonne</span></td></tr>
+                  <tr><td style="font-weight:900;">Timbuktu</td><td>113</td><td style="color:#ef4444; font-weight:900;">-890K</td><td>2</td><td><span class="dg-badge-sm dg-badge-amber">Moy.</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="dg-panel">
+            <div class="dg-panel-title">Actions rapides</div>
+            <div class="dg-action-grid">
+              <div class="dg-action-card"><div><div class="dg-action-label" style="color:#ef4444;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;"></i>Alertes</div><div class="dg-action-sub">À traiter</div></div><span class="dg-action-count" style="background:#fee2e2; color:#ef4444;">12</span></div>
+              <div class="dg-action-card"><div><div class="dg-action-label" style="color:#d97706;"><i class="fa-solid fa-arrows-rotate" style="margin-right:4px;"></i>Passages</div><div class="dg-action-sub">Bloqués</div></div><span class="dg-action-count" style="background:#fef3c7; color:#d97706;">7</span></div>
+              <div class="dg-action-card"><div><div class="dg-action-label" style="color:#2563eb;"><i class="fa-solid fa-user-plus" style="margin-right:4px;"></i>Recruter</div><div class="dg-action-sub">Nouveau staff</div></div><span style="width:22px; height:22px; background:#2563eb; color:#fff; border-radius:999px; display:grid; place-items:center; font-size:.6rem;"><i class="fa-solid fa-plus"></i></span></div>
+              <div class="dg-action-card"><div><div class="dg-action-label" style="color:#64748b;"><i class="fa-solid fa-file-export" style="margin-right:4px;"></i>Exporter</div><div class="dg-action-sub">Données</div></div><span style="width:22px; height:22px; background:#f1f5f9; color:#64748b; border-radius:999px; display:grid; place-items:center; font-size:.6rem;"><i class="fa-solid fa-download"></i></span></div>
+            </div>
+          </div>
+          <div class="dg-panel">
+            <div class="dg-panel-title">Situation financière</div>
+            <div class="dg-donut-row" style="margin-bottom:12px;">
+              <div class="dg-donut-wrap"><div style="width:64px; height:64px; border-radius:50%; background:#f0fdf4; border:8px solid #16a34a; margin:0 auto;"></div><div class="dg-donut-val">45.2M</div><div class="dg-donut-lbl">Revenus</div></div>
+              <div class="dg-donut-wrap"><div style="width:64px; height:64px; border-radius:50%; background:#fee2e2; border:8px solid #ef4444; margin:0 auto;"></div><div class="dg-donut-val">28.7M</div><div class="dg-donut-lbl">Dépenses</div></div>
+            </div>
+            <div style="text-align:center; padding:8px; background:#f0fdf4; border-radius:8px;">
+              <div style="font-size:.6rem; font-weight:900; color:#16a34a; text-transform:uppercase;">Solde positif</div>
+              <div style="font-size:1.1rem; font-weight:900; color:#16a34a;">+16.5M FCFA</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ======================== SECTION: ALERTES & RISQUES ======================== -->
+      <template x-if="section === 'alerts'">
+      <div>
+        <div class="dg-section-hero">
+          <div>
+            <div class="dg-section-hero-title"><i class="fa-solid fa-triangle-exclamation" style="color:#ef4444; margin-right:8px;"></i>Alertes & Risques</div>
+            <div class="dg-section-hero-sub">12 alertes ouvertes · Trier par gravité et annexe</div>
+          </div>
+          <div class="dg-section-actions">
+            <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-filter"></i>Filtrer</button>
+            <button type="button" class="dg-btn dg-btn-primary"><i class="fa-solid fa-bell"></i> Nouvelle alerte</button>
+          </div>
+        </div>
+
+        <!-- Stat -->
+        <div class="dg-stat-grid" style="margin-bottom:16px;">
+          <div class="dg-stat-box" style="background:#fee2e2;"><div class="dg-stat-val" style="color:#ef4444;">3</div><div class="dg-stat-lbl" style="color:#dc2626;">Critiques</div></div>
+          <div class="dg-stat-box" style="background:#fef3c7;"><div class="dg-stat-val" style="color:#d97706;">7</div><div class="dg-stat-lbl" style="color:#b45309;">Moyennes</div></div>
+          <div class="dg-stat-box" style="background:#f0fdf4;"><div class="dg-stat-val" style="color:#16a34a;">2</div><div class="dg-stat-lbl" style="color:#15803d;">Résolues ce mois</div></div>
+        </div>
+
+        <!-- Filters -->
+        <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+          <button type="button" class="dg-btn dg-btn-danger"><i class="fa-solid fa-filter"></i>Toutes (12)</button>
+          <button type="button" class="dg-btn dg-btn-outline">Absences (3)</button>
+          <button type="button" class="dg-btn dg-btn-outline">Paiements (7)</button>
+          <button type="button" class="dg-btn dg-btn-outline">Santé (2)</button>
+          <button type="button" class="dg-btn dg-btn-outline">Annexion <select style="border:0; background:transparent; font-size:.72rem; font-weight:800; margin-left:4px;"><option>Toutes</option><option>Bamako</option><option>Mopti</option></select></button>
+        </div>
+
+        <!-- Alert table -->
+        <div class="dg-panel">
+          <div class="dg-table-wrap">
+            <table class="dg-table">
+              <thead><tr><th>Date</th><th>Type</th><th>Étudiant</th><th>Annexe</th><th>Classe</th><th>Niveau</th><th>Actions</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>22/05</td><td><span class="dg-badge-sm dg-badge-red"><i class="fa-solid fa-user-slash" style="margin-right:3px;"></i>Absence répétée</span></td>
+                  <td style="font-weight:800;">Aïcha Koné</td><td>Bamako Centre</td><td>L1 Médecine</td><td><span class="dg-badge-sm dg-badge-red">Critique</span></td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-check"></i>Résoudre</button>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-share"></i>Escalader</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>21/05</td><td><span class="dg-badge-sm dg-badge-amber"><i class="fa-solid fa-credit-card" style="margin-right:3px;"></i>Paiement en retard</span></td>
+                  <td style="font-weight:800;">Moussa Traoré</td><td>Mopti</td><td>L2 Pharmacie</td><td><span class="dg-badge-sm dg-badge-amber">Moyen</span></td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-check"></i>Résoudre</button>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-phone"></i>Relancer</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>20/05</td><td><span class="dg-badge-sm dg-badge-amber"><i class="fa-solid fa-credit-card" style="margin-right:3px;"></i>Paiement en retard</span></td>
+                  <td style="font-weight:800;">Fatou Sidibé</td><td>Ségou</td><td>L1 Médecine</td><td><span class="dg-badge-sm dg-badge-amber">Moyen</span></td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-check"></i>Résoudre</button>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-phone"></i>Relancer</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>19/05</td><td><span class="dg-badge-sm dg-badge-blue"><i class="fa-solid fa-stethoscope" style="margin-right:3px;"></i>Alerte santé</span></td>
+                  <td style="font-weight:800;">Amadou Diallo</td><td>Kayes</td><td>L3 Médecine</td><td><span class="dg-badge-sm dg-badge-blue">Info</span></td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-check"></i>Marquer vu</button>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-user-md"></i>Suivi</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+            <span style="font-size:.72rem; color:#94a3b8; font-weight:700;">Affichage 1-4 sur 12 alertes</span>
+            <div style="display:flex; gap:4px;">
+              <button type="button" class="dg-btn dg-btn-outline" style="height:32px; padding:0 .6rem; font-size:.68rem;"><i class="fa-solid fa-chevron-left"></i></button>
+              <button type="button" class="dg-btn dg-btn-primary" style="height:32px; padding:0 .6rem; font-size:.68rem;">1</button>
+              <button type="button" class="dg-btn dg-btn-outline" style="height:32px; padding:0 .6rem; font-size:.68rem;">2</button>
+              <button type="button" class="dg-btn dg-btn-outline" style="height:32px; padding:0 .6rem; font-size:.68rem;">3</button>
+              <button type="button" class="dg-btn dg-btn-outline" style="height:32px; padding:0 .6rem; font-size:.68rem;"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ======================== SECTION: PASSAGES & REINSCRIPTIONS ======================== -->
+      <template x-if="section === 'workflows'">
+      <div>
+        <div class="dg-section-hero">
+          <div>
+            <div class="dg-section-hero-title"><i class="fa-solid fa-arrows-rotate" style="color:#d97706; margin-right:8px;"></i>Passages & Réinscriptions</div>
+            <div class="dg-section-hero-sub">Gestion des passages de classe et réinscriptions annuelles</div>
+          </div>
+          <div class="dg-section-actions">
+            <button type="button" class="dg-btn dg-btn-warning"><i class="fa-solid fa-play"></i> Lancer passage</button>
+            <button type="button" class="dg-btn dg-btn-primary"><i class="fa-solid fa-file-import"></i> Import CSV</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="dg-stat-grid" style="margin-bottom:16px;">
+          <div class="dg-stat-box" style="background:#f1f5f9;"><div class="dg-stat-val" style="color:#475569;">847</div><div class="dg-stat-lbl">Total étudiants</div></div>
+          <div class="dg-stat-box" style="background:#f0fdf4;"><div class="dg-stat-val" style="color:#16a34a;">623</div><div class="dg-stat-lbl">Passages validés</div></div>
+          <div class="dg-stat-box" style="background:#fef3c7;"><div class="dg-stat-val" style="color:#d97706;">217</div><div class="dg-stat-lbl">En attente</div></div>
+          <div class="dg-stat-box" style="background:#fee2e2;"><div class="dg-stat-val" style="color:#ef4444;">7</div><div class="dg-stat-lbl">Bloqués</div></div>
+        </div>
+
+        <!-- Status tabs -->
+        <div style="display:flex; gap:4px; margin-bottom:14px;">
+          <button type="button" class="dg-btn dg-btn-outline">Tous (847)</button>
+          <button type="button" class="dg-btn dg-btn-success"><i class="fa-solid fa-check-circle"></i> Validés (623)</button>
+          <button type="button" class="dg-btn dg-btn-warning"><i class="fa-solid fa-clock"></i> En attente (217)</button>
+          <button type="button" class="dg-btn dg-btn-danger"><i class="fa-solid fa-ban"></i> Bloqués (7)</button>
+        </div>
+
+        <!-- Workflow table -->
+        <div class="dg-panel">
+          <div class="dg-table-wrap">
+            <table class="dg-table">
+              <thead><tr><th>Étudiant</th><th>Annexe</th><th>Classe actuelle</th><th>→ Classe nächste</th><th>Statut</th><th>Actions</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td style="font-weight:800;">Aïcha Koné</td><td>Bamako</td><td>L1 Médecine</td><td><i class="fa-solid fa-arrow-right" style="margin-right:4px; color:#94a3b8;"></i>L2 Médecine</td>
+                  <td><span class="dg-badge-sm dg-badge-green">Validé</span></td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-eye"></i>Voir</button>
+                    <button type="button" class="dg-btn dg-btn-danger" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-ban"></i>Bloquer</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight:800;">Moussa Traoré</td><td>Mopti</td><td>L1 Pharmacie</td><td><i class="fa-solid fa-arrow-right" style="margin-right:4px; color:#94a3b8;"></i>L2 Pharmacie</td>
+                  <td><span class="dg-badge-sm dg-badge-amber">En attente</span></td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-check"></i>Valider</button>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-eye"></i>Voir</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight:800;">Fatou Sidibé</td><td>Ségou</td><td>L2 Médecine</td><td><i class="fa-solid fa-arrow-right" style="margin-right:4px; color:#94a3b8;"></i>—</td>
+                  <td><span class="dg-badge-sm dg-badge-red">Bloqué</span></td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-info-circle"></i>Motif</button>
+                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-check"></i>Débloquer</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ======================== SECTION: EMPLOI DU TEMPS ======================== -->
+      <template x-if="section === 'schedule'">
+      <div>
+        <div class="dg-section-hero">
+          <div>
+            <div class="dg-section-hero-title"><i class="fa-regular fa-calendar-days" style="color:#2563eb; margin-right:8px;"></i>Emploi du temps</div>
+            <div class="dg-section-hero-sub">218 cours programmés · Semaine du 19 au 25 mai 2026</div>
+          </div>
+          <div class="dg-section-actions">
+            <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-chevron-left"></i> Précédent</button>
+            <button type="button" class="dg-btn dg-btn-outline">Semaine en cours</button>
+            <button type="button" class="dg-btn dg-btn-outline">Suivant <i class="fa-solid fa-chevron-right"></i></button>
+            <button type="button" class="dg-btn dg-btn-primary"><i class="fa-solid fa-plus"></i> Créer cours</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="dg-stat-grid" style="margin-bottom:16px;">
+          <div class="dg-stat-box" style="background:#eff6ff;"><div class="dg-stat-val" style="color:#2563eb;">218</div><div class="dg-stat-lbl">Cours semaine</div></div>
+          <div class="dg-stat-box" style="background:#f0fdf4;"><div class="dg-stat-val" style="color:#16a34a;">34</div><div class="dg-stat-lbl">Aujourd'hui</div></div>
+          <div class="dg-stat-box" style="background:#fef3c7;"><div class="dg-stat-val" style="color:#d97706;">8</div><div class="dg-stat-lbl">Cahiers manquants</div></div>
+          <div class="dg-stat-box" style="background:#dbeafe;"><div class="dg-stat-val" style="color:#2563eb;">94%</div><div class="dg-stat-lbl">Appels validés</div></div>
+        </div>
+
+        <!-- Schedule table by day -->
+        <div class="dg-panel" style="margin-bottom:16px;">
+          <div class="dg-section-header">
+            <div class="dg-panel-title" style="margin:0;">Programme de la semaine — Bamako Centre</div>
+            <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-download"></i> Exporter</button>
+          </div>
+          <div class="dg-table-wrap">
+            <table class="dg-table">
+              <thead><tr><th>Jour</th><th>08h-10h</th><th>10h-12h</th><th>14h-16h</th><th>16h-18h</th></tr></thead>
+              <tbody>
+                <tr><td style="font-weight:900; background:#f8fafc;">Lundi</td>
+                  <td><div style="background:#dbeafe; border-radius:6px; padding:6px 8px;"><div style="font-size:.72rem; font-weight:800; color:#1d4ed8;">Anatomie L1</div><div style="font-size:.6rem; color:#64748b;">Dr. Coulibaly</div></div></td>
+                  <td><div style="background:#f0fdf4; border-radius:6px; padding:6px 8px;"><div style="font-size:.72rem; font-weight:800; color:#15803d;">Physiologie L2</div><div style="font-size:.6rem; color:#64748b;">Dr. Koné</div></div></td>
+                  <td><div style="background:#fef3c7; border-radius:6px; padding:6px 8px;"><div style="font-size:.72rem; font-weight:800; color:#b45309;">⚠ Cahier manquant</div></div></td>
+                  <td>—</td>
+                </tr>
+                <tr><td style="font-weight:900; background:#f8fafc;">Mardi</td>
+                  <td><div style="background:#dbeafe; border-radius:6px; padding:6px 8px;"><div style="font-size:.72rem; font-weight:800; color:#1d4ed8;">Biochimie L1</div><div style="font-size:.6rem; color:#64748b;">Dr. Ouattara</div></div></td>
+                  <td>—</td>
+                  <td><div style="background:#f0fdf4; border-radius:6px; padding:6px 8px;"><div style="font-size:.72rem; font-weight:800; color:#15803d;">Pharmacologie L3</div><div style="font-size:.6rem; color:#64748b;">Dr. Sangaré</div></div></td>
+                  <td>—</td>
+                </tr>
+                <tr><td style="font-weight:900; background:#f8fafc;">Mercredi</td>
+                  <td><div style="background:#dbeafe; border-radius:6px; padding:6px 8px;"><div style="font-size:.72rem; font-weight:800; color:#1d4ed8;">Anatomie L2</div><div style="font-size:.6rem; color:#64748b;">Dr. Coulibaly</div></div></td>
+                  <td><div style="background:#f0fdf4; border-radius:6px; padding:6px 8px;"><div style="font-size:.72rem; font-weight:800; color:#15803d;">Pathologie L3</div><div style="font-size:.6rem; color:#64748b;">Dr. Diallo</div></div></td>
+                  <td>—</td>
+                  <td>—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ======================== SECTION: ANNEXES ======================== -->
+      <template x-if="section === 'annexes'">
+      <div>
+        <div class="dg-section-hero">
+          <div>
+            <div class="dg-section-hero-title"><i class="fa-regular fa-building" style="color:#7c3aed; margin-right:8px;"></i>Annexes</div>
+            <div class="dg-section-hero-sub">Vue consolidée des 6 annexes · Sélectionnez pour détail</div>
+          </div>
+          <div class="dg-section-actions">
+            <button type="button" class="dg-btn dg-btn-primary"><i class="fa-solid fa-plus"></i> Nouvelle annexe</button>
+          </div>
+        </div>
+
+        <!-- Annex cards -->
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; margin-bottom:16px;">
+          <!-- Bamako -->
+          <div class="dg-panel" style="border-top: 3px solid #16a34a; cursor:pointer;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+              <div><div style="font-size:.9rem; font-weight:900;">Bamako Centre</div><div style="font-size:.65rem; color:#94a3b8; font-weight:600;">Code: BAM-001</div></div>
+              <span class="dg-badge-sm dg-badge-green">Active</span>
+            </div>
+            <div class="dg-stat-grid" style="margin-bottom:12px;">
+              <div class="dg-stat-box" style="background:#eff6ff;"><div class="dg-stat-val" style="color:#2563eb; font-size:1.1rem;">642</div><div class="dg-stat-lbl">Étuds</div></div>
+              <div class="dg-stat-box" style="background:#f0fdf4;"><div class="dg-stat-val" style="color:#16a34a; font-size:1.1rem;">+12.4M</div><div class="dg-stat-lbl">Solde</div></div>
+              <div class="dg-stat-box" style="background:#fee2e2;"><div class="dg-stat-val" style="color:#ef4444; font-size:1.1rem;">2</div><div class="dg-stat-lbl">Alertes</div></div>
+            </div>
+            <div style="font-size:.65rem; color:#64748b; font-weight:700;">Manager: Dr. Samaké</div>
+            <div style="display:flex; gap:6px; margin-top:10px;">
+              <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.68rem; height:32px; justify-content:center;"><i class="fa-solid fa-user"></i>Staff</button>
+              <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.68rem; height:32px; justify-content:center;"><i class="fa-solid fa-sack-dollar"></i>Finance</button>
+              <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.68rem; height:32px; justify-content:center;"><i class="fa-solid fa-eye"></i>Voir</button>
+            </div>
+          </div>
+          <!-- Mopti -->
+          <div class="dg-panel" style="border-top: 3px solid #ef4444; cursor:pointer;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+              <div><div style="font-size:.9rem; font-weight:900;">Mopti</div><div style="font-size:.65rem; color:#94a3b8; font-weight:600;">Code: MOT-001</div></div>
+              <span class="dg-badge-sm dg-badge-red">À risque</span>
+            </div>
+            <div class="dg-stat-grid" style="margin-bottom:12px;">
+              <div class="dg-stat-box" style="background:#eff6ff;"><div class="dg-stat-val" style="color:#2563eb; font-size:1.1rem;">289</div><div class="dg-stat-lbl">Étuds</div></div>
+              <div class="dg-stat-box" style="background:#fee2e2;"><div class="dg-stat-val" style="color:#ef4444; font-size:1.1rem;">-1.2M</div><div class="dg-stat-lbl">Solde</div></div>
+              <div class="dg-stat-box" style="background:#fee2e2;"><div class="dg-stat-val" style="color:#ef4444; font-size:1.1rem;">5</div><div class="dg-stat-lbl">Alertes</div></div>
+            </div>
+            <div style="font-size:.65rem; color:#64748b; font-weight:700;">Manager: — Non assigné</div>
+            <div style="display:flex; gap:6px; margin-top:10px;">
+              <button type="button" class="dg-btn dg-btn-danger" style="flex:1; font-size:.68rem; height:32px; justify-content:center;"><i class="fa-solid fa-exclamation"></i>Urgent</button>
+              <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.68rem; height:32px; justify-content:center;"><i class="fa-solid fa-user-plus"></i>Affecter</button>
+            </div>
+          </div>
+          <!-- Ségou -->
+          <div class="dg-panel" style="border-top: 3px solid #16a34a; cursor:pointer;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+              <div><div style="font-size:.9rem; font-weight:900;">Ségou</div><div style="font-size:.65rem; color:#94a3b8; font-weight:600;">Code: SEG-001</div></div>
+              <span class="dg-badge-sm dg-badge-green">Active</span>
+            </div>
+            <div class="dg-stat-grid" style="margin-bottom:12px;">
+              <div class="dg-stat-box" style="background:#eff6ff;"><div class="dg-stat-val" style="color:#2563eb; font-size:1.1rem;">398</div><div class="dg-stat-lbl">Étuds</div></div>
+              <div class="dg-stat-box" style="background:#f0fdf4;"><div class="dg-stat-val" style="color:#16a34a; font-size:1.1rem;">+8.1M</div><div class="dg-stat-lbl">Solde</div></div>
+              <div class="dg-stat-box" style="background:#f1f5f9;"><div class="dg-stat-val" style="color:#64748b; font-size:1.1rem;">1</div><div class="dg-stat-lbl">Alertes</div></div>
+            </div>
+            <div style="font-size:.65rem; color:#64748b; font-weight:700;">Manager: Dr. Fané</div>
+            <div style="display:flex; gap:6px; margin-top:10px;">
+              <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.68rem; height:32px; justify-content:center;"><i class="fa-solid fa-user"></i>Staff</button>
+              <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.68rem; height:32px; justify-content:center;"><i class="fa-solid fa-eye"></i>Voir</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ======================== SECTION: FINANCE ======================== -->
+      <template x-if="section === 'finance'">
+      <div>
+        <div class="dg-section-hero">
+          <div>
+            <div class="dg-section-hero-title"><i class="fa-solid fa-sack-dollar" style="color:#16a34a; margin-right:8px;"></i>Finance consolidée</div>
+            <div class="dg-section-hero-sub">Vue financière globale · Mai 2026</div>
+          </div>
+          <div class="dg-section-actions">
+            <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-download"></i> Exporter</button>
+            <button type="button" class="dg-btn dg-btn-primary"><i class="fa-solid fa-file-export"></i> Rapport mensuel</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="dg-row-4" style="margin-bottom:16px;">
+          <div class="dg-kpi-card" style="border-top:3px solid #16a34a; min-height:auto; padding:14px;">
+            <div style="font-size:.65rem; font-weight:900; color:#16a34a; text-transform:uppercase;">Revenus</div>
+            <div style="font-size:1.5rem; font-weight:900; color:#16a34a; margin-top:4px;">45.2M</div>
+            <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">FCFA ce mois</div>
+          </div>
+          <div class="dg-kpi-card" style="border-top:3px solid #ef4444; min-height:auto; padding:14px;">
+            <div style="font-size:.65rem; font-weight:900; color:#ef4444; text-transform:uppercase;">Dépenses</div>
+            <div style="font-size:1.5rem; font-weight:900; color:#ef4444; margin-top:4px;">28.7M</div>
+            <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">FCFA ce mois</div>
+          </div>
+          <div class="dg-kpi-card" style="border-top:3px solid #7c3aed; min-height:auto; padding:14px;">
+            <div style="font-size:.65rem; font-weight:900; color:#7c3aed; text-transform:uppercase;">Solde</div>
+            <div style="font-size:1.5rem; font-weight:900; color:#16a34a; margin-top:4px;">+16.5M</div>
+            <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">Bénéfice net</div>
+          </div>
+          <div class="dg-kpi-card" style="border-top:3px solid #f59e0b; min-height:auto; padding:14px;">
+            <div style="font-size:.65rem; font-weight:900; color:#f59e0b; text-transform:uppercase;">Encaissements</div>
+            <div style="font-size:1.5rem; font-weight:900; color:#0f172a; margin-top:4px;">312</div>
+            <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">Paiements validés</div>
+          </div>
+        </div>
+
+        <!-- Table + Breakdown -->
+        <div class="dg-row-2">
+          <div class="dg-panel">
+            <div class="dg-section-header">
+              <div class="dg-panel-title" style="margin:0;">Dernières transactions</div>
+              <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px;"><i class="fa-solid fa-plus"></i>Nouvelle</button>
+            </div>
+            <div class="dg-table-wrap">
+              <table class="dg-table">
+                <thead><tr><th>Date</th><th>Référence</th><th>Étudiant</th><th>Annexe</th><th>Montant</th><th>Action</th></tr></thead>
+                <tbody>
+                  <tr><td>25/05</td><td style="font-family:monospace; font-size:.72rem;">PAY-2026-1847</td><td style="font-weight:800;">Aïcha Koné</td><td>Bamako</td><td style="color:#16a34a; font-weight:900;">+250 000 F</td><td><button type="button" class="dg-btn dg-btn-outline" style="font-size:.62rem; height:26px; padding:0 .4rem;"><i class="fa-solid fa-eye"></i></button></td></tr>
+                  <tr><td>24/05</td><td style="font-family:monospace; font-size:.72rem;">PAY-2026-1846</td><td style="font-weight:800;">Moussa Traoré</td><td>Mopti</td><td style="color:#16a34a; font-weight:900;">+180 000 F</td><td><button type="button" class="dg-btn dg-btn-outline" style="font-size:.62rem; height:26px; padding:0 .4rem;"><i class="fa-solid fa-eye"></i></button></td></tr>
+                  <tr><td>24/05</td><td style="font-family:monospace; font-size:.72rem;">DEP-2026-089</td><td style="font-weight:800;">Salaires mai</td><td>Tous</td><td style="color:#ef4444; font-weight:900;">-3 200 000 F</td><td><button type="button" class="dg-btn dg-btn-outline" style="font-size:.62rem; height:26px; padding:0 .4rem;"><i class="fa-solid fa-eye"></i></button></td></tr>
+                  <tr><td>23/05</td><td style="font-family:monospace; font-size:.72rem;">PAY-2026-1845</td><td style="font-weight:800;">Fatou Sidibé</td><td>Ségou</td><td style="color:#16a34a; font-weight:900;">+250 000 F</td><td><button type="button" class="dg-btn dg-btn-outline" style="font-size:.62rem; height:26px; padding:0 .4rem;"><i class="fa-solid fa-eye"></i></button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="dg-panel">
+            <div class="dg-panel-title">Répartition des dépenses</div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Salaires</span><span>11.2M · 39%</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:39%; background:#ef4444;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Fournitures</span><span>5.7M · 20%</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:20%; background:#f59e0b;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Équipement</span><span>4.3M · 15%</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:15%; background:#2563eb;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Locaux</span><span>3.8M · 13%</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:13%; background:#7c3aed;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Autres</span><span>3.7M · 13%</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:13%; background:#94a3b8;"></div></div></div>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ======================== SECTION: RH / STAFF ======================== -->
+      <template x-if="section === 'rh'">
+      <div>
+        <div class="dg-section-hero">
+          <div>
+            <div class="dg-section-hero-title"><i class="fa-solid fa-user-group" style="color:#7c3aed; margin-right:8px;"></i>RH / Staff</div>
+            <div class="dg-section-hero-sub">Gestion des ressources humaines · 42 staff actifs</div>
+          </div>
+          <div class="dg-section-actions">
+            <button type="button" class="dg-btn dg-btn-primary"><i class="fa-solid fa-user-plus"></i> Recruter</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="dg-stat-grid" style="margin-bottom:16px;">
+          <div class="dg-stat-box" style="background:#f5f3ff;"><div class="dg-stat-val" style="color:#7c3aed;">42</div><div class="dg-stat-lbl">Staff total</div></div>
+          <div class="dg-stat-box" style="background:#eff6ff;"><div class="dg-stat-val" style="color:#2563eb;">28</div><div class="dg-stat-lbl">Enseignants</div></div>
+          <div class="dg-stat-box" style="background:#f0fdf4;"><div class="dg-stat-val" style="color:#16a34a;">6</div><div class="dg-stat-lbl">Managers assignés</div></div>
+          <div class="dg-stat-box" style="background:#fef3c7;"><div class="dg-stat-val" style="color:#d97706;">0</div><div class="dg-stat-lbl">Sans affectation</div></div>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+          <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-filter"></i>Tous (42)</button>
+          <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-user-graduate"></i>Enseignants (28)</button>
+          <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-user-tie"></i>Managers (6)</button>
+          <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-user-xmark"></i>Contrats à réviser (3)</button>
+        </div>
+
+        <div class="dg-panel">
+          <div class="dg-table-wrap">
+            <table class="dg-table">
+              <thead><tr><th>Nom</th><th>Poste</th><th>Annexe</th><th>Contrat</th><th>Salaire</th><th>Actions</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td style="font-weight:800;">Dr. Amadou Coulibaly</td>
+                  <td><span class="dg-badge-sm dg-badge-blue">Enseignant</span></td>
+                  <td>Bamako Centre</td>
+                  <td><span class="dg-badge-sm dg-badge-green">CDI</span></td>
+                  <td style="font-weight:800;">850 000 F</td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-eye"></i>Fiche</button>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-calendar"></i>Affecter</button>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-file-lines"></i>Contrat</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight:800;">Dr. Fatou Ouattara</td>
+                  <td><span class="dg-badge-sm dg-badge-blue">Enseignante</span></td>
+                  <td>Ségou</td>
+                  <td><span class="dg-badge-sm dg-badge-amber">CDD</span></td>
+                  <td style="font-weight:800;">650 000 F</td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-eye"></i>Fiche</button>
+                    <button type="button" class="dg-btn dg-btn-warning" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-file-contract"></i>Renouveler</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-weight:800;">M. Boubacar Samaké</td>
+                  <td><span class="dg-badge-sm dg-badge-blue">Manager</span></td>
+                  <td>Bamako Centre</td>
+                  <td><span class="dg-badge-sm dg-badge-green">CDI</span></td>
+                  <td style="font-weight:800;">1 200 000 F</td>
+                  <td>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-eye"></i>Fiche</button>
+                    <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px; padding:0 .6rem;"><i class="fa-solid fa-file-lines"></i>Contrat</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ======================== SECTION: ANALYTICS ======================== -->
+      <template x-if="section === 'analytics'">
+      <div>
+        <div class="dg-section-hero">
+          <div>
+            <div class="dg-section-hero-title"><i class="fa-solid fa-chart-line" style="color:#2563eb; margin-right:8px;"></i>Analytics</div>
+            <div class="dg-section-hero-sub">Indicateurs de performance et tendances</div>
+          </div>
+          <div class="dg-section-actions">
+            <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-download"></i> Exporter</button>
+            <select class="dg-filter" style="height:36px; font-size:.75rem;"><option>6 derniers mois</option><option>12 mois</option><option>Cette année</option></select>
+          </div>
+        </div>
+
+        <div class="dg-row-2" style="margin-bottom:16px;">
+          <div class="dg-panel">
+            <div class="dg-panel-title">Inscriptions mensuelles</div>
+            <div style="height:140px; background:#f8fafc; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:.78rem; font-weight:700; margin-bottom:12px;">
+              <i class="fa-solid fa-chart-bar" style="margin-right:8px; opacity:.5;"></i>Histogramme inscriptions
+            </div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Jan-Juin 2026</span><span>+24% vs 2025</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:100%; background:#2563eb;"></div></div></div>
+          </div>
+          <div class="dg-panel">
+            <div class="dg-panel-title">Taux de conversion admissions</div>
+            <div style="height:140px; background:#f8fafc; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:.78rem; font-weight:700; margin-bottom:12px;">
+              <i class="fa-solid fa-chart-pie" style="margin-right:8px; opacity:.5;"></i>Camembert conversion
+            </div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Taux acceptation</span><span>46%</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:46%; background:#16a34a;"></div></div></div>
+          </div>
+        </div>
+
+        <div class="dg-row-2">
+          <div class="dg-panel">
+            <div class="dg-panel-title">Revenus par annexe</div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Bamako</span><span style="color:#16a34a; font-weight:900;">+12.4M</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:100%; background:#16a34a;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Ségou</span><span style="color:#16a34a; font-weight:900;">+8.1M</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:65%; background:#16a34a;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Kayes</span><span style="color:#16a34a; font-weight:900;">+4.3M</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:35%; background:#16a34a;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Sikasso</span><span style="color:#16a34a; font-weight:900;">+2.8M</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:23%; background:#16a34a;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Timbuktu</span><span style="color:#ef4444; font-weight:900;">-890K</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:7%; background:#ef4444;"></div></div></div>
+            <div class="dg-bar-item"><div class="dg-bar-label"><span>Mopti</span><span style="color:#ef4444; font-weight:900;">-1.2M</span></div><div class="dg-bar-track"><div class="dg-bar-fill" style="width:10%; background:#ef4444;"></div></div></div>
+          </div>
+          <div class="dg-panel">
+            <div class="dg-panel-title">Indicateurs clés</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+              <div style="text-align:center; padding:12px; background:#eff6ff; border-radius:8px;"><div style="font-size:1.4rem; font-weight:900; color:#2563eb;">72%</div><div style="font-size:.6rem; font-weight:800; color:#475569;">Taux réussite</div></div>
+              <div style="text-align:center; padding:12px; background:#f0fdf4; border-radius:8px;"><div style="font-size:1.4rem; font-weight:900; color:#16a34a;">+18%</div><div style="font-size:.6rem; font-weight:800; color:#475569;">Croissance étuds</div></div>
+              <div style="text-align:center; padding:12px; background:#f5f3ff; border-radius:8px;"><div style="font-size:1.4rem; font-weight:900; color:#7c3aed;">89%</div><div style="font-size:.6rem; font-weight:800; color:#475569;">Taux rétention</div></div>
+              <div style="text-align:center; padding:12px; background:#fef3c7; border-radius:8px;"><div style="font-size:1.4rem; font-weight:900; color:#d97706;">3.2</div><div style="font-size:.6rem; font-weight:800; color:#475567;">Ratio étuds/classe</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ======================== SECTION: TEMPS RÉEL ======================== -->
+      <template x-if="section === 'realtime'">
+      <div>
+        <div class="dg-section-hero">
+          <div>
+            <div class="dg-section-hero-title"><i class="fa-solid fa-wave-square" style="color:#16a34a; margin-right:8px;"></i>Temps réel <span style="font-size:.65rem; font-weight:900; background:#16a34a; color:#fff; padding:.1rem .4rem; border-radius:999px; margin-left:6px;">LIVE</span></div>
+            <div class="dg-section-hero-sub">Activité en cours · Mise à jour automatique</div>
+          </div>
+          <div class="dg-section-actions">
+            <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-pause"></i> Pause</button>
+            <button type="button" class="dg-btn dg-btn-outline"><i class="fa-solid fa-rotate-right"></i> Rafraîchir</button>
+          </div>
+        </div>
+
+        <!-- Live stats -->
+        <div class="dg-row-4" style="margin-bottom:16px;">
+          <div class="dg-kpi-card" style="border-top:3px solid #16a34a; min-height:auto; padding:14px;">
+            <div style="font-size:.65rem; font-weight:900; color:#16a34a;">Nouvelles inscriptions</div>
+            <div style="font-size:1.8rem; font-weight:900; color:#0f172a; margin-top:4px;">+3</div>
+            <div style="font-size:.62rem; color:#94a3b8;">Aujourd'hui</div>
+            <div style="margin-top:4px; display:flex; align-items:center; gap:4px;">
+              <span style="width:8px; height:8px; border-radius:50%; background:#16a34a; display:inline-block; animation:pulse 1.5s infinite;"></span>
+              <span style="font-size:.6rem; color:#16a34a; font-weight:800;">+1 il y a 12min</span>
+            </div>
+          </div>
+          <div class="dg-kpi-card" style="border-top:3px solid #2563eb; min-height:auto; padding:14px;">
+            <div style="font-size:.65rem; font-weight:900; color:#2563eb;">Paiements</div>
+            <div style="font-size:1.8rem; font-weight:900; color:#0f172a; margin-top:4px;">+5</div>
+            <div style="font-size:.62rem; color:#94a3b8;">Aujourd'hui</div>
+            <div style="margin-top:4px; display:flex; align-items:center; gap:4px;">
+              <span style="width:8px; height:8px; border-radius:50%; background:#2563eb; display:inline-block; animation:pulse 1.5s infinite;"></span>
+              <span style="font-size:.6rem; color:#2563eb; font-weight:800;">+2 il y a 8min</span>
+            </div>
+          </div>
+          <div class="dg-kpi-card" style="border-top:3px solid #7c3aed; min-height:auto; padding:14px;">
+            <div style="font-size:.65rem; font-weight:900; color:#7c3aed;">Cours en cours</div>
+            <div style="font-size:1.8rem; font-weight:900; color:#0f172a; margin-top:4px;">34</div>
+            <div style="font-size:.62rem; color:#94a3b8;">Maintenant</div>
+          </div>
+          <div class="dg-kpi-card" style="border-top:3px solid #f59e0b; min-height:auto; padding:14px;">
+            <div style="font-size:.65rem; font-weight:900; color:#f59e0b;">Alertes nouvelles</div>
+            <div style="font-size:1.8rem; font-weight:900; color:#0f172a; margin-top:4px;">+2</div>
+            <div style="font-size:.62rem; color:#94a3b8;">Aujourd'hui</div>
+          </div>
+        </div>
+
+        <!-- Live feed -->
+        <div class="dg-panel">
+          <div class="dg-section-header">
+            <div class="dg-panel-title" style="margin:0;">Fil d'activité</div>
+            <span style="font-size:.68rem; color:#94a3b8; font-weight:700;"><i class="fa-solid fa-circle" style="color:#16a34a; font-size:.5rem; margin-right:4px; animation:pulse 1.5s infinite;"></i>Connexion active</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:flex-start; gap:10px; padding:10px; background:#f0fdf4; border-radius:8px; border-left:3px solid #16a34a;">
+              <i class="fa-solid fa-credit-card" style="color:#16a34a; margin-top:2px;"></i>
+              <div><div style="font-size:.78rem; font-weight:800;">Paiement reçu — 250 000 FCFA</div><div style="font-size:.62rem; color:#94a3b8; font-weight:600;">Aïcha Koné · Bamako · il y a 2 min</div></div>
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:10px; padding:10px; background:#eff6ff; border-radius:8px; border-left:3px solid #2563eb;">
+              <i class="fa-solid fa-user-plus" style="color:#2563eb; margin-top:2px;"></i>
+              <div><div style="font-size:.78rem; font-weight:800;">Nouvelle inscription</div><div style="font-size:.62rem; color:#94a3b8; font-weight:600;">Moussa Sangaré · Ségou · il y a 12 min</div></div>
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:10px; padding:10px; background:#fef3c7; border-radius:8px; border-left:3px solid #f59e0b;">
+              <i class="fa-solid fa-triangle-exclamation" style="color:#d97706; margin-top:2px;"></i>
+              <div><div style="font-size:.78rem; font-weight:800;">Alerte paiement — Mopti</div><div style="font-size:.62rem; color:#94a3b8; font-weight:600;">Solde négatif depuis 5 jours · il y a 25 min</div></div>
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:10px; padding:10px; background:#eff6ff; border-radius:8px; border-left:3px solid #2563eb;">
+              <i class="fa-solid fa-user-plus" style="color:#2563eb; margin-top:2px;"></i>
+              <div><div style="font-size:.78rem; font-weight:800;">Nouvelle inscription</div><div style="font-size:.62rem; color:#94a3b8; font-weight:600;">Fatou Diallo · Kayes · il y a 38 min</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- FOOTER -->
+      <div class="dg-footer">
+        Dashboard DG · ESFE Mali · Mis à jour 25/05/2026 à 16:02 ·
+        <button type="button" style="background:none; border:none; color:#2563eb; cursor:pointer; font-weight:800; font-size:.68rem;"><i class="fa-solid fa-rotate-right" style="margin-right:4px;"></i>Actualiser</button>
+      </div>
+
+    </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

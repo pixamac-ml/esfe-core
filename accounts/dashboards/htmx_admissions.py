@@ -12,6 +12,7 @@ from functools import wraps
 
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.views.decorators.http import require_POST, require_GET
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -122,8 +123,11 @@ def approve_candidature_htmx(request, candidature_id):
             "candidatureApproved": {
                 "id": candidature.id
             },
+            "openInscriptionPositioning": {
+                "url": reverse("accounts:inscription_positioning_modal_htmx", args=[candidature.id])
+            },
             "showToast": {
-                "message": f"Candidature {candidature.reference} approuvée",
+                "message": f"Candidature {candidature.reference} approuvee. Positionnement academique requis.",
                 "type": "success"
             }
         })

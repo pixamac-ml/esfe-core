@@ -1,44 +1,152 @@
 {% load humanize %}
 <div class="dg-card dg-card-pad">
-  <div class="dg-section-head">
+  <div class="dg-section-hero">
     <div>
-      <h3 class="dg-title">Finance consolidee</h3>
+      <div class="dg-section-hero-title">
+        <i class="fa-solid fa-sack-dollar" style="color:#16a34a; margin-right:8px;"></i>Finance consolidee
+      </div>
+      <div class="dg-section-hero-sub">Vue financiere globale · {{ dashboard_period_label|default:"Ce mois" }}</div>
     </div>
-    <div class="flex gap-2">
-      <button type="button" class="dg-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance')" title="Detail"><i class="fa-regular fa-eye"></i></button>
+    <div class="dg-section-actions">
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance')">
+        <i class="fa-solid fa-download"></i>Exporter
+      </button>
+      <button type="button" class="dg-btn dg-btn-primary">
+        <i class="fa-solid fa-file-export"></i>Rapport mensuel
+      </button>
     </div>
   </div>
-  <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-    <div class="h-[220px]">
-      <canvas id="dgFinanceChart"></canvas>
+
+  <div class="dg-context-bar">
+    <div>
+      <div class="dg-context-label">Perimetre financier</div>
+      <div class="dg-context-hint">La lecture suit l'annexe et la periode choisies dans le bandeau DG.</div>
     </div>
-    <div class="space-y-3">
-      <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-        <p class="text-xs font-bold text-emerald-700">Revenus valides</p>
-        <p class="mt-1 text-lg font-black text-slate-900">{{ finance.revenue|intcomma }} FCFA</p>
-      </div>
-      <div class="rounded-xl border border-rose-100 bg-rose-50 p-3">
-        <p class="text-xs font-bold text-rose-700">Depenses suivies</p>
-        <p class="mt-1 text-lg font-black text-slate-900">{{ finance.expenses|intcomma }} FCFA</p>
-      </div>
-      <div class="rounded-xl border border-blue-100 bg-blue-50 p-3">
-        <p class="text-xs font-bold text-blue-700">Solde estime</p>
-        <p class="mt-1 text-lg font-black {% if finance.balance < 0 %}text-rose-700{% else %}text-slate-900{% endif %}">{{ finance.balance|intcomma }} FCFA</p>
-      </div>
+    <div class="dg-context-main">
+      <span class="dg-scope-chip">{{ dashboard_scope_label|default:"Toutes les annexes" }}</span>
+      <span class="dg-scope-chip">{{ dashboard_period_label|default:"Ce mois" }}</span>
+      <span class="dg-scope-chip">{{ finance.validated_payments|default:0|intcomma }} paiements valides</span>
     </div>
   </div>
-  <div class="mt-4 grid grid-cols-2 gap-3">
-    <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-      <p class="text-xs font-bold text-slate-500">Paiements valides</p>
-      <p class="mt-1 text-xl font-black text-slate-900">{{ finance.validated_payments|intcomma }}</p>
+
+  <!-- Stats row -->
+  <div class="dg-row-4" style="margin-bottom:16px;">
+    <div class="dg-kpi-card" style="border-top:3px solid #16a34a; min-height:auto; padding:14px;">
+      <div style="font-size:.65rem; font-weight:900; color:#16a34a; text-transform:uppercase;">Revenus</div>
+      <div style="font-size:1.5rem; font-weight:900; color:#16a34a; margin-top:4px;">{{ finance.revenue|intcomma }}</div>
+      <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">FCFA ce mois</div>
     </div>
-    <div class="rounded-xl border border-amber-100 bg-amber-50 p-3">
-      <p class="text-xs font-bold text-amber-700">Paiements en attente</p>
-      <p class="mt-1 text-xl font-black text-amber-800">{{ finance.pending_payments|intcomma }}</p>
+    <div class="dg-kpi-card" style="border-top:3px solid #ef4444; min-height:auto; padding:14px;">
+      <div style="font-size:.65rem; font-weight:900; color:#ef4444; text-transform:uppercase;">Depenses</div>
+      <div style="font-size:1.5rem; font-weight:900; color:#ef4444; margin-top:4px;">{{ finance.expenses|intcomma }}</div>
+      <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">FCFA ce mois</div>
     </div>
-    <div class="rounded-xl border border-slate-100 bg-white p-3">
-      <p class="text-xs font-bold text-slate-500">Paiements annules</p>
-      <p class="mt-1 text-xl font-black text-slate-900">{{ finance.cancelled_payments|intcomma }}</p>
+    <div class="dg-kpi-card" style="border-top:3px solid #7c3aed; min-height:auto; padding:14px;">
+      <div style="font-size:.65rem; font-weight:900; color:{% if finance.balance >= 0 %}#16a34a{% else %}#ef4444{% endif %}; text-transform:uppercase;">Solde</div>
+      <div style="font-size:1.5rem; font-weight:900; color:{% if finance.balance >= 0 %}#16a34a{% else %}#ef4444{% endif %}; margin-top:4px;">{% if finance.balance >= 0 %}+{% endif %}{{ finance.balance|intcomma }}</div>
+      <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">{% if finance.balance >= 0 %}Benefice net{% else %}Deficit{% endif %}</div>
+    </div>
+    <div class="dg-kpi-card" style="border-top:3px solid #f59e0b; min-height:auto; padding:14px;">
+      <div style="font-size:.65rem; font-weight:900; color:#f59e0b; text-transform:uppercase;">Encaissements</div>
+      <div style="font-size:1.5rem; font-weight:900; color:#0f172a; margin-top:4px;">{{ finance.validated_payments|intcomma }}</div>
+      <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">Paiements valides</div>
+    </div>
+  </div>
+
+  <!-- Transactions table + breakdown -->
+  <div class="dg-row-2">
+    <div class="dg-panel">
+      <div class="dg-section-header">
+        <div class="dg-panel-title" style="margin:0;">Dernieres transactions</div>
+        <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px;">
+          <i class="fa-solid fa-plus"></i>Nouvelle
+        </button>
+      </div>
+      <div class="dg-table-wrap">
+        <table class="dg-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Reference</th>
+              <th>Etudiant</th>
+              <th>Annexe</th>
+              <th>Montant</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payment in finance.latest_payments|default:empty_list %}
+            <tr>
+              <td class="text-xs font-semibold text-slate-500">{{ payment.paid_at|date:"d/m" }}</td>
+              <td style="font-family:monospace; font-size:.68rem; color:#64748b;">PAY-{{ payment.id|default:0 }}</td>
+              <td class="font-black">
+                {% with candidature=payment.inscription.candidature %}
+                  {% if candidature.first_name or candidature.last_name %}
+                    {{ candidature.first_name }} {{ candidature.last_name }}
+                  {% else %}
+                    —
+                  {% endif %}
+                {% endwith %}
+              </td>
+              <td>{{ payment.inscription.candidature.branch.name|default:"—" }}</td>
+              <td style="color:#16a34a; font-weight:900;">+{{ payment.amount|intcomma }} F</td>
+              <td>
+                <button type="button" class="dg-btn dg-btn-outline" style="font-size:.6rem; height:26px; padding:0 .4rem;"
+                  onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=payment&id={{ payment.id }}')">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" style="text-align:center; padding:24px 16px;">
+                <div style="color:#94a3b8; font-size:.78rem; font-weight:700;">Aucun paiement recent</div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="dg-panel">
+      <div class="dg-panel-title">Repartition des depenses</div>
+      <div style="height:220px; background:#f8fafc; border-radius:8px; padding:12px; margin-bottom:14px;">
+        <canvas id="dgFinanceChart"></canvas>
+      </div>
+      {% with total=finance.expenses|default:1 %}
+      <div class="dg-bar-item">
+        <div class="dg-bar-label"><span>Salaires</span><span>{{ finance.expenses|intcomma }} · —</span></div>
+        <div class="dg-bar-track"><div class="dg-bar-fill" style="width:39%; background:#ef4444;"></div></div>
+      </div>
+      <div class="dg-bar-item">
+        <div class="dg-bar-label"><span>Fournitures</span><span>— · 20%</span></div>
+        <div class="dg-bar-track"><div class="dg-bar-fill" style="width:20%; background:#f59e0b;"></div></div>
+      </div>
+      <div class="dg-bar-item">
+        <div class="dg-bar-label"><span>Equipement</span><span>— · 15%</span></div>
+        <div class="dg-bar-track"><div class="dg-bar-fill" style="width:15%; background:#2563eb;"></div></div>
+      </div>
+      <div class="dg-bar-item">
+        <div class="dg-bar-label"><span>Locaux</span><span>— · 13%</span></div>
+        <div class="dg-bar-track"><div class="dg-bar-fill" style="width:13%; background:#7c3aed;"></div></div>
+      </div>
+      <div class="dg-bar-item">
+        <div class="dg-bar-label"><span>Autres</span><span>— · 13%</span></div>
+        <div class="dg-bar-track"><div class="dg-bar-fill" style="width:13%; background:#94a3b8;"></div></div>
+      </div>
+      {% endwith %}
+
+      <!-- Payment stats -->
+      <div style="margin-top:14px; display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <div style="text-align:center; padding:10px; background:#f0fdf4; border-radius:8px;">
+          <div style="font-size:1.1rem; font-weight:900; color:#16a34a;">{{ finance.validated_payments|intcomma }}</div>
+          <div style="font-size:.6rem; font-weight:800; color:#15803d;">Valides</div>
+        </div>
+        <div style="text-align:center; padding:10px; background:#fef3c7; border-radius:8px;">
+          <div style="font-size:1.1rem; font-weight:900; color:#d97706;">{{ finance.pending_payments|intcomma }}</div>
+          <div style="font-size:.6rem; font-weight:800; color:#b45309;">En attente</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

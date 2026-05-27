@@ -1,0 +1,96 @@
+<div class="mk-command">
+  <section class="mk-intel">
+    <div class="mk-intel-head">
+      <div>
+        <div class="mk-intel-title">Centre de decision</div>
+        <div class="mk-item-sub" style="color:#cbd5e1">Analyse automatique des diffusions, audiences et urgences</div>
+      </div>
+      <span class="mk-badge {% if guidance.workload.health == 'danger' %}red{% elif guidance.workload.health == 'warning' %}amber{% else %}green{% endif %}">{{ guidance.workload.health }}</span>
+    </div>
+    <div class="mk-intel-grid">
+      <div class="mk-intel-card"><div class="mk-intel-label">{{ guidance.workload.label }}</div><div class="mk-intel-value">{{ guidance.workload.value }}</div></div>
+      <div class="mk-intel-card"><div class="mk-intel-label">{{ guidance.open_rate.label }}</div><div class="mk-intel-value">{{ guidance.open_rate.value }}%</div></div>
+    </div>
+  </section>
+  <section class="mk-panel" style="margin-bottom:0">
+    <div class="mk-panel-head"><div class="mk-panel-title">Recommandations backend</div><span class="mk-badge">Guidage</span></div>
+    <div class="mk-recos">
+      {% for reco in guidance.recommendations %}
+        <div class="mk-reco">
+          <div><div class="mk-reco-title">{{ reco.title }}</div><div class="mk-reco-body">{{ reco.body }}</div></div>
+          <span class="mk-reco-metric">{{ reco.metric }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<div class="mk-kpis">
+  <div class="mk-kpi"><i class="fa-solid fa-bullseye"></i><div class="mk-kpi-label">Campagnes actives</div><div class="mk-kpi-value">{{ kpis.active_campaigns }}</div><div class="mk-kpi-detail">{{ kpis.scheduled_campaigns }} planifiee(s)</div></div>
+  <div class="mk-kpi"><i class="fa-solid fa-bell"></i><div class="mk-kpi-label">Annonces actives</div><div class="mk-kpi-value">{{ kpis.active_announcements }}</div><div class="mk-kpi-detail">{{ kpis.active_popups }} popup actif(s)</div></div>
+  <div class="mk-kpi"><i class="fa-solid fa-envelope"></i><div class="mk-kpi-label">Emails envoyes</div><div class="mk-kpi-value">{{ kpis.emails_sent }}</div><div class="mk-kpi-detail">Taux ouverture {{ kpis.open_rate }}%</div></div>
+  <div class="mk-kpi"><i class="fa-solid fa-user-plus"></i><div class="mk-kpi-label">Prospects recents</div><div class="mk-kpi-value">{{ kpis.recent_prospects }}</div><div class="mk-kpi-detail">{{ kpis.urgent_campaigns }} campagne(s) urgente(s)</div></div>
+</div>
+
+<div class="mk-grid-3">
+  <section class="mk-panel">
+    <div class="mk-panel-head"><div class="mk-panel-title">Campagnes</div><a class="mk-btn" href="{% url 'marketing:campaign_create' %}"><i class="fa-solid fa-plus"></i></a></div>
+    <div class="mk-table-wrap"><table class="mk-table"><thead><tr><th>Campagne</th><th>Statut</th><th>Audience</th><th>Date</th><th>Progression</th><th></th></tr></thead><tbody>
+      {% for campaign in campaigns %}
+        <tr data-drawer hx-get="{% url 'marketing:campaign_drawer' campaign.id %}" hx-target="#mk-drawer-host" hx-swap="innerHTML"><td><strong>{{ campaign.name }}</strong><br><span class="mk-item-sub">{{ campaign.objective|default:"Objectif non renseigne" }}</span></td><td><span class="mk-badge {% if campaign.status == "active" %}green{% elif campaign.status == "scheduled" %}amber{% endif %}">{{ campaign.get_status_display }}</span></td><td>{{ campaign.audience_label }}</td><td>{{ campaign.starts_at|date:"d/m/Y H:i"|default:"-" }}</td><td>{{ campaign.progress }}%</td><td><a class="mk-btn icon" href="{% url 'marketing:campaign_prepare_brevo' campaign.id %}" onclick="event.stopPropagation()"><i class="fa-solid fa-envelope"></i></a></td></tr>
+      {% empty %}<tr><td colspan="6">Aucune campagne.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <section class="mk-panel">
+    <div class="mk-panel-head"><div class="mk-panel-title">Calendrier marketing</div></div>
+    <div class="mk-list">{% for item in upcoming_items %}<div class="mk-list-item"><div><div class="mk-item-title">{{ item.title }}</div><div class="mk-item-sub">{{ item.kind }} - {{ item.date|date:"d/m/Y H:i" }}</div></div><span class="mk-badge amber">{{ item.status }}</span></div>{% empty %}<div class="mk-list-item"><div class="mk-item-sub">Aucun element programme.</div></div>{% endfor %}</div>
+  </section>
+  <section class="mk-panel">
+    <div class="mk-panel-head"><div class="mk-panel-title">Notifications urgentes</div></div>
+    <div class="mk-list">{% for announcement in urgent_announcements %}<div class="mk-list-item"><div><div class="mk-item-title">{{ announcement.title }}</div><div class="mk-item-sub">{{ announcement.audience_label }}</div></div><span class="mk-badge red">{{ announcement.get_priority_display }}</span></div>{% empty %}<div class="mk-list-item"><div class="mk-item-sub">Aucune urgence active.</div></div>{% endfor %}</div>
+  </section>
+</div>
+
+<div class="mk-grid-2">
+  <section class="mk-panel">
+    <div class="mk-panel-head"><div class="mk-panel-title">Communication interne</div><a class="mk-btn" href="{% url 'marketing:announcement_create' %}"><i class="fa-solid fa-plus"></i></a></div>
+    <div class="mk-table-wrap"><table class="mk-table"><thead><tr><th>Annonce</th><th>Type</th><th>Priorite</th><th>Cible</th><th></th></tr></thead><tbody>
+      {% for announcement in announcements %}
+        <tr data-drawer hx-get="{% url 'marketing:announcement_drawer' announcement.id %}" hx-target="#mk-drawer-host" hx-swap="innerHTML"><td><strong>{{ announcement.title }}</strong></td><td>{{ announcement.get_announcement_type_display }}</td><td><span class="mk-badge {% if announcement.priority == "critical" %}red{% elif announcement.priority == "high" %}amber{% endif %}">{{ announcement.get_priority_display }}</span></td><td>{{ announcement.audience_label }}</td><td><a class="mk-btn icon" href="{% url 'marketing:announcement_publish' announcement.id %}" onclick="event.stopPropagation()"><i class="fa-solid fa-broadcast-tower"></i></a></td></tr>
+      {% empty %}<tr><td colspan="5">Aucune annonce.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <section class="mk-panel">
+    <div class="mk-panel-head"><div class="mk-panel-title">Prospects & audiences</div><a class="mk-btn" href="{% url 'marketing:prospect_create' %}"><i class="fa-solid fa-plus"></i></a></div>
+    <div class="mk-table-wrap"><table class="mk-table"><thead><tr><th>Nom</th><th>Contact</th><th>Annexe</th><th>Source</th></tr></thead><tbody>
+      {% for prospect in prospects %}<tr><td><strong>{{ prospect.full_name }}</strong><br><span class="mk-item-sub">{{ prospect.city|default:"-" }}</span></td><td>{{ prospect.email|default:prospect.phone }}</td><td>{{ prospect.interested_branch|default:"-" }}</td><td>{{ prospect.get_source_display }}</td></tr>{% empty %}<tr><td colspan="4">Aucun prospect.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+
+<div class="mk-grid-2">
+  <section class="mk-panel">
+    <div class="mk-panel-head"><div class="mk-panel-title">Bibliotheque media</div><a class="mk-btn" href="{% url 'marketing:media_create' %}"><i class="fa-solid fa-upload"></i></a></div>
+    <div class="mk-list">{% for media in media_items %}<div class="mk-list-item"><div><div class="mk-item-title">{{ media.title }}</div><div class="mk-item-sub">{{ media.get_media_type_display }} - {{ media.created_at|date:"d/m/Y" }}</div></div><a class="mk-btn danger" href="{% url 'marketing:media_archive' media.id %}"><i class="fa-solid fa-box-archive"></i></a></div>{% empty %}<div class="mk-list-item"><div class="mk-item-sub">Aucun media importe.</div></div>{% endfor %}</div>
+  </section>
+  <section class="mk-panel">
+    <div class="mk-panel-head"><div class="mk-panel-title">Historique diffusion</div></div>
+    <div class="mk-table-wrap"><table class="mk-table"><thead><tr><th>Objet</th><th>Canal</th><th>Statut</th><th>Volume</th><th>Date</th></tr></thead><tbody>
+      {% for log in dispatch_logs %}<tr><td>{% if log.announcement %}{{ log.announcement.title }}{% elif log.campaign %}{{ log.campaign.name }}{% else %}Diffusion{% endif %}</td><td>{{ log.channel }}</td><td><span class="mk-badge {% if log.status == "sent" %}green{% elif log.status == "failed" %}red{% endif %}">{{ log.get_status_display }}</span></td><td>{{ log.recipients_count }}</td><td>{{ log.created_at|date:"d/m/Y H:i" }}</td></tr>{% empty %}<tr><td colspan="5">Aucun historique.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+
+<section class="mk-panel">
+  <div class="mk-panel-head"><div class="mk-panel-title">Annexes les plus actives</div><span class="mk-badge">Vue globale</span></div>
+  <div class="mk-list">{% for branch in branch_activity %}<div class="mk-list-item"><div><div class="mk-item-title">{{ branch.name }}</div><div class="mk-item-sub">{{ branch.campaign_count }} campagne(s), {{ branch.announcement_count }} annonce(s)</div></div><span class="mk-badge">{{ branch.code }}</span></div>{% empty %}<div class="mk-list-item"><div class="mk-item-sub">Aucune annexe active.</div></div>{% endfor %}</div>
+</section>
+
+<section class="mk-panel">
+  <div class="mk-panel-head"><div class="mk-panel-title">Pression par annexe</div><span class="mk-badge">Priorisation</span></div>
+  <div class="mk-table-wrap"><table class="mk-table"><thead><tr><th>Annexe</th><th>Campagnes actives</th><th>Annonces actives</th><th>Prospects 30j</th></tr></thead><tbody>
+    {% for branch in guidance.branch_pressure %}
+      <tr><td><strong>{{ branch.name }}</strong><br><span class="mk-item-sub">{{ branch.code }}</span></td><td>{{ branch.active_campaigns }}</td><td>{{ branch.active_announcements }}</td><td>{{ branch.recent_prospects }}</td></tr>
+    {% empty %}<tr><td colspan="4">Aucune pression annexe detectee.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>

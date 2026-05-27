@@ -1,0 +1,37 @@
+<section class="mk-account-zone" id="marketing-account-zone">
+  <div class="mk-account-head">
+    <div>
+      <div class="mk-account-title">Compte responsable</div>
+      <div class="mk-account-sub">Salaire, notifications et parametres restent consultables sans quitter le dashboard.</div>
+    </div>
+    <div class="mk-account-tabs" role="tablist">
+      <button class="mk-account-tab is-active" type="button" hx-get="{% url 'marketing:account_salary' %}" hx-target="#marketing-account-panel" hx-swap="innerHTML" data-mk-account-tab>
+        <i class="fa-solid fa-money-bill-wave"></i> Salaire
+      </button>
+      <button class="mk-account-tab" type="button" hx-get="{% url 'marketing:account_notifications' %}" hx-target="#marketing-account-panel" hx-swap="innerHTML" data-mk-account-tab>
+        <i class="fa-regular fa-bell"></i> Notifications
+        {% if messages_count %}<span>{{ messages_count }}</span>{% endif %}
+      </button>
+      <button class="mk-account-tab" type="button" hx-get="{% url 'marketing:account_settings' %}" hx-target="#marketing-account-panel" hx-swap="innerHTML" data-mk-account-tab>
+        <i class="fa-solid fa-user-gear"></i> Parametres
+      </button>
+    </div>
+  </div>
+  <div id="marketing-account-panel">
+    {% include "marketing/partials/account_salary.html" %}
+  </div>
+</section>
+<script>
+  (function(){
+    var zone = document.getElementById("marketing-account-zone");
+    if (!zone || zone.dataset.tabsReady === "1") return;
+    zone.dataset.tabsReady = "1";
+    zone.addEventListener("click", function(event){
+      var tab = event.target.closest("[data-mk-account-tab]");
+      if (!tab) return;
+      zone.querySelectorAll("[data-mk-account-tab]").forEach(function(item){
+        item.classList.toggle("is-active", item === tab);
+      });
+    });
+  })();
+</script>

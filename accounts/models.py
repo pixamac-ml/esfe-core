@@ -43,6 +43,7 @@ class Profile(models.Model):
         ("branch_manager", "Gestionnaire annexe"),
         ("academic_supervisor", "Surveillant academique"),
         ("it_support", "Informaticien"),
+        ("marketing_manager", "Responsable marketing digital"),
         ("super_admin", "Super administrateur"),
     ]
 

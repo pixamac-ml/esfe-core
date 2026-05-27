@@ -1,91 +1,216 @@
+{% load humanize %}
 <div class="dg-card dg-card-pad">
-  <div class="dg-section-head">
+  <div class="dg-section-hero">
     <div>
-      <div class="flex items-center gap-3">
-        <h3 class="dg-title">Centre des alertes prioritaires</h3>
-        <span class="dg-badge bg-rose-500 text-white">{{ open_alerts }}</span>
+      <div class="dg-section-hero-title">
+        <i class="fa-solid fa-triangle-exclamation" style="color:#ef4444; margin-right:8px;"></i>Alertes & Risques
       </div>
+      <div class="dg-section-hero-sub">{{ open_alerts|default:0 }} alerte{{ open_alerts|pluralize:"s," }} ouverte{{ open_alerts|pluralize:"s," }} · Trier par gravite et annexe</div>
     </div>
-    <div class="flex flex-wrap gap-2">
-      <button type="button" class="dg-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')" title="Detail"><i class="fa-regular fa-eye"></i></button>
+    <div class="dg-section-actions">
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')">
+        <i class="fa-solid fa-filter"></i>Filtrer
+      </button>
+      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=alert')">
+        <i class="fa-solid fa-bell"></i>Nouvelle alerte
+      </button>
     </div>
   </div>
-  <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
-    <div class="xl:col-span-8 overflow-x-auto">
-      <table class="dg-table">
-        <thead>
-          <tr>
-            <th>Gravite</th>
-            <th>Type</th>
-            <th>Annexe</th>
-            <th>Description</th>
-            <th>Responsable</th>
-            <th>Statut</th>
-            <th>Age</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for alert in priority_alerts %}
-          <tr>
-            <td>
-              <span class="dg-badge {% if alert.tone == 'red' %}bg-rose-100 text-rose-700{% else %}bg-orange-100 text-orange-700{% endif %}">{{ alert.severity }}</span>
-            </td>
-            <td class="font-black">{{ alert.type }}</td>
-            <td>{{ alert.branch_name }}</td>
-            <td>{{ alert.description }}</td>
-            <td>{{ alert.owner }}</td>
-            <td><span class="dg-badge bg-slate-100 text-slate-700">{{ alert.status }}</span></td>
-            <td>{{ alert.age }}</td>
-            <td>
-              <div class="flex gap-2">
-                <button type="button" class="dg-action" onclick="dgOpenDrawer('{{ alert.drawer_url }}')">
-                  <i class="fa-regular fa-eye"></i>
-                  Voir
-                </button>
-                <button type="button" class="dg-action" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal={% if alert.action_name == 'followup_finance' %}finance&kind=finance&branch_id={{ alert.action_id }}{% elif alert.action_name == 'resolve_alert' %}alert&kind=alert&id={{ alert.action_id }}{% else %}case&kind=case&id={{ alert.action_id }}{% endif %}')" title="Ouvrir">
-                  <i class="fa-regular fa-window-restore"></i>
-                </button>
-                {% if alert.action_id %}
-                <form method="post" action="{% url 'accounts_portal:dg_action' %}" onsubmit="return dgSubmitAction(this)">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="{{ alert.action_name }}">
-                  <input type="hidden" name="object_id" value="{{ alert.action_id }}">
-                  <button type="submit" class="dg-action">
-                    {% if alert.action_name == "resolve_alert" %}Resoudre{% elif alert.action_name == "escalate_case" %}Escalader{% else %}Suivre{% endif %}
-                  </button>
-                </form>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="8" class="py-8 text-center font-semibold text-slate-500">Aucune alerte prioritaire ouverte.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+
+  <div class="dg-context-bar">
+    <div>
+      <div class="dg-context-label">Lecture priorisee</div>
+      <div class="dg-context-hint">Commencez par l'annexe, puis traitez les alertes critiques avant les relances.</div>
     </div>
-    <aside class="xl:col-span-4 space-y-4">
-      <div class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <h4 class="text-base font-black text-slate-950">Repartition des risques</h4>
-            <p class="text-xs font-semibold text-slate-500">Par categorie d'alerte</p>
-          </div>
+    <div class="dg-context-main">
+      <span class="dg-scope-chip">{{ dashboard_scope_label|default:"Toutes les annexes" }}</span>
+      <span class="dg-scope-chip">{{ dashboard_period_label|default:"Periode courante" }}</span>
+      <span class="dg-scope-chip">{{ open_alerts|default:0|intcomma }} ouvertes</span>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="dg-stat-grid" style="margin-bottom:16px;">
+    <div class="dg-stat-box" style="background:#fee2e2;">
+      <div class="dg-stat-val" style="color:#ef4444;">{{ critical_alerts|default:0 }}</div>
+      <div class="dg-stat-lbl" style="color:#dc2626;">Critiques</div>
+    </div>
+    <div class="dg-stat-box" style="background:#fef3c7;">
+      <div class="dg-stat-val" style="color:#d97706;">{{ open_alerts|default:0 }}</div>
+      <div class="dg-stat-lbl" style="color:#b45309;">Ouvertes total</div>
+    </div>
+    <div class="dg-stat-box" style="background:#f0fdf4;">
+      <div class="dg-stat-val" style="color:#16a34a;">{{ analytics.risk_breakdown.0.value|default:0 }}</div>
+      <div class="dg-stat-lbl" style="color:#15803d;">Finance</div>
+    </div>
+    <div class="dg-stat-box" style="background:#eff6ff;">
+      <div class="dg-stat-val" style="color:#2563eb;">{{ analytics.risk_breakdown.2.value|default:0 }}</div>
+      <div class="dg-stat-lbl" style="color:#1d4ed8;">Assiduite</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+    <button type="button" class="dg-btn dg-btn-primary" style="background:#ef4444; border-color:#ef4444;">
+      <i class="fa-solid fa-list"></i>Toutes ({{ open_alerts|default:0 }})
+    </button>
+    <button type="button" class="dg-btn dg-btn-outline">
+      Absences ({{ analytics.risk_breakdown.2.value|default:0 }})
+    </button>
+    <button type="button" class="dg-btn dg-btn-outline">
+      Finance ({{ analytics.risk_breakdown.0.value|default:0 }})
+    </button>
+    <button type="button" class="dg-btn dg-btn-outline">
+      Etudiants ({{ analytics.risk_breakdown.1.value|default:0 }})
+    </button>
+    <button type="button" class="dg-btn dg-btn-outline">
+      Annexe
+      <select onchange="dgHandleBranchChange(this.value)" style="border:0; background:transparent; font-size:.72rem; font-weight:800; margin-left:4px; color:inherit;">
+        <option value="">Toutes</option>
+        {% for branch in all_branches %}
+        <option value="{{ branch.id }}" {% if selected_branch_id == branch.id|stringformat:"s" %}selected{% endif %}>{{ branch.name }}</option>
+        {% endfor %}
+      </select>
+    </button>
+  </div>
+
+  <!-- Main table + sidebar -->
+  <div style="display:grid; grid-template-columns: 1fr 340px; gap:16px;">
+    <div class="dg-panel">
+      <div class="dg-table-wrap">
+        <table class="dg-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Annexe</th>
+              <th>Niveau</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alert in priority_alerts %}
+            <tr>
+              <td class="text-xs font-semibold text-slate-500">{{ alert.age }}</td>
+              <td>
+                <span class="dg-badge {% if alert.tone == 'red' %}bg-rose-100 text-rose-700{% elif alert.tone == 'orange' %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                  {% if alert.type == 'Assiduite' %}<i class="fa-solid fa-user-slash" style="margin-right:3px;"></i>
+                  {% elif alert.type == 'Finance' %}<i class="fa-solid fa-credit-card" style="margin-right:3px;"></i>
+                  {% elif alert.type == 'Suivi etudiant' %}<i class="fa-solid fa-user" style="margin-right:3px;"></i>
+                  {% else %}<i class="fa-solid fa-circle-exclamation" style="margin-right:3px;"></i>{% endif %}
+                  {{ alert.type }}
+                </span>
+              </td>
+              <td class="font-black">{{ alert.description }}</td>
+              <td>{{ alert.branch_name }}</td>
+              <td>
+                <span class="dg-badge {% if alert.tone == 'red' %}bg-rose-100 text-rose-700{% elif alert.tone == 'orange' %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                  {% if alert.tone == 'red' %}Critique{% else %}Moyen{% endif %}
+                </span>
+              </td>
+              <td>
+                <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                  <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" onclick="dgOpenDrawer('{{ alert.drawer_url }}')">
+                    <i class="fa-solid fa-check"></i>Resoudre
+                  </button>
+                  <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=alert&id={{ alert.action_id }}')">
+                    <i class="fa-solid fa-share"></i>Escalader
+                  </button>
+                  <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" onclick="dgOpenDrawer('{{ alert.drawer_url }}')">
+                    <i class="fa-solid fa-phone"></i>Relancer
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="dg-empty">
+                <div class="dg-empty-icon"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="dg-empty-text">Aucune alerte en attente — tout est en ordre</div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+        <span style="font-size:.72rem; color:#94a3b8; font-weight:700;">Affichage 1-{{ priority_alerts|length|default:0 }} sur {{ open_alerts|default:0 }} alertes</span>
+        <div style="display:flex; gap:4px;">
+          <button type="button" class="dg-btn dg-btn-outline" style="height:30px; padding:0 .5rem; font-size:.68rem;"><i class="fa-solid fa-chevron-left"></i></button>
+          <button type="button" class="dg-btn dg-btn-primary" style="height:30px; padding:0 .5rem; font-size:.68rem;">1</button>
+          <button type="button" class="dg-btn dg-btn-outline" style="height:30px; padding:0 .5rem; font-size:.68rem;">2</button>
+          <button type="button" class="dg-btn dg-btn-outline" style="height:30px; padding:0 .5rem; font-size:.68rem;"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
-        <div class="h-[210px]">
+      </div>
+    </div>
+
+    <!-- Sidebar: risk breakdown + actions -->
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="dg-panel">
+        <div class="dg-panel-title">Repartition des risques</div>
+        <div style="height:220px; background:#f8fafc; border-radius:8px; padding:12px; margin-bottom:14px;">
           <canvas id="dgRiskChart"></canvas>
         </div>
-      </div>
-      <div class="rounded-2xl border border-slate-100 bg-white p-5">
-        <h4 class="mb-3 text-base font-black text-slate-950">Alertes</h4>
-        <div class="space-y-2">
-          <button type="button" class="dg-quick-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')"><span><i class="fa-solid fa-user-shield mr-2"></i>Voir les responsables</span><i class="fa-solid fa-chevron-right"></i></button>
-          <button type="button" class="dg-quick-action" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=case')"><span><i class="fa-solid fa-arrow-up-right-dots mr-2"></i>Cas escalades</span><i class="fa-solid fa-chevron-right"></i></button>
+        <div class="dg-bar-item">
+          <div class="dg-bar-label"><span>Finance</span><span>{{ analytics.risk_breakdown.0.value|default:0 }}</span></div>
+          <div class="dg-bar-track">
+            <div class="dg-bar-fill" style="width:{% widthratio analytics.risk_breakdown.0.value|default:0 analytics.risk_total|default:1 100 %}%; background:#ef4444;"></div>
+          </div>
+        </div>
+        <div class="dg-bar-item">
+          <div class="dg-bar-label"><span>Suivi etudiant</span><span>{{ analytics.risk_breakdown.1.value|default:0 }}</span></div>
+          <div class="dg-bar-track">
+            <div class="dg-bar-fill" style="width:{% widthratio analytics.risk_breakdown.1.value|default:0 analytics.risk_total|default:1 100 %}%; background:#f97316;"></div>
+          </div>
+        </div>
+        <div class="dg-bar-item">
+          <div class="dg-bar-label"><span>Assiduite</span><span>{{ analytics.risk_breakdown.2.value|default:0 }}</span></div>
+          <div class="dg-bar-track">
+            <div class="dg-bar-fill" style="width:{% widthratio analytics.risk_breakdown.2.value|default:0 analytics.risk_total|default:1 100 %}%; background:#f59e0b;"></div>
+          </div>
+        </div>
+        <div class="dg-bar-item">
+          <div class="dg-bar-label"><span>Workflow</span><span>{{ analytics.risk_breakdown.3.value|default:0 }}</span></div>
+          <div class="dg-bar-track">
+            <div class="dg-bar-fill" style="width:{% widthratio analytics.risk_breakdown.3.value|default:0 analytics.risk_total|default:1 100 %}%; background:#2563eb;"></div>
+          </div>
         </div>
       </div>
-    </aside>
+
+      <div class="dg-panel">
+        <div class="dg-panel-title">Actions rapides</div>
+        <div class="dg-action-grid">
+          <div class="dg-action-card" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')">
+            <div>
+              <div class="dg-action-label" style="color:#ef4444;"><i class="fa-solid fa-check-circle" style="margin-right:4px;"></i>Resoudre alerte</div>
+              <div class="dg-action-sub">{{ open_alerts|default:0 }} a traiter</div>
+            </div>
+            <span class="dg-action-count" style="background:#fee2e2; color:#ef4444;">{{ open_alerts|default:0 }}</span>
+          </div>
+          <div class="dg-action-card" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=case')">
+            <div>
+              <div class="dg-action-label" style="color:#d97706;"><i class="fa-solid fa-share" style="margin-right:4px;"></i>Escalader cas</div>
+              <div class="dg-action-sub">Cas en attente</div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="color:#94a3b8;"></i>
+          </div>
+          <div class="dg-action-card" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance')">
+            <div>
+              <div class="dg-action-label" style="color:#16a34a;"><i class="fa-solid fa-credit-card" style="margin-right:4px;"></i>Relancer paiement</div>
+              <div class="dg-action-sub">{{ analytics.pending_payments|default:0 }} en attente</div>
+            </div>
+            <span class="dg-action-count" style="background:#f0fdf4; color:#16a34a;">{{ analytics.pending_payments|default:0 }}</span>
+          </div>
+          <div class="dg-action-card" onclick="dgShowSection('alerts')">
+            <div>
+              <div class="dg-action-label" style="color:#2563eb;"><i class="fa-solid fa-bell" style="margin-right:4px;"></i>Toutes les alertes</div>
+              <div class="dg-action-sub">Vue detaillee</div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="color:#94a3b8;"></i>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

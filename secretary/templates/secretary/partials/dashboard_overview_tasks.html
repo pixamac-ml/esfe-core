@@ -1,0 +1,15 @@
+<div id="sg-overview-tasks"
+     class="sg-panel"
+     hx-get="{% url 'secretary:htmx_overview_tasks' %}"
+     hx-trigger="secretary:tasks-updated from:body"
+     hx-swap="outerHTML">
+  <div class="sg-panel-title">Taches urgentes</div>
+  <div class="message-list">
+    {% for item in pending_tasks_rows %}
+    <div class="sg-action-card">
+      <div><div class="sg-action-label">{{ item.title }}</div><div class="sg-action-sub">{{ item.get_priority_display }} - {{ item.due_date|date:"d/m"|default:"Sans date" }}</div></div>
+      <span class="sg-badge-sm {% if item.priority == 'urgent' %}sg-badge-red{% else %}sg-badge-amber{% endif %}">{{ item.get_status_display }}</span>
+    </div>
+    {% empty %}<div class="sg-empty">Aucune tache urgente.</div>{% endfor %}
+  </div>
+</div>

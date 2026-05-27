@@ -1,10 +1,23 @@
-<div class="message-list">
+<div>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px;border-bottom:1px solid #f1f5f9;">
+    <div>
+      <div style="font-size:.85rem;font-weight:950;color:#0f172a;">Notifications</div>
+      <div class="sg-notification-meta">{{ unread_count|default:0 }} non lue(s)</div>
+    </div>
+    <a class="sg-page-link" href="{% url 'secretary:secretary_dashboard' %}?section=notifications">Tout voir</a>
+  </div>
+  <div class="sg-notification-list">
     {% for message in recent_messages %}
-        <div class="message chat-bubble">
-            <strong>{{ message.title }}</strong><br>
-            <span class="help-text">{{ message.body|default:"Notification centralisee" }} | {{ message.created_at|date:"d/m/Y H:i" }}</span>
-        </div>
+      <a class="sg-notification-item {% if not message.read_at %}is-unread{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=notifications&notification_id={{ message.id }}">
+        <span class="sg-notification-dot" {% if message.read_at %}style="background:#cbd5e1;"{% endif %}></span>
+        <span style="min-width:0;">
+          <span class="sg-notification-title">{{ message.title }}</span>
+          <span class="sg-notification-body">{{ message.body|default:"Notification centralisee"|truncatechars:120 }}</span>
+          <span class="sg-notification-meta">{{ message.created_at|date:"d/m/Y H:i" }}</span>
+        </span>
+      </a>
     {% empty %}
-        <div class="message">Aucun message recent.</div>
+      <div class="sg-empty" style="padding:20px;">Aucune notification recente.</div>
     {% endfor %}
+  </div>
 </div>

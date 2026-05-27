@@ -89,6 +89,8 @@ def resolve_level_from_entry_year(programme, entry_year):
 
     if "master" in cycle_name:
         level = MASTER_ENTRY_YEAR_TO_LEVEL.get(normalized_entry_year)
+        if not level and normalized_entry_year in (4, 5):
+            level = LEGACY_ENTRY_YEAR_TO_LEVEL.get(normalized_entry_year)
         if not level:
             return _build_result(
                 "manual_required_ambiguous_level",

@@ -1,0 +1,154 @@
+{% extends "marketing/base.html" %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_subtitle %}Creation guidee avec ciblage, contenu et controles avant diffusion{% endblock %}
+{% block top_actions %}<a class="mk-btn" href="{% url 'marketing:dashboard' %}"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>{% endblock %}
+{% block content %}
+<div class="mk-content flush">
+  {% if form_kind == "announcement" or form_kind == "campaign" %}
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      x-data="{step:1,total:4,scenario:'',audience:'all'}"
+      hx-get="{% url 'marketing:htmx_audience_estimate' %}"
+      hx-target="#audience-estimate"
+      hx-trigger="change delay:250ms from:select"
+    >
+      {% csrf_token %}
+      <div class="mk-flow">
+        <aside class="mk-flow-rail">
+          <div class="mk-flow-title">{{ title }}</div>
+          <div class="mk-flow-sub">Un assistant structure la decision avant l'envoi.</div>
+          <div class="mk-step-list">
+            <button class="mk-step-pill" type="button" :class="{active:step===1,done:step>1}" @click="step=1"><span class="mk-step-num">1</span><span><span class="mk-step-name">Objectif</span><span class="mk-step-desc">Choisir le type de communication</span></span></button>
+            <button class="mk-step-pill" type="button" :class="{active:step===2,done:step>2}" @click="step=2"><span class="mk-step-num">2</span><span><span class="mk-step-name">Audience</span><span class="mk-step-desc">Annexe, formation, classe</span></span></button>
+            <button class="mk-step-pill" type="button" :class="{active:step===3,done:step>3}" @click="step=3"><span class="mk-step-num">3</span><span><span class="mk-step-name">Message</span><span class="mk-step-desc">Contenu et medias importes</span></span></button>
+            <button class="mk-step-pill" type="button" :class="{active:step===4}" @click="step=4"><span class="mk-step-num">4</span><span><span class="mk-step-name">Diffusion</span><span class="mk-step-desc">Planifier ou publier</span></span></button>
+          </div>
+        </aside>
+
+        <main class="mk-flow-main">
+          <section class="mk-flow-card" x-show="step===1">
+            <div class="mk-panel-head">
+              <div><div class="mk-panel-title">Objectif</div><div class="mk-flow-sub">Selectionne le workflow qui ressemble le plus a l'action a faire.</div></div>
+            </div>
+            {% if form_kind == "announcement" %}
+              <div class="mk-choice-grid">
+                <button class="mk-choice" type="button" :class="{active:scenario==='event'}" @click="scenario='event';$refs.announcementType.value='event';$refs.priority.value='normal'"><i class="fa-solid fa-calendar-day"></i><div class="mk-choice-title">Evenement</div><div class="mk-choice-sub">Journee culturelle, conference, reunion ou ceremonie.</div></button>
+                <button class="mk-choice" type="button" :class="{active:scenario==='urgency'}" @click="scenario='urgency';$refs.announcementType.value='urgency';$refs.priority.value='critical'"><i class="fa-solid fa-triangle-exclamation"></i><div class="mk-choice-title">Urgence DG</div><div class="mk-choice-sub">Popup critique, notification immediate et lecture prioritaire.</div></button>
+                <button class="mk-choice" type="button" :class="{active:scenario==='academic'}" @click="scenario='academic';$refs.announcementType.value='academic';$refs.priority.value='high'"><i class="fa-solid fa-graduation-cap"></i><div class="mk-choice-title">Info academique</div><div class="mk-choice-sub">Cours, suspension, rappel pedagogique ou consigne classe.</div></button>
+              </div>
+              <div class="mk-field-grid" style="margin-top:16px">
+                <div class="mk-field"><label>{{ form.title.label }}</label>{{ form.title }}</div>
+                <div class="mk-field"><label>{{ form.announcement_type.label }}</label><select x-ref="announcementType" name="{{ form.announcement_type.name }}" class="mk-select">{% for value,label in form.announcement_type.field.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+                <div class="mk-field"><label>{{ form.priority.label }}</label><select x-ref="priority" name="{{ form.priority.name }}" class="mk-select">{% for value,label in form.priority.field.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+                <div class="mk-field"><label>{{ form.status.label }}</label>{{ form.status }}</div>
+              </div>
+            {% else %}
+              <div class="mk-choice-grid">
+                <button class="mk-choice" type="button" :class="{active:scenario==='inscriptions'}" @click="scenario='inscriptions';$refs.channel.value='email'"><i class="fa-solid fa-user-graduate"></i><div class="mk-choice-title">Inscriptions</div><div class="mk-choice-sub">Campagne email pour transformer les prospects en inscrits.</div></button>
+                <button class="mk-choice" type="button" :class="{active:scenario==='relance'}" @click="scenario='relance';$refs.channel.value='email'"><i class="fa-solid fa-rotate-right"></i><div class="mk-choice-title">Relance prospects</div><div class="mk-choice-sub">Segmenter les leads froids ou incomplets et relancer.</div></button>
+                <button class="mk-choice" type="button" :class="{active:scenario==='event'}" @click="scenario='event';$refs.channel.value='email'"><i class="fa-solid fa-bullhorn"></i><div class="mk-choice-title">Promotion evenement</div><div class="mk-choice-sub">Portes ouvertes, ceremonies et rappels de participation.</div></button>
+              </div>
+              <div class="mk-field-grid" style="margin-top:16px">
+                <div class="mk-field"><label>{{ form.name.label }}</label>{{ form.name }}</div>
+                <div class="mk-field"><label>{{ form.channel.label }}</label><select x-ref="channel" name="{{ form.channel.name }}" class="mk-select">{% for value,label in form.channel.field.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+                <div class="mk-field full"><label>{{ form.objective.label }}</label>{{ form.objective }}</div>
+                <div class="mk-field"><label>{{ form.status.label }}</label>{{ form.status }}</div>
+                <div class="mk-field"><label>{{ form.progress.label }}</label>{{ form.progress }}</div>
+              </div>
+            {% endif %}
+          </section>
+
+          <section class="mk-flow-card" x-show="step===2">
+            <div class="mk-panel-head">
+              <div><div class="mk-panel-title">Audience</div><div class="mk-flow-sub">Tout est filtrable par annexe, formation, cycle et classe.</div></div>
+            </div>
+            <div class="mk-choice-grid">
+              <button class="mk-choice" type="button" :class="{active:audience==='all'}" @click="audience='all';$refs.scope.value='all'"><i class="fa-solid fa-network-wired"></i><div class="mk-choice-title">Tout ESFE</div><div class="mk-choice-sub">Diffusion globale sur tout le reseau.</div></button>
+              <button class="mk-choice" type="button" :class="{active:audience==='branches'}" @click="audience='branches';$refs.scope.value='branches'"><i class="fa-solid fa-building"></i><div class="mk-choice-title">Annexes</div><div class="mk-choice-sub">Une ou plusieurs annexes precises.</div></button>
+              <button class="mk-choice" type="button" :class="{active:audience==='custom'}" @click="audience='custom';$refs.scope.value='custom'"><i class="fa-solid fa-filter"></i><div class="mk-choice-title">Avance</div><div class="mk-choice-sub">Annexe, formation, cycle et classe combines.</div></button>
+            </div>
+            <div class="mk-field-grid" style="margin-top:16px">
+              <div class="mk-field"><label>{{ form.audience_scope.label }}</label><select x-ref="scope" name="{{ form.audience_scope.name }}" class="mk-select">{% for value,label in form.audience_scope.field.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+              <div class="mk-field"><label>{{ form.branches.label }}</label>{{ form.branches }}</div>
+              <div class="mk-field"><label>{{ form.formations.label }}</label>{{ form.formations }}</div>
+              <div class="mk-field"><label>{{ form.cycles.label }}</label>{{ form.cycles }}</div>
+              <div class="mk-field full"><label>{{ form.classes.label }}</label>{{ form.classes }}</div>
+            </div>
+            <div id="audience-estimate"></div>
+          </section>
+
+          <section class="mk-flow-card" x-show="step===3">
+            <div class="mk-panel-head">
+              <div><div class="mk-panel-title">Message</div><div class="mk-flow-sub">ESFE organise et diffuse les medias crees dans Photoshop, Canva, Premiere ou Illustrator.</div></div>
+            </div>
+            <div class="mk-field full"><label>{{ form.content.label }}</label>{{ form.content }}</div>
+          </section>
+
+          <section class="mk-flow-card" x-show="step===4">
+            <div class="mk-panel-head">
+              <div><div class="mk-panel-title">Diffusion</div><div class="mk-flow-sub">Controle les dates, canaux et comportements avant execution.</div></div>
+            </div>
+            <div class="mk-field-grid">
+              <div class="mk-field"><label>{{ form.starts_at.label }}</label>{{ form.starts_at }}</div>
+              <div class="mk-field"><label>{{ form.ends_at.label }}</label>{{ form.ends_at }}</div>
+              {% if form_kind == "announcement" %}
+                <div class="mk-field"><label>{{ form.scheduled_at.label }}</label>{{ form.scheduled_at }}</div>
+                <div class="mk-field"><label>Popup</label><label style="display:flex;gap:8px;align-items:center">{{ form.show_popup.as_widget }} Afficher au chargement dashboard</label><label style="display:flex;gap:8px;align-items:center;margin-top:8px">{{ form.is_blocking_popup.as_widget }} Bloquant si urgence</label></div>
+              {% else %}
+                <div class="mk-field"><label>{{ form.budget_estimate.label }}</label>{{ form.budget_estimate }}</div>
+              {% endif %}
+            </div>
+            {% if form_kind == "announcement" %}
+              <div class="mk-flow-card" style="padding:14px;margin-top:14px">
+                <div class="mk-panel-title">Canaux V1</div>
+                <label style="margin-right:16px"><input class="mk-checkbox" type="checkbox" name="channels" value="popup" checked> Popup dashboard</label>
+                <label style="margin-right:16px"><input class="mk-checkbox" type="checkbox" name="channels" value="notification" checked> Notification dashboard</label>
+                <label><input class="mk-checkbox" type="checkbox" name="channels" value="email"> Email</label>
+              </div>
+            {% endif %}
+          </section>
+
+          <div class="mk-sticky-actions">
+            <div class="mk-actions">
+              <button class="mk-btn" type="button" x-show="step>1" @click="step--"><i class="fa-solid fa-arrow-left"></i> Retour</button>
+              <button class="mk-btn primary" type="button" x-show="step<total" @click="step++"><i class="fa-solid fa-arrow-right"></i> Continuer</button>
+              <button class="mk-btn primary" type="submit" x-show="step===total"><i class="fa-solid fa-floppy-disk"></i> {{ submit_label }}</button>
+              {% if form_kind == "announcement" %}<button class="mk-btn success" type="submit" name="publish_now" value="1" x-show="step===total"><i class="fa-solid fa-broadcast-tower"></i> Publier maintenant</button>{% endif %}
+              {% if form_kind == "campaign" %}<button class="mk-btn success" type="submit" name="prepare_brevo" value="1" x-show="step===total"><i class="fa-solid fa-envelope"></i> Preparer Brevo</button>{% endif %}
+            </div>
+          </div>
+        </main>
+
+        <aside class="mk-flow-side">
+          <div class="mk-panel-title">Controle assistant</div>
+          <div class="mk-summary-box"><div class="mk-summary-label">Etat</div><div class="mk-summary-value">Brouillon guide</div></div>
+          <div class="mk-summary-box"><div class="mk-summary-label">Workflow</div><div class="mk-summary-value" x-text="scenario || 'A choisir'"></div></div>
+          <div class="mk-summary-box"><div class="mk-summary-label">Audience</div><div class="mk-summary-value" x-text="audience"></div></div>
+          <div class="mk-recos">
+            <div class="mk-reco"><div><div class="mk-reco-title">Controle ciblage</div><div class="mk-reco-body">Verifier l'annexe avant diffusion pour eviter un envoi global par erreur.</div></div><span class="mk-reco-metric">Obligatoire</span></div>
+            <div class="mk-reco"><div><div class="mk-reco-title">Message court</div><div class="mk-reco-body">Les popup doivent etre rapides, clairs et non bloquants hors urgence.</div></div><span class="mk-reco-metric">UX</span></div>
+            {% if form_kind == "campaign" %}<div class="mk-reco"><div><div class="mk-reco-title">Brevo</div><div class="mk-reco-body">La preparation cree un historique et estime les contacts email disponibles.</div></div><span class="mk-reco-metric">V1</span></div>{% endif %}
+          </div>
+        </aside>
+      </div>
+    </form>
+  {% else %}
+    <section class="mk-panel" style="margin:24px">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mk-form-grid">
+          {% for field in form %}
+            <div class="mk-field {% if field.field.widget.input_type == 'textarea' or field.name == 'branches' %}full{% endif %}">
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% for error in field.errors %}<div class="mk-help" style="color:#dc2626">{{ error }}</div>{% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="mk-actions" style="margin-top:16px"><button class="mk-btn primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> {{ submit_label }}</button></div>
+      </form>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

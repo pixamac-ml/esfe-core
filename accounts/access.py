@@ -32,6 +32,7 @@ POSITION_TO_CANONICAL = {
     "branch_manager": "staff_admin",
     "academic_supervisor": "staff_admin",
     "it_support": "staff_admin",
+    "marketing_manager": "staff_admin",
     "super_admin": "super_admin",
 }
 
@@ -53,6 +54,8 @@ GROUP_TO_CANONICAL = {
     "executive_director": "directeur_general",
     "deputy_executive_director": "directeur_general",
     "executive": "directeur_etudes",
+    "marketing": "staff_admin",
+    "marketing_manager": "staff_admin",
 }
 
 ACCESS_RULES = {
@@ -91,6 +94,13 @@ ACCESS_RULES = {
         "canonical_roles": set(),
         "allow_global": False,
     },
+    ("view_dashboard", "marketing"): {
+        "groups": {"marketing", "marketing_manager"},
+        "profile_roles": set(),
+        "positions": {"marketing_manager"},
+        "canonical_roles": set(),
+        "allow_global": True,
+    },
     ("view_portal", "student"): {
         "groups": set(),
         "profile_roles": {"student"},
@@ -128,6 +138,7 @@ ACCESS_RULES = {
             "deputy_executive_director",
             "branch_manager",
             "academic_supervisor",
+            "marketing_manager",
             "super_admin",
         },
         "canonical_roles": {"staff_admin", "directeur_etudes", "directeur_general", "super_admin"},
@@ -261,6 +272,8 @@ def get_user_position(user):
             position = "super_admin"
         elif {"secretary", "secretaries"}.intersection(set(get_user_groups(user))):
             position = "secretary"
+        elif {"marketing", "marketing_manager"}.intersection(set(get_user_groups(user))):
+            position = "marketing_manager"
         else:
             position = None
 

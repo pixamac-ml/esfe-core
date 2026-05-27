@@ -56,17 +56,38 @@ class RegistryEntryForm(SecretaryBaseForm):
     def _apply_scope(self):
         self.fields["related_student"].queryset = self._student_queryset()
         self.fields["related_staff"].queryset = self._branch_user_queryset()
+        self.fields["entry_type"].widget.attrs.setdefault("data-registry-routing", "true")
+        self.fields["motive"].widget.attrs.setdefault("placeholder", "Motif concret de la venue")
+        self.fields["visitor_name"].widget.attrs.setdefault("placeholder", "Nom du parent, visiteur ou deposant")
 
     class Meta:
         model = RegistryEntry
         fields = [
-            "title",
-            "description",
             "entry_type",
+            "visitor_name",
+            "visitor_phone",
+            "visitor_email",
             "related_student",
             "related_staff",
+            "student_class_label",
+            "motive",
+            "description",
+            "priority",
+            "target_service",
             "status",
+            "exited_at",
+            "attachment",
         ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "exited_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        }
+
+    def clean_exited_at(self):
+        exited_at = self.cleaned_data.get("exited_at")
+        if exited_at and timezone.is_naive(exited_at):
+            return timezone.make_aware(exited_at, timezone.get_current_timezone())
+        return exited_at
 
 
 class AppointmentForm(SecretaryBaseForm):

@@ -1,0 +1,87 @@
+{% extends "academics/reports/base_report.html" %}
+
+{% block title %}Bulletin {{ bulletin.reference }}{% endblock %}
+{% block report_title %}{{ bulletin.get_bulletin_type_display }}{% endblock %}
+{% block report_subtitle %}{{ bulletin.academic_class }} - {{ bulletin.academic_year }}{% endblock %}
+{% block footer_left %}Reference {{ bulletin.reference }}{% endblock %}
+{% block footer_right %}Matricule {{ student_matricule }}{% endblock %}
+
+{% block content %}
+  <style>
+    .doc-meta { border: 1px solid #d9dfeb; border-radius: 14px; background: #f8faff; padding: 16px 18px; margin-bottom: 18px; }
+    .doc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 24px; }
+    .doc-label { display: block; color: #5b6474; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .summary-card { border: 1px solid #d9dfeb; border-radius: 12px; padding: 12px 14px; }
+    .summary-card .label { color: #5b6474; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    .summary-card .value { color: #163c7a; font-size: 20px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #cfd6e4; padding: 6px 7px; text-align: center; vertical-align: middle; word-break: break-word; }
+    th { background: #edf2fb; }
+    .left { text-align: left; }
+    .signature-block { margin-top: 26px; display: flex; justify-content: space-between; gap: 20px; }
+    .signature-box { width: 260px; text-align: center; }
+    .signature-space { height: 70px; }
+  </style>
+
+  <section class="doc-meta">
+    <div class="doc-grid">
+      <div><span class="doc-label">Etudiant</span>{{ student_full_name }}</div>
+      <div><span class="doc-label">Matricule</span>{{ student_matricule }}</div>
+      <div><span class="doc-label">Statut document</span>{{ bulletin.get_status_display }}</div>
+      <div><span class="doc-label">Annexe</span>{{ bulletin.branch }}</div>
+      <div><span class="doc-label">Classe</span>{{ bulletin.academic_class }}</div>
+      <div><span class="doc-label">Reference</span>{{ bulletin.reference }}</div>
+    </div>
+  </section>
+
+  <section class="summary-grid">
+    <article class="summary-card"><div class="label">Moyenne</div><div class="value">{{ average_display }}</div></article>
+    <article class="summary-card"><div class="label">Credits obtenus</div><div class="value">{{ credits_obtained_display }}</div></article>
+    <article class="summary-card"><div class="label">Credits requis</div><div class="value">{{ total_credits_display }}</div></article>
+    <article class="summary-card"><div class="label">Mention</div><div class="value">{{ bulletin.mention|default:"-" }}</div></article>
+  </section>
+
+  {% if bulletin.bulletin_type == "semester" and semester_result %}
+    {% include "academics/reports/partials/semester_rows.html" %}
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Semestre</th>
+          <th>Moyenne</th>
+          <th>Credits obtenus</th>
+          <th>Credits requis</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in bulletin.snapshot.semesters %}
+          <tr>
+            <td>S{{ forloop.counter }}</td>
+            <td>{{ item.average|default:"-" }}</td>
+            <td>{{ item.credit_obtained }}</td>
+            <td>{{ item.credit_required }}</td>
+            <td>{{ item.status }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  <section class="doc-meta" style="margin-top: 18px;">
+    <strong>Decision :</strong> {{ bulletin.decision|default:"-" }}
+  </section>
+
+  <section class="signature-block">
+    <div>
+      <strong>Observations :</strong>
+      ....................................................................................................................
+    </div>
+    <div class="signature-box">
+      <div>Bamako, le ..................................</div>
+      <div class="signature-space"></div>
+      <strong>La Direction des Etudes</strong>
+    </div>
+  </section>
+{% endblock %}

@@ -2,14 +2,15 @@ from django import template
 
 register = template.Library()
 
+
 @register.filter
-def zip(a, b):
-    return zip(a, b)
+def index(list_like, i):
+    """Accès par index : {{ list|index:0 }}"""
+    try:
+        return list_like[i]
+    except (IndexError, TypeError):
+        return None
 
-
-from django import template
-
-register = template.Library()
 
 @register.filter
 def divisibleby(value, arg):

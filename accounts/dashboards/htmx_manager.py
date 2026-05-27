@@ -172,11 +172,17 @@ def candidature_accept(request, pk):
     candidature.reviewed_at = timezone.now()
     candidature.reviewed_by = request.user
     candidature.save(update_fields=["status", "reviewed_at", "reviewed_by"])
-    return render(
+    response = render(
         request,
         "accounts/dashboard/partials/manager_candidature_row.html",
         {"candidature": candidature},
     )
+    response["HX-Trigger"] = (
+        '{"openInscriptionPositioning": {"url": "%s"}, '
+        '"showToast": {"message": "Candidature acceptee. Positionnement academique requis.", "type": "success"}}'
+        % reverse("accounts:htmx_inscription_positioning", args=[candidature.id])
+    )
+    return response
 
 
 @manager_required

@@ -16,7 +16,9 @@ from django.urls.exceptions import NoReverseMatch
 from django.utils import timezone
 
 from academics.models import (
+    AcademicBulletin,
     AcademicClass,
+    AcademicDiplomaAward,
     AcademicEnrollment,
     AcademicScheduleEvent,
     EC,
@@ -26,6 +28,12 @@ from academics.models import (
     LessonLog,
     Semester,
     WeeklyScheduleSlot,
+)
+from academics.permissions import can_manage_bulletins, can_manage_diplomas
+from academics.services.documents import (
+    generate_annual_bulletins_for_class,
+    generate_semester_bulletins_for_class,
+    prepare_diploma_awards_for_class,
 )
 from admissions.models import Candidature
 from accounts.models import BranchExpense, Profile
@@ -405,6 +413,7 @@ def _director_semester_rows(branch):
         rows.append({
             "semester": semester,
             "class": semester.academic_class,
+            "student_count": len(enrollments),
             "expected": expected,
             "entered": entered,
             "progress": progress,
@@ -414,6 +423,11 @@ def _director_semester_rows(branch):
             "can_validate": ready and semester.status not in {Semester.STATUS_FINALIZED, Semester.STATUS_PUBLISHED},
             "can_publish": semester.status == Semester.STATUS_FINALIZED,
             "can_generate": semester.status == Semester.STATUS_PUBLISHED,
+            "bulletins_count": AcademicBulletin.objects.filter(
+                academic_class=semester.academic_class,
+                semester=semester,
+                bulletin_type=AcademicBulletin.TYPE_SEMESTER,
+            ).exclude(status=AcademicBulletin.STATUS_CANCELLED).count(),
         })
     return rows
 
@@ -683,6 +697,20 @@ def _build_director_workspace_context(request, *, toast=None):
     in_progress = [row for row in semester_rows if row["state"] == "en_cours"]
     without_notes = [row for row in semester_rows if row["state"] == "pas_de_notes"]
     published = [row for row in semester_rows if row["can_generate"]]
+    diploma_candidate_classes = []
+    for item in class_cards:
+        academic_class = item["class"]
+        is_terminal = str(academic_class.level or "").upper().strip() in {"L3", "M2"}
+        if not is_terminal:
+            continue
+        if item["semester_count"] and item["published_count"] >= item["semester_count"]:
+            diploma_candidate_classes.append({
+                "class": academic_class,
+                "student_count": item["student_count"],
+                "awards_count": AcademicDiplomaAward.objects.filter(
+                    academic_class=academic_class,
+                ).exclude(status=AcademicDiplomaAward.STATUS_CANCELLED).count(),
+            })
     document_workflows = [
         {
             "title": "Contrats enseignants",
@@ -750,6 +778,7 @@ def _build_director_workspace_context(request, *, toast=None):
         upcoming_events=upcoming_events,
         recent_lesson_logs=recent_lesson_logs,
     )
+    bulletin_scope_class = selected_class or (class_rows[0] if class_rows else None)
 
     context = {
         "branch": branch,
@@ -776,6 +805,9 @@ def _build_director_workspace_context(request, *, toast=None):
         "in_progress": in_progress,
         "without_notes": without_notes,
         "published": published,
+        "can_manage_bulletins": bool(bulletin_scope_class and can_manage_bulletins(request.user, bulletin_scope_class)),
+        "can_manage_diplomas": get_user_position(request.user) in {"executive_director", "deputy_executive_director"},
+        "diploma_candidate_classes": diploma_candidate_classes,
         "ready_to_validate_count": len(ready_to_validate),
         "published_count": len(published),
         "document_workflows": document_workflows,
@@ -938,6 +970,50 @@ def director_results_action(request):
     request.session["director_rejected_semester_ids"] = sorted(rejected_semester_ids)
     context = _build_director_workspace_context(request, toast=toast)
     context["section"] = "results"
+    return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required({"director_of_studies", "super_admin"})
+def director_bulletin_action(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_academic_branch(request)
+    action = (request.POST.get("action") or "").strip()
+    toast = {"level": "error", "message": "Action bulletin impossible."}
+    try:
+        if action == "generate_semester_class":
+            semester = Semester.objects.select_related("academic_class", "academic_class__branch").get(pk=request.POST.get("semester_id"))
+            if branch and semester.academic_class.branch_id != branch.id:
+                raise ValidationError("Action hors annexe refusee.")
+            if not can_manage_bulletins(request.user, semester.academic_class):
+                raise ValidationError("Seul le Directeur des etudes peut delivrer les bulletins.")
+            bulletins = generate_semester_bulletins_for_class(
+                academic_class=semester.academic_class,
+                semester=semester,
+                actor=request.user,
+                publish=True,
+            )
+            toast = {"level": "success", "message": f"{len(bulletins)} bulletin(s) semestriel(s) generes."}
+        elif action == "generate_annual_class":
+            academic_class = AcademicClass.objects.select_related("branch", "academic_year").get(pk=request.POST.get("class_id"))
+            if branch and academic_class.branch_id != branch.id:
+                raise ValidationError("Action hors annexe refusee.")
+            if not can_manage_bulletins(request.user, academic_class):
+                raise ValidationError("Seul le Directeur des etudes peut delivrer les bulletins.")
+            bulletins = generate_annual_bulletins_for_class(
+                academic_class=academic_class,
+                actor=request.user,
+                publish=True,
+            )
+            toast = {"level": "success", "message": f"{len(bulletins)} bulletin(s) annuel(s) generes."}
+        else:
+            raise ValidationError("Action bulletin inconnue.")
+    except (Semester.DoesNotExist, AcademicClass.DoesNotExist):
+        toast = {"level": "error", "message": "Classe ou semestre introuvable."}
+    except ValidationError as exc:
+        toast = {"level": "error", "message": " ".join(exc.messages)}
+    context = _build_director_workspace_context(request, toast=toast)
+    context["section"] = "publications"
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
@@ -2028,6 +2104,8 @@ def portal_dashboard(request):
         return _render_supervisor_dashboard(request)
     if position == "it_support":
         return _render_it_dashboard(request)
+    if position == "marketing_manager":
+        return redirect("marketing:dashboard")
 
     if can_access(request.user, "view_portal", "student"):
         return redirect("portal_student:dashboard")
@@ -4623,6 +4701,33 @@ def dg_section(request, section: str):
     if position not in {"executive_director", "deputy_executive_director"}:
         return HttpResponseForbidden("Accès réservé au Directeur Général.")
     context = build_dg_section_context(request, section, _build_portal_context)
+    if section == "workflows":
+        terminal_classes = AcademicClass.objects.select_related("branch", "academic_year", "programme").filter(
+            is_active=True,
+            level__in=["L3", "M2"],
+        )
+        diploma_rows = []
+        for academic_class in terminal_classes[:30]:
+            semesters = list(academic_class.semesters.all())
+            if not semesters:
+                continue
+            published_count = sum(1 for semester in semesters if semester.status == Semester.STATUS_PUBLISHED)
+            if published_count < len(semesters):
+                continue
+            student_count = academic_class.enrollments.filter(is_active=True).count()
+            awards_count = AcademicDiplomaAward.objects.filter(academic_class=academic_class).exclude(
+                status=AcademicDiplomaAward.STATUS_CANCELLED
+            ).count()
+            diploma_rows.append(
+                {
+                    "class": academic_class,
+                    "student_count": student_count,
+                    "published_count": published_count,
+                    "semester_count": len(semesters),
+                    "awards_count": awards_count,
+                }
+            )
+        context["diploma_candidate_classes"] = diploma_rows
     template_map = {
         "kpis": "portal/dg/partials/kpis/overview.html",
         "alerts": "portal/dg/partials/alerts/priority_table.html",
@@ -4720,6 +4825,34 @@ def dg_action(request):
     except (AttendanceAlert.DoesNotExist, StudentCase.DoesNotExist, Branch.DoesNotExist):
         return JsonResponse({"ok": False, "message": "Element introuvable."}, status=404)
     return JsonResponse({"ok": True, **result})
+
+
+@login_required
+def dg_diploma_action(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Acces reserve a la Direction Generale.")
+    if request.method != "POST":
+        return HttpResponseBadRequest("Methode invalide.")
+    class_id = (request.POST.get("class_id") or "").strip()
+    publish = (request.POST.get("publish") or "").strip().lower() in {"1", "true", "yes", "on"}
+    if not class_id.isdigit():
+        return JsonResponse({"ok": False, "message": "Classe invalide."}, status=400)
+    try:
+        academic_class = AcademicClass.objects.select_related("branch", "academic_year", "programme").get(pk=int(class_id), is_active=True)
+        if not can_manage_diplomas(request.user, academic_class):
+            return JsonResponse({"ok": False, "message": "Action non autorisee."}, status=403)
+        result = prepare_diploma_awards_for_class(academic_class=academic_class, actor=request.user, publish=publish)
+    except AcademicClass.DoesNotExist:
+        return JsonResponse({"ok": False, "message": "Classe introuvable."}, status=404)
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"{len(result['awards'])} diplome(s) prepare(s). {len(result['skipped'])} dossier(s) ignore(s).",
+            "prepared": len(result["awards"]),
+            "skipped": result["skipped"],
+        }
+    )
 
 
 @login_required

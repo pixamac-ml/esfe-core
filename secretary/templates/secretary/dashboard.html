@@ -1,766 +1,517 @@
 {% extends "secretary/base.html" %}
-{% block title %}Dashboard Secrétariat{% endblock %}
+{% load humanize %}
+{% block title %}Dashboard Secretariat ESFE{% endblock %}
 
 {% block content %}
-<div x-data="secretaryDashboard()" x-init="init()" class="space-y-5">
+{% include "secretary/partials/dashboard_scope.html" %}
 
-  {# ══════════════════════════════════════════════════════════
-     §1 — HEADER : identité + horloge live + 5 KPI + 3 actions
-  ══════════════════════════════════════════════════════════ #}
-  <section class="glass-card rounded-3xl px-6 py-4 shadow-card border-t-4 border-t-blue-600">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+<!-- Nav tabs - server-backed links; works even without JavaScript -->
+<div class="sg-nav-tabs">
+  <a class="sg-nav-tab {% if active_section == 'overview' %}active{% endif %}" href="?section=overview">Vue globale</a>
+  <a class="sg-nav-tab {% if active_section == 'registry' %}active{% endif %}" href="?section=registry">Registre</a>
+  <a class="sg-nav-tab {% if active_section == 'visits' %}active{% endif %}" href="?section=visits">Visiteurs</a>
+  <a class="sg-nav-tab {% if active_section == 'classes' %}active{% endif %}" href="?section=classes">Classes</a>
+  <a class="sg-nav-tab {% if active_section == 'students' %}active{% endif %}" href="?section=students">Etudiants</a>
+  <a class="sg-nav-tab {% if active_section == 'appointments' %}active{% endif %}" href="?section=appointments">Rendez-vous</a>
+  <a class="sg-nav-tab {% if active_section == 'deposits' %}active{% endif %}" href="?section=deposits">Depots</a>
+  <a class="sg-nav-tab {% if active_section == 'reports' %}active{% endif %}" href="?section=reports">Rapports</a>
+  <a class="sg-nav-tab {% if active_section == 'salary' %}active{% endif %}" href="?section=salary">Salaire</a>
+  <a class="sg-nav-tab {% if active_section == 'notifications' %}active{% endif %}" href="?section=notifications">Notifications</a>
+  <a class="sg-nav-tab {% if active_section == 'settings' %}active{% endif %}" href="?section=settings">Parametres</a>
+</div>
 
-      {# Identité + horloge #}
-      <div class="min-w-0">
-        <p class="secretary-kicker">Accueil opérationnel</p>
-        <h2 class="mt-0.5 text-xl font-extrabold tracking-tight">Secrétariat</h2>
-        <p class="mt-0.5 text-xs font-medium text-slate-400" x-text="currentDateTime"></p>
-      </div>
+<!-- =========== SECTION: OVERVIEW =========== -->
+<div class="sg-section-panel {% if active_section == 'overview' %}is-active{% endif %}" data-sg-panel="overview" {% if active_section != 'overview' %}hidden{% endif %}>
+  {% include "secretary/partials/dashboard_kpis.html" %}
 
-      {# 5 KPI — une seule rangée compacte #}
-      <div class="flex flex-wrap gap-2 lg:gap-3">
-        <template x-for="kpi in kpis" :key="kpi.label">
-          <div class="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700
-                      bg-white dark:bg-slate-900 px-3 py-2 shadow-sm min-w-[108px] cursor-default">
-            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" :class="kpi.bg">
-              <i :data-lucide="kpi.icon" class="h-4 w-4" :class="kpi.color"></i>
-            </div>
-            <div class="min-w-0">
-              <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate" x-text="kpi.label"></p>
-              <p class="text-lg font-extrabold leading-none" x-text="kpi.value"></p>
-            </div>
-          </div>
-        </template>
-      </div>
+  <div class="sg-row-2" style="margin-bottom:16px;">
+    {% include "secretary/partials/dashboard_overview_registry.html" %}
 
-      {# 3 actions primaires header #}
-      <div class="flex flex-wrap gap-2 shrink-0">
-        <button type="button"
-          class="secretary-btn secretary-btn-primary text-xs px-3 py-2 min-h-0 h-9 gap-1.5"
-          hx-get="{% url 'secretary:visitor_create' %}"
-          hx-target="#secretary-modal-content" hx-swap="innerHTML"
-          hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-          <i data-lucide="user-plus" class="h-3.5 w-3.5"></i> Visite
+    <div class="sg-panel">
+      <div class="sg-panel-title">Actions rapides</div>
+      <div class="sg-action-grid">
+        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+          <div><div class="sg-action-label" style="color:#2563eb;"><i class="fa-solid fa-book-medical"></i> Registre</div><div class="sg-action-sub">Accueil parent, visiteur, paiement</div></div><span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">+</span>
         </button>
-        <button type="button"
-          class="secretary-btn secretary-btn-primary text-xs px-3 py-2 min-h-0 h-9 gap-1.5"
-          hx-get="{% url 'secretary:appointment_create' %}"
-          hx-target="#secretary-modal-content" hx-swap="innerHTML"
-          hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-          <i data-lucide="calendar-plus" class="h-3.5 w-3.5"></i> RDV
+        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+          <div><div class="sg-action-label" style="color:#7c3aed;"><i class="fa-solid fa-user-plus"></i> Visite</div><div class="sg-action-sub">Arrivee et sortie</div></div><span class="sg-action-count" style="background:#f5f3ff;color:#7c3aed;">+</span>
         </button>
-        <button type="button"
-          class="secretary-btn secretary-btn-primary text-xs px-3 py-2 min-h-0 h-9 gap-1.5"
-          hx-get="{% url 'secretary:document_receipt_create' %}"
-          hx-target="#secretary-modal-content" hx-swap="innerHTML"
-          hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-          <i data-lucide="file-plus" class="h-3.5 w-3.5"></i> Pièce
+        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+          <div><div class="sg-action-label" style="color:#16a34a;"><i class="fa-regular fa-calendar-plus"></i> RDV</div><div class="sg-action-sub">Agenda direction/service</div></div><span class="sg-action-count" style="background:#dcfce7;color:#16a34a;">+</span>
+        </button>
+        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+          <div><div class="sg-action-label" style="color:#d97706;"><i class="fa-solid fa-box"></i> Depot</div><div class="sg-action-sub">Document, colis, livraison</div></div><span class="sg-action-count" style="background:#fef3c7;color:#d97706;">+</span>
         </button>
       </div>
-
+      <div class="sg-divider"></div>
+      <div class="sg-panel-title">Routage intelligent</div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Paiement scolarite</span><span>Gestionnaire</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:100%;background:#16a34a;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Depot colis</span><span>Surveillance</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:85%;background:#7c3aed;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Retrait diplome</span><span>Direction etudes</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:70%;background:#2563eb;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Reclamation</span><span>Administration</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:62%;background:#ef4444;"></div></div></div>
     </div>
-  </section>
+  </div>
 
-  <section class="glass-card rounded-3xl px-6 py-4 shadow-card border-t-4 border-t-slate-900">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div class="min-w-0">
-        <p class="secretary-kicker">Compte</p>
-        <h3 class="mt-0.5 text-lg font-extrabold tracking-tight">Profil, preferences, securite</h3>
-        <p class="mt-0.5 text-xs font-medium text-slate-400">Acces direct a l'essentiel, sans passer par plusieurs menus.</p>
+  <div class="sg-row-3">
+    {% include "secretary/partials/dashboard_overview_appointments.html" %}
+    {% include "secretary/partials/dashboard_overview_visits.html" %}
+    {% include "secretary/partials/dashboard_overview_tasks.html" %}
+  </div>
+</div>
+
+<!-- =========== SECTION: REGISTRY =========== -->
+<div class="sg-section-panel {% if active_section == 'registry' %}is-active{% endif %}" data-sg-panel="registry" {% if active_section != 'registry' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-book-open" style="color:#2563eb;margin-right:8px;"></i>Registre administratif intelligent</div>
+      <div class="sg-section-hero-sub">Chaque interaction humaine devient un evenement route, historise et imprimable.</div>
+    </div>
+    <div class="sg-section-actions">
+      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:registry_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+        <i class="fa-solid fa-plus"></i>Nouvelle entree
+      </button>
+    </div>
+  </div>
+  <div class="sg-row-4" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ pending_registry_count }}</div><div class="sg-stat-lbl">En attente</div></div>
+    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ pending_tasks }}</div><div class="sg-stat-lbl">Actions liees</div></div>
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ visits_today }}</div><div class="sg-stat-lbl">Passages jour</div></div>
+    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ pending_documents_count }}</div><div class="sg-stat-lbl">Pieces</div></div>
+  </div>
+  <div class="sg-row-2" style="margin-bottom:16px;">
+    <div class="sg-panel">
+      <div class="sg-section-header"><div class="sg-panel-title" style="margin:0;">Entrees recentes</div></div>
+      <div class="sg-table-wrap">
+        <table class="sg-table">
+          <thead><tr><th>N</th><th>Type</th><th>Visiteur</th><th>Etudiant</th><th>Service</th><th>Statut</th></tr></thead>
+          <tbody>
+            {% for item in recent_registry %}
+            <tr>
+              <td style="font-family:monospace;">{{ item.registry_number|default:item.pk }}</td>
+              <td style="font-weight:900;">{{ item.get_entry_type_display }}</td>
+              <td>{{ item.visitor_name|default:"-" }}</td>
+              <td>{% if item.related_student %}{{ item.related_student.full_name }}{% else %}-{% endif %}</td>
+              <td>{{ item.target_service|default:"Accueil" }}</td>
+              <td><span class="sg-badge-sm sg-badge-blue">{{ item.get_status_display }}</span></td>
+            </tr>
+            {% empty %}<tr><td colspan="6" class="sg-empty">Aucune entree recente.</td></tr>{% endfor %}
+          </tbody>
+        </table>
       </div>
-      <div class="flex flex-wrap gap-2 shrink-0">
-        <a href="{% url 'accounts:edit_profile' %}" class="secretary-btn secretary-btn-primary text-xs px-3 py-2 min-h-0 h-9 gap-1.5">
-          <i data-lucide="pencil-line" class="h-3.5 w-3.5"></i> Profil
-        </a>
-        <a href="{% url 'accounts:edit_preferences' %}" class="secretary-btn secretary-btn-secondary text-xs px-3 py-2 min-h-0 h-9 gap-1.5">
-          <i data-lucide="settings-2" class="h-3.5 w-3.5"></i> Preferences
-        </a>
-        <a href="{% url 'password_change' %}" class="secretary-btn secretary-btn-secondary text-xs px-3 py-2 min-h-0 h-9 gap-1.5">
-          <i data-lucide="key-round" class="h-3.5 w-3.5"></i> Mot de passe
-        </a>
+      {% if registry_page.has_other_pages %}
+        <div class="sg-pagination">
+          <div class="sg-pagination-info">Page {{ registry_page.number }} / {{ registry_page.paginator.num_pages }} - {{ registry_page.paginator.count }} entree(s)</div>
+          <div class="sg-pagination-actions">
+            {% if registry_page.has_previous %}
+              <a class="sg-page-link" href="?section=registry&registry_page={{ registry_page.previous_page_number }}"><i class="fa-solid fa-chevron-left"></i>Precedent</a>
+            {% else %}
+              <span class="sg-page-link is-disabled"><i class="fa-solid fa-chevron-left"></i>Precedent</span>
+            {% endif %}
+            <span class="sg-page-link is-current">{{ registry_page.number }}</span>
+            {% if registry_page.has_next %}
+              <a class="sg-page-link" href="?section=registry&registry_page={{ registry_page.next_page_number }}">Suivant<i class="fa-solid fa-chevron-right"></i></a>
+            {% else %}
+              <span class="sg-page-link is-disabled">Suivant<i class="fa-solid fa-chevron-right"></i></span>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Repartition par type</div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Parent / tuteur</span><span>45%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:45%;background:#2563eb;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Paiement</span><span>28%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:28%;background:#16a34a;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Livraison colis</span><span>15%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:15%;background:#7c3aed;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Reclamation</span><span>12%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:12%;background:#f59e0b;"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- =========== SECTION: VISITS =========== -->
+<div class="sg-section-panel {% if active_section == 'visits' %}is-active{% endif %}" data-sg-panel="visits" {% if active_section != 'visits' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-user-clock" style="color:#7c3aed;margin-right:8px;"></i>Gestion des visiteurs</div>
+      <div class="sg-section-hero-sub">Enregistrement arrivee et sortie, historique des passages.</div>
+    </div>
+    <div class="sg-section-actions">
+      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:visitor_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+        <i class="fa-solid fa-plus"></i>Nouveau passage
+      </button>
+    </div>
+  </div>
+  <div class="sg-row-4" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ active_visits }}</div><div class="sg-stat-lbl">Visites ouvertes</div></div>
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ visits_today }}</div><div class="sg-stat-lbl">Aujourd'hui</div></div>
+    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ pending_tasks }}</div><div class="sg-stat-lbl">En attente action</div></div>
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ pending_registry_count }}</div><div class="sg-stat-lbl">Registre en attente</div></div>
+  </div>
+  <div class="sg-row-2">
+    {% include "secretary/partials/dashboard_visits_open.html" %}
+    <div class="sg-panel">
+      <div class="sg-panel-title">Passages du jour</div>
+      <div class="message-list">
+        {% for item in today_visits_rows %}
+        <div class="sg-action-card">
+          <div><div class="sg-action-label">{{ item.full_name }}</div><div class="sg-action-sub">{{ item.arrived_at|date:"H:i" }} - {{ item.reason|default:"Accueil" }}</div></div>
+          <span class="sg-badge-sm sg-badge-green">{{ item.get_status_display }}</span>
+        </div>
+        {% empty %}<div class="sg-empty">Aucun passage aujourd'hui.</div>{% endfor %}
+      </div>
+      {% if today_visits_page.has_other_pages %}
+        <div class="sg-pagination">
+          <div class="sg-pagination-info">Page {{ today_visits_page.number }} / {{ today_visits_page.paginator.num_pages }} - {{ today_visits_page.paginator.count }} passage(s)</div>
+          <div class="sg-pagination-actions">
+            {% if today_visits_page.has_previous %}
+              <a class="sg-page-link" href="?section=visits&today_visits_page={{ today_visits_page.previous_page_number }}"><i class="fa-solid fa-chevron-left"></i>Precedent</a>
+            {% else %}
+              <span class="sg-page-link is-disabled"><i class="fa-solid fa-chevron-left"></i>Precedent</span>
+            {% endif %}
+            <span class="sg-page-link is-current">{{ today_visits_page.number }}</span>
+            {% if today_visits_page.has_next %}
+              <a class="sg-page-link" href="?section=visits&today_visits_page={{ today_visits_page.next_page_number }}">Suivant<i class="fa-solid fa-chevron-right"></i></a>
+            {% else %}
+              <span class="sg-page-link is-disabled">Suivant<i class="fa-solid fa-chevron-right"></i></span>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- =========== SECTION: CLASSES =========== -->
+<div class="sg-section-panel {% if active_section == 'classes' %}is-active{% endif %}" data-sg-panel="classes" {% if active_section != 'classes' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-school" style="color:#7c3aed;margin-right:8px;"></i>Classes etudiants</div>
+      <div class="sg-section-hero-sub">Reperer une classe, ouvrir son effectif, puis acceder au dossier etudiant.</div>
+    </div>
+    <span class="sg-scope-chip">{{ classes_count|default:0 }} classes actives</span>
+  </div>
+  <div class="sg-row-2">
+    <div class="sg-panel">
+      <div class="sg-section-header">
+        <div>
+          <div class="sg-panel-title" style="margin-bottom:4px;">Classes de l'annexe</div>
+          <div class="sg-section-header-sub">Recherche par classe, niveau, formation ou annee academique.</div>
+        </div>
+      </div>
+      <div class="sg-search" style="width:100%;margin-bottom:14px;">
+        <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
+        <input type="search" name="q" placeholder="Ex: L1, Licence, Sante, 2026..." hx-get="{% url 'secretary:htmx_class_results' %}" hx-trigger="input changed delay:300ms" hx-target="#class-results-panel">
+      </div>
+      <div id="class-results-panel" class="message-list">
+        {% include "secretary/partials/class_results.html" with classes=classes_rows page_obj=classes_page query="" %}
       </div>
     </div>
-    <div class="mt-4 grid gap-2 md:grid-cols-4">
-      <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shadow-sm">
-        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Email</p>
-        <p class="mt-1 text-sm font-extrabold truncate">{{ request.user.email|default:"Non renseigne" }}</p>
-      </div>
-      <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shadow-sm">
-        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Telephone</p>
-        <p class="mt-1 text-sm font-extrabold truncate">{{ request.user.profile.phone|default:"Non renseigne" }}</p>
-      </div>
-      <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shadow-sm">
-        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Annexe</p>
-        <p class="mt-1 text-sm font-extrabold truncate">{{ request.user.profile.branch.name|default:"Non rattache" }}</p>
-      </div>
-      <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shadow-sm">
-        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Statut</p>
-        <p class="mt-1 text-sm font-extrabold truncate">{{ request.user.profile.get_employment_status_display|default:"Non renseigne" }}</p>
+    <div class="sg-panel" id="class-students-panel">
+      <div class="sg-panel-title">Effectif de la classe</div>
+      <div class="sg-empty">
+        <div class="sg-empty-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
+        <div class="sg-empty-text">Selectionnez une classe pour afficher ses etudiants.</div>
       </div>
     </div>
-  </section>
+  </div>
+</div>
 
-  {# GRID 2 colonnes #}
-  <div class="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
+<!-- =========== SECTION: STUDENTS =========== -->
+<div class="sg-section-panel {% if active_section == 'students' %}is-active{% endif %}" data-sg-panel="students" {% if active_section != 'students' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-graduation-cap" style="color:#14b8a6;margin-right:8px;"></i>Recherche et fiche etudiant</div>
+      <div class="sg-section-hero-sub">La fiche s'ouvre en drawer lateral large, pas en petite modal.</div>
+    </div>
+    <span class="sg-scope-chip">{{ students_count }} etudiants actifs</span>
+  </div>
+  <div class="sg-panel">
+    <div class="sg-search" style="width:100%;margin-bottom:14px;">
+      <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
+      <input type="search" name="q" placeholder="Nom, prenom, matricule, telephone ou email" hx-get="{% url 'secretary:htmx_student_results' %}" hx-trigger="input changed delay:300ms" hx-target="#student-results-panel" value="{{ student_query }}">
+    </div>
+    <div id="student-results-panel">
+      {% include "secretary/partials/student_results.html" with students=student_results page_obj=student_results_page query=student_query %}
+    </div>
+  </div>
+</div>
 
-    {# ══════════════════════
-       COLONNE GAUCHE
-    ══════════════════════ #}
-    <div class="space-y-5">
+<!-- =========== SECTION: APPOINTMENTS =========== -->
+<div class="sg-section-panel {% if active_section == 'appointments' %}is-active{% endif %}" data-sg-panel="appointments" {% if active_section != 'appointments' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-regular fa-calendar-days" style="color:#16a34a;margin-right:8px;"></i>Agenda et demandes de rendez-vous</div>
+      <div class="sg-section-hero-sub">DG, direction des etudes, gestionnaire, enseignants et administration.</div>
+    </div>
+    <div class="sg-section-actions">
+      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:appointment_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+        <i class="fa-solid fa-plus"></i>Nouveau RDV
+      </button>
+    </div>
+  </div>
+  <div class="sg-row-2" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ appointments_today }}</div><div class="sg-stat-lbl">Rdv aujourd'hui</div></div>
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ visits_today }}</div><div class="sg-stat-lbl">Visites jour</div></div>
+  </div>
+  {% include "secretary/partials/dashboard_appointments_today.html" %}
+</div>
 
-      {# ══════════════════════════════════════════════════════════
-         §2 — FLUX DU JOUR : 5 sous-blocs, rows une ligne
-      ══════════════════════════════════════════════════════════ #}
-      <section class="glass-card secretary-section secretary-section-cyan rounded-3xl shadow-card">
-        <div class="flex items-center justify-between px-6 pt-5 pb-2">
-          <div>
-            <p class="secretary-kicker">Temps réel</p>
-            <h3 class="text-base font-extrabold">Flux du jour</h3>
-          </div>
-          <span class="secretary-badge text-xs">
-            {{ pending_registry_count|add:pending_documents_count|add:pending_tasks|add:active_visits }} à traiter
-          </span>
-        </div>
+<!-- =========== SECTION: DEPOSITS =========== -->
+<div class="sg-section-panel {% if active_section == 'deposits' %}is-active{% endif %}" data-sg-panel="deposits" {% if active_section != 'deposits' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-box-archive" style="color:#d97706;margin-right:8px;"></i>Depots, pieces et livraisons</div>
+      <div class="sg-section-hero-sub">Colis parent, document administratif, livraison ecole, retrait diplome.</div>
+    </div>
+    <div class="sg-section-actions">
+      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:document_receipt_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+        <i class="fa-solid fa-plus"></i>Nouveau depot
+      </button>
+    </div>
+  </div>
+  <div class="sg-row-4" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ pending_documents_count }}</div><div class="sg-stat-lbl">En attente</div></div>
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ visits_today }}</div><div class="sg-stat-lbl">Passages jour</div></div>
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ pending_registry_count }}</div><div class="sg-stat-lbl">Registre</div></div>
+    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ pending_tasks }}</div><div class="sg-stat-lbl">Taches</div></div>
+  </div>
+  <div class="sg-row-2">
+    {% include "secretary/partials/dashboard_documents_pending.html" %}
+    <div class="sg-panel">
+      <div class="sg-panel-title">Processus de remise</div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Depot identifie</span><span>Recu et numerote</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:100%;background:#2563eb;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Etudiant / service notifie</span><span>En cours</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:70%;background:#7c3aed;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Remise confirmee</span><span>Termine</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:45%;background:#16a34a;"></div></div></div>
+      <div class="sg-bar-item" style="margin-top:8px;"><div class="sg-bar-label"><span>Taux de remise</span><span>45%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:45%;background:#16a34a;"></div></div></div>
+    </div>
+  </div>
+</div>
 
-        {# ── Registre ── #}
-        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
-          <div class="mb-2 flex items-center gap-2">
-            <i data-lucide="book-copy" class="h-3.5 w-3.5 text-sky-600"></i>
-            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Registre</h4>
-            {% if pending_registry_count > 0 %}
-            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900 text-[10px] font-extrabold text-sky-700 dark:text-sky-300">{{ pending_registry_count }}</span>
-            {% endif %}
-          </div>
-          {% if pending_registry_rows %}
-          <ul class="space-y-1.5">
-            {% for item in pending_registry_rows %}
-            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
-              <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-sky-400"></span>
-              <div class="min-w-0 flex-1">
-                <span class="text-sm font-extrabold truncate block">{{ item.title }}</span>
-              </div>
-              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.entry_type }} · {{ item.get_status_display }}</span>
-              <div class="flex gap-1.5 shrink-0">
-                {% if item.status == 'pending' %}
-                <form method="post" hx-post="{% url 'secretary:registry_start' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
-                </form>
-                {% endif %}
-                {% if item.status != 'completed' %}
-                <form method="post" hx-post="{% url 'secretary:registry_mark_processed' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Traiter</button>
-                </form>
-                {% endif %}
-                {% if not item.is_archived %}
-                <form method="post" hx-post="{% url 'secretary:registry_archive' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-secondary text-[11px] px-2 py-0.5 min-h-0 h-6 rounded-lg" type="submit" title="Archiver"><i data-lucide="archive" class="h-3 w-3"></i></button>
-                </form>
-                {% endif %}
-              </div>
-            </li>
+<!-- =========== SECTION: SALARY =========== -->
+<div class="sg-section-panel {% if active_section == 'salary' %}is-active{% endif %}" data-sg-panel="salary" {% if active_section != 'salary' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-money-bill-wave" style="color:#16a34a;margin-right:8px;"></i>Salaire et fiche de paie</div>
+      <div class="sg-section-hero-sub">Consultation personnelle. Les modifications et paiements restent gerees par le gestionnaire habilite.</div>
+    </div>
+    <span class="sg-scope-chip">Base: {{ secretary_profile.salary_base|default:0|intcomma }} FCFA</span>
+  </div>
+  <div class="sg-row-3" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ secretary_profile.salary_base|default:0|intcomma }}</div><div class="sg-stat-lbl">Base FCFA</div></div>
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{% if latest_salary_entry %}{{ latest_salary_entry.net_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Net dernier mois</div></div>
+    <div class="sg-stat-box" style="background:#fffbeb;"><div class="sg-stat-val" style="color:#d97706;">{% if latest_salary_entry %}{{ latest_salary_entry.remaining_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Reste a retirer</div></div>
+  </div>
+  <div class="sg-row-2">
+    <div class="sg-panel">
+      <div class="sg-panel-title">Historique paie</div>
+      <div class="sg-table-wrap">
+        <table class="sg-table">
+          <thead><tr><th>Periode</th><th>Base</th><th>Primes</th><th>Retenues</th><th>Net</th><th>Retire</th><th>Statut</th></tr></thead>
+          <tbody>
+            {% for entry in salary_entries %}
+              <tr>
+                <td style="font-weight:900;">{{ entry.period_month|date:"F Y" }}</td>
+                <td>{{ entry.base_salary|intcomma }}</td>
+                <td>{{ entry.allowances|intcomma }}</td>
+                <td>{{ entry.deductions|add:entry.advances|intcomma }}</td>
+                <td style="font-weight:900;">{{ entry.net_salary|intcomma }}</td>
+                <td>{{ entry.paid_amount|intcomma }}</td>
+                <td><span class="sg-badge-sm {% if entry.status == 'paid' %}sg-badge-green{% elif entry.status == 'ready' %}sg-badge-blue{% elif entry.status == 'partial' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ entry.get_status_display }}</span></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="sg-empty">Aucune fiche de paie disponible pour le moment.</td></tr>
             {% endfor %}
-          </ul>
-          {% else %}
-          <p class="secretary-muted text-xs py-1.5 italic">Registre vide.</p>
-          {% endif %}
-        </div>
-
-        {# ── Documents ── #}
-        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
-          <div class="mb-2 flex items-center gap-2">
-            <i data-lucide="file-signature" class="h-3.5 w-3.5 text-amber-600"></i>
-            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Documents</h4>
-            {% if pending_documents_count > 0 %}
-            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900 text-[10px] font-extrabold text-amber-700 dark:text-amber-300">{{ pending_documents_count }}</span>
-            {% endif %}
+          </tbody>
+        </table>
+      </div>
+      {% if salary_entries_page.has_other_pages %}
+        <div class="sg-pagination">
+          <div class="sg-pagination-info">Page {{ salary_entries_page.number }} / {{ salary_entries_page.paginator.num_pages }}</div>
+          <div class="sg-pagination-actions">
+            {% if salary_entries_page.has_previous %}<a class="sg-page-link" href="?section=salary&salary_page={{ salary_entries_page.previous_page_number }}"><i class="fa-solid fa-chevron-left"></i>Precedent</a>{% endif %}
+            <span class="sg-page-link is-current">{{ salary_entries_page.number }}</span>
+            {% if salary_entries_page.has_next %}<a class="sg-page-link" href="?section=salary&salary_page={{ salary_entries_page.next_page_number }}">Suivant<i class="fa-solid fa-chevron-right"></i></a>{% endif %}
           </div>
-          {% if pending_documents_rows %}
-          <ul class="space-y-1.5">
-            {% for item in pending_documents_rows %}
-            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
-              <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-amber-400"></span>
-              <div class="min-w-0 flex-1">
-                <span class="text-sm font-extrabold truncate block">{{ item.title }}</span>
-              </div>
-              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.submitted_by_name }} · {{ item.get_status_display }}</span>
-              <div class="flex gap-1.5 shrink-0">
-                {% if item.status == 'pending' %}
-                <form method="post" hx-post="{% url 'secretary:document_receipt_start' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
-                </form>
-                {% endif %}
-                {% if item.file %}
-                <a class="secretary-btn secretary-btn-secondary text-[11px] px-2 py-0.5 min-h-0 h-6 rounded-lg" href="{{ item.file.url }}" target="_blank" rel="noopener" title="Ouvrir"><i data-lucide="paperclip" class="h-3 w-3"></i></a>
-                {% endif %}
-                {% if not item.is_archived %}
-                <form method="post" hx-post="{% url 'secretary:document_receipt_archive' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Archiver</button>
-                </form>
-                {% endif %}
-              </div>
-            </li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <p class="secretary-muted text-xs py-1.5 italic">Aucun document en attente.</p>
-          {% endif %}
         </div>
+      {% endif %}
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Regles d'acces</div>
+      <div class="message-list">
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Lecture uniquement</div><div class="sg-action-sub">La secretaire consulte ses fiches sans modifier les montants.</div></div><span class="sg-badge-sm sg-badge-blue">RH</span></div>
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Correction salaire</div><div class="sg-action-sub">A demander au gestionnaire ou a la direction habilitee.</div></div><span class="sg-badge-sm sg-badge-gray">Controle</span></div>
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Probleme d'acces</div><div class="sg-action-sub">Traitement par l'informaticien pour garder la maintenabilite.</div></div><span class="sg-badge-sm sg-badge-amber">Support</span></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-        {# ── Rendez-vous du jour ── #}
-        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
-          <div class="mb-2 flex items-center gap-2">
-            <i data-lucide="calendar-check-2" class="h-3.5 w-3.5 text-emerald-600"></i>
-            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Rendez-vous du jour</h4>
-            {% if appointments_today > 0 %}
-            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">{{ appointments_today }}</span>
-            {% endif %}
-          </div>
-          {% if today_appointments_rows %}
-          <ul class="space-y-1.5">
-            {% for item in today_appointments_rows %}
-            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
-              <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-400"></span>
-              <div class="min-w-0 flex-1">
-                <span class="text-sm font-extrabold truncate block">{{ item.title }}</span>
-              </div>
-              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.person_name }} · {{ item.scheduled_at|date:"H:i" }}</span>
-              <div class="flex gap-1.5 shrink-0">
-                {% if item.status != 'completed' %}
-                <form method="post" hx-post="{% url 'secretary:appointment_complete' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Clôturer</button>
-                </form>
-                {% else %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
-                  <i data-lucide="check" class="h-3 w-3"></i> Terminé
-                </span>
-                {% endif %}
-              </div>
-            </li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <p class="secretary-muted text-xs py-1.5 italic">Aucun rendez-vous prévu aujourd'hui.</p>
-          {% endif %}
-        </div>
-
-        {# ── Visites ouvertes ── #}
-        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3">
-          <div class="mb-2 flex items-center gap-2">
-            <i data-lucide="user-round-search" class="h-3.5 w-3.5 text-violet-600"></i>
-            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Visites ouvertes</h4>
-            {% if active_visits > 0 %}
-            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900 text-[10px] font-extrabold text-violet-700 dark:text-violet-300">{{ active_visits }}</span>
-            {% endif %}
-          </div>
-          {% if open_visits_rows %}
-          <ul class="space-y-1.5">
-            {% for item in open_visits_rows %}
-            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
-              <span class="inline-block h-2 w-2 shrink-0 rounded-full bg-violet-400"></span>
-              <div class="min-w-0 flex-1">
-                <span class="text-sm font-extrabold truncate block">{{ item.full_name }}</span>
-              </div>
-              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.reason|default:"—"|truncatechars:20 }} · {{ item.arrived_at|date:"H:i" }}</span>
-              <div class="flex gap-1.5 shrink-0">
-                <form method="post" hx-post="{% url 'secretary:visitor_complete' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Clôturer</button>
-                </form>
-              </div>
-            </li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <p class="secretary-muted text-xs py-1.5 italic">Aucune visite ouverte.</p>
-          {% endif %}
-        </div>
-
-        {# ── Tâches prioritaires ── #}
-        <div class="border-t border-slate-100 dark:border-slate-800 px-6 py-3 pb-5">
-          <div class="mb-2 flex items-center gap-2">
-            <i data-lucide="check-square" class="h-3.5 w-3.5 text-rose-600"></i>
-            <h4 class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Tâches prioritaires</h4>
-            {% if pending_tasks > 0 %}
-            <span class="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900 text-[10px] font-extrabold text-rose-700 dark:text-rose-300">{{ pending_tasks }}</span>
-            {% endif %}
-          </div>
-          {% if pending_tasks_rows %}
-          <ul class="space-y-1.5">
-            {% for item in pending_tasks_rows %}
-            <li class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 px-4 py-2">
-              <span class="inline-block h-2 w-2 shrink-0 rounded-full
-                {% if item.priority == 'urgent' %}bg-rose-500{% elif item.priority == 'high' %}bg-orange-400{% else %}bg-rose-300{% endif %}"></span>
-              <div class="min-w-0 flex-1">
-                <span class="text-sm font-extrabold truncate block">{{ item.title }}</span>
-              </div>
-              <span class="hidden sm:block shrink-0 text-xs text-slate-400">{{ item.get_priority_display }} · {{ item.due_date|date:"d/m"|default:"—" }}</span>
-              <div class="flex gap-1.5 shrink-0">
-                {% if item.status == 'pending' %}
-                <form method="post" hx-post="{% url 'secretary:task_start' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-secondary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Prendre</button>
-                </form>
-                {% endif %}
-                {% if item.status != 'completed' %}
-                <form method="post" hx-post="{% url 'secretary:task_complete' item.id %}" hx-target="body" hx-swap="none">{% csrf_token %}
-                  <button class="secretary-btn secretary-btn-primary text-[11px] px-2.5 py-0.5 min-h-0 h-6 rounded-lg" type="submit">Terminer</button>
-                </form>
-                {% endif %}
-              </div>
-            </li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <p class="secretary-muted text-xs py-1.5 italic">Aucune tâche prioritaire.</p>
-          {% endif %}
-        </div>
-
-      </section>
-
-      {# ══════════════════════════════════════════════════════════
-         §3 — RÉSULTATS ACADÉMIQUES (lecture seule)
-      ══════════════════════════════════════════════════════════ #}
-      <section class="glass-card secretary-section secretary-section-violet rounded-3xl shadow-card">
-        <div class="flex items-center justify-between px-6 pt-5 pb-3">
-          <div>
-            <p class="secretary-kicker">Lecture seule</p>
-            <h3 class="text-base font-extrabold">Résultats académiques</h3>
-          </div>
-          <input type="text"
-            class="secretary-input text-xs h-8 w-40 !py-1.5"
-            placeholder="Filière, classe…"
-            x-model="resultsFilter"
-            @input="filterResults()">
-        </div>
-        <div class="px-6 pb-5 space-y-2">
-          {% for result in academic_results %}
-          <div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800
-                      bg-white/60 dark:bg-slate-900/60 px-4 py-2.5 result-row"
-               data-search="{{ result.filiere|lower }} {{ result.classe|lower }} {{ result.titre|lower }} {{ result.annee_academique|lower }}">
-            <div class="flex items-center gap-3 min-w-0 flex-1">
-              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/50">
-                <i data-lucide="graduation-cap" class="h-4 w-4 text-violet-600 dark:text-violet-300"></i>
-              </div>
-              <div class="min-w-0">
-                <p class="text-sm font-extrabold truncate">{{ result.titre }}</p>
-                <p class="text-xs text-slate-400 truncate">{{ result.filiere }} · {{ result.classe }} · {{ result.annee_academique }}</p>
-              </div>
+<!-- =========== SECTION: NOTIFICATIONS =========== -->
+<div class="sg-section-panel {% if active_section == 'notifications' %}is-active{% endif %}" data-sg-panel="notifications" {% if active_section != 'notifications' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-regular fa-bell" style="color:#2563eb;margin-right:8px;"></i>Centre de notifications</div>
+      <div class="sg-section-hero-sub">Les alertes restent dans le dashboard. Ouvrir une notification la marque lue definitivement.</div>
+    </div>
+    <span class="sg-scope-chip">{{ messages_count|default:0 }} non lue(s)</span>
+  </div>
+  <div class="sg-row-2">
+    <div class="sg-panel">
+      <div class="sg-panel-title">Notifications recentes</div>
+      <div class="message-list">
+        {% for notification in notifications_rows %}
+          <a class="sg-action-card {% if not notification.read_at %}is-unread{% endif %}" href="?section=notifications&notification_id={{ notification.id }}">
+            <div style="min-width:0;">
+              <div class="sg-action-label">{{ notification.title }}</div>
+              <div class="sg-action-sub">{{ notification.body|default:"Notification centralisee"|truncatechars:90 }}</div>
+              <div class="sg-notification-meta">{{ notification.created_at|date:"d/m/Y H:i" }}</div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide
-                {% if result.is_published %}bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300
-                {% else %}bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300{% endif %}">
-                {% if result.is_published %}Publié{% else %}Brouillon{% endif %}
-              </span>
-              {% if result.fichier_pdf %}
-              <a href="{{ result.fichier_pdf.url }}" target="_blank" rel="noopener"
-                 class="secretary-btn secretary-btn-secondary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl gap-1"
-                 title="Télécharger le PDF">
-                <i data-lucide="download" class="h-3 w-3"></i> PDF
-              </a>
-              {% endif %}
-            </div>
+            {% if not notification.read_at %}<span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">new</span>{% else %}<span class="sg-badge-sm sg-badge-gray">Lue</span>{% endif %}
+          </a>
+        {% empty %}
+          <div class="sg-empty">Aucune notification pour le moment.</div>
+        {% endfor %}
+      </div>
+      {% if notifications_page.has_other_pages %}
+        <div class="sg-pagination">
+          <div class="sg-pagination-info">Page {{ notifications_page.number }} / {{ notifications_page.paginator.num_pages }}</div>
+          <div class="sg-pagination-actions">
+            {% if notifications_page.has_previous %}<a class="sg-page-link" href="?section=notifications&notifications_page={{ notifications_page.previous_page_number }}"><i class="fa-solid fa-chevron-left"></i>Precedent</a>{% endif %}
+            <span class="sg-page-link is-current">{{ notifications_page.number }}</span>
+            {% if notifications_page.has_next %}<a class="sg-page-link" href="?section=notifications&notifications_page={{ notifications_page.next_page_number }}">Suivant<i class="fa-solid fa-chevron-right"></i></a>{% endif %}
           </div>
-          {% empty %}
-          <p class="secretary-muted text-sm py-4 text-center">Aucun résultat publié pour cette annexe.</p>
+        </div>
+      {% endif %}
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Detail</div>
+      {% if selected_notification %}
+        <div class="sg-action-card" style="cursor:default;align-items:flex-start;">
+          <div>
+            <div class="sg-action-label" style="font-size:.95rem;color:#0f172a;">{{ selected_notification.title }}</div>
+            <div class="sg-action-sub" style="font-size:.78rem;margin-top:8px;color:#475569;">{{ selected_notification.body|default:"Aucun detail complementaire." }}</div>
+            <div class="sg-divider"></div>
+            <div class="sg-profile-line"><i class="fa-regular fa-clock" style="color:#94a3b8;width:18px;"></i><div><div class="sg-stat-lbl">Recu le</div><div style="font-weight:800;">{{ selected_notification.created_at|date:"d/m/Y H:i" }}</div></div></div>
+            <div class="sg-profile-line"><i class="fa-solid fa-check" style="color:#16a34a;width:18px;"></i><div><div class="sg-stat-lbl">Lecture</div><div style="font-weight:800;">Marquee lue le {{ selected_notification.read_at|date:"d/m/Y H:i" }}</div></div></div>
+          </div>
+        </div>
+      {% else %}
+        <div class="sg-empty">Selectionnez une notification pour ouvrir son detail.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- =========== SECTION: SETTINGS =========== -->
+<div class="sg-section-panel {% if active_section == 'settings' %}is-active{% endif %}" data-sg-panel="settings" {% if active_section != 'settings' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-user-gear" style="color:#64748b;margin-right:8px;"></i>Parametres du compte</div>
+      <div class="sg-section-hero-sub">Profil et preferences modifiables sans quitter le dashboard. Les acces sensibles passent par l'informaticien.</div>
+    </div>
+    <span class="sg-scope-chip">{{ request.user.username }}</span>
+  </div>
+  <div class="sg-row-2">
+    <div class="sg-panel">
+      <div class="sg-panel-title">Profil visible</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding:12px;border:1px solid #f1f5f9;border-radius:12px;background:#fbfcff;">
+        <div class="sg-avatar-img" style="width:64px;height:64px;font-size:1.2rem;">
+          {% if secretary_profile.avatar %}
+            <img src="{{ secretary_profile.avatar.url }}" alt="Photo de profil">
+          {% else %}
+            {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+          {% endif %}
+        </div>
+        <div style="min-width:0;">
+          <div style="font-size:.95rem;font-weight:950;color:#0f172a;">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="sg-section-header-sub">{{ secretary_profile.phone|default:"Telephone non renseigne" }} - {{ secretary_profile.location|default:"Localisation non renseignee" }}</div>
+        </div>
+      </div>
+      <form method="post" action="{% url 'secretary:profile_update' %}" enctype="multipart/form-data" style="display:grid;gap:12px;">
+        {% csrf_token %}
+        <div class="sg-form-grid">
+          {% for field in profile_form.visible_fields %}
+            <div class="field">
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="errors">{{ field.errors }}</div>{% endif %}
+            </div>
           {% endfor %}
         </div>
-      </section>
+        <div class="sg-section-actions"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer le profil</button></div>
+      </form>
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Preferences et securite</div>
+      <form method="post" action="{% url 'secretary:preferences_update' %}" style="display:grid;gap:10px;">
+        {% csrf_token %}
+        {% for field in preference_form.visible_fields %}
+          <label class="sg-action-card" style="justify-content:flex-start;gap:10px;">
+            {{ field }}
+            <span><span class="sg-action-label">{{ field.label }}</span></span>
+          </label>
+        {% endfor %}
+        <div class="sg-section-actions"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer les preferences</button></div>
+      </form>
+      <div class="sg-divider"></div>
+      <div class="message-list">
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Mot de passe</div><div class="sg-action-sub">Changement gere par l'informaticien pour assistance et tracabilite.</div></div><span class="sg-badge-sm sg-badge-amber">Support</span></div>
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Email institutionnel</div><div class="sg-action-sub">{{ request.user.email|default:"Non renseigne" }}</div></div><span class="sg-badge-sm sg-badge-gray">Compte</span></div>
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Fonction</div><div class="sg-action-sub">{{ secretary_profile.get_position_display|default:"Secretaire" }} - {{ secretary_profile.branch.name|default:"Annexe non definie" }}</div></div><span class="sg-badge-sm sg-badge-blue">RH</span></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-      {# ══════════════════════════════════════════════════════════
-         §4 — DOSSIERS ÉTUDIANTS : recherche live HTMX + snapshot
-      ══════════════════════════════════════════════════════════ #}
-      <section class="glass-card secretary-section secretary-section-teal rounded-3xl shadow-card">
-        <div class="flex items-center justify-between px-6 pt-5 pb-3">
-          <div>
-            <p class="secretary-kicker">Dossiers</p>
-            <h3 class="text-base font-extrabold">Étudiants</h3>
-          </div>
-          <span class="secretary-badge text-xs">
-            <i data-lucide="users" class="h-3 w-3"></i>
-            {{ students_count }} actifs
-          </span>
-        </div>
+<!-- =========== SECTION: REPORTS =========== -->
+<div class="sg-section-panel {% if active_section == 'reports' %}is-active{% endif %}" data-sg-panel="reports" {% if active_section != 'reports' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-file-export" style="color:#64748b;margin-right:8px;"></i>Rapports, impression et mode degrade</div>
+      <div class="sg-section-hero-sub">Rapport journalier, export Excel/PDF, impression directe et reprise manuelle en cas de panne.</div>
+    </div>
+    <div class="sg-section-actions">
+      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:daily_registry_report' %}?format=xlsx"><i class="fa-solid fa-file-excel"></i>Excel</a>
+      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:daily_registry_report' %}?format=pdf"><i class="fa-solid fa-file-pdf"></i>PDF</a>
+      <a class="sg-btn sg-btn-primary" href="{% url 'secretary:daily_registry_report' %}"><i class="fa-solid fa-print"></i>Imprimer</a>
+    </div>
+  </div>
+  <div class="sg-row-3">
+    <div class="sg-panel">
+      <div class="sg-panel-title">Rapport journalier</div>
+      <p class="sg-section-header-sub">Colonnes : numero, heure, type, visiteur, etudiant, service, motif, action, statut et heure sortie.</p>
+      <div class="sg-divider"></div>
+      <div style="background:#f8fafc;border-radius:8px;padding:12px;text-align:center;">
+        <i class="fa-solid fa-file-lines" style="font-size:2rem;color:#94a3b8;margin-bottom:8px;display:block;"></i>
+        <p style="font-size:.78rem;font-weight:700;color:#475569;">Generer le rapport du jour</p>
+        <a class="sg-btn sg-btn-primary" href="{% url 'secretary:daily_registry_report' %}" style="margin-top:8px;"><i class="fa-solid fa-eye"></i>Voir le rapport</a>
+      </div>
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Archivage</div>
+      <p class="sg-section-header-sub">Les entrees, historiques, pieces jointes et scans restent traces dans le registre.</p>
+      <div class="sg-divider"></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Entrees cette semaine</span><span>{{ pending_registry_count|default:0 }}</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:80%;background:#2563eb;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Visites cette semaine</span><span>{{ visits_today|default:0 }}</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:60%;background:#7c3aed;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Depots cette semaine</span><span>{{ pending_documents_count|default:0 }}</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:40%;background:#d97706;"></div></div></div>
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Mode degrade</div>
+      <p class="sg-section-header-sub">En panne reseau ou courant, impression du canevas journalier puis saisie differee au retour serveur.</p>
+      <div class="sg-divider"></div>
+      <div class="sg-action-grid">
+        <button type="button" class="sg-action-card" onclick="window.print()">
+          <div><div class="sg-action-label" style="color:#2563eb;"><i class="fa-solid fa-print"></i>Imprimer canevas</div><div class="sg-action-sub">Feuille papier</div></div>
+        </button>
+        <button type="button" class="sg-action-card" onclick="sgRefreshDashboard()">
+          <div><div class="sg-action-label" style="color:#64748b;"><i class="fa-solid fa-cloud-arrow-up"></i>Reimporter</div><div class="sg-action-sub">Apres panne</div></div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
-        {# Barre recherche #}
-        <div class="px-6 pb-3">
-          <div class="relative">
-            <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"></i>
-            <input type="text"
-              name="student_q"
-              class="secretary-input !pl-10 !py-2 text-sm"
-              placeholder="Nom, matricule, email…"
-              hx-get="{% url 'secretary:htmx_student_results' %}"
-              hx-trigger="input changed delay:350ms"
-              hx-target="#student-results-panel"
-              hx-include="[name='student_q']"
-              value="{{ student_query }}">
-          </div>
-        </div>
-
-        <div id="student-results-panel" class="px-6 pb-5 space-y-2">
-          {% for student in student_results %}
-          <div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800
-                      bg-white/60 dark:bg-slate-900/60 px-4 py-2.5">
-            <div class="flex items-center gap-3 min-w-0 flex-1">
-              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl
-                          bg-teal-50 dark:bg-teal-950/50 font-extrabold text-teal-700 dark:text-teal-300 text-xs uppercase">
-                {{ student.full_name|first }}
-              </div>
-              <div class="min-w-0">
-                <p class="text-sm font-extrabold truncate">{{ student.full_name }}</p>
-                <p class="text-xs text-slate-400 truncate">
-                  {{ student.matricule }} · {{ student.inscription.candidature.programme.title|default:"—" }}
-                </p>
-              </div>
-            </div>
-            <div class="flex gap-2 shrink-0">
-              <button type="button"
-                class="secretary-btn secretary-btn-secondary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl"
-                hx-get="{% url 'secretary:student_snapshot_view' student.id %}"
-                hx-target="#secretary-modal-content" hx-swap="innerHTML"
-                hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-                Dossier
-              </button>
-              <button type="button"
-                class="secretary-btn secretary-btn-primary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl"
-                hx-get="{% url 'secretary:registry_create' %}?student={{ student.id }}"
-                hx-target="#secretary-modal-content" hx-swap="innerHTML"
-                hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-                + Registre
-              </button>
-            </div>
-          </div>
-          {% empty %}
-          <p class="secretary-muted text-sm py-4 text-center italic">
-            {% if student_query %}Aucun étudiant trouvé pour « {{ student_query }} ».
-            {% else %}Saisir un nom, matricule ou email pour rechercher.{% endif %}
-          </p>
-          {% endfor %}
-        </div>
-      </section>
-
-      {# ══════════════════════════════════════════════════════════
-         §5 — COMMANDES SHOP : URLs corrigées (shop/urls.py réel)
-      ══════════════════════════════════════════════════════════ #}
-      <section class="glass-card secretary-section secretary-section-amber rounded-3xl shadow-card">
-        <div class="flex items-center justify-between px-6 pt-5 pb-3">
-          <div>
-            <p class="secretary-kicker">Boutique</p>
-            <h3 class="text-base font-extrabold">Commandes en attente</h3>
-          </div>
-          {# Pas de vue liste shop côté secrétaire — lien retiré #}
-        </div>
-        <div class="px-6 pb-5 space-y-2">
-          {% for order in pending_shop_orders %}
-          <div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 dark:border-slate-800
-                      bg-white/60 dark:bg-slate-900/60 px-4 py-2.5">
-            <div class="flex items-center gap-3 min-w-0 flex-1">
-              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/50">
-                <i data-lucide="shopping-bag" class="h-4 w-4 text-amber-600 dark:text-amber-300"></i>
-              </div>
-              <div class="min-w-0">
-                <p class="text-sm font-extrabold truncate">
-                  {{ order.inscription.candidature.first_name }} {{ order.inscription.candidature.last_name }}
-                </p>
-                <p class="text-xs text-slate-400 truncate">
-                  Réf. {{ order.reference|default:"—" }} ·
-                  {{ order.total_amount|floatformat:0 }} FCFA ·
-                  <span class="{% if order.status == 'ready' %}text-emerald-600 font-bold{% endif %}">
-                    {{ order.get_status_display }}
-                  </span>
-                </p>
-              </div>
-            </div>
-            <div class="flex gap-2 shrink-0">
-              {# Détail étudiant — URL existante dans shop/urls.py #}
-              <button type="button"
-                 hx-get="{% url 'secretary:shop_order_detail' order.pk %}"
-                 hx-target="#secretary-modal-content" hx-swap="innerHTML"
-                 hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()"
-                 class="secretary-btn secretary-btn-secondary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl">
-                Détail
-              </button>
-              {# Livraison — uniquement si statut = ready #}
-              {% if order.status == 'ready' %}
-              <form method="post" hx-post="{% url 'secretary:shop_order_deliver' order.pk %}" hx-target="body" hx-swap="none">
-                {% csrf_token %}
-                <button type="submit"
-                  class="secretary-btn secretary-btn-primary text-xs px-2.5 py-1 min-h-0 h-7 rounded-xl">
-                  Remettre
-                </button>
-              </form>
-              {% endif %}
-            </div>
-          </div>
-          {% empty %}
-          <p class="secretary-muted text-sm py-4 text-center">Aucune commande en attente.</p>
-          {% endfor %}
-        </div>
-      </section>
-
-    </div>{# /colonne gauche #}
-
-    {# ══════════════════════
-       COLONNE DROITE (sidebar)
-    ══════════════════════ #}
-    <aside class="space-y-5">
-
-      {# ══════════════════════════════════════════════════════════
-         §6 — ACTIONS RAPIDES : grille 2×3
-      ══════════════════════════════════════════════════════════ #}
-      <section class="glass-card secretary-section secretary-section-blue rounded-3xl shadow-card px-5 pt-5 pb-5">
-        <p class="secretary-kicker mb-1">Raccourcis</p>
-        <h3 class="text-base font-extrabold mb-4">Actions rapides</h3>
-        <div class="grid grid-cols-2 gap-2.5">
-
-          <button type="button"
-            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-sky-400 hover:shadow-md transition-all group"
-            hx-get="{% url 'secretary:registry_create' %}"
-            hx-target="#secretary-modal-content" hx-swap="innerHTML"
-            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950/50 transition-transform group-hover:scale-110">
-              <i data-lucide="book-plus" class="h-4 w-4 text-sky-600 dark:text-sky-300"></i>
-            </span>
-            <span class="text-[11px] font-bold leading-tight">Saisir registre</span>
-          </button>
-
-          <button type="button"
-            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-rose-400 hover:shadow-md transition-all group"
-            hx-get="{% url 'secretary:task_create' %}"
-            hx-target="#secretary-modal-content" hx-swap="innerHTML"
-            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-950/50 transition-transform group-hover:scale-110">
-              <i data-lucide="list-plus" class="h-4 w-4 text-rose-600 dark:text-rose-300"></i>
-            </span>
-            <span class="text-[11px] font-bold leading-tight">Créer tâche</span>
-          </button>
-
-          <button type="button"
-            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-emerald-400 hover:shadow-md transition-all group"
-            hx-get="{% url 'secretary:appointment_create' %}"
-            hx-target="#secretary-modal-content" hx-swap="innerHTML"
-            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/50 transition-transform group-hover:scale-110">
-              <i data-lucide="calendar-plus" class="h-4 w-4 text-emerald-600 dark:text-emerald-300"></i>
-            </span>
-            <span class="text-[11px] font-bold leading-tight">Programmer RDV</span>
-          </button>
-
-          <button type="button"
-            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-amber-400 hover:shadow-md transition-all group"
-            hx-get="{% url 'secretary:document_receipt_create' %}"
-            hx-target="#secretary-modal-content" hx-swap="innerHTML"
-            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/50 transition-transform group-hover:scale-110">
-              <i data-lucide="file-plus" class="h-4 w-4 text-amber-600 dark:text-amber-300"></i>
-            </span>
-            <span class="text-[11px] font-bold leading-tight">Recevoir pièce</span>
-          </button>
-
-          <button type="button"
-            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-violet-400 hover:shadow-md transition-all group"
-            hx-get="{% url 'secretary:visitor_create' %}"
-            hx-target="#secretary-modal-content" hx-swap="innerHTML"
-            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/50 transition-transform group-hover:scale-110">
-              <i data-lucide="user-plus" class="h-4 w-4 text-violet-600 dark:text-violet-300"></i>
-            </span>
-            <span class="text-[11px] font-bold leading-tight">Nouvelle visite</span>
-          </button>
-
-          <button type="button"
-            class="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-3.5 text-center hover:border-teal-400 hover:shadow-md transition-all group"
-            hx-get="{% url 'secretary:htmx_student_results' %}"
-            hx-target="#secretary-modal-content" hx-swap="innerHTML"
-            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-950/50 transition-transform group-hover:scale-110">
-              <i data-lucide="search" class="h-4 w-4 text-teal-600 dark:text-teal-300"></i>
-            </span>
-            <span class="text-[11px] font-bold leading-tight">Chercher étudiant</span>
-          </button>
-
-        </div>
-      </section>
-
-      {# ══════════════════════════════════════════════════════════
-         §7 — NOTIFICATIONS / MESSAGES
-      ══════════════════════════════════════════════════════════ #}
-      <section class="glass-card secretary-section secretary-section-slate rounded-3xl shadow-card px-5 pt-5 pb-5">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <p class="secretary-kicker">Boîte</p>
-            <h3 class="text-base font-extrabold">Messages récents</h3>
-          </div>
-          {% if messages_count > 0 %}
-          <span class="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-extrabold">
-            {{ messages_count }}
-          </span>
-          {% endif %}
-        </div>
-
-        <div class="space-y-2">
-          {% for notif in notifications|slice:":6" %}
-          <div class="flex items-start gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-3">
-            <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
-              <i data-lucide="bell" class="h-3.5 w-3.5 text-slate-500"></i>
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-xs font-extrabold truncate">{{ notif.title }}</p>
-              <p class="text-[11px] text-slate-400 mt-0.5 truncate">{{ notif.body|default:"Notification" }}</p>
-              <p class="text-[10px] text-slate-300 dark:text-slate-600 mt-0.5">{{ notif.created_at|date:"d/m H:i" }}</p>
-            </div>
-          </div>
-          {% empty %}
-          <p class="secretary-muted text-sm py-4 text-center">Aucune notification récente.</p>
-          {% endfor %}
-        </div>
-
-        <div class="mt-3">
-          <button class="secretary-btn secretary-btn-secondary w-full text-xs h-8 min-h-0 rounded-xl"
-            hx-get="{% url 'secretary:htmx_messages_panel' %}"
-            hx-target="#secretary-modal-content" hx-swap="innerHTML"
-            hx-on="htmx:afterOnLoad: window.sgOpenModal && window.sgOpenModal()">
-            Voir tous les messages
-          </button>
-        </div>
-      </section>
-
-      {# ══════════════════════════════════════════════════════════
-         §8 — NAVIGATION vers les listes avec compteurs
-      ══════════════════════════════════════════════════════════ #}
-      <section class="glass-card secretary-section secretary-section-emerald rounded-3xl shadow-card px-5 pt-5 pb-5">
-        <p class="secretary-kicker mb-1">Navigation</p>
-        <h3 class="text-base font-extrabold mb-4">Accès aux listes</h3>
-        <div class="space-y-1.5">
-
-          <a href="{% url 'secretary:registry_list' %}"
-             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-sky-400 hover:shadow-sm transition-all">
-            <div class="flex items-center gap-2.5">
-              <i data-lucide="book-copy" class="h-4 w-4 text-sky-500"></i>
-              <span class="text-sm font-bold">Registre</span>
-            </div>
-            {% if pending_registry_count %}<span class="text-[11px] font-extrabold text-slate-400">{{ pending_registry_count }}</span>{% endif %}
-          </a>
-
-          <a href="{% url 'secretary:appointment_list' %}"
-             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-emerald-400 hover:shadow-sm transition-all">
-            <div class="flex items-center gap-2.5">
-              <i data-lucide="calendar-check-2" class="h-4 w-4 text-emerald-500"></i>
-              <span class="text-sm font-bold">Rendez-vous</span>
-            </div>
-            {% if appointments_today %}<span class="text-[11px] font-extrabold text-slate-400">{{ appointments_today }}</span>{% endif %}
-          </a>
-
-          <a href="{% url 'secretary:visitor_list' %}"
-             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-violet-400 hover:shadow-sm transition-all">
-            <div class="flex items-center gap-2.5">
-              <i data-lucide="user-round-search" class="h-4 w-4 text-violet-500"></i>
-              <span class="text-sm font-bold">Visites</span>
-            </div>
-            {% if active_visits %}<span class="text-[11px] font-extrabold text-slate-400">{{ active_visits }}</span>{% endif %}
-          </a>
-
-          <a href="{% url 'secretary:task_list' %}"
-             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-rose-400 hover:shadow-sm transition-all">
-            <div class="flex items-center gap-2.5">
-              <i data-lucide="check-square" class="h-4 w-4 text-rose-500"></i>
-              <span class="text-sm font-bold">Tâches</span>
-            </div>
-            {% if pending_tasks %}<span class="text-[11px] font-extrabold text-slate-400">{{ pending_tasks }}</span>{% endif %}
-          </a>
-
-          <a href="{% url 'secretary:document_receipt_list' %}"
-             class="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 px-3.5 py-2.5 hover:border-amber-400 hover:shadow-sm transition-all">
-            <div class="flex items-center gap-2.5">
-              <i data-lucide="file-signature" class="h-4 w-4 text-amber-500"></i>
-              <span class="text-sm font-bold">Documents</span>
-            </div>
-            {% if pending_documents_count %}<span class="text-[11px] font-extrabold text-slate-400">{{ pending_documents_count }}</span>{% endif %}
-          </a>
-
-        </div>
-      </section>
-
-    </aside>
-
-  </div>{# /grid #}
-
-</div>{# /x-data #}
-
-<script>
-function secretaryDashboard() {
-  return {
-    currentDateTime: "",
-    resultsFilter: "",
-    kpis: [
-      {
-        label: "Registre",
-        value: "{{ pending_registry_count|default:0 }}",
-        icon: "book-copy",
-        bg: "bg-sky-50 dark:bg-sky-950/50",
-        color: "text-sky-600 dark:text-sky-300"
-      },
-      {
-        label: "Documents",
-        value: "{{ pending_documents_count|default:0 }}",
-        icon: "file-signature",
-        bg: "bg-amber-50 dark:bg-amber-950/50",
-        color: "text-amber-600 dark:text-amber-300"
-      },
-      {
-        label: "RDV",
-        value: "{{ appointments_today|default:0 }}",
-        icon: "calendar-check-2",
-        bg: "bg-emerald-50 dark:bg-emerald-950/50",
-        color: "text-emerald-600 dark:text-emerald-300"
-      },
-      {
-        label: "Visites",
-        value: "{{ active_visits|default:0 }}",
-        icon: "user-round-search",
-        bg: "bg-violet-50 dark:bg-violet-950/50",
-        color: "text-violet-600 dark:text-violet-300"
-      },
-      {
-        label: "Tâches",
-        value: "{{ pending_tasks|default:0 }}",
-        icon: "check-square",
-        bg: "bg-rose-50 dark:bg-rose-950/50",
-        color: "text-rose-600 dark:text-rose-300"
-      },
-    ],
-
-    init() {
-      this.tickClock();
-      setInterval(() => this.tickClock(), 30000);
-      this.$nextTick(() => {
-        if (window.lucide) window.lucide.createIcons();
-      });
-      // Re-render icons après chaque swap HTMX
-      document.body.addEventListener("htmx:afterSwap", () => {
-        if (window.lucide) window.lucide.createIcons();
-      });
-      // Refresh auto du dashboard toutes les 5 minutes
-      setInterval(() => {
-        if (!document.hidden) window.location.reload();
-      }, 300000);
-    },
-
-    tickClock() {
-      const now = new Date();
-      this.currentDateTime =
-        now.toLocaleDateString("fr-FR", {
-          weekday: "long", day: "numeric", month: "long", year: "numeric"
-        }) + " · " +
-        now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-    },
-
-    filterResults() {
-      const q = this.resultsFilter.toLowerCase().trim();
-      document.querySelectorAll(".result-row").forEach(row => {
-        row.style.display = (!q || row.dataset.search.includes(q)) ? "" : "none";
-      });
-    }
-  };
-}
-</script>
 {% endblock %}

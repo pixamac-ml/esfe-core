@@ -1,0 +1,53 @@
+{% extends "secretary/base.html" %}
+{% block title %}Rapport journalier registre{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="sg-section-header">
+    <div>
+      <h1>Rapport journalier du registre</h1>
+      <p class="help-text">{{ branch.name|default:"Toutes annexes" }} - {{ report_date|default:"Aujourd'hui" }}</p>
+    </div>
+    <div class="sg-section-actions">
+      <a class="sg-btn sg-btn-outline" href="?format=xlsx"><i class="fa-solid fa-file-excel"></i>Exporter Excel</a>
+      <a class="sg-btn sg-btn-outline" href="?format=pdf"><i class="fa-solid fa-file-pdf"></i>Exporter PDF</a>
+      <button class="sg-btn sg-btn-primary" type="button" onclick="window.print()"><i class="fa-solid fa-print"></i>Imprimer</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>N</th>
+        <th>Heure</th>
+        <th>Type</th>
+        <th>Visiteur</th>
+        <th>Etudiant</th>
+        <th>Service</th>
+        <th>Motif</th>
+        <th>Action</th>
+        <th>Statut</th>
+        <th>Heure sortie</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <td>{{ entry.registry_number|default:entry.pk }}</td>
+        <td>{{ entry.created_at|date:"H:i" }}</td>
+        <td>{{ entry.get_entry_type_display }}</td>
+        <td>{{ entry.visitor_name|default:"-" }}</td>
+        <td>{% if entry.related_student %}{{ entry.related_student.full_name }}{% else %}-{% endif %}</td>
+        <td>{{ entry.target_service|default:"Accueil" }}</td>
+        <td>{{ entry.motive|default:entry.description|truncatechars:60 }}</td>
+        <td>{{ entry.linked_actions|join:", " }}</td>
+        <td>{{ entry.get_status_display }}</td>
+        <td>{{ entry.exited_at|date:"H:i"|default:"-" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="10">Aucune entree pour cette journee.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

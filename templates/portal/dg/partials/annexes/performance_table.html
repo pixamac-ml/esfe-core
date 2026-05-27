@@ -1,61 +1,176 @@
 {% load humanize %}
 <div class="dg-card dg-card-pad">
-  <div class="dg-section-head">
+  <div class="dg-section-hero">
     <div>
-      <h3 class="dg-title">Performance des annexes</h3>
+      <div class="dg-section-hero-title">
+        <i class="fa-regular fa-building" style="color:#7c3aed; margin-right:8px;"></i>Annexes
+      </div>
+      <div class="dg-section-hero-sub">{{ total_branches|default:0 }} annexe{{ total_branches|pluralize:"s," }} active{{ total_branches|pluralize:"s," }} · Selectionnez pour detail</div>
+    </div>
+    <div class="dg-section-actions">
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=branch')">
+        <i class="fa-solid fa-eye"></i>Vue detaillee
+      </button>
+      <button type="button" class="dg-btn dg-btn-primary">
+        <i class="fa-solid fa-plus"></i>Nouvelle annexe
+      </button>
     </div>
   </div>
-  <div class="overflow-x-auto">
-    <table class="dg-table">
-      <thead>
-        <tr>
-          <th>Annexe</th>
-          <th>Responsable</th>
-          <th>Etudiants</th>
-          <th>Classes</th>
-          <th>Inscriptions</th>
-          <th>Revenus</th>
-          <th>Depenses</th>
-          <th>Solde</th>
-          <th>Alertes</th>
-          <th>Performance</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in branch_summaries %}
-        <tr>
-          <td class="font-black">{{ item.branch.name }}</td>
-          <td>{{ item.manager_name }}</td>
-          <td>{{ item.student_count|intcomma }}</td>
-          <td>{{ item.class_count|intcomma }}</td>
-          <td>{{ item.active_inscription_count|intcomma }}</td>
-          <td>{{ item.revenue_total|intcomma }}</td>
-          <td>{{ item.expense_total|intcomma }}</td>
-          <td class="{% if item.balance_total < 0 %}text-rose-700{% else %}text-emerald-700{% endif %} font-black">{{ item.balance_total|intcomma }}</td>
-          <td class="{% if item.open_alert_count %}text-rose-700{% endif %} font-black">{{ item.open_alert_count|intcomma }}</td>
-          <td>
-            <span class="dg-badge {% if item.performance_tone == 'green' %}bg-emerald-100 text-emerald-700{% elif item.performance_tone == 'orange' %}bg-orange-100 text-orange-700{% elif item.performance_tone == 'blue' %}bg-blue-100 text-blue-700{% else %}bg-slate-100 text-slate-600{% endif %}">
-              {{ item.performance_label }}
-            </span>
-          </td>
-          <td class="text-right">
-            <div class="flex justify-end gap-2">
-              <button type="button" class="dg-action" onclick="dgOpenDrawer('{{ item.drawer_url }}')">
-                <i class="fa-regular fa-eye"></i>
-              </button>
-              <button type="button" class="dg-action" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=branch&kind=branch&branch_id={{ item.branch.id }}')" title="Ouvrir">
-                <i class="fa-regular fa-window-restore"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="11" class="py-6 text-center font-semibold text-slate-500">Aucune annexe active.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+
+  <div class="dg-context-bar">
+    <div>
+      <div class="dg-context-label">Lecture des annexes</div>
+      <div class="dg-context-hint">Selectionnez une annexe pour ouvrir sa fiche, puis basculez vers finance, staff ou audit depuis le drawer.</div>
+    </div>
+    <div class="dg-context-main">
+      <span class="dg-scope-chip">{{ total_branches|default:0|intcomma }} annexes</span>
+      <span class="dg-scope-chip">{{ total_students|default:0|intcomma }} etudiants</span>
+      <span class="dg-scope-chip">{{ rh.branches_without_manager|default:0|intcomma }} sans manager</span>
+    </div>
+  </div>
+
+  <!-- Stats summary -->
+  <div class="dg-stat-grid" style="margin-bottom:16px;">
+    <div class="dg-stat-box" style="background:#f5f3ff;">
+      <div class="dg-stat-val" style="color:#7c3aed;">{{ total_branches|default:0 }}</div>
+      <div class="dg-stat-lbl">Annexes total</div>
+    </div>
+    <div class="dg-stat-box" style="background:#eff6ff;">
+      <div class="dg-stat-val" style="color:#2563eb;">{{ total_students|default:0|intcomma }}</div>
+      <div class="dg-stat-lbl">Etudiants</div>
+    </div>
+    <div class="dg-stat-box" style="background:#f0fdf4;">
+      <div class="dg-stat-val" style="color:#16a34a;">{{ rh.branches_with_manager|default:0 }}</div>
+      <div class="dg-stat-lbl">Avec manager</div>
+    </div>
+    <div class="dg-stat-box" style="background:#fef3c7;">
+      <div class="dg-stat-val" style="color:#d97706;">{{ rh.branches_without_manager|default:0 }}</div>
+      <div class="dg-stat-lbl">Sans manager</div>
+    </div>
+  </div>
+
+  <!-- Annexe cards grid -->
+  <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; margin-bottom:16px;">
+    {% for item in branch_summaries %}
+    <div class="dg-panel" style="border-top: 3px solid {% if item.balance_total >= 0 %}#16a34a{% else %}#ef4444{% endif %}; cursor:pointer;"
+      onclick="dgOpenDrawer('{{ item.drawer_url }}')">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+        <div>
+          <div style="font-size:.88rem; font-weight:900; color:#0f172a;">{{ item.branch.name }}</div>
+          <div style="font-size:.62rem; color:#94a3b8; font-weight:600;">Code: {{ item.branch.code|default:item.branch.id }}</div>
+        </div>
+        <span class="dg-badge-sm {% if item.open_alert_count %}dg-badge-red{% else %}dg-badge-green{% endif %}">
+          {% if item.open_alert_count %}A risque{% else %}Active{% endif %}
+        </span>
+      </div>
+      <div class="dg-stat-grid" style="margin-bottom:10px;">
+        <div class="dg-stat-box" style="background:#eff6ff;">
+          <div class="dg-stat-val" style="color:#2563eb; font-size:1.1rem;">{{ item.student_count|intcomma }}</div>
+          <div class="dg-stat-lbl">Etuds</div>
+        </div>
+        <div class="dg-stat-box" style="background:{% if item.balance_total >= 0 %}#f0fdf4{% else %}#fee2e2{% endif %};">
+          <div class="dg-stat-val" style="color:{% if item.balance_total >= 0 %}#16a34a{% else %}#ef4444{% endif %}; font-size:1rem;">{% if item.balance_total >= 0 %}+{% endif %}{{ item.balance_total|intcomma }}</div>
+          <div class="dg-stat-lbl">Solde</div>
+        </div>
+        <div class="dg-stat-box" style="background:{% if item.open_alert_count %}#fee2e2{% else %}#f1f5f9{% endif %};">
+          <div class="dg-stat-val" style="color:{% if item.open_alert_count %}#ef4444{% else %}#64748b{% endif %}; font-size:1.1rem;">{{ item.open_alert_count|intcomma }}</div>
+          <div class="dg-stat-lbl">Alertes</div>
+        </div>
+      </div>
+      <div style="font-size:.62rem; color:#64748b; font-weight:700; margin-bottom:10px;">
+        {% if item.manager_name and item.manager_name != 'Non assigne' %}
+        Manager: {{ item.manager_name }}
+        {% else %}
+        <span style="color:#ef4444;">Non assignee</span>
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.65rem; height:30px; justify-content:center;"
+          onclick="event.stopPropagation(); dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=branch&branch_id={{ item.branch.id }}')">
+          <i class="fa-solid fa-user"></i>Staff
+        </button>
+        <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.65rem; height:30px; justify-content:center;"
+          onclick="event.stopPropagation(); dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance&branch_id={{ item.branch.id }}')">
+          <i class="fa-solid fa-sack-dollar"></i>Finance
+        </button>
+        <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.65rem; height:30px; justify-content:center;"
+          onclick="event.stopPropagation(); dgOpenDrawer('{{ item.drawer_url }}')">
+          <i class="fa-solid fa-eye"></i>Voir
+        </button>
+      </div>
+    </div>
+    {% empty %}
+    {% for i in "xxxxxx" %}
+    <div class="dg-panel" style="padding:20px; text-align:center;">
+      <div style="font-size:.72rem; color:#94a3b8; font-weight:700;">Aucune annexe</div>
+    </div>
+    {% endfor %}
+    {% endfor %}
+  </div>
+
+  <!-- Full table -->
+  <div class="dg-panel">
+    <div class="dg-section-header">
+      <div class="dg-panel-title" style="margin:0;">Performance detaillee</div>
+      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px;" onclick="dgShowSection('analytics')">
+        <i class="fa-solid fa-chart-line"></i>Analytics
+      </button>
+    </div>
+    <div class="dg-table-wrap">
+      <table class="dg-table">
+        <thead>
+          <tr>
+            <th>Annexe</th>
+            <th>Manager</th>
+            <th>Etudiants</th>
+            <th>Classes</th>
+            <th>Inscriptions</th>
+            <th>Solde</th>
+            <th>Alertes</th>
+            <th>Perf.</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in branch_summaries %}
+          <tr>
+            <td class="font-black" style="color:#2563eb;">{{ item.branch.name }}</td>
+            <td>{{ item.manager_name|default:"—" }}</td>
+            <td>{{ item.student_count|intcomma }}</td>
+            <td>{{ item.class_count|intcomma }}</td>
+            <td>{{ item.active_inscription_count|intcomma }}</td>
+            <td class="{% if item.balance_total < 0 %}font-black text-rose-700{% else %}font-black text-emerald-700{% endif %}">
+              {% if item.balance_total >= 0 %}+{% endif %}{{ item.balance_total|intcomma }}
+            </td>
+            <td class="{% if item.open_alert_count %}font-black text-rose-700{% endif %}">{{ item.open_alert_count|intcomma }}</td>
+            <td>
+              <span class="dg-badge {% if item.performance_tone == 'green' %}bg-emerald-100 text-emerald-700{% elif item.performance_tone == 'orange' %}bg-orange-100 text-orange-700{% elif item.performance_tone == 'blue' %}bg-blue-100 text-blue-700{% else %}bg-slate-100 text-slate-600{% endif %}">
+                {{ item.performance_label }}
+              </span>
+            </td>
+            <td>
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="dg-btn dg-btn-outline" style="font-size:.62rem; height:26px; padding:0 .4rem;"
+                  onclick="dgOpenDrawer('{{ item.drawer_url }}')">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+                <button type="button" class="dg-btn dg-btn-outline" style="font-size:.62rem; height:26px; padding:0 .4rem;"
+                  onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=branch&kind=branch&branch_id={{ item.branch.id }}')">
+                  <i class="fa-solid fa-gear"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="dg-empty">
+              <div class="dg-empty-icon"><i class="fa-solid fa-building"></i></div>
+              <div class="dg-empty-text">Aucune annexe active</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>

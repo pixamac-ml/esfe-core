@@ -1,0 +1,55 @@
+{% extends "academics/reports/base_report.html" %}
+
+{% block title %}Diplome {{ award.reference }}{% endblock %}
+{% block report_title %}Diplome{% endblock %}
+{% block report_subtitle %}{{ diploma.name }}{% endblock %}
+{% block footer_left %}Reference {{ award.reference }}{% endblock %}
+{% block footer_right %}Matricule {{ student_matricule }}{% endblock %}
+
+{% block content %}
+  <style>
+    .diploma-shell { border: 2px solid #163c7a; padding: 36px; text-align: center; min-height: 620px; }
+    .small-title { color: #5b6474; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+    .student-name { margin: 30px 0 10px; color: #163c7a; font-size: 32px; font-weight: 800; }
+    .line { margin: 18px auto; max-width: 720px; font-size: 17px; line-height: 1.7; }
+    .meta { margin-top: 26px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: left; }
+    .meta article { border: 1px solid #d9dfeb; border-radius: 12px; padding: 12px; }
+    .meta span { display: block; color: #5b6474; font-size: 11px; text-transform: uppercase; }
+    .signature-row { margin-top: 64px; display: flex; justify-content: space-between; text-align: center; }
+    .signature { width: 260px; }
+    .signature-space { height: 70px; }
+  </style>
+
+  <section class="diploma-shell">
+    <div class="small-title">Ecole Superieure Felix Sante</div>
+    <h2>Certifie que</h2>
+    <div class="student-name">{{ student_full_name }}</div>
+    <p class="line">
+      Matricule {{ student_matricule }}, inscrit en {{ programme.title }}, a satisfait aux exigences academiques
+      de l'annee {{ academic_year.name }} et obtient le diplome suivant :
+    </p>
+    <h1>{{ diploma.name }}</h1>
+    <p class="line">
+      Moyenne finale : <strong>{{ average_display }}</strong>
+      {% if award.mention %} - Mention : <strong>{{ award.mention }}</strong>{% endif %}
+    </p>
+
+    <div class="meta">
+      <article><span>Reference</span>{{ award.reference }}</article>
+      <article><span>Annexe</span>{{ award.branch }}</article>
+      <article><span>Statut</span>{{ award.get_status_display }}</article>
+    </div>
+
+    <div class="signature-row">
+      <div class="signature">
+        <div class="signature-space"></div>
+        <strong>Direction des Etudes</strong>
+      </div>
+      <div class="signature">
+        <div>Bamako, le ..................................</div>
+        <div class="signature-space"></div>
+        <strong>Direction Generale</strong>
+      </div>
+    </div>
+  </section>
+{% endblock %}

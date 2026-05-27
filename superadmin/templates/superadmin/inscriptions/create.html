@@ -27,7 +27,11 @@
 
             {% if positioning.error_message %}
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                {{ positioning.error_message }}
+                <p class="font-semibold mb-1">Positionnement impossible pour le moment</p>
+                <p class="mb-3">{{ positioning.error_message }}</p>
+                <p class="text-xs text-amber-700 mb-0">
+                    Verifie qu'une classe active existe pour ce programme, cette annexe et l'annee academique {{ positioning.academic_year_name|default:candidature.academic_year }}.
+                </p>
             </div>
             {% endif %}
 
@@ -77,7 +81,7 @@
 
                 <div class="flex justify-end gap-2">
                     <a href="{% url 'superadmin:candidature_detail' candidature.pk %}" class="btn btn-outline">Annuler</a>
-                    <button type="submit" class="btn btn-primary" {% if not positioning.available_classes %}disabled{% endif %}><i class="fas fa-plus"></i>Creer l'inscription</button>
+                    <button type="submit" class="btn btn-primary" {% if not positioning.available_classes %}disabled title="Creez d'abord une classe academique compatible."{% endif %}><i class="fas fa-plus"></i>Creer l'inscription</button>
                 </div>
             </form>
             {% else %}

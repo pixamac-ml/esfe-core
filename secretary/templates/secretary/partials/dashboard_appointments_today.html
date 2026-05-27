@@ -1,0 +1,40 @@
+<div id="sg-appointments-today"
+     class="sg-panel"
+     hx-get="{% url 'secretary:htmx_appointments_today' %}"
+     hx-trigger="secretary:appointments-updated from:body"
+     hx-swap="outerHTML">
+  <div class="sg-table-wrap">
+    <table class="sg-table">
+      <thead><tr><th>Heure</th><th>Titre</th><th>Visiteur</th><th>Assigne a</th><th>Statut</th></tr></thead>
+      <tbody>
+        {% for item in today_appointments_rows %}
+        <tr>
+          <td style="font-weight:900;">{{ item.scheduled_at|date:"H:i" }}</td>
+          <td>{{ item.title }}</td>
+          <td>{{ item.person_name }}</td>
+          <td>{{ item.assigned_to|default:"-" }}</td>
+          <td><span class="sg-badge-sm sg-badge-green">{{ item.get_status_display }}</span></td>
+        </tr>
+        {% empty %}<tr><td colspan="5" class="sg-empty">Aucun rendez-vous aujourd'hui.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if appointments_page.has_other_pages %}
+    <div class="sg-pagination">
+      <div class="sg-pagination-info">Page {{ appointments_page.number }} / {{ appointments_page.paginator.num_pages }} - {{ appointments_page.paginator.count }} rendez-vous</div>
+      <div class="sg-pagination-actions">
+        {% if appointments_page.has_previous %}
+          <button class="sg-page-link" type="button" hx-get="{% url 'secretary:htmx_appointments_today' %}?appointments_page={{ appointments_page.previous_page_number }}" hx-target="#sg-appointments-today" hx-swap="outerHTML"><i class="fa-solid fa-chevron-left"></i>Precedent</button>
+        {% else %}
+          <span class="sg-page-link is-disabled"><i class="fa-solid fa-chevron-left"></i>Precedent</span>
+        {% endif %}
+        <span class="sg-page-link is-current">{{ appointments_page.number }}</span>
+        {% if appointments_page.has_next %}
+          <button class="sg-page-link" type="button" hx-get="{% url 'secretary:htmx_appointments_today' %}?appointments_page={{ appointments_page.next_page_number }}" hx-target="#sg-appointments-today" hx-swap="outerHTML">Suivant<i class="fa-solid fa-chevron-right"></i></button>
+        {% else %}
+          <span class="sg-page-link is-disabled">Suivant<i class="fa-solid fa-chevron-right"></i></span>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>

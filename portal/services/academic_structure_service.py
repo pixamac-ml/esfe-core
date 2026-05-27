@@ -13,6 +13,24 @@ from inscriptions.models import Inscription
 from students.models import Student
 
 
+def _group_programmes_by_cycle():
+    grouped = {}
+    programmes = Programme.objects.select_related("cycle").order_by(
+        "cycle__min_duration_years",
+        "cycle__name",
+        "title",
+        "id",
+    )[:300]
+    for programme in programmes:
+        cycle_name = programme.cycle.name if programme.cycle_id else "Sans cycle"
+        grouped.setdefault(cycle_name, []).append(programme)
+    return [{"cycle": cycle, "programmes": items} for cycle, items in grouped.items()]
+
+
+def _academic_class_name(*, programme, branch, academic_year, level):
+    return f"{level} {programme.title} - {branch.name} ({academic_year.name})"[:100]
+
+
 def build_academic_structure_context(*, branch, selected_class_id=None, student_query="", section="classes"):
     section = (section or "classes").strip().lower()
     if section not in {"classes", "maquettes", "affectations"}:
@@ -67,7 +85,7 @@ def build_academic_structure_context(*, branch, selected_class_id=None, student_
         "section": section,
         "semesters": semesters,
         "ue_rows": ue_rows,
-        "programmes": list(Programme.objects.order_by("title")[:300]),
+        "programmes_by_cycle": _group_programmes_by_cycle(),
         "academic_years": list(AcademicYear.objects.order_by("-start_date")[:20]),
         "unassigned_students": list(unassigned_students[:80]),
         "student_query": student_query,
@@ -102,11 +120,21 @@ def save_academic_class(*, branch, class_id=None, programme_id=None, academic_ye
         except (InvalidOperation, TypeError):
             raise ValidationError("Seuil de validation invalide.")
 
-    academic_class = (
-        AcademicClass.objects.select_for_update().filter(pk=class_id, branch=branch).first()
-        if class_id
-        else AcademicClass(branch=branch)
+    duplicate_class = AcademicClass.objects.select_for_update().filter(
+        programme=programme,
+        branch=branch,
+        academic_year=academic_year,
+        level=level,
     )
+
+    if class_id:
+        duplicate_class = duplicate_class.exclude(pk=class_id).first()
+        if duplicate_class is not None:
+            raise ValidationError("Une classe existe deja pour ce programme, cette annee et ce niveau.")
+        academic_class = AcademicClass.objects.select_for_update().filter(pk=class_id, branch=branch).first()
+    else:
+        academic_class = duplicate_class.first() or AcademicClass(branch=branch)
+
     if academic_class is None:
         raise ValidationError("Classe introuvable.")
 
@@ -115,7 +143,15 @@ def save_academic_class(*, branch, class_id=None, programme_id=None, academic_ye
     academic_class.level = level
     academic_class.study_level = _infer_study_level(level)
     academic_class.validation_threshold = validation_threshold
+    academic_class.name = _academic_class_name(
+        programme=programme,
+        branch=branch,
+        academic_year=academic_year,
+        level=level,
+    )
     academic_class.is_active = True
+    academic_class.is_archived = False
+    academic_class.archived_at = None
     academic_class.save()
 
     for number in (1, 2):

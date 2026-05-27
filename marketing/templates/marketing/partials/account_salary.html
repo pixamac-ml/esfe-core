@@ -1,0 +1,58 @@
+{% load humanize %}
+<div class="sg-section-panel is-active" data-sg-panel="salary">
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-money-bill-wave" style="color:#16a34a;margin-right:8px;"></i>Salaire et fiche de paie</div>
+      <div class="sg-section-hero-sub">Consultation personnelle. Les modifications et paiements restent gerees par le gestionnaire habilite.</div>
+    </div>
+    <span class="sg-scope-chip">Base: {{ marketing_profile.salary_base|default:0|intcomma }} FCFA</span>
+  </div>
+  <div class="sg-row-3" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ marketing_profile.salary_base|default:0|intcomma }}</div><div class="sg-stat-lbl">Base FCFA</div></div>
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{% if latest_salary_entry %}{{ latest_salary_entry.net_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Net dernier mois</div></div>
+    <div class="sg-stat-box" style="background:#fffbeb;"><div class="sg-stat-val" style="color:#d97706;">{% if latest_salary_entry %}{{ latest_salary_entry.remaining_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Reste a retirer</div></div>
+  </div>
+  <div class="sg-row-2">
+    <div class="sg-panel">
+      <div class="sg-panel-title">Historique paie</div>
+      <div class="sg-table-wrap">
+        <table class="sg-table">
+          <thead><tr><th>Periode</th><th>Base</th><th>Primes</th><th>Retenues</th><th>Net</th><th>Retire</th><th>Statut</th></tr></thead>
+          <tbody>
+            {% for entry in salary_entries %}
+              <tr>
+                <td style="font-weight:900;">{{ entry.period_month|date:"F Y" }}</td>
+                <td>{{ entry.base_salary|intcomma }}</td>
+                <td>{{ entry.allowances|intcomma }}</td>
+                <td>{{ entry.deductions|add:entry.advances|intcomma }}</td>
+                <td style="font-weight:900;">{{ entry.net_salary|intcomma }}</td>
+                <td>{{ entry.paid_amount|intcomma }}</td>
+                <td><span class="sg-badge-sm {% if entry.status == 'paid' %}sg-badge-green{% elif entry.status == 'ready' %}sg-badge-blue{% elif entry.status == 'partial' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ entry.get_status_display }}</span></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="sg-empty">Aucune fiche de paie disponible pour le moment.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if salary_entries_page.has_other_pages %}
+        <div class="sg-pagination">
+          <div class="sg-pagination-info">Page {{ salary_entries_page.number }} / {{ salary_entries_page.paginator.num_pages }}</div>
+          <div class="sg-pagination-actions">
+            {% if salary_entries_page.has_previous %}<button class="sg-page-link" type="button" hx-get="{% url 'marketing:account_salary' %}?salary_page={{ salary_entries_page.previous_page_number }}" hx-target="#marketing-account-panel"><i class="fa-solid fa-chevron-left"></i>Precedent</button>{% endif %}
+            <span class="sg-page-link is-current">{{ salary_entries_page.number }}</span>
+            {% if salary_entries_page.has_next %}<button class="sg-page-link" type="button" hx-get="{% url 'marketing:account_salary' %}?salary_page={{ salary_entries_page.next_page_number }}" hx-target="#marketing-account-panel">Suivant<i class="fa-solid fa-chevron-right"></i></button>{% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Regles d'acces</div>
+      <div class="message-list">
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Lecture uniquement</div><div class="sg-action-sub">Le responsable marketing consulte ses fiches sans modifier les montants.</div></div><span class="sg-badge-sm sg-badge-blue">RH</span></div>
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Correction salaire</div><div class="sg-action-sub">A demander au gestionnaire ou a la direction habilitee.</div></div><span class="sg-badge-sm sg-badge-gray">Controle</span></div>
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Probleme d'acces</div><div class="sg-action-sub">Traitement par l'informaticien pour garder la maintenabilite.</div></div><span class="sg-badge-sm sg-badge-amber">Support</span></div>
+      </div>
+    </div>
+  </div>
+</div>

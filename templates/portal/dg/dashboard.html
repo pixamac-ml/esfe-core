@@ -9,7 +9,10 @@
 
 {% block extra_head %}
 {{ block.super }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script
+  src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"
+  crossorigin="anonymous"
+></script>
 <style>
   :root {
     --dg-navy: #07162d;
@@ -22,7 +25,7 @@
   body { background: var(--dg-soft); color: var(--dg-text); }
   .dg-scroll::-webkit-scrollbar { width: 7px; height: 7px; }
   .dg-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-  .dg-shell { min-height: 100vh; display: flex; overflow: hidden; background: var(--dg-soft); }
+  .dg-shell { height: 100vh; min-height: 0; display: flex; overflow: hidden; background: var(--dg-soft); }
   .dg-sidebar {
     width: 270px;
     min-height: 100vh;
@@ -50,7 +53,7 @@
   }
   .dg-link:hover { background: rgba(255,255,255,.075); color: #fff; transform: translateX(2px); }
   .dg-link.active { background: linear-gradient(135deg, #3257ff, #4f46e5); color: #fff; box-shadow: 0 14px 24px rgba(37,99,235,.25); }
-  .dg-main { height: 100vh; min-width: 0; flex: 1; overflow-y: auto; }
+  .dg-main { height: 100vh; min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .dg-topbar {
     position: sticky;
     top: 0;
@@ -75,6 +78,7 @@
   .dg-filter label { display: none; }
   .dg-filter select { width: 100%; border: 0; outline: 0; background: transparent; color: #0f172a; font-size: .85rem; font-weight: 900; }
   .dg-search {
+    position: relative;
     height: 46px;
     min-width: 280px;
     display: flex;
@@ -96,6 +100,39 @@
     font-size: .88rem;
     font-weight: 750;
   }
+  .dg-search-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 8px);
+    z-index: 120;
+    display: none;
+    max-height: 340px;
+    overflow-y: auto;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    background: #fff;
+    padding: 8px;
+    box-shadow: 0 22px 50px rgba(15,23,42,.18);
+  }
+  .dg-search-panel.open { display: block; }
+  .dg-search-result {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 9px 10px;
+    text-align: left;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .dg-search-result:hover,
+  .dg-search-result.active { border-color: #bfdbfe; background: #eff6ff; }
+  .dg-search-result-title { display: block; color: #0f172a; font-size: .8rem; font-weight: 950; line-height: 1.25; }
+  .dg-search-result-meta { display: block; margin-top: 2px; color: #64748b; font-size: .66rem; font-weight: 800; }
+  .dg-search-empty { padding: 10px; color: #64748b; font-size: .76rem; font-weight: 800; }
   .dg-notif {
     position: relative;
     display: grid;
@@ -142,7 +179,9 @@
     font-weight: 950;
     box-shadow: 0 8px 20px rgba(37,99,235,.22);
   }
-  .dg-content { padding: 24px; }
+  .dg-scroll-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  .dg-content { padding: 20px 24px; }
+  .dg-content-wrap { width: 100%; }
   .dg-section { margin-top: 24px; }
   .dg-card {
     background: #fff;
@@ -188,23 +227,79 @@
     height: 38px;
     opacity: .9;
   }
-  .dg-table { width: 100%; border-collapse: collapse; }
+  .dg-panel { background: #fff; border: 1px solid #dfe7f3; border-radius: 16px; padding: 18px; box-shadow: 0 4px 16px rgba(15,23,42,.04); }
+  .dg-panel-title { font-size: .75rem; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; color: #64748b; margin-bottom: 14px; }
+  .dg-section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .dg-section-header-title { font-size: .9rem; font-weight: 900; color: #0f172a; }
+  .dg-section-header-sub { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
+  .dg-section-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #f1f5f9; }
+  .dg-section-hero-title { font-size: 1.2rem; font-weight: 900; color: #0f172a; }
+  .dg-section-hero-sub { font-size: .78rem; color: #64748b; margin-top: .2rem; }
+  .dg-section-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .dg-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; overflow: hidden; }
+  .dg-kpi-card { background: #fff; border: 1px solid #dfe7f3; border-radius: 16px; padding: 18px; min-height: 152px; position: relative; overflow: hidden; cursor: pointer; }
+  .dg-kpi-card:hover { box-shadow: 0 8px 24px rgba(15,23,42,.08); }
+  .dg-kpi-icon-wrap { position: absolute; right: 14px; top: 14px; width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; font-size: .95rem; }
+  .dg-kpi-label { font-size: .7rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+  .dg-kpi-value { font-size: 1.9rem; font-weight: 900; color: #0f172a; line-height: 1.1; margin-top: .4rem; }
+  .dg-kpi-detail { font-size: .65rem; font-weight: 700; color: #94a3b8; margin-top: .25rem; }
+  .dg-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dg-row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .dg-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .dg-row-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .dg-table-wrap { overflow-x: auto; max-width: 100%; }
+  .dg-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .dg-stat-box { text-align: center; padding: 12px; border-radius: 10px; }
+  .dg-stat-val { font-size: 1.4rem; font-weight: 900; }
+  .dg-stat-lbl { font-size: .62rem; font-weight: 800; text-transform: uppercase; margin-top: 2px; }
+  .dg-bar-item { margin-bottom: 8px; }
+  .dg-bar-label { display: flex; justify-content: space-between; gap: 12px; font-size: .68rem; font-weight: 700; color: #64748b; margin-bottom: 3px; }
+  .dg-bar-track { height: 6px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+  .dg-bar-fill { height: 100%; border-radius: 999px; }
+  .dg-action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dg-action-card { display: flex; align-items: center; justify-content: space-between; border: 1px solid #dce6f3; border-radius: .75rem; background: #fff; padding: 10px 14px; cursor: pointer; transition: all .15s; }
+  .dg-action-card:hover { border-color: #bfdbfe; background: #f8fbff; transform: translateY(-1px); }
+  .dg-action-label { font-size: .78rem; font-weight: 800; }
+  .dg-action-sub { font-size: .62rem; color: #94a3b8; font-weight: 600; margin-top: 1px; }
+  .dg-action-count { font-size: .68rem; font-weight: 950; padding: .2rem .5rem; border-radius: 999px; flex-shrink: 0; }
+  .dg-btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 36px; border-radius: .6rem; padding: 0 .85rem; font-size: .75rem; font-weight: 800; cursor: pointer; transition: all .15s; border: 1px solid; white-space: nowrap; }
+  .dg-btn-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .dg-btn-primary:hover { background: #1d4ed8; }
+  .dg-btn-outline { background: #fff; border-color: #dbe3ef; color: #475569; }
+  .dg-btn-outline:hover { background: #f8fafc; border-color: #bfdbfe; }
+  .dg-btn-danger { background: #fff; border-color: #fecaca; color: #ef4444; }
+  .dg-btn-danger:hover { background: #fef2f2; }
+  .dg-btn-success { background: #fff; border-color: #bbf7d0; color: #16a34a; }
+  .dg-btn-success:hover { background: #f0fdf4; }
+  .dg-btn-warning { background: #fff; border-color: #fde68a; color: #d97706; }
+  .dg-btn-warning:hover { background: #fffbeb; }
+  .dg-form-group { display: flex; flex-direction: column; gap: 4px; }
+  .dg-form-label { font-size: .7rem; font-weight: 800; color: #475569; }
+  .dg-form-select,
+  .dg-form-input { height: 38px; border: 1px solid #dbe3ef; border-radius: .6rem; padding: 0 .75rem; font-size: .82rem; background: #fff; color: #0f172a; outline: none; }
+  .dg-form-select:focus,
+  .dg-form-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+  .dg-empty { text-align: center; padding: 32px 16px; color: #94a3b8; }
+  .dg-empty-icon { font-size: 2rem; margin-bottom: 8px; opacity: .4; }
+  .dg-empty-text { font-size: .8rem; font-weight: 700; }
+  .dg-footer { text-align: center; padding: 10px; color: #94a3b8; font-size: .68rem; font-weight: 600; }
+  .dg-table { width: min-content; min-width: 100%; border-collapse: collapse; }
   .dg-table th {
-    padding: 13px 12px;
+    padding: 9px 11px;
     border-bottom: 1px solid #e7edf6;
     background: #fbfcff;
     color: #64748b;
-    font-size: .7rem;
+    font-size: .62rem;
     font-weight: 950;
     text-align: left;
     text-transform: uppercase;
     white-space: nowrap;
   }
   .dg-table td {
-    padding: 14px 12px;
-    border-bottom: 1px solid #edf2f7;
+    padding: 11px 11px;
+    border-bottom: 1px solid #f1f5f9;
     color: #0f172a;
-    font-size: .82rem;
+    font-size: .78rem;
     white-space: nowrap;
   }
   .dg-table tr:hover td { background: #f8fbff; }
@@ -218,6 +313,12 @@
     font-weight: 950;
     white-space: nowrap;
   }
+  .dg-badge-sm { font-size: .6rem; font-weight: 950; padding: .2rem .45rem; border-radius: 999px; white-space: nowrap; }
+  .dg-badge-green { background: #dcfce7; color: #16a34a; }
+  .dg-badge-red { background: #fee2e2; color: #ef4444; }
+  .dg-badge-amber { background: #fef3c7; color: #d97706; }
+  .dg-badge-blue { background: #dbeafe; color: #2563eb; }
+  .dg-badge-gray { background: #f1f5f9; color: #64748b; }
   .dg-action {
     display: inline-flex;
     min-height: 38px;
@@ -259,7 +360,7 @@
     top: 0;
     right: 0;
     z-index: 91;
-    width: min(680px, 100vw);
+    width: min(1040px, 96vw);
     height: 100vh;
     background: #fff;
     box-shadow: -28px 0 60px rgba(15,23,42,.18);
@@ -288,7 +389,7 @@
     width: min(1360px, calc(100vw - 28px));
     max-height: calc(100vh - 28px);
     overflow-y: auto;
-    border-radius: 22px;
+    border-radius: 14px;
     background: #fff;
     box-shadow: 0 32px 80px rgba(15,23,42,.28);
   }
@@ -300,6 +401,10 @@
   @media (max-width: 1500px) {
     .dg-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
+  @media (max-width: 1200px) {
+    .dg-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dg-row-3, .dg-row-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
   @media (max-width: 980px) {
     .dg-sidebar { position: fixed; z-index: 80; transform: translateX(-100%); }
     .dg-sidebar.open { transform: translateX(0); }
@@ -308,8 +413,90 @@
     .dg-filter { flex: 1 1 180px; }
     .dg-search { min-width: 100%; }
     .dg-avatar { width: 100%; justify-content: space-between; }
-    .dg-kpis, .dg-workflow-grid { grid-template-columns: 1fr; }
+    .dg-kpis, .dg-workflow-grid, .dg-kpi-grid, .dg-row-2, .dg-row-3, .dg-row-4, .dg-row-5, .dg-action-grid { grid-template-columns: 1fr; }
     .dg-content { padding: 14px; }
+    .dg-section-hero { flex-direction: column; }
+  }
+  .dg-nav-tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .dg-nav-tab {
+    padding: .4rem .85rem;
+    border-radius: .6rem;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    font-size: .72rem;
+    font-weight: 850;
+    color: #64748b;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .dg-nav-tab:hover { background: #f1f5f9; }
+  .dg-nav-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .dg-scope-bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: 16px; }
+  .dg-scope-chip { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: .35rem .75rem; font-size: .72rem; font-weight: 700; color: #475569; }
+  .dg-kpi:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(15,23,42,.07); }
+  .dg-clock {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    gap: .65rem;
+    border: 1px solid #dbeafe;
+    border-radius: .75rem;
+    background: #eff6ff;
+    padding: .35rem .75rem;
+    color: #1e40af;
+    white-space: nowrap;
+  }
+  .dg-clock-date { display: block; font-size: .62rem; font-weight: 850; color: #64748b; line-height: 1; }
+  .dg-clock-time { display: block; margin-top: .18rem; font-size: .9rem; font-weight: 950; color: #0f172a; line-height: 1; }
+  .dg-context-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    padding: 12px 14px;
+  }
+  .dg-context-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dg-context-label { font-size: .7rem; font-weight: 950; color: #334155; text-transform: uppercase; letter-spacing: .06em; }
+  .dg-context-hint { font-size: .72rem; font-weight: 750; color: #64748b; }
+  .dg-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; align-items: start; }
+  .dg-detail-main, .dg-detail-side, .dg-detail-section {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    padding: 16px;
+  }
+  .dg-detail-main { min-width: 0; }
+  .dg-detail-side { position: sticky; top: 86px; }
+  .dg-detail-title { font-size: 1.35rem; font-weight: 950; color: #0f172a; line-height: 1.15; }
+  .dg-detail-subtitle { margin-top: .35rem; font-size: .85rem; font-weight: 700; color: #64748b; }
+  .dg-detail-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+  .dg-detail-kpi { border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; padding: 12px; }
+  .dg-detail-kpi span { display: block; font-size: .68rem; font-weight: 850; color: #64748b; text-transform: uppercase; }
+  .dg-detail-kpi strong { display: block; margin-top: .35rem; font-size: 1.12rem; font-weight: 950; color: #0f172a; }
+  .dg-detail-list { margin-top: 12px; display: grid; gap: 8px; }
+  .dg-detail-list-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #f1f5f9; padding: 8px 0; font-size: .82rem; }
+  .dg-detail-list-row:last-child { border-bottom: 0; }
+  .dg-drawer-item {
+    display: block;
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 10px 12px;
+    text-align: left;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .dg-drawer-item:hover { background: #fff; border-color: #bfdbfe; }
+  @media (max-width: 900px) {
+    .dg-detail-grid { grid-template-columns: 1fr; }
+    .dg-detail-side { position: static; }
+    .dg-detail-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 </style>
 {% endblock %}
@@ -328,18 +515,30 @@
         </div>
       </div>
     </div>
-    <div class="flex h-[calc(100vh-78px)] flex-col overflow-y-auto px-3 py-5 dg-scroll">
-      <div class="dg-hide-compact mb-3 px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Pilotage executif</div>
-      <nav class="space-y-1.5">
-        <button type="button" :class="activeSection === 'overview' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('overview')"><i class="fa-solid fa-network-wired w-5 text-center"></i><span>Vue globale</span></button>
-        <button type="button" :class="activeSection === 'alerts' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('alerts')"><i class="fa-solid fa-triangle-exclamation w-5 text-center"></i><span>Alertes & Risques</span><span class="dg-badge ml-auto bg-rose-500 text-white">{{ open_alerts }}</span></button>
-        <button type="button" :class="activeSection === 'workflows' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('workflows')"><i class="fa-solid fa-arrows-rotate w-5 text-center"></i><span>Passages & Reinscriptions</span></button>
-        <button type="button" :class="activeSection === 'schedule' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('schedule')"><i class="fa-regular fa-calendar-days w-5 text-center"></i><span>Emploi du temps</span></button>
-        <button type="button" :class="activeSection === 'annexes' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('annexes')"><i class="fa-regular fa-building w-5 text-center"></i><span>Annexes</span></button>
-        <button type="button" :class="activeSection === 'finance' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('finance')"><i class="fa-solid fa-sack-dollar w-5 text-center"></i><span>Finance</span></button>
+<div class="flex h-[calc(100vh-78px)] flex-col overflow-y-auto px-3 py-5 dg-scroll">
+      <div class="dg-hide-compact mb-1 px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Pilotage</div>
+      <nav class="space-y-.5">
+        <button type="button" :class="activeSection === 'overview' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('overview')"><i class="fa-solid fa-home w-5 text-center"></i><span>Vue globale</span></button>
         <button type="button" :class="activeSection === 'analytics' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('analytics')"><i class="fa-solid fa-chart-line w-5 text-center"></i><span>Analytics</span></button>
-        <button type="button" :class="activeSection === 'realtime' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('realtime')"><i class="fa-solid fa-wave-square w-5 text-center"></i><span>Temps reel</span></button>
+        <button type="button" :class="activeSection === 'realtime' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('realtime')"><i class="fa-solid fa-wave-square w-5 text-center"></i><span>Temps reel</span><span class="dg-badge bg-blue-600 text-white ml-auto">LIVE</span></button>
+      </nav>
+      <div class="dg-hide-compact mt-2 mb-1 h-px bg-white/10"></div>
+      <div class="dg-hide-compact px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Operations</div>
+      <nav class="space-y-.5">
+        <button type="button" :class="activeSection === 'alerts' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('alerts')"><i class="fa-solid fa-triangle-exclamation w-5 text-center"></i><span>Alertes & Risques</span><span class="dg-badge bg-rose-500 text-white ml-auto">{{ open_alerts }}</span></button>
+        <button type="button" :class="activeSection === 'workflows' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('workflows')"><i class="fa-solid fa-arrows-rotate w-5 text-center"></i><span>Passages & Reins.</span><span class="dg-badge bg-amber-500 text-white ml-auto">{{ workflow.blocked_count }}</span></button>
+        <button type="button" :class="activeSection === 'schedule' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('schedule')"><i class="fa-regular fa-calendar-days w-5 text-center"></i><span>Emploi du temps</span></button>
+      </nav>
+      <div class="dg-hide-compact mt-2 mb-1 h-px bg-white/10"></div>
+      <div class="dg-hide-compact px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Ressources</div>
+      <nav class="space-y-.5">
+        <button type="button" :class="activeSection === 'annexes' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('annexes')"><i class="fa-regular fa-building w-5 text-center"></i><span>Annexes</span></button>
         <button type="button" :class="activeSection === 'rh' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('rh')"><i class="fa-solid fa-user-group w-5 text-center"></i><span>RH / Staff</span></button>
+      </nav>
+      <div class="dg-hide-compact mt-2 mb-1 h-px bg-white/10"></div>
+      <div class="dg-hide-compact px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Finance</div>
+      <nav class="space-y-.5">
+        <button type="button" :class="activeSection === 'finance' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('finance')"><i class="fa-solid fa-sack-dollar w-5 text-center"></i><span>Finance</span></button>
       </nav>
       <div class="mt-auto"></div>
       <form method="post" action="{% url 'accounts:logout' %}" class="mt-3">
@@ -366,7 +565,8 @@
         <div class="dg-filter-row flex items-center gap-3">
           <label class="dg-search" title="Recherche">
             <i class="fa-solid fa-magnifying-glass"></i>
-          <input id="dg-search-input" type="search" placeholder="Rechercher" oninput="dgSearchCurrentSection(this.value)" onkeydown="if (event.key === 'Enter') { event.preventDefault(); dgSearchCurrentSection(this.value); }">
+          <input id="dg-search-input" type="search" placeholder="Rechercher DG / DGA" autocomplete="off" oninput="dgSearchCurrentSection(this.value)" onkeydown="dgHandleSearchKey(event)">
+          <div id="dg-search-panel" class="dg-search-panel dg-scroll"></div>
           </label>
           <div class="dg-filter">
             <label>Annexe</label>
@@ -385,10 +585,18 @@
             <option value="week" {% if dashboard_period == "week" %}selected{% endif %}>Cette semaine</option>
           </select>
           </div>
-        <button type="button" class="dg-notif" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')">
-          <i class="fa-regular fa-bell text-lg"></i>
+        {% include "communication/partials/dashboard_widget.html" %}
+        <button type="button" class="dg-notif" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')" title="Alertes DG">
+          <i class="fa-solid fa-triangle-exclamation text-lg"></i>
           <span>{{ open_alerts }}</span>
         </button>
+        <div class="dg-clock" title="Heure locale">
+          <i class="fa-regular fa-clock"></i>
+          <span>
+            <span class="dg-clock-date" data-dg-live-date>{{ generated_at|date:"d/m/Y" }}</span>
+            <span class="dg-clock-time" data-dg-live-clock>{{ generated_at|date:"H:i:s" }}</span>
+          </span>
+        </div>
         <div class="dg-avatar">
           <div class="hidden text-right xl:block">
             <p class="text-sm font-black text-slate-950">{{ executive_display_name }}</p>
@@ -399,23 +607,40 @@
       </div>
     </header>
 
-    <div class="dg-content">
-      <section class="mb-5 flex flex-wrap items-center gap-2 text-xs font-black">
-        <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700">{{ dashboard_scope_label }}</span>
-        <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700">{{ total_branches|intcomma }} annexe{% if total_branches > 1 %}s{% endif %}</span>
-        <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700">{{ total_students|intcomma }} etudiants</span>
-        <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700">{{ schedule.total_events|intcomma }} cours semaine</span>
-      </section>
-      <section id="overview" x-show="activeSection === 'overview'" x-cloak class="dg-card dg-card-pad">
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+<div class="dg-content dg-scroll-area">
+      <div class="dg-content-wrap">
+        <!-- SCOPE BAR -->
+        <div class="dg-context-bar">
           <div>
-            <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Direction generale</p>
-            <h2 class="mt-2 text-3xl font-black leading-tight text-slate-950">Cockpit executif institutionnel</h2>
+            <div class="dg-context-label">Contexte de lecture</div>
+            <div class="dg-context-hint">Les sections suivent le filtre annexe et periode. L'emploi du temps ajoute le filtre classe.</div>
+          </div>
+          <div class="dg-context-main">
+            <span class="dg-scope-chip"><i class="fa-solid fa-globe" style="margin-right:4px;"></i>{{ dashboard_scope_label }}</span>
+            <span class="dg-scope-chip"><i class="fa-solid fa-building" style="margin-right:4px;"></i>{{ total_branches|intcomma }} annexe{% if total_branches > 1 %}s{% endif %}</span>
+            <span class="dg-scope-chip"><i class="fa-solid fa-users" style="margin-right:4px;"></i>{{ total_students|intcomma }} etudiants</span>
+            <span class="dg-scope-chip"><i class="fa-solid fa-calendar" style="margin-right:4px;"></i>{{ schedule.total_events|intcomma }} cours / semaine</span>
+          </div>
+        </div>
+
+        <!-- NAV TABS -->
+        <div class="dg-nav-tabs mb-4 flex gap-1.5 flex-wrap">
+          <template x-for="s in ['overview','alerts','workflows','schedule','annexes','finance','rh','analytics','realtime']" :key="s">
+            <button type="button" :class="activeSection === s ? 'dg-nav-tab active' : 'dg-nav-tab'" @click="dgShowSection(s)" x-text="s.charAt(0).toUpperCase() + s.slice(1).replace(/([A-Z])/g,' $1')"></button>
+          </template>
+        </div>
+
+        <!-- OVERVIEW SECTION -->
+        <section id="overview" x-show="activeSection === 'overview'" x-cloak class="dg-card dg-card-pad">
+          <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Direction generale</p>
+              <h2 class="mt-2 text-3xl font-black leading-tight text-slate-950">Cockpit executif institutionnel</h2>
           </div>
           <div class="flex items-center gap-3 text-xs font-semibold text-slate-500">
             <span class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-            <span>Systeme operationnel</span>
-            <span>Maj : {{ generated_at|date:"H:i:s" }}</span>
+            <span>Lecture actualisee</span>
+            <span data-dg-live-clock>{{ generated_at|date:"H:i:s" }}</span>
           </div>
         </div>
         <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -589,10 +814,36 @@
               {% endfor %}
             </div>
           </div>
-        </div>
+</div>
       </section>
 
-      <section id="dg-workspace" class="dg-section" x-show="activeSection !== 'overview'" x-cloak>
+      <!-- ALL SECTIONS — rendered server-side, Alpine.js controls visibility -->
+      <section id="dg-section-alerts" class="dg-section" x-show="activeSection === 'alerts'" x-cloak>
+        {% include "portal/dg/partials/alerts/priority_table.html" %}
+      </section>
+      <section id="dg-section-workflows" class="dg-section" x-show="activeSection === 'workflows'" x-cloak>
+        {% include "portal/dg/partials/workflows/reenrollment.html" %}
+      </section>
+      <section id="dg-section-schedule" class="dg-section" x-show="activeSection === 'schedule'" x-cloak>
+        {% include "portal/dg/partials/schedule/overview.html" %}
+      </section>
+      <section id="dg-section-annexes" class="dg-section" x-show="activeSection === 'annexes'" x-cloak>
+        {% include "portal/dg/partials/annexes/performance_table.html" %}
+      </section>
+      <section id="dg-section-finance" class="dg-section" x-show="activeSection === 'finance'" x-cloak>
+        {% include "portal/dg/partials/finance/summary.html" %}
+      </section>
+      <section id="dg-section-rh" class="dg-section" x-show="activeSection === 'rh'" x-cloak>
+        {% include "portal/dg/partials/rh/staff.html" %}
+      </section>
+      <section id="dg-section-analytics" class="dg-section" x-show="activeSection === 'analytics'" x-cloak>
+        {% include "portal/dg/partials/analytics/charts.html" %}
+      </section>
+      <section id="dg-section-realtime" class="dg-section" x-show="activeSection === 'realtime'" x-cloak>
+        {% include "portal/dg/partials/realtime/monitoring.html" %}
+      </section>
+
+      <section id="dg-workspace" class="dg-section" x-show="activeSection !== 'overview' && !['alerts','workflows','schedule','annexes','finance','rh','analytics','realtime'].includes(activeSection)" x-cloak>
         <div class="dg-card dg-card-pad">
           <div class="dg-section-head">
             <div>
@@ -625,6 +876,10 @@
         </div>
       </section>
 
+      <div class="dg-footer">
+        Dashboard DG - ESFE Mali
+      </div>
+
     </div>
   </main>
 
@@ -638,7 +893,7 @@
           </button>
           <div class="min-w-0">
             <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Detail executif</p>
-            <h3 class="mt-1 truncate text-xl font-black text-slate-950">Analyse rapide</h3>
+            <h3 class="mt-1 truncate text-xl font-black text-slate-950">Fiche de decision</h3>
           </div>
         </div>
         <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50" onclick="dgCloseDrawer()">
@@ -698,6 +953,9 @@
       return;
     }
     dgLoadSection(normalized, true);
+    window.setTimeout(function() {
+      dgEnsureDashboardLibs(dgBuildCharts);
+    }, 80);
   }
 
   function dgGetCurrentSection() {
@@ -722,6 +980,10 @@
     if (!hadBranchParam) {
       if (branchId) url.searchParams.set('branch_id', branchId);
       else url.searchParams.delete('branch_id');
+    }
+    const classId = window.dgToolbarState && window.dgToolbarState.classId;
+    if (classId && dgGetCurrentSection() === 'schedule' && !url.searchParams.has('class_id')) {
+      url.searchParams.set('class_id', classId);
     }
     return url;
   }
@@ -753,6 +1015,7 @@
   function dgHandleBranchChange(value) {
     window.dgToolbarState = window.dgToolbarState || {};
     window.dgToolbarState.branchId = value || '';
+    window.dgToolbarState.classId = '';
     const currentSection = dgGetCurrentSection();
     if (currentSection === 'overview') {
       const period = (window.dgToolbarState && window.dgToolbarState.period) || (document.getElementById('dg-period-select') && document.getElementById('dg-period-select').value) || 'month';
@@ -767,8 +1030,21 @@
   function dgLoadScheduleWeek(weekStart) {
     window.dgToolbarState = window.dgToolbarState || {};
     window.dgToolbarState.weekStart = weekStart || '';
-    const target = document.getElementById('dg-workspace');
-    if (target) target.dataset.section = '';
+    dgLoadSection('schedule', true);
+  }
+
+  function dgScheduleBranchChange(value) {
+    const branch = document.getElementById('dg-branch-select');
+    if (branch) branch.value = value || '';
+    window.dgToolbarState = window.dgToolbarState || {};
+    window.dgToolbarState.branchId = value || '';
+    window.dgToolbarState.classId = '';
+    dgLoadSection('schedule', true);
+  }
+
+  function dgScheduleClassChange(value) {
+    window.dgToolbarState = window.dgToolbarState || {};
+    window.dgToolbarState.classId = value || '';
     dgLoadSection('schedule', true);
   }
 
@@ -827,40 +1103,169 @@
     });
   }
 
-  function dgSearchCurrentSection(query) {
-    const term = (query || '').trim().toLowerCase();
-    dgClearSearchHits();
-    if (!term) return;
-    const currentSection = dgGetCurrentSection();
-    const scope = currentSection === 'overview' ? document.getElementById('overview') : document.getElementById('dg-workspace');
-    if (!scope) return;
-    const candidates = scope.querySelectorAll('tr, .dg-card, .dg-workflow-card, .dg-quick-action, .rounded-2xl, .rounded-xl, button, a');
-    const matches = [];
-    candidates.forEach(function(node) {
-      const text = (node.textContent || '').toLowerCase();
-      if (text.includes(term)) matches.push(node);
-    });
-    if (matches.length) {
-      matches.slice(0, 6).forEach(function(node) {
-        node.classList.add('dg-search-hit');
+  function dgNormalizeSearchText(value) {
+    return (value || '')
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function dgSearchSections() {
+    return [
+      { key: 'overview', label: 'Vue globale', node: document.getElementById('overview') },
+      { key: 'alerts', label: 'Alertes & risques', node: document.getElementById('dg-section-alerts') },
+      { key: 'workflows', label: 'Passages, bulletins, diplomes', node: document.getElementById('dg-section-workflows') },
+      { key: 'schedule', label: 'Emploi du temps', node: document.getElementById('dg-section-schedule') },
+      { key: 'annexes', label: 'Annexes', node: document.getElementById('dg-section-annexes') },
+      { key: 'finance', label: 'Finance', node: document.getElementById('dg-section-finance') },
+      { key: 'rh', label: 'RH / Staff', node: document.getElementById('dg-section-rh') },
+      { key: 'analytics', label: 'Analytics', node: document.getElementById('dg-section-analytics') },
+      { key: 'realtime', label: 'Temps reel', node: document.getElementById('dg-section-realtime') },
+    ];
+  }
+
+  function dgSearchCandidates(scope) {
+    if (!scope) return [];
+    return Array.from(scope.querySelectorAll('tr, .dg-panel, .dg-card, .dg-quick-action, .dg-action-card, .dg-kpi-card, .dg-stat-box, button, a'))
+      .filter(function(node) {
+        return node.offsetParent !== null || node.closest('[x-show]');
       });
-      matches[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function dgBuildSearchResults(query) {
+    const term = dgNormalizeSearchText(query);
+    if (term.length < 2) return [];
+    const results = [];
+    const seen = new Set();
+    dgSearchSections().forEach(function(section) {
+      dgSearchCandidates(section.node).forEach(function(node, index) {
+        const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!text || text.length < 2) return;
+        const normalized = dgNormalizeSearchText(text);
+        if (!normalized.includes(term)) return;
+        const key = section.key + ':' + normalized.slice(0, 90);
+        if (seen.has(key)) return;
+        seen.add(key);
+        results.push({
+          id: key,
+          section: section.key,
+          sectionLabel: section.label,
+          title: text.slice(0, 90),
+          node: node,
+          score: normalized.indexOf(term) === 0 ? 0 : index + 1,
+        });
+      });
+    });
+    return results.sort(function(a, b) {
+      if (a.section === dgGetCurrentSection() && b.section !== dgGetCurrentSection()) return -1;
+      if (b.section === dgGetCurrentSection() && a.section !== dgGetCurrentSection()) return 1;
+      return a.score - b.score;
+    }).slice(0, 10);
+  }
+
+  function dgRenderSearchPanel(results, query) {
+    const panel = document.getElementById('dg-search-panel');
+    if (!panel) return;
+    panel.innerHTML = '';
+    if (dgNormalizeSearchText(query).length < 2) {
+      panel.classList.remove('open');
+      return;
+    }
+    panel.classList.add('open');
+    if (!results.length) {
+      const mapped = dgGetSectionFromKeyword(dgNormalizeSearchText(query));
+      if (mapped) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'dg-search-result active';
+        button.innerHTML = '<span><span class="dg-search-result-title"></span><span class="dg-search-result-meta"></span></span><i class="fa-solid fa-arrow-right"></i>';
+        button.querySelector('.dg-search-result-title').textContent = 'Ouvrir la section correspondante';
+        button.querySelector('.dg-search-result-meta').textContent = mapped;
+        button.addEventListener('click', function() {
+          panel.classList.remove('open');
+          dgShowSection(mapped);
+        });
+        panel.appendChild(button);
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'dg-search-empty';
+        empty.textContent = 'Aucun resultat dans le perimetre affiche.';
+        panel.appendChild(empty);
+      }
+      return;
+    }
+    results.forEach(function(result, index) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'dg-search-result' + (index === 0 ? ' active' : '');
+      button.dataset.index = String(index);
+      button.innerHTML = '<span><span class="dg-search-result-title"></span><span class="dg-search-result-meta"></span></span><i class="fa-solid fa-arrow-right"></i>';
+      button.querySelector('.dg-search-result-title').textContent = result.title;
+      button.querySelector('.dg-search-result-meta').textContent = result.sectionLabel;
+      button.addEventListener('click', function() {
+        dgOpenSearchResult(index);
+      });
+      panel.appendChild(button);
+    });
+  }
+
+  window.dgSearchResults = window.dgSearchResults || [];
+
+  function dgSearchCurrentSection(query) {
+    const term = dgNormalizeSearchText(query);
+    dgClearSearchHits();
+    window.dgSearchResults = dgBuildSearchResults(term);
+    dgRenderSearchPanel(window.dgSearchResults, term);
+    if (window.dgSearchResults.length) {
+      window.dgSearchResults.slice(0, 5).forEach(function(result) {
+        result.node.classList.add('dg-search-hit');
+      });
       return;
     }
     const mapped = dgGetSectionFromKeyword(term);
-    if (mapped) dgShowSection(mapped);
+    if (mapped && term.length >= 3) dgShowSection(mapped);
+  }
+
+  function dgOpenSearchResult(index) {
+    const result = (window.dgSearchResults || [])[index || 0];
+    if (!result) return;
+    const panel = document.getElementById('dg-search-panel');
+    if (panel) panel.classList.remove('open');
+    dgShowSection(result.section);
+    window.setTimeout(function() {
+      dgClearSearchHits();
+      result.node.classList.add('dg-search-hit');
+      result.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 180);
+  }
+
+  function dgHandleSearchKey(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if ((window.dgSearchResults || []).length) dgOpenSearchResult(0);
+      else dgSearchCurrentSection(event.target.value);
+      return;
+    }
+    if (event.key === 'Escape') {
+      const panel = document.getElementById('dg-search-panel');
+      if (panel) panel.classList.remove('open');
+      event.target.blur();
+    }
   }
 
   function dgGetSectionFromKeyword(term) {
     if (!term) return '';
     if (term.includes('finance') || term.includes('caiss') || term.includes('revenue')) return 'finance';
     if (term.includes('alert') || term.includes('risque') || term.includes('risk')) return 'alerts';
-    if (term.includes('workflow') || term.includes('passage') || term.includes('reinscription')) return 'workflows';
+    if (term.includes('workflow') || term.includes('passage') || term.includes('reinscription') || term.includes('bulletin') || term.includes('diplome')) return 'workflows';
     if (term.includes('emploi') || term.includes('planning') || term.includes('schedule') || term.includes('cours') || term.includes('cahier')) return 'schedule';
-    if (term.includes('annexe') || term.includes('academ') || term.includes('classe')) return 'annexes';
-    if (term.includes('rh') || term.includes('staff') || term.includes('recrut')) return 'rh';
-    if (term.includes('live') || term.includes('reel') || term.includes('temps')) return 'realtime';
-    if (term.includes('analyt') || term.includes('audit') || term.includes('graph')) return 'analytics';
+    if (term.includes('annexe') || term.includes('ecole') || term.includes('academ') || term.includes('classe')) return 'annexes';
+    if (term.includes('rh') || term.includes('staff') || term.includes('personnel') || term.includes('recrut')) return 'rh';
+    if (term.includes('live') || term.includes('reel') || term.includes('temps') || term.includes('activite')) return 'realtime';
+    if (term.includes('analyt') || term.includes('audit') || term.includes('graph') || term.includes('stat')) return 'analytics';
     return '';
   }
 
@@ -869,6 +1274,7 @@
     domain: (document.getElementById('dg-domain-select') && document.getElementById('dg-domain-select').value) || 'overview',
     period: (document.getElementById('dg-period-select') && document.getElementById('dg-period-select').value) || '{{ dashboard_period|default:"month" }}',
     branchId: (document.getElementById('dg-branch-select') && document.getElementById('dg-branch-select').value) || '{{ selected_branch_id|default:"" }}',
+    classId: (new URL(window.location.href)).searchParams.get('class_id') || '',
   };
   window.dgUIState = window.dgUIState || {
     modalOpen: false,
@@ -914,8 +1320,8 @@
   function dgAbortOverlayRequest(kind) {
     const key = kind === 'modal' ? 'modalRequest' : 'drawerRequest';
     const request = window.dgUIState[key];
-    if (request && typeof request.abort === 'function') {
-      request.abort();
+    if (request) {
+      request.cancelled = true;
     }
     window.dgUIState[key] = null;
   }
@@ -924,8 +1330,8 @@
     const target = document.getElementById(targetId);
     if (!target || !url) return;
     dgAbortOverlayRequest(kind);
-    const controller = new AbortController();
-    window.dgUIState[kind === 'modal' ? 'modalRequest' : 'drawerRequest'] = controller;
+    const requestState = { cancelled: false };
+    window.dgUIState[kind === 'modal' ? 'modalRequest' : 'drawerRequest'] = requestState;
     target.innerHTML = '<div class="p-6 text-sm font-bold text-slate-500">Chargement...</div>';
     const scopedUrl = dgBuildScopedUrl(url, {});
     if (kind === 'drawer') {
@@ -935,18 +1341,17 @@
     if (kind === 'modal') window.dgUIState.modalUrl = scopedUrl.toString();
     fetch(scopedUrl.toString(), {
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      signal: controller.signal,
     })
       .then(response => response.text().then(html => ({ ok: response.ok, html })))
       .then(({ ok, html }) => {
-        if (controller.signal.aborted) return;
+        if (requestState.cancelled || window.dgUIState[kind === 'modal' ? 'modalRequest' : 'drawerRequest'] !== requestState) return;
         if (!ok) throw new Error('overlay load failed');
         target.innerHTML = html;
         dgWireRecruitmentModal();
-        dgBuildCharts();
+        dgEnsureDashboardLibs(dgBuildCharts);
       })
       .catch(error => {
-        if (error && error.name === 'AbortError') return;
+        if (requestState.cancelled) return;
         if (kind === 'modal') dgCloseModal();
         else dgCloseDrawer();
         dgShowNotice('Impossible de charger le contenu.', true);
@@ -954,36 +1359,49 @@
   }
 
   function dgLoadSection(section, force) {
-    const allowed = new Set(['kpis', 'alerts', 'workflows', 'schedule', 'annexes', 'finance', 'analytics', 'realtime', 'rh']);
+    const allowed = new Set(['alerts', 'workflows', 'schedule', 'annexes', 'finance', 'rh', 'analytics', 'realtime']);
     const normalized = allowed.has(section) ? section : 'overview';
-    const target = document.getElementById('dg-workspace');
-    if (!target) return;
-    if (normalized === 'overview') {
-      target.innerHTML = '';
+    if (normalized === 'overview') return;
+    const preRendered = document.getElementById(`dg-section-${normalized}`);
+    if (preRendered && !force) {
+      window.setTimeout(function() {
+        dgEnsureDashboardLibs(dgBuildCharts);
+      }, 80);
       return;
     }
+    const target = preRendered || document.getElementById(`dg-workspace-${normalized}`) || document.getElementById('dg-workspace');
+    if (!target) return;
     if (!force && target.dataset.section === normalized) return;
     target.dataset.section = normalized;
     const period = (window.dgToolbarState && window.dgToolbarState.period) || 'month';
     const scopedUrl = dgBuildScopedUrl(`${DG_SECTION_BASE}${normalized}/`, {
       period: period,
       week_start: normalized === 'schedule' ? (window.dgToolbarState && window.dgToolbarState.weekStart) || '' : '',
+      class_id: normalized === 'schedule' ? (window.dgToolbarState && window.dgToolbarState.classId) || '' : '',
     });
     target.innerHTML = '<div class="dg-card dg-card-pad"><div class="text-sm font-bold text-slate-500">Chargement de la section...</div></div>';
     fetch(scopedUrl.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(response => response.text())
+      .then(response => {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.text();
+      })
       .then(html => {
         target.innerHTML = html;
         dgWireRecruitmentModal();
-        dgBuildCharts();
+        dgEnsureDashboardLibs(function() {
+          dgBuildCharts();
+          if (typeof window.dgBuildSectionCharts === 'function') {
+            window.dgBuildSectionCharts(normalized);
+          }
+        });
       })
       .catch(() => {
-        target.innerHTML = '<div class="dg-card dg-card-pad"><div class="text-sm font-bold text-rose-600">Impossible de charger cette section.</div></div>';
+        target.innerHTML = '<div class="dg-card dg-card-pad"><div class="text-sm font-bold text-rose-600">Impossible de charger cette section. <button type="button" class="underline" onclick="dgLoadSection(\'' + normalized + '\', true)">Reessayer</button></div></div>';
       });
   }
 
-  function dgRefreshSection(section) {
-    const allowed = new Set(['overview', 'kpis', 'alerts', 'workflows', 'schedule', 'annexes', 'finance', 'analytics', 'realtime', 'rh']);
+function dgRefreshSection(section) {
+    const allowed = new Set(['overview', 'alerts', 'workflows', 'schedule', 'annexes', 'finance', 'rh', 'analytics', 'realtime']);
     const normalized = allowed.has(section) ? section : 'overview';
     if (normalized === 'overview') {
       window.location.reload();
@@ -995,6 +1413,7 @@
   function dgSubmitAction(form) {
     const formData = new FormData(form);
     const csrf = formData.get('csrfmiddlewaretoken') || '';
+    const actionUrl = form.getAttribute('action') || form.getAttribute('hx-post') || window.location.href;
     const submit = form.querySelector('button[type="submit"]');
     const originalHtml = submit ? submit.innerHTML : '';
     if (submit) {
@@ -1002,7 +1421,7 @@
       submit.classList.add('opacity-60', 'cursor-wait');
       submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
     }
-    fetch(form.action, {
+    fetch(actionUrl, {
       method: 'POST',
       body: formData,
       credentials: 'same-origin',
@@ -1047,7 +1466,8 @@
     const target = document.getElementById('dg-modal-content');
     const formData = new FormData(form);
     const csrf = formData.get('csrfmiddlewaretoken') || '';
-    fetch(form.action || form.getAttribute('hx-post'), {
+    const actionUrl = form.getAttribute('action') || form.getAttribute('hx-post') || window.location.href;
+    fetch(actionUrl, {
       method: 'POST',
       body: formData,
       credentials: 'same-origin',
@@ -1148,9 +1568,16 @@
     position.addEventListener('change', sync);
     sync();
   }
-  function dgBuildCharts() {
+function dgBuildCharts() {
     if (!window.Chart) return;
-    function spark(id, data, color) {
+    // Sparklines removed — replaced with CSS bars in partials
+    // Risk chart removed — replaced with CSS bars in priority_table.html
+    // Finance chart removed — replaced with CSS bars in finance/summary.html
+    // Monthly chart removed — replaced with CSS bars in analytics/charts.html
+    // Realtime chart removed — replaced with CSS bars in realtime/monitoring.html
+
+    // Only build charts that still exist (e.g., legacy canvas elements)
+    function safeSpark(id, data, color) {
       const canvas = document.getElementById(id);
       if (!canvas || canvas.dataset.chartReady) return;
       canvas.dataset.chartReady = '1';
@@ -1168,9 +1595,13 @@
         }
       });
     }
-    spark('dgSparkStudents', [12, 16, 15, 20, 18, 24, 23, 25, 31, 35, 32, 40], '#2563eb');
-    spark('dgSparkRevenue', [8, 10, 9, 13, 12, 16, 17, 20, 25, 31, 36, 44], '#16a34a');
-    spark('dgSparkAlerts', [5, 8, 6, 11, 9, 7, 12, 8, 6, 5, 7, 9], '#f43f5e');
+    // Keep sparklines if they still exist on the page
+    const sparkExists = document.getElementById('dgSparkStudents');
+    if (sparkExists) {
+      safeSpark('dgSparkStudents', [12, 16, 15, 20, 18, 24, 23, 25, 31, 35, 32, 40], '#2563eb');
+      safeSpark('dgSparkRevenue', [8, 10, 9, 13, 12, 16, 17, 20, 25, 31, 36, 44], '#16a34a');
+      safeSpark('dgSparkAlerts', [5, 8, 6, 11, 9, 7, 12, 8, 6, 5, 7, 9], '#f43f5e');
+    }
 
     const risk = document.getElementById('dgRiskChart');
     if (risk && !risk.dataset.chartReady) {
@@ -1200,23 +1631,20 @@
     if (finance && !finance.dataset.chartReady) {
       finance.dataset.chartReady = '1';
       new Chart(finance, {
-        type: 'doughnut',
+        type: 'bar',
         data: {
-          labels: ['Revenus', 'Depenses', 'Solde'],
+          labels: ['Revenus', 'Depenses'],
           datasets: [{
-            data: [{{ finance.revenue|default:0 }}, {{ finance.expenses|default:0 }}, {{ finance.balance_chart|default:0 }}],
-            backgroundColor: ['#22c55e', '#f43f5e', '#2563eb'],
-            borderColor: '#fff',
-            borderWidth: 4,
-            cutout: '68%'
+            data: [{{ finance.revenue|default:0 }}, {{ finance.expenses|default:0 }}],
+            backgroundColor: ['#16a34a', '#ef4444'],
+            borderRadius: 8
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          cutout: '72%',
-          animation: { duration: 900, easing: 'easeOutQuart' },
-          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } }
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' } } }
         }
       });
     }
@@ -1228,19 +1656,16 @@
         data: {
           labels: {{ analytics.monthly_labels_json|safe }},
           datasets: [
-            { label: 'Candidatures', data: {{ analytics.monthly_candidatures_json|safe }}, backgroundColor: '#2563eb', borderRadius: 4 },
-            { type: 'line', label: 'Revenus', data: {{ analytics.monthly_revenue_json|safe }}, borderColor: '#16a34a', backgroundColor: '#16a34a', tension: .35, borderWidth: 3 }
+            { label: 'Candidatures', data: {{ analytics.monthly_candidatures_json|safe }}, backgroundColor: '#2563eb', borderRadius: 6 },
+            { label: 'Paiements', data: {{ analytics.monthly_payments_json|safe }}, backgroundColor: '#16a34a', borderRadius: 6 }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           animation: { duration: 900, easing: 'easeOutQuart' },
-          plugins: { legend: { position: 'top', align: 'start', labels: { boxWidth: 10, usePointStyle: true } } },
-          scales: {
-            x: { grid: { display: false } },
-            y: { grid: { color: '#e5e7eb' }, beginAtZero: true }
-          }
+          plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' } } }
         }
       });
     }
@@ -1263,12 +1688,179 @@
           plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } },
           scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' }, beginAtZero: true } }
         }
-      });
+});
     }
   }
+  function dgBuildCharts() {
+    if (!window.Chart) return;
+    window.dgChartInstances = window.dgChartInstances || {};
+
+    function chartVisible(canvas) {
+      return !!(canvas && canvas.offsetParent !== null && canvas.clientWidth > 0 && canvas.clientHeight > 0);
+    }
+
+    function buildOnce(id, factory) {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (window.dgChartInstances[id]) {
+        window.dgChartInstances[id].resize();
+        return;
+      }
+      if (!chartVisible(canvas)) return;
+      window.dgChartInstances[id] = factory(canvas);
+    }
+
+    buildOnce('dgRiskChart', function(canvas) {
+      return new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels: {{ analytics.risk_labels_json|safe }},
+          datasets: [{
+            data: {{ analytics.risk_values_json|safe }},
+            backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#2563eb'],
+            borderColor: '#fff',
+            borderWidth: 4,
+            cutout: '68%'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } } }
+        }
+      });
+    });
+
+    buildOnce('dgFinanceChart', function(canvas) {
+      return new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: ['Revenus', 'Depenses'],
+          datasets: [{
+            data: [{{ finance.revenue|default:0 }}, {{ finance.expenses|default:0 }}],
+            backgroundColor: ['#16a34a', '#ef4444'],
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' } } }
+        }
+      });
+    });
+
+    buildOnce('dgMonthlyChart', function(canvas) {
+      return new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: {{ analytics.monthly_labels_json|safe }},
+          datasets: [
+            { label: 'Candidatures', data: {{ analytics.monthly_candidatures_json|safe }}, backgroundColor: '#2563eb', borderRadius: 6 },
+            { label: 'Paiements', data: {{ analytics.monthly_payments_json|safe }}, backgroundColor: '#16a34a', borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8 } } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' } } }
+        }
+      });
+    });
+
+    buildOnce('dgAdmissionChart', function(canvas) {
+      return new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: [{% for row in analytics.candidature_status_rows %}'{{ row.label|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+          datasets: [{
+            label: 'Dossiers',
+            data: [{% for row in analytics.candidature_status_rows %}{{ row.count|default:0 }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+            backgroundColor: ['#16a34a', '#f59e0b', '#ef4444'],
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' }, beginAtZero: true } }
+        }
+      });
+    });
+
+    buildOnce('dgRealtimeChart', function(canvas) {
+      return new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: ['00:00','02:00','04:00','06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00'],
+          datasets: [
+            { label: 'Inscriptions', data: [0, 8, 12, 18, 34, 52, 64, 81, 92, 108, 118, 128], borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)', fill: true, tension: .34, borderWidth: 3 },
+            { label: 'Paiements', data: [0, 5, 9, 13, 24, 37, 46, 58, 73, 84, 96, 110], borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.08)', fill: true, tension: .34, borderWidth: 3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8 } } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' }, beginAtZero: true } }
+        }
+      });
+    });
+  }
+
+  function dgEnsureDashboardLibs(callback) {
+    const run = typeof callback === 'function' ? callback : function() {};
+    if (window.Chart) {
+      run();
+      return;
+    }
+    if (window.dgChartLoading) {
+      document.addEventListener('dg:chart-ready', run, { once: true });
+      return;
+    }
+    window.dgChartLoading = true;
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js';
+    script.crossOrigin = 'anonymous';
+    script.onload = function() {
+      window.dgChartLoading = false;
+      document.dispatchEvent(new CustomEvent('dg:chart-ready'));
+      run();
+    };
+    script.onerror = function() {
+      window.dgChartLoading = false;
+      dgShowNotice('Impossible de charger la bibliotheque des graphiques.', true);
+    };
+    document.head.appendChild(script);
+  }
+
+  function dgStartLiveClock() {
+    function pad(value) {
+      return String(value).padStart(2, '0');
+    }
+    function tick() {
+      const now = new Date();
+      const dateValue = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+      const timeValue = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      document.querySelectorAll('[data-dg-live-date]').forEach(function(node) {
+        node.textContent = dateValue;
+      });
+      document.querySelectorAll('[data-dg-live-clock]').forEach(function(node) {
+        node.textContent = timeValue;
+      });
+    }
+    tick();
+    window.clearInterval(window.dgLiveClockTimer);
+    window.dgLiveClockTimer = window.setInterval(tick, 1000);
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
-    dgBuildCharts();
+    dgEnsureDashboardLibs(dgBuildCharts);
     dgWireRecruitmentModal();
+    dgStartLiveClock();
     const initialSection = (window.location.hash || '#overview').replace('#', '');
     if (initialSection && initialSection !== 'overview') {
       dgShowSection(initialSection);
@@ -1281,6 +1873,13 @@
   document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
       dgResetOverlayState();
+    }
+  });
+  document.addEventListener('click', function(event) {
+    const searchBox = event.target.closest('.dg-search');
+    if (!searchBox) {
+      const panel = document.getElementById('dg-search-panel');
+      if (panel) panel.classList.remove('open');
     }
   });
 </script>

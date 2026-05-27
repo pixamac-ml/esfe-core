@@ -11,7 +11,17 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET, require_POST
 
-from academics.models import AcademicEnrollment, AcademicClass, AcademicScheduleEvent, EC, LessonLog, Semester
+from academics.models import (
+    AcademicBulletin,
+    AcademicDiplomaAward,
+    AcademicEnrollment,
+    AcademicClass,
+    AcademicScheduleEvent,
+    AcademicYear,
+    EC,
+    LessonLog,
+    Semester,
+)
 from academics.services.lesson_log_service import (
     create_lesson_log,
     get_class_lesson_logs,
@@ -21,6 +31,15 @@ from academics.services.lesson_log_service import (
 )
 from accounts.dashboards.helpers import get_user_branch
 from branches.models import Branch
+from students.models import Student
+from academics.permissions import can_manage_bulletins, can_manage_diplomas, can_view_academic_class, can_view_student_academic_report
+from academics.services.documents import (
+    build_bulletin_context,
+    build_diploma_context,
+    generate_annual_bulletin,
+    generate_semester_bulletin,
+    prepare_diploma_award,
+)
 from academics.services.reporting import (
     build_annual_class_report,
     build_student_annual_report,
@@ -48,11 +67,31 @@ def _ensure_pdf_backend():
     return None
 
 
-def _build_semester_report_context(student_id, semester_id):
+def _resolve_report_student(student_id):
+    student = Student.objects.select_related("user", "inscription__candidature__branch").filter(id=student_id).first()
+    if student:
+        return student
+    return get_object_or_404(Student.objects.select_related("user", "inscription__candidature__branch"), user_id=student_id)
+
+
+def _ensure_can_view_semester_report(request, student_id, semester):
+    student = _resolve_report_student(student_id)
+    if not can_view_student_academic_report(request.user, student, academic_class=semester.academic_class):
+        raise PermissionDenied("Acces refuse a ce releve academique.")
+    return student
+
+
+def _ensure_can_view_class_reports(request, academic_class):
+    if not can_view_academic_class(request.user, academic_class):
+        raise PermissionDenied("Acces refuse a cette classe.")
+
+
+def _build_semester_report_context(request, student_id, semester_id):
     semester = get_object_or_404(
-        Semester.objects.select_related("academic_class"),
+        Semester.objects.select_related("academic_class__branch"),
         id=semester_id,
     )
+    _ensure_can_view_semester_report(request, student_id, semester)
     permissions = get_semester_permissions(semester)
     if not permissions["can_generate_reports"]:
         raise PermissionDenied("Les releves ne sont disponibles qu'apres publication.")
@@ -63,12 +102,20 @@ def _build_semester_report_filename(context):
     return f"releve-semestre-s{context['semester'].number}-{context['student_matricule']}.pdf"
 
 
+def _render_pdf_from_template(request, template_name, context):
+    backend_error = _ensure_pdf_backend()
+    if backend_error is not None:
+        return None, backend_error
+    html = render_to_string(template_name, context, request=request)
+    return HTML(string=html, base_url=request.build_absolute_uri()).write_pdf(), None
+
+
 def _render_semester_report_pdf(request, student_id, semester_id):
     backend_error = _ensure_pdf_backend()
     if backend_error is not None:
         return None, None, backend_error
 
-    context = _build_semester_report_context(student_id, semester_id)
+    context = _build_semester_report_context(request, student_id, semester_id)
     html = render_to_string(
         "academics/reports/semester_report.html",
         context,
@@ -108,11 +155,13 @@ def _get_class_student_ids(semester):
     return [enrollment.student.student_profile.id for enrollment in enrollments]
 
 
+@login_required
 def student_semester_report_view(request, student_id, semester_id):
-    context = _build_semester_report_context(student_id, semester_id)
+    context = _build_semester_report_context(request, student_id, semester_id)
     return render(request, "academics/reports/semester_report.html", context)
 
 
+@login_required
 def student_semester_pdf_view(request, student_id, semester_id):
     pdf_bytes, context, backend_error = _render_semester_report_pdf(request, student_id, semester_id)
     if backend_error is not None:
@@ -123,14 +172,16 @@ def student_semester_pdf_view(request, student_id, semester_id):
     return response
 
 
+@login_required
 def export_selected_reports_view(request, semester_id):
     if request.method != "POST":
         return HttpResponse("Methode non autorisee.", status=405)
 
     semester = get_object_or_404(
-        Semester.objects.select_related("academic_class"),
+        Semester.objects.select_related("academic_class__branch"),
         id=semester_id,
     )
+    _ensure_can_view_class_reports(request, semester.academic_class)
     selected_ids = _normalize_selected_student_ids(request.POST.getlist("selected_students"))
     if not selected_ids:
         return HttpResponse("Aucun etudiant selectionne.", status=400)
@@ -152,11 +203,13 @@ def export_selected_reports_view(request, semester_id):
     return response
 
 
+@login_required
 def export_class_reports_view(request, semester_id):
     semester = get_object_or_404(
-        Semester.objects.select_related("academic_class"),
+        Semester.objects.select_related("academic_class__branch"),
         id=semester_id,
     )
+    _ensure_can_view_class_reports(request, semester.academic_class)
     backend_error = _ensure_pdf_backend()
     if backend_error is not None:
         return backend_error
@@ -178,14 +231,16 @@ def export_class_reports_view(request, semester_id):
     return response
 
 
+@login_required
 def class_reports_overview_view(request, semester_id):
     semester = get_object_or_404(
-        Semester.objects.select_related("academic_class"),
+        Semester.objects.select_related("academic_class__branch"),
         id=semester_id,
     )
+    _ensure_can_view_class_reports(request, semester.academic_class)
     rows = []
     for student_id in _get_class_student_ids(semester):
-        context = _build_semester_report_context(student_id, semester.id)
+        context = _build_semester_report_context(request, student_id, semester.id)
         rows.append({
             "student_id": student_id,
             "student_name": context["student_full_name"],
@@ -203,7 +258,10 @@ def class_reports_overview_view(request, semester_id):
     )
 
 
+@login_required
 def annual_class_report_view(request, class_id):
+    academic_class = get_object_or_404(AcademicClass.objects.select_related("branch"), pk=class_id)
+    _ensure_can_view_class_reports(request, academic_class)
     data = build_annual_class_report(class_id)
     return render(
         request,
@@ -212,7 +270,11 @@ def annual_class_report_view(request, class_id):
     )
 
 
+@login_required
 def student_annual_report_view(request, student_id):
+    student = _resolve_report_student(student_id)
+    if not can_view_student_academic_report(request.user, student):
+        raise PermissionDenied("Acces refuse a ce rapport academique.")
     data = build_student_annual_report(student_id)
     return render(
         request,
@@ -221,9 +283,158 @@ def student_annual_report_view(request, student_id):
     )
 
 
+@login_required
 def student_year_report_view(request, student_id, academic_year_id):
+    student = _resolve_report_student(student_id)
+    academic_year = get_object_or_404(AcademicYear, pk=academic_year_id)
+    if not can_view_student_academic_report(request.user, student, academic_year=academic_year):
+        raise PermissionDenied("Acces refuse a ce rapport academique.")
     context = compute_year_result(student_id, academic_year_id)
     return render(request, "academics/reports/year_report.html", context)
+
+
+@login_required
+@require_POST
+def generate_semester_bulletin_view(request, enrollment_id, semester_id):
+    enrollment = get_object_or_404(
+        AcademicEnrollment.objects.select_related(
+            "student__student_profile",
+            "academic_class__branch",
+            "academic_year",
+            "programme",
+            "branch",
+        ),
+        pk=enrollment_id,
+    )
+    if not can_manage_bulletins(request.user, enrollment.academic_class):
+        raise PermissionDenied("Vous n'etes pas autorise a generer ce bulletin.")
+    semester = get_object_or_404(Semester, pk=semester_id, academic_class=enrollment.academic_class)
+    bulletin = generate_semester_bulletin(enrollment=enrollment, semester=semester, actor=request.user)
+    return JsonResponse({"ok": True, "bulletin_id": bulletin.pk, "reference": bulletin.reference})
+
+
+@login_required
+@require_POST
+def generate_annual_bulletin_view(request, enrollment_id):
+    enrollment = get_object_or_404(
+        AcademicEnrollment.objects.select_related(
+            "student__student_profile",
+            "academic_class__branch",
+            "academic_year",
+            "programme",
+            "branch",
+        ),
+        pk=enrollment_id,
+    )
+    if not can_manage_bulletins(request.user, enrollment.academic_class):
+        raise PermissionDenied("Vous n'etes pas autorise a generer ce bulletin.")
+    bulletin = generate_annual_bulletin(enrollment=enrollment, actor=request.user)
+    return JsonResponse({"ok": True, "bulletin_id": bulletin.pk, "reference": bulletin.reference})
+
+
+@login_required
+def bulletin_detail_view(request, bulletin_id):
+    bulletin = get_object_or_404(
+        AcademicBulletin.objects.select_related(
+            "student__user",
+            "enrollment",
+            "academic_year",
+            "academic_class__branch",
+            "branch",
+            "semester",
+        ),
+        pk=bulletin_id,
+    )
+    if not can_view_student_academic_report(request.user, bulletin.student, academic_class=bulletin.academic_class):
+        raise PermissionDenied("Acces refuse a ce bulletin.")
+    return render(request, "academics/reports/bulletin.html", build_bulletin_context(bulletin))
+
+
+@login_required
+def bulletin_pdf_view(request, bulletin_id):
+    bulletin = get_object_or_404(
+        AcademicBulletin.objects.select_related(
+            "student__user",
+            "enrollment",
+            "academic_year",
+            "academic_class__branch",
+            "branch",
+            "semester",
+        ),
+        pk=bulletin_id,
+    )
+    if not can_view_student_academic_report(request.user, bulletin.student, academic_class=bulletin.academic_class):
+        raise PermissionDenied("Acces refuse a ce bulletin.")
+    context = build_bulletin_context(bulletin)
+    pdf_bytes, backend_error = _render_pdf_from_template(request, "academics/reports/bulletin.html", context)
+    if backend_error is not None:
+        return backend_error
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="bulletin-{bulletin.reference}.pdf"'
+    return response
+
+
+@login_required
+@require_POST
+def prepare_diploma_award_view(request, enrollment_id):
+    enrollment = get_object_or_404(
+        AcademicEnrollment.objects.select_related(
+            "student__student_profile",
+            "academic_class__branch",
+            "academic_year",
+            "programme__diploma_awarded",
+            "branch",
+        ),
+        pk=enrollment_id,
+    )
+    if not can_manage_diplomas(request.user, enrollment.academic_class):
+        raise PermissionDenied("Vous n'etes pas autorise a preparer ce diplome.")
+    award = prepare_diploma_award(enrollment=enrollment, actor=request.user)
+    return JsonResponse({"ok": True, "diploma_award_id": award.pk, "reference": award.reference})
+
+
+@login_required
+def diploma_award_detail_view(request, award_id):
+    award = get_object_or_404(
+        AcademicDiplomaAward.objects.select_related(
+            "student__user",
+            "enrollment",
+            "academic_year",
+            "academic_class__branch",
+            "branch",
+            "programme",
+            "diploma",
+        ),
+        pk=award_id,
+    )
+    if not can_view_student_academic_report(request.user, award.student, academic_class=award.academic_class):
+        raise PermissionDenied("Acces refuse a ce diplome.")
+    return render(request, "academics/reports/diploma_award.html", build_diploma_context(award))
+
+
+@login_required
+def diploma_award_pdf_view(request, award_id):
+    award = get_object_or_404(
+        AcademicDiplomaAward.objects.select_related(
+            "student__user",
+            "enrollment",
+            "academic_year",
+            "academic_class__branch",
+            "branch",
+            "programme",
+            "diploma",
+        ),
+        pk=award_id,
+    )
+    if not can_view_student_academic_report(request.user, award.student, academic_class=award.academic_class):
+        raise PermissionDenied("Acces refuse a ce diplome.")
+    context = build_diploma_context(award)
+    pdf_bytes, backend_error = _render_pdf_from_template(request, "academics/reports/diploma_award.html", context)
+    if backend_error is not None:
+        return backend_error
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="diplome-{award.reference}.pdf"'
+    return response
 
 
 def _parse_json_body(request):

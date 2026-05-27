@@ -1,8 +1,8 @@
 {% extends "superadmin/base.html" %}
 {% load humanize %}
 
-{% block page_title %}Tableau de bord ERP{% endblock %}
-{% block page_subtitle %}Centre de commande unifie de la plateforme{% endblock %}
+{% block page_title %}Tableau de bord{% endblock %}
+{% block page_subtitle %}Suivi des admissions, inscriptions et finances{% endblock %}
 
 {% block content_main %}
 <div id="dashboard-root" class="space-y-6" x-data="dashboardCockpit()" x-init="init()">
@@ -37,7 +37,7 @@
 
             <label class="inline-flex items-center gap-2 text-sm text-slate-600">
                 <input type="checkbox" {% if widget_autorefresh %}checked{% endif %} @change="toggleAutorefresh($event.target.checked)">
-                Auto-refresh widgets (30s)
+                Actualisation automatique (30s)
             </label>
         </div>
     </section>
@@ -54,11 +54,11 @@
         <article x-data="{ hovered: false }" @mouseenter="hovered = true" @mouseleave="hovered = false" :class="hovered ? 'ring-2 ring-amber-100' : ''" class="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Candidatures en attente</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Candidatures à traiter</p>
                     <p class="text-2xl font-bold tracking-tight text-slate-900">{{ candidatures_pending|default:0 }}</p>
                     <p class="text-xs text-amber-600 mt-1">sur {{ candidatures_count|default:0|intcomma }} total</p>
                     <p class="text-xs mt-1 {% if trends.candidatures.up %}text-emerald-600{% else %}text-rose-600{% endif %}">
-                        {% if trends.candidatures.up %}+{% endif %}{{ trends.candidatures.pct }}% vs 7j prec.
+                        {% if trends.candidatures.up %}+{% endif %}{{ trends.candidatures.pct }}% vs {{ comparison_label }}
                     </p>
                 </div>
                 <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
@@ -70,11 +70,11 @@
         <article x-data="{ hovered: false }" @mouseenter="hovered = true" @mouseleave="hovered = false" :class="hovered ? 'ring-2 ring-emerald-100' : ''" class="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Inscriptions validees</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Inscriptions actives</p>
                     <p class="text-2xl font-bold tracking-tight text-slate-900">{{ inscriptions_active|default:0|intcomma }}</p>
-                    <p class="text-xs text-emerald-600 mt-1">{{ inscriptions_count|default:0|intcomma }} enregistrees</p>
+                    <p class="text-xs text-emerald-600 mt-1">{{ inscriptions_count|default:0|intcomma }} dossiers créés</p>
                     <p class="text-xs mt-1 {% if trends.inscriptions.up %}text-emerald-600{% else %}text-rose-600{% endif %}">
-                        {% if trends.inscriptions.up %}+{% endif %}{{ trends.inscriptions.pct }}% vs 7j prec.
+                        {% if trends.inscriptions.up %}+{% endif %}{{ trends.inscriptions.pct }}% vs {{ comparison_label }}
                     </p>
                 </div>
                 <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
@@ -86,11 +86,11 @@
         <article x-data="{ hovered: false }" @mouseenter="hovered = true" @mouseleave="hovered = false" :class="hovered ? 'ring-2 ring-cyan-100' : ''" class="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Revenus valides</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Paiements validés</p>
                     <p class="text-2xl font-bold tracking-tight text-slate-900">{{ payments_total|default:0|intcomma }}</p>
                     <p class="text-xs text-slate-500 mt-1">FCFA</p>
                     <p class="text-xs mt-1 {% if trends.payments.up %}text-emerald-600{% else %}text-rose-600{% endif %}">
-                        {% if trends.payments.up %}+{% endif %}{{ trends.payments.pct }}% vs 7j prec.
+                        {% if trends.payments.up %}+{% endif %}{{ trends.payments.pct }}% vs {{ comparison_label }}
                     </p>
                 </div>
                 <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700">
@@ -102,7 +102,7 @@
         <article class="rounded-xl border border-slate-200 bg-white shadow-sm p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Messages non traites</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Messages à traiter</p>
                     <p class="text-2xl font-bold tracking-tight text-slate-900">{{ messages_unread|default:0|intcomma }}</p>
                     <p class="text-xs text-slate-500 mt-1">boite de reception</p>
                 </div>
@@ -132,7 +132,7 @@
                         <span class="text-xs text-slate-500">{{ candidatures_count|default:0|intcomma }}</span>
                     </div>
                     <h3 class="text-sm font-semibold text-slate-900 mb-1">Candidatures</h3>
-                    <p class="text-xs text-slate-500 mb-0">Suivi, validation et decisions</p>
+                    <p class="text-xs text-slate-500 mb-0">Étude, validation et décisions</p>
                 </a>
 
                 <a href="{% url 'superadmin:inscription_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
@@ -153,8 +153,8 @@
                         </span>
                         <span class="text-xs text-slate-500">{{ students_count|default:0|intcomma }}</span>
                     </div>
-                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Etudiants</h3>
-                    <p class="text-xs text-slate-500 mb-0">Parcours et dossiers complets</p>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Étudiants</h3>
+                    <p class="text-xs text-slate-500 mb-0">Comptes et dossiers étudiants</p>
                 </a>
 
                 <a href="{% url 'superadmin:formation_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
@@ -165,7 +165,7 @@
                         <span class="text-xs text-slate-500">{{ formations_count|default:0|intcomma }}</span>
                     </div>
                     <h3 class="text-sm font-semibold text-slate-900 mb-1">Programmes</h3>
-                    <p class="text-xs text-slate-500 mb-0">Catalogue, cycles et filieres</p>
+                    <p class="text-xs text-slate-500 mb-0">Catalogue, cycles et filières</p>
                 </a>
 
                 <a href="{% url 'superadmin:payment_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
@@ -186,8 +186,8 @@
                         </span>
                         <span class="text-xs text-slate-500">Configuration</span>
                     </div>
-                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Parametres</h3>
-                    <p class="text-xs text-slate-500 mb-0">Reglages institutionnels</p>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Paramètres</h3>
+                    <p class="text-xs text-slate-500 mb-0">Réglages institutionnels</p>
                 </a>
 
                 <a href="{% url 'superadmin:page_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
@@ -195,10 +195,10 @@
                         <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
                             <i data-lucide="scale" class="w-5 h-5"></i>
                         </span>
-                        <span class="text-xs text-slate-500">Conformite</span>
+                        <span class="text-xs text-slate-500">Conformité</span>
                     </div>
-                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Pages legales</h3>
-                    <p class="text-xs text-slate-500 mb-0">Mentions, confidentialite, conditions</p>
+                    <h3 class="text-sm font-semibold text-slate-900 mb-1">Pages légales</h3>
+                    <p class="text-xs text-slate-500 mb-0">Mentions, confidentialité, conditions</p>
                 </a>
 
                 <a href="{% url 'superadmin:article_list' %}" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
@@ -209,7 +209,7 @@
                         <span class="text-xs text-slate-500">{{ articles_count|default:0|intcomma }}</span>
                     </div>
                     <h3 class="text-sm font-semibold text-slate-900 mb-1">Contenu</h3>
-                    <p class="text-xs text-slate-500 mb-0">Articles et actualites</p>
+                    <p class="text-xs text-slate-500 mb-0">Articles et actualités</p>
                 </a>
 
                 <a href="{% url 'admin:index' %}" target="_blank" rel="noopener" class="group rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 p-4 transition-all duration-300 no-underline">
@@ -217,18 +217,18 @@
                         <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-200 text-slate-700">
                             <i data-lucide="shield-check" class="w-5 h-5"></i>
                         </span>
-                        <span class="text-xs text-slate-500">Avance</span>
+                        <span class="text-xs text-slate-500">Avancé</span>
                     </div>
                     <h3 class="text-sm font-semibold text-slate-900 mb-1">Utilisateurs</h3>
-                    <p class="text-xs text-slate-500 mb-0">Gestion avancee Django Admin</p>
+                    <p class="text-xs text-slate-500 mb-0">Gestion avancée Django Admin</p>
                 </a>
             </div>
         </article>
 
         <article class="rounded-xl border border-slate-200 bg-white shadow-sm p-5">
             <header class="mb-4">
-                <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Activite recente</h2>
-                <p class="text-sm text-slate-500 mb-0">Dernieres operations detectees</p>
+                <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Activité récente</h2>
+                <p class="text-sm text-slate-500 mb-0">Derniers dossiers enregistrés</p>
             </header>
 
             {% if recent_candidatures %}
@@ -257,8 +257,8 @@
                     <span class="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-200 text-slate-500">
                         <i data-lucide="inbox" class="w-6 h-6"></i>
                     </span>
-                    <p class="text-sm font-medium text-slate-700 mb-1">Aucune activite recente</p>
-                    <p class="text-xs text-slate-500 mb-0">Les actions admin apparaitront ici en temps reel.</p>
+                    <p class="text-sm font-medium text-slate-700 mb-1">Aucune activité récente</p>
+                    <p class="text-xs text-slate-500 mb-0">Les nouveaux dossiers apparaîtront ici.</p>
                 </div>
             {% endif %}
         </article>
@@ -268,12 +268,12 @@
         <article class="xl:col-span-2 rounded-xl border border-slate-200 bg-white shadow-sm p-5">
             <header class="flex items-center justify-between mb-4">
                 <div>
-                    <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Vue analytique (placeholder)</h2>
-                    <p class="text-sm text-slate-500 mb-0">Zone prete pour Chart.js ou ApexCharts</p>
+                    <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Évolution des admissions</h2>
+                    <p class="text-sm text-slate-500 mb-0">Candidatures et inscriptions sur la période sélectionnée</p>
                 </div>
                 <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600">
                     <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Donnees live
+                    Données à jour
                 </span>
             </header>
 
@@ -284,38 +284,38 @@
 
         <article class="rounded-xl border border-slate-200 bg-white shadow-sm p-5">
             <header class="mb-4">
-                <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Pipeline instantane</h2>
-                <p class="text-sm text-slate-500 mb-0">Etat des volumes cles</p>
+                <h2 class="text-base font-bold tracking-tight text-slate-900 mb-1">Pipeline administratif</h2>
+                <p class="text-sm text-slate-500 mb-0">Avancement des dossiers et du catalogue</p>
             </header>
 
             <div class="space-y-4">
                 <div>
                     <div class="mb-1 flex items-center justify-between text-xs text-slate-600">
-                        <span>Candidatures traitees</span>
-                        <span>{% widthratio candidatures_pending|default:0 candidatures_count|default:1 100 %}% restant</span>
+                        <span>Candidatures traitées</span>
+                        <span>{{ candidatures_processed_percent|default:0 }}%</span>
                     </div>
                     <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div class="h-full bg-[var(--accent)]" style="width:{% widthratio candidatures_pending|default:0 candidatures_count|default:1 100 %}%"></div>
+                        <div class="h-full bg-[var(--accent)]" style="width:{{ candidatures_processed_percent|default:0 }}%"></div>
                     </div>
                 </div>
 
                 <div>
                     <div class="mb-1 flex items-center justify-between text-xs text-slate-600">
                         <span>Inscriptions actives</span>
-                        <span>{% widthratio inscriptions_active|default:0 inscriptions_count|default:1 100 %}%</span>
+                        <span>{{ inscriptions_active_percent|default:0 }}%</span>
                     </div>
                     <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div class="h-full bg-[var(--secondary)]" style="width:{% widthratio inscriptions_active|default:0 inscriptions_count|default:1 100 %}%"></div>
+                        <div class="h-full bg-[var(--secondary)]" style="width:{{ inscriptions_active_percent|default:0 }}%"></div>
                     </div>
                 </div>
 
                 <div>
                     <div class="mb-1 flex items-center justify-between text-xs text-slate-600">
                         <span>Formations publiees</span>
-                        <span>{% widthratio formations_published|default:0 formations_count|default:1 100 %}%</span>
+                        <span>{{ formations_published_percent|default:0 }}%</span>
                     </div>
                     <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div class="h-full bg-[var(--primary)]" style="width:{% widthratio formations_published|default:0 formations_count|default:1 100 %}%"></div>
+                        <div class="h-full bg-[var(--primary)]" style="width:{{ formations_published_percent|default:0 }}%"></div>
                     </div>
                 </div>
             </div>

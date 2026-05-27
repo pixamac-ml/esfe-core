@@ -1,62 +1,149 @@
-{% load humanize %}
+﻿{% load humanize %}
 <div class="dg-card dg-card-pad">
-  <div class="dg-section-head">
+  <div class="dg-section-hero">
     <div>
-      <h3 class="dg-title">Monitoring temps reel</h3>
+      <div class="dg-section-hero-title">
+        <i class="fa-solid fa-wave-square" style="color:#16a34a; margin-right:8px;"></i>Temps reel
+        <span style="font-size:.65rem; font-weight:900; background:#16a34a; color:#fff; padding:.1rem .4rem; border-radius:999px; margin-left:8px;">LIVE</span>
+      </div>
+      <div class="dg-section-hero-sub">Activite en cours Â· Donnees du jour</div>
     </div>
-    <div class="flex items-center gap-2">
-      <span class="dg-badge bg-emerald-100 text-emerald-700">Live</span>
+    <div class="dg-section-actions">
+      <button type="button" class="dg-btn dg-btn-outline">
+        <i class="fa-solid fa-pause"></i>Pause
+      </button>
+      <button type="button" class="dg-btn dg-btn-outline" onclick="dgRefreshSection('realtime')">
+        <i class="fa-solid fa-rotate-right"></i>Actualiser
+      </button>
     </div>
   </div>
-  <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
-    <div class="xl:col-span-8">
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-          <p class="text-sm font-black text-blue-700">Flux etudiants</p>
-          <p class="mt-3 text-4xl font-black text-blue-700">{{ realtime.today_inscriptions|intcomma }}</p>
-          <p class="mt-2 text-xs font-bold text-blue-700/70">Nouvelles inscriptions</p>
-        </div>
-        <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
-          <p class="text-sm font-black text-emerald-700">Flux paiements</p>
-          <p class="mt-3 text-4xl font-black text-emerald-700">{{ realtime.today_payments|intcomma }}</p>
-          <p class="mt-2 text-xs font-bold text-emerald-700/70">Paiements valides</p>
-        </div>
-        <div class="rounded-2xl border border-orange-100 bg-orange-50 p-5">
-          <p class="text-sm font-black text-orange-700">Saturation</p>
-          <p class="mt-3 text-4xl font-black text-orange-700">{{ analytics.class_fill_rate }}%</p>
-          <p class="mt-2 text-xs font-bold text-orange-700/70">Remplissage global</p>
-        </div>
-        <div class="rounded-2xl border border-rose-100 bg-rose-50 p-5">
-          <p class="text-sm font-black text-rose-700">Alertes live</p>
-          <p class="mt-3 text-4xl font-black text-rose-700">{{ open_alerts|intcomma }}</p>
-          <p class="mt-2 text-xs font-bold text-rose-700/70">A surveiller</p>
-        </div>
-      </div>
-      <div class="mt-5 h-[260px] rounded-2xl border border-slate-100 bg-slate-50 p-4">
-        <canvas id="dgRealtimeChart"></canvas>
+
+  <div class="dg-context-bar">
+    <div>
+      <div class="dg-context-label">Activite courante</div>
+      <div class="dg-context-hint">L'heure officielle est affichee dans le bandeau DG et se met a jour en continu.</div>
+    </div>
+    <div class="dg-context-main">
+      <span class="dg-scope-chip">{{ dashboard_scope_label|default:"Toutes les annexes" }}</span>
+      <span class="dg-scope-chip">{{ realtime.today_inscriptions|default:0|intcomma }} inscriptions jour</span>
+      <span class="dg-scope-chip">{{ realtime.today_payments|default:0|intcomma }} paiements jour</span>
+    </div>
+  </div>
+
+  <!-- Live stats row -->
+  <div class="dg-row-4" style="margin-bottom:16px;">
+    <div class="dg-kpi-card" style="border-top:3px solid #16a34a; min-height:auto; padding:14px;">
+      <div style="font-size:.65rem; font-weight:900; color:#16a34a;">Nouvelles inscriptions</div>
+      <div style="font-size:1.8rem; font-weight:900; color:#0f172a; margin-top:4px;">+{{ realtime.today_inscriptions|default:0 }}</div>
+      <div style="font-size:.62rem; color:#94a3b8;">Aujourd'hui</div>
+      <div style="margin-top:4px; display:flex; align-items:center; gap:4px;">
+        <span style="width:8px; height:8px; border-radius:50%; background:#16a34a; display:inline-block;"></span>
+        <span style="font-size:.6rem; color:#16a34a; font-weight:800;">Live</span>
       </div>
     </div>
-    <aside class="xl:col-span-4 space-y-4">
-      <div class="rounded-2xl border border-slate-100 bg-white p-5">
-        <h4 class="text-base font-black text-slate-950">Objectifs de la journee</h4>
-        <div class="mt-4 space-y-4">
-          <div>
-            <div class="mb-2 flex justify-between text-xs font-black text-slate-600"><span>Inscriptions</span><span>{{ realtime.today_inscriptions|intcomma }} / 150</span></div>
-            <div class="h-2 rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-600" style="width: {% widthratio realtime.today_inscriptions 150 100 %}%"></div></div>
-          </div>
-          <div>
-            <div class="mb-2 flex justify-between text-xs font-black text-slate-600"><span>Paiements</span><span>{{ realtime.today_payments|intcomma }} / 120</span></div>
-            <div class="h-2 rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width: {% widthratio realtime.today_payments 120 100 %}%"></div></div>
-          </div>
-          <div>
-            <div class="mb-2 flex justify-between text-xs font-black text-slate-600"><span>Alertes traitees</span><span>76%</span></div>
-            <div class="h-2 rounded-full bg-slate-100"><div class="h-full w-[76%] rounded-full bg-orange-500"></div></div>
-          </div>
+    <div class="dg-kpi-card" style="border-top:3px solid #2563eb; min-height:auto; padding:14px;">
+      <div style="font-size:.65rem; font-weight:900; color:#2563eb;">Paiements</div>
+      <div style="font-size:1.8rem; font-weight:900; color:#0f172a; margin-top:4px;">+{{ realtime.today_payments|default:0 }}</div>
+      <div style="font-size:.62rem; color:#94a3b8;">Aujourd'hui</div>
+      <div style="margin-top:4px; display:flex; align-items:center; gap:4px;">
+        <span style="width:8px; height:8px; border-radius:50%; background:#2563eb; display:inline-block;"></span>
+        <span style="font-size:.6rem; color:#2563eb; font-weight:800;">Live</span>
+      </div>
+    </div>
+    <div class="dg-kpi-card" style="border-top:3px solid #7c3aed; min-height:auto; padding:14px;">
+      <div style="font-size:.65rem; font-weight:900; color:#7c3aed;">Cours en cours</div>
+      <div style="font-size:1.8rem; font-weight:900; color:#0f172a; margin-top:4px;">{{ schedule.today_events_count|intcomma }}</div>
+      <div style="font-size:.62rem; color:#94a3b8;">Maintenant</div>
+    </div>
+    <div class="dg-kpi-card" style="border-top:3px solid #f59e0b; min-height:auto; padding:14px;">
+      <div style="font-size:.65rem; font-weight:900; color:#f59e0b;">Alertes nouvelles</div>
+      <div style="font-size:1.8rem; font-weight:900; color:#0f172a; margin-top:4px;">+{{ open_alerts|default:0 }}</div>
+      <div style="font-size:.62rem; color:#94a3b8;">Aujourd'hui</div>
+    </div>
+  </div>
+
+  <!-- Live activity feed -->
+  <div class="dg-panel">
+    <div class="dg-section-header">
+      <div class="dg-panel-title" style="margin:0;">Fil d'activite</div>
+      <span style="font-size:.65rem; color:#94a3b8; font-weight:700;">
+        <span style="width:8px; height:8px; border-radius:50%; background:#16a34a; display:inline-block; animation:pulse 1.5s infinite; margin-right:4px;"></span>
+        Connexion active
+      </span>
+    </div>
+
+    <!-- Activity feed items from recent payments -->
+    {% for payment in finance.latest_payments|default:empty_list|slice:":4" %}
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:10px; background:#f0fdf4; border-radius:8px; border-left:3px solid #16a34a; margin-bottom:8px;">
+      <i class="fa-solid fa-credit-card" style="color:#16a34a; margin-top:2px;"></i>
+      <div>
+        <div style="font-size:.78rem; font-weight:800;">Paiement recu â€” {{ payment.amount|intcomma }} FCFA</div>
+        <div style="font-size:.62rem; color:#94a3b8; font-weight:600;">
+          {{ payment.inscription.candidature.last_name|default:"Etudiant" }} Â·
+          {{ payment.inscription.candidature.branch.name|default:"â€”" }} Â·
+          {{ payment.paid_at|timesince }}
         </div>
       </div>
-      <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5 text-sm font-semibold text-blue-700">
-        Derniere synchronisation : {{ generated_at|date:"d/m/Y H:i:s" }}
+    </div>
+    {% empty %}
+    <div style="padding:16px; background:#f8fafc; border-radius:8px; text-align:center; color:#64748b; font-size:.78rem; font-weight:700;">
+      Aucune activite recente a afficher pour ce perimetre.
+    </div>
+    {% endfor %}
+
+    <!-- Current status -->
+    <div style="margin-top:8px; padding:12px; background:#eff6ff; border-radius:8px; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="width:8px; height:8px; border-radius:50%; background:#16a34a; display:inline-block;"></span>
+        <span style="font-size:.72rem; font-weight:800; color:#1d4ed8;">Connexion active</span>
       </div>
-    </aside>
+      <div style="font-size:.62rem; color:#64748b; font-weight:600;">
+        Heure : <span data-dg-live-clock>{{ generated_at|date:"H:i:s" }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- System status grid -->
+  <div class="dg-row-2" style="margin-top:14px;">
+    <div class="dg-panel">
+      <div class="dg-panel-title">Indicateurs temps reel</div>
+      <div style="height:220px; background:#f8fafc; border-radius:8px; padding:12px; margin-bottom:14px;">
+        <canvas id="dgRealtimeChart"></canvas>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div style="text-align:center; padding:12px; background:#f0fdf4; border-radius:8px;">
+          <div style="font-size:1.4rem; font-weight:900; color:#16a34a;">{{ realtime.today_inscriptions|default:0 }}</div>
+          <div style="font-size:.6rem; font-weight:800; color:#475569;">Inscriptions jour</div>
+        </div>
+        <div style="text-align:center; padding:12px; background:#eff6ff; border-radius:8px;">
+          <div style="font-size:1.4rem; font-weight:900; color:#2563eb;">{{ realtime.today_payments|default:0 }}</div>
+          <div style="font-size:.6rem; font-weight:800; color:#475569;">Paiements jour</div>
+        </div>
+        <div style="text-align:center; padding:12px; background:#f5f3ff; border-radius:8px;">
+          <div style="font-size:1.4rem; font-weight:900; color:#7c3aed;">{{ schedule.today_events_count|intcomma }}</div>
+          <div style="font-size:.6rem; font-weight:800; color:#475569;">Cours actifs</div>
+        </div>
+        <div style="text-align:center; padding:12px; background:#fef3c7; border-radius:8px;">
+          <div style="font-size:1.4rem; font-weight:900; color:#d97706;">{{ open_alerts|default:0 }}</div>
+          <div style="font-size:.6rem; font-weight:800; color:#475569;">Alertes traitement</div>
+        </div>
+      </div>
+    </div>
+    <div class="dg-panel">
+      <div class="dg-panel-title">Derniers paiements</div>
+      {% for payment in finance.latest_payments|default:empty_list|slice:":3" %}
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px; background:#f8fafc; border-radius:6px; margin-bottom:6px;">
+        <div>
+          <div style="font-size:.72rem; font-weight:800; color:#0f172a;">{{ payment.inscription.candidature.last_name|default:"â€”" }}</div>
+          <div style="font-size:.58rem; color:#94a3b8; font-weight:600;">{{ payment.inscription.candidature.branch.name|default:"â€”" }}</div>
+        </div>
+        <span style="font-size:.78rem; font-weight:900; color:#16a34a;">+{{ payment.amount|intcomma }}</span>
+      </div>
+      {% empty %}
+      <div style="padding:16px; background:#f8fafc; border-radius:8px; text-align:center; color:#64748b; font-size:.78rem; font-weight:700;">
+        Aucun paiement recent pour ce perimetre.
+      </div>
+      {% endfor %}
+    </div>
   </div>
 </div>

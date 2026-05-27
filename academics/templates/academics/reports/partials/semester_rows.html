@@ -1,0 +1,28 @@
+<table>
+  <thead>
+    <tr>
+      <th>Code UE</th>
+      <th>UE</th>
+      <th>Matiere</th>
+      <th>Note</th>
+      <th>Credits</th>
+      <th>Statut</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ue_result in semester_result.ue_results %}
+      {% for ec_row in ue_result.rows %}
+        <tr>
+          {% if forloop.first %}
+            <td rowspan="{{ ue_result.rows|length }}">{{ ue_result.ue.code }}</td>
+            <td rowspan="{{ ue_result.rows|length }}" class="left">{{ ue_result.ue.title }}</td>
+          {% endif %}
+          <td class="left">{{ ec_row.ec.title }}</td>
+          <td>{{ ec_row.note_display }}</td>
+          <td>{{ ec_row.credit_obtained_display }} / {{ ec_row.credit_required_display }}</td>
+          <td>{% if ec_row.is_validated %}Valide{% else %}Non valide{% endif %}</td>
+        </tr>
+      {% endfor %}
+    {% endfor %}
+  </tbody>
+</table>

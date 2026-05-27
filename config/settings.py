@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "ui.apps.UiConfig",
     "core.apps.CoreConfig",
     "communication.apps.CommunicationConfig",
+    "marketing.apps.MarketingConfig",
 
     # ✅ CKEditor 5 (UNIQUEMENT celui-ci)
     "django_ckeditor_5",
@@ -119,6 +120,46 @@ MIDDLEWARE = [
 if ENABLE_BROWSER_RELOAD and importlib.util.find_spec("django_browser_reload"):
     MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
 
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "ignore_client_cancelled": {
+            "()": "core.logging.IgnoreClientCancelledError",
+        },
+    },
+    "loggers": {
+        "django.request": {
+            "filters": ["ignore_client_cancelled"],
+        },
+        "django.server": {
+            "filters": ["ignore_client_cancelled"],
+        },
+        "django.core.handlers.asgi": {
+            "filters": ["ignore_client_cancelled"],
+        },
+        "asgiref": {
+            "filters": ["ignore_client_cancelled"],
+        },
+        "uvicorn.error": {
+            "filters": ["ignore_client_cancelled"],
+        },
+        "uvicorn.access": {
+            "filters": ["ignore_client_cancelled"],
+        },
+        "daphne.server": {
+            "filters": ["ignore_client_cancelled"],
+        },
+        "daphne.http_protocol": {
+            "filters": ["ignore_client_cancelled"],
+        },
+        "channels.server": {
+            "filters": ["ignore_client_cancelled"],
+        },
+    },
+}
+
 # ==================================================
 # URLS / WSGI / ASGI
 # ==================================================
@@ -147,6 +188,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.seo_defaults",
+                "communication.context_processors.notification_widget",
             ],
         },
     },

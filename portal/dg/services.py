@@ -9,7 +9,8 @@ from django.db.models.functions import TruncMonth
 from django.urls import reverse
 from django.utils import timezone
 
-from academics.models import AcademicEnrollment, AcademicScheduleEvent, LessonLog, WeeklyScheduleSlot
+from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, LessonLog, WeeklyScheduleSlot
+from academics.services.schedule_service import get_class_week_schedule_with_weekly_slots
 from accounts.access import get_user_position
 from accounts.models import BranchExpense, Profile
 from payments.models import Payment
@@ -407,6 +408,23 @@ def _build_schedule(request, branches, base):
     branch_ids = base["branch_filter"]["id__in"]
     today, week_start, week_end, week_start_dt, week_end_dt, today_start_dt, today_end_dt = _week_scope(request)
     now = timezone.now()
+    selected_class_id = (request.GET.get("class_id") or "").strip()
+    class_options = list(
+        AcademicClass.objects.filter(
+            is_active=True,
+            is_archived=False,
+            branch_id__in=branch_ids,
+        )
+        .select_related("branch", "programme", "academic_year")
+        .annotate(student_count=Count("enrollments", filter=Q(enrollments__is_active=True)))
+        .order_by("branch__name", "level", "programme__title", "id")
+    )
+    selected_class = None
+    if selected_class_id.isdigit():
+        selected_class = next((item for item in class_options if item.id == int(selected_class_id)), None)
+    if selected_class is None and len(branch_ids) == 1 and class_options:
+        selected_class = class_options[0]
+
     weekly_events_qs = (
         AcademicScheduleEvent.objects.filter(
             branch_id__in=branch_ids,
@@ -418,6 +436,8 @@ def _build_schedule(request, branches, base):
         .annotate(lesson_log_count=Count("lesson_logs"))
         .order_by("start_datetime", "id")
     )
+    if selected_class is not None:
+        weekly_events_qs = weekly_events_qs.filter(academic_class=selected_class)
     today_events_qs = weekly_events_qs.filter(start_datetime__gte=today_start_dt, start_datetime__lt=today_end_dt)
     past_course_events = weekly_events_qs.filter(
         event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
@@ -445,12 +465,16 @@ def _build_schedule(request, branches, base):
         date__lt=week_end,
     )
     weekly_events = list(weekly_events_qs)
+    class_schedule = None
+    if selected_class is not None:
+        class_schedule = get_class_week_schedule_with_weekly_slots(selected_class, week_start)
+        weekly_events = class_schedule.get("events") or []
     total_events = len(weekly_events)
-    completed_events = sum(1 for event in weekly_events if event.status == AcademicScheduleEvent.STATUS_COMPLETED)
-    cancelled_events = sum(1 for event in weekly_events if event.status == AcademicScheduleEvent.STATUS_CANCELLED)
-    postponed_events = sum(1 for event in weekly_events if event.status == AcademicScheduleEvent.STATUS_POSTPONED)
-    ongoing_events = sum(1 for event in weekly_events if event.status == AcademicScheduleEvent.STATUS_ONGOING)
-    planned_events = sum(1 for event in weekly_events if event.status == AcademicScheduleEvent.STATUS_PLANNED)
+    completed_events = sum(1 for event in weekly_events if (event.get("status") if isinstance(event, dict) else event.status) == AcademicScheduleEvent.STATUS_COMPLETED)
+    cancelled_events = sum(1 for event in weekly_events if (event.get("status") if isinstance(event, dict) else event.status) == AcademicScheduleEvent.STATUS_CANCELLED)
+    postponed_events = sum(1 for event in weekly_events if (event.get("status") if isinstance(event, dict) else event.status) == AcademicScheduleEvent.STATUS_POSTPONED)
+    ongoing_events = sum(1 for event in weekly_events if (event.get("status") if isinstance(event, dict) else event.status) == AcademicScheduleEvent.STATUS_ONGOING)
+    planned_events = sum(1 for event in weekly_events if (event.get("status") if isinstance(event, dict) else event.status) == AcademicScheduleEvent.STATUS_PLANNED)
     past_course_count = past_course_events.count()
     lesson_done_count = lesson_logs_qs.filter(status=LessonLog.STATUS_DONE).count()
     missing_lesson_logs_count = missing_lesson_logs_qs.count()
@@ -463,23 +487,39 @@ def _build_schedule(request, branches, base):
     ]
     weekday_labels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
     weekday_rows = []
+    today_events_count = 0
     for offset, label in enumerate(weekday_labels):
         day = week_start + timedelta(days=offset)
-        count = sum(1 for event in weekly_events if timezone.localtime(event.start_datetime).date() == day)
+        count = sum(
+            1
+            for event in weekly_events
+            if (event.get("start_datetime") if isinstance(event, dict) else timezone.localtime(event.start_datetime)).date() == day
+        )
+        if day == today:
+            today_events_count = count
         weekday_rows.append({"label": label, "date": day, "count": count, "percent": _percent(count, total_events)})
     teacher_load = {}
     for event in weekly_events:
-        teacher_name = event.teacher.get_full_name() or event.teacher.username if event.teacher_id else "Non assigne"
+        if isinstance(event, dict):
+            teacher_name = event.get("teacher_name") or "Non assigne"
+            duration_minutes = event.get("duration_minutes") or 0
+        else:
+            teacher_name = event.teacher.get_full_name() or event.teacher.username if event.teacher_id else "Non assigne"
+            duration_minutes = event.duration_minutes
         item = teacher_load.setdefault(teacher_name, {"teacher_name": teacher_name, "count": 0, "minutes": 0})
         item["count"] += 1
-        item["minutes"] += event.duration_minutes
+        item["minutes"] += duration_minutes
     teacher_load_rows = sorted(teacher_load.values(), key=lambda item: (item["minutes"], item["count"]), reverse=True)[:6]
     for item in teacher_load_rows:
         item["hours"] = round(item["minutes"] / 60, 1)
 
     branch_rows = []
     for branch in branches:
-        branch_events = [event for event in weekly_events if event.branch_id == branch.id]
+        branch_events = [
+            event
+            for event in weekly_events
+            if (event.get("branch_name") if isinstance(event, dict) else event.branch_id) == (branch.name if isinstance(event, dict) else branch.id)
+        ]
         branch_past_count = past_course_events.filter(branch=branch).count()
         branch_missing_count = missing_lesson_logs_qs.filter(branch=branch).count()
         branch_teacher_absent = teacher_attendance_qs.filter(branch=branch, status=TeacherAttendance.STATUS_ABSENT).count()
@@ -489,7 +529,11 @@ def _build_schedule(request, branches, base):
             {
                 "branch": branch,
                 "events": len(branch_events),
-                "today_events": sum(1 for event in branch_events if timezone.localtime(event.start_datetime).date() == today),
+                "today_events": sum(
+                    1
+                    for event in branch_events
+                    if (event.get("start_datetime") if isinstance(event, dict) else timezone.localtime(event.start_datetime)).date() == today
+                ),
                 "missing_lesson_logs": branch_missing_count,
                 "coverage_rate": _percent(max(branch_past_count - branch_missing_count, 0), branch_past_count),
                 "teacher_absences": branch_teacher_absent,
@@ -516,9 +560,13 @@ def _build_schedule(request, branches, base):
         "week_end": week_end - timedelta(days=1),
         "prev_week_start": week_start - timedelta(days=7),
         "next_week_start": week_start + timedelta(days=7),
-        "calendar": _build_calendar_grid(weekly_events, week_start),
+        "calendar": class_schedule or _build_calendar_grid(weekly_events, week_start),
+        "class_options": class_options,
+        "selected_class": selected_class,
+        "selected_class_id": str(selected_class.id) if selected_class else "",
+        "requires_class_selection": selected_class is None,
         "total_events": total_events,
-        "today_events_count": today_events_qs.count(),
+        "today_events_count": today_events_count if selected_class is not None else today_events_qs.count(),
         "planned_events": planned_events,
         "ongoing_events": ongoing_events,
         "completed_events": completed_events,
@@ -957,6 +1005,7 @@ def build_dg_dashboard_context(request, base_context_builder):
                 "today_courses": schedule["today_events_count"],
                 "system_status": "operationnel",
             },
+            "empty_list": [],
         }
     )
     return context
@@ -975,6 +1024,7 @@ def build_dg_drawer_context(request):
     student_id = (request.GET.get("student_id") or item_id).strip()
     payment_id = (request.GET.get("payment_id") or item_id).strip()
     staff_id = (request.GET.get("staff_id") or item_id).strip()
+    event_id = (request.GET.get("event_id") or item_id).strip()
     step = (request.GET.get("step") or "").strip()
     branch = None
     if branch_id.isdigit():
@@ -984,6 +1034,7 @@ def build_dg_drawer_context(request):
     student = None
     payment = None
     staff_profile = None
+    schedule_event = None
     alert_rows = []
     case_rows = []
     if item_id.isdigit():
@@ -1021,6 +1072,12 @@ def build_dg_drawer_context(request):
         )
     if kind == "staff" and staff_id.isdigit():
         staff_profile = Profile.objects.select_related("user", "branch").filter(id=int(staff_id)).first()
+    if kind == "schedule" and event_id.isdigit():
+        schedule_event = (
+            AcademicScheduleEvent.objects.select_related("academic_class", "branch", "teacher", "ec", "academic_year")
+            .filter(id=int(event_id))
+            .first()
+        )
     if kind == "alert" and alert is None:
         alert_qs = AttendanceAlert.objects.filter(is_resolved=False)
         if branch:
@@ -1115,6 +1172,7 @@ def build_dg_drawer_context(request):
         "drawer_student": student,
         "drawer_payment": payment,
         "drawer_staff_profile": staff_profile,
+        "drawer_schedule_event": schedule_event,
         "drawer_alert_rows": alert_rows,
         "drawer_case_rows": case_rows,
         "drawer_student_rows": student_rows,

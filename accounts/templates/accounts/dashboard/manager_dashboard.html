@@ -1459,5 +1459,30 @@ document.body.addEventListener("inscriptionCreated", function () {
     closeDashboardModal();
     window.location.reload();
 });
+
+document.body.addEventListener("openInscriptionPositioning", function (event) {
+    const target = document.getElementById("modal-container");
+    const url = event.detail && event.detail.url;
+    if (!target || !url) return;
+
+    target.innerHTML = '<div class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4"><div class="rounded-2xl bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-xl">Chargement du positionnement academique...</div></div>';
+    openDashboardModal();
+
+    fetch(url, {
+        headers: { "HX-Request": "true", "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin"
+    })
+        .then(function (response) {
+            if (!response.ok) throw new Error("Positionnement indisponible");
+            return response.text();
+        })
+        .then(function (html) {
+            target.innerHTML = html;
+            openDashboardModal();
+        })
+        .catch(function () {
+            target.innerHTML = '<div class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4"><div class="rounded-2xl bg-white px-5 py-4 text-sm font-semibold text-red-600 shadow-xl">Impossible de charger le positionnement academique.</div></div>';
+        });
+});
 </script>
 {% endblock %}

@@ -1,0 +1,17 @@
+{% extends "marketing/base.html" %}
+{% block top_actions %}
+  <a class="mk-btn primary" href="{% url 'marketing:announcement_create' %}"><i class="fa-solid fa-plus"></i> Annonce</a>
+  <a class="mk-btn" href="{% url 'marketing:campaign_create' %}"><i class="fa-solid fa-paper-plane"></i> Campagne</a>
+{% endblock %}
+{% block content %}
+  <form class="mk-filter-bar" hx-get="{% url 'marketing:htmx_workspace' %}" hx-target="#marketing-workspace" hx-push-url="true">
+    <input class="mk-input" type="search" name="q" value="{{ filters.q }}" placeholder="Recherche">
+    <select class="mk-select" name="branch"><option value="">Toutes annexes</option>{% for branch in branches %}<option value="{{ branch.id }}" {% if filters.branch == branch.id|stringformat:"s" %}selected{% endif %}>{{ branch.name }}</option>{% endfor %}</select>
+    <select class="mk-select" name="formation"><option value="">Toutes formations</option>{% for formation in formations %}<option value="{{ formation.id }}" {% if filters.formation == formation.id|stringformat:"s" %}selected{% endif %}>{{ formation.title }}</option>{% endfor %}</select>
+    <select class="mk-select" name="cycle"><option value="">Tous cycles</option>{% for cycle in cycles %}<option value="{{ cycle.id }}" {% if filters.cycle == cycle.id|stringformat:"s" %}selected{% endif %}>{{ cycle.name }}</option>{% endfor %}</select>
+    <select class="mk-select" name="class"><option value="">Toutes classes</option>{% for class in classes %}<option value="{{ class.id }}" {% if filters.class == class.id|stringformat:"s" %}selected{% endif %}>{{ class }}</option>{% endfor %}</select>
+    <button class="mk-btn primary" type="submit"><i class="fa-solid fa-filter"></i> Filtrer</button>
+  </form>
+  <div id="marketing-workspace">{% include "marketing/partials/workspace.html" %}</div>
+  {% include "marketing/partials/account_workspace.html" %}
+{% endblock %}

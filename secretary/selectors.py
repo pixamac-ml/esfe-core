@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from accounts.dashboards.helpers import get_user_branch, is_global_viewer
@@ -60,7 +60,8 @@ def get_registry_queryset(filters=None, *, user=None, branch=None):
         user=user,
         branch=branch,
         branch_filter=lambda resolved_branch: (
-            Q(related_student__inscription__candidature__branch=resolved_branch)
+            Q(branch=resolved_branch)
+            | Q(related_student__inscription__candidature__branch=resolved_branch)
             | Q(created_by__profile__branch=resolved_branch)
             | Q(related_staff__profile__branch=resolved_branch)
         ),
@@ -70,6 +71,12 @@ def get_registry_queryset(filters=None, *, user=None, branch=None):
             Q(title__icontains=q)
             | Q(description__icontains=q)
             | Q(entry_type__icontains=q)
+            | Q(registry_number__icontains=q)
+            | Q(visitor_name__icontains=q)
+            | Q(visitor_phone__icontains=q)
+            | Q(visitor_email__icontains=q)
+            | Q(motive__icontains=q)
+            | Q(target_service__icontains=q)
             | Q(related_student__matricule__icontains=q)
             | Q(related_student__user__username__icontains=q)
         )
@@ -239,22 +246,14 @@ def search_students(query, *, user=None, branch=None):
         | Q(inscription__candidature__first_name__icontains=query)
         | Q(inscription__candidature__last_name__icontains=query)
         | Q(inscription__candidature__email__icontains=query)
+        | Q(inscription__candidature__phone__icontains=query)
     )
 
 
 def search_classes(query, *, user=None, branch=None):
-    queryset = AcademicClass.objects.select_related(
-        "programme",
-        "branch",
-        "academic_year",
-    ).filter(is_active=True)
-    resolved_branch, global_viewer = _resolve_scope(user=user, branch=branch)
-    if not global_viewer:
-        if resolved_branch is None:
-            return queryset.none()
-        queryset = queryset.filter(branch=resolved_branch)
+    queryset = get_classes_queryset(user=user, branch=branch)
     if not query:
-        return queryset.none()
+        return queryset
     return queryset.filter(
         Q(name__icontains=query)
         | Q(level__icontains=query)
@@ -262,6 +261,44 @@ def search_classes(query, *, user=None, branch=None):
         | Q(branch__name__icontains=query)
         | Q(academic_year__name__icontains=query)
     )
+
+
+def get_classes_queryset(*, user=None, branch=None):
+    queryset = AcademicClass.objects.select_related(
+        "programme",
+        "branch",
+        "academic_year",
+    ).annotate(
+        active_student_count=Count(
+            "enrollments",
+            filter=Q(enrollments__is_active=True, enrollments__is_archived=False),
+            distinct=True,
+        )
+    ).filter(is_active=True, is_archived=False)
+    resolved_branch, global_viewer = _resolve_scope(user=user, branch=branch)
+    if not global_viewer:
+        if resolved_branch is None:
+            return queryset.none()
+        queryset = queryset.filter(branch=resolved_branch)
+    return queryset.order_by("programme__title", "level", "name")
+
+
+def get_class_students_queryset(academic_class_id, *, user=None, branch=None):
+    class_queryset = get_classes_queryset(user=user, branch=branch).filter(id=academic_class_id)
+    academic_class = class_queryset.first()
+    if academic_class is None:
+        return None, Student.objects.none()
+    queryset = Student.objects.select_related(
+        "user",
+        "inscription__candidature__programme",
+        "inscription__candidature__branch",
+    ).filter(
+        user__academic_enrollments__academic_class=academic_class,
+        user__academic_enrollments__is_active=True,
+        user__academic_enrollments__is_archived=False,
+        is_active=True,
+    ).order_by("inscription__candidature__last_name", "inscription__candidature__first_name").distinct()
+    return academic_class, queryset
 
 
 def get_student_snapshot_queryset(student_id, *, user=None, branch=None):

@@ -1,0 +1,15 @@
+<div id="sg-overview-appointments"
+     class="sg-panel"
+     hx-get="{% url 'secretary:htmx_overview_appointments' %}"
+     hx-trigger="secretary:appointments-updated from:body"
+     hx-swap="outerHTML">
+  <div class="sg-panel-title">Rendez-vous du jour</div>
+  <div class="message-list">
+    {% for item in today_appointments_rows %}
+    <div class="sg-action-card">
+      <div><div class="sg-action-label">{{ item.scheduled_at|date:"H:i" }} - {{ item.person_name }}</div><div class="sg-action-sub">{{ item.title }}</div></div>
+      <span class="sg-badge-sm sg-badge-green">{{ item.get_status_display }}</span>
+    </div>
+    {% empty %}<div class="sg-empty">Aucun rendez-vous aujourd'hui.</div>{% endfor %}
+  </div>
+</div>

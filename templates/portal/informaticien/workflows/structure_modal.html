@@ -31,15 +31,30 @@
         <input type="hidden" name="action" value="save_class">
         <input type="hidden" name="section" value="classes">
         <input type="hidden" name="class_id" value="{{ target_class.id|default:'' }}">
-        <label class="grid gap-2 text-sm font-bold text-slate-700">
-          Programme
-          <select name="programme_id" class="h-12 rounded-xl border border-slate-200 px-4">
-            <option value="">Choisir un programme</option>
-            {% for programme in programmes %}
-            <option value="{{ programme.id }}" {% if form_values.programme_id|stringformat:"s" == programme.id|stringformat:"s" or not form_values and target_class and target_class.programme_id == programme.id %}selected{% endif %}>{{ programme.title }}</option>
-            {% endfor %}
-          </select>
-        </label>
+        <div class="grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
+          <label class="grid gap-2 text-sm font-bold text-slate-700">
+            Cycle
+            <select id="it-class-cycle-filter" class="h-12 rounded-xl border border-slate-200 px-4">
+              <option value="">Tous les cycles</option>
+              {% for group in programmes_by_cycle %}
+              <option value="{{ group.cycle }}">{{ group.cycle }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="grid gap-2 text-sm font-bold text-slate-700">
+            Programme
+            <select id="it-class-programme-select" name="programme_id" class="h-12 rounded-xl border border-slate-200 px-4">
+              <option value="">Choisir un programme</option>
+              {% for group in programmes_by_cycle %}
+              <optgroup label="{{ group.cycle }}">
+                {% for programme in group.programmes %}
+                <option value="{{ programme.id }}" data-cycle="{{ group.cycle }}" {% if form_values.programme_id|stringformat:"s" == programme.id|stringformat:"s" or not form_values and target_class and target_class.programme_id == programme.id %}selected{% endif %}>{{ group.cycle }} - {{ programme.title }}</option>
+                {% endfor %}
+              </optgroup>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
         <div class="grid gap-4 md:grid-cols-2">
           <label class="grid gap-2 text-sm font-bold text-slate-700">
             Annee academique
@@ -61,6 +76,40 @@
         </label>
         <button type="submit" class="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white">Enregistrer la classe</button>
       </form>
+      <script>
+        (function () {
+          const cycleSelect = document.getElementById("it-class-cycle-filter");
+          const programmeSelect = document.getElementById("it-class-programme-select");
+          if (!cycleSelect || !programmeSelect) return;
+
+          const selectedOption = programmeSelect.options[programmeSelect.selectedIndex];
+          if (selectedOption && selectedOption.dataset.cycle) {
+            cycleSelect.value = selectedOption.dataset.cycle;
+          }
+
+          function applyCycleFilter() {
+            const cycle = cycleSelect.value;
+            let selectedStillVisible = false;
+            Array.from(programmeSelect.options).forEach(function (option) {
+              if (!option.value) {
+                option.hidden = false;
+                return;
+              }
+              const visible = !cycle || option.dataset.cycle === cycle;
+              option.hidden = !visible;
+              if (option.selected && visible) {
+                selectedStillVisible = true;
+              }
+            });
+            if (!selectedStillVisible) {
+              programmeSelect.value = "";
+            }
+          }
+
+          cycleSelect.addEventListener("change", applyCycleFilter);
+          applyCycleFilter();
+        })();
+      </script>
       {% elif kind == "ue" %}
       <form
         method="post"

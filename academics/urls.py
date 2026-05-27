@@ -2,13 +2,20 @@ from django.urls import path
 
 from .views import (
     annual_class_report_view,
+    bulletin_detail_view,
+    bulletin_pdf_view,
     class_reports_overview_view,
     class_lesson_logs_view,
     daily_lesson_status_view,
+    diploma_award_detail_view,
+    diploma_award_pdf_view,
     export_class_reports_view,
     export_selected_reports_view,
+    generate_annual_bulletin_view,
+    generate_semester_bulletin_view,
     lesson_log_create_view,
     lesson_log_update_view,
+    prepare_diploma_award_view,
     student_annual_report_view,
     student_semester_pdf_view,
     student_semester_report_view,
@@ -68,6 +75,41 @@ urlpatterns = [
         "reports/student/<int:student_id>/year/<int:academic_year_id>/",
         student_year_report_view,
         name="student_year_report",
+    ),
+    path(
+        "bulletins/generate/semester/<int:enrollment_id>/<int:semester_id>/",
+        generate_semester_bulletin_view,
+        name="generate_semester_bulletin",
+    ),
+    path(
+        "bulletins/generate/annual/<int:enrollment_id>/",
+        generate_annual_bulletin_view,
+        name="generate_annual_bulletin",
+    ),
+    path(
+        "bulletins/<int:bulletin_id>/",
+        bulletin_detail_view,
+        name="bulletin_detail",
+    ),
+    path(
+        "bulletins/<int:bulletin_id>/pdf/",
+        bulletin_pdf_view,
+        name="bulletin_pdf",
+    ),
+    path(
+        "diplomas/prepare/<int:enrollment_id>/",
+        prepare_diploma_award_view,
+        name="prepare_diploma_award",
+    ),
+    path(
+        "diplomas/<int:award_id>/",
+        diploma_award_detail_view,
+        name="diploma_award_detail",
+    ),
+    path(
+        "diplomas/<int:award_id>/pdf/",
+        diploma_award_pdf_view,
+        name="diploma_award_pdf",
     ),
     path(
         "lesson-logs/create/",

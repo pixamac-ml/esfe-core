@@ -114,6 +114,9 @@ def dashboard_redirect(request):
     if position == "secretary":
         return redirect("accounts_portal:portal_secretary")
 
+    if position == "marketing_manager":
+        return redirect("marketing:dashboard")
+
     if check_admissions_access(user):
         return redirect("accounts:admissions_dashboard")
 

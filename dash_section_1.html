@@ -1,628 +1,719 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ESFÉ Mali | Section Résultats</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard DG - Maquette Proposée</title>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f6f8fc; color: #0f172a; }
 
-    <!-- Tailwind -->
-    <script src="https://cdn.tailwindcss.com"></script>
+  .dg-shell { display: flex; min-height: 100vh; }
 
-    <!-- AlpineJS -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  /* ===== SIDEBAR CLUSTER ===== */
+  .dg-sidebar {
+    width: 270px; min-height: 100vh; flex: 0 0 270px;
+    background: linear-gradient(180deg, #08172d 0%, #081b36 48%, #061326 100%);
+    color: #fff; padding: 0;
+  }
+  .dg-logo { height: 78px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .dg-logo-mark { width: 40px; height: 40px; background: linear-gradient(135deg, #2563eb, #4f46e5); border-radius: 10px; display: grid; place-items: center; }
+  .dg-logo-text { font-size: 1.1rem; font-weight: 900; letter-spacing: -.02em; }
+  .dg-logo-sub { font-size: .65rem; font-weight: 600; color: #94a3b8; margin-top: 1px; }
 
-    <!-- Lucide -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+  .dg-sidebar-scroll { height: calc(100vh - 78px); overflow-y: auto; padding: 1rem .75rem; }
 
-    <style>
-        body {
-            font-family: Inter, system-ui, sans-serif;
-        }
+  .dg-cluster-label {
+    font-size: .6rem; font-weight: 900; text-transform: uppercase;
+    letter-spacing: .18em; color: #475569; padding: .5rem .5rem .25rem;
+  }
 
-        .scrollbar-thin::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
+  .dg-link {
+    display: flex; align-items: center; gap: .75rem;
+    min-height: 42px; padding: .5rem .75rem; border-radius: .75rem;
+    color: #94a3b8; font-size: .82rem; font-weight: 700;
+    cursor: pointer; transition: background .15s, color .15s;
+  }
+  .dg-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .dg-link.active { background: linear-gradient(135deg, #3257ff, #4f46e5); color: #fff; box-shadow: 0 8px 20px rgba(37,99,235,.25); }
+  .dg-badge { margin-left: auto; background: #f43f5e; color: #fff; font-size: .6rem; font-weight: 950; padding: .15rem .45rem; border-radius: 999px; }
 
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 999px;
-        }
-    </style>
+  .dg-sidebar-divider { height: 1px; background: rgba(255,255,255,.08); margin: .75rem 0; }
+
+  .dg-logout { margin-top: auto; }
+  .dg-logout-btn {
+    display: flex; align-items: center; gap: .75rem;
+    min-height: 42px; padding: .5rem .75rem; border-radius: .75rem;
+    color: #fca5a5; font-size: .82rem; font-weight: 700; width: 100%;
+    cursor: pointer; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2);
+  }
+
+  /* ===== MAIN CONTENT ===== */
+  .dg-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  /* ===== TOPBAR ===== */
+  .dg-topbar {
+    min-height: 72px; border-bottom: 1px solid #e2e8f0;
+    background: rgba(255,255,255,.97); padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    position: sticky; top: 0; z-index: 40;
+  }
+  .dg-topbar-left { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+  .dg-topbar-right { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
+
+  .dg-btn-icon {
+    width: 44px; height: 44px; border: 1px solid #e2e8f0;
+    border-radius: .75rem; background: #fff;
+    display: grid; place-items: center; cursor: pointer; color: #475569;
+    transition: background .15s;
+  }
+  .dg-btn-icon:hover { background: #f8fafc; }
+
+  .dg-avatar {
+    height: 44px; display: flex; align-items: center; gap: .75rem;
+    border: 1px solid #e2e8f0; border-radius: .85rem; background: #fff; padding: .35rem .65rem .35rem .45rem;
+  }
+  .dg-avatar-img {
+    width: 36px; height: 36px; border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    display: grid; place-items: center; color: #fff; font-weight: 900; font-size: .8rem;
+  }
+
+  .dg-filter { height: 44px; min-width: 150px; border: 1px solid #dbe3ef; border-radius: .7rem; background: #fff; padding: .4rem .75rem; display: flex; align-items: center; }
+  .dg-filter select { width: 100%; border: 0; outline: 0; background: transparent; color: #0f172a; font-size: .82rem; font-weight: 700; }
+
+  .dg-search {
+    height: 44px; min-width: 240px; display: flex; align-items: center; gap: .5rem;
+    border: 1px solid #dbe3ef; border-radius: .85rem; background: #fff; padding: 0 .9rem;
+  }
+  .dg-search input { border: 0; outline: 0; background: transparent; width: 100%; font-size: .85rem; font-weight: 600; }
+
+  /* ===== CONTENT ===== */
+  .dg-content { padding: 20px 24px; flex: 1; }
+
+  /* Scope breadcrumb */
+  .dg-scope-bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: 16px; }
+  .dg-scope-chip { background: #fff; border: 1px solid #e2e8f0; border-radius: .5rem; padding: .4rem .75rem; font-size: .72rem; font-weight: 700; color: #475569; }
+
+  /* ===== KPI ROW ===== */
+  .dg-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .dg-kpi-card {
+    background: #fff; border: 1px solid #dfe7f3; border-radius: 16px;
+    padding: 18px; box-shadow: 0 4px 16px rgba(15,23,42,.04);
+    position: relative; overflow: hidden; transition: transform .15s, box-shadow .15s;
+  }
+  .dg-kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(15,23,42,.08); }
+
+  .dg-kpi-icon-wrap {
+    position: absolute; right: 14px; top: 14px;
+    width: 48px; height: 48px; border-radius: 999px;
+    display: grid; place-items: center; font-size: 1rem;
+  }
+  .dg-kpi-label { font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+  .dg-kpi-value { font-size: 2rem; font-weight: 900; color: #0f172a; line-height: 1.1; margin-top: .5rem; }
+  .dg-kpi-detail { font-size: .68rem; font-weight: 700; color: #94a3b8; margin-top: .3rem; }
+  .dg-kpi-trend {
+    position: absolute; bottom: 12px; right: 12px; left: 12px; height: 36px;
+    opacity: .85;
+  }
+
+  /* ===== TREND CHART ===== */
+  .dg-trend-section { background: #fff; border: 1px solid #dfe7f3; border-radius: 16px; padding: 20px; box-shadow: 0 4px 16px rgba(15,23,42,.04); margin-bottom: 16px; }
+  .dg-section-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+  .dg-section-title { font-size: 1rem; font-weight: 900; color: #0f172a; }
+  .dg-section-sub { font-size: .78rem; color: #64748b; margin-top: .2rem; }
+  .dg-chart-area { height: 160px; position: relative; }
+
+  /* ===== TWO COLUMN LAYOUT ===== */
+  .dg-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .dg-panel { background: #fff; border: 1px solid #dfe7f3; border-radius: 16px; padding: 18px; box-shadow: 0 4px 16px rgba(15,23,42,.04); }
+  .dg-panel-title { font-size: .78rem; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; color: #64748b; margin-bottom: 14px; }
+
+  /* Admission bars */
+  .dg-bar-item { margin-bottom: 10px; }
+  .dg-bar-label { display: flex; justify-content: space-between; font-size: .72rem; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+  .dg-bar-track { height: 8px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+  .dg-bar-fill { height: 100%; border-radius: 999px; }
+
+  /* Schedule pills */
+  .dg-pill-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dg-pill { border-radius: 10px; padding: 10px 12px; }
+  .dg-pill-label { font-size: .65rem; font-weight: 800; text-transform: uppercase; }
+  .dg-pill-value { font-size: 1.4rem; font-weight: 900; margin-top: 2px; }
+
+  /* Risks */
+  .dg-risk-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 6px; }
+  .dg-risk-label { font-size: .78rem; font-weight: 700; color: #475569; }
+  .dg-risk-badge { font-size: .65rem; font-weight: 950; padding: .2rem .5rem; border-radius: 999px; }
+
+  /* ===== BOTTOM ROW ===== */
+  .dg-bottom-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .dg-table-wrap { overflow-x: auto; }
+  .dg-table { width: 100%; border-collapse: collapse; }
+  .dg-table th { padding: 10px 12px; border-bottom: 1px solid #e7edf6; background: #fbfcff; color: #64748b; font-size: .65rem; font-weight: 950; text-transform: uppercase; text-align: left; }
+  .dg-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: .8rem; }
+  .dg-table tr:hover td { background: #f8fbff; }
+  .dg-status-badge { font-size: .65rem; font-weight: 950; padding: .25rem .5rem; border-radius: 999px; }
+
+  /* Actions */
+  .dg-action-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .dg-quick-action {
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1px solid #dce6f3; border-radius: .75rem; background: #fff;
+    padding: 10px 14px; cursor: pointer; transition: all .15s;
+  }
+  .dg-quick-action:hover { border-color: #bfdbfe; background: #f8fbff; transform: translateY(-1px); }
+  .dg-quick-action-label { font-size: .8rem; font-weight: 800; color: #2563eb; }
+  .dg-quick-action-sub { font-size: .65rem; color: #94a3b8; font-weight: 600; }
+  .dg-quick-action-count { font-size: .7rem; font-weight: 950; padding: .2rem .5rem; border-radius: 999px; }
+
+  /* ===== DONUT SECTION ===== */
+  .dg-donut-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dg-donut-item { text-align: center; }
+  .dg-donut-canvas { width: 90px; height: 90px; margin: 0 auto; }
+  .dg-donut-label { font-size: .7rem; font-weight: 700; color: #64748b; margin-top: 6px; }
+  .dg-donut-value { font-size: 1.2rem; font-weight: 900; color: #0f172a; }
+
+  /* ===== NAV TABS ===== */
+  .dg-nav-tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .dg-nav-tab {
+    padding: .5rem 1rem; border-radius: .6rem; border: 1px solid #e2e8f0;
+    background: #fff; font-size: .78rem; font-weight: 800; color: #64748b; cursor: pointer;
+    transition: all .15s;
+  }
+  .dg-nav-tab:hover { background: #f1f5f9; }
+  .dg-nav-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+  /* Responsive */
+  @media (max-width: 1200px) {
+    .dg-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .dg-bottom-row { grid-template-columns: 1fr 1fr; }
+    .dg-bottom-row > *:last-child { grid-column: 1 / -1; }
+  }
+  @media (max-width: 768px) {
+    .dg-sidebar { display: none; }
+    .dg-kpi-grid { grid-template-columns: 1fr 1fr; }
+    .dg-two-col { grid-template-columns: 1fr; }
+    .dg-bottom-row { grid-template-columns: 1fr; }
+  }
+</style>
 </head>
+<body>
+<div class="dg-shell" x-data="{ activeSection: 'overview' }">
 
-<body class="bg-slate-50">
+  <!-- SIDEBAR -->
+  <aside class="dg-sidebar">
+    <div class="dg-logo">
+      <div class="dg-logo-mark"><i class="fa-solid fa-user-doctor text-white"></i></div>
+      <div style="margin-left: .75rem;">
+        <div class="dg-logo-text">FELIX SANTE</div>
+        <div class="dg-logo-sub">Ecole de Santé FHB - Mali</div>
+      </div>
+    </div>
+    <div class="dg-sidebar-scroll">
 
-<div x-data="{ openVerificationModal: false }" class="min-h-screen p-6">
+      <!-- Cluster: Pilotage -->
+      <div class="dg-cluster-label">Pilotage</div>
+      <div :class="activeSection === 'overview' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'overview'">
+        <i class="fa-solid fa-home w-4 text-center"></i>
+        <span>Vue globale</span>
+      </div>
+      <div :class="activeSection === 'analytics' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'analytics'">
+        <i class="fa-solid fa-chart-line w-4 text-center"></i>
+        <span>Analytics</span>
+      </div>
+      <div :class="activeSection === 'realtime' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'realtime'">
+        <i class="fa-solid fa-wave-square w-4 text-center"></i>
+        <span>Temps réel</span>
+        <span class="dg-badge">LIVE</span>
+      </div>
 
-    <!-- PAGE HEADER -->
-    <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 mb-6">
+      <div class="dg-sidebar-divider"></div>
 
-        <!-- LEFT -->
+      <!-- Cluster: Opérations -->
+      <div class="dg-cluster-label">Opérations</div>
+      <div :class="activeSection === 'alerts' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'alerts'">
+        <i class="fa-solid fa-triangle-exclamation w-4 text-center"></i>
+        <span>Alertes & Risques</span>
+        <span class="dg-badge">12</span>
+      </div>
+      <div :class="activeSection === 'workflows' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'workflows'">
+        <i class="fa-solid fa-arrows-rotate w-4 text-center"></i>
+        <span>Passages & Réins.</span>
+      </div>
+      <div :class="activeSection === 'schedule' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'schedule'">
+        <i class="fa-regular fa-calendar-days w-4 text-center"></i>
+        <span>Emploi du temps</span>
+      </div>
+
+      <div class="dg-sidebar-divider"></div>
+
+      <!-- Cluster: Ressources -->
+      <div class="dg-cluster-label">Ressources</div>
+      <div :class="activeSection === 'annexes' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'annexes'">
+        <i class="fa-regular fa-building w-4 text-center"></i>
+        <span>Annexes</span>
+      </div>
+      <div :class="activeSection === 'rh' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'rh'">
+        <i class="fa-solid fa-user-group w-4 text-center"></i>
+        <span>RH / Staff</span>
+      </div>
+
+      <div class="dg-sidebar-divider"></div>
+
+      <!-- Cluster: Finance -->
+      <div class="dg-cluster-label">Finance</div>
+      <div :class="activeSection === 'finance' ? 'dg-link active' : 'dg-link'" @click="activeSection = 'finance'">
+        <i class="fa-solid fa-sack-dollar w-4 text-center"></i>
+        <span>Finance</span>
+      </div>
+
+      <div class="dg-sidebar-divider"></div>
+
+      <div class="dg-logout">
+        <button class="dg-logout-btn">
+          <i class="fa-solid fa-arrow-right-from-bracket w-4 text-center"></i>
+          <span>Déconnexion</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="dg-main">
+    <!-- Topbar -->
+    <header class="dg-topbar">
+      <div class="dg-topbar-left">
+        <button class="dg-btn-icon"><i class="fa-solid fa-bars-staggered"></i></button>
         <div>
-            <div class="flex items-center gap-2 text-sm text-slate-500 mb-2">
-                <span>Accueil</span>
-                <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                <span>Résultats</span>
-                <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                <span class="text-slate-900 font-semibold">Licence 2 SI</span>
-            </div>
-
-            <h1 class="text-3xl font-black text-slate-900">
-                Résultats — Gestion des notes
-            </h1>
-
-            <p class="text-slate-500 mt-2">
-                Vérification, correction et publication des résultats académiques.
-            </p>
+          <div style="font-size: 1.1rem; font-weight: 900; color: #0f172a;">Dr. Boubacar Koné</div>
+          <div style="font-size: .72rem; font-weight: 600; color: #94a3b8;">Directeur Exécutif — Mai 2026</div>
         </div>
-
-        <!-- RIGHT -->
-        <div class="flex flex-wrap items-center gap-3">
-
-            <button class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2">
-                <i data-lucide="calendar" class="w-4 h-4"></i>
-                S4 — 2024/2025
-            </button>
-
-            <button
-                @click="openVerificationModal = true"
-                class="h-11 px-5 rounded-xl bg-orange-500 text-white font-semibold hover:bg-orange-600 transition flex items-center gap-2"
-            >
-                <i data-lucide="shield-alert" class="w-4 h-4"></i>
-                Vérifier anomalies
-            </button>
-
-            <button class="h-11 px-5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition flex items-center gap-2">
-                <i data-lucide="send" class="w-4 h-4"></i>
-                Publier résultats
-            </button>
-
+      </div>
+      <div class="dg-topbar-right">
+        <div class="dg-search">
+          <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
+          <input type="search" placeholder="Rechercher...">
         </div>
-
-    </div>
-
-    <!-- STATS -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
-
-        <!-- CARD -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-500">
-                        Moyenne générale
-                    </p>
-
-                    <h2 class="text-4xl font-black mt-3 text-slate-900">
-                        12.45
-                    </h2>
-
-                    <p class="text-sm text-emerald-600 mt-2">
-                        +0.8 ce semestre
-                    </p>
-                </div>
-
-                <div class="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
-                    <i data-lucide="bar-chart-3" class="w-7 h-7"></i>
-                </div>
-            </div>
+        <div class="dg-filter">
+          <select>
+            <option>Toutes les annexes</option>
+            <option>Bamako Centre</option>
+            <option>Ségou</option>
+            <option>Mopti</option>
+          </select>
         </div>
-
-        <!-- CARD -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-500">
-                        Taux de réussite
-                    </p>
-
-                    <h2 class="text-4xl font-black mt-3 text-slate-900">
-                        75%
-                    </h2>
-
-                    <p class="text-sm text-emerald-600 mt-2">
-                        Très bon niveau
-                    </p>
-                </div>
-
-                <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                    <i data-lucide="check-circle-2" class="w-7 h-7"></i>
-                </div>
-            </div>
+        <div class="dg-filter">
+          <select>
+            <option>Ce mois</option>
+            <option>Cette semaine</option>
+            <option>Aujourd'hui</option>
+          </select>
         </div>
-
-        <!-- CARD -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-500">
-                        Notes > 20
-                    </p>
-
-                    <h2 class="text-4xl font-black mt-3 text-red-600">
-                        3
-                    </h2>
-
-                    <p class="text-sm text-red-500 mt-2">
-                        À vérifier
-                    </p>
-                </div>
-
-                <div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center">
-                    <i data-lucide="triangle-alert" class="w-7 h-7"></i>
-                </div>
-            </div>
+        <button class="dg-btn-icon" title="Actualiser"><i class="fa-solid fa-rotate-right"></i></button>
+        <button class="dg-btn-icon" title="Notifications" style="position:relative;">
+          <i class="fa-regular fa-bell"></i>
+          <span style="position:absolute; top:-4px; right:-4px; width:18px; height:18px; background:#f43f5e; color:#fff; font-size:.55rem; font-weight:950; border-radius:999px; display:grid; place-items:center;">12</span>
+        </button>
+        <div class="dg-avatar">
+          <div>
+            <div style="font-size:.82rem; font-weight:900; color:#0f172a;">Dr. Boubacar Koné</div>
+            <div style="font-size:.65rem; font-weight:600; color:#94a3b8;">DG</div>
+          </div>
+          <div class="dg-avatar-img">BK</div>
         </div>
+      </div>
+    </header>
 
-        <!-- CARD -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-500">
-                        Étudiants validés
-                    </p>
+    <!-- Content -->
+    <div class="dg-content">
 
-                    <h2 class="text-4xl font-black mt-3 text-slate-900">
-                        240
-                    </h2>
+      <!-- Scope bar -->
+      <div class="dg-scope-bar">
+        <span class="dg-scope-chip">Toutes les annexes</span>
+        <span class="dg-scope-chip">6 annexes</span>
+        <span class="dg-scope-chip">1 847 étudiants</span>
+        <span class="dg-scope-chip">218 cours cette semaine</span>
+      </div>
 
-                    <p class="text-sm text-emerald-600 mt-2">
-                        Sur 320 étudiants
-                    </p>
-                </div>
+      <!-- Nav tabs -->
+      <div class="dg-nav-tabs">
+        <button class="dg-nav-tab active">Overview</button>
+        <button class="dg-nav-tab">Alertes</button>
+        <button class="dg-nav-tab">Finance</button>
+        <button class="dg-nav-tab">Annexes</button>
+        <button class="dg-nav-tab">RH</button>
+        <button class="dg-nav-tab">Opérations</button>
+      </div>
 
-                <div class="w-14 h-14 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center">
-                    <i data-lucide="graduation-cap" class="w-7 h-7"></i>
-                </div>
-            </div>
+      <!-- KPI Row -->
+      <div class="dg-kpi-grid">
+        <div class="dg-kpi-card" style="border-top: 3px solid #2563eb;">
+          <div class="dg-kpi-icon-wrap bg-blue-50 text-blue-600"><i class="fa-solid fa-users"></i></div>
+          <div class="dg-kpi-label" style="color:#2563eb;">Étudiants totaux</div>
+          <div class="dg-kpi-value">1 847</div>
+          <div class="dg-kpi-detail">Inscrits cette année</div>
+          <canvas class="dg-kpi-trend" id="spark1"></canvas>
         </div>
-
-    </div>
-
-    <!-- MAIN TABLE -->
-    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-
-        <!-- TOPBAR -->
-        <div class="p-5 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-
-            <!-- FILTERS -->
-            <div class="flex flex-wrap items-center gap-3">
-
-                <div class="relative">
-                    <input
-                        type="text"
-                        placeholder="Rechercher un étudiant..."
-                        class="h-11 w-72 rounded-xl border border-slate-200 pl-11 pr-4 outline-none focus:border-blue-500"
-                    >
-
-                    <i
-                        data-lucide="search"
-                        class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                    ></i>
-                </div>
-
-                <select class="h-11 rounded-xl border border-slate-200 px-4 text-sm">
-                    <option>Toutes les UE</option>
-                </select>
-
-                <select class="h-11 rounded-xl border border-slate-200 px-4 text-sm">
-                    <option>Tous les statuts</option>
-                </select>
-
-                <button class="h-11 px-4 rounded-xl border border-slate-200 text-sm font-semibold flex items-center gap-2">
-                    <i data-lucide="filter" class="w-4 h-4"></i>
-                    Filtrer
-                </button>
-
-            </div>
-
-            <!-- ACTIONS -->
-            <div class="flex flex-wrap items-center gap-3">
-
-                <button class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2">
-                    <i data-lucide="download" class="w-4 h-4"></i>
-                    Exporter
-                </button>
-
-                <button class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2">
-                    <i data-lucide="printer" class="w-4 h-4"></i>
-                    Imprimer
-                </button>
-
-            </div>
-
+        <div class="dg-kpi-card" style="border-top: 3px solid #16a34a;">
+          <div class="dg-kpi-icon-wrap bg-emerald-50 text-emerald-600"><i class="fa-solid fa-sack-dollar"></i></div>
+          <div class="dg-kpi-label" style="color:#16a34a;">Revenus consolidés</div>
+          <div class="dg-kpi-value" style="color:#16a34a;">45.2M</div>
+          <div class="dg-kpi-detail">FCFA ce mois</div>
+          <canvas class="dg-kpi-trend" id="spark2"></canvas>
         </div>
+        <div class="dg-kpi-card" style="border-top: 3px solid #f43f5e;">
+          <div class="dg-kpi-icon-wrap bg-rose-50 text-rose-600"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="dg-kpi-label" style="color:#f43f5e;">Alertes critiques</div>
+          <div class="dg-kpi-value" style="color:#f43f5e;">12</div>
+          <div class="dg-kpi-detail">À traiter en priorité</div>
+        </div>
+        <div class="dg-kpi-card" style="border-top: 3px solid #7c3aed;">
+          <div class="dg-kpi-icon-wrap bg-violet-50 text-violet-600"><i class="fa-solid fa-building"></i></div>
+          <div class="dg-kpi-label" style="color:#7c3aed;">Annexes actives</div>
+          <div class="dg-kpi-value">6</div>
+          <div class="dg-kpi-detail">4 performantes, 2 à risque</div>
+        </div>
+      </div>
 
-        <!-- TABLE -->
-        <div class="overflow-x-auto scrollbar-thin">
+      <!-- Trend Chart -->
+      <div class="dg-trend-section">
+        <div class="dg-section-header">
+          <div>
+            <div class="dg-section-title">Tendances mensuelles</div>
+            <div class="dg-section-sub">Candidatures vs Revenus — 6 derniers mois</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span style="font-size:.7rem; font-weight:800; display:flex; align-items:center; gap:4px;"><span style="width:10px; height:3px; background:#2563eb; border-radius:2px;"></span> Candidatures</span>
+            <span style="font-size:.7rem; font-weight:800; display:flex; align-items:center; gap:4px;"><span style="width:10px; height:3px; background:#16a34a; border-radius:2px;"></span> Revenus</span>
+          </div>
+        </div>
+        <div class="dg-chart-area">
+          <canvas id="trendChart" style="width:100%; height:100%;"></canvas>
+        </div>
+      </div>
 
-            <table class="w-full min-w-[1400px]">
+      <!-- Two column: Admissions + Schedule -->
+      <div class="dg-two-col">
+        <div class="dg-panel">
+          <div class="dg-panel-title">Admissions</div>
+          <div class="dg-bar-item">
+            <div class="dg-bar-label"><span>Acceptées</span><span>847 · 46%</span></div>
+            <div class="dg-bar-track"><div class="dg-bar-fill" style="width:46%; background:#16a34a;"></div></div>
+          </div>
+          <div class="dg-bar-item">
+            <div class="dg-bar-label"><span>En attente</span><span>312 · 17%</span></div>
+            <div class="dg-bar-track"><div class="dg-bar-fill" style="width:17%; background:#f59e0b;"></div></div>
+          </div>
+          <div class="dg-bar-item">
+            <div class="dg-bar-label"><span>Refusées</span><span>89 · 5%</span></div>
+            <div class="dg-bar-track"><div class="dg-bar-fill" style="width:5%; background:#ef4444;"></div></div>
+          </div>
+          <div class="dg-bar-item">
+            <div class="dg-bar-label"><span>Non finalisées</span><span>599 · 32%</span></div>
+            <div class="dg-bar-track"><div class="dg-bar-fill" style="width:32%; background:#94a3b8;"></div></div>
+          </div>
+        </div>
+        <div class="dg-panel">
+          <div class="dg-panel-title">Planning semaine</div>
+          <div class="dg-pill-grid">
+            <div class="dg-pill" style="background:#f8fafc;">
+              <div class="dg-pill-label" style="color:#64748b;">Cours</div>
+              <div class="dg-pill-value">218</div>
+            </div>
+            <div class="dg-pill" style="background:#f8fafc;">
+              <div class="dg-pill-label" style="color:#64748b;">Aujourd'hui</div>
+              <div class="dg-pill-value">34</div>
+            </div>
+            <div class="dg-pill" style="background:#fef3c7;">
+              <div class="dg-pill-label" style="color:#b45309;">Cahiers manquants</div>
+              <div class="dg-pill-value" style="color:#b45309;">8</div>
+            </div>
+            <div class="dg-pill" style="background:#dbeafe;">
+              <div class="dg-pill-label" style="color:#1d4ed8;">Appels validés</div>
+              <div class="dg-pill-value" style="color:#1d4ed8;">94%</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                <!-- HEAD -->
-                <thead class="bg-slate-100 border-b border-slate-200">
+      <!-- Risks -->
+      <div class="dg-panel" style="margin-bottom:16px;">
+        <div class="dg-section-header">
+          <div class="dg-panel-title" style="margin:0;">Répartition des risques</div>
+          <button style="font-size:.72rem; font-weight:800; color:#2563eb; background:none; border:none; cursor:pointer;">Voir détail →</button>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:8px;">
+          <div class="dg-risk-row">
+            <span class="dg-risk-label">Absences rép.</span>
+            <span class="dg-risk-badge bg-rose-100 text-rose-700">3</span>
+          </div>
+          <div class="dg-risk-row">
+            <span class="dg-risk-label">Paiements en retard</span>
+            <span class="dg-risk-badge bg-orange-100 text-orange-700">7</span>
+          </div>
+          <div class="dg-risk-row">
+            <span class="dg-risk-label">Classes sous-effectif</span>
+            <span class="dg-risk-badge bg-amber-100 text-amber-700">2</span>
+          </div>
+          <div class="dg-risk-row">
+            <span class="dg-risk-label">Alertes santé</span>
+            <span class="dg-risk-badge bg-blue-100 text-blue-700">0</span>
+          </div>
+        </div>
+      </div>
 
-                    <tr>
-
-                        <th class="px-5 py-4 text-left">
-                            <input type="checkbox">
-                        </th>
-
-                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
-                            Étudiant
-                        </th>
-
-                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
-                            Matricule
-                        </th>
-
-                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
-                            UE validées
-                        </th>
-
-                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
-                            Moyenne
-                        </th>
-
-                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
-                            Crédits
-                        </th>
-
-                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
-                            Anomalies
-                        </th>
-
-                        <th class="px-5 py-4 text-left text-sm font-bold text-slate-700">
-                            Statut
-                        </th>
-
-                        <th class="px-5 py-4 text-right text-sm font-bold text-slate-700">
-                            Actions
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-                <!-- BODY -->
-                <tbody class="divide-y divide-slate-100 text-sm">
-
-                    <!-- ROW -->
-                    <tr class="hover:bg-slate-50 transition">
-
-                        <td class="px-5 py-4">
-                            <input type="checkbox">
-                        </td>
-
-                        <td class="px-5 py-4 font-semibold text-slate-900">
-                            TRAORÉ Moussa
-                        </td>
-
-                        <td class="px-5 py-4 text-slate-600">
-                            ESF2023001
-                        </td>
-
-                        <td class="px-5 py-4">
-                            8 / 8
-                        </td>
-
-                        <td class="px-5 py-4 font-bold">
-                            16.25
-                        </td>
-
-                        <td class="px-5 py-4">
-                            24
-                        </td>
-
-                        <td class="px-5 py-4">
-                            0
-                        </td>
-
-                        <td class="px-5 py-4">
-
-                            <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
-                                Validé
-                            </span>
-
-                        </td>
-
-                        <td class="px-5 py-4">
-
-                            <div class="flex justify-end gap-2">
-
-                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
-                                    <i data-lucide="eye" class="w-4 h-4"></i>
-                                </button>
-
-                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
-                                    <i data-lucide="square-pen" class="w-4 h-4"></i>
-                                </button>
-
-                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
-                                    <i data-lucide="file-text" class="w-4 h-4"></i>
-                                </button>
-
-                            </div>
-
-                        </td>
-
-                    </tr>
-
-                    <!-- ROW -->
-                    <tr class="hover:bg-slate-50 transition">
-
-                        <td class="px-5 py-4">
-                            <input type="checkbox">
-                        </td>
-
-                        <td class="px-5 py-4 font-semibold text-slate-900">
-                            KONÉ Aïssata
-                        </td>
-
-                        <td class="px-5 py-4 text-slate-600">
-                            ESF2023002
-                        </td>
-
-                        <td class="px-5 py-4">
-                            7 / 8
-                        </td>
-
-                        <td class="px-5 py-4 font-bold text-red-600">
-                            21.50
-                        </td>
-
-                        <td class="px-5 py-4">
-                            21
-                        </td>
-
-                        <td class="px-5 py-4 text-red-600 font-bold">
-                            1
-                        </td>
-
-                        <td class="px-5 py-4">
-
-                            <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">
-                                Anomalie
-                            </span>
-
-                        </td>
-
-                        <td class="px-5 py-4">
-
-                            <div class="flex justify-end gap-2">
-
-                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
-                                    <i data-lucide="eye" class="w-4 h-4"></i>
-                                </button>
-
-                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
-                                    <i data-lucide="triangle-alert" class="w-4 h-4 text-red-500"></i>
-                                </button>
-
-                                <button class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100">
-                                    <i data-lucide="square-pen" class="w-4 h-4"></i>
-                                </button>
-
-                            </div>
-
-                        </td>
-
-                    </tr>
-
-                </tbody>
-
+      <!-- Bottom row: Table + Actions + Donut -->
+      <div class="dg-bottom-row">
+        <!-- Branch performance table -->
+        <div class="dg-panel">
+          <div class="dg-section-header">
+            <div class="dg-panel-title" style="margin:0;">Performance par annexe</div>
+            <button style="font-size:.72rem; font-weight:800; color:#2563eb; background:none; border:none; cursor:pointer;">Toutes →</button>
+          </div>
+          <div class="dg-table-wrap">
+            <table class="dg-table">
+              <thead>
+                <tr>
+                  <th>Annexe</th>
+                  <th>Étudiants</th>
+                  <th>Solde</th>
+                  <th>Alertes</th>
+                  <th>Perf.</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="font-weight:900;">Bamako Centre</td>
+                  <td>642</td>
+                  <td style="color:#16a34a; font-weight:900;">+12.4M</td>
+                  <td>2</td>
+                  <td><span class="dg-status-badge bg-emerald-100 text-emerald-700">Haute</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:900;">Ségou</td>
+                  <td>398</td>
+                  <td style="color:#16a34a; font-weight:900;">+8.1M</td>
+                  <td>1</td>
+                  <td><span class="dg-status-badge bg-emerald-100 text-emerald-700">Haute</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:900;">Mopti</td>
+                  <td>289</td>
+                  <td style="color:#ef4444; font-weight:900;">-1.2M</td>
+                  <td>5</td>
+                  <td><span class="dg-status-badge bg-rose-100 text-rose-700">Critique</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:900;">Kayes</td>
+                  <td>218</td>
+                  <td style="color:#16a34a; font-weight:900;">+4.3M</td>
+                  <td>0</td>
+                  <td><span class="dg-status-badge bg-blue-100 text-blue-700">Bonne</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:900;">Sikasso</td>
+                  <td>187</td>
+                  <td style="color:#16a34a; font-weight:900;">+2.8M</td>
+                  <td>2</td>
+                  <td><span class="dg-status-badge bg-blue-100 text-blue-700">Bonne</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:900;">Timbuktu</td>
+                  <td>113</td>
+                  <td style="color:#ef4444; font-weight:900;">-890K</td>
+                  <td>2</td>
+                  <td><span class="dg-status-badge bg-orange-100 text-orange-700">Moyenne</span></td>
+                </tr>
+              </tbody>
             </table>
-
+          </div>
         </div>
 
-        <!-- FOOTER -->
-        <div class="px-5 py-4 border-t border-slate-200 flex items-center justify-between">
-
-            <p class="text-sm text-slate-500">
-                Affichage de 1 à 10 sur 320 étudiants
-            </p>
-
-            <div class="flex items-center gap-2">
-
-                <button class="w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-100">
-                    1
-                </button>
-
-                <button class="w-9 h-9 rounded-lg border border-slate-200 bg-blue-600 text-white">
-                    2
-                </button>
-
-                <button class="w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-100">
-                    3
-                </button>
-
+        <!-- Quick actions -->
+        <div class="dg-panel">
+          <div class="dg-panel-title">Actions rapides</div>
+          <div class="dg-action-row">
+            <div class="dg-quick-action">
+              <div>
+                <div class="dg-quick-action-label"><i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;"></i>Alertes</div>
+                <div class="dg-quick-action-sub">À traiter</div>
+              </div>
+              <span class="dg-quick-action-count bg-rose-100 text-rose-700">12</span>
             </div>
-
+            <div class="dg-quick-action">
+              <div>
+                <div class="dg-quick-action-label"><i class="fa-solid fa-arrows-rotate" style="margin-right:4px;"></i>Passages</div>
+                <div class="dg-quick-action-sub">Bloqués</div>
+              </div>
+              <span class="dg-quick-action-count bg-orange-100 text-orange-700">7</span>
+            </div>
+            <div class="dg-quick-action">
+              <div>
+                <div class="dg-quick-action-label"><i class="fa-solid fa-user-plus" style="margin-right:4px;"></i>Recruter</div>
+                <div class="dg-quick-action-sub">Nouveau staff</div>
+              </div>
+              <span style="width:22px; height:22px; background:#2563eb; color:#fff; border-radius:999px; display:grid; place-items:center; font-size:.65rem;"><i class="fa-solid fa-plus"></i></span>
+            </div>
+            <div class="dg-quick-action">
+              <div>
+                <div class="dg-quick-action-label"><i class="fa-solid fa-file-export" style="margin-right:4px;"></i>Exporter</div>
+                <div class="dg-quick-action-sub">Données</div>
+              </div>
+              <span style="width:22px; height:22px; background:#f1f5f9; color:#64748b; border-radius:999px; display:grid; place-items:center; font-size:.65rem;"><i class="fa-solid fa-download"></i></span>
+            </div>
+          </div>
         </div>
+
+        <!-- Finance donut -->
+        <div class="dg-panel">
+          <div class="dg-panel-title">Situation financière</div>
+          <div class="dg-donut-grid">
+            <div class="dg-donut-item">
+              <canvas class="dg-donut-canvas" id="donut1"></canvas>
+              <div class="dg-donut-value">45.2M</div>
+              <div class="dg-donut-label">Revenus</div>
+            </div>
+            <div class="dg-donut-item">
+              <canvas class="dg-donut-canvas" id="donut2"></canvas>
+              <div class="dg-donut-value">28.7M</div>
+              <div class="dg-donut-label">Dépenses</div>
+            </div>
+          </div>
+          <div style="text-align:center; margin-top:10px; padding:8px; background:#f0fdf4; border-radius:8px;">
+            <div style="font-size:.65rem; font-weight:900; color:#16a34a; text-transform:uppercase;">Solde positif</div>
+            <div style="font-size:1.4rem; font-weight:900; color:#16a34a;">+16.5M FCFA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div style="text-align:center; padding:12px; color:#94a3b8; font-size:.7rem; font-weight:600;">
+        Mis à jour le 25/05/2026 à 14:42 · <button style="background:none; border:none; color:#2563eb; cursor:pointer; font-weight:800;">Actualiser</button>
+      </div>
 
     </div>
-
-    <!-- MODAL -->
-    <div
-        x-show="openVerificationModal"
-        x-transition
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
-    >
-
-        <!-- BOX -->
-        <div
-            @click.away="openVerificationModal = false"
-            class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden"
-        >
-
-            <!-- HEADER -->
-            <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
-
-                <div>
-                    <h2 class="text-2xl font-black text-slate-900">
-                        Vérification avant publication
-                    </h2>
-
-                    <p class="text-sm text-slate-500 mt-1">
-                        Licence 2 SI — Semestre 4
-                    </p>
-                </div>
-
-                <button
-                    @click="openVerificationModal = false"
-                    class="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center"
-                >
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-
-            </div>
-
-            <!-- CONTENT -->
-            <div class="p-6 overflow-x-auto">
-
-                <table class="w-full">
-
-                    <thead class="bg-slate-100">
-
-                        <tr>
-
-                            <th class="px-5 py-4 text-left text-sm font-bold">
-                                Vérification
-                            </th>
-
-                            <th class="px-5 py-4 text-left text-sm font-bold">
-                                Statut
-                            </th>
-
-                            <th class="px-5 py-4 text-left text-sm font-bold">
-                                Détails
-                            </th>
-
-                            <th class="px-5 py-4 text-right text-sm font-bold">
-                                Action
-                            </th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody class="divide-y divide-slate-100 text-sm">
-
-                        <tr>
-
-                            <td class="px-5 py-4 font-semibold">
-                                Notes supérieures à 20
-                            </td>
-
-                            <td class="px-5 py-4">
-
-                                <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">
-                                    Attention
-                                </span>
-
-                            </td>
-
-                            <td class="px-5 py-4">
-                                2 notes détectées
-                            </td>
-
-                            <td class="px-5 py-4 text-right">
-
-                                <button class="text-blue-600 font-semibold">
-                                    Voir
-                                </button>
-
-                            </td>
-
-                        </tr>
-
-                        <tr>
-
-                            <td class="px-5 py-4 font-semibold">
-                                Moyennes incohérentes
-                            </td>
-
-                            <td class="px-5 py-4">
-
-                                <span class="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold">
-                                    Vérification
-                                </span>
-
-                            </td>
-
-                            <td class="px-5 py-4">
-                                1 moyenne détectée
-                            </td>
-
-                            <td class="px-5 py-4 text-right">
-
-                                <button class="text-blue-600 font-semibold">
-                                    Corriger
-                                </button>
-
-                            </td>
-
-                        </tr>
-
-                        <tr>
-
-                            <td class="px-5 py-4 font-semibold">
-                                UE sans enseignant
-                            </td>
-
-                            <td class="px-5 py-4">
-
-                                <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
-                                    OK
-                                </span>
-
-                            </td>
-
-                            <td class="px-5 py-4">
-                                Toutes assignées
-                            </td>
-
-                            <td class="px-5 py-4 text-right">
-                                —
-                            </td>
-
-                        </tr>
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
-            <!-- FOOTER -->
-            <div class="px-6 py-5 border-t border-slate-200 flex justify-end gap-3">
-
-                <button
-                    @click="openVerificationModal = false"
-                    class="h-11 px-5 rounded-xl border border-slate-200 font-semibold"
-                >
-                    Annuler
-                </button>
-
-                <button class="h-11 px-5 rounded-xl bg-blue-600 text-white font-semibold">
-                    Exporter rapport
-                </button>
-
-                <button class="h-11 px-5 rounded-xl bg-emerald-600 text-white font-semibold">
-                    Publier maintenant
-                </button>
-
-            </div>
-
-        </div>
-
-    </div>
-
+  </main>
 </div>
 
-<!-- LUCIDE -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-    lucide.createIcons();
-</script>
+  // Sparkline mock
+  function drawSpark(canvasId, data, color) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map((_, i) => i),
+        datasets: [{
+          data: data,
+          borderColor: color,
+          backgroundColor: color + '15',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 1.5,
+          pointRadius: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { x: { display: false }, y: { display: false } }
+      }
+    });
+  }
 
+  // Trend bar chart
+  const trendCtx = document.getElementById('trendChart');
+  if (trendCtx) {
+    new Chart(trendCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
+        datasets: [
+          {
+            label: 'Candidatures',
+            data: [120, 145, 180, 162, 198, 220],
+            backgroundColor: '#2563eb',
+            borderRadius: 6,
+            yAxisID: 'y'
+          },
+          {
+            type: 'line',
+            label: 'Revenus (×100k)',
+            data: [80, 95, 110, 125, 148, 165],
+            borderColor: '#16a34a',
+            backgroundColor: 'transparent',
+            tension: 0.35,
+            borderWidth: 2.5,
+            pointRadius: 4,
+            pointBackgroundColor: '#16a34a',
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            titleColor: '#fff',
+            bodyColor: '#e2e8f0',
+            padding: 10,
+            cornerRadius: 8
+          }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            grid: { color: '#f1f5f9' },
+            beginAtZero: true,
+            position: 'left',
+            title: { display: true, text: 'Candidatures' }
+          },
+          y1: {
+            grid: { display: false },
+            beginAtZero: true,
+            position: 'right'
+          }
+        }
+      }
+    });
+  }
+
+  // Donut charts
+  function drawDonut(canvasId, value, color) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [value, 100 - value],
+          backgroundColor: [color, '#f1f5f9'],
+          borderWidth: 0,
+          cutout: '70%'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+      }
+    });
+  }
+
+  drawSpark('spark1', [10, 12, 14, 13, 16, 18, 17, 20, 22, 21, 24, 26], '#2563eb');
+  drawSpark('spark2', [8, 9, 11, 13, 15, 17, 16, 18, 21, 24, 28, 32], '#16a34a');
+  drawDonut('donut1', 78, '#16a34a');
+  drawDonut('donut2', 63, '#ef4444');
+</script>
 </body>
 </html>

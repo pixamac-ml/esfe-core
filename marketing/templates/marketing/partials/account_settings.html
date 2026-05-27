@@ -1,0 +1,59 @@
+<div class="sg-section-panel is-active" data-sg-panel="settings">
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-user-gear" style="color:#64748b;margin-right:8px;"></i>Parametres du compte</div>
+      <div class="sg-section-hero-sub">Profil et preferences modifiables sans quitter le dashboard. Les acces sensibles passent par l'informaticien.</div>
+    </div>
+    <span class="sg-scope-chip">{{ request.user.username }}</span>
+  </div>
+  <div class="sg-row-2">
+    <div class="sg-panel">
+      <div class="sg-panel-title">Profil visible</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding:12px;border:1px solid #f1f5f9;border-radius:12px;background:#fbfcff;">
+        <div class="sg-avatar-img" style="width:64px;height:64px;font-size:1.2rem;">
+          {% if marketing_profile.avatar %}
+            <img src="{{ marketing_profile.avatar.url }}" alt="Photo de profil">
+          {% else %}
+            {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+          {% endif %}
+        </div>
+        <div style="min-width:0;">
+          <div style="font-size:.95rem;font-weight:950;color:#0f172a;">{{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="sg-section-header-sub">{{ marketing_profile.phone|default:"Telephone non renseigne" }} - {{ marketing_profile.location|default:"Localisation non renseignee" }}</div>
+        </div>
+      </div>
+      <form method="post" action="{% url 'marketing:profile_update' %}" enctype="multipart/form-data" style="display:grid;gap:12px;" hx-post="{% url 'marketing:profile_update' %}" hx-target="#marketing-account-panel" hx-swap="innerHTML">
+        {% csrf_token %}
+        <div class="sg-form-grid">
+          {% for field in profile_form.visible_fields %}
+            <div class="field">
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="errors">{{ field.errors }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="sg-section-actions"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer le profil</button></div>
+      </form>
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Preferences et securite</div>
+      <form method="post" action="{% url 'marketing:preferences_update' %}" style="display:grid;gap:10px;" hx-post="{% url 'marketing:preferences_update' %}" hx-target="#marketing-account-panel" hx-swap="innerHTML">
+        {% csrf_token %}
+        {% for field in preference_form.visible_fields %}
+          <label class="sg-action-card" style="justify-content:flex-start;gap:10px;">
+            {{ field }}
+            <span><span class="sg-action-label">{{ field.label }}</span></span>
+          </label>
+        {% endfor %}
+        <div class="sg-section-actions"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer les preferences</button></div>
+      </form>
+      <div class="sg-divider"></div>
+      <div class="message-list">
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Mot de passe</div><div class="sg-action-sub">Changement gere par l'informaticien pour assistance et tracabilite.</div></div><span class="sg-badge-sm sg-badge-amber">Support</span></div>
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Email institutionnel</div><div class="sg-action-sub">{{ request.user.email|default:"Non renseigne" }}</div></div><span class="sg-badge-sm sg-badge-gray">Compte</span></div>
+        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Fonction</div><div class="sg-action-sub">{{ marketing_profile.get_position_display|default:"Responsable marketing" }} - {{ marketing_profile.branch.name|default:"Annexe non definie" }}</div></div><span class="sg-badge-sm sg-badge-blue">RH</span></div>
+      </div>
+    </div>
+  </div>
+</div>

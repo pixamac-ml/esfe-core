@@ -1,0 +1,54 @@
+<div class="sg-section-panel is-active" data-sg-panel="notifications">
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-regular fa-bell" style="color:#2563eb;margin-right:8px;"></i>Centre de notifications</div>
+      <div class="sg-section-hero-sub">Les alertes restent dans le dashboard. Ouvrir une notification la marque lue definitivement.</div>
+    </div>
+    <span class="sg-scope-chip">{{ messages_count|default:0 }} non lue(s)</span>
+  </div>
+  <div class="sg-row-2">
+    <div class="sg-panel">
+      <div class="sg-panel-title">Notifications recentes</div>
+      <div class="message-list">
+        {% for notification in notifications_rows %}
+          <button class="sg-action-card {% if not notification.read_at %}is-unread{% endif %}" type="button" hx-get="{% url 'marketing:account_notifications' %}?notification_id={{ notification.id }}" hx-target="#marketing-account-panel" hx-swap="innerHTML">
+            <div style="min-width:0;text-align:left;">
+              <div class="sg-action-label">{{ notification.title }}</div>
+              <div class="sg-action-sub">{{ notification.body|default:"Notification centralisee"|truncatechars:90 }}</div>
+              <div class="sg-notification-meta">{{ notification.created_at|date:"d/m/Y H:i" }}</div>
+            </div>
+            {% if not notification.read_at %}<span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">new</span>{% else %}<span class="sg-badge-sm sg-badge-gray">Lue</span>{% endif %}
+          </button>
+        {% empty %}
+          <div class="sg-empty">Aucune notification pour le moment.</div>
+        {% endfor %}
+      </div>
+      {% if notifications_page.has_other_pages %}
+        <div class="sg-pagination">
+          <div class="sg-pagination-info">Page {{ notifications_page.number }} / {{ notifications_page.paginator.num_pages }}</div>
+          <div class="sg-pagination-actions">
+            {% if notifications_page.has_previous %}<button class="sg-page-link" type="button" hx-get="{% url 'marketing:account_notifications' %}?notifications_page={{ notifications_page.previous_page_number }}" hx-target="#marketing-account-panel"><i class="fa-solid fa-chevron-left"></i>Precedent</button>{% endif %}
+            <span class="sg-page-link is-current">{{ notifications_page.number }}</span>
+            {% if notifications_page.has_next %}<button class="sg-page-link" type="button" hx-get="{% url 'marketing:account_notifications' %}?notifications_page={{ notifications_page.next_page_number }}" hx-target="#marketing-account-panel">Suivant<i class="fa-solid fa-chevron-right"></i></button>{% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <div class="sg-panel">
+      <div class="sg-panel-title">Detail</div>
+      {% if selected_notification %}
+        <div class="sg-action-card" style="cursor:default;align-items:flex-start;">
+          <div>
+            <div class="sg-action-label" style="font-size:.95rem;color:#0f172a;">{{ selected_notification.title }}</div>
+            <div class="sg-action-sub" style="font-size:.78rem;margin-top:8px;color:#475569;">{{ selected_notification.body|default:"Aucun detail complementaire." }}</div>
+            <div class="sg-divider"></div>
+            <div class="sg-profile-line"><i class="fa-regular fa-clock" style="color:#94a3b8;width:18px;"></i><div><div class="sg-stat-lbl">Recu le</div><div style="font-weight:800;">{{ selected_notification.created_at|date:"d/m/Y H:i" }}</div></div></div>
+            <div class="sg-profile-line"><i class="fa-solid fa-check" style="color:#16a34a;width:18px;"></i><div><div class="sg-stat-lbl">Lecture</div><div style="font-weight:800;">Marquee lue le {{ selected_notification.read_at|date:"d/m/Y H:i" }}</div></div></div>
+          </div>
+        </div>
+      {% else %}
+        <div class="sg-empty">Selectionnez une notification pour ouvrir son detail.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>

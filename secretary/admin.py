@@ -3,9 +3,31 @@ from .models import RegistryEntry, Appointment, VisitorLog, DocumentReceipt, Sec
 
 @admin.register(RegistryEntry)
 class RegistryEntryAdmin(admin.ModelAdmin):
-    list_display = ("title", "entry_type", "created_at", "created_by", "status", "is_archived")
-    list_filter = ("status", "entry_type", "is_archived", "is_active")
-    search_fields = ("title", "description", "entry_type", "related_student__matricule")
+    list_display = (
+        "registry_number",
+        "entry_type",
+        "visitor_name",
+        "target_service",
+        "priority",
+        "created_at",
+        "created_by",
+        "status",
+        "is_archived",
+    )
+    list_filter = ("status", "entry_type", "priority", "target_service", "branch", "is_archived", "is_active")
+    search_fields = (
+        "registry_number",
+        "event_identifier",
+        "title",
+        "description",
+        "entry_type",
+        "visitor_name",
+        "visitor_phone",
+        "visitor_email",
+        "motive",
+        "related_student__matricule",
+    )
+    readonly_fields = ("registry_number", "daily_number", "event_identifier", "history")
 
 @admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):

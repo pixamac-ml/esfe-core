@@ -57,6 +57,31 @@
 <div id="notes-workspace" class="workflow-grid-placeholder">
   Selectionne une classe et un semestre pour afficher automatiquement la maquette des notes.
 </div>
+{% else %}
+<section class="workflow-table-shell">
+  <div class="workflow-table-head">
+    <div>
+      <p class="workflow-kicker">Espace de travail</p>
+      <h3>{{ selected_class.display_name }} - Semestre {{ selected_semester.number }}</h3>
+      <p class="workflow-muted">La saisie s'ouvre dans le drawer plein ecran pour garder le dashboard degage.</p>
+    </div>
+    <div class="workflow-actions">
+      <button
+        type="button"
+        class="workflow-btn workflow-btn-primary"
+        hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}?drawer=1&class_id={{ selected_class.id }}&semester_id={{ selected_semester.id }}"
+        hx-target="#it-drawer-content"
+        hx-swap="innerHTML"
+      >
+        Ouvrir la saisie
+      </button>
+    </div>
+  </div>
+  <div
+    hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}?drawer=1&class_id={{ selected_class.id }}&semester_id={{ selected_semester.id }}"
+    hx-trigger="load"
+    hx-target="#it-drawer-content"
+    hx-swap="innerHTML"
+  ></div>
+</section>
 {% endif %}
-
-{% component "notes_workflow" academic_class=selected_class semester=selected_semester state=state actions=actions %}{% endcomponent %}

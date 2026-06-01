@@ -13,13 +13,14 @@
     method="post"
     action="{% url 'accounts_portal:it_notes_workflow_action' %}"
     hx-post="{% url 'accounts_portal:it_notes_workflow_action' %}"
-    hx-target="#it-workspace"
+    hx-target="{{ target }}"
     hx-swap="innerHTML"
   >
     {% csrf_token %}
     <input type="hidden" name="class_id" value="{{ academic_class.id }}">
     <input type="hidden" name="semester_id" value="{{ semester.id }}">
     <input type="hidden" name="action" value="{{ action.code }}">
+    {% if drawer_mode %}<input type="hidden" name="drawer" value="1">{% endif %}
     <button type="submit" class="workflow-btn workflow-btn-{{ action.style }}">{{ action.label }}</button>
   </form>
   {% endif %}

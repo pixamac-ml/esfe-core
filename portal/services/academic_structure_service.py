@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -31,20 +32,29 @@ def _academic_class_name(*, programme, branch, academic_year, level):
     return f"{level} {programme.title} - {branch.name} ({academic_year.name})"[:100]
 
 
-def build_academic_structure_context(*, branch, selected_class_id=None, student_query="", section="classes"):
+def _page_queryset(queryset, page_number, *, per_page):
+    paginator = Paginator(queryset, per_page)
+    try:
+        return paginator.page(page_number or 1)
+    except (EmptyPage, PageNotAnInteger):
+        return paginator.page(1)
+
+
+def build_academic_structure_context(*, branch, selected_class_id=None, student_query="", section="classes", class_page=1, student_page=1):
     section = (section or "classes").strip().lower()
     if section not in {"classes", "maquettes", "affectations"}:
         section = "classes"
 
-    classes = list(
+    classes_qs = (
         AcademicClass.objects.select_related("programme", "academic_year", "branch")
         .filter(branch=branch)
         .filter(is_archived=False)
         .order_by("-is_active", "programme__title", "level", "id")
     )
-    selected_class = next((item for item in classes if str(item.id) == str(selected_class_id)), None)
-    if selected_class is None and classes:
-        selected_class = classes[0]
+    selected_class = classes_qs.filter(pk=selected_class_id).first() if selected_class_id else None
+    if selected_class is None:
+        selected_class = classes_qs.first()
+    classes_page = _page_queryset(classes_qs, class_page, per_page=12)
 
     semesters = []
     ue_rows = []
@@ -78,22 +88,27 @@ def build_academic_structure_context(*, branch, selected_class_id=None, student_
             | Q(matricule__icontains=student_query)
         )
 
+    unassigned_students_count = unassigned_students.count()
+    unassigned_students_page = _page_queryset(unassigned_students, student_page, per_page=15)
+
     return {
         "branch": branch,
-        "classes": classes,
+        "classes": list(classes_page.object_list),
+        "classes_page": classes_page,
         "selected_class": selected_class,
         "section": section,
         "semesters": semesters,
         "ue_rows": ue_rows,
         "programmes_by_cycle": _group_programmes_by_cycle(),
         "academic_years": list(AcademicYear.objects.order_by("-start_date")[:20]),
-        "unassigned_students": list(unassigned_students[:80]),
+        "unassigned_students": list(unassigned_students_page.object_list),
+        "unassigned_students_page": unassigned_students_page,
         "student_query": student_query,
         "metrics": {
-            "classes": len(classes),
+            "classes": classes_qs.count(),
             "ues": sum(semester.ues.count() for semester in semesters) if selected_class else 0,
             "ecs": ec_count,
-            "students_without_class": unassigned_students.count(),
+            "students_without_class": unassigned_students_count,
         },
     }
 

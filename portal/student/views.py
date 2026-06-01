@@ -354,6 +354,58 @@ def mark_message_unread(request, message_id):
 
 @login_required
 @role_required("student")
+def shop_orders_partial(request):
+    from shop.models import ShopOrder
+    orders = ShopOrder.objects.filter(
+        student=request.user,
+    ).select_related("branch").prefetch_related(
+        "items", "payments"
+    ).order_by("-created_at")[:50]
+    branch_slug = None
+    student_profile = getattr(request.user, "student_profile", None)
+    if student_profile and student_profile.inscription and student_profile.inscription.candidature:
+        branch_slug = student_profile.inscription.candidature.branch.slug
+    return render(request, "portal/student/partials/shop_orders_student.html", {
+        "orders": orders,
+        "branch_slug": branch_slug,
+    })
+
+
+@login_required
+@role_required("student")
+def shop_catalog_partial(request):
+    from shop.services.shop_service import get_recommended_products_for_student
+    products = get_recommended_products_for_student(request.user)
+    return render(request, "portal/student/partials/shop_catalog_student.html", {
+        "products": products,
+    })
+
+
+@login_required
+@role_required("student")
+def shop_cart_partial(request):
+    from shop.models import ShopOrder
+    pending_orders = ShopOrder.objects.filter(
+        student=request.user,
+    ).exclude(
+        status__in=[
+            ShopOrder.STATUS_DELIVERED,
+            ShopOrder.STATUS_CANCELLED,
+            ShopOrder.STATUS_PAID,
+            ShopOrder.STATUS_READY,
+        ],
+    ).select_related("branch").prefetch_related(
+        "items", "items__product", "payments"
+    ).order_by("-created_at")
+    total_due = sum(order.balance for order in pending_orders)
+    return render(request, "portal/student/partials/shop_cart_student.html", {
+        "pending_orders": pending_orders,
+        "total_due": total_due,
+    })
+
+
+@login_required
+@role_required("student")
 def timetable_partial(request):
     context = get_student_timetable_context(request.user)
     return render(request, "portal/student/partials/calendar_student.html", context)

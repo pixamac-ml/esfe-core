@@ -142,6 +142,7 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
     last_name = (data.get("last_name") or "").strip()
     email = (data.get("email") or "").strip().lower()
     phone = (data.get("phone") or "").strip()
+    teacher_hourly_rate_raw = data.get("teacher_hourly_rate") or 0
     specialty = (data.get("specialty") or "").strip()
     room_label = (data.get("room_label") or "").strip()
     planned_hours = _parse_planned_hours(data.get("planned_hours"))
@@ -167,6 +168,13 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
     if User.objects.filter(email__iexact=email).exists():
         raise ValidationError("Cet email est deja utilise par un autre compte.")
 
+    try:
+        teacher_hourly_rate = int(teacher_hourly_rate_raw or 0)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("Le tarif horaire est invalide.") from exc
+    if teacher_hourly_rate < 0:
+        raise ValidationError("Le tarif horaire ne peut pas etre negatif.")
+
     classes, ecs = _normalize_assignment_inputs(branch=branch, class_ids=class_ids, ec_ids=ec_ids)
     username = _generate_unique_username(first_name=first_name, last_name=last_name)
     password = create_temp_password()
@@ -189,6 +197,7 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
     profile.hire_date = timezone.localdate()
     profile.main_domain = specialty
     profile.location = phone
+    profile.teacher_hourly_rate = teacher_hourly_rate
     profile.save(
         update_fields=[
             "role",
@@ -200,6 +209,7 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
             "hire_date",
             "main_domain",
             "location",
+            "teacher_hourly_rate",
         ]
     )
 

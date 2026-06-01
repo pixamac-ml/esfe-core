@@ -110,6 +110,11 @@ class Profile(models.Model):
         help_text="Salaire mensuel de base en FCFA.",
     )
 
+    teacher_hourly_rate = models.PositiveBigIntegerField(
+        default=0,
+        help_text="Tarif horaire officiel pour les enseignants, en FCFA.",
+    )
+
     employment_status = models.CharField(
         max_length=20,
         choices=EMPLOYMENT_STATUS_CHOICES,
@@ -447,17 +452,21 @@ class BranchCashMovement(models.Model):
     SOURCE_MANUAL = "manual"
     SOURCE_EXPENSE = "expense"
     SOURCE_PAYROLL = "payroll"
+    SOURCE_HONORARIUM = "honorarium"
     SOURCE_STUDENT_PAYMENT = "student_payment"
     SOURCE_SHOP = "shop"
     SOURCE_ADJUSTMENT = "adjustment"
+    SOURCE_DONATION = "donation"
 
     SOURCE_CHOICES = [
         (SOURCE_MANUAL, "Saisie manuelle"),
         (SOURCE_EXPENSE, "Depense"),
         (SOURCE_PAYROLL, "Salaire"),
+        (SOURCE_HONORARIUM, "Honoraire enseignant"),
         (SOURCE_STUDENT_PAYMENT, "Paiement etudiant"),
         (SOURCE_SHOP, "Boutique"),
         (SOURCE_ADJUSTMENT, "Ajustement caisse"),
+        (SOURCE_DONATION, "Don / Donation"),
     ]
 
     branch = models.ForeignKey(
@@ -537,3 +546,290 @@ class AccountingDocumentSequence(models.Model):
 
     def __str__(self):
         return f"{self.branch} - {self.document_type} - {self.year}: {self.last_number}"
+
+
+class TeacherHonorariumEntry(models.Model):
+    STATUS_DRAFT = "draft"
+    STATUS_READY = "ready"
+    STATUS_PARTIAL = "partial"
+    STATUS_PAID = "paid"
+
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "A verifier"),
+        (STATUS_READY, "Disponible a retirer"),
+        (STATUS_PARTIAL, "Retrait partiel"),
+        (STATUS_PAID, "Retire"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="teacher_honorarium_entries",
+        db_index=True,
+    )
+    teacher = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="teacher_honorarium_entries",
+        db_index=True,
+    )
+    period_month = models.DateField(db_index=True, help_text="Premier jour du mois des honoraires.")
+    hourly_rate = models.PositiveBigIntegerField(default=0)
+    validated_hours = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    adjustments = models.PositiveBigIntegerField(default=0)
+    deductions = models.PositiveBigIntegerField(default=0)
+    advances = models.PositiveBigIntegerField(default=0)
+    paid_amount = models.PositiveBigIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+    paid_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_teacher_honorariums",
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_teacher_honorariums",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-period_month", "teacher__last_name", "teacher__first_name"]
+        verbose_name = "Honoraire enseignant"
+        verbose_name_plural = "Honoraires enseignants"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["branch", "teacher", "period_month"],
+                name="accounts_unique_branch_teacher_honorarium_period",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["branch", "period_month"]),
+            models.Index(fields=["teacher", "period_month"]),
+            models.Index(fields=["status", "period_month"]),
+        ]
+
+    def __str__(self):
+        return f"Honoraire {self.teacher} - {self.period_month:%Y-%m}"
+
+    @property
+    def gross_amount(self):
+        return max(int(self.validated_hours * self.hourly_rate) + self.adjustments, 0)
+
+    @property
+    def net_amount(self):
+        return max(self.gross_amount - self.deductions - self.advances, 0)
+
+    @property
+    def remaining_amount(self):
+        return max(self.net_amount - self.paid_amount, 0)
+
+    def refresh_status(self):
+        if self.paid_amount >= self.net_amount and self.net_amount > 0:
+            self.status = self.STATUS_PAID
+            if not self.paid_at:
+                self.paid_at = timezone.now()
+        elif self.paid_amount > 0:
+            self.status = self.STATUS_PARTIAL
+            self.paid_at = timezone.now()
+        elif self.status == self.STATUS_PAID:
+            self.status = self.STATUS_READY
+            self.paid_at = None
+
+    def save(self, *args, **kwargs):
+        self.refresh_status()
+        super().save(*args, **kwargs)
+
+
+class BranchMonthlyClosure(models.Model):
+    STATUS_DRAFT = "draft"
+    STATUS_VALIDATED = "validated"
+    STATUS_CLOSED = "closed"
+
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_VALIDATED, "Validee"),
+        (STATUS_CLOSED, "Cloturee"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="monthly_closures",
+        db_index=True,
+    )
+    period_month = models.DateField(db_index=True)
+    total_entries = models.PositiveBigIntegerField(default=0)
+    total_exits = models.PositiveBigIntegerField(default=0)
+    student_revenue = models.PositiveBigIntegerField(default=0)
+    shop_revenue = models.PositiveBigIntegerField(default=0)
+    salary_paid = models.PositiveBigIntegerField(default=0)
+    honorarium_paid = models.PositiveBigIntegerField(default=0)
+    expenses_paid = models.PositiveBigIntegerField(default=0)
+    result_amount = models.BigIntegerField(default=0)
+    bank_transfer_amount = models.PositiveBigIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_monthly_closures",
+    )
+    validated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="validated_monthly_closures",
+    )
+    validated_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    closed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-period_month", "-created_at"]
+        verbose_name = "Cloture mensuelle"
+        verbose_name_plural = "Clotures mensuelles"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["branch", "period_month"],
+                name="accounts_unique_branch_monthly_closure_period",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["branch", "period_month"]),
+            models.Index(fields=["branch", "status"]),
+        ]
+
+    def __str__(self):
+        return f"Cloture {self.branch} - {self.period_month:%Y-%m}"
+
+    @property
+    def is_closed(self):
+        return self.status == self.STATUS_CLOSED
+
+
+class BranchBankTransfer(models.Model):
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="bank_transfers",
+        db_index=True,
+    )
+    closure = models.OneToOneField(
+        BranchMonthlyClosure,
+        on_delete=models.CASCADE,
+        related_name="bank_transfer",
+    )
+    bank_name = models.CharField(max_length=180)
+    reference = models.CharField(max_length=120, db_index=True)
+    transfer_date = models.DateField(db_index=True)
+    amount = models.PositiveBigIntegerField()
+    proof = models.FileField(upload_to="accounts/bank-transfers/", blank=True, null=True)
+    comment = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_bank_transfers",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-transfer_date", "-created_at"]
+        verbose_name = "Versement bancaire"
+        verbose_name_plural = "Versements bancaires"
+        indexes = [
+            models.Index(fields=["branch", "transfer_date"]),
+            models.Index(fields=["reference"]),
+        ]
+
+    def __str__(self):
+        return f"{self.bank_name} - {self.amount} FCFA - {self.reference}"
+
+
+class Donation(models.Model):
+    PAYMENT_CASH = "cash"
+    PAYMENT_OM = "orange_money"
+    PAYMENT_TMONEY = "t-money"
+    PAYMENT_WAVE = "wave"
+    PAYMENT_BANK = "bank_transfer"
+    PAYMENT_CHEQUE = "cheque"
+
+    PAYMENT_METHOD_CHOICES = [
+        (PAYMENT_CASH, "Especes"),
+        (PAYMENT_OM, "Orange Money"),
+        (PAYMENT_TMONEY, "T-Money"),
+        (PAYMENT_WAVE, "Wave"),
+        (PAYMENT_BANK, "Virement bancaire"),
+        (PAYMENT_CHEQUE, "Cheque"),
+    ]
+
+    MOTIF_CHOICES = [
+        ("sponsoring", "Sponsoring / Partenariat"),
+        ("mecenat", "Mecenat"),
+        ("appui", "Appui institutionnel"),
+        ("projet", "Projet / Programme"),
+        ("bourse", "Bourse etudiant"),
+        ("infrastructure", "Infrastructure / Equipement"),
+        ("evenement", "Evenement / Activite"),
+        ("libre", "Don libre"),
+        ("autre", "Autre"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="donations",
+        db_index=True,
+    )
+    cash_movement = models.OneToOneField(
+        BranchCashMovement,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="donation_source",
+        help_text="Mouvement de caisse lié (entrée)",
+    )
+    donor_name = models.CharField(max_length=200, db_index=True, help_text="Nom du donateur / organisation.")
+    amount = models.PositiveBigIntegerField(help_text="Montant du don en FCFA.")
+    date = models.DateField(default=timezone.localdate, db_index=True)
+    motif = models.CharField(max_length=40, choices=MOTIF_CHOICES, default="libre", db_index=True)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default=PAYMENT_CASH)
+    description = models.TextField(blank=True, help_text="Description ou remerciements.")
+    receipt_number = models.CharField(max_length=80, blank=True, db_index=True, help_text="Numero de recu.")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_donations",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "Don / Donation"
+        verbose_name_plural = "Dons / Donations"
+        indexes = [
+            models.Index(fields=["branch", "date"]),
+            models.Index(fields=["branch", "motif"]),
+            models.Index(fields=["donor_name"]),
+        ]
+
+    def __str__(self):
+        return f"Don de {self.donor_name} — {self.amount} FCFA ({self.get_motif_display()})"

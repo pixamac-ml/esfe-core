@@ -19,7 +19,7 @@ from shop.forms import (
     StudentShopPaymentForm,
 )
 from shop.models import ShopCashPaymentSession, ShopOrder, ShopPayment, ShopProduct, ShopSequence, ShopStockMovement
-from shop.services.shop_cash_session import verify_agent_and_create_shop_session
+from shop.services.shop_cash_session import manager_shop_sessions_for_agent, verify_agent_and_create_shop_session
 from shop.services.shop_service import (
     create_counter_order,
     create_shop_payment,
@@ -67,12 +67,17 @@ def manager_shop_redirect(request):
 
 def render_manager_shop_panel(request, *, product_form=None, stock_form=None, counter_order_form=None, shop_error="", status=200):
     shop_context = get_manager_shop_context(request.branch)
+    manager_agent = _payment_agent_for_branch_manager(request.user, request.branch)
+    active_shop_cash_sessions = manager_shop_sessions_for_agent(manager_agent, limit=12) if manager_agent else []
     context = {
         **shop_context,
         "shop_error": shop_error or shop_context.get("shop_error", ""),
         "shop_product_form": product_form or ShopProductForm(),
         "shop_stock_form": stock_form or ShopStockInForm(branch=request.branch),
         "shop_counter_order_form": counter_order_form or ShopCounterOrderForm(branch=request.branch),
+        "manager_agent": manager_agent,
+        "active_shop_cash_sessions": active_shop_cash_sessions,
+        "active_shop_cash_sessions_count": len(active_shop_cash_sessions),
     }
     response = render(request, "shop/partials/manager_shop_panel.html", context)
     response.status_code = status
@@ -219,6 +224,8 @@ def public_shop_product_order(request, branch_slug, pk):
 @require_GET
 def student_required_modal(request):
     context = get_required_shop_context(request.user)
+    if getattr(request, "htmx", None):
+        context["show_popup"] = True
     return render(request, "shop/partials/student_required_modal.html", context)
 
 
@@ -245,16 +252,15 @@ def student_order_detail(request, pk):
     )
     balance = order.balance
     payment_form = StudentShopPaymentForm(order=order)
-    return render(
-        request,
-        "shop/partials/student_order_detail.html",
-        {
-            "order": order,
-            "payment_form": payment_form,
-            "order_balance": balance,
-            "has_pending_payment": order.payments.filter(status=ShopPayment.STATUS_PENDING).exists(),
-        },
-    )
+    context = {
+        "order": order,
+        "payment_form": payment_form,
+        "order_balance": balance,
+        "has_pending_payment": order.payments.filter(status=ShopPayment.STATUS_PENDING).exists(),
+    }
+    if getattr(request, "htmx", None):
+        return render(request, "shop/partials/student_order_detail.html", context)
+    return render(request, "shop/student_order_detail.html", context)
 
 
 @login_required

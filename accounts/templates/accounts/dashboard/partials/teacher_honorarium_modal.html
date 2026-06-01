@@ -1,0 +1,129 @@
+{% load humanize %}
+<div class="space-y-0">
+<div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">Honoraire enseignant</h2>
+                <p class="text-sm text-slate-500">{{ teacher_profile.user.get_full_name|default:teacher_profile.user.username }} • {{ payroll_month|date:"F Y" }}</p>
+            </div>
+            <button onclick="closeDashboardModal()" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-slate-500 transition">
+                <i class="fas fa-times"></i>
+            </button>
+    </div>
+</div>
+
+    <div class="p-6 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Enseignant</p>
+                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ teacher_profile.user.get_full_name|default:teacher_profile.user.username }}</p>
+                    <p class="text-xs text-slate-500 mt-1">{{ teacher_profile.user.email|default:"-" }}</p>
+                </div>
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Fonction</p>
+                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ teacher_profile.get_position_display|default:teacher_profile.position|default:"Enseignant" }}</p>
+                    <p class="text-xs text-slate-500 mt-1">{{ teacher_profile.branch.name }}</p>
+                </div>
+                <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Tarif horaire</p>
+                    <p class="mt-2 text-sm font-semibold text-slate-900">{{ teacher_profile.teacher_hourly_rate|intcomma }} FCFA</p>
+                    <p class="text-xs text-slate-500 mt-1">{{ teacher_profile.get_employment_status_display }}</p>
+                </div>
+            </div>
+
+            {% if honorarium_entry %}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4"><p class="text-xs uppercase tracking-wide text-emerald-700">Net</p><p class="mt-2 text-xl font-bold text-slate-900">{{ honorarium_entry.net_amount|intcomma }}</p></div>
+                <div class="rounded-2xl bg-blue-50 border border-blue-100 p-4"><p class="text-xs uppercase tracking-wide text-blue-700">Paye</p><p class="mt-2 text-xl font-bold text-slate-900">{{ honorarium_entry.paid_amount|intcomma }}</p></div>
+                <div class="rounded-2xl bg-rose-50 border border-rose-100 p-4"><p class="text-xs uppercase tracking-wide text-rose-700">Reste</p><p class="mt-2 text-xl font-bold text-slate-900">{{ honorarium_entry.remaining_amount|intcomma }}</p></div>
+                <div class="rounded-2xl bg-violet-50 border border-violet-100 p-4"><p class="text-xs uppercase tracking-wide text-violet-700">Etat</p><p class="mt-2 text-sm font-bold text-slate-900">{{ honorarium_entry.get_status_display }}</p></div>
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6">
+                <form
+                    hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_upsert' teacher_profile.user_id %}"
+                    hx-target="#modal-content"
+                    hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Periode</label>
+                            {{ honorarium_form.period_month }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Tarif horaire</label>
+                            {{ honorarium_form.hourly_rate }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Heures validees</label>
+                            {{ honorarium_form.validated_hours }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Ajustements</label>
+                            {{ honorarium_form.adjustments }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Retenues</label>
+                            {{ honorarium_form.deductions }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Avances</label>
+                            {{ honorarium_form.advances }}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Notes internes</label>
+                        {{ honorarium_form.notes }}
+                    </div>
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        Les honoraires sont calcules depuis les heures validees. Rendre la fiche disponible notifie l'enseignant.
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <button type="submit" name="submit_action" value="draft" class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
+                            <i class="fas fa-save"></i>
+                            Enregistrer a verifier
+                        </button>
+                        <button type="submit" name="submit_action" value="ready" class="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition">
+                            <i class="fas fa-badge-check"></i>
+                            Rendre disponible
+                        </button>
+                    </div>
+                </form>
+
+                <div class="rounded-3xl bg-slate-50 border border-slate-100 p-5 space-y-4">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-slate-400">Retrait honoraire</p>
+                        <h3 class="text-lg font-semibold text-slate-900 mt-1">Enregistrer le paiement effectif</h3>
+                    </div>
+                    {% if honorarium_entry %}
+                    <form
+                        hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_pay' honorarium_entry.id %}"
+                        hx-target="#modal-content"
+                        hx-swap="innerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Montant a verser</label>
+                            <input type="number" name="payment_amount" min="1" max="{{ honorarium_entry.remaining_amount }}" value="{{ honorarium_entry.remaining_amount }}" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required>
+                        </div>
+                        <div class="rounded-2xl bg-white border border-slate-200 p-4 text-sm text-slate-600 space-y-2">
+                            <div class="flex justify-between"><span>Disponible en caisse</span><span class="font-semibold text-slate-900">{{ available_cash_balance|intcomma }} FCFA</span></div>
+                            <div class="flex justify-between"><span>Net du mois</span><span class="font-semibold text-slate-900">{{ honorarium_entry.net_amount|intcomma }} FCFA</span></div>
+                            <div class="flex justify-between"><span>Deja paye</span><span class="font-semibold text-slate-900">{{ honorarium_entry.paid_amount|intcomma }} FCFA</span></div>
+                            <div class="flex justify-between"><span>Reste</span><span class="font-semibold text-rose-600">{{ honorarium_entry.remaining_amount|intcomma }} FCFA</span></div>
+                        </div>
+                        <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                            <i class="fas fa-money-bill-wave"></i>
+                            Enregistrer le retrait
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                        Prepare d'abord l'honoraire du mois pour cet enseignant.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+    </div>
+</div>

@@ -1,0 +1,373 @@
+DASH GESTIONNAIRE D'UNE ANNEXE - DOCUMENT METIER DETAILLE
+Date de reference: 2026-05-29
+
+1. OBJECTIF DU DASHBOARD
+
+Le dashboard gestionnaire est le poste de pilotage operationnel d'une annexe.
+Il sert a suivre et traiter les dossiers etudiants, a encaisser les paiements, a tenir la caisse, a gerer les depenses, a preparer et payer les salaires, et a lire l'etat financier de l'annexe.
+
+Ce dashboard n'est pas un simple tableau de consultation.
+La gestionnaire y prend des decisions, valide des flux, corrige des operations et fait avancer le dossier d'un candidat jusqu'a l'inscription active.
+
+2. PERIMETRE REEL DE LA GESTIONNAIRE
+
+La gestionnaire agit uniquement sur son annexe.
+Tout ce qu'elle voit et tout ce qu'elle modifie doit rester filtre sur sa branche.
+
+Elle travaille sur:
+- les candidatures de son annexe;
+- les inscriptions creees a partir de ces candidatures;
+- les paiements lies a ces inscriptions;
+- la caisse de l'annexe;
+- les salaires du personnel rattache a l'annexe;
+- les depenses de l'annexe;
+- la boutique si elle est activee;
+- les rapports financiers locaux.
+
+3. CE QUE LA GESTIONNAIRE FAIT CONCRETEMENT
+
+3.1 Traiter les candidatures
+
+Cas concret:
+Un candidat depose un dossier. La gestionnaire ouvre la candidature, verifie les informations, lit les documents, puis decide de la suite.
+
+Elle peut:
+- voir le detail complet;
+- passer en analyse;
+- demander un complement;
+- accepter;
+- refuser;
+- supprimer une candidature refusee si aucun dossier n'en depend.
+
+Effet metier:
+- "submitted" -> dossier recu;
+- "under_review" -> dossier en cours d'analyse;
+- "to_complete" -> dossier incomplet, complement demande;
+- "accepted" -> dossier valide pour creation de l'inscription;
+- "rejected" -> dossier refuse.
+
+Exemple:
+- Un candidat a oublie son relevé de notes.
+- La gestionnaire le met "a completer".
+- Le candidat renvoie le document.
+- La gestionnaire reprend l'analyse puis accepte la candidature.
+
+3.2 Transformer une candidature acceptee en inscription
+
+Cas concret:
+Une candidature acceptee doit devenir un dossier administratif payable.
+
+La gestionnaire:
+- ouvre le positionnement academique;
+- choisit le niveau ou la classe;
+- verifie les frais associes;
+- cree l'inscription;
+- lance le parcours financier du dossier.
+
+Effet metier:
+L'inscription devient la base de tous les paiements et de l'etat financier du candidat.
+
+Exemple:
+- Candidature acceptee en licence 1.
+- La gestionnaire choisit la classe correspondante.
+- Le systeme calcule les frais d'inscription.
+- Une inscription est creee avec un token public unique.
+
+3.3 Suivre les inscriptions
+
+Cas concret:
+La gestionnaire veut savoir quels dossiers sont en attente, partiels ou actifs.
+
+Elle peut:
+- ouvrir le detail de l'inscription;
+- consulter le token public;
+- voir le solde restant;
+- ouvrir le dossier public;
+- voir les paiements deja enregistres;
+- accorder une session cash si le dossier est payable.
+
+Etats observes:
+- creee;
+- en attente de paiement;
+- partielle;
+- active;
+- terminee ou archivee selon le cycle du dossier.
+
+Exemple:
+- Un dossier a deja ete paye a 60%.
+- La gestionnaire voit le solde restant.
+- Elle decide si un nouveau paiement peut etre initie.
+
+3.4 Gerer les paiements
+
+Cas concret:
+Un etudiant a verse un paiement, ou veut en initier un autre.
+
+La gestionnaire peut:
+- voir le detail du paiement;
+- valider un paiement en attente;
+- annuler un paiement en attente;
+- corriger un paiement valide avec justification;
+- voir le token public du dossier associe;
+- ouvrir le dossier public dans un nouvel onglet.
+
+Workflow metier:
+- un paiement pending doit etre valide ou annule;
+- un paiement validated peut etre corrige;
+- toute correction doit etre traçable;
+- le paiement alimente la caisse de l'annexe.
+
+Exemple:
+- Paiement de 50 000 FCFA en attente.
+- La gestionnaire verifie le receveur et le dossier.
+- Elle valide le paiement.
+- Le systeme met a jour le solde de l'inscription et ajoute le mouvement en caisse.
+
+Autre exemple:
+- Un paiement a ete valide avec un mauvais montant.
+- La gestionnaire ouvre le detail.
+- Elle corrige le montant en justifiant l'operation.
+- L'historique financier conserve la trace.
+
+3.5 Gerer les sessions cash
+
+Cas concret:
+Pour un paiement en especes, la gestionnaire peut generer ou regenerer un code cash lie a une inscription payable.
+
+Elle peut:
+- choisir une inscription payable;
+- generer une session cash;
+- regenerer le code si besoin;
+- completer la session;
+- fermer ou annuler la session selon le workflow local.
+
+Exemple:
+- Un etudiant vient payer en caisse.
+- La gestionnaire selectionne son dossier payable.
+- Elle genere un code de session cash.
+- L'agent utilise ce code pour finaliser le paiement.
+
+3.6 Gerer les salaires
+
+Cas concret:
+La gestionnaire doit preparer les fiches de paie et regler le personnel de l'annexe.
+
+Elle peut:
+- voir la liste des employes rattaches a l'annexe;
+- ouvrir le detail d'une fiche de paie;
+- creer ou modifier une fiche;
+- pre-calculer les fiches manquantes;
+- notifier les fiches disponibles;
+- enregistrer une avance;
+- payer une fiche partiellement ou totalement;
+- refuser un paiement si la caisse est insuffisante.
+
+Cas pratique:
+- En debut de mois, aucune fiche n'existe.
+- La gestionnaire lance le pre-calcul.
+- Les fiches sont creees.
+- Elle rend les fiches disponibles.
+- Chaque employe voit sa paie.
+- Quand la caisse le permet, elle paye une partie ou la totalite.
+
+3.7 Gerer les depenses
+
+Cas concret:
+L'annexe doit payer des charges ou des achats.
+
+La gestionnaire peut:
+- creer une depense;
+- renseigner titre, categorie, montant, fournisseur, date et piece jointe;
+- approuver la depense;
+- la rejeter;
+- la payer quand elle est approuvee.
+
+Exemple:
+- Achat de fournitures: 18 000 FCFA.
+- La gestionnaire cree la depense avec justificatif.
+- Le responsable valide la charge.
+- Elle la paye.
+- Le mouvement sort de caisse est trace.
+
+3.8 Gerer la caisse
+
+Cas concret:
+La gestionnaire doit savoir combien l'annexe a vraiment en caisse et d'ou viennent les mouvements.
+
+Elle peut:
+- lire les entrees et sorties;
+- filtrer par source;
+- filtrer par type;
+- ajouter un mouvement manuel si necessaire;
+- synchroniser les paiements etudiants valides;
+- generer des pieces de caisse.
+
+Sources principales:
+- paiement etudiant;
+- salaire;
+- depense;
+- boutique;
+- ajustement manuel;
+- autres mouvements administratifs.
+
+Exemple:
+- Un paiement etudiant a ete valide.
+- S'il manque dans la caisse, la gestionnaire lance la synchronisation.
+- Le journal est remis a jour.
+
+3.9 Lire le rapport financier
+
+Cas concret:
+La gestionnaire veut un bilan de periode.
+
+Elle peut voir:
+- total des entrees;
+- total des sorties;
+- paiements etudiants;
+- ventes boutique;
+- depenses payees;
+- salaires payes;
+- autres charges;
+- autres entrees;
+- solde net;
+- gain reel de l'annexe;
+- evolution annuelle.
+
+Exemple:
+- Sur le mois, l'annexe a recu 2 500 000 FCFA.
+- Elle a paye 1 100 000 FCFA de charges et salaires.
+- Le rapport montre le gain reel restant apres engagements.
+
+3.10 Gerer la boutique
+
+Cas concret:
+Si le module boutique est actif, la gestionnaire suit les ventes et le stock.
+
+Elle peut:
+- consulter les produits;
+- suivre le stock;
+- voir les commandes;
+- suivre les ventes;
+- lier les ventes a la caisse.
+
+Exemple:
+- Un article est vendu a un etudiant.
+- La vente remonte dans la caisse.
+- Le stock baisse.
+
+4. CE QUE LE DASHBOARD AFFICHE
+
+Le dashboard organise les informations par sections:
+- Vue globale;
+- Candidatures;
+- Inscriptions;
+- Paiements;
+- Salaires;
+- Depenses;
+- Boutique;
+- Caisse;
+- Rapport.
+
+Il affiche aussi:
+- des KPI de synthese;
+- des listes d'actions rapides;
+- des recherches globales;
+- des modales detaillees;
+- des actions directes HTMX;
+- des badges de statut.
+
+5. LES TOKENS PUBLICS
+
+Le token public n'est pas un simple identifiant decoratif.
+Il sert a ouvrir le dossier public de l'inscription.
+
+Concretement:
+- un token public renvoie vers le detail public du dossier;
+- il peut etre clique depuis les sections inscriptions et paiements;
+- il permet de retrouver le dossier sans chercher le nom a la main.
+
+Exemple:
+- La gestionnaire voit le token d'un paiement.
+- Elle clique dessus.
+- Elle ouvre le dossier public de l'inscription liee.
+
+6. CAS D'USAGE CONCRETS
+
+Cas 1: dossier incomplet
+- la candidature est ouverte;
+- la gestionnaire detecte un document manquant;
+- elle demande complement;
+- le candidat complete;
+- la gestionnaire reprend l'analyse.
+
+Cas 2: candidature acceptee
+- la candidature est validee;
+- la gestionnaire ouvre le positionnement academique;
+- elle cree l'inscription;
+- le dossier devient payable.
+
+Cas 3: paiement en attente
+- un paiement est enregistre;
+- il reste pending;
+- la gestionnaire le verifie;
+- elle le valide ou l'annule.
+
+Cas 4: correction de paiement
+- le paiement a ete valide avec un mauvais montant;
+- la gestionnaire corrige;
+- elle indique une justification;
+- la caisse et l'historique sont mis a jour.
+
+Cas 5: salaire a payer
+- une fiche est prete;
+- la caisse est suffisante;
+- la gestionnaire paye tout ou partie;
+- le solde restant est mis a jour.
+
+Cas 6: caisse insuffisante
+- la gestionnaire veut payer un salaire ou une depense;
+- la caisse ne couvre pas le montant;
+- l'operation est bloquee;
+- elle doit d'abord encaisser ou reduire le montant.
+
+Cas 7: depense approuvee
+- une facture est en attente;
+- elle est approuvee;
+- elle est payee ensuite;
+- la sortie de caisse est tracee.
+
+7. REGLES DE GESTION A RESPECTER
+
+- ne jamais agir hors annexe;
+- ne jamais valider un montant superieur au solde d'un dossier;
+- ne jamais payer un salaire si la caisse est insuffisante;
+- ne jamais corriger un paiement sans justification;
+- ne jamais supprimer une candidature liee a un dossier actif;
+- toujours garder une trace des operations sensibles;
+- toujours pouvoir rouvrir le dossier via le token public.
+
+8. CE QUI DOIT RESTER STABLE DANS LE CODE
+
+Pour que le dashboard soit fiable, il faut conserver:
+- les modales detaillees;
+- les boutons d'action qui remplacent bien les lignes;
+- les ids de lignes stables;
+- les routes HTMX clairement nommees;
+- les liens publics sur les tokens;
+- la synchronisation caisse/paiement/salaire;
+- les messages de validation et d'erreur lisibles.
+
+9. RESUME FINAL
+
+Le dashboard gestionnaire d'une annexe sert a transformer le flux administratif en flux exploitable:
+- reception des candidatures;
+- validation des dossiers;
+- creation des inscriptions;
+- gestion des paiements;
+- suivi de la caisse;
+- gestion des depenses;
+- gestion des salaires;
+- lecture du rapport financier.
+
+En pratique, c'est le centre de commande local de l'annexe.
+Il doit rester clair, stable, traçable et directement orienté vers les actions metier.

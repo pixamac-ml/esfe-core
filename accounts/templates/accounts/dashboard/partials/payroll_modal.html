@@ -1,8 +1,6 @@
 {% load humanize %}
-<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
-    <div class="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+<div class="space-y-0">
+<div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
             <div>
                 <h2 class="text-xl font-bold text-slate-900">Paie employe</h2>
                 <p class="text-sm text-slate-500">{{ employee_profile.user.get_full_name|default:employee_profile.user.username }} • {{ payroll_month|date:"F Y" }}</p>
@@ -10,9 +8,10 @@
             <button onclick="closeDashboardModal()" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-slate-500 transition">
                 <i class="fas fa-times"></i>
             </button>
-        </div>
+    </div>
+</div>
 
-        <div class="p-6 space-y-6">
+    <div class="p-6 space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
                     <p class="text-xs uppercase tracking-wide text-slate-400">Employe</p>
@@ -25,7 +24,7 @@
                     <p class="text-xs text-slate-500 mt-1">{{ employee_profile.branch.name }}</p>
                 </div>
                 <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-                    <p class="text-xs uppercase tracking-wide text-slate-400">Base employee</p>
+                    <p class="text-xs uppercase tracking-wide text-slate-400">Salaire officiel</p>
                     <p class="mt-2 text-sm font-semibold text-slate-900">{{ employee_profile.salary_base|intcomma }} FCFA</p>
                     <p class="text-xs text-slate-500 mt-1">{{ employee_profile.get_employment_status_display }}</p>
                 </div>
@@ -43,7 +42,7 @@
             <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6">
                 <form
                     hx-post="{% url 'accounts:htmx_manager_salary_upsert' employee_profile.user_id %}"
-                    hx-target="#modal-container"
+                    hx-target="#modal-content"
                     hx-swap="innerHTML"
                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                     class="space-y-4">
@@ -53,7 +52,7 @@
                             {{ payroll_form.period_month }}
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">Salaire de base</label>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Salaire officiel</label>
                             {{ payroll_form.base_salary }}
                         </div>
                         <div>
@@ -96,7 +95,7 @@
                     {% if payroll_entry %}
                     <form
                         hx-post="{% url 'accounts:htmx_manager_salary_pay' payroll_entry.id %}"
-                        hx-target="#modal-container"
+                        hx-target="#modal-content"
                         hx-swap="innerHTML"
                         hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                         class="space-y-4">
@@ -131,7 +130,7 @@
                 </div>
                 <form
                     hx-post="{% url 'accounts:htmx_manager_salary_advance' employee_profile.user_id %}"
-                    hx-target="#modal-container"
+                    hx-target="#modal-content"
                     hx-swap="innerHTML"
                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                     class="space-y-4">
@@ -151,6 +150,5 @@
                     </button>
                 </form>
             </div>
-        </div>
     </div>
 </div>

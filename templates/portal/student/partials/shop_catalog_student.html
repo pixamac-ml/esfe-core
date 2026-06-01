@@ -1,0 +1,57 @@
+{% load humanize %}
+<div class="space-y-3">
+  <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]">Catalogue des articles disponibles</p>
+  {% if products %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      {% for product in products %}
+        <div class="flex flex-col rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] overflow-hidden transition hover:shadow-sm">
+          {% if product.image %}
+          <div class="h-36 bg-slate-100">
+            <img src="{{ product.image.url }}" alt="{{ product.name }}" class="h-full w-full object-cover">
+          </div>
+          {% else %}
+          <div class="h-36 bg-slate-100 grid place-items-center">
+            <i data-lucide="package" class="h-8 w-8 text-slate-300"></i>
+          </div>
+          {% endif %}
+          <form hx-post="{% url 'shop:student_create_required_order' %}"
+                hx-target="#shop"
+                hx-swap="innerHTML"
+                class="flex flex-1 flex-col p-3">
+            {% csrf_token %}
+            <input type="hidden" name="product_ids" value="{{ product.id }}">
+            <div class="flex-1">
+              <div class="flex items-start justify-between gap-2">
+                <p class="text-sm font-bold text-[color:var(--text)]">{{ product.name }}</p>
+                <span class="shrink-0 text-xs font-bold text-primary">{{ product.unit_price|intcomma }} FCFA</span>
+              </div>
+              <p class="mt-1 text-xs text-slate-500">{{ product.get_category_display }}</p>
+              <p class="mt-1 text-xs text-[color:var(--muted)] line-clamp-2">{{ product.description|default:""|truncatechars:80 }}</p>
+            </div>
+            <div class="mt-3 flex items-center justify-between gap-2">
+              <span class="rounded-full px-2 py-0.5 text-[10px] font-bold
+                {% if product.is_low_stock %}bg-rose-100 text-rose-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                Stock {{ product.current_stock }}
+              </span>
+              <div class="flex items-center gap-2">
+                {% if product.is_required %}
+                <span class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">Obligatoire</span>
+                {% endif %}
+                <button type="submit"
+                  class="rounded-lg bg-primary-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-primary-700">
+                  Acheter
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center">
+      <i data-lucide="package-open" class="mx-auto h-8 w-8 text-[color:var(--muted)]"></i>
+      <p class="mt-3 text-sm font-semibold text-[color:var(--text)]">Aucun article disponible</p>
+      <p class="mt-1 text-xs text-[color:var(--muted)]">La boutique n'a pas encore d'articles pour votre formation.</p>
+    </div>
+  {% endif %}
+</div>

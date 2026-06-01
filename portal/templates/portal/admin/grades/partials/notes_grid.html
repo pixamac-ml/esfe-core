@@ -13,6 +13,9 @@
       --warning:#fff7da;
       --shadow:0 10px 30px rgba(15, 23, 42, 0.08);
       --radius:16px;
+      --sticky-check-width:42px;
+      --sticky-index-width:52px;
+      --sticky-name-width:240px;
       color:var(--text);
     }
 
@@ -90,26 +93,65 @@
       border-radius:10px;
       font-size:12px;
     }
-    .notes-grid .checkboxCol{width:42px;min-width:42px;max-width:42px;background:#fff;position:sticky;left:0;z-index:4}
-    .notes-grid .numCol{left:42px;z-index:3}
-    .notes-grid .nameCol{left:78px}
+    .notes-grid .checkboxCol{
+      width:var(--sticky-check-width);
+      min-width:var(--sticky-check-width);
+      max-width:var(--sticky-check-width);
+      background:#fff;
+      position:sticky;
+      left:0;
+      z-index:20;
+      box-shadow:2px 0 0 var(--line);
+    }
+    .notes-grid .numCol{
+      width:var(--sticky-index-width);
+      min-width:var(--sticky-index-width);
+      max-width:var(--sticky-index-width);
+      background:#fff;
+      position:sticky;
+      left:var(--sticky-check-width);
+      z-index:19;
+      box-shadow:2px 0 0 var(--line);
+    }
+    .notes-grid .nameCol{
+      width:var(--sticky-name-width);
+      min-width:var(--sticky-name-width);
+      max-width:var(--sticky-name-width);
+      left:calc(var(--sticky-check-width) + var(--sticky-index-width));
+      z-index:18;
+      box-shadow:2px 0 0 var(--line);
+    }
     .notes-grid .student-check{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
-    .notes-grid table{border-collapse:collapse;min-width:2400px;width:max-content;background:#fff}
+    .notes-grid table{border-collapse:collapse;table-layout:fixed;min-width:2400px;width:max-content;background:#fff}
     .notes-grid th,.notes-grid td{
       border:1px solid var(--line);padding:8px 10px;text-align:center;font-size:12px;white-space:nowrap;vertical-align:middle;font-variant-numeric:tabular-nums
     }
     .notes-grid th{
-      position:sticky;
-      top:0;
-      z-index:5;
+      position:static;
       background:#eef3ff;
       font-weight:bold;
       box-shadow:0 1px 0 var(--line);
+      white-space:normal;
+      word-break:break-word;
     }
+    /* All 5 header rows stick to top; higher z-index = on top when stacked */
+    .notes-grid thead tr:nth-child(1) th{position:sticky;top:0;z-index:9}
+    .notes-grid thead tr:nth-child(2) th{position:sticky;top:0;z-index:8}
+    .notes-grid thead tr:nth-child(3) th{position:sticky;top:0;z-index:7}
+    .notes-grid thead tr:nth-child(4) th{position:sticky;top:0;z-index:6}
+    .notes-grid thead tr:nth-child(5) th{position:sticky;top:0;z-index:5}
+    /* Make first 3 header cells in all rows stick to left */
+    .notes-grid thead th.checkboxCol,
+    .notes-grid thead th.numCol,
+    .notes-grid thead th.nameCol{position:sticky;background:#eef3ff}
+    .notes-grid thead th.checkboxCol{left:0;z-index:25}
+    .notes-grid thead th.numCol{left:var(--sticky-check-width);z-index:24}
+    .notes-grid thead th.nameCol{left:calc(var(--sticky-check-width) + var(--sticky-index-width));z-index:23}
+    .notes-grid thead th.nameCol{background:#fff}
     .notes-grid .block{background:#dbeafe;color:#17306b;font-weight:bold}
     .notes-grid .unit{background:#ede9fe;color:#4c1d95;font-weight:bold}
     .notes-grid .semester{background:#f1f5f9;font-weight:bold}
-    .notes-grid .nameCol{min-width:240px;text-align:left;font-weight:bold;background:#fff;position:sticky;z-index:6}
+    .notes-grid .nameCol{min-width:240px;text-align:left;font-weight:bold;background:#fff;position:sticky;z-index:13}
     .notes-grid .numCol{min-width:52px;background:#fff;position:sticky}
     .notes-grid .leftLabel{background:#f8fafc;font-weight:bold}
     .notes-grid .v{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;line-height:1;min-width:30px}
@@ -193,6 +235,26 @@
       <div class="notes-grid-shell">
       <div class="table-wrap notes-grid-scroll" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
         <table>
+          <colgroup>
+            <col style="width:42px">
+            <col style="width:52px">
+            <col style="width:240px">
+            {% for ue in ues %}
+              {% for ec in ue.ecs.all %}
+                <col style="width:118px">
+                <col style="width:82px">
+                <col style="width:92px">
+              {% endfor %}
+              <col style="width:92px">
+              <col style="width:92px">
+              <col style="width:92px">
+            {% endfor %}
+            <col style="width:112px">
+            <col style="width:112px">
+            <col style="width:112px">
+            <col style="width:160px">
+          </colgroup>
+          <thead>
           <tr>
             <th colspan="3">Etudiants</th>
             {% for ue in ues %}
@@ -269,10 +331,12 @@
             <th class="v semester">Pourcentage</th>
             <th class="v semester">Credits</th>
           </tr>
-
+          </thead>
+          <tbody>
           {% for row in rows %}
             {% include "portal/admin/grades/partials/excel_row.html" with row=row %}
           {% endfor %}
+          </tbody>
         </table>
       </div>
       </div>

@@ -8,8 +8,8 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from admissions.models import Candidature
-from accounts.forms import BranchCashMovementForm, BranchExpenseForm
-from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
+from accounts.forms import BranchBankTransferForm, BranchCashMovementForm, BranchExpenseForm, BranchMonthlyClosureForm, DonationForm
+from accounts.models import BranchBankTransfer, BranchCashMovement, BranchExpense, BranchMonthlyClosure, Donation, PayrollEntry, Profile, TeacherHonorariumEntry
 from accounts.services.manager_intelligence import build_manager_intelligence_context
 from accounts.services.manager_intelligence import get_branch_cash_balance
 from shop.forms import ShopCounterOrderForm, ShopProductForm, ShopStockInForm
@@ -135,7 +135,22 @@ def _manager_context(request, active_section="overview"):
         .exclude(user_type="public")
         .order_by("user__first_name", "user__last_name")
     )
-    branch_staff_user_ids = list(branch_staff_profiles.values_list("user_id", flat=True))
+    branch_teacher_profiles = (
+        Profile.objects
+        .select_related("user", "branch")
+        .filter(
+            branch=branch,
+            user__is_active=True,
+            position="teacher",
+        )
+        .exclude(user_type="public")
+        .order_by("user__first_name", "user__last_name")
+    )
+    branch_salary_profiles = branch_staff_profiles.exclude(position="teacher")
+    branch_staff_user_ids = list(
+        branch_salary_profiles.values_list("user_id", flat=True)
+    )
+    branch_teacher_user_ids = list(branch_teacher_profiles.values_list("user_id", flat=True))
     manager_agent = _get_manager_agent(request.user, branch)
     active_cash_sessions = []
     if manager_agent:
@@ -414,12 +429,16 @@ def _manager_context(request, active_section="overview"):
     report_other_charges = report_movements.filter(
         movement_type=BranchCashMovement.TYPE_OUT,
     ).exclude(
-        source__in=[BranchCashMovement.SOURCE_EXPENSE, BranchCashMovement.SOURCE_PAYROLL]
+        source__in=[BranchCashMovement.SOURCE_EXPENSE, BranchCashMovement.SOURCE_PAYROLL, BranchCashMovement.SOURCE_HONORARIUM]
     ).aggregate(total=Sum("amount"))["total"] or 0
     report_other_entries = report_movements.filter(
         movement_type=BranchCashMovement.TYPE_IN,
     ).exclude(
         source__in=[BranchCashMovement.SOURCE_STUDENT_PAYMENT, BranchCashMovement.SOURCE_SHOP]
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    report_honorarium = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT,
+        source=BranchCashMovement.SOURCE_HONORARIUM,
     ).aggregate(total=Sum("amount"))["total"] or 0
     report_rows = [
         {"label": "Total entrees", "amount": report_total_entries, "tone": "emerald"},
@@ -428,12 +447,13 @@ def _manager_context(request, active_section="overview"):
         {"label": "Ventes boutique", "amount": report_shop_sales, "tone": "violet"},
         {"label": "Depenses", "amount": report_expenses, "tone": "amber"},
         {"label": "Salaires", "amount": report_salaries, "tone": "slate"},
+        {"label": "Honoraires enseignants", "amount": report_honorarium, "tone": "indigo"},
         {"label": "Autres charges", "amount": report_other_charges, "tone": "rose"},
         {"label": "Autres entrees", "amount": report_other_entries, "tone": "emerald"},
         {"label": "Solde net", "amount": report_total_entries - report_total_exits, "tone": "dark"},
         {
             "label": "Gain reel annexe",
-            "amount": (report_student_payments + report_shop_sales + report_other_entries) - (report_expenses + report_salaries + report_other_charges),
+            "amount": (report_student_payments + report_shop_sales + report_other_entries) - (report_expenses + report_salaries + report_honorarium + report_other_charges),
             "tone": "primary",
         },
     ]
@@ -494,6 +514,10 @@ def _manager_context(request, active_section="overview"):
         branch=branch,
         period_month=start_of_month,
     ).aggregate(total=Sum("paid_amount"))["total"] or 0
+    honorarium_paid_month = TeacherHonorariumEntry.objects.filter(
+        branch=branch,
+        period_month=start_of_month,
+    ).aggregate(total=Sum("paid_amount"))["total"] or 0
     cash_stats = {
         "movements": BranchCashMovement.objects.filter(branch=branch).count(),
         "in_month": cash_in_month,
@@ -504,6 +528,7 @@ def _manager_context(request, active_section="overview"):
         "student_receipts_month": total_month,
         "expenses_paid_month": expense_stats["paid_month_amount"],
         "salary_paid_month": salary_paid_month,
+        "honorarium_paid_month": honorarium_paid_month,
     }
     recent_financial_logs = (
         FinancialLog.objects
@@ -527,7 +552,7 @@ def _manager_context(request, active_section="overview"):
     }
     salary_status = request.GET.get("salary_status", "").strip()
     salary_search = request.GET.get("salary_q", "").strip()
-    staff_profiles_filtered = branch_staff_profiles
+    staff_profiles_filtered = branch_salary_profiles
     if salary_status:
         if salary_status == "missing":
             staff_profiles_filtered = [
@@ -572,15 +597,74 @@ def _manager_context(request, active_section="overview"):
         "paid_total": payroll_total_paid,
         "remaining_total": payroll_remaining,
     }
+    honorarium_entries_qs = (
+        TeacherHonorariumEntry.objects
+        .filter(
+            branch=branch,
+            teacher_id__in=branch_teacher_user_ids,
+            period_month=payroll_month,
+        )
+        .select_related("teacher", "teacher__profile", "branch")
+        .order_by("teacher__first_name", "teacher__last_name")
+    )
+    honorarium_entries_by_teacher = {entry.teacher_id: entry for entry in honorarium_entries_qs}
+    honorarium_status = request.GET.get("honorarium_status", "").strip()
+    honorarium_search = request.GET.get("honorarium_q", "").strip()
+    teacher_profiles_filtered = branch_teacher_profiles
+    if honorarium_status:
+        if honorarium_status == "missing":
+            teacher_profiles_filtered = [
+                profile for profile in teacher_profiles_filtered
+                if profile.user_id not in honorarium_entries_by_teacher
+            ]
+        else:
+            teacher_profiles_filtered = [
+                profile for profile in teacher_profiles_filtered
+                if honorarium_entries_by_teacher.get(profile.user_id)
+                and honorarium_entries_by_teacher[profile.user_id].status == honorarium_status
+            ]
+    else:
+        teacher_profiles_filtered = list(teacher_profiles_filtered)
+    if honorarium_search:
+        search_value = honorarium_search.lower()
+        teacher_profiles_filtered = [
+            profile for profile in teacher_profiles_filtered
+            if search_value in (profile.user.get_full_name() or profile.user.username).lower()
+            or search_value in (profile.employee_code or "").lower()
+            or search_value in (profile.position or "").lower()
+        ]
+    for profile in teacher_profiles_filtered:
+        profile.current_honorarium = honorarium_entries_by_teacher.get(profile.user_id)
+    honorarium_entries_page = _paginate(
+        request,
+        teacher_profiles_filtered,
+        param_name="honorarium_page",
+        per_page=15,
+    )
+    honorarium_total_due = sum(entry.net_amount for entry in honorarium_entries_qs)
+    honorarium_total_paid = sum(entry.paid_amount for entry in honorarium_entries_qs)
+    honorarium_remaining = max(honorarium_total_due - honorarium_total_paid, 0)
+    honorarium_stats = {
+        "teachers": len(branch_teacher_user_ids),
+        "prepared": honorarium_entries_qs.count(),
+        "paid": sum(1 for entry in honorarium_entries_qs if entry.status == TeacherHonorariumEntry.STATUS_PAID),
+        "partial": sum(1 for entry in honorarium_entries_qs if entry.status == TeacherHonorariumEntry.STATUS_PARTIAL),
+        "ready": sum(1 for entry in honorarium_entries_qs if entry.status == TeacherHonorariumEntry.STATUS_READY),
+        "due_total": honorarium_total_due,
+        "paid_total": honorarium_total_paid,
+        "remaining_total": honorarium_remaining,
+    }
     intelligence = build_manager_intelligence_context(
         branch=branch,
         payroll_month=payroll_month,
         base_payments=base_payments,
         base_inscriptions=base_inscriptions,
         payroll_stats=payroll_stats,
+        honorarium_stats=honorarium_stats,
         expense_stats=expense_stats,
         cash_stats=cash_stats,
         branch_staff_user_ids=branch_staff_user_ids,
+        branch_teacher_user_ids=branch_teacher_user_ids,
     )
     shop_context = {
         "shop_products": [],
@@ -608,8 +692,8 @@ def _manager_context(request, active_section="overview"):
     shop_stats = shop_context.get("shop_stats", {})
     shop_sales_month = shop_stats.get("month_sales", 0) or 0
     period_revenue = total_month + shop_sales_month
-    period_paid_charges = cash_stats["expenses_paid_month"] + cash_stats["salary_paid_month"]
-    period_commitments = payroll_stats["remaining_total"] + expense_stats["pending_amount"]
+    period_paid_charges = cash_stats["expenses_paid_month"] + cash_stats["salary_paid_month"] + cash_stats["honorarium_paid_month"]
+    period_commitments = payroll_stats["remaining_total"] + honorarium_stats["remaining_total"] + expense_stats["pending_amount"]
     period_net_result = period_revenue - period_paid_charges
     period_balance_after_commitments = cash_stats["estimated_month_balance"] - period_commitments
     candidature_total = candidature_stats["total"]
@@ -620,6 +704,7 @@ def _manager_context(request, active_section="overview"):
         "total_revenue": period_revenue,
         "expenses_paid": cash_stats["expenses_paid_month"],
         "salary_paid": cash_stats["salary_paid_month"],
+        "honorarium_paid": cash_stats["honorarium_paid_month"],
         "charges_paid": period_paid_charges,
         "net_result": period_net_result,
         "estimated_cash": cash_stats["estimated_month_balance"],
@@ -721,6 +806,10 @@ def _manager_context(request, active_section="overview"):
         "payroll_stats": payroll_stats,
         "salary_status": salary_status,
         "salary_search": salary_search,
+        "honorarium_entries": honorarium_entries_page,
+        "honorarium_stats": honorarium_stats,
+        "honorarium_status": honorarium_status,
+        "honorarium_search": honorarium_search,
         "candidatures": candidatures_page,
         "candidature_stats": candidature_stats,
         "cand_status": cand_status,
@@ -760,7 +849,28 @@ def _manager_context(request, active_section="overview"):
         "cash_search": cash_search,
         "cash_form": BranchCashMovementForm(),
         "cash_sources": BranchCashMovement.SOURCE_CHOICES,
+        "closure_form": BranchMonthlyClosureForm(initial={
+            "period_month": payroll_month,
+            "bank_transfer_amount": 0,
+        }),
+        "available_cash_balance": get_branch_cash_balance(branch),
+        "transfer_form": BranchBankTransferForm(initial={
+            "transfer_date": today,
+            "amount": 0,
+        }),
         "manager_intelligence": intelligence,
+        "monthly_closures": BranchMonthlyClosure.objects.filter(branch=branch).order_by("-period_month", "-created_at")[:12],
+        "bank_transfers": BranchBankTransfer.objects.filter(branch=branch).select_related("closure").order_by("-transfer_date", "-created_at")[:12],
+        "donations": Donation.objects.filter(branch=branch).order_by("-date", "-created_at")[:20],
+        "donation_stats": {
+            "total": Donation.objects.filter(branch=branch).aggregate(total=Sum("amount"))["total"] or 0,
+            "count": Donation.objects.filter(branch=branch).count(),
+            "this_month": Donation.objects.filter(
+                branch=branch,
+                date__gte=today.replace(day=1),
+            ).aggregate(total=Sum("amount"))["total"] or 0,
+        },
+        "donation_form": DonationForm(),
         "shop_product_form": ShopProductForm(),
         "shop_stock_form": ShopStockInForm(branch=branch),
         "shop_counter_order_form": ShopCounterOrderForm(branch=branch),
@@ -783,7 +893,7 @@ def _render_manager_dashboard(request, active_section):
 @manager_required
 def manager_dashboard(request):
     section = request.GET.get("section", "overview").strip() or "overview"
-    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse", "rapport", "boutique"}
+    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse", "rapport", "cloture", "boutique", "dons"}
     if section not in allowed_sections:
         section = "overview"
     return _render_manager_dashboard(request, section)

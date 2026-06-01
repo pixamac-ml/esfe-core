@@ -93,6 +93,23 @@
         </div>
     </div>
 
+    <!-- ===================== SESSIONS CASH BOUTIQUE ACTIVES ===================== -->
+    {% if active_shop_cash_sessions %}
+    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900">Sessions especes boutique actives</h3>
+                <p class="text-sm text-slate-500">{{ active_shop_cash_sessions_count }} session{{ active_shop_cash_sessions_count|pluralize }} en attente de validation code.</p>
+            </div>
+        </div>
+        <div class="p-4 space-y-4">
+            {% for session in active_shop_cash_sessions %}
+                {% include "shop/partials/manager_shop_cash_session_card.html" with manager_agent=manager_agent %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- ===================== TABLEAU COMMANDES ===================== -->
     <div id="manager-shop-orders" class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
@@ -144,7 +161,7 @@
                             <div class="flex flex-wrap justify-end gap-2">
                                 {% for payment in order.payments.all %}
                                     {% if payment.status == "pending" %}
-                                    <button hx-post="/shop/manager/payment/{{ payment.id }}/validate/"
+                                    <button hx-post="{% url 'shop:manager_payment_validate' payment.id %}"
                                         hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                         hx-target="#manager-shop-module" hx-swap="outerHTML"
                                         class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
@@ -152,14 +169,14 @@
                                     </button>
                                     {% endif %}
                                     {% if payment.receipt_pdf %}
-                                    <a href="/shop/payment/{{ payment.id }}/receipt/" target="_blank"
+                                    <a href="{% url 'shop:payment_receipt' payment.id %}" target="_blank"
                                        class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
                                         <i class="fas fa-file-pdf mr-1"></i>Reçu
                                     </a>
                                     {% endif %}
                                 {% endfor %}
                                 {% if order.status == "paid" %}
-                                <button hx-post="/shop/manager/order/{{ order.id }}/ready/"
+                                <button hx-post="{% url 'shop:manager_order_mark_ready' order.id %}"
                                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                     hx-target="#manager-shop-module" hx-swap="outerHTML"
                                     class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
@@ -167,7 +184,7 @@
                                 </button>
                                 {% endif %}
                                 {% if order.status == "ready" or order.status == "paid" %}
-                                <button hx-post="/shop/manager/order/{{ order.id }}/deliver/"
+                                <button hx-post="{% url 'shop:manager_order_deliver' order.id %}"
                                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                     hx-target="#manager-shop-module" hx-swap="outerHTML"
                                     class="rounded-lg border border-primary-800 bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-700">
@@ -222,7 +239,7 @@
                         <span class="text-xs font-semibold {% if product.is_required %}text-primary{% else %}text-slate-400{% endif %}">
                             {% if product.is_required %}Obligatoire{% else %}Libre{% endif %}
                         </span>
-                        <button hx-post="/shop/manager/product/{{ product.id }}/delete/"
+                        <button hx-post="{% url 'shop:manager_product_delete' product.id %}"
                             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                             hx-target="#manager-shop-module" hx-swap="outerHTML"
                             hx-confirm="Supprimer cet article ?"
@@ -266,7 +283,7 @@
                         </div>
                         {% endif %}
 
-                        <form hx-post="/shop/manager/product/create/"
+                        <form hx-post="{% url 'shop:manager_product_create' %}"
                             hx-target="#manager-shop-module" hx-swap="outerHTML"
                             hx-on::after-request="if ($event.detail.successful) { openCreateProduct = false; resetCreateProduct(); }"
                             enctype="multipart/form-data" class="space-y-6">
@@ -426,7 +443,7 @@
                 </button>
             </div>
             <div class="p-6">
-                <form hx-post="/shop/manager/stock/in/"
+                <form hx-post="{% url 'shop:manager_stock_in' %}"
                     hx-target="#manager-shop-module" hx-swap="outerHTML"
                     hx-on::after-request="if ($event.detail.successful) { openStockIn = false; }"
                     class="space-y-4">
@@ -469,7 +486,7 @@
                 </button>
             </div>
             <div class="p-6 max-h-[80vh] overflow-y-auto">
-                <form hx-post="/shop/manager/order/create-counter/"
+                <form hx-post="{% url 'shop:manager_counter_order_create' %}"
                     hx-target="#manager-shop-module" hx-swap="outerHTML"
                     hx-on::after-request="if ($event.detail.successful) { openCounterOrder = false; }"
                     class="space-y-4">

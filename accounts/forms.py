@@ -2,7 +2,17 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 
-from .models import BranchCashMovement, BranchExpense, PayrollEntry, Profile, UserPreference
+from .models import (
+    BranchBankTransfer,
+    BranchCashMovement,
+    BranchExpense,
+    BranchMonthlyClosure,
+    Donation,
+    PayrollEntry,
+    Profile,
+    TeacherHonorariumEntry,
+    UserPreference,
+)
 
 User = get_user_model()
 
@@ -215,6 +225,90 @@ class PayrollEntryForm(forms.ModelForm):
         })
 
 
+class TeacherHonorariumEntryForm(forms.ModelForm):
+    class Meta:
+        model = TeacherHonorariumEntry
+        fields = [
+            "period_month",
+            "hourly_rate",
+            "validated_hours",
+            "adjustments",
+            "deductions",
+            "advances",
+            "notes",
+        ]
+        widgets = {
+            "period_month": forms.DateInput(attrs={"type": "date"}),
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ["period_month", "hourly_rate", "validated_hours", "adjustments", "deductions", "advances"]:
+            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+        self.fields["notes"].widget.attrs.update({
+            "class": TEXTAREA_CLASS,
+            "placeholder": "Observations internes sur les honoraires du mois...",
+        })
+
+
+class BranchMonthlyClosureForm(forms.ModelForm):
+    class Meta:
+        model = BranchMonthlyClosure
+        fields = [
+            "period_month",
+            "bank_transfer_amount",
+            "notes",
+        ]
+        widgets = {
+            "period_month": forms.DateInput(attrs={"type": "date"}),
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ["period_month", "bank_transfer_amount"]:
+            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+        self.fields["bank_transfer_amount"].required = False
+        self.fields["notes"].widget.attrs.update({
+            "class": TEXTAREA_CLASS,
+            "placeholder": "Motif de cloture ou observations de fin de periode...",
+        })
+
+
+class BranchBankTransferForm(forms.ModelForm):
+    class Meta:
+        model = BranchBankTransfer
+        fields = [
+            "bank_name",
+            "reference",
+            "transfer_date",
+            "amount",
+            "proof",
+            "comment",
+        ]
+        widgets = {
+            "transfer_date": forms.DateInput(attrs={"type": "date"}),
+            "comment": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ["bank_name", "reference", "transfer_date", "amount"]:
+            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+            self.fields[field_name].required = False
+        self.fields["proof"].widget.attrs.update({
+            "class": INPUT_CLASS,
+            "accept": ".pdf,image/jpeg,image/png,image/webp",
+        })
+        self.fields["proof"].required = False
+        self.fields["comment"].widget.attrs.update({
+            "class": TEXTAREA_CLASS,
+            "placeholder": "Commentaire interne sur le versement bancaire...",
+        })
+        self.fields["comment"].required = False
+
+
 class BranchExpenseForm(forms.ModelForm):
     class Meta:
         model = BranchExpense
@@ -269,4 +363,31 @@ class BranchCashMovementForm(forms.ModelForm):
         self.fields["notes"].widget.attrs.update({
             "class": TEXTAREA_CLASS,
             "placeholder": "Commentaire interne sur ce mouvement...",
+        })
+
+
+class DonationForm(forms.ModelForm):
+    class Meta:
+        model = Donation
+        fields = [
+            "donor_name",
+            "amount",
+            "date",
+            "motif",
+            "payment_method",
+            "description",
+            "receipt_number",
+        ]
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date"}),
+            "description": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ["donor_name", "amount", "date", "motif", "payment_method", "receipt_number"]:
+            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+        self.fields["description"].widget.attrs.update({
+            "class": TEXTAREA_CLASS,
+            "placeholder": "Remerciements ou note...",
         })

@@ -1,0 +1,909 @@
+DOCUMENTATION DETAILLEE - APP DJANGO "academics"
+================================================
+
+Projet analyse : C:\Users\HP\PycharmProjects\esfe-core
+Date de redaction : 2026-05-28
+
+
+1. ROLE GENERAL DE L'APP
+------------------------
+
+L'app "academics" porte le coeur pedagogique et academique du projet ESFE.
+Elle ne gere pas seulement une liste de cours : elle fait le lien entre les
+inscriptions administratives, les classes reelles, les semestres, les UE, les EC,
+les notes, les credits, les bulletins, les diplomes, les emplois du temps et le
+cahier de texte.
+
+Elle sert donc a transformer une inscription administrative valide en parcours
+academique exploitable :
+
+- rattacher un etudiant a une classe academique concrete ;
+- structurer une classe en semestres, UE et EC ;
+- saisir ou importer les notes par EC ;
+- calculer les credits, moyennes et decisions ;
+- generer des releves, bulletins et documents de diplome ;
+- planifier les cours et detecter les conflits d'emploi du temps ;
+- suivre l'execution des seances et le cahier de texte ;
+- alimenter les dashboards direction, surveillance, portail etudiant et autres
+  apps connectees.
+
+
+2. ORGANISATION DES FICHIERS
+----------------------------
+
+Fichiers principaux :
+
+- academics/models.py
+  Definit toutes les tables metier : annees academiques, classes, inscriptions
+  academiques, semestres, UE, EC, notes, planning, cahier de texte, bulletins et
+  diplomes.
+
+- academics/services/
+  Contient la logique metier reusable. C'est la partie la plus importante de
+  l'app : calculs de notes, calculs de semestre/annee, affectation d'etudiant,
+  generation de bulletins, emplois du temps, cahier de texte, reporting, etc.
+
+- academics/views.py
+  Expose les vues Django pour les rapports, PDF, bulletins, diplomes et API JSON
+  du cahier de texte.
+
+- academics/views_import.py
+  Expose les endpoints d'import Excel des notes.
+
+- academics/urls.py
+  Declare les routes publiques de l'app.
+
+- academics/imports/
+  Gere la generation du template Excel et l'import des notes.
+
+- academics/management/commands/
+  Contient des commandes de seed/demo et des scripts d'affectation academique.
+
+- academics/templates/academics/reports/
+  Contient les templates HTML utilises pour les releves, bulletins, rapports et
+  diplomes, y compris les rendus PDF via WeasyPrint.
+
+- academics/admin.py
+  Configure l'administration Django des modeles academics.
+
+- academics/tests.py
+  Couvre notamment les calculs academiques, le resolveur de contexte, le service
+  d'emploi du temps et le cahier de texte.
+
+
+3. MODELE DE DONNEES
+--------------------
+
+3.1. Referentiels simples
+
+Language
+- Stocke les langues disponibles.
+- Champs : name, code, is_active, created_at.
+
+Profession
+- Stocke les metiers/professions.
+- Champs : name, description, is_active, created_at.
+
+
+3.2. Annee academique
+
+AcademicYear
+- Reference centrale d'une annee academique, par exemple "2025-2026".
+- Champs : name, start_date, end_date, is_active, created_at.
+- Validation :
+  - start_date doit etre avant end_date ;
+  - une seule annee academique peut etre active a la fois.
+- Le save() appelle full_clean(), donc ces controles s'appliquent avant
+  enregistrement.
+
+
+3.3. Classe academique
+
+AcademicClass
+- Represente une vraie classe pedagogique : programme + annexe + annee + niveau.
+- Champs principaux :
+  - programme : lien vers formations.Programme ;
+  - branch : annexe ;
+  - academic_year : annee academique ;
+  - level : L1, L2, L3, M1, M2, etc. ;
+  - study_level : DEF, BAC, LICENCE, MASTER ;
+  - validation_threshold : seuil de validation, souvent 10 ou 12 ;
+  - is_active, is_archived, archived_at.
+- Contrainte :
+  - une seule classe pour le meme programme, la meme annexe, la meme annee et le
+    meme niveau.
+- display_name retourne le nom lisible de la classe.
+
+
+3.4. Inscription academique
+
+AcademicEnrollment
+- C'est le pont entre l'inscription administrative et le suivi academique.
+- Elle relie :
+  - une Inscription administrative ;
+  - un utilisateur etudiant ;
+  - un Programme ;
+  - une Branch ;
+  - une AcademicYear ;
+  - une AcademicClass.
+- Statuts :
+  - ACTIVE ;
+  - ARCHIVED ;
+  - COMPLETED ;
+  - SUSPENDED ;
+  - TRANSFERRED ;
+  - ABANDONED.
+- Validation :
+  - l'inscription doit avoir un paiement valide, etre partiellement payee/active
+    ou deja posseder un etudiant cree ;
+  - programme, annexe et classe doivent rester coherents avec la candidature ;
+  - la classe cible doit etre active et non archivee ;
+  - un etudiant ne peut pas avoir deux inscriptions academiques actives pour le
+    meme programme et la meme annee.
+- save() synchronise status avec is_active/is_archived/archived_at.
+
+
+3.5. Semestre, UE et EC
+
+Semester
+- Rattache un semestre a une AcademicClass.
+- Champs :
+  - academic_class ;
+  - number : 1 ou 2 ;
+  - status ;
+  - total_required_credits, par defaut 30.
+- Statuts de workflow :
+  - DRAFT ;
+  - NORMAL_ENTRY ;
+  - NORMAL_LOCKED ;
+  - RETAKE_ENTRY ;
+  - FINALIZED ;
+  - PUBLISHED.
+- Contrainte :
+  - une classe ne peut avoir qu'un semestre 1 et un semestre 2.
+- calculate_for_enrollment() appelle compute_semester_result().
+
+UE
+- Unite d'enseignement rattachee a un semestre.
+- Champs : semester, code, title.
+- Les credits et coefficients d'une UE sont calcules depuis ses EC.
+- Contrainte : code unique dans un semestre.
+- calculate_for_enrollment() appelle compute_ue_result().
+
+EC
+- Element constitutif, c'est-a-dire la matiere evaluee.
+- Champs : ue, title, credit_required, coefficient.
+- Validation :
+  - credit_required et coefficient doivent etre positifs ;
+  - credit_required ne doit pas depasser 6 ;
+  - credit_required ne doit pas etre inferieur au coefficient.
+
+
+3.6. Contenus pedagogiques
+
+ECChapter
+- Chapitre d'un EC.
+- Champs : ec, title, order.
+
+ECContent
+- Contenu rattache a un chapitre : PDF, video, document, image, texte, etc.
+- Champs : chapter, title, content_type, file, video_url, text_content, duration,
+  order, is_active.
+- Validation :
+  - les types fichier exigent un fichier ;
+  - les videos exigent video_url ;
+  - les contenus texte exigent text_content.
+
+StudentContentProgress
+- Suit la progression d'un etudiant sur un contenu.
+- Champs : student, content, is_completed, progress_percent, last_position,
+  first_viewed_at, updated_at.
+- Le pourcentage est borne entre 0 et 100.
+
+
+3.7. Notes
+
+ECGrade
+- Stocke la note d'un etudiant sur un EC.
+- Champs principaux :
+  - enrollment ;
+  - ec ;
+  - note ;
+  - normal_score ;
+  - retake_score ;
+  - final_score ;
+  - note_coefficient ;
+  - credit_obtained ;
+  - is_validated.
+- Logique :
+  - la note finale est la meilleure entre normal_score et retake_score quand les
+    deux existent ;
+  - les credits sont obtenus seulement si la note finale atteint le seuil ;
+  - le save() applique apply_ec_grade() avant enregistrement.
+
+
+3.8. Emploi du temps
+
+AcademicScheduleEvent
+- Evenement date de planning : cours, examen, reunion, TP, seminaire, autre.
+- Champs :
+  - title, description, event_type ;
+  - academic_class, ec, teacher, branch, academic_year ;
+  - start_datetime, end_datetime ;
+  - status ;
+  - location, is_online, meeting_link ;
+  - created_by, updated_by ;
+  - is_active.
+- Statuts :
+  - draft ;
+  - planned ;
+  - ongoing ;
+  - completed ;
+  - postponed ;
+  - cancelled.
+- Validation :
+  - fin apres debut ;
+  - coherence entre classe, annexe, annee academique et EC ;
+  - lien en ligne requis si is_online est vrai.
+- duration_minutes retourne la duree calculee.
+
+AcademicScheduleChangeLog
+- Journalise les changements de planning : creation, modification, report,
+  annulation, completion.
+- Stocke anciens/nouveaux horaires, anciens/nouveaux statuts, raison et auteur.
+
+AcademicScheduleExecutionLog
+- Trace l'execution reelle d'un evenement : debut, fin, enseignant reel, notes,
+  cloture.
+
+WeeklyScheduleSlot
+- Grille hebdomadaire recurrente officielle.
+- Sert de modele pour materialiser des AcademicScheduleEvent dates sur une
+  semaine.
+- Champs : classe, EC, enseignant, annexe, annee, jour, heure debut, heure fin,
+  salle, actif.
+- Validation :
+  - horaires coherents ;
+  - classe/annexe/annee/EC coherents.
+
+
+3.9. Cahier de texte
+
+LessonLog
+- Trace ce qui s'est passe pendant un cours.
+- Champs :
+  - academic_class, ec, teacher, schedule_event ;
+  - date, start_time, end_time ;
+  - status ;
+  - content, homework, observations ;
+  - branch, created_by, validated_by.
+- Statuts :
+  - planned ;
+  - done ;
+  - cancelled ;
+  - absent_teacher.
+- Validation :
+  - fin apres debut ;
+  - l'EC doit appartenir a la classe ;
+  - l'evenement planifie, s'il existe, doit correspondre a la classe, l'EC,
+    l'enseignant et l'annexe ;
+  - si le cours est marque done, content devient obligatoire.
+
+
+3.10. Bulletins et diplomes
+
+AcademicBulletin
+- Stocke un bulletin semestriel ou annuel.
+- Champs :
+  - student, enrollment, academic_year, academic_class, branch, semester ;
+  - bulletin_type : semester ou annual ;
+  - status : draft, generated, published, cancelled ;
+  - reference ;
+  - average, total_credits, credits_obtained ;
+  - decision, mention ;
+  - snapshot JSON ;
+  - generated_by/at, published_by/at ;
+  - pdf_file.
+- Unicite :
+  - un bulletin semestriel par etudiant + inscription + semestre ;
+  - un bulletin annuel par etudiant + inscription.
+- La reference est generee automatiquement si absente.
+
+AcademicDiplomaAward
+- Stocke la preparation/livraison d'un diplome.
+- Champs :
+  - student, enrollment, academic_year, academic_class, branch, programme,
+    diploma ;
+  - reference, status, final_average, mention, decision ;
+  - awarded_at, prepared_by, delivered_by, delivered_at ;
+  - snapshot JSON, pdf_file.
+- Unicite :
+  - un diplome par etudiant + programme + annee academique.
+- La reference est generee automatiquement.
+
+
+4. CALCULS ACADEMIQUES
+----------------------
+
+4.1. Seuil de validation
+
+Le service academics/services/grading.py contient resolve_threshold().
+
+Priorite :
+1. utiliser validation_threshold de la classe ;
+2. sinon utiliser study_level :
+   - DEF -> 10 ;
+   - BAC -> 12 ;
+   - LICENCE -> 12 ;
+   - MASTER -> 12 ;
+3. fallback global -> 10.
+
+
+4.2. Calcul d'un EC
+
+calculate_ec_grade(note, coefficient, credit_required, threshold) :
+
+- convertit proprement les valeurs en Decimal ;
+- borne la note entre 0 et 20 pour le calcul ;
+- calcule note_coefficient = note * coefficient ;
+- donne tous les credits de l'EC si note >= threshold ;
+- sinon donne 0 credit ;
+- retourne note, note_coefficient, credit_obtained, is_validated.
+
+apply_ec_grade(instance) :
+
+- choisit final_score :
+  - retake_score si seul le rattrapage existe ;
+  - normal_score si seul le normal existe ;
+  - max(normal_score, retake_score) si les deux existent ;
+- applique calculate_ec_grade ;
+- met a jour note, note_coefficient, credit_obtained et is_validated.
+
+
+4.3. Calcul d'une UE
+
+compute_ue_result(ue, enrollment) :
+
+- recupere tous les EC de l'UE ;
+- recupere les notes ECGrade de l'etudiant ;
+- calcule la moyenne UE :
+  somme(note_coefficient EC) / somme(coefficients EC) ;
+- calcule les credits obtenus ;
+- detecte les notes manquantes ;
+- liste les EC echoues ;
+- retourne un statut :
+  - incomplete ;
+  - validated ;
+  - failed.
+
+Une UE est validee si :
+
+- toutes les notes attendues sont presentes ;
+- la moyenne UE atteint le seuil ;
+- les credits obtenus couvrent les credits requis de l'UE.
+
+
+4.4. Calcul d'un semestre
+
+compute_semester_result(semester, enrollment) :
+
+- calcule toutes les UE du semestre ;
+- calcule la moyenne semestrielle :
+  somme(moyenne UE * coefficient UE) / somme(coefficients UE) ;
+- cumule credits requis et credits obtenus ;
+- detecte les notes manquantes ;
+- liste les UE/EC echoues ;
+- calcule un pourcentage de credits obtenus ;
+- produit des raisons de blocage.
+
+Un semestre est valide si :
+
+- il est complet ;
+- la moyenne atteint le seuil ;
+- tous les credits requis sont obtenus.
+
+compute_class_ranking() classe les etudiants d'une classe pour un semestre avec
+gestion simple des ex-aequo.
+
+
+4.5. Calcul annuel et decision
+
+compute_annual_result(enrollment) :
+
+- calcule tous les semestres de la classe ;
+- pondere la moyenne annuelle par les credits requis ;
+- cumule credits requis/obtenus ;
+- remonte les blocages ;
+- retourne complete/validated/failed.
+
+compute_annual_decision(enrollment) :
+
+- determine la decision academique automatique :
+  - promoted ;
+  - promoted_with_debt ;
+  - repeated ;
+  - completed.
+- Regles principales :
+  - tous les semestres valides -> passage ou completion si niveau terminal ;
+  - aucune validation -> redoublement ;
+  - un seul semestre echoue peut etre compense si l'ecart sous le seuil ne
+    depasse pas DEFAULT_SEMESTER_COMPENSATION_MAX_GAP = 0.50 ;
+  - une dette academique n'est pas autorisee en niveau terminal L3 ou M2 ;
+  - notes incompletes -> decision bloquee.
+
+compute_year_result(student, academic_year) :
+
+- resout l'etudiant et l'annee ;
+- retrouve l'inscription academique active ;
+- calcule S1, S2, resultat annuel et decision ;
+- sert aux rapports annuels et vues etudiant.
+
+
+5. AFFECTATION ACADEMIQUE D'UN ETUDIANT
+---------------------------------------
+
+Le service academics/services/enrollment_service.py expose
+assign_student_academic_enrollment(inscription).
+
+Objectif :
+- creer automatiquement AcademicEnrollment apres une inscription administrative.
+
+Priorite :
+1. si inscription.academic_class est deja renseignee, elle est validee via
+   validate_academic_class_for_candidature() ;
+2. sinon le systeme resout automatiquement le contexte via la candidature :
+   programme + annexe + annee academique + entry_year -> level -> classe.
+
+Le resolveur academics/services/academic_context_resolver.py fait ce travail :
+
+- resolve_academic_year() transforme une valeur legacy/string en AcademicYear ;
+- resolve_level_from_entry_year() transforme entry_year en L1/L2/L3/M1/M2 selon
+  le cycle ;
+- resolve_academic_context() cherche ensuite l'AcademicClass active compatible.
+
+Si une donnee manque ou si plusieurs classes correspondent, le service retourne
+un statut de type manual_required_* au lieu de creer une inscription academique
+incorrecte.
+
+Le service academics/services/academic_positioning.py aide les ecrans de
+positionnement :
+
+- liste les classes disponibles pour une candidature ;
+- trie les niveaux ;
+- calcule les frais par niveau ;
+- valide qu'une classe choisie correspond bien a la candidature.
+
+
+6. IMPORT EXCEL DES NOTES
+-------------------------
+
+Deux couches existent :
+
+- academics/imports/template_service.py : genere un template Excel dynamique ;
+- academics/imports/import_service.py : lit le fichier rempli et applique les
+  notes.
+
+Template :
+- base sur une classe et un semestre ;
+- contient les etudiants actifs de la classe ;
+- contient les colonnes NOM, PRENOM, matricule/identifiants et les EC du
+  semestre.
+
+Import :
+- endpoint POST : imports/grades/upload/ ;
+- attend class_id, semester_id et file ;
+- lit le fichier avec pandas ;
+- mappe les colonnes aux EC ;
+- retrouve l'etudiant par ENROLLMENT_ID, MATRICULE ou NOM/PRENOM ;
+- ignore les cellules vides ;
+- refuse les notes hors 0-20 ;
+- si des etudiants sont inconnus ou des notes invalides existent, il retourne
+  les problemes sans appliquer les updates ;
+- sinon il fait update_or_create sur ECGrade puis apply_ec_grade().
+
+Resultat retourne :
+- updated ;
+- skipped_empty ;
+- skipped_unknown_columns ;
+- skipped_unknown_students ;
+- skipped_invalid_scores ;
+- unknown_columns ;
+- student_issues.
+
+
+7. REPORTING, BULLETINS ET DIPLOMES
+-----------------------------------
+
+7.1. Rapports
+
+academics/services/reporting.py construit les contextes :
+
+- build_student_semester_report(student_id, semester_id) ;
+- build_annual_class_report(class_id) ;
+- build_student_annual_report(student_id).
+
+Ces fonctions :
+- resolvent l'etudiant ;
+- retrouvent l'inscription academique active ;
+- calculent les resultats ;
+- formatent les decimales avec virgule ;
+- preparent les donnees pour les templates HTML/PDF.
+
+
+7.2. Bulletins
+
+academics/services/documents.py gere :
+
+- generate_semester_bulletin() ;
+- generate_semester_bulletins_for_class() ;
+- generate_annual_bulletin() ;
+- generate_annual_bulletins_for_class() ;
+- build_bulletin_context().
+
+Important :
+- un bulletin semestriel n'est genere que si le workflow du semestre autorise
+  les rapports ;
+- un bulletin annuel exige que tous les semestres soient publiables ;
+- les resultats sont stockes en snapshot JSON pour conserver une trace de l'etat
+  au moment de la generation ;
+- la mention est derivee de la moyenne :
+  - >= 16 : Tres bien ;
+  - >= 14 : Bien ;
+  - >= 12 : Assez bien ;
+  - >= 10 : Passable ;
+  - sinon : Insuffisant.
+
+
+7.3. Diplomes
+
+prepare_diploma_award() :
+
+- appelle compute_annual_decision() ;
+- prepare un diplome seulement si decision == completed ;
+- lie le diplome au programme et a diploma_awarded ;
+- stocke moyenne finale, mention, decision et snapshot.
+
+La livraison effective peut mettre le statut a delivered avec delivered_by,
+delivered_at et awarded_at.
+
+
+8. EMPLOI DU TEMPS ET PLANIFICATION
+-----------------------------------
+
+academics/services/schedule_service.py est le service principal.
+
+Fonctions importantes :
+
+- create_schedule_event() / create_schedule() ;
+- update_schedule_event() / update_schedule() ;
+- postpone_schedule_event() ;
+- cancel_schedule_event() ;
+- start_schedule_event() ;
+- complete_schedule_event() ;
+- get_schedule_conflicts() ;
+- suggest_available_slots() ;
+- get_class_week_schedule() ;
+- get_student_week_schedule() ;
+- get_teacher_week_schedule() ;
+- get_branch_week_schedule() ;
+- get_director_schedule_overview() ;
+- get_schedule_alerts() ;
+- get_schedule_quality_score().
+
+Logique de conflit :
+- conflit de classe ;
+- conflit d'enseignant ;
+- conflit de salle ;
+- conflit d'EC ;
+- incoherence annexe/classe ;
+- incoherence annee academique/classe.
+
+Le service verifie aussi les affectations enseignant/classe/EC via
+DirectorTeacherAssignment dans portal.models :
+
+- si un enseignant n'est pas affecte a l'EC, la planification est bloquee ;
+- si le volume d'heures planifie depasse planned_hours, la planification est
+  bloquee.
+
+Grille hebdomadaire :
+
+- WeeklyScheduleSlot stocke les creneaux recurrents ;
+- detect_weekly_schedule_conflicts() verifie les chevauchements recurrentiels ;
+- materialize_week_events_from_weekly_slots() cree les AcademicScheduleEvent
+  dates pour une semaine donnee ;
+- get_class_week_schedule_with_weekly_slots() peut afficher les creneaux
+  officiels meme s'ils ne sont pas encore materialises.
+
+Dashboard planning :
+
+- get_weekly_schedule_stats() calcule nombre de cours, taux de completion,
+  taux d'annulation, charge enseignants/classes ;
+- get_schedule_alerts() signale enseignant manquant, salle manquante, report non
+  reprogramme, surcharge enseignant, taux d'annulation eleve, classe sans cours
+  et conflits non resolus ;
+- get_schedule_quality_score() produit un score de qualite.
+
+
+9. CAHIER DE TEXTE ET EXECUTION DES COURS
+-----------------------------------------
+
+academics/services/lesson_log_service.py gere le cahier de texte.
+
+create_lesson_log() :
+- valide la classe, l'EC, l'enseignant, l'annexe et l'event planifie ;
+- cherche une presence enseignant du jour ;
+- si l'enseignant est absent, force le statut absent_teacher ;
+- cree le LessonLog.
+
+update_lesson_log() :
+- applique les changements ;
+- revalide le scope ;
+- resynchronise le statut si l'enseignant est absent ;
+- valide automatiquement si status=done et updated_by est present.
+
+get_missing_lesson_logs() :
+- liste les cours planifies sans cahier de texte.
+
+get_daily_lesson_status() :
+- resume une journee :
+  - nombre de cours planifies ;
+  - nombre de cahiers de texte ;
+  - cahiers manquants ;
+  - cas critiques enseignant absent ;
+  - logs existants.
+
+get_lesson_log_quality_controls() :
+- retourne un indicateur simple de qualite : clean ou non.
+
+
+10. PERMISSIONS
+---------------
+
+academics/permissions.py centralise les droits.
+
+Positions globales :
+- super_admin ;
+- executive_director ;
+- deputy_executive_director.
+
+Consultation rapports :
+- positions globales ;
+- director_of_studies ;
+- academic_supervisor ;
+- it_support ;
+- l'etudiant lui-meme pour ses propres rapports.
+
+Import des notes :
+- positions globales ;
+- director_of_studies ;
+- it_support ;
+- avec controle d'annexe sauf role global.
+
+Gestion bulletins :
+- super_admin ;
+- director_of_studies ;
+- avec controle d'annexe.
+
+Gestion diplomes :
+- executive_director ;
+- deputy_executive_director.
+
+La fonction user_has_branch_scope() limite les actions a l'annexe de
+l'utilisateur, sauf pour les profils globaux.
+
+
+11. ROUTES EXPOSEES
+-------------------
+
+Namespace : academics
+
+Imports :
+- GET  imports/grades/template/<class_id>/<semester_id>/
+  Telecharge le template Excel de notes.
+- POST imports/grades/upload/
+  Importe les notes d'un fichier Excel.
+
+Rapports :
+- GET reports/student/<student_id>/semester/<semester_id>/
+  Affiche le releve semestriel HTML.
+- GET reports/student/<student_id>/semester/<semester_id>/pdf/
+  Genere le PDF du releve semestriel.
+- POST reports/semester/<semester_id>/export-selected/
+  Exporte en ZIP les releves des etudiants selectionnes.
+- GET reports/semester/<semester_id>/export-all/
+  Exporte en ZIP tous les releves d'une classe.
+- GET reports/semester/<semester_id>/overview/
+  Liste les releves disponibles pour une classe.
+- GET reports/class/<class_id>/annual/
+  Rapport annuel de classe.
+- GET reports/student/<student_id>/annual/
+  Rapport annuel d'un etudiant.
+- GET reports/student/<student_id>/year/<academic_year_id>/
+  Rapport d'un etudiant sur une annee academique.
+
+Bulletins :
+- POST bulletins/generate/semester/<enrollment_id>/<semester_id>/
+  Genere un bulletin semestriel.
+- POST bulletins/generate/annual/<enrollment_id>/
+  Genere un bulletin annuel.
+- GET bulletins/<bulletin_id>/
+  Detail HTML d'un bulletin.
+- GET bulletins/<bulletin_id>/pdf/
+  PDF d'un bulletin.
+
+Diplomes :
+- POST diplomas/prepare/<enrollment_id>/
+  Prepare un diplome.
+- GET diplomas/<award_id>/
+  Detail HTML d'un diplome.
+- GET diplomas/<award_id>/pdf/
+  PDF du diplome.
+
+Cahier de texte :
+- POST lesson-logs/create/
+  Cree un cahier de texte.
+- POST lesson-logs/<lesson_log_id>/update/
+  Met a jour un cahier de texte.
+- GET lesson-logs/class/<class_id>/
+  Liste les cahiers d'une classe.
+- GET lesson-logs/teacher/<teacher_id>/
+  Liste les cahiers d'un enseignant.
+- GET lesson-logs/daily-status/
+  Donne l'etat quotidien des cahiers de texte.
+
+
+12. COMMANDES DE GESTION
+------------------------
+
+Commandes presentes :
+
+- seed_academics_structure.py
+  Cree ou complete la structure academique : annees, classes, semestres, UE/EC.
+
+- assign_missing_enrollments.py
+  Affecte les inscriptions administratives qui n'ont pas encore
+  AcademicEnrollment.
+
+- seed_academic_result_cases.py
+  Cree des cas de demonstration pour resultats, notes et decisions.
+
+- seed_school_grade_mockup.py
+  Cree des donnees de notes de demonstration.
+
+- seed_student_dashboard_demo.py
+  Alimente un scenario demo pour dashboard etudiant.
+
+- seed_week_schedule_all_classes.py
+  Genere des emplois du temps hebdomadaires pour les classes.
+
+Ces commandes sont utiles pour initialiser une base demo ou rattraper des donnees
+legacy.
+
+
+13. INTEGRATIONS AVEC LES AUTRES APPS
+-------------------------------------
+
+formations
+- Programme est la base des classes academiques.
+- Les diplomes prepares utilisent programme.diploma_awarded.
+- Les frais de positionnement peuvent venir du programme.
+
+branches
+- Branch limite les classes, inscriptions, plannings et droits par annexe.
+
+inscriptions
+- Inscription est la source administrative.
+- AcademicEnrollment est cree a partir d'une Inscription.
+
+admissions
+- Candidature fournit programme, annexe, annee academique et entry_year.
+
+students
+- Student fournit le profil etudiant, matricule et donnees personnelles.
+- TeacherAttendance est utilise pour detecter les enseignants absents.
+
+accounts
+- Les positions utilisateur et l'annexe de l'utilisateur pilotent les
+  permissions.
+
+portal
+- DirectorTeacherAssignment controle les affectations enseignant/classe/EC et le
+  volume d'heures prevu.
+- Des widgets et services du portail consomment les plannings et snapshots
+  academics.
+
+payments
+- AcademicEnrollment verifie qu'une inscription a un paiement valide ou un etat
+  compatible avant creation.
+
+
+14. FLUX METIER TYPIQUES
+------------------------
+
+14.1. Creation d'un parcours etudiant
+
+1. Une candidature existe dans admissions.
+2. Une inscription administrative est creee dans inscriptions.
+3. Apres paiement ou activation, assign_student_academic_enrollment() est appele.
+4. Le service trouve la classe academique compatible.
+5. AcademicEnrollment est cree.
+6. L'etudiant peut apparaitre dans les rapports, imports de notes, planning et
+   portail etudiant.
+
+
+14.2. Saisie/import des notes
+
+1. Le responsable telecharge un template pour classe + semestre.
+2. Il remplit les notes.
+3. Il upload le fichier.
+4. Le service mappe etudiants et EC.
+5. Les ECGrade sont crees ou mis a jour.
+6. apply_ec_grade calcule note finale, credits et validation.
+7. Les rapports utilisent compute_semester_result() et compute_annual_result().
+
+
+14.3. Publication des resultats
+
+1. Les notes sont completes.
+2. Le semestre avance dans son workflow jusqu'a PUBLISHED.
+3. Les releves semestriels deviennent disponibles.
+4. Les bulletins semestriels peuvent etre generes.
+5. Quand tous les semestres sont publies, le bulletin annuel devient disponible.
+6. Si le cycle est termine et valide, le diplome peut etre prepare.
+
+
+14.4. Planification d'une semaine
+
+1. Des creneaux hebdomadaires sont crees via WeeklyScheduleSlot.
+2. Le surveillant/direction materialise les evenements dates de la semaine.
+3. create_schedule_event() verifie conflits, coherence et volumes horaires.
+4. Les dashboards affichent la grille semaine.
+5. start_schedule_event() et complete_schedule_event() suivent l'execution.
+6. Les logs de changement conservent l'historique.
+
+
+14.5. Cahier de texte
+
+1. Un cours est planifie dans AcademicScheduleEvent.
+2. Apres ou pendant le cours, un LessonLog est cree.
+3. Si TeacherAttendance indique une absence, le log passe en absent_teacher.
+4. Le dashboard peut detecter les cours planifies sans cahier de texte.
+5. Les controles quotidiens remontent les anomalies.
+
+
+15. POINTS D'ATTENTION TECHNIQUES
+---------------------------------
+
+- Plusieurs validations sont dans les modeles avec full_clean() appele au save().
+  Il faut donc respecter les coherences metier avant d'enregistrer.
+
+- Les calculs sont en Decimal, ce qui evite les erreurs de float pour les notes
+  et credits.
+
+- Les bulletins stockent un snapshot JSON : cela fige les donnees au moment de la
+  generation, meme si les notes changent plus tard.
+
+- Les rapports PDF dependent de WeasyPrint. Si WeasyPrint ou ses dependances
+  systeme manquent, la vue retourne une erreur 500 explicite.
+
+- Les permissions sont fortement liees aux positions accounts et a l'annexe de
+  l'utilisateur.
+
+- Le service d'emploi du temps depend aussi de portal.models.DirectorTeacherAssignment.
+  Une planification peut donc echouer meme si les champs de l'event sont valides,
+  si l'enseignant n'est pas affecte ou depasse son volume horaire.
+
+- Le modele AcademicEnrollment reste le pivot. Sans lui, un etudiant ne peut pas
+  etre correctement calcule, classe, exporte ou rattache aux rapports.
+
+
+16. RESUME COURT
+----------------
+
+L'app "academics" est le moteur pedagogique du systeme ESFE. Elle part des
+inscriptions administratives et construit tout le suivi academique : classes,
+semestres, UE/EC, notes, credits, decisions, bulletins, diplomes, emplois du
+temps, execution des cours et cahier de texte. Sa logique est principalement
+dans academics/services/, tandis que models.py definit les objets persistants et
+views.py expose les rapports, PDF et APIs JSON.
+

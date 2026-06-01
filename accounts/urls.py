@@ -67,6 +67,7 @@ from .dashboards.manager_dashboard import *
 
 
 from .dashboards.htmx_manager import *
+from .dashboards.htmx_manager import donation_create, export_report_xlsx
 
 
 app_name = "accounts"
@@ -366,10 +367,12 @@ urlpatterns = [
     # HTMX ACTIONS - CANDIDATURES
     # =============================================
     path("htmx/manager/candidature/<int:pk>/detail/", candidature_detail, name="htmx_candidature_detail"),
+    path("htmx/manager/candidature/<int:pk>/under-review/", candidature_under_review, name="htmx_candidature_under_review"),
     path("htmx/manager/candidature/<int:pk>/accept/", candidature_accept, name="htmx_candidature_accept"),
     path("htmx/manager/candidature/<int:pk>/reject/", candidature_reject, name="htmx_candidature_reject"),
     path("htmx/manager/candidature/<int:pk>/to-complete/", candidature_to_complete,
          name="htmx_candidature_to_complete"),
+    path("htmx/manager/candidature/<int:pk>/delete/", candidature_delete, name="htmx_candidature_delete"),
 
     # =============================================
     # HTMX ACTIONS - INSCRIPTIONS
@@ -407,6 +410,12 @@ urlpatterns = [
     path("htmx/manager/payroll/<int:pk>/pay/", salary_pay, name="htmx_manager_salary_pay"),
     path("htmx/manager/payroll/prepare-all/", salary_prepare_all, name="htmx_manager_salary_prepare_all"),
     path("htmx/manager/payroll/pay-ready-all/", salary_pay_ready_all, name="htmx_manager_salary_pay_ready_all"),
+    path("htmx/manager/honorarium/<int:pk>/detail/", teacher_honorarium_detail, name="htmx_manager_teacher_honorarium_detail"),
+    path("htmx/manager/honorarium/<int:pk>/save/", teacher_honorarium_upsert, name="htmx_manager_teacher_honorarium_upsert"),
+    path("htmx/manager/honorarium/<int:pk>/pay/", teacher_honorarium_pay, name="htmx_manager_teacher_honorarium_pay"),
+    path("htmx/manager/honorarium/prepare-all/", teacher_honorarium_prepare_all, name="htmx_manager_teacher_honorarium_prepare_all"),
+    path("htmx/manager/honorarium/pay-ready-all/", teacher_honorarium_pay_ready_all, name="htmx_manager_teacher_honorarium_pay_ready_all"),
+    path("htmx/manager/closure/create/", monthly_closure_create, name="htmx_manager_monthly_closure_create"),
 
     # =============================================
     # HTMX ACTIONS - DEPENSES ET CAISSE GESTIONNAIRE
@@ -419,6 +428,17 @@ urlpatterns = [
     path("htmx/manager/cash/sync/", cash_sync, name="htmx_manager_cash_sync"),
     path("htmx/manager/cash-movement/<int:pk>/receipt/", cash_movement_receipt,
          name="htmx_manager_cash_movement_receipt"),
+
+    # =============================================
+    # =============================================
+    # EXPORT
+    # =============================================
+    path("manager/export/report/xlsx/", export_report_xlsx, name="manager_export_report_xlsx"),
+
+    # =============================================
+    # DONS / DONATIONS
+    # =============================================
+    path("htmx/manager/donation/create/", donation_create, name="htmx_manager_donation_create"),
 
     # =============================================
     # RECHERCHE

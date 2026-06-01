@@ -1046,6 +1046,7 @@ def director_teacher_create(request):
                 "last_name": request.POST.get("last_name"),
                 "email": request.POST.get("email"),
                 "phone": request.POST.get("phone"),
+                "teacher_hourly_rate": request.POST.get("teacher_hourly_rate"),
                 "specialty": request.POST.get("specialty"),
                 "class_id": request.POST.get("class_id"),
                 "ec_id": request.POST.get("ec_id"),

@@ -1,7 +1,5 @@
-<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
-    <div class="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div class="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-4 flex items-center justify-between rounded-t-3xl">
+<div class="space-y-0">
+<div class="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-4 flex items-center justify-between rounded-t-3xl">
             <div>
                 <h2 class="text-xl font-bold">Paiement {{ payment.reference }}</h2>
                 <p class="text-sm text-green-100">{{ payment.inscription.candidature.full_name }}</p>
@@ -9,9 +7,10 @@
             <button onclick="closeDashboardModal()" class="w-10 h-10 rounded-xl hover:bg-white/15 transition">
                 <i class="fas fa-times"></i>
             </button>
-        </div>
+    </div>
+</div>
 
-        <div class="p-6 space-y-6">
+    <div class="p-6 space-y-6">
             <div class="text-center py-2">
                 <p class="text-sm text-slate-500 mb-2">Montant</p>
                 <p class="text-4xl font-bold text-slate-900">{{ payment.amount|floatformat:0 }} FCFA</p>
@@ -41,7 +40,16 @@
                 <div class="flex justify-between gap-4"><span class="text-slate-500">Reference inscription</span><span class="font-mono text-slate-900">{{ payment.inscription.reference }}</span></div>
                 <div class="flex justify-between gap-4"><span class="text-slate-500">Programme</span><span class="text-slate-900">{{ payment.inscription.candidature.programme.title }}</span></div>
                 <div class="flex justify-between gap-4"><span class="text-slate-500">Montant du dossier</span><span class="text-slate-900">{{ payment.inscription.amount_due|floatformat:0 }} FCFA</span></div>
-                <div class="flex justify-between gap-4"><span class="text-slate-500">Token public</span><span class="font-mono text-slate-900">{{ payment.inscription.public_token }}</span></div>
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500">Token public</span>
+                    <a
+                        href="{% url 'inscriptions:public_detail' payment.inscription.public_token %}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="font-mono text-blue-600 hover:text-blue-700 hover:underline">
+                        {{ payment.inscription.public_token }}
+                    </a>
+                </div>
             </div>
 
             {% if payment.status == 'validated' %}
@@ -58,7 +66,7 @@
                 {% endif %}
                 <form
                     hx-post="{% url 'accounts:htmx_payment_correct' payment.id %}"
-                    hx-target="#modal-container"
+                    hx-target="#modal-content"
                     hx-swap="innerHTML"
                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                     class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -115,7 +123,14 @@
             </div>
         </div>
 
-        <div class="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex items-center justify-between rounded-b-3xl">
+        <div class="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex items-center justify-between gap-3 rounded-b-3xl">
+            <a href="{% url 'inscriptions:public_detail' payment.inscription.public_token %}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="inline-flex items-center px-4 py-2 rounded-xl border border-blue-200 text-blue-700 hover:bg-blue-50 transition">
+                <i class="fas fa-link mr-2"></i>
+                Ouvrir le dossier public
+            </a>
             {% if payment.receipt_pdf %}
             <a href="{{ payment.receipt_pdf.url }}" target="_blank" class="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-light transition">
                 <i class="fas fa-download mr-2"></i>
@@ -125,7 +140,6 @@
             <div></div>
             {% endif %}
             <button onclick="closeDashboardModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Fermer</button>
-        </div>
     </div>
 </div>
 <script>

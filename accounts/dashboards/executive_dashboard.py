@@ -12,6 +12,7 @@ from admissions.models import Candidature
 from inscriptions.models import Inscription
 from payments.models import Payment, PaymentAgent
 from branches.models import Branch
+from accounts.models import BranchBankTransfer
 from formations.models import Programme
 from students.models import StudentYearDecision
 
@@ -175,6 +176,14 @@ def executive_dashboard(request):
             is_active=True
         ).count()
 
+        # Versements bancaires
+        bank_transfers = BranchBankTransfer.objects.filter(
+            branch=branch,
+        ).order_by("-transfer_date")[:5]
+        bank_transfers_total = BranchBankTransfer.objects.filter(
+            branch=branch,
+        ).aggregate(total=Sum("amount"))["total"] or 0
+
         branch_stats.append({
 
             "branch": branch,
@@ -190,6 +199,9 @@ def executive_dashboard(request):
             "inscriptions": inscriptions_count,
 
             "agents": agents_count,
+
+            "bank_transfers": bank_transfers,
+            "bank_transfers_total": bank_transfers_total,
 
         })
 
@@ -276,6 +288,16 @@ def executive_dashboard(request):
     )
 
     # =====================================================
+    # VERSEMENTS BANCAIRES GLOBAUX
+    # =====================================================
+
+    all_bank_transfers = (
+        BranchBankTransfer.objects
+        .select_related("branch", "closure", "created_by")
+        .order_by("-transfer_date")[:30]
+    )
+
+    # =====================================================
     # CONTEXTE
     # =====================================================
 
@@ -308,6 +330,7 @@ def executive_dashboard(request):
         "recent_payments": recent_payments,
         "reenrollment_stats": reenrollment_stats,
 
+        "all_bank_transfers": all_bank_transfers,
         "dashboard_type": "executive"
 
     }

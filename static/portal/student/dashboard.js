@@ -138,7 +138,8 @@
         { label: "Academique", icon: "graduation-cap", target: "academics" },
         { label: "Notifications", icon: "bell", target: "messages" },
         { label: "Encadrement", icon: "users-round", target: "teachers" },
-        { label: "Parametres", icon: "settings-2", target: "settings" }
+        { label: "Parametres", icon: "settings-2", target: "settings" },
+        { label: "Boutique", icon: "shopping-bag", target: "shop" }
       ],
       sectionMeta: [
         {
@@ -189,6 +190,13 @@
           title: "Gestion du compte",
           description: "Modifiez votre profil systeme, vos documents, vos preferences et vos acces sans quitter le dashboard.",
           badge: "Centre compte"
+        },
+        {
+          key: "shop",
+          kicker: "Boutique",
+          title: "Mes commandes boutique",
+          description: "Consultez vos commandes, suivez leur statut et effectuez les paiements.",
+          badge: "Section boutique"
         }
       ],
       courses: [],
@@ -498,6 +506,7 @@
         if (sectionKey === "messages") idsToLoad.push("messages");
         if (sectionKey === "academics") idsToLoad.push("academics");
         if (sectionKey === "settings") idsToLoad.push("settings");
+        if (sectionKey === "shop") idsToLoad.push("shop");
 
         idsToLoad.forEach((elementId) => {
           const el = document.getElementById(elementId);

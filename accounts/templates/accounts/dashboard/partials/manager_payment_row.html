@@ -8,7 +8,13 @@
     </td>
     <td class="px-6 py-4">
         <p class="text-sm font-medium text-slate-900">{{ payment.inscription.candidature.full_name }}</p>
-        <p class="text-xs text-slate-500">{{ payment.inscription.public_token }}</p>
+        <a
+            href="{% url 'inscriptions:public_detail' payment.inscription.public_token %}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-xs text-blue-600 hover:text-blue-700 hover:underline">
+            {{ payment.inscription.public_token }}
+        </a>
     </td>
     <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ payment.amount|intcomma }} FCFA</td>
     <td class="px-6 py-4 text-sm text-slate-600">{{ payment.get_method_display }}</td>
@@ -24,7 +30,7 @@
     <td class="px-6 py-4 text-right">
         <div class="flex items-center justify-end gap-2">
             <button hx-get="{% url 'accounts:htmx_payment_detail' payment.pk %}"
-                    hx-target="#modal-container"
+                    hx-target="#modal-content"
                     hx-swap="innerHTML"
                     class="p-2 rounded-lg text-primary hover:bg-primary/10 transition"
                     onclick="openDashboardModal()">
@@ -50,7 +56,7 @@
             {% endif %}
             {% if payment.status == 'validated' %}
             <button hx-get="{% url 'accounts:htmx_payment_detail' payment.pk %}"
-                    hx-target="#modal-container"
+                    hx-target="#modal-content"
                     hx-swap="innerHTML"
                     class="p-2 rounded-lg text-amber-600 hover:bg-amber-50 transition"
                     onclick="openDashboardModal()"

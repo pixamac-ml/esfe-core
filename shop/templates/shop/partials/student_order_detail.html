@@ -1,5 +1,12 @@
 {% load humanize %}
 <section class="min-h-screen bg-slate-50 p-6">
+  <button type="button"
+    hx-get="{% url 'portal_student:shop_orders_partial' %}"
+    hx-target="#shop"
+    hx-swap="innerHTML"
+    class="mb-4 flex items-center gap-2 text-xs font-bold text-slate-500 transition hover:text-primary">
+    <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Retour a la boutique
+  </button>
   <div class="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
     <p class="text-xs font-bold uppercase tracking-wide text-primary">Commande boutique</p>
     <h1 class="mt-1 text-2xl font-black text-slate-900">{{ order.reference }}</h1>
@@ -49,7 +56,7 @@
         </div>
       </div>
 
-      <form method="post" action="/shop/student/order/{{ order.id }}/pay/" class="space-y-5">
+      <form method="post" action="{% url 'shop:student_order_pay' order.id %}" class="space-y-5">
         {% csrf_token %}
 
         <div>
@@ -138,7 +145,7 @@
       <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm">
         <span class="break-words">{{ payment.reference|default:"Paiement en attente" }} — {{ payment.get_status_display }} — {{ payment.amount|intcomma }} F — {{ payment.get_method_display }}</span>
         {% if payment.receipt_pdf %}
-        <a href="/shop/payment/{{ payment.id }}/receipt/" class="shrink-0 font-semibold text-primary">Recu PDF</a>
+        <a href="{% url 'shop:payment_receipt' payment.id %}" class="shrink-0 font-semibold text-primary">Recu PDF</a>
         {% endif %}
       </div>
       {% endfor %}

@@ -157,7 +157,10 @@
         <div class="rounded-xl bg-violet-50 p-3"><p class="text-xs font-bold text-violet-700">Poste</p><p class="font-black">{{ drawer_staff_profile.get_position_display|default:"-" }}</p></div>
         <div class="rounded-xl bg-blue-50 p-3"><p class="text-xs font-bold text-blue-700">Annexe</p><p class="font-black">{{ drawer_staff_profile.branch|default:"Global" }}</p></div>
         <div class="rounded-xl bg-emerald-50 p-3"><p class="text-xs font-bold text-emerald-700">Statut</p><p class="font-black">{{ drawer_staff_profile.get_employment_status_display }}</p></div>
-        <div class="rounded-xl bg-amber-50 p-3"><p class="text-xs font-bold text-amber-700">Salaire</p><p class="font-black">{{ drawer_staff_profile.salary_base|intcomma }} FCFA</p></div>
+        <div class="rounded-xl bg-amber-50 p-3">
+          <p class="text-xs font-bold text-amber-700">{% if drawer_staff_profile.position == "teacher" %}Tarif horaire{% else %}Salaire{% endif %}</p>
+          <p class="font-black">{% if drawer_staff_profile.position == "teacher" %}{{ drawer_staff_profile.teacher_hourly_rate|intcomma }}{% else %}{{ drawer_staff_profile.salary_base|intcomma }}{% endif %} FCFA</p>
+        </div>
       </div>
       {% else %}
       <p class="text-xs font-black uppercase tracking-wide text-violet-600">Staff</p>

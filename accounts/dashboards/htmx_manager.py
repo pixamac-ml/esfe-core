@@ -1,3 +1,5 @@
+from calendar import monthrange
+import json
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
@@ -9,13 +11,21 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from django.db.models import Q
+from django.db.models import Q, Sum
 
 from academics.models import AcademicClass
 from academics.services.academic_positioning import get_positioning_context, get_positioning_fee_for_level
 from admissions.models import Candidature
-from accounts.forms import BranchCashMovementForm, BranchExpenseForm, PayrollEntryForm
-from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile
+from accounts.forms import (
+    BranchBankTransferForm,
+    BranchCashMovementForm,
+    BranchExpenseForm,
+    BranchMonthlyClosureForm,
+    DonationForm,
+    PayrollEntryForm,
+    TeacherHonorariumEntryForm,
+)
+from accounts.models import BranchBankTransfer, BranchCashMovement, BranchExpense, BranchMonthlyClosure, Donation, PayrollEntry, Profile, TeacherHonorariumEntry
 from accounts.services.accounting_documents import (
     create_cash_movement,
     ensure_expense_reference,
@@ -24,11 +34,15 @@ from accounts.services.accounting_documents import (
 )
 from accounts.services.manager_intelligence import (
     get_branch_cash_balance,
+    mark_ready_teacher_honorarium_entries_available,
+    notify_teacher_honorarium_available,
     mark_ready_payroll_entries_available,
     notify_salary_available,
     payment_cash_reference,
+    pay_ready_teacher_honorarium_entries,
     pay_ready_payroll_entries,
     payroll_cash_reference,
+    prepare_missing_teacher_honorarium_entries,
     prepare_missing_payroll_entries,
     sync_student_payment_cash_movements,
 )
@@ -37,6 +51,7 @@ from payments.models import CashPaymentSession, FinancialLog, Payment, PaymentAg
 from payments.services.corrections import correct_validated_payment_amount, financial_logs_for_payment
 
 from accounts.dashboards.helpers import get_user_branch, is_manager
+from accounts.services.excel_reports import export_branch_report_xlsx, xlsx_response
 
 
 PAYABLE_INSCRIPTION_STATUSES = {
@@ -73,7 +88,7 @@ def get_current_agent(user, branch):
 def _render_manager_academic_positioning_modal(request, candidature, *, form_error="", selected_level="", selected_class_id=""):
     return render(
         request,
-        "accounts/dashboard/partials/academic_positioning_modal.html",
+        "accounts/dashboard/partials/academic_positioning_body.html",
         {
             "candidature": candidature,
             "positioning": get_positioning_context(candidature=candidature),
@@ -125,10 +140,25 @@ def get_branch_staff_profile(branch, user_id):
     )
 
 
+def get_branch_teacher_profile(branch, user_id):
+    profile = get_branch_staff_profile(branch, user_id)
+    if profile.position != "teacher":
+        raise Http404("Profil enseignant introuvable")
+    return profile
+
+
 def manager_salary_redirect_response(period_month):
     response = HttpResponse("")
     response["HX-Redirect"] = (
         f"{reverse('accounts:manager_dashboard')}?section=salaires&salary_month={period_month.strftime('%Y-%m')}"
+    )
+    return response
+
+
+def manager_closure_redirect_response(period_month):
+    response = HttpResponse("")
+    response["HX-Redirect"] = (
+        f"{reverse('accounts:manager_dashboard')}?section=cloture&salary_month={period_month.strftime('%Y-%m')}"
     )
     return response
 
@@ -162,6 +192,35 @@ def candidature_detail(request, pk):
             "documents": documents,
         },
     )
+
+
+@manager_required
+@require_POST
+def candidature_under_review(request, pk):
+    candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
+
+    if candidature.status != "submitted":
+        return HttpResponse("Seules les candidatures soumises peuvent passer en analyse.", status=400)
+
+    candidature.status = "under_review"
+    candidature.reviewed_at = timezone.now()
+    candidature.reviewed_by = request.user
+    candidature.save(update_fields=["status", "reviewed_at", "reviewed_by"])
+
+    response = render(
+        request,
+        "accounts/dashboard/partials/manager_candidature_row.html",
+        {"candidature": candidature},
+    )
+    response["HX-Trigger"] = json.dumps(
+        {
+            "showToast": {
+                "message": "Candidature passee en analyse.",
+                "type": "info",
+            }
+        }
+    )
+    return response
 
 
 @manager_required
@@ -215,6 +274,42 @@ def candidature_to_complete(request, pk):
         "accounts/dashboard/partials/manager_candidature_row.html",
         {"candidature": candidature},
     )
+
+
+@manager_required
+@require_POST
+def candidature_delete(request, pk):
+    candidature = get_object_or_404(
+        Candidature.objects.select_related("branch").prefetch_related("documents"),
+        pk=pk,
+        branch=request.branch,
+        is_deleted=False,
+    )
+
+    if candidature.status != "rejected":
+        return HttpResponse("Seules les candidatures rejetees peuvent etre supprimees.", status=400)
+
+    if hasattr(candidature, "inscription"):
+        return HttpResponse("Impossible de supprimer: une inscription est liee a cette candidature.", status=400)
+
+    with transaction.atomic():
+        candidature.documents.all().delete()
+        candidature.is_deleted = True
+        candidature.deleted_at = timezone.now()
+        candidature.deleted_by = request.user
+        candidature.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+
+    response = HttpResponse("")
+    response["HX-Trigger"] = json.dumps(
+        {
+            "candidatureDeleted": {"id": pk},
+            "showToast": {
+                "message": "Candidature supprimee.",
+                "type": "warning",
+            },
+        }
+    )
+    return response
 
 
 @manager_required
@@ -985,6 +1080,284 @@ def salary_pay_ready_all(request):
 
 
 @manager_required
+@require_GET
+def teacher_honorarium_detail(request, pk):
+    profile = get_branch_teacher_profile(request.branch, pk)
+    payroll_month = get_salary_period_from_request(request)
+    honorarium_entry = (
+        TeacherHonorariumEntry.objects
+        .filter(
+            branch=request.branch,
+            teacher=profile.user,
+            period_month=payroll_month,
+        )
+        .select_related("teacher", "teacher__profile", "branch")
+        .first()
+    )
+    form = TeacherHonorariumEntryForm(instance=honorarium_entry)
+    if not honorarium_entry:
+        form.initial.update({
+            "period_month": payroll_month,
+            "hourly_rate": profile.teacher_hourly_rate,
+        })
+    return render(
+        request,
+        "accounts/dashboard/partials/teacher_honorarium_modal.html",
+        {
+            "teacher_profile": profile,
+            "honorarium_entry": honorarium_entry,
+            "honorarium_form": form,
+            "payroll_month": payroll_month,
+            "available_cash_balance": get_branch_cash_balance(request.branch),
+        },
+    )
+
+
+@manager_required
+@require_POST
+def teacher_honorarium_upsert(request, pk):
+    profile = get_branch_teacher_profile(request.branch, pk)
+    payroll_month = get_salary_period_from_request(request)
+    honorarium_entry = (
+        TeacherHonorariumEntry.objects
+        .filter(
+            branch=request.branch,
+            teacher=profile.user,
+            period_month=payroll_month,
+        )
+        .first()
+    )
+    form = TeacherHonorariumEntryForm(request.POST, instance=honorarium_entry)
+    if not form.is_valid():
+        response = render(
+            request,
+            "accounts/dashboard/partials/teacher_honorarium_modal.html",
+            {
+                "teacher_profile": profile,
+                "honorarium_entry": honorarium_entry,
+                "honorarium_form": form,
+                "payroll_month": payroll_month,
+                "available_cash_balance": get_branch_cash_balance(request.branch),
+            },
+        )
+        response.status_code = 400
+        return response
+
+    entry = form.save(commit=False)
+    entry.branch = request.branch
+    entry.teacher = profile.user
+    entry.updated_by = request.user
+    if not entry.pk:
+        entry.created_by = request.user
+    previous_status = honorarium_entry.status if honorarium_entry else ""
+    action = (request.POST.get("submit_action") or "draft").strip()
+    if action == "ready" and entry.paid_amount == 0:
+        entry.status = TeacherHonorariumEntry.STATUS_READY
+    elif entry.paid_amount == 0:
+        entry.status = TeacherHonorariumEntry.STATUS_DRAFT
+    entry.save()
+    if entry.status == TeacherHonorariumEntry.STATUS_READY and previous_status != TeacherHonorariumEntry.STATUS_READY:
+        notify_teacher_honorarium_available(entry, request.user)
+
+    if profile.teacher_hourly_rate != entry.hourly_rate:
+        profile.teacher_hourly_rate = entry.hourly_rate
+        profile.save(update_fields=["teacher_hourly_rate"])
+
+    entry.refresh_from_db()
+    return manager_closure_redirect_response(entry.period_month)
+
+
+@manager_required
+@require_POST
+def teacher_honorarium_pay(request, pk):
+    honorarium_entry = get_object_or_404(
+        TeacherHonorariumEntry.objects.select_related("teacher", "teacher__profile", "branch"),
+        pk=pk,
+        branch=request.branch,
+    )
+    raw_amount = (request.POST.get("payment_amount") or "").strip()
+    try:
+        payment_amount = int(raw_amount)
+    except (TypeError, ValueError):
+        payment_amount = 0
+    if payment_amount <= 0:
+        return HttpResponse(
+            "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Montant de paiement invalide.</div>",
+            status=400,
+        )
+    if payment_amount > honorarium_entry.remaining_amount:
+        return HttpResponse(
+            "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le montant depasse le reste a payer sur cet honoraire.</div>",
+            status=400,
+        )
+    available_cash = get_branch_cash_balance(request.branch)
+    if payment_amount > available_cash:
+        return HttpResponse(
+            (
+                "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
+                f"Caisse insuffisante pour ce paiement. Disponible: {available_cash} FCFA."
+                "</div>"
+            ),
+            status=400,
+        )
+
+    honorarium_entry.paid_amount += payment_amount
+    honorarium_entry.updated_by = request.user
+    honorarium_entry.save()
+    create_cash_movement(
+        branch=request.branch,
+        movement_type=BranchCashMovement.TYPE_OUT,
+        source=BranchCashMovement.SOURCE_HONORARIUM,
+        amount=payment_amount,
+        label=f"Honoraire - {honorarium_entry.teacher.get_full_name() or honorarium_entry.teacher.username}",
+        movement_date=timezone.localdate(),
+        source_reference=f"HON-{honorarium_entry.pk}-{payment_amount}",
+        notes=f"Paiement honoraire {honorarium_entry.period_month:%Y-%m}.",
+        created_by=request.user,
+    )
+
+    return manager_closure_redirect_response(honorarium_entry.period_month)
+
+
+@manager_required
+@require_POST
+def teacher_honorarium_prepare_all(request):
+    payroll_month = get_salary_period_from_request(request)
+    result = prepare_missing_teacher_honorarium_entries(request.branch, payroll_month, request.user)
+    return manager_section_notice_redirect_response(
+        "cloture",
+        f"honoraires_preparees_{result['created']}",
+    )
+
+
+@manager_required
+@require_POST
+def teacher_honorarium_pay_ready_all(request):
+    payroll_month = get_salary_period_from_request(request)
+    result = mark_ready_teacher_honorarium_entries_available(request.branch, payroll_month, request.user)
+    return manager_section_notice_redirect_response(
+        "cloture",
+        f"honoraires_disponibles_{result['notified_count']}",
+    )
+
+
+@manager_required
+@require_POST
+def monthly_closure_create(request):
+    closure_form = BranchMonthlyClosureForm(request.POST)
+    if not closure_form.is_valid():
+        response = render(
+            request,
+            "accounts/dashboard/partials/monthly_closure_form.html",
+            {
+                "closure_form": closure_form,
+                "transfer_form": BranchBankTransferForm(request.POST, request.FILES),
+                "available_cash_balance": get_branch_cash_balance(request.branch),
+                "closure_error": "Verifiez les champs du formulaire de cloture.",
+            },
+        )
+        response.status_code = 400
+        return response
+
+    period_month = closure_form.cleaned_data["period_month"]
+    transfer_amount = closure_form.cleaned_data["bank_transfer_amount"] or 0
+    period_end = date(period_month.year, period_month.month, monthrange(period_month.year, period_month.month)[1])
+    report_movements = BranchCashMovement.objects.filter(
+        branch=request.branch,
+        movement_date__gte=period_month,
+        movement_date__lte=period_end,
+    )
+    total_entries = report_movements.filter(movement_type=BranchCashMovement.TYPE_IN).aggregate(total=Sum("amount"))["total"] or 0
+    total_exits = report_movements.filter(movement_type=BranchCashMovement.TYPE_OUT).aggregate(total=Sum("amount"))["total"] or 0
+    student_revenue = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_IN,
+        source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    shop_revenue = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_IN,
+        source=BranchCashMovement.SOURCE_SHOP,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    salary_paid = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT,
+        source=BranchCashMovement.SOURCE_PAYROLL,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    honorarium_paid = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT,
+        source=BranchCashMovement.SOURCE_HONORARIUM,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    expenses_paid = report_movements.filter(
+        movement_type=BranchCashMovement.TYPE_OUT,
+        source=BranchCashMovement.SOURCE_EXPENSE,
+    ).aggregate(total=Sum("amount"))["total"] or 0
+    result_amount = total_entries - total_exits
+    transfer_form = BranchBankTransferForm(request.POST, request.FILES)
+    transfer_is_valid = True
+    if transfer_amount > 0:
+        transfer_is_valid = transfer_form.is_valid()
+        if transfer_is_valid:
+            required_transfer_fields = [
+                transfer_form.cleaned_data.get("bank_name"),
+                transfer_form.cleaned_data.get("reference"),
+                transfer_form.cleaned_data.get("transfer_date"),
+            ]
+            if not all(required_transfer_fields):
+                transfer_is_valid = False
+    if not transfer_is_valid:
+        response = render(
+            request,
+            "accounts/dashboard/partials/monthly_closure_form.html",
+            {
+                "closure_form": closure_form,
+                "transfer_form": transfer_form,
+                "available_cash_balance": get_branch_cash_balance(request.branch),
+                "closure_error": "Verifiez les champs du versement bancaire.",
+            },
+        )
+        response.status_code = 400
+        return response
+
+    with transaction.atomic():
+        closure, _ = BranchMonthlyClosure.objects.update_or_create(
+            branch=request.branch,
+            period_month=period_month,
+            defaults={
+                "total_entries": total_entries,
+                "total_exits": total_exits,
+                "student_revenue": student_revenue,
+                "shop_revenue": shop_revenue,
+                "salary_paid": salary_paid,
+                "honorarium_paid": honorarium_paid,
+                "expenses_paid": expenses_paid,
+                "result_amount": result_amount,
+                "bank_transfer_amount": transfer_amount,
+                "status": BranchMonthlyClosure.STATUS_CLOSED,
+                "notes": closure_form.cleaned_data.get("notes", ""),
+                "validated_by": request.user,
+                "validated_at": timezone.now(),
+                "closed_at": timezone.now(),
+            },
+        )
+        if transfer_amount > 0:
+            transfer, _ = BranchBankTransfer.objects.update_or_create(
+                closure=closure,
+                defaults={
+                    "branch": request.branch,
+                    "bank_name": transfer_form.cleaned_data["bank_name"],
+                    "reference": transfer_form.cleaned_data["reference"],
+                    "transfer_date": transfer_form.cleaned_data["transfer_date"],
+                    "amount": transfer_amount,
+                    "comment": transfer_form.cleaned_data.get("comment", ""),
+                    "created_by": request.user,
+                },
+            )
+            if transfer_form.cleaned_data.get("proof"):
+                transfer.proof = transfer_form.cleaned_data["proof"]
+                transfer.save(update_fields=["proof", "updated_at"])
+
+    return manager_closure_redirect_response(period_month)
+
+
+@manager_required
 @require_POST
 def expense_create(request):
     form = BranchExpenseForm(request.POST, request.FILES)
@@ -1107,4 +1480,74 @@ def cash_movement_receipt(request, pk):
         movement.receipt_pdf.open("rb"),
         as_attachment=True,
         filename=f"piece-caisse-{movement.receipt_number or movement.reference}.pdf",
+    )
+
+
+@manager_required
+@require_GET
+def export_report_xlsx(request):
+    from datetime import date
+    from accounts.dashboards.manager_dashboard import _resolve_report_period
+    from accounts.services.excel_reports import export_branch_report_xlsx, xlsx_response
+
+    branch = request.branch
+    today = date.today()
+    report_period = _resolve_report_period(request, today)
+
+    branch_staff_profiles = Profile.objects.filter(
+        branch=branch, user__is_active=True,
+    ).exclude(position="student").exclude(user_type="public").order_by("user__first_name")[:500]
+
+    branch_teacher_profiles = branch_staff_profiles.filter(position="teacher")
+
+    wb = export_branch_report_xlsx(
+        branch=branch,
+        report_period=report_period,
+        branch_staff_profiles=branch_staff_profiles,
+        branch_teacher_profiles=branch_teacher_profiles,
+    )
+    label = report_period["label"].replace(" ", "_")
+    return xlsx_response(
+        wb,
+        filename=f"rapport_{branch.code}_{label}_{today.isoformat()}.xlsx",
+    )
+
+
+# =============================================================
+# DONS / DONATIONS
+# =============================================================
+
+@manager_required
+@require_POST
+def donation_create(request):
+    form = DonationForm(request.POST)
+    if not form.is_valid():
+        return render(
+            request,
+            "accounts/dashboard/partials/donation_form.html",
+            {"donation_form": form},
+        )
+
+    donation = form.save(commit=False)
+    donation.branch = request.branch
+    donation.created_by = request.user
+    donation.save()
+
+    BranchCashMovement.objects.create(
+        branch=request.branch,
+        movement_type=BranchCashMovement.TYPE_IN,
+        source=BranchCashMovement.SOURCE_DONATION,
+        amount=donation.amount,
+        label=f"Don de {donation.donor_name}",
+        movement_date=donation.date,
+        source_reference=f"donation_{donation.pk}",
+        reference=f"DON-{donation.pk:06d}",
+        notes=donation.description or "",
+        created_by=request.user,
+    )
+
+    return render(
+        request,
+        "accounts/dashboard/partials/donation_row.html",
+        {"donation": donation},
     )

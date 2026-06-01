@@ -4,9 +4,11 @@ from io import BytesIO
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
 from django.http import FileResponse, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape
 from reportlab.lib.units import mm
@@ -135,10 +137,17 @@ def _build_notes_workflow_context(request, *, toast=None):
 def it_notes_flow_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
+    context = _build_notes_workflow_context(request)
+    if request.GET.get("drawer") == "1":
+        return render(
+            request,
+            "portal/informaticien/drawers/notes_drawer.html",
+            context,
+        )
     return render(
         request,
         "portal/informaticien/workflows/notes_workspace.html",
-        _build_notes_workflow_context(request),
+        context,
     )
 
 
@@ -188,9 +197,14 @@ def it_notes_workflow_action(request):
             return response
         toast = {"level": "error", "message": " ".join(exc.messages)}
 
+    template_name = (
+        "portal/informaticien/drawers/notes_drawer.html"
+        if request.POST.get("drawer") == "1"
+        else "portal/informaticien/workflows/notes_workspace.html"
+    )
     response = render(
         request,
-        "portal/informaticien/workflows/notes_workspace.html",
+        template_name,
         _build_notes_workflow_context(request, toast=toast),
     )
     if successful:
@@ -329,6 +343,107 @@ def it_audit_workspace(request):
 def _resolve_import_selection(request):
     selection = _resolve_workflow_selection(request)
     return selection["classes"], selection["selected_class"], selection["selected_semester"]
+
+
+def _paginate_items(items, page_number, *, per_page):
+    paginator = Paginator(items, per_page)
+    try:
+        return paginator.page(page_number or 1)
+    except (EmptyPage, PageNotAnInteger):
+        return paginator.page(1)
+
+
+def _build_structure_drawer_context(*, branch, class_id="", semester_id="", ue_id="", ec_id="", section="maquettes", ue_page=1, ec_page=1, ec_ue_id=""):
+    actual_class = (
+        AcademicClass.objects.select_related("programme", "academic_year", "branch")
+        .filter(pk=class_id, branch=branch, is_archived=False)
+        .first()
+        if class_id
+        else None
+    )
+    context = build_academic_structure_context(
+        branch=branch,
+        selected_class_id=actual_class.id if actual_class else None,
+        section=section,
+    )
+    selected_class = actual_class
+    context["selected_class"] = selected_class
+    selected_semester = None
+    selected_ue = None
+    selected_ec = None
+
+    if selected_class is not None and semester_id:
+        selected_semester = Semester.objects.filter(
+            pk=semester_id,
+            academic_class__branch=branch,
+            academic_class=selected_class,
+        ).first()
+    elif selected_class is not None:
+        selected_semester = selected_class.semesters.order_by("number").first()
+
+    if ue_id:
+        selected_ue = UE.objects.filter(
+            pk=ue_id,
+            semester__academic_class__branch=branch,
+        ).select_related("semester", "semester__academic_class").first()
+
+    if ec_id:
+        selected_ec = EC.objects.filter(
+            pk=ec_id,
+            ue__semester__academic_class__branch=branch,
+        ).select_related("ue", "ue__semester", "ue__semester__academic_class").first()
+
+    if selected_ec is not None and selected_ue is None:
+        selected_ue = selected_ec.ue
+    if selected_ue is not None and selected_semester is None:
+        selected_semester = selected_ue.semester
+
+    semesters = list(selected_class.semesters.prefetch_related("ues__ecs").order_by("number")) if selected_class else []
+    ue_pairs = []
+    ue_rows = []
+    ec_count = 0
+    for semester in semesters:
+        semester_ues = list(semester.ues.all().order_by("code", "id"))
+        ue_pairs.extend((semester, ue) for ue in semester_ues)
+        ec_count += sum(len(ue.ecs.all()) for ue in semester_ues)
+    drawer_ues_page = _paginate_items(ue_pairs, ue_page, per_page=8) if ue_pairs else None
+    row_map = {}
+    for semester, ue in (drawer_ues_page.object_list if drawer_ues_page else []):
+        ec_list = list(ue.ecs.all().order_by("title", "id"))
+        active_ec_page = str(ec_ue_id or "") == str(ue.id)
+        ecs_page = _paginate_items(ec_list, ec_page if active_ec_page else 1, per_page=10) if ec_list else None
+        row_map.setdefault(semester.id, {"semester": semester, "ues": []})["ues"].append(
+            {
+                "ue": ue,
+                "ecs_page": ecs_page,
+                "ec_count": len(ec_list),
+                "active_ec_page": active_ec_page,
+            }
+        )
+    ue_rows = list(row_map.values())
+
+    context.update(
+        {
+            "drawer_kind": "class",
+            "drawer_class": selected_class,
+            "drawer_semesters": semesters,
+            "drawer_ue_rows": ue_rows,
+            "drawer_ues_page": drawer_ues_page,
+            "drawer_ec_page": ec_page,
+            "drawer_ec_ue_id": ec_ue_id,
+            "drawer_selected_semester": selected_semester,
+            "drawer_selected_ue": selected_ue,
+            "drawer_selected_ec": selected_ec,
+            "drawer_ec_count": ec_count,
+            "drawer_url": (
+                f"{reverse('accounts_portal:it_structure_drawer')}?class_id={selected_class.id}&section={section}"
+                + (f"&semester_id={selected_semester.id}" if selected_semester else "")
+                + (f"&ue_id={selected_ue.id}" if selected_ue else "")
+                + (f"&ec_id={selected_ec.id}" if selected_ec else "")
+            ) if selected_class else reverse("accounts_portal:it_structure_drawer"),
+        }
+    )
+    return context
 
 
 @login_required
@@ -495,8 +610,30 @@ def it_structure_workspace(request):
             selected_class_id=selected_class_id,
             student_query=student_query,
             section=section,
+            class_page=request.GET.get("class_page") or 1,
+            student_page=request.GET.get("student_page") or 1,
         ),
     )
+
+
+@login_required
+def it_structure_drawer(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+
+    branch = get_user_branch(request.user)
+    context = _build_structure_drawer_context(
+        branch=branch,
+        class_id=(request.GET.get("class_id") or request.GET.get("id") or request.GET.get("class") or "").strip(),
+        semester_id=(request.GET.get("semester_id") or "").strip(),
+        ue_id=(request.GET.get("ue_id") or "").strip(),
+        ec_id=(request.GET.get("ec_id") or "").strip(),
+        section=(request.GET.get("section") or "maquettes").strip(),
+        ue_page=request.GET.get("ue_page") or 1,
+        ec_page=request.GET.get("ec_page") or 1,
+        ec_ue_id=(request.GET.get("ec_ue_id") or "").strip(),
+    )
+    return render(request, "portal/informaticien/drawers/structure_drawer.html", context)
 
 
 @login_required
@@ -656,7 +793,7 @@ def it_structure_action(request):
     )
     context["toast"] = toast
     response = render(request, "portal/informaticien/workflows/structure_workspace.html", context)
-    response["HX-Trigger"] = "it-modal-close"
+    response["HX-Trigger"] = '{"it-modal-close": true, "it-structure-updated": true}'
     return response
 
 

@@ -1,0 +1,71 @@
+{% load humanize %}
+<div class="space-y-4">
+    {% if closure_error %}
+    <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ closure_error }}</div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Recettes</p>
+            <p class="mt-2 text-lg font-bold text-slate-900">{{ period_summary.total_revenue|default:0|intcomma }} FCFA</p>
+        </div>
+        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Charges</p>
+            <p class="mt-2 text-lg font-bold text-slate-900">{{ period_summary.charges_paid|default:0|intcomma }} FCFA</p>
+        </div>
+        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Resultat</p>
+            <p class="mt-2 text-lg font-bold text-slate-900">{{ period_summary.net_result|default:0|intcomma }} FCFA</p>
+        </div>
+        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Caisse</p>
+            <p class="mt-2 text-lg font-bold text-slate-900">{{ available_cash_balance|default:0|intcomma }} FCFA</p>
+        </div>
+    </div>
+
+    <form method="post" action="{% url 'accounts:htmx_manager_monthly_closure_create' %}" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+        {% csrf_token %}
+        <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {{ closure_form.period_month }}
+                {{ closure_form.bank_transfer_amount }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Notes de cloture</label>
+                {{ closure_form.notes }}
+            </div>
+
+            <input type="hidden" name="total_entries" value="{{ period_summary.total_revenue|default:0 }}">
+            <input type="hidden" name="total_exits" value="{{ period_summary.charges_paid|default:0 }}">
+            <input type="hidden" name="student_revenue" value="{{ period_summary.student_revenue|default:0 }}">
+            <input type="hidden" name="shop_revenue" value="{{ period_summary.shop_revenue|default:0 }}">
+            <input type="hidden" name="salary_paid" value="{{ period_summary.salary_paid|default:0 }}">
+            <input type="hidden" name="honorarium_paid" value="{{ period_summary.honorarium_paid|default:0 }}">
+            <input type="hidden" name="expenses_paid" value="{{ period_summary.expenses_paid|default:0 }}">
+            <input type="hidden" name="result_amount" value="{{ period_summary.net_result|default:0 }}">
+
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                La cloture archivera la periode, puis le versement bancaire pourra etre enregistre sans supprimer l'historique.
+            </div>
+        </div>
+
+        <div class="rounded-3xl bg-white border border-slate-100 p-5 space-y-4">
+            <div>
+                <p class="text-xs uppercase tracking-wide text-slate-400">Versement bancaire</p>
+                <h3 class="text-lg font-semibold text-slate-900 mt-1">Enregistrer le reliquat verse</h3>
+            </div>
+            <div class="grid grid-cols-1 gap-3">
+                {{ transfer_form.bank_name }}
+                {{ transfer_form.reference }}
+                {{ transfer_form.transfer_date }}
+                <input type="hidden" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
+                {{ transfer_form.proof }}
+                {{ transfer_form.comment }}
+            </div>
+            <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
+                <i class="fas fa-lock"></i>
+                Cloturer la periode
+            </button>
+        </div>
+    </form>
+</div>

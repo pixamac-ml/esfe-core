@@ -1,64 +1,65 @@
 """
-Helpers centralisés pour les dashboards staff.
+Helpers centralises pour les dashboards staff.
 
 Objectifs :
-- utilitaires sécurisés
+- utilitaires securises
 - gestion annexe utilisateur
 - pagination standard
-- outils robustes pour requêtes GET
-- logique rôles staff
+- outils robustes pour requetes GET
+- logique roles staff
 """
 
+from typing import Any
+
+from django.contrib.auth.models import AbstractBaseUser
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import QuerySet
+from django.http import HttpRequest
 
 from accounts.access import (
     get_user_annexe,
     get_user_groups,
     get_user_scope,
 )
+from branches.models import Branch
 
 
 # ==========================================================
 # GROUPES UTILISATEUR
 # ==========================================================
 
-def user_has_group(user, group_name):
+def user_has_group(user: AbstractBaseUser, group_name: str) -> bool:
     """
-    Vérifie si l'utilisateur appartient à un groupe.
+    Verifie si l'utilisateur appartient a un groupe.
     """
-
     return group_name in get_user_groups(user)
 
 
-def is_manager(user):
+def is_manager(user: AbstractBaseUser) -> bool:
     """
-    Vérifie si l'utilisateur est gestionnaire.
+    Verifie si l'utilisateur est gestionnaire.
     """
-
     return user_has_group(user, "gestionnaire")
 
 
-def is_admissions(user):
+def is_admissions(user: AbstractBaseUser) -> bool:
     """
-    Vérifie si l'utilisateur appartient au staff admissions.
+    Verifie si l'utilisateur appartient au staff admissions.
     """
-
     return user_has_group(user, "admissions")
 
 
-def is_finance(user):
+def is_finance(user: AbstractBaseUser) -> bool:
     """
-    Vérifie si l'utilisateur appartient au staff finance.
+    Verifie si l'utilisateur appartient au staff finance.
     """
-
     return user_has_group(user, "finance")
 
 
-def is_executive(user):
+def is_executive(user: AbstractBaseUser) -> bool:
     """
-    Vérifie si l'utilisateur appartient à la direction.
+    Verifie si l'utilisateur appartient a la direction.
     """
-
     return user_has_group(user, "executive") or user.is_superuser
 
 
@@ -66,18 +67,17 @@ def is_executive(user):
 # ANNEXE UTILISATEUR
 # ==========================================================
 
-def get_user_branch(user):
+def get_user_branch(user: AbstractBaseUser) -> Branch | None:
     """
-    Détermine l'annexe associée à l'utilisateur.
+    Determine l'annexe associee a l'utilisateur.
 
-    Priorité :
+    Priorite :
 
-    1. superuser -> accès global
+    1. superuser -> acces global
     2. profile.branch
     3. PaymentAgent.branch
     4. Branch.manager
     """
-
     return get_user_annexe(user)
 
 
@@ -85,11 +85,10 @@ def get_user_branch(user):
 # VUE GLOBALE
 # ==========================================================
 
-def is_global_viewer(user):
+def is_global_viewer(user: AbstractBaseUser) -> bool:
     """
-    Détermine si l'utilisateur peut voir toutes les annexes.
+    Determine si l'utilisateur peut voir toutes les annexes.
     """
-
     if not user or not user.is_authenticated:
         return False
     return bool(get_user_scope(user)["is_global"])
@@ -99,11 +98,10 @@ def is_global_viewer(user):
 # ANNEXE OBLIGATOIRE (gestionnaire)
 # ==========================================================
 
-def ensure_manager_branch(user):
+def ensure_manager_branch(user: AbstractBaseUser) -> Branch | None:
     """
-    Vérifie qu'un gestionnaire possède une annexe.
+    Verifie qu'un gestionnaire possede une annexe.
     """
-
     if not is_manager(user):
         return None
 
@@ -111,7 +109,7 @@ def ensure_manager_branch(user):
 
     if not branch:
         raise ValueError(
-            "Le gestionnaire doit être assigné à une annexe."
+            "Le gestionnaire doit etre assigne a une annexe."
         )
 
     return branch
@@ -121,11 +119,10 @@ def ensure_manager_branch(user):
 # PAGINATION STANDARD
 # ==========================================================
 
-def paginate_queryset(request, queryset, per_page=25):
+def paginate_queryset(request: HttpRequest, queryset: QuerySet, per_page: int = 25) -> Any:
     """
-    Pagination sécurisée pour dashboards.
+    Pagination securisee pour dashboards.
     """
-
     paginator = Paginator(queryset, per_page)
 
     page_number = request.GET.get("page")
@@ -143,14 +140,13 @@ def paginate_queryset(request, queryset, per_page=25):
 
 
 # ==========================================================
-# GET PARAM SÉCURISÉ
+# GET PARAM SECURISE
 # ==========================================================
 
-def safe_int(value, default=0):
+def safe_int(value: Any, default: int = 0) -> int:
     """
     Convertit une valeur GET en int sans crash.
     """
-
     try:
         return int(value)
 
@@ -162,11 +158,10 @@ def safe_int(value, default=0):
 # SAFE GET STRING
 # ==========================================================
 
-def safe_str(value, default=""):
+def safe_str(value: Any, default: str = "") -> str:
     """
     Nettoie une valeur GET string.
     """
-
     if not value:
         return default
 
@@ -177,11 +172,10 @@ def safe_str(value, default=""):
 # SAFE BOOLEAN
 # ==========================================================
 
-def safe_bool(value):
+def safe_bool(value: Any) -> bool:
     """
-    Convertit un paramètre GET en booléen.
+    Convertit un parametre GET en booleen.
     """
-
     if isinstance(value, bool):
         return value
 

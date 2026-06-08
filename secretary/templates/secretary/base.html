@@ -166,8 +166,7 @@
     .sg-nav-tab { padding: .45rem .9rem; border-radius: .6rem; border: 1px solid #e2e8f0; background: #fff; font-size: .75rem; font-weight: 800; color: #64748b; cursor: pointer; transition: all .15s; }
     .sg-nav-tab:hover { background: #f1f5f9; }
     .sg-nav-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; }
-    .sg-section-panel { display: none; }
-    .sg-section-panel.is-active { display: block; }
+
 
     /* ===== PANELS ===== */
     .sg-panel, .panel { background: #fff; border: 1px solid #dfe7f3; border-radius: 16px; padding: 18px; box-shadow: 0 4px 16px rgba(15,23,42,.04); }
@@ -285,9 +284,19 @@
     .sg-action-label { font-size: .78rem; font-weight: 800; }
     .sg-action-sub { font-size: .62rem; color: #94a3b8; font-weight: 600; margin-top: 1px; }
     .sg-action-count { font-size: .68rem; font-weight: 950; padding: .2rem .5rem; border-radius: 999px; flex-shrink: 0; }
+    .sg-section-panel { display: none; }
+    .sg-section-panel.is-active {
+      display: block;
+      animation: sgFadeIn .2s ease;
+    }
+    @keyframes sgFadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     .sg-empty { text-align: center; padding: 32px 16px; color: #94a3b8; font-size: .78rem; font-weight: 700; }
     .sg-empty-icon { font-size: 1.8rem; margin-bottom: 8px; opacity: .35; }
     .sg-empty-text { font-size: .8rem; font-weight: 700; }
+    .sg-panel.htmx-request, .sg-kpi-card.htmx-request { opacity: .65; transition: opacity .18s; }
     .sg-divider { height: 1px; background: #f1f5f9; margin: 16px 0; }
     .pagination { display: flex; gap: 8px; margin-top: 16px; align-items: center; flex-wrap: wrap; }
     .sg-pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
@@ -446,21 +455,19 @@
 
       <div class="sg-sidebar-scroll">
         <div class="sg-cluster-label">Accueil</div>
-        <a class="sg-sidebar-link {% if active_section == 'overview' %}active{% endif %}" href="?section=overview" title="Vue globale" aria-label="Vue globale">
-          <i class="fa-solid fa-home w-4 text-center"></i>
+        <a class="sg-sidebar-link {% if active_section == 'overview' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=overview" data-section="overview" title="Vue globale" aria-label="Vue globale">
+          <i class="fa-regular fa-eye w-4 text-center"></i>
           <span class="sg-sidebar-text">Vue globale</span>
         </a>
-        <a class="sg-sidebar-link {% if active_section == 'registry' %}active{% endif %}" href="?section=registry" title="Registre" aria-label="Registre">
+        <a class="sg-sidebar-link {% if active_section == 'registry' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=registry" data-section="registry" title="Registre" aria-label="Registre">
           <i class="fa-solid fa-book-open w-4 text-center"></i>
           <span class="sg-sidebar-text">Registre</span>
-          <span id="sg-count-registry" class="sg-badge sg-badge-blue">{{ pending_registry_count|default:0 }}</span>
         </a>
-        <a class="sg-sidebar-link {% if active_section == 'visits' %}active{% endif %}" href="?section=visits" title="Visiteurs" aria-label="Visiteurs">
+        <a class="sg-sidebar-link {% if active_section == 'visits' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=visits" data-section="visits" title="Visiteurs" aria-label="Visiteurs">
           <i class="fa-solid fa-user-clock w-4 text-center"></i>
           <span class="sg-sidebar-text">Visiteurs</span>
-          <span id="sg-count-visits" class="sg-badge sg-badge-amber">{{ active_visits|default:0 }}</span>
         </a>
-        <a class="sg-sidebar-link {% if active_section == 'deposits' %}active{% endif %}" href="?section=deposits" title="Depots" aria-label="Depots">
+        <a class="sg-sidebar-link {% if active_section == 'deposits' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=deposits" data-section="deposits" title="Depots" aria-label="Depots">
           <i class="fa-solid fa-box-archive w-4 text-center"></i>
           <span class="sg-sidebar-text">Depots</span>
           <span id="sg-count-documents" class="sg-badge sg-badge-amber">{{ pending_documents_count|default:0 }}</span>
@@ -468,38 +475,38 @@
 
         <div class="sg-sidebar-divider"></div>
         <div class="sg-cluster-label">Organisation</div>
-        <a class="sg-sidebar-link {% if active_section == 'appointments' %}active{% endif %}" href="?section=appointments" title="Rendez-vous" aria-label="Rendez-vous">
+        <a class="sg-sidebar-link {% if active_section == 'appointments' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=appointments" data-section="appointments" title="Rendez-vous" aria-label="Rendez-vous">
           <i class="fa-regular fa-calendar-days w-4 text-center"></i>
           <span class="sg-sidebar-text">Rendez-vous</span>
           <span id="sg-count-appointments" class="sg-badge sg-badge-blue">{{ appointments_today|default:0 }}</span>
         </a>
-        <a class="sg-sidebar-link {% if active_section == 'classes' %}active{% endif %}" href="?section=classes" title="Classes" aria-label="Classes">
+        <a class="sg-sidebar-link {% if active_section == 'classes' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=classes" data-section="classes" title="Classes" aria-label="Classes">
           <i class="fa-solid fa-school w-4 text-center"></i>
           <span class="sg-sidebar-text">Classes</span>
         </a>
-        <a class="sg-sidebar-link {% if active_section == 'students' %}active{% endif %}" href="?section=students" title="Etudiants" aria-label="Etudiants">
+        <a class="sg-sidebar-link {% if active_section == 'students' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=students" data-section="students" title="Etudiants" aria-label="Etudiants">
           <i class="fa-solid fa-graduation-cap w-4 text-center"></i>
           <span class="sg-sidebar-text">Etudiants</span>
         </a>
-        <a class="sg-sidebar-link {% if active_section == 'reports' %}active{% endif %}" href="?section=reports" title="Rapports" aria-label="Rapports">
+        <a class="sg-sidebar-link {% if active_section == 'reports' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=reports" data-section="reports" title="Rapports" aria-label="Rapports">
           <i class="fa-solid fa-file-export w-4 text-center"></i>
           <span class="sg-sidebar-text">Rapports</span>
         </a>
-        <a class="sg-sidebar-link {% if active_section == 'salary' %}active{% endif %}" href="?section=salary" title="Salaire" aria-label="Salaire">
+        <a class="sg-sidebar-link {% if active_section == 'salary' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=salary" data-section="salary" title="Salaire" aria-label="Salaire">
           <i class="fa-solid fa-money-bill-wave w-4 text-center"></i>
           <span class="sg-sidebar-text">Salaire</span>
         </a>
 
         <div class="sg-sidebar-divider"></div>
         <div class="sg-cluster-label">Communication</div>
-        <a class="sg-sidebar-link {% if active_section == 'notifications' %}active{% endif %}" href="?section=notifications" title="Notifications" aria-label="Notifications">
+        <a class="sg-sidebar-link {% if active_section == 'notifications' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=notifications" data-section="notifications" title="Notifications" aria-label="Notifications">
           <i class="fa-regular fa-bell w-4 text-center"></i>
           <span class="sg-sidebar-text">Notifications</span>
           <span id="sg-count-notifications" class="sg-badge sg-badge-red">{{ messages_count|default:0 }}</span>
         </a>
 
         <div class="sg-sidebar-divider"></div>
-        <a class="sg-sidebar-link {% if active_section == 'settings' %}active{% endif %}" href="?section=settings" title="Parametres" aria-label="Parametres">
+        <a class="sg-sidebar-link {% if active_section == 'settings' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=settings" data-section="settings" title="Parametres" aria-label="Parametres">
           <i class="fa-solid fa-user-gear w-4 text-center"></i>
           <span class="sg-sidebar-text">Parametres</span>
         </a>
@@ -541,12 +548,12 @@
               <span class="sg-header-date-sub" data-sg-current-time></span>
             </span>
           </div>
-          <form class="sg-search" action="{% url 'secretary:secretary_dashboard' %}" method="get">
+          <div class="sg-search">
             <i class="fa-solid fa-magnifying-glass" style="color: #94a3b8;"></i>
-            <input type="search" name="student_q" placeholder="Etudiant, matricule, telephone...">
-          </form>
+            <input type="search" name="q" placeholder="Etudiant, matricule, telephone..." hx-get="{% url 'secretary:htmx_student_results' %}" hx-trigger="input changed delay:300ms" hx-target="#student-results-panel" hx-on:htmx:after-request="sgSwitchSection('students')">
+          </div>
           <div class="sg-filter">
-            <select><option>{{ request.user.profile.branch.name|default:"Annexe" }}</option></select>
+            <select disabled style="opacity:.65;"><option>{{ request.user.profile.branch.name|default:"Annexe" }}</option></select>
           </div>
           <button type="button" class="sg-btn-icon" onclick="sgRefreshDashboard()" title="Actualiser" aria-label="Actualiser">
             <i class="fa-solid fa-rotate-right"></i>
@@ -571,11 +578,14 @@
       <div class="sg-scroll-area">
         <div class="sg-content-wrap">
           {% if messages %}
-            <div style="display: grid; gap: 8px; margin-bottom: 16px;">
-              {% for message in messages %}
-                <div class="sg-panel" style="padding: 10px 14px; font-size: .8rem; font-weight: 800;">{{ message }}</div>
-              {% endfor %}
-            </div>
+            <script>
+              (function() {
+                var toneMap = { success: 'success', error: 'error', warning: 'notification', info: 'notification', debug: 'notification' };
+                {% for message in messages %}
+                  sgToast('{{ message.tags|title }}', '{{ message|escapejs }}', toneMap['{{ message.tags }}'] || 'notification');
+                {% endfor %}
+              })();
+            </script>
           {% endif %}
           {% block content %}{% endblock %}
         </div>
@@ -592,7 +602,25 @@
     }
 
     function sgToggleSidebar() {
-      document.getElementById('sg-sidebar')?.classList.toggle('collapsed');
+      var sidebar = document.getElementById('sg-sidebar');
+      sidebar?.classList.toggle('collapsed');
+      try { localStorage.setItem('sg-sidebar-collapsed', sidebar?.classList.contains('collapsed')); } catch(e) {}
+    }
+    try { if (localStorage.getItem('sg-sidebar-collapsed') === 'true') document.getElementById('sg-sidebar')?.classList.add('collapsed'); } catch(e) {}
+
+    function sgSwitchSection(name) {
+      document.querySelectorAll('.sg-section-panel').forEach(function (p) {
+        p.classList.remove('is-active');
+        p.hidden = true;
+      });
+      var target = document.querySelector('[data-sg-panel="' + name + '"]');
+      if (target) { target.classList.add('is-active'); target.hidden = false; }
+      document.querySelectorAll('.sg-nav-tab').forEach(function (t) {
+        t.classList.toggle('active', t.getAttribute('data-section') === name);
+      });
+      document.querySelectorAll('.sg-sidebar-link').forEach(function (l) {
+        l.classList.toggle('active', l.getAttribute('data-section') === name);
+      });
     }
 
     function sgOpen() {

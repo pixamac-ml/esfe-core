@@ -4,6 +4,7 @@
 
 from decimal import Decimal, ROUND_HALF_UP
 
+from academics.services.grading import resolve_threshold, validate_average
 from .ue import compute_ue_result
 
 
@@ -52,10 +53,9 @@ def compute_semester_result(semester, enrollment):
     )
     if semester_average is not None:
         semester_average = semester_average.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+        validate_average(semester_average, f"Moyenne semestre S{semester.number}")
 
-    threshold = Decimal(str(semester.academic_class.validation_threshold or 0))
-    if threshold <= Decimal("0.00"):
-        threshold = Decimal("10.00")
+    threshold = resolve_threshold(enrollment)
 
     percentage = (
         (total_obtained_credits / total_required_credits) * Decimal("100")

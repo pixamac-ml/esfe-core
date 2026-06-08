@@ -46,8 +46,9 @@
                     <td>{{ appointment.assigned_to|default:"-" }}</td>
                     <td><span class="badge">{{ appointment.get_status_display }}</span></td>
                     <td>
+                        <button type="button" class="btn" hx-get="{% url 'secretary:appointment_update' appointment.id %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Modifier</button>
                         {% if appointment.status != "completed" %}
-                            <form method="post" hx-post="{% url 'secretary:appointment_complete' appointment.id %}" hx-target="body" hx-swap="none">
+                            <form method="post" action="{% url 'secretary:appointment_complete' appointment.id %}">
                                 {% csrf_token %}
                                 <button class="btn" type="submit">Cloturer</button>
                             </form>

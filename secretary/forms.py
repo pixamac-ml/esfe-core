@@ -63,6 +63,7 @@ class RegistryEntryForm(SecretaryBaseForm):
     class Meta:
         model = RegistryEntry
         fields = [
+            "title",
             "entry_type",
             "visitor_name",
             "visitor_phone",

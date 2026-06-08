@@ -1,4 +1,6 @@
 from .admin_grades import admin_grade_dashboard
+from .admin_grades import class_grade_sheet_pdf_view
+from .admin_grades import class_grade_sheet_print_view
 from .admin_grades import it_notes_grid_view
 from .admin_grades import it_notes_workspace_view
 from .admin_grades import load_student_results

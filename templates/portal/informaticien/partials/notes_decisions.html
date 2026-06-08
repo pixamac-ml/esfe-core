@@ -1,0 +1,45 @@
+{% if decisions or debts %}
+<div style="margin-top:16px">
+  <h3 style="font-size:16px;font-weight:900;color:#0f172a;margin:0 0 12px">Décisions annuelles &amp; Dettes</h3>
+  <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:14px;background:white">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+          <th style="text-align:left;padding:10px 12px;font-weight:900;color:#334155">Étudiant</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:900;color:#334155">S1</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:900;color:#334155">S2</th>
+          <th style="text-align:center;padding:10px 12px;font-weight:900;color:#334155">Année</th>
+          <th style="text-align:left;padding:10px 12px;font-weight:900;color:#334155">Dettes actives</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in decisions %}
+        <tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:10px 12px;font-weight:700;color:#0f172a">{{ item.student_name }}</td>
+          <td style="text-align:center;padding:10px 12px">
+            <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:800;{% if item.s1 == 'VALIDÉ' %}background:#dcfce7;color:#15803d{% elif item.s1 == 'ADMISSIBLE' %}background:#fef3c7;color:#b45309{% else %}background:#fee2e2;color:#b91c1c{% endif %}">{{ item.s1 }}</span>
+          </td>
+          <td style="text-align:center;padding:10px 12px">
+            <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:800;{% if item.s2 == 'VALIDÉ' %}background:#dcfce7;color:#15803d{% elif item.s2 == 'ADMISSIBLE' %}background:#fef3c7;color:#b45309{% else %}background:#fee2e2;color:#b91c1c{% endif %}">{{ item.s2 }}</span>
+          </td>
+          <td style="text-align:center;padding:10px 12px">
+            <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:800;{% if item.year == 'VALIDÉ' %}background:#dcfce7;color:#15803d{% elif item.year == 'ADMISSIBLE' %}background:#fef3c7;color:#b45309{% else %}background:#fee2e2;color:#b91c1c{% endif %}">{{ item.year }}</span>
+          </td>
+          <td style="padding:10px 12px;font-size:12px;color:#64748b">
+            {% if item.debts %}
+              <span style="color:#d97706;font-weight:700">⚠️ {{ item.debts|join:", " }}</span>
+            {% else %}
+              <span style="color:#16a34a">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="text-align:center;padding:24px;color:#94a3b8;font-weight:700">Aucune décision générée. Cliquez sur "Générer les décisions" une fois les notes finalisées.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}

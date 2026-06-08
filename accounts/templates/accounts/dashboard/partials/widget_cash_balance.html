@@ -1,0 +1,19 @@
+{% load humanize %}
+<div id="widget-cash-balance"
+     class="dg-kpi-card"
+     style="border-top:3px solid #0f9d8a; cursor:default;"
+     hx-get="{% url 'accounts:widget_cash_balance' %}"
+     hx-trigger="every 30s, cashBalanceUpdated from:body"
+     hx-swap="outerHTML">
+  <div class="dg-kpi-icon-wrap bg-teal-50 text-teal-600"><i class="fa-solid fa-vault"></i></div>
+  <div class="dg-kpi-label" style="color:#0f9d8a;">Caisse disponible</div>
+  <div class="dg-kpi-value">{{ balance|intcomma }}</div>
+  <div class="dg-kpi-detail">
+    Entrees mois: {{ cash_in_month|intcomma }} &middot; Sorties: {{ cash_out_month|intcomma }}
+    {% if net_month >= 0 %}
+    <span style="color:#16a34a;">+{{ net_month|intcomma }}</span>
+    {% else %}
+    <span style="color:#ef4444;">{{ net_month|intcomma }}</span>
+    {% endif %}
+  </div>
+</div>

@@ -183,14 +183,14 @@
       </a>
       <a href="?section=candidatures" class="dg-link {% if active_section == 'candidatures' %}active{% endif %}">
         <i class="fa-solid fa-file-circle-check w-4 text-center"></i><span>Candidatures</span>
-        {% if candidatures_pending %}<span class="dg-badge">{{ candidatures_pending }}</span>{% endif %}
+        <span class="js-badge-candidatures" data-badge="candidatures" hx-get="{% url 'accounts:widget_sidebar_badges' %}" hx-trigger="candidatureUpdated from:body" hx-target="closest .js-badge-candidatures" hx-swap="outerHTML">{% if candidatures_pending %}<span class="dg-badge">{{ candidatures_pending }}</span>{% endif %}</span>
       </a>
       <a href="?section=inscriptions" class="dg-link {% if active_section == 'inscriptions' %}active{% endif %}">
         <i class="fa-solid fa-id-card w-4 text-center"></i><span>Inscriptions</span>
       </a>
       <a href="?section=paiements" class="dg-link {% if active_section == 'paiements' %}active{% endif %}">
         <i class="fa-solid fa-credit-card w-4 text-center"></i><span>Paiements</span>
-        {% if pending_payments %}<span class="dg-badge">{{ pending_payments }}</span>{% endif %}
+        <span class="js-badge-payments" data-badge="payments" hx-get="{% url 'accounts:widget_sidebar_badges' %}" hx-trigger="paymentUpdated from:body" hx-target="closest .js-badge-payments" hx-swap="outerHTML">{% if pending_payments %}<span class="dg-badge">{{ pending_payments }}</span>{% endif %}</span>
       </a>
 
       <div class="dg-sidebar-divider"></div>
@@ -276,13 +276,7 @@
 
     <div class="dg-scroll-area">
       <div class="dg-content-wrap">
-        <div class="dg-scope-bar">
-          <span class="dg-scope-chip"><i class="fa-solid fa-building" style="margin-right:4px;"></i>{{ branch.name }}</span>
-          <span class="dg-scope-chip"><i class="fa-solid fa-users" style="margin-right:4px;"></i>{{ total_students|intcomma }} etudiants</span>
-          <span class="dg-scope-chip"><i class="fa-solid fa-file-circle-check" style="margin-right:4px;"></i>{{ candidatures_pending|intcomma }} candidatures</span>
-          <span class="dg-scope-chip"><i class="fa-solid fa-credit-card" style="margin-right:4px;"></i>{{ pending_payments|intcomma }} paiements en attente</span>
-          <span class="dg-scope-chip"><i class="fa-solid fa-vault" style="margin-right:4px;"></i>{{ cash_stats.available_balance|intcomma }} FCFA caisse</span>
-        </div>
+        {% include "accounts/dashboard/partials/widget_scope_bar.html" %}
 
         <div class="dg-nav-tabs">
           <a href="?section=overview" class="dg-nav-tab {% if active_section == 'overview' %}active{% endif %}">Overview</a>
@@ -369,31 +363,21 @@
               </div>
             </div>
 
-            <div class="dg-kpi-grid">
-              <div class="dg-kpi-card" style="border-top:3px solid #2563eb;">
+            <div class="dg-kpi-grid" id="live-kpi-grid">
+              <div class="dg-kpi-card" style="border-top:3px solid #2563eb; cursor:default;">
                 <div class="dg-kpi-icon-wrap bg-blue-50 text-blue-600"><i class="fa-solid fa-users"></i></div>
                 <div class="dg-kpi-label" style="color:#2563eb;">Etudiants</div>
                 <div class="dg-kpi-value">{{ total_students|intcomma }}</div>
                 <div class="dg-kpi-detail">Inscrits actifs</div>
               </div>
-              <div class="dg-kpi-card" style="border-top:3px solid #16a34a;">
-                <div class="dg-kpi-icon-wrap bg-emerald-50 text-emerald-600"><i class="fa-solid fa-sack-dollar"></i></div>
-                <div class="dg-kpi-label" style="color:#16a34a;">Encaisse mois</div>
-                <div class="dg-kpi-value">{{ total_month|intcomma }}</div>
-                <div class="dg-kpi-detail">Paiements scolaires valides</div>
-              </div>
-              <div class="dg-kpi-card" style="border-top:3px solid #f43f5e;">
+              {% include "accounts/dashboard/partials/widget_today_payments.html" %}
+              <div class="dg-kpi-card" style="border-top:3px solid #f43f5e; cursor:default;" id="alerts-kpi-card">
                 <div class="dg-kpi-icon-wrap bg-rose-50 text-rose-600"><i class="fa-solid fa-triangle-exclamation"></i></div>
                 <div class="dg-kpi-label" style="color:#f43f5e;">Alertes</div>
                 <div class="dg-kpi-value">{{ manager_intelligence.alerts|length|default:0 }}</div>
                 <div class="dg-kpi-detail">Elements critiques a traiter</div>
               </div>
-              <div class="dg-kpi-card" style="border-top:3px solid #7c3aed;">
-                <div class="dg-kpi-icon-wrap bg-violet-50 text-violet-600"><i class="fa-solid fa-building"></i></div>
-                <div class="dg-kpi-label" style="color:#7c3aed;">Annexe</div>
-                <div class="dg-kpi-value">{{ branch.name }}</div>
-                <div class="dg-kpi-detail">Portee locale</div>
-              </div>
+              {% include "accounts/dashboard/partials/widget_cash_balance.html" %}
             </div>
           </div>
         </section>

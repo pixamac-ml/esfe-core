@@ -5,6 +5,7 @@
 
 from decimal import Decimal, ROUND_HALF_UP
 import logging
+from django.core.exceptions import ValidationError
 from django.db.models import Sum, Prefetch
 
 
@@ -25,7 +26,7 @@ def to_decimal(value, default="0.00"):
 
 def resolve_threshold(enrollment):
     """
-    Resout le seuil metier de validation.
+    Resout le seuil metier de validation du semestre.
 
     PRIORITE :
     1. seuil defini sur la classe
@@ -49,6 +50,38 @@ def resolve_threshold(enrollment):
         return Decimal("12.00")
 
     return Decimal("10.00")
+
+
+def resolve_ec_threshold(coefficient):
+    """
+    Seuil de validation d'un EC selon son coefficient.
+
+    Regle metier :
+    - Coeff 1  → 8
+    - Coeff 2  → 10
+    - Coeff >= 3 → 12
+    """
+    coeff = to_decimal(coefficient)
+    if coeff <= Decimal("1.00"):
+        return Decimal("8.00")
+    elif coeff <= Decimal("2.00"):
+        return Decimal("10.00")
+    else:
+        return Decimal("12.00")
+
+
+def validate_average(value, label="Moyenne"):
+    """
+    Verifie qu'une moyenne calculee est dans l'intervalle [0, 20].
+    Leve ValidationError si ce n'est pas le cas.
+    """
+    if value is None:
+        return
+    val = to_decimal(value)
+    if val < Decimal("0.00") or val > Decimal("20.00"):
+        raise ValidationError(
+            f"{label} invalide : {val}. Doit etre entre 0 et 20."
+        )
 
 
 def format_note(note):
@@ -124,10 +157,10 @@ def calculate_ec_grade(note, coefficient, credit_required, threshold):
         note_for_math = Decimal("0.00")
     else:
         note_for_math = note_value
-        if note_for_math < Decimal("0.00"):
-            note_for_math = Decimal("0.00")
-        if note_for_math > Decimal("20.00"):
-            note_for_math = Decimal("20.00")
+        if note_for_math < Decimal("0.00") or note_for_math > Decimal("20.00"):
+            raise ValidationError(
+                f"Note invalide : {note_for_math}. Les notes doivent etre entre 0 et 20."
+            )
 
     note_coefficient = note_for_math * coefficient
 
@@ -158,9 +191,35 @@ def calculate_ec_grade(note, coefficient, credit_required, threshold):
 # APPLICATION SUR MODEL
 # ================================
 
+def _clear_debts_on_validation(instance):
+    """
+    Si l'EC est valide et qu'une dette pendante existe pour ce couple
+    enrollment+EC, la marque comme soldee.
+    """
+    if not instance.is_validated:
+        return
+    try:
+        from academics.models import AcademicDebt
+        debt = AcademicDebt.objects.filter(
+            enrollment=instance.enrollment,
+            ec=instance.ec,
+            status=AcademicDebt.STATUS_PENDING,
+        ).first()
+        if debt:
+            debt.mark_cleared(score_retake=instance.final_score)
+            logger.info(
+                f"Dette soldee: enrollment={instance.enrollment_id}, "
+                f"ec={instance.ec_id}, retake={instance.final_score}"
+            )
+    except Exception:
+        logger.exception(
+            f"Erreur lors de l'apurement de dette pour enrollment={instance.enrollment_id}, ec={instance.ec_id}"
+        )
+
+
 def apply_ec_grade(instance):
     compute_final_score(instance)
-    threshold = resolve_threshold(instance.enrollment)
+    threshold = resolve_ec_threshold(instance.ec.coefficient)
     result = calculate_ec_grade(
         note=instance.final_score,
         coefficient=instance.ec.coefficient,
@@ -171,6 +230,7 @@ def apply_ec_grade(instance):
     instance.note_coefficient = result["note_coefficient"]
     instance.credit_obtained = result["credit_obtained"]
     instance.is_validated = result["is_validated"]
+    _clear_debts_on_validation(instance)
     logger.info(
         f"Note EC enregistree: enrollment={instance.enrollment_id}, ec={instance.ec_id}, "
         f"normal={instance.normal_score}, retake={instance.retake_score}, final={instance.final_score}"
@@ -213,17 +273,17 @@ def calculate_semester_summary(enrollment, semester):
 
 def calculate_academic_year_summary(enrollment):
     """
-    Calcule la moyenne generale, credits totaux, validation finale pour l'annee academique.
+    Consolide les semestres sans calculer de moyenne annuelle.
+
+    Le resultat annuel est une analyse academique (VALIDE / ADMISSIBLE / NON ADMIS),
+    pas un calcul de moyenne supplementaire.
     """
     from academics.models import Semester
     semesters = Semester.objects.filter(academic_class=enrollment.academic_class).prefetch_related(
         Prefetch('ues__ecs__grades', to_attr='all_grades')
     )
-    total_coef = Decimal('0.00')
-    total_note_coef = Decimal('0.00')
     total_credits = Decimal('0.00')
     credits_obtained = Decimal('0.00')
-    threshold = resolve_threshold(enrollment)
     missing_grades = 0
     blocking_reasons = []
     semester_summaries = []
@@ -234,24 +294,15 @@ def calculate_academic_year_summary(enrollment):
         semester_summaries.append(sem_summary)
         if semester_result:
             missing_grades += semester_result.get("missing_grades", 0)
-        if sem_summary["moyenne"] is not None:
-            total_note_coef += sem_summary["moyenne"] * semester_credits
-            total_coef += semester_credits
         total_credits += semester_credits
         credits_obtained += sem_summary["credits_obtenus"]
-    moyenne = (total_note_coef / total_coef) if total_coef > 0 else None
     statut = "EN COURS"
     if missing_grades:
         statut = "INCOMPLET"
         blocking_reasons.append(f"{missing_grades} note(s) manquante(s).")
-    elif moyenne is not None:
-        if moyenne >= threshold and credits_obtained >= total_credits:
-            statut = "VALIDE"
-        elif moyenne < threshold or credits_obtained < total_credits:
-            statut = "NON VALIDE"
-    logger.info(f"Recalcul annee: enrollment={enrollment.id}, moyenne={moyenne}, credits={credits_obtained}/{total_credits}, statut={statut}")
+    logger.info(f"Consolidation annee: enrollment={enrollment.id}, credits={credits_obtained}/{total_credits}, statut={statut}")
     return {
-        "moyenne": moyenne,
+        "moyenne": None,
         "credits_obtenus": credits_obtained,
         "credits_requis": total_credits,
         "statut": statut,

@@ -340,6 +340,46 @@
               <i data-lucide="moon" class="mr-2 h-4 w-4"></i>
               Theme
             </button>
+            <div class="relative" @click.outside="notificationDropdownOpen = false">
+              <button
+                type="button"
+                class="workflow-btn workflow-btn-secondary relative"
+                @click="toggleNotificationDropdown()"
+                title="Notifications"
+              >
+                <i data-lucide="bell" class="h-4 w-4"></i>
+                <span
+                  x-show="unreadCount > 0"
+                  x-cloak
+                  class="absolute -right-1 -top-1 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white"
+                  x-text="unreadCount"
+                ></span>
+              </button>
+              <div
+                x-show="notificationDropdownOpen"
+                x-cloak
+                x-transition
+                class="absolute right-0 z-50 mt-2 w-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                id="it-notif-dropdown"
+              >
+                <div class="border-b border-slate-100 px-5 py-3">
+                  <p class="text-sm font-black text-slate-900">Notifications</p>
+                </div>
+                <div id="it-notif-dropdown-content" hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?partial=dropdown" hx-trigger="load" hx-swap="innerHTML">
+                  <div class="p-6 text-center text-sm text-slate-500">Chargement...</div>
+                </div>
+                <div class="border-t border-slate-100 bg-slate-50 px-5 py-2.5">
+                  <button
+                    type="button"
+                    class="flex w-full items-center justify-center gap-1 text-xs font-black text-blue-600 hover:text-blue-800"
+                    @click="notificationDropdownOpen = false; openModule('notifications')"
+                  >
+                    Voir toutes les notifications
+                    <i data-lucide="arrow-right" style="width:12px;height:12px;"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
             <div class="relative" @click.outside="profileOpen = false">
               <button type="button" class="workflow-btn workflow-btn-secondary" @click="profileOpen = !profileOpen">
                 <span class="grid h-7 w-7 place-items-center rounded-full bg-blue-600 text-xs font-black text-white">
@@ -392,6 +432,8 @@
       collapsed: false,
       darkMode: false,
       profileOpen: false,
+      notificationDropdownOpen: false,
+      unreadCount: 0,
       activeModule: 'home',
       modules: [
         { key: 'home', label: 'Accueil', icon: 'home', kicker: 'Actions rapides et priorites' },
@@ -402,6 +444,7 @@
         { key: 'cards', label: 'Cartes etudiants', icon: 'badge', kicker: 'Classe -> Etudiant -> PDF' },
         { key: 'accounts', label: 'Utilisateurs', icon: 'shield-check', kicker: 'Utilisateur -> Etat compte -> Action' },
         { key: 'support', label: 'Support', icon: 'life-buoy', kicker: 'Tickets de l annexe' },
+        { key: 'notifications', label: 'Notifications', icon: 'bell', kicker: 'Alertes, messages et communications' },
         { key: 'settings', label: 'Compte', icon: 'settings', kicker: 'Profil, securite, preferences et annexe' },
       ],
       init() {
@@ -409,12 +452,14 @@
         this.darkMode = window.localStorage.getItem('it_flow_dark') === '1';
         this.applyTheme();
         this.$nextTick(() => this.renderIcons());
+        this.loadUnreadCount();
         document.body.addEventListener('htmx:afterSwap', (event) => {
           this.renderIcons();
           if (event.detail && event.detail.target && event.detail.target.id === 'it-drawer-content') {
             this.openDrawer();
           }
         });
+        document.body.addEventListener('notif-update', () => this.loadUnreadCount());
         document.body.addEventListener('it-modal-close', () => this.closeModal());
         document.body.addEventListener('htmx:beforeRequest', (event) => {
           const elt = event && event.detail ? event.detail.elt : null;
@@ -425,6 +470,27 @@
         document.body.addEventListener('it-drawer-close', () => this.closeDrawer());
         window.itOpenDrawer = () => this.openDrawer();
         window.itCloseDrawer = () => this.closeDrawer();
+      },
+      loadUnreadCount() {
+        fetch('{% url "accounts_portal:it_notifications_workspace" %}?count_only=1')
+          .then(r => r.text())
+          .then(html => {
+            const match = html.match(/>(\d+)<\/span>/);
+            if (match) this.unreadCount = parseInt(match[1], 10);
+          })
+          .catch(() => {});
+      },
+      toggleNotificationDropdown() {
+        this.notificationDropdownOpen = !this.notificationDropdownOpen;
+        if (this.notificationDropdownOpen) {
+          this.$nextTick(() => {
+            const content = document.getElementById('it-notif-dropdown-content');
+            if (content && content.getAttribute('hx-trigger') === 'load' && !content.dataset.loaded) {
+              content.dataset.loaded = '1';
+              if (window.htmx) window.htmx.process(content);
+            }
+          });
+        }
       },
       currentModule() {
         return this.modules.find((item) => item.key === this.activeModule) || this.modules[0];
@@ -447,6 +513,7 @@
           accounts: "{% url 'accounts_portal:it_accounts_flow_workspace' %}",
           cards: "{% url 'accounts_portal:it_cards_workspace' %}",
           support: "{% url 'accounts_portal:it_support_flow_workspace' %}",
+          notifications: "{% url 'accounts_portal:it_notifications_workspace' %}",
           settings: "{% url 'accounts_portal:it_my_account_workspace' %}",
         };
         if (window.htmx) {

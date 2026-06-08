@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Relevé de classe — {{ academic_class.name }} — Semestre {{ semester.number }}</title>
+
+<style>
+@page {
+    size: {% if print_format == "a3" %}A3{% else %}A4{% endif %} landscape;
+    margin: 10mm 8mm 14mm;
+    @bottom-center {
+        content: "Page " counter(page) " / " counter(pages);
+        font-size: 8px;
+        color: #555;
+        font-family: "Roboto", Arial, sans-serif;
+    }
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+    font-family: "Roboto", Arial, sans-serif;
+    font-size: 9px;
+    color:#000;
+    line-height:1.2;
+}
+
+.page{page-break-after:always;padding:0}
+
+/* ===== HEADER PREMIERE PAGE ===== */
+.first-page .school-header{
+    display:flex;
+    align-items:flex-start;
+    gap:24px;
+    margin-bottom:14px;
+}
+
+.first-page .school-logo{width:110px;height:110px;flex-shrink:0}
+.first-page .school-logo img{width:100%;height:100%;object-fit:contain}
+
+.first-page .school-identity{flex:1;padding-top:4px}
+.first-page .school-identity .school-name{
+    font-size:20px;
+    font-weight:900;
+    line-height:1.2;
+    text-transform:uppercase;
+    letter-spacing:.02em;
+    margin-bottom:2px;
+}
+.first-page .school-identity .slogan{
+    font-size:11px;
+    font-style:italic;
+    color:#555;
+    margin-bottom:6px;
+    border-top:1px solid #ccc;
+    border-bottom:1px solid #ccc;
+    padding:3px 0;
+    display:inline-block;
+}
+.first-page .school-identity .contact{
+    font-size:8px;
+    color:#555;
+    line-height:1.5;
+}
+.first-page .school-identity .contact .sep{color:#aaa;margin:0 6px}
+
+.first-page .report-title{
+    text-align:center;
+    margin-bottom:12px;
+}
+.first-page .report-title h2{
+    font-size:24px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.15em;
+    margin-bottom:6px;
+    color:#000;
+}
+.first-page .report-title .report-details{
+    display:flex;
+    justify-content:center;
+    gap:8px;
+    font-size:10px;
+    color:#333;
+}
+.first-page .report-title .report-details span{
+    background:#f0f0f0;
+    padding:4px 14px;
+    border-radius:4px;
+    font-weight:700;
+}
+
+.first-page .header-sep{
+    border:none;
+    border-top:3px double #222;
+    margin-bottom:8px;
+}
+
+/* ===== HEADER PAGES SUIVANTES ===== */
+.next-page .suite-header{
+    text-align:center;
+    padding:3px 0 5px;
+    margin-bottom:6px;
+    border-bottom:1px solid #555;
+}
+.next-page .suite-header p{font-size:9px;color:#333;margin:0}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    font-size:8px;
+}
+
+th, td{
+    border:1px solid #222;
+    padding:3px 4px;
+    text-align:center;
+    vertical-align:middle;
+}
+
+thead th{background:#e8e8e8;font-weight:700}
+
+.student-name{text-align:left;font-weight:600}
+.student-prenom{text-align:left}
+.ue-header{background:#d0d0d0;font-weight:700;white-space:normal;word-break:break-word}
+.semester-header{background:#c0c0c0;font-weight:700}
+.semester-summary{background:#f0f0f0;font-weight:600}
+.ok{background:#d1fae5}
+.bad{background:#fee2e2}
+.empty{background:#f5f5f5}
+.left-label{text-align:left;font-weight:600;background:#f5f5f5}
+</style>
+
+</head>
+<body>
+
+{% for chunk in ue_chunks %}
+<div class="page{% if forloop.first %} first-page{% else %} next-page{% endif %}">
+
+{% if forloop.first %}
+{# ===== PREMIERE PAGE : logo + infos officielles ===== #}
+<div class="school-header">
+    <div class="school-logo">
+        <img src="{% static 'institution/logo_esfe.png' %}" alt="ESFE">
+    </div>
+    <div class="school-identity">
+        <div class="school-name">École de Santé<br>Félix Houphouët-Boigny – Mali (ESFé)</div>
+        <div class="slogan">« Demain, c'est aujourd'hui »</div>
+        <div class="contact">
+            Djélibougou, BP 00223, Bamako – Mali
+            <span class="sep">|</span>
+            Tél : 76-37-88-66 / 66-37-88-66
+            <span class="sep">|</span>
+            info@esfe.edu.ml
+            <span class="sep">|</span>
+            www.esfe.edu.ml
+        </div>
+    </div>
+</div>
+
+<div class="report-title">
+    <h2>Relevé de notes</h2>
+    <div class="report-details">
+        <span>{{ academic_class.name }}</span>
+        <span>Semestre {{ semester.number }}</span>
+        <span>{{ semester.academic_class.academic_year.name }}</span>
+    </div>
+</div>
+
+<hr class="header-sep">
+{% else %}
+{# ===== PAGES SUIVANTES : entête minimal ===== #}
+<div class="suite-header">
+    <p><strong>{{ academic_class.name }}</strong> — Semestre {{ semester.number }} <span style="color:#888">(suite)</span></p>
+</div>
+{% endif %}
+
+<table>
+<thead>
+<tr>
+    <th colspan="4" style="width:188px">Unité d'enseignement</th>
+    {% for ue in chunk %}
+        <th colspan="{{ ue.ecs.count|add:ue.ecs.count|add:ue.ecs.count|add:3 }}" class="ue-header">{{ ue.code }} — {{ ue.title }}</th>
+    {% endfor %}
+    <th colspan="3" class="semester-header">Semestre</th>
+</tr>
+<tr>
+    <th colspan="4">Matière</th>
+    {% for ue in chunk %}
+        {% for ec in ue.ecs.all %}
+            <th colspan="3" style="font-weight:600;font-size:7px;white-space:normal;word-break:break-word">{{ ec.title }}</th>
+        {% endfor %}
+        <th colspan="3" class="ue-header" style="font-size:7px">Unité {{ ue.code }}</th>
+    {% endfor %}
+    <th colspan="3"></th>
+</tr>
+<tr>
+    <th colspan="4" class="left-label">Crédits requis</th>
+    {% for ue in chunk %}
+        {% for ec in ue.ecs.all %}
+            <th colspan="3" style="font-weight:400;font-size:7px">{{ ec.credit_required }}</th>
+        {% endfor %}
+        <th colspan="3" class="ue-header" style="font-size:7px">{{ ue.credit_required }}</th>
+    {% endfor %}
+    <th colspan="3" style="font-size:7px">{% with first=rows.0 %}{{ first.semester_required_credits_display|default:"0,00" }}{% endwith %}</th>
+</tr>
+<tr>
+    <th colspan="4" class="left-label">Coefficients</th>
+    {% for ue in chunk %}
+        {% for ec in ue.ecs.all %}
+            <th colspan="3" style="font-weight:400;font-size:7px">{{ ec.coefficient }}</th>
+        {% endfor %}
+        <th colspan="3" class="ue-header" style="font-size:7px">{{ ue.coefficient }}</th>
+    {% endfor %}
+    <th colspan="3" style="font-size:7px">{% with first=rows.0 %}{{ first.semester_total_coefficients_display|default:"0,00" }}{% endwith %}</th>
+</tr>
+<tr>
+    <th style="width:22px">N°</th>
+    <th style="width:66px">Matricule</th>
+    <th style="width:70px">Nom</th>
+    <th style="width:70px">Prénom</th>
+    {% for ue in chunk %}
+        {% for ec in ue.ecs.all %}
+            <th style="width:22px">Note</th>
+            <th style="width:18px">Coef.</th>
+            <th style="width:18px">Credit Obt</th>
+        {% endfor %}
+        <th style="width:22px">Note</th>
+        <th style="width:18px">Coef.</th>
+        <th style="width:20px">Credit Obt</th>
+    {% endfor %}
+    <th style="width:24px">Moyenne</th>
+    <th style="width:24px">Pourcentage</th>
+    <th style="width:28px">Crédit Obtenus</th>
+</tr>
+</thead>
+<tbody>
+{% for row in rows %}
+<tr>
+    <td>{{ row.index }}</td>
+    <td>{{ row.student_matricule|default:"" }}</td>
+    <td class="student-name">{{ row.student_last_name|truncatechars:15 }}</td>
+    <td class="student-prenom">{{ row.student_first_name|truncatechars:15 }}</td>
+
+    {% for ue_block in row.ue_blocks %}
+        {% if ue_block.ue in chunk %}
+            {% for ec_row in ue_block.rows %}
+                <td class="{% if ec_row.display_status == 'validated' %}ok{% elif ec_row.display_status == 'failed' %}bad{% else %}empty{% endif %}">
+                    {{ ec_row.note_display|default:"-" }}
+                </td>
+                <td>{{ ec_row.note_coefficient_display|default:"0,00" }}</td>
+                <td class="{% if ec_row.is_validated %}ok{% else %}bad{% endif %}">
+                    {{ ec_row.credit_obtained_display|default:"0,00" }}
+                </td>
+            {% endfor %}
+            <td class="ue-header">{{ ue_block.average_display|default:"0,00" }}</td>
+            <td>{{ ue_block.total_note_coefficients_display|default:"0,00" }}</td>
+            <td class="{% if ue_block.credit_obtained > 0 %}ok{% else %}bad{% endif %}">
+                {{ ue_block.credit_obtained_display|default:"0,00" }}
+            </td>
+        {% endif %}
+    {% endfor %}
+
+    <td class="semester-summary">{{ row.semester_average_display|default:"0,00" }}</td>
+    <td class="semester-summary">{{ row.semester_percentage_display|default:"0,00" }}</td>
+    <td class="semester-summary">{{ row.semester_credits_display|default:"0,00" }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+</div><!-- /page -->
+{% endfor %}
+
+</body>
+</html>

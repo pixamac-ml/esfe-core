@@ -19,6 +19,8 @@ from .models import (
     AcademicScheduleExecutionLog,
     AcademicBulletin,
     AcademicDiplomaAward,
+    AcademicDebt,
+    AcademicDecisionLog,
     LessonLog,
     WeeklyScheduleSlot,
     Language,
@@ -48,7 +50,7 @@ class ProfessionAdmin(admin.ModelAdmin):
 
 @admin.register(AcademicClass)
 class AcademicClassAdmin(admin.ModelAdmin):
-    list_display = ("name", "programme", "branch", "academic_year", "level", "is_active")
+    list_display = ("name", "programme", "branch", "academic_year", "level", "validation_threshold", "admissibility_gap", "is_active")
     list_filter = ("academic_year", "branch", "programme", "level")
     search_fields = ("name",)
 
@@ -57,6 +59,7 @@ class AcademicClassAdmin(admin.ModelAdmin):
 class SemesterAdmin(admin.ModelAdmin):
     list_display = ("academic_class", "number", "total_required_credits")
     list_filter = ("number", "academic_class__academic_year")
+    search_fields = ("academic_class__name",)
 
 
 class ECInline(admin.TabularInline):
@@ -309,3 +312,48 @@ class WeeklyScheduleSlotAdmin(admin.ModelAdmin):
     list_filter = ("branch", "academic_year", "weekday", "is_active")
     search_fields = ("room", "academic_class__name", "ec__title", "teacher__username")
     autocomplete_fields = ("academic_class", "ec", "teacher", "branch", "academic_year", "created_by")
+
+
+@admin.register(AcademicDebt)
+class AcademicDebtAdmin(admin.ModelAdmin):
+    list_display = (
+        "enrollment",
+        "ec",
+        "semester",
+        "academic_year",
+        "academic_class",
+        "score_original",
+        "score_retake",
+        "status",
+        "carry_forward_to",
+        "created_at",
+    )
+    list_filter = ("status", "academic_year", "academic_class", "semester")
+    search_fields = (
+        "enrollment__student__username",
+        "enrollment__student__email",
+        "ec__title",
+    )
+    readonly_fields = ("created_at", "cleared_at", "updated_at")
+    autocomplete_fields = ("enrollment", "ec", "semester", "academic_year", "academic_class", "carry_forward_to")
+
+
+@admin.register(AcademicDecisionLog)
+class AcademicDecisionLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "academic_class",
+        "academic_year",
+        "actor",
+        "total_students",
+        "validated_count",
+        "admissible_count",
+        "non_admis_count",
+        "created_at",
+    )
+    list_filter = ("academic_year", "academic_class", "created_at")
+    search_fields = (
+        "academic_class__name",
+        "actor__username",
+    )
+    readonly_fields = ("created_at", "details")
+    autocomplete_fields = ("academic_class", "academic_year", "actor")

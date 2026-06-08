@@ -1,0 +1,23 @@
+{% load humanize %}
+<div id="widget-active-sessions"
+     class="dg-panel"
+     style="margin-bottom:16px;"
+     hx-get="{% url 'accounts:widget_active_sessions' %}"
+     hx-trigger="every 15s, cashBalanceUpdated from:body"
+     hx-swap="outerHTML">
+  <div class="dg-panel-title">Sessions caisse actives <span class="dg-badge-sm dg-badge-green">{{ count }}</span></div>
+  {% for session in sessions %}
+  <div class="dg-action-card" style="margin-bottom:4px;">
+    <div>
+      <div class="dg-action-label">{{ session.inscription.candidature.full_name }}</div>
+      <div class="dg-action-sub">Code: {{ session.verification_code }} &middot; expire dans {{ session.expires_at|timeuntil }}</div>
+    </div>
+    <span class="dg-badge-sm dg-badge-green">Active</span>
+  </div>
+  {% empty %}
+  <div class="dg-empty">
+    <div class="dg-empty-icon"><i class="fa-solid fa-clock"></i></div>
+    <div class="dg-empty-text">Aucune session active</div>
+  </div>
+  {% endfor %}
+</div>

@@ -215,7 +215,7 @@ def public_shop_product_order(request, branch_slug, pk):
             customer_phone=form.cleaned_data.get("customer_phone", ""),
         )
     except ValidationError as exc:
-        form.add_error(None, exc.message)
+        form.add_error(None, str(exc))
         return render_public_shop_catalog(request, branch=branch, status=400, form=form, selected_product=product)
     return redirect(f"/shop/{get_branch_public_shop_identifier(branch)}/?ordered={order.reference}")
 
@@ -233,13 +233,26 @@ def student_required_modal(request):
 @require_POST
 def student_create_required_order(request):
     product_ids = request.POST.getlist("product_ids")
-    try:
-        order = create_student_required_order(request.user, product_ids, created_by=request.user)
-    except ValidationError as exc:
-        return HttpResponse(exc.message, status=400)
-    if not order:
-        return HttpResponse("Aucun article selectionne.", status=400)
-    return redirect(f"/shop/student/order/{order.pk}/")
+    error = None
+    if not product_ids:
+        error = "Aucun article selectionne."
+    else:
+        try:
+            order = create_student_required_order(request.user, product_ids, created_by=request.user)
+        except ValidationError as exc:
+            error = str(exc)
+        except (AttributeError, TypeError):
+            error = "Commande impossible : profil etudiant incomplet (inscription ou branche manquante)."
+        else:
+            if order:
+                return redirect(f"/shop/student/order/{order.pk}/")
+            error = "Aucun article selectionne."
+
+    from portal.student.views import shop_catalog_partial
+    catalog_response = shop_catalog_partial(request)
+    catalog_html = catalog_response.content.decode() if hasattr(catalog_response, "content") else str(catalog_response)
+    html = f"""<div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div>{catalog_html}"""
+    return HttpResponse(html)
 
 
 @login_required
@@ -423,7 +436,7 @@ def manager_counter_order_create(request):
             immediate_settlement=True,
         )
     except ValidationError as exc:
-        form.add_error(None, exc.message)
+        form.add_error(None, str(exc))
         return render_manager_shop_panel(request, counter_order_form=form, status=400)
     if request.headers.get("HX-Request"):
         return render_manager_shop_panel(request, counter_order_form=ShopCounterOrderForm(branch=request.branch))
@@ -437,7 +450,7 @@ def manager_payment_validate(request, pk):
     try:
         validate_shop_payment(payment, user=request.user)
     except ValidationError as exc:
-        return render_manager_shop_panel(request, shop_error=exc.message, status=400)
+        return render_manager_shop_panel(request, shop_error=str(exc), status=400)
     if request.headers.get("HX-Request"):
         return render_manager_shop_panel(request)
     return manager_shop_redirect(request)

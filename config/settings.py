@@ -33,11 +33,12 @@ def env_list(name: str, default: str = "") -> list[str]:
 # SECURITY
 # ==================================================
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key-change-me")
-DEBUG = env_bool("DEBUG", True)
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured("SECRET_KEY must be set in .env — generate one with: python -c \"import secrets; print(secrets.token_urlsafe(50))\"")
+DEBUG = env_bool("DEBUG", False)
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", BASE_URL)
-#ALLOWED_HOSTS =['127'192.168.2.3'.0.0.1',,'localhost']
-ALLOWED_HOSTS =['127.0.0.1','192.168.2.3','localhost']
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
 ENABLE_BROWSER_RELOAD = DEBUG and env_bool("ENABLE_BROWSER_RELOAD", True)
 ENABLE_WEBSOCKETS = env_bool("ENABLE_WEBSOCKETS", True)
 REDIS_URL = os.getenv("REDIS_URL", "").strip()
@@ -52,6 +53,7 @@ INSTALLED_APPS = [
     "django_components",
     "daphne",
     "channels",
+    "axes",
     # Django core
     "django.contrib.admin",
     "django.contrib.auth",
@@ -120,6 +122,12 @@ MIDDLEWARE = [
 if ENABLE_BROWSER_RELOAD and importlib.util.find_spec("django_browser_reload"):
     MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
 
+MIDDLEWARE.append("axes.middleware.AxesMiddleware")
+
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 LOGGING = {
     "version": 1,
@@ -179,7 +187,7 @@ ASGI_APPLICATION = "config.asgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [BASE_DIR / "templates", BASE_DIR / "ui" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -369,6 +377,11 @@ SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "strict-origin-when
 # Le dashboard integre certains contenus (PDF, previews) via iframe.
 # SAMEORIGIN garde la protection clickjacking tout en autorisant l'integration interne.
 X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "SAMEORIGIN")
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_AGE = 28800  # 8 heures
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 if DEBUG:
     SECURE_SSL_REDIRECT = False

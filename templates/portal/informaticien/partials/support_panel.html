@@ -23,6 +23,7 @@
         hx-target="#it-support-panel"
         hx-swap="innerHTML"
         class="mt-5 space-y-3"
+        x-on:submit="$dispatch('notify', {message: 'Création du ticket en cours...', type: 'info'})"
       >
         {% csrf_token %}
         <input type="hidden" name="kind" value="{{ request.GET.kind }}">
@@ -102,17 +103,17 @@
               {% endif %}
             </div>
             <div class="grid gap-2 sm:grid-cols-2 xl:w-[360px]">
-              <form method="post" action="{% url 'accounts_portal:it_assign_ticket' ticket.id %}" hx-post="{% url 'accounts_portal:it_assign_ticket' ticket.id %}" hx-target="#it-support-panel" hx-swap="innerHTML">
+              <form method="post" action="{% url 'accounts_portal:it_assign_ticket' ticket.id %}" hx-post="{% url 'accounts_portal:it_assign_ticket' ticket.id %}" hx-target="#it-support-panel" hx-swap="innerHTML" x-on:submit="$dispatch('notify', {message: 'Prise en charge du ticket...', type: 'info'})">
                 {% csrf_token %}
                 <button type="submit" class="w-full rounded-2xl bg-slate-900 px-4 py-3 text-xs font-bold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">Prendre</button>
               </form>
-              <form method="post" action="{% url 'accounts_portal:it_update_ticket_status' ticket.id %}" hx-post="{% url 'accounts_portal:it_update_ticket_status' ticket.id %}" hx-target="#it-support-panel" hx-swap="innerHTML">
+              <form method="post" action="{% url 'accounts_portal:it_update_ticket_status' ticket.id %}" hx-post="{% url 'accounts_portal:it_update_ticket_status' ticket.id %}" hx-target="#it-support-panel" hx-swap="innerHTML" x-on:submit="$dispatch('notify', {message: 'Résolution du ticket en cours...', type: 'info'})">
                 {% csrf_token %}
                 <input type="hidden" name="status" value="resolved">
                 <input type="hidden" name="resolution" value="Probleme traite depuis le dashboard informaticien.">
                 <button type="submit" class="w-full rounded-2xl bg-emerald-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-emerald-700">Resolu</button>
               </form>
-              <form class="sm:col-span-2" method="post" action="{% url 'accounts_portal:it_comment_ticket' ticket.id %}" hx-post="{% url 'accounts_portal:it_comment_ticket' ticket.id %}" hx-target="#it-support-panel" hx-swap="innerHTML">
+              <form class="sm:col-span-2" method="post" action="{% url 'accounts_portal:it_comment_ticket' ticket.id %}" hx-post="{% url 'accounts_portal:it_comment_ticket' ticket.id %}" hx-target="#it-support-panel" hx-swap="innerHTML" x-on:submit="$dispatch('notify', {message: 'Ajout du commentaire...', type: 'info'})">
                 {% csrf_token %}
                 <div class="flex gap-2">
                   <input name="body" placeholder="Commentaire interne..." class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">

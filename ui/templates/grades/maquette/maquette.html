@@ -1,0 +1,522 @@
+{% load component_tags %}
+{% comment %}
+  Maquette de saisie des notes — refonte CSS Grid.
+
+  Réutilise les sous-composants historiques pour ne pas casser la logique métier :
+  - notes_header + notes_actions_bar (toolbar)
+  - student_identity_column (ligne étudiant)
+  - ec_note_cell (cellule note éditable)
+  - semester_summary (résultats à droite)
+
+  Forme : 2 niveaux d'header (UE / EC) + 3 sous-colonnes par EC (Note / Note coef. /
+  Crédits obtenus) + colonne "Unité" synthétique par UE + 3 colonnes résultats
+  figées à droite (Moyenne / Pourcentage / Crédits).
+
+  Refactor pur : la forme de la maquette (visuelle et structurelle) est conservée
+  à 100%, seule la transposition HTML passe de <table> à CSS Grid.
+{% endcomment %}
+
+<div class="maq-root"
+     data-grid-key="{{ academic_class.id }}-{{ semester.id }}"
+     data-session="{{ active_session_type }}"
+     data-total-ecs="{{ total_ecs }}"
+     data-total-ues="{{ total_ues }}">
+
+  <style>
+    /* === Tokens === */
+    .maq-root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --line: #d9e2ef;
+      --line-dark: #b9c8de;
+      --text: #1e293b;
+      --muted: #64748b;
+      --primary: #1d4ed8;
+      --primary-soft: #dbeafe;
+      --warning: #fff7da;
+      --ok: #16a34a;
+      --ok-soft: #dcfce7;
+      --bad: #b91c1c;
+      --bad-soft: #fee2e2;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      --radius: 16px;
+      --meta-num: 52px;
+      --meta-name: 240px;
+      --ec-col: 78px;
+      --unit-col: 78px;
+      --result-col: 110px;
+      color: var(--text);
+    }
+    .maq-root * { box-sizing: border-box; }
+
+    /* === Layout principal === */
+    .maq-shell {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .maq-toolbar {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line);
+      background: #fff; flex-wrap: wrap;
+    }
+
+    /* === Conteneur scrollable (horizontal + vertical) === */
+    .maq-scroll {
+      overflow: auto;
+      max-height: min(72vh, 980px);
+      background: linear-gradient(to right, rgba(244,247,251,0.98), rgba(244,247,251,0)) 0 0 / 34px 100% no-repeat;
+    }
+
+    /* === GRID : transposition de la maquette Excel === */
+    .maq-grid {
+      display: grid;
+      /* Largeurs définies via --meta-num, --meta-name, --ec-col, --unit-col, --result-col */
+      grid-template-columns:
+        var(--meta-num)                     /* N°  */
+        var(--meta-name)                     /* NOM */
+        var(--meta-name)                     /* PRENOMS */
+        repeat(var(--maq-ec-count, 0), minmax(var(--ec-col), 1fr))
+        repeat(var(--maq-ue-count, 0), minmax(var(--unit-col), 1fr))
+        var(--result-col)                    /* MOYENNE  */
+        var(--result-col)                    /* %        */
+        var(--result-col);                   /* CRÉDITS  */
+      background: #fff;
+      min-width: 100%;
+    }
+
+    /* === Header sticky === */
+    .maq-row {
+      display: contents; /* les enfants deviennent des grid items directs */
+    }
+
+    /* Cellules d'header : 5 lignes sticky au top */
+    .maq-cell {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: center;
+      font-size: 12px;
+      white-space: nowrap;
+      vertical-align: middle;
+      font-variant-numeric: tabular-nums;
+      background: #fff;
+    }
+
+    .maq-cell--h {
+      position: sticky;
+      background: #eef3ff;
+      font-weight: 700;
+      z-index: 5;
+      white-space: normal;
+      word-break: break-word;
+    }
+    .maq-cell--h-ue    { background: #dbeafe; color: #17306b; }
+    .maq-cell--h-unit  { background: #ede9fe; color: #4c1d95; }
+    .maq-cell--h-res   { background: #f1f5f9; }
+    .maq-cell--h-label { background: #f8fafc; text-align: left; }
+
+    /* Empilement vertical des 5 lignes d'header */
+    .maq-cell--h-row1 { top: 0;        z-index: 9; }
+    .maq-cell--h-row2 { top: 0;        z-index: 8; }
+    .maq-cell--h-row3 { top: 0;        z-index: 7; }
+    .maq-cell--h-row4 { top: 0;        z-index: 6; }
+    .maq-cell--h-row5 { top: 0;        z-index: 5; }
+
+    /* === Colonnes meta figées à gauche === */
+    .maq-cell--meta,
+    .maq-cell--h.meta {
+      position: sticky;
+      background: #fff;
+      z-index: 3;
+    }
+    .maq-cell--meta-num   { left: 0;                                z-index: 14; }
+    .maq-cell--meta-name  { left: var(--meta-num);                  z-index: 13; }
+    .maq-cell--meta-prenom{ left: calc(var(--meta-num) + var(--meta-name)); z-index: 12; }
+    .maq-cell--h.meta-num   { left: 0;                                z-index: 24; }
+    .maq-cell--h.meta-name  { left: var(--meta-num);                  z-index: 23; }
+    .maq-cell--h.meta-prenom{ left: calc(var(--meta-num) + var(--meta-name)); z-index: 22; }
+
+    /* === Colonnes résultats figées à droite === */
+    .maq-cell--res,
+    .maq-cell--h.res {
+      position: sticky;
+      background: #f8fafc;
+      font-weight: 700;
+      z-index: 3;
+    }
+    .maq-cell--h.res { z-index: 6; background: #f1f5f9; }
+    .maq-cell--res-1 { right: calc(var(--result-col) * 2); z-index: 11; }
+    .maq-cell--res-2 { right: var(--result-col);          z-index: 11; }
+    .maq-cell--res-3 { right: 0;                          z-index: 11; }
+    .maq-cell--h.res-1 { right: calc(var(--result-col) * 2); z-index: 21; }
+    .maq-cell--h.res-2 { right: var(--result-col);          z-index: 21; }
+    .maq-cell--h.res-3 { right: 0;                          z-index: 21; }
+
+    /* Coin haut-gauche (intersection header × meta) */
+    .maq-cell--corner {
+      position: sticky;
+      top: 0;
+      left: 0;
+      z-index: 30;
+      background: #eef3ff;
+    }
+
+    /* === Cellules Note (éditables) === */
+    .maq-cell--note {
+      padding: 4px;
+      background: #fff;
+    }
+    .maq-cell--input {
+      width: 100%;
+      text-align: center;
+      border: 1px solid var(--line-dark);
+      padding: 7px 4px;
+      border-radius: 8px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      outline: none;
+      font-variant-numeric: tabular-nums;
+    }
+    .maq-cell--input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(29, 78, 216, .12);
+    }
+    .maq-cell--input:disabled {
+      background: #e2e8f0;
+      color: #64748b;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .maq-cell--input.is-saved {
+      border-color: var(--ok);
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, .14);
+    }
+    .maq-cell--input.htmx-request {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    /* === Color coding par statut (déjà calculé par le service) === */
+    .maq-cell--ok    { background: var(--ok-soft); }
+    .maq-cell--bad   { background: var(--bad-soft); }
+    .maq-cell--empty { background: #f1f5f9; }
+    .maq-cell--warn  { background: var(--warning); }
+
+    /* === Badges Unité + semestre === */
+    .maq-cell--unit  { background: #ede9fe; color: #4c1d95; font-weight: 700; }
+    .maq-cell--sem   { background: #f8fafc; font-weight: 700; }
+
+    /* === Lignes d'étudiant === */
+    .maq-row-student .maq-cell { font-size: 12px; }
+    .maq-row-student .maq-cell--meta-name,
+    .maq-row-student .maq-cell--meta-prenom {
+      text-align: left;
+      font-weight: 700;
+      background: #fff;
+    }
+    .maq-row-student .maq-cell--meta-num {
+      background: #fff;
+      color: var(--muted);
+    }
+
+    /* === Cellule nom étudiant (large, sticky) === */
+    .maq-cell--h-name {
+      min-width: var(--meta-name);
+      text-align: left;
+    }
+
+    /* === Cellule d'écriture verticale (style "Note" tourné) === */
+    .maq-cell--v {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 11px;
+      line-height: 1;
+      min-width: 30px;
+    }
+
+    /* === Responsive === */
+    @media (max-width: 1200px) {
+      .maq-cell--meta,
+      .maq-cell--res { position: static; }
+    }
+  </style>
+
+  {# === Variables CSS dynamiques injectées par le contexte === #}
+  <script>
+    (function() {
+      var root = document.currentScript.previousElementSibling.parentElement;
+      if (!root || !root.classList.contains('maq-root')) return;
+      root.style.setProperty('--maq-ec-count', root.dataset.totalEcs || '0');
+      root.style.setProperty('--maq-ue-count', root.dataset.totalUes || '0');
+    })();
+  </script>
+
+  <div class="maq-shell">
+    {# === Toolbar : titre + actions workflow === #}
+    <div class="maq-toolbar">
+      {% component "notes_header" academic_class=academic_class semester=semester rows=rows active_session_label=active_session_label workflow_badge=workflow_badge %}{% endcomponent %}
+      {% component "notes_actions_bar" academic_class=academic_class semester=semester active_session_type=active_session_type workflow_permissions=workflow_permissions first_enrollment=first_enrollment publish_ready=publish_ready embedded_in_dashboard=embedded_in_dashboard %}{% endcomponent %}
+    </div>
+
+    {# === Zone scrollable === #}
+    <div class="maq-scroll">
+      <div class="maq-grid">
+
+        {# ============================================================ #}
+        {# HEADER — 5 lignes sticky empilées                           #}
+        {# ============================================================ #}
+
+        {# --- Ligne 1 : Noms des UEs --- #}
+        <div class="maq-cell maq-cell--h maq-cell--corner maq-cell--h-row1">Etudiants</div>
+        <div class="maq-cell maq-cell--h meta-num maq-cell--h-row1"></div>
+        <div class="maq-cell maq-cell--h meta-prenom maq-cell--h-row1"></div>
+
+        {% for ue in ues %}
+          {# Chaque UE span = (nb_ecs * 3) colonnes + 3 colonnes Unité #}
+          {% with ue_cols=ue.ecs.count|stringformat:"s" %}
+          <div class="maq-cell maq-cell--h maq-cell--h-ue maq-cell--h-row1"
+               style="grid-column: span {{ ue.ecs.count|add:ue.ecs.count|add:ue.ecs.count|add:3 }};">
+            {{ ue.code }} — {{ ue.title }}
+          </div>
+          {% endwith %}
+        {% endfor %}
+
+        <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row1"
+             style="grid-column: span 3;">
+          RÉSULTAT DU SEMESTRE
+        </div>
+
+        {# --- Ligne 2 : Noms des ECs + Unité --- #}
+        <div class="maq-cell maq-cell--h maq-cell--corner maq-cell--h-row2">Matières</div>
+        <div class="maq-cell maq-cell--h meta-num maq-cell--h-row2"></div>
+        <div class="maq-cell maq-cell--h meta-prenom maq-cell--h-row2"></div>
+
+        {% for ue in ues %}
+          {% for ec in ue.ecs.all %}
+            <div class="maq-cell maq-cell--h maq-cell--h-row2" style="grid-column: span 3;">
+              {{ ec.title }}
+            </div>
+          {% endfor %}
+          <div class="maq-cell maq-cell--h maq-cell--h-unit maq-cell--h-row2" style="grid-column: span 3;">
+            Unité
+          </div>
+        {% endfor %}
+
+        <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row2" style="grid-column: span 3;"></div>
+
+        {# --- Ligne 3 : Crédits requis --- #}
+        <div class="maq-cell maq-cell--h maq-cell--h-label maq-cell--corner maq-cell--h-row3">Crédits requis</div>
+        <div class="maq-cell maq-cell--h maq-cell--h-label meta-num maq-cell--h-row3"></div>
+        <div class="maq-cell maq-cell--h maq-cell--h-label meta-prenom maq-cell--h-row3"></div>
+
+        {% for ue in ues %}
+          {% for ec in ue.ecs.all %}
+            <div class="maq-cell maq-cell--h maq-cell--h-row3" style="grid-column: span 3;">
+              {{ ec.credit_required }}
+            </div>
+          {% endfor %}
+          <div class="maq-cell maq-cell--h maq-cell--h-unit maq-cell--h-row3" style="grid-column: span 3;">
+            {{ ue.credit_required }}
+          </div>
+        {% endfor %}
+
+        {% for row in rows|slice:":1" %}
+          <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row3" style="grid-column: span 3;">
+            {{ row.semester_required_credits_display|default:"0,00" }}
+          </div>
+        {% empty %}
+          <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row3" style="grid-column: span 3;">0,00</div>
+        {% endfor %}
+
+        {# --- Ligne 4 : Coefficients --- #}
+        <div class="maq-cell maq-cell--h maq-cell--h-label maq-cell--corner maq-cell--h-row4">Coefficients</div>
+        <div class="maq-cell maq-cell--h maq-cell--h-label meta-num maq-cell--h-row4"></div>
+        <div class="maq-cell maq-cell--h maq-cell--h-label meta-prenom maq-cell--h-row4"></div>
+
+        {% for ue in ues %}
+          {% for ec in ue.ecs.all %}
+            <div class="maq-cell maq-cell--h maq-cell--h-row4" style="grid-column: span 3;">
+              {{ ec.coefficient }}
+            </div>
+          {% endfor %}
+          <div class="maq-cell maq-cell--h maq-cell--h-unit maq-cell--h-row4" style="grid-column: span 3;">
+            {{ ue.coefficient }}
+          </div>
+        {% endfor %}
+
+        {% for row in rows|slice:":1" %}
+          <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row4" style="grid-column: span 3;">
+            {{ row.semester_total_coefficients_display|default:"0,00" }}
+          </div>
+        {% empty %}
+          <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row4" style="grid-column: span 3;">0,00</div>
+        {% endfor %}
+
+        {# --- Ligne 5 : sous-en-têtes (Note / Note coef. / Crédits) --- #}
+        <div class="maq-cell maq-cell--h maq-cell--h-row5 maq-cell--h-name meta-num">N°</div>
+        <div class="maq-cell maq-cell--h maq-cell--h-row5 maq-cell--h-name meta-name">NOM</div>
+        <div class="maq-cell maq-cell--h maq-cell--h-row5 maq-cell--h-name meta-prenom">PRÉNOMS</div>
+
+        {% for ue in ues %}
+          {% for ec in ue.ecs.all %}
+            <div class="maq-cell maq-cell--h maq-cell--h-row5 maq-cell--v">Note</div>
+            <div class="maq-cell maq-cell--h maq-cell--h-row5 maq-cell--v">Note coef.</div>
+            <div class="maq-cell maq-cell--h maq-cell--h-row5 maq-cell--v">Crédits</div>
+          {% endfor %}
+          <div class="maq-cell maq-cell--h maq-cell--h-unit maq-cell--h-row5 maq-cell--v">Note</div>
+          <div class="maq-cell maq-cell--h maq-cell--h-unit maq-cell--h-row5 maq-cell--v">Note coef.</div>
+          <div class="maq-cell maq-cell--h maq-cell--h-unit maq-cell--h-row5 maq-cell--v">Crédits</div>
+        {% endfor %}
+
+        <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row5 maq-cell--v res-1">Moyenne</div>
+        <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row5 maq-cell--v res-2">%</div>
+        <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row5 maq-cell--v res-3">Crédits</div>
+
+        {# ============================================================ #}
+        {# BODY — 1 ligne par étudiant                                  #}
+        {# ============================================================ #}
+        {% for row in rows %}
+          <div class="maq-row-student maq-row"
+               data-row-id="{{ row.student_id }}"
+               data-enrollment-id="{{ row.enrollment_id|default:'' }}">
+
+            {# --- Métadonnées figées à gauche --- #}
+            <div class="maq-cell maq-cell--meta maq-cell--meta-num">
+              {{ forloop.counter }}
+            </div>
+            <div class="maq-cell maq-cell--meta maq-cell--meta-name">
+              {{ row.last_name|default:"" }}
+            </div>
+            <div class="maq-cell maq-cell--meta maq-cell--meta-prenom">
+              {{ row.first_name|default:"" }}
+            </div>
+
+            {# --- Pour chaque UE : ECs + Unité synthétique --- #}
+            {% for ue_block in row.ue_blocks %}
+              {% for ec_row in ue_block.rows %}
+                {# Cellule Note (éditable) — via composant existant #}
+                {% component "ec_note_cell" row=row ec_row=ec_row %}{% endcomponent %}
+
+                <div class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}">
+                  {{ ec_row.note_coefficient_display|default:"0,00" }}
+                </div>
+                <div class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}">
+                  {{ ec_row.credit_obtained_display|default:"0,00" }}
+                </div>
+              {% endfor %}
+
+              {# Colonne "Unité" synthétique (par UE) #}
+              <div class="maq-cell maq-cell--unit">
+                {{ ue_block.average_display|default:"0,00" }}
+              </div>
+              <div class="maq-cell maq-cell--unit">
+                {{ ue_block.total_note_coefficients_display|default:"0,00" }}
+              </div>
+              <div class="maq-cell maq-cell--unit {% if ue_block.credit_obtained == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">
+                {{ ue_block.credit_obtained_display|default:"0,00" }}
+              </div>
+            {% endfor %}
+
+            {# --- Résultats figés à droite (3 colonnes) --- #}
+            <div class="maq-cell maq-cell--res maq-cell--res-1">
+              {{ row.semester_average_display|default:"0,00" }}
+            </div>
+            <div class="maq-cell maq-cell--res maq-cell--res-2">
+              {{ row.semester_percentage_display|default:"0,00" }}%
+            </div>
+            <div class="maq-cell maq-cell--res maq-cell--res-3 {% if row.semester_credit_obtained == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">
+              {{ row.semester_credit_obtained_display|default:"0,00" }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {# JS : navigation clavier + validation 0-20 + color coding     #}
+  {# ============================================================ #}
+  <script>
+    (function() {
+      var root = document.currentScript.previousElementSibling;
+      while (root && !root.classList.contains('maq-root')) {
+        root = root.parentElement;
+      }
+      if (!root || root.dataset.bound === '1') return;
+      root.dataset.bound = '1';
+
+      // --- 1. Validation 0-20 + color coding par seuil de coefficient ---
+      root.addEventListener('input', function(ev) {
+        var input = ev.target.closest('.maq-cell--input');
+        if (!input) return;
+        var val = parseFloat(input.value);
+        var cell = input.closest('.maq-cell--note') || input.parentElement;
+
+        // Reset
+        input.classList.remove('is-validated', 'is-failed', 'is-invalid');
+        cell.classList.remove('maq-cell--ok', 'maq-cell--bad', 'maq-cell--warn');
+
+        if (isNaN(val)) return;
+
+        if (val < 0 || val > 20) {
+          input.classList.add('is-invalid');
+          return;
+        }
+
+        var seuil = parseFloat(input.dataset.seuil || '10');
+        if (val >= seuil) {
+          input.classList.add('is-validated');
+          cell.classList.add('maq-cell--ok');
+        } else {
+          input.classList.add('is-failed');
+          cell.classList.add('maq-cell--bad');
+        }
+      });
+
+      // --- 2. Navigation clavier (Tab / Enter / flèches) ---
+      root.addEventListener('keydown', function(ev) {
+        var input = ev.target.closest('.maq-cell--input');
+        if (!input) return;
+
+        var cell = input.closest('.maq-cell--note') || input.parentElement;
+        var row = cell.closest('.maq-row-student');
+        var grid = cell.closest('.maq-grid');
+
+        // Toutes les cellules Note éditables dans l'ordre du grid
+        var allNoteCells = Array.from(grid.querySelectorAll('.maq-cell--note .maq-cell--input'));
+        var idx = allNoteCells.indexOf(input);
+
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          // Descendre d'une ligne, même colonne
+          var sameColumnNext = allNoteCells[idx + (grid.querySelectorAll('.maq-row-student').length)];
+          if (sameColumnNext) sameColumnNext.focus();
+        } else if (ev.key === 'ArrowDown') {
+          ev.preventDefault();
+          var next = allNoteCells[idx + (grid.querySelectorAll('.maq-row-student').length)];
+          if (next) next.focus();
+        } else if (ev.key === 'ArrowUp') {
+          ev.preventDefault();
+          var prev = allNoteCells[idx - (grid.querySelectorAll('.maq-row-student').length)];
+          if (prev) prev.focus();
+        } else if (ev.key === 'Escape') {
+          input.value = input.defaultValue;
+          input.blur();
+        }
+      });
+
+      // --- 3. Indicateur "saved" (déclenché par HTMX après requête OK) ---
+      root.addEventListener('htmx:afterRequest', function(ev) {
+        var input = ev.target.closest('.maq-cell--input');
+        if (!input) return;
+        if (ev.detail.xhr && ev.detail.xhr.status === 200) {
+          input.classList.add('is-saved');
+          setTimeout(function() { input.classList.remove('is-saved'); }, 1500);
+        }
+      });
+    })();
+  </script>
+</div>

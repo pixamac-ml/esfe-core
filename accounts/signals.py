@@ -23,7 +23,7 @@ def create_user_profile(sender, instance, created, **kwargs):
     if created:
         profile, was_created = Profile.objects.get_or_create(user=instance)
         if was_created:
-            logger.info(f"Profil créé pour le nouvel utilisateur: {instance.username}")
+            logger.info(f"Profil créé — user_id={instance.pk}")
 
 
 # ==========================================================
@@ -37,7 +37,7 @@ def save_user_profile(sender, instance, **kwargs):
     profile, created = Profile.objects.get_or_create(user=instance)
 
     if created:
-        logger.info(f"Profil créé pour utilisateur existant: {instance.username}")
+        logger.info(f"Profil créé pour utilisateur existant — user_id={instance.pk}")
 
 
 # ==========================================================
@@ -108,8 +108,8 @@ def auto_prepare_payroll_on_salary_change(sender, instance, **kwargs):
     )
     if created:
         logger.info(
-            "PayrollEntry auto-créée pour %s (%s) — %s — %s FCFA",
-            instance.user.get_full_name() or instance.user.username,
+            "PayrollEntry auto-créée — user_id=%s branch=%s period=%s amount=%s FCFA",
+            instance.user_id,
             instance.branch_id,
             period_month,
             instance.salary_base,
@@ -160,8 +160,8 @@ def auto_prepare_honorarium_on_rate_change(sender, instance, **kwargs):
     )
     if created:
         logger.info(
-            "TeacherHonorariumEntry auto-créée pour %s (%s) — %s — %s FCFA/h",
-            instance.user.get_full_name() or instance.user.username,
+            "TeacherHonorariumEntry auto-créée — user_id=%s branch=%s period=%s rate=%s FCFA/h",
+            instance.user_id,
             instance.branch_id,
             period_month,
             instance.teacher_hourly_rate,

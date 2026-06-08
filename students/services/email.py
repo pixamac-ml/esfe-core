@@ -3,7 +3,7 @@ from django.conf import settings
 from communication.services import EmailService
 
 
-def send_student_credentials_email(*, student, raw_password):
+def send_student_credentials_email(*, student, raw_password=None):
     user = student.user
     inscription = student.inscription
     candidature = inscription.candidature
@@ -22,8 +22,9 @@ def send_student_credentials_email(*, student, raw_password):
             "last_name": user.last_name,
             "email": user.email,
         },
-        "password": raw_password,
-        "temporary_password": raw_password,
+        "needs_password_reset": True,
+        "password": None,
+        "temporary_password": None,
         "username": user.username,
         "student_name": f"{user.first_name} {user.last_name}".strip(),
         "candidate_name": candidature.full_name,

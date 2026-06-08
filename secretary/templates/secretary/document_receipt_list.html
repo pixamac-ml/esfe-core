@@ -45,15 +45,16 @@
                     <td><span class="badge">{{ receipt.get_status_display }}</span></td>
                     <td>
                         <div class="actions">
+                            <button type="button" class="btn" hx-get="{% url 'secretary:document_receipt_update' receipt.id %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Modifier</button>
                             {% if receipt.status == "pending" %}
-                                <form method="post" hx-post="{% url 'secretary:document_receipt_start' receipt.id %}" hx-target="body" hx-swap="none">
+                                <form method="post" action="{% url 'secretary:document_receipt_start' receipt.id %}">
                                     {% csrf_token %}
                                     <button class="btn" type="submit">Prendre en charge</button>
                                 </form>
                             {% endif %}
                             {% if receipt.file %}<a class="btn" href="{{ receipt.file.url }}" target="_blank" rel="noopener">Fichier</a>{% endif %}
                             {% if not receipt.is_archived %}
-                                <form method="post" hx-post="{% url 'secretary:document_receipt_archive' receipt.id %}" hx-target="body" hx-swap="none">
+                                <form method="post" action="{% url 'secretary:document_receipt_archive' receipt.id %}">
                                     {% csrf_token %}
                                     <button class="btn btn-danger" type="submit">Archiver</button>
                                 </form>

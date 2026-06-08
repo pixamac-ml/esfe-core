@@ -312,3 +312,141 @@ PHASE 7 — LIVRABLES ATTENDUS
 * Garder le système ultra maintenable et scalable.
 
 Travaille proprement, étape par étape, avec une vision long terme de plateforme universitaire professionnelle haut de gamme.
+
+====================================================================
+DESIGN PROPOSAL — DASHBOARD ENSEIGNANT (Juin 2026)
+====================================================================
+
+Problème #1 : Le dashboard actuel utilise ses propres couleurs
+(`--school-primary: #2563eb`, CSS variables maison) au lieu du thème
+Tailwind du projet (primary: #1e4f6f, secondary: #1db5b0, accent: #f39c12).
+Il est incohérent avec le reste de l'app (manager, secretary, student).
+
+------------------------------------------------------------
+Design A — "Harmonisation" (RECOMMANDÉ)
+------------------------------------------------------------
+Reprendre la charte existante du projet :
+  Primary  → #1e4f6f (bleu foncé) — sidebar, headers
+  Secondary → #1db5b0 (teal) — boutons, accents, badges
+  Accent   → #f39c12 (amber) — highlights, alertes
+
+Changements :
+  • Sidebar : fond bg-primary-900 (comme manager/secretary)
+  • KPI cards : border-t-4 border-secondary avec icône teal
+  • Boutons : bg-secondary au lieu de bg-blue-600
+  • Badges : tons success/primary/warning/danger du projet
+  • Réutiliser les composants existants : {% component "dashboard_card" %},
+    {% component "metric_card" %}, {% component "button" %}
+
+------------------------------------------------------------
+Design B — "Clean & Moderne"
+------------------------------------------------------------
+Même base que A mais plus épuré :
+  • Supprimer le fond gradient de la sidebar → fond bg-primary-950 uni
+  • KPI cards repensées : chiffre géant + étiquette en dessous, sans icône,
+    avec barre verticale colorée à gauche
+  • Tableaux sans border : divide-none + row-hover subtil
+  • Modale latérale plus large (max-w-3xl → max-w-4xl)
+  • Espacement plus aéré (gap-8 au lieu de gap-5)
+  • Section "Accueil" : style dashboard "insights" façon Notion
+
+------------------------------------------------------------
+Design C — "Rapid" (changements minimaux)
+------------------------------------------------------------
+  Avant                    | Après
+  -------------------------|-----------------------------
+  #2563eb (blue-600)       | #1db5b0 (secondary)
+  Sidebar gradient custom  | Sidebar bg-primary-900
+  teacher-icon 18px         | w-5 h-5 standard
+  border-slate-200         | border-primary-200/20
+  Dark mode !important     | Classes dark: Tailwind
+
+------------------------------------------------------------
+AUTRES PROBLÈMES IDENTIFIÉS (à corriger quel que soit le design)
+------------------------------------------------------------
+1. build_teacher_dashboard_context() fait 350 lignes → découper
+2. week_end incohérent (7j vs 6j) → corriger le off-by-one
+3. Recherche = "Find in Page" seulement → vraie recherche
+4. Input recherche inactif dans Cahier de texte → supprimer ou brancher
+5. Code commenté (lignes 543-572) → supprimer
+6. Étudiants limités à 80 sans pagination → pagination HTMX
+7. Pas de spinner/loading HTMX → améliorer UX
+8. Pas de vue honoraires pour l'enseignant → ajouter
+
+====================================================================
+DESIGN MINIMALISTE — DASHBOARD ENSEIGNANT "CLEAN SLATE"
+====================================================================
+
+Philosophie : "Less is more". Pas de fioritures, pas de gradients,
+pas d'icônes superflues. Le contenu est le roi.
+
+------------------------------------------------------------
+Layout global
+------------------------------------------------------------
+  • Sidebar réduite à 64px icônes (toujours collapsed par défaut)
+    - Fond blanc avec border-right subtile
+    - Icônes uniquement (tooltip au hover)
+    - En bas : avatar + logout
+  • Main area : fond gris très clair (#f8fafc)
+    - Pas de header sticky complexe
+    - Simplement : date + nom enseignant en haut à droite
+  • Pas de breadcrumbs
+  • Pas de bouton dark mode visible
+
+------------------------------------------------------------
+Accueil (Overview)
+------------------------------------------------------------
+  • 4 KPI cards en ligne : juste le chiffre + label, sans icône,
+    sans ombre, bordure fine
+  • En dessous : une simple liste des cours du jour (heure + nom +
+    classe), sans boutons — juste du texte
+  • "Prochains cours" : même liste en dessous
+  • Pas de priorites/insights, pas de bouton paramètres, pas de CTA
+
+------------------------------------------------------------
+Mes classes
+------------------------------------------------------------
+  • Table simple : Classe | Programme | Effectif | Matières
+  • Pas d'icônes dans le tableau
+  • Au clic sur une ligne → ouvre la modale latérale
+  • Filtre par classe en haut (select dropdown simple)
+
+------------------------------------------------------------
+Planning
+------------------------------------------------------------
+  • Table semaine : Jour | Horaire | Cours | Classe | Salle
+  • Texte seul, pas de badges, pas de couleurs
+  • Bouton "Cahier" discret en fin de ligne
+
+------------------------------------------------------------
+Cahier de texte
+------------------------------------------------------------
+  • Liste des cours passés sans cahier saisi (prioritaire)
+  • Formulaire minimal : statut (select) + contenu (textarea)
+  • Bouton "Enregistrer" uniquement
+
+------------------------------------------------------------
+Palette
+------------------------------------------------------------
+  • Sidebar icônes : #475569 (slate-600)
+  • Sidebar active : #1e4f6f (primary) + bg slate-50
+  • Texte corps : #334155 (slate-700)
+  • Titres : #0f172a (slate-900)
+  • Cards : bg-white, border #e2e8f0, border-radius 12px
+  • Liens/actions : underline au hover, pas de couleur bleue
+  • Pas de teal (#1db5b0), pas d'amber (#f39c12)
+  • Seule couleur = #1e4f6f (primary) pour les rares boutons
+
+------------------------------------------------------------
+Règles strictes
+------------------------------------------------------------
+  1. Pas d'icônes dans les cards KPI
+  2. Pas de badges colorés (statut en texte simple)
+  3. Pas de gradient nulle part
+  4. Pas d'ombre portée (box-shadow: none)
+  5. Un seul bouton par section max
+  6. Police système (Roboto), pas de Poppins
+  7. Pas d'Alpine.js sauf si strictement nécessaire
+  8. Chaque section = une question : "Quel est mon prochain cours ?"
+     "Quels sont mes étudiants ?" "Qu'ai-je enseigné ?"
+

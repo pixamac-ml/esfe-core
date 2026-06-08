@@ -10,6 +10,7 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     path("portal/student-dashboard/", include("portal.student.urls")),
     path("portal/", include(("portal.urls", "accounts_portal"), namespace="accounts_portal")),
+    path("secretary/", include("secretary.urls")),
     path("formations/", include("formations.urls")),
     path("blog/", include("blog.urls")),
     path("admissions/", include("admissions.urls")),

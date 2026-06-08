@@ -1,5 +1,6 @@
 # core/urls.py
 
+from django.conf import settings
 from django.urls import path
 from . import views
 
@@ -34,9 +35,6 @@ urlpatterns = [
         name="legal_pdf"
     ),
 
-    # Apercu des pages d'erreur (dev/preprod)
-    path("erreurs/<int:error_code>/", views.preview_error_page, name="error_page_preview"),
-
 
     # =====================================================
     # INTERNAL / SUPERADMIN
@@ -44,3 +42,8 @@ urlpatterns = [
 
 
 ]
+
+if settings.DEBUG:
+    urlpatterns.append(
+        path("erreurs/<int:error_code>/", views.preview_error_page, name="error_page_preview"),
+    )

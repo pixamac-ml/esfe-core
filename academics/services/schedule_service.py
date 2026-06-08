@@ -310,12 +310,14 @@ def _build_week_grid_from_serialized(serialized_events, week_start: date):
             }
         )
 
+    extra_slots = [slot for slot in slots if not slot["is_standard"]]
+
     return {
         "week_start": week_start,
         "days": days,
         "slots": slots,
-        "extra_slots": [],
-        "has_extra_slots": False,
+        "extra_slots": extra_slots,
+        "has_extra_slots": bool(extra_slots),
         "events": serialized_events,
         "empty_days": [item for item in day_event_counts if not item["has_events"]],
         "day_event_counts": day_event_counts,

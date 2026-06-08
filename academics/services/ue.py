@@ -5,7 +5,7 @@
 
 from decimal import Decimal, ROUND_HALF_UP
 
-from academics.services.grading import calculate_ec_grade, resolve_threshold
+from academics.services.grading import calculate_ec_grade, resolve_ec_threshold, resolve_threshold, validate_average
 
 
 TWO_PLACES = Decimal("0.01")
@@ -34,7 +34,7 @@ def compute_ue_result(ue, enrollment):
         grade.ec_id: grade
         for grade in ECGrade.objects.filter(enrollment=enrollment, ec__ue=ue).select_related("ec")
     }
-    threshold = resolve_threshold(enrollment)
+    class_threshold = resolve_threshold(enrollment)
 
     rows = []
 
@@ -55,11 +55,12 @@ def compute_ue_result(ue, enrollment):
             entered_grades += 1
         else:
             missing_grades += 1
+        ec_threshold = resolve_ec_threshold(ec.coefficient)
         ec_result = calculate_ec_grade(
             note=note,
             coefficient=ec.coefficient,
             credit_required=ec.credit_required,
-            threshold=threshold,
+            threshold=ec_threshold,
         )
         note_coefficient = ec_result["note_coefficient"]
         credit_obtained = ec_result["credit_obtained"]
@@ -93,11 +94,12 @@ def compute_ue_result(ue, enrollment):
     )
     if ue_average is not None:
         ue_average = ue_average.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+        validate_average(ue_average, f"Moyenne UE {ue.code}")
     is_complete = missing_grades == 0 and expected_grades > 0
     is_validated = bool(
         is_complete
         and ue_average is not None
-        and ue_average >= threshold
+        and ue_average >= class_threshold
         and total_obtained_credits >= Decimal(str(ue.credit_required or 0))
     )
 

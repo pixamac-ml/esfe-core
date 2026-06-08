@@ -7,17 +7,17 @@
 
 <!-- Nav tabs - server-backed links; works even without JavaScript -->
 <div class="sg-nav-tabs">
-  <a class="sg-nav-tab {% if active_section == 'overview' %}active{% endif %}" href="?section=overview">Vue globale</a>
-  <a class="sg-nav-tab {% if active_section == 'registry' %}active{% endif %}" href="?section=registry">Registre</a>
-  <a class="sg-nav-tab {% if active_section == 'visits' %}active{% endif %}" href="?section=visits">Visiteurs</a>
-  <a class="sg-nav-tab {% if active_section == 'classes' %}active{% endif %}" href="?section=classes">Classes</a>
-  <a class="sg-nav-tab {% if active_section == 'students' %}active{% endif %}" href="?section=students">Etudiants</a>
-  <a class="sg-nav-tab {% if active_section == 'appointments' %}active{% endif %}" href="?section=appointments">Rendez-vous</a>
-  <a class="sg-nav-tab {% if active_section == 'deposits' %}active{% endif %}" href="?section=deposits">Depots</a>
-  <a class="sg-nav-tab {% if active_section == 'reports' %}active{% endif %}" href="?section=reports">Rapports</a>
-  <a class="sg-nav-tab {% if active_section == 'salary' %}active{% endif %}" href="?section=salary">Salaire</a>
-  <a class="sg-nav-tab {% if active_section == 'notifications' %}active{% endif %}" href="?section=notifications">Notifications</a>
-  <a class="sg-nav-tab {% if active_section == 'settings' %}active{% endif %}" href="?section=settings">Parametres</a>
+  <a class="sg-nav-tab {% if active_section == 'overview' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=overview" data-section="overview">Vue globale</a>
+  <a class="sg-nav-tab {% if active_section == 'registry' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=registry" data-section="registry">Registre</a>
+  <a class="sg-nav-tab {% if active_section == 'visits' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=visits" data-section="visits">Visiteurs</a>
+  <a class="sg-nav-tab {% if active_section == 'classes' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=classes" data-section="classes">Classes</a>
+  <a class="sg-nav-tab {% if active_section == 'students' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=students" data-section="students">Etudiants</a>
+  <a class="sg-nav-tab {% if active_section == 'appointments' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=appointments" data-section="appointments">Rendez-vous</a>
+  <a class="sg-nav-tab {% if active_section == 'deposits' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=deposits" data-section="deposits">Depots</a>
+  <a class="sg-nav-tab {% if active_section == 'reports' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=reports" data-section="reports">Rapports</a>
+  <a class="sg-nav-tab {% if active_section == 'salary' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=salary" data-section="salary">Salaire</a>
+  <a class="sg-nav-tab {% if active_section == 'notifications' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=notifications" data-section="notifications">Notifications</a>
+  <a class="sg-nav-tab {% if active_section == 'settings' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=settings" data-section="settings">Parametres</a>
 </div>
 
 <!-- =========== SECTION: OVERVIEW =========== -->
@@ -45,10 +45,11 @@
       </div>
       <div class="sg-divider"></div>
       <div class="sg-panel-title">Routage intelligent</div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Paiement scolarite</span><span>Gestionnaire</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:100%;background:#16a34a;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Depot colis</span><span>Surveillance</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:85%;background:#7c3aed;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Retrait diplome</span><span>Direction etudes</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:70%;background:#2563eb;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Reclamation</span><span>Administration</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:62%;background:#ef4444;"></div></div></div>
+      <div class="sg-section-header-sub" style="margin-bottom:12px;">Chaque entree registre est automatiquement orientee vers le service competent.</div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Paiement scolarite</span><span>Gestionnaire</span></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Depot colis</span><span>Surveillance</span></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Retrait diplome</span><span>Direction etudes</span></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>Reclamation</span><span>Administration</span></div></div>
     </div>
   </div>
 
@@ -95,7 +96,7 @@
               <td>{{ item.target_service|default:"Accueil" }}</td>
               <td><span class="sg-badge-sm sg-badge-blue">{{ item.get_status_display }}</span></td>
             </tr>
-            {% empty %}<tr><td colspan="6" class="sg-empty">Aucune entree recente.</td></tr>{% endfor %}
+            {% empty %}<tr><td colspan="6"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-solid fa-book-open"></i></div><div class="sg-empty-text">Aucune entree recente.</div></div></td></tr>{% endfor %}
           </tbody>
         </table>
       </div>
@@ -120,10 +121,14 @@
     </div>
     <div class="sg-panel">
       <div class="sg-panel-title">Repartition par type</div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Parent / tuteur</span><span>45%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:45%;background:#2563eb;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Paiement</span><span>28%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:28%;background:#16a34a;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Livraison colis</span><span>15%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:15%;background:#7c3aed;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Reclamation</span><span>12%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:12%;background:#f59e0b;"></div></div></div>
+      {% for item in registry_type_distribution %}
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>{{ item.label }}</span><span>{{ item.pct }}% ({{ item.count }})</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:{{ item.pct }}%;background:{% cycle '#2563eb' '#16a34a' '#7c3aed' '#f59e0b' '#ef4444' '#14b8a6' '#f97316' '#6366f1' %};"></div></div></div>
+      {% empty %}
+      <div class="sg-empty">
+        <div class="sg-empty-icon"><i class="fa-solid fa-chart-pie"></i></div>
+        <div class="sg-empty-text">Aucune entree enregistree.</div>
+      </div>
+      {% endfor %}
     </div>
   </div>
 </div>
@@ -158,7 +163,7 @@
           <div><div class="sg-action-label">{{ item.full_name }}</div><div class="sg-action-sub">{{ item.arrived_at|date:"H:i" }} - {{ item.reason|default:"Accueil" }}</div></div>
           <span class="sg-badge-sm sg-badge-green">{{ item.get_status_display }}</span>
         </div>
-        {% empty %}<div class="sg-empty">Aucun passage aujourd'hui.</div>{% endfor %}
+        {% empty %}<div class="sg-empty"><div class="sg-empty-icon"><i class="fa-solid fa-user-clock"></i></div><div class="sg-empty-text">Aucun passage aujourd'hui.</div></div>{% endfor %}
       </div>
       {% if today_visits_page.has_other_pages %}
         <div class="sg-pagination">
@@ -282,10 +287,10 @@
     {% include "secretary/partials/dashboard_documents_pending.html" %}
     <div class="sg-panel">
       <div class="sg-panel-title">Processus de remise</div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Depot identifie</span><span>Recu et numerote</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:100%;background:#2563eb;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Etudiant / service notifie</span><span>En cours</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:70%;background:#7c3aed;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Remise confirmee</span><span>Termine</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:45%;background:#16a34a;"></div></div></div>
-      <div class="sg-bar-item" style="margin-top:8px;"><div class="sg-bar-label"><span>Taux de remise</span><span>45%</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:45%;background:#16a34a;"></div></div></div>
+      <div class="sg-section-header-sub" style="margin-bottom:12px;">Les depots suivent un circuit de traitement en 3 etapes.</div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>1. Depot identifie</span><span>Recu et numerote</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:100%;background:#2563eb;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>2. Destinataire notifie</span><span>En attente de remise</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:65%;background:#7c3aed;"></div></div></div>
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>3. Remise confirmee</span><span>Traite</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:30%;background:#16a34a;"></div></div></div>
     </div>
   </div>
 </div>
@@ -322,7 +327,7 @@
                 <td><span class="sg-badge-sm {% if entry.status == 'paid' %}sg-badge-green{% elif entry.status == 'ready' %}sg-badge-blue{% elif entry.status == 'partial' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ entry.get_status_display }}</span></td>
               </tr>
             {% empty %}
-              <tr><td colspan="7" class="sg-empty">Aucune fiche de paie disponible pour le moment.</td></tr>
+              <tr><td colspan="7"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-regular fa-file-lines"></i></div><div class="sg-empty-text">Aucune fiche de paie disponible pour le moment.</div></div></td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -372,7 +377,10 @@
             {% if not notification.read_at %}<span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">new</span>{% else %}<span class="sg-badge-sm sg-badge-gray">Lue</span>{% endif %}
           </a>
         {% empty %}
-          <div class="sg-empty">Aucune notification pour le moment.</div>
+          <div class="sg-empty">
+            <div class="sg-empty-icon"><i class="fa-regular fa-bell-slash"></i></div>
+            <div class="sg-empty-text">Aucune notification pour le moment.</div>
+          </div>
         {% endfor %}
       </div>
       {% if notifications_page.has_other_pages %}
@@ -399,7 +407,7 @@
           </div>
         </div>
       {% else %}
-        <div class="sg-empty">Selectionnez une notification pour ouvrir son detail.</div>
+        <div class="sg-empty"><div class="sg-empty-icon"><i class="fa-regular fa-message"></i></div><div class="sg-empty-text">Selectionnez une notification pour ouvrir son detail.</div></div>
       {% endif %}
     </div>
   </div>
@@ -494,9 +502,9 @@
       <div class="sg-panel-title">Archivage</div>
       <p class="sg-section-header-sub">Les entrees, historiques, pieces jointes et scans restent traces dans le registre.</p>
       <div class="sg-divider"></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Entrees cette semaine</span><span>{{ pending_registry_count|default:0 }}</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:80%;background:#2563eb;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Visites cette semaine</span><span>{{ visits_today|default:0 }}</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:60%;background:#7c3aed;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Depots cette semaine</span><span>{{ pending_documents_count|default:0 }}</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:40%;background:#d97706;"></div></div></div>
+      <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label"><i class="fa-solid fa-book-open" style="color:#2563eb;width:18px;"></i>Entrees registre</div><div class="sg-action-sub">En attente de routage</div></div><span class="sg-badge-sm sg-badge-blue">{{ pending_registry_count|default:0 }}</span></div>
+      <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label"><i class="fa-solid fa-user-clock" style="color:#7c3aed;width:18px;"></i>Visites</div><div class="sg-action-sub">Passages aujourd'hui</div></div><span class="sg-badge-sm sg-badge-blue">{{ visits_today|default:0 }}</span></div>
+      <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label"><i class="fa-solid fa-box-archive" style="color:#d97706;width:18px;"></i>Depots / pieces</div><div class="sg-action-sub">En attente de remise</div></div><span class="sg-badge-sm sg-badge-amber">{{ pending_documents_count|default:0 }}</span></div>
     </div>
     <div class="sg-panel">
       <div class="sg-panel-title">Mode degrade</div>

@@ -1,5 +1,7 @@
 """Wrappers de compatibilite vers la couche centrale d'acces."""
 
+from django.contrib.auth.models import AbstractBaseUser
+
 from accounts.access import (
     can_access,
     get_user_profile_role,
@@ -11,9 +13,9 @@ from accounts.access import (
 # OUTILS
 # ==========================================================
 
-def get_user_role(user):
+def get_user_role(user: AbstractBaseUser) -> str | None:
     """
-    Retourne le rôle du profil utilisateur si disponible.
+    Retourne le role du profil utilisateur si disponible.
     """
     return get_user_profile_role(user)
 
@@ -22,11 +24,10 @@ def get_user_role(user):
 # GLOBAL VIEWER
 # ==========================================================
 
-def is_global_viewer(user):
+def is_global_viewer(user: AbstractBaseUser) -> bool:
     """
     Utilisateurs pouvant voir toutes les annexes.
     """
-
     if not user or not user.is_authenticated:
         return False
     return bool(get_user_scope(user)["is_global"])
@@ -36,11 +37,10 @@ def is_global_viewer(user):
 # DASHBOARD ADMISSIONS
 # ==========================================================
 
-def check_admissions_access(user):
+def check_admissions_access(user: AbstractBaseUser) -> bool:
     """
-    Vérifie accès dashboard admissions.
+    Verifie acces dashboard admissions.
     """
-
     return can_access(user, "view_dashboard", "admissions")
 
 
@@ -48,11 +48,10 @@ def check_admissions_access(user):
 # DASHBOARD FINANCE
 # ==========================================================
 
-def check_finance_access(user):
+def check_finance_access(user: AbstractBaseUser) -> bool:
     """
-    Vérifie accès dashboard finance.
+    Verifie acces dashboard finance.
     """
-
     return can_access(user, "view_dashboard", "finance")
 
 
@@ -60,9 +59,8 @@ def check_finance_access(user):
 # DASHBOARD EXECUTIVE
 # ==========================================================
 
-def check_executive_access(user):
+def check_executive_access(user: AbstractBaseUser) -> bool:
     """
-    Vérifie accès dashboard direction.
+    Verifie acces dashboard direction.
     """
-
     return can_access(user, "view_dashboard", "executive")

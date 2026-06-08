@@ -7,7 +7,7 @@
   <div class="message-list">
     {% for item in open_visits_rows %}
     <div class="sg-action-card">
-      <div><div class="sg-action-label">{{ item.full_name }}</div><div class="sg-action-sub">{{ item.arrived_at|date:"H:i" }} - {{ item.reason|default:"Accueil" }}</div></div>
+      <div><div class="sg-action-label">{{ item.full_name }}</div><div class="sg-action-sub">{{ item.arrived_at|date:"H:i" }} - {{ item.reason|default:"Accueil" }}{% if item.related_student %} — {{ item.related_student.full_name }}{% endif %}</div></div>
       <form method="post" hx-post="{% url 'secretary:visitor_complete' item.id %}" hx-target="closest .sg-action-card" hx-swap="outerHTML swap:180ms" data-sg-optimistic="fade-remove">{% csrf_token %}
         <button class="sg-btn sg-btn-outline" style="height:28px;font-size:.65rem;">Sortie</button>
       </form>

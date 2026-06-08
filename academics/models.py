@@ -150,6 +150,13 @@ class AcademicClass(models.Model):
         help_text="Seuil de validation de référence : 10 ou 12 selon le niveau.",
     )
 
+    admissibility_gap = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("2.00"),
+        help_text="Marge d'admissibilité en points sous le seuil. Ex: 2 = admissible si moyenne ≥ seuil - 2.",
+    )
+
     is_active = models.BooleanField(default=True, db_index=True)
     is_archived = models.BooleanField(default=False, db_index=True)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -1405,3 +1412,168 @@ class AcademicDiplomaAward(models.Model):
             errors["diploma"] = "Le diplome ne correspond pas au programme."
         if errors:
             raise ValidationError(errors)
+
+
+class AcademicDebt(models.Model):
+    """
+    Dette academique : EC non valide qu'un etudiant doit repasser.
+    Creee automatiquement quand un etudiant est declare ADMISSIBLE.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_CLEARED = "cleared"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "En attente"),
+        (STATUS_CLEARED, "Soldee"),
+    ]
+
+    enrollment = models.ForeignKey(
+        AcademicEnrollment,
+        on_delete=models.PROTECT,
+        related_name="academic_debts",
+    )
+    ec = models.ForeignKey(
+        EC,
+        on_delete=models.PROTECT,
+        related_name="academic_debts",
+    )
+    semester = models.ForeignKey(
+        Semester,
+        on_delete=models.PROTECT,
+        related_name="academic_debts",
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.PROTECT,
+        related_name="academic_debts",
+    )
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="academic_debts",
+    )
+
+    score_original = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        help_text="Note originale ayant cause la dette.",
+    )
+    score_retake = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        help_text="Note de repêchage (mise a jour quand l'EC est repasse).",
+    )
+
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES,
+        default=STATUS_PENDING, db_index=True,
+    )
+    carry_forward_to = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="carried_debts",
+        help_text="Annee academique vers laquelle la dette est reportee.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    cleared_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Dette academique"
+        verbose_name_plural = "Dettes academiques"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["enrollment", "ec", "semester", "academic_year"],
+                name="academics_unique_debt_per_enrollment_ec_semester_year",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["enrollment", "status"]),
+            models.Index(fields=["ec", "status"]),
+            models.Index(fields=["academic_year", "status"]),
+            models.Index(fields=["academic_class", "status"]),
+        ]
+
+    def __str__(self):
+        return f"Dette {self.enrollment} - {self.ec} (S{self.semester.number})"
+
+    def clean(self):
+        errors = {}
+        if self.enrollment_id and self.ec_id:
+            ec_semester = self.ec.ue.semester
+            if ec_semester.id != self.semester_id:
+                errors["ec"] = "L'EC n'appartient pas au semestre indique."
+            if ec_semester.academic_class_id != self.enrollment.academic_class_id:
+                errors["ec"] = "L'EC n'appartient pas a la classe de l'inscription."
+        if self.enrollment_id:
+            if self.academic_year_id and self.enrollment.academic_year_id != self.academic_year_id:
+                errors["academic_year"] = "L'annee ne correspond pas a l'inscription."
+            if self.academic_class_id and self.enrollment.academic_class_id != self.academic_class_id:
+                errors["academic_class"] = "La classe ne correspond pas a l'inscription."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def mark_cleared(self, score_retake=None):
+        self.status = self.STATUS_CLEARED
+        if score_retake is not None:
+            self.score_retake = Decimal(str(score_retake))
+        self.cleared_at = timezone.now()
+        self.save(update_fields=["status", "score_retake", "cleared_at", "updated_at"])
+
+
+class AcademicDecisionLog(models.Model):
+    """
+    Journal d'audit des decisions annuelles (VALIDE / ADMISSIBLE / NON ADMIS).
+
+    Enregistre a chaque generation de bulletins annuels pour une classe :
+    - qui a lance le calcul
+    - quels parametres ont ete utilises (seuil, marge)
+    - combien d'etudiants dans chaque statut
+    - quelles regles ont ete declenchees
+    """
+
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="decision_logs",
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.PROTECT,
+        related_name="decision_logs",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="academic_decision_logs",
+    )
+    threshold = models.DecimalField(
+        max_digits=4, decimal_places=2,
+        help_text="Seuil de validation utilise.",
+    )
+    admissibility_gap = models.DecimalField(
+        max_digits=4, decimal_places=2,
+        help_text="Marge d'admissibilite utilisee.",
+    )
+    total_students = models.PositiveIntegerField(default=0)
+    validated_count = models.PositiveIntegerField(default=0)
+    admissible_count = models.PositiveIntegerField(default=0)
+    non_admis_count = models.PositiveIntegerField(default=0)
+    rule_codes_used = models.JSONField(default=list, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Journal de decision annuelle"
+        verbose_name_plural = "Journaux de decisions annuelles"
+
+    def __str__(self):
+        return f"Decision {self.academic_class} - {self.academic_year} ({self.created_at.date()})"

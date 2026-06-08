@@ -1,0 +1,45 @@
+{% load component_tags %}
+{% if state %}
+<section class="workflow-table-shell">
+  <div class="workflow-table-head">
+    <div>
+      <p class="workflow-kicker">Workflow notes</p>
+      <h3>{{ state.label }}</h3>
+      <p>{{ state.description }}</p>
+    </div>
+  </div>
+
+  {% component "notes_workflow_bar" state_code=state.code has_candidates=state.retake_candidates_count %}{% endcomponent %}
+
+  <div class="mt-4 grid gap-3 md:grid-cols-4">
+    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Saisie</p>
+      <p class="mt-2 text-2xl font-black text-slate-900">{{ state.entered_grades }}/{{ state.expected_grades }}</p>
+    </article>
+    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progression</p>
+      <p class="mt-2 text-2xl font-black text-slate-900">{{ state.progress_percent }}%</p>
+    </article>
+    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Notes manquantes</p>
+      <p class="mt-2 text-2xl font-black text-slate-900">{{ state.missing_grades }}</p>
+    </article>
+    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Rattrapage</p>
+      <p class="mt-2 text-2xl font-black text-slate-900">{{ state.retake_candidates_count }}</p>
+    </article>
+  </div>
+  {% if state.technical_alerts %}
+  <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+    {{ state.technical_alerts|join:" · " }}
+  </div>
+  {% endif %}
+  <div class="mt-4">
+    {% if drawer_mode %}
+      {% component "notes_actions" actions=actions academic_class=academic_class semester=semester target="#it-drawer-content" drawer_mode=True %}{% endcomponent %}
+    {% else %}
+      {% component "notes_actions" actions=actions academic_class=academic_class semester=semester %}{% endcomponent %}
+    {% endif %}
+  </div>
+</section>
+{% endif %}

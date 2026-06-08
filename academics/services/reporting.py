@@ -44,10 +44,10 @@ def _resolve_student(student_id):
 
 def _annual_decision(validation_s1, validation_s2):
     if validation_s1 and validation_s2:
-        return "Admis"
+        return "VALIDÉ"
     if validation_s1 or validation_s2:
-        return "Admissible"
-    return "Double"
+        return "ADMISSIBLE"
+    return "NON ADMIS"
 
 
 def build_student_semester_report(student_id: int, semester_id: int) -> dict:

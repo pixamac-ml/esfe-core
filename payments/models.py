@@ -10,7 +10,7 @@ from inscriptions.models import Inscription
 
 from payments.services.receipt import generate_receipt_number
 from payments.services.qrcode import generate_qr_image
-from payments.utils.pdf import render_pdf
+from core.pdf_documents import generate_pdf as generate_esfe_pdf
 
 from students.services.create_student import create_student_after_first_payment
 from students.services.email import (
@@ -336,15 +336,35 @@ class Payment(models.Model):
 
                 self.receipt_number = generate_receipt_number(self)
 
-                qr_image = generate_qr_image(
-                    inscription.get_public_url()
-                )
+                cand = inscription.candidature
+                programme = cand.programme
 
-                pdf_bytes = render_pdf(
-                    payment=self,
-                    inscription=inscription,
-                    qr_image=qr_image
-                )
+                pdf_bytes = generate_esfe_pdf("esfe_receipt", {
+                    "receipt_number": self.receipt_number,
+                    "date": self.paid_at.strftime("%d %B %Y"),
+                    "academic_year": cand.academic_year,
+                    "student_name": f"{cand.last_name} {cand.first_name}",
+                    "student_matricule": f"CAND-{cand.academic_year[:4]}-{cand.id:05d}",
+                    "programme": programme.title if programme else "",
+                    "level": getattr(programme, "cycle", {}).name if programme and hasattr(programme, "cycle") else "",
+                    "items": [
+                        {
+                            "label": f"Frais d'inscription",
+                            "quantity": "1",
+                            "unit_price": f"{inscription.amount_due:,}".replace(",", " "),
+                            "total": f"{inscription.amount_due:,} FCFA".replace(",", " "),
+                        },
+                        {
+                            "label": "Paiement effectué",
+                            "quantity": "1",
+                            "unit_price": f"{self.amount:,}".replace(",", " "),
+                            "total": f"{self.amount:,} FCFA".replace(",", " "),
+                        },
+                    ],
+                    "total_amount": f"{self.amount:,}".replace(",", " "),
+                    "payment_method": self.get_method_display() if hasattr(self, "get_method_display") else "",
+                    "payment_reference": self.reference or "",
+                })
 
                 self.receipt_pdf.save(
                     f"receipt-{self.receipt_number}.pdf",

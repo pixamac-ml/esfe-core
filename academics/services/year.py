@@ -1,26 +1,25 @@
 from decimal import Decimal
+import logging
 
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
-from academics.models import AcademicEnrollment, AcademicYear
+from academics.models import AcademicDebt, AcademicEnrollment, AcademicYear
 from academics.services.grading import resolve_threshold
 from academics.services.semester import compute_semester_result
 from students.models import Student
 
-DECISION_PROMOTED = "promoted"
-DECISION_PROMOTED_WITH_DEBT = "promoted_with_debt"
-DECISION_REPEATED = "repeated"
-DECISION_COMPLETED = "completed"
+logger = logging.getLogger("esfe.year")
+
+DECISION_VALIDE = "VALIDE"
+DECISION_ADMISSIBLE = "ADMISSIBLE"
+DECISION_NON_ADMIS = "NON_ADMIS"
 
 RULE_ALL_SEMESTERS_VALIDATED = "all_semesters_validated"
-RULE_COMPENSATED_SEMESTER_DEBT = "compensated_semester_debt"
+RULE_ADMISSIBLE_GAP = "admissible_gap"
 RULE_NO_SEMESTER_VALIDATED = "no_semester_validated"
-RULE_SEMESTER_GAP_TOO_LARGE = "semester_gap_too_large"
+RULE_GAP_TOO_LARGE = "gap_too_large"
 RULE_INCOMPLETE_GRADES = "incomplete_grades"
-RULE_TERMINAL_DEBT_BLOCKED = "terminal_debt_blocked"
-
-DEFAULT_SEMESTER_COMPENSATION_MAX_GAP = Decimal("0.50")
 
 
 def _format_decimal(value):
@@ -109,10 +108,87 @@ def _semester_snapshot(semester_result):
     }
 
 
+def carry_forward_debts(source_enrollment, target_enrollment):
+    """
+    Reporte les dettes academiques non soldees vers la nouvelle inscription.
+
+    Clone chaque dette pending de l'ancienne inscription vers la nouvelle,
+    de sorte que le mecanisme _clear_debts_on_validation() puisse les
+    retrouver lors du retake des EC en annee superieure.
+    """
+    pending_debts = AcademicDebt.objects.filter(
+        enrollment=source_enrollment,
+        status=AcademicDebt.STATUS_PENDING,
+    ).select_related("semester")
+    created = 0
+    for debt in pending_debts:
+        _, was_created = AcademicDebt.objects.get_or_create(
+            enrollment=target_enrollment,
+            ec=debt.ec,
+            semester=debt.semester,
+            academic_year=target_enrollment.academic_year,
+            defaults={
+                "academic_class": target_enrollment.academic_class,
+                "score_original": debt.score_original,
+                "carry_forward_to": None,
+            },
+        )
+        if was_created:
+            created += 1
+        debt.carry_forward_to = target_enrollment.academic_year
+        debt.save(update_fields=["carry_forward_to"])
+    if created:
+        logger.info(
+            f"Dettes reportees: source={source_enrollment.id}, "
+            f"cible={target_enrollment.id}, nb={created}"
+        )
+    return created
+
+
+def create_academic_debts(enrollment, semester_result):
+    """
+    Cree des enregistrements AcademicDebt pour chaque EC echoue d'un semestre.
+    """
+    academic_year = enrollment.academic_year
+    academic_class = enrollment.academic_class
+    semester = semester_result.get("semester")
+    created = 0
+    for failed in semester_result.get("failed_subjects", []):
+        ec = failed.get("ec")
+        if not ec or not semester:
+            continue
+        score = Decimal(str(failed.get("score", "0")))
+        _, created_flag = AcademicDebt.objects.get_or_create(
+            enrollment=enrollment,
+            ec=ec,
+            semester=semester,
+            academic_year=academic_year,
+            defaults={
+                "academic_class": academic_class,
+                "score_original": score,
+                "carry_forward_to": None,
+            },
+        )
+        if created_flag:
+            created += 1
+    if created:
+        logger.info(
+            f"Dettes creees: enrollment={enrollment.id}, "
+            f"semestre=S{semester.number}, nb={created}"
+        )
+    return created
+
+
 def compute_annual_result(enrollment):
+    """
+    Consolide les resultats des semestres sans calculer de moyenne annuelle.
+
+    Le resultat annuel affiche simplement :
+    - moyenne S1, credits S1
+    - moyenne S2, credits S2
+    - decision : VALIDE / ADMISSIBLE / NON ADMIS
+    """
     semesters = list(enrollment.academic_class.semesters.all().order_by("number"))
-    threshold = resolve_threshold(enrollment)
-    total_weighted = Decimal("0.00")
     total_credits = Decimal("0.00")
     credits_obtained = Decimal("0.00")
     missing_grades = 0
@@ -123,130 +199,122 @@ def compute_annual_result(enrollment):
         result = compute_semester_result(semester, enrollment)
         semester_results.append(result)
         credit_required = Decimal(str(result.get("credit_required") or "0"))
-        credit_obtained = Decimal(str(result.get("credit_obtained") or "0"))
-        credits_obtained += credit_obtained
+        credit_obtained_sem = Decimal(str(result.get("credit_obtained") or "0"))
+        credits_obtained += credit_obtained_sem
         total_credits += credit_required
         missing_grades += result.get("missing_grades", 0)
-        if result.get("average") is not None and credit_required > 0:
-            total_weighted += Decimal(str(result["average"])) * credit_required
         for reason in result.get("blocking_reasons", []):
             blocking_reasons.append(f"S{semester.number}: {reason}")
 
-    average = (total_weighted / total_credits).quantize(Decimal("0.01")) if total_credits > 0 and missing_grades == 0 else None
     is_complete = missing_grades == 0 and bool(semesters)
-    is_validated = bool(
-        is_complete
-        and average is not None
-        and average >= threshold
-        and total_credits > 0
-        and credits_obtained >= total_credits
-    )
-    status = "incomplete" if not is_complete else ("validated" if is_validated else "failed")
     if missing_grades and not blocking_reasons:
         blocking_reasons.append(f"{missing_grades} note(s) manquante(s).")
+
+    logger.info(
+        f"Consolidation annuelle: enrollment={enrollment.id}, "
+        f"credits={credits_obtained}/{total_credits}, complete={is_complete}"
+    )
 
     return {
         "enrollment": enrollment,
         "semester_results": semester_results,
-        "average": average,
-        "threshold": threshold,
+        "average": None,
         "credit_required": total_credits,
         "credit_obtained": credits_obtained,
         "is_complete": is_complete,
-        "is_validated": is_validated,
         "missing_grades": missing_grades,
         "blocking_reasons": blocking_reasons,
-        "status": status,
+        "status": "incomplete" if not is_complete else "complete",
     }
 
 
-def compute_annual_decision(enrollment, *, compensation_max_gap=DEFAULT_SEMESTER_COMPENSATION_MAX_GAP):
+def compute_annual_decision(enrollment):
     """
-    Determine la decision academique automatique.
+    Determine la decision annuelle : VALIDE / ADMISSIBLE / NON_ADMIS.
 
-    Le directeur des etudes valide la conformite du calcul; il ne choisit pas
-    arbitrairement le passage. La compensation est volontairement stricte:
-    un seul semestre echoue, il est complet, et sa moyenne reste dans l'ecart
-    autorise sous le seuil.
+    Regles :
+    - S1 valide ET S2 valide → VALIDE
+    - S1 valide ET S2 proche seuil (ou inverse) → ADMISSIBLE (avec dette)
+    - Sinon → NON_ADMIS
+
+    La marge d'admissibilite est lue depuis AcademicClass.admissibility_gap.
     """
     annual_result = compute_annual_result(enrollment)
-    threshold = _decimal_or_none(annual_result.get("threshold")) or Decimal("10.00")
-    max_gap = Decimal(str(compensation_max_gap))
+    academic_class = enrollment.academic_class
+    threshold = resolve_threshold(enrollment)
+    gap = _decimal_or_none(academic_class.admissibility_gap) or Decimal("2.00")
     semester_results = annual_result.get("semester_results", [])
-    complete_semesters = [result for result in semester_results if result.get("is_complete")]
-    validated_semesters = [result for result in semester_results if result.get("is_validated")]
-    failed_complete_semesters = [
-        result for result in semester_results
-        if result.get("is_complete") and not result.get("is_validated")
-    ]
     debt_subjects = []
     reasons = list(annual_result.get("blocking_reasons", []))
 
-    decision = DECISION_REPEATED
+    decision = DECISION_NON_ADMIS
     rule_code = RULE_INCOMPLETE_GRADES
     requires_academic_debt = False
-    compensation_gap = None
 
-    if not annual_result.get("is_complete") or len(complete_semesters) != len(semester_results):
+    if not annual_result.get("is_complete"):
         reasons.append("Decision finale bloquee tant que toutes les notes ne sont pas disponibles.")
-    elif len(validated_semesters) == len(semester_results) and semester_results:
-        decision = DECISION_COMPLETED if _is_terminal_level(enrollment.academic_class.level) else DECISION_PROMOTED
-        rule_code = RULE_ALL_SEMESTERS_VALIDATED
-        reasons = ["Tous les semestres sont valides."]
-    elif len(validated_semesters) == 0:
-        decision = DECISION_REPEATED
-        rule_code = RULE_NO_SEMESTER_VALIDATED
-        reasons.append("Aucun semestre n'est valide.")
-    elif len(validated_semesters) == 1 and len(failed_complete_semesters) == 1:
-        failed_semester = failed_complete_semesters[0]
-        failed_average = _decimal_or_none(failed_semester.get("average"))
-        if failed_average is not None:
-            compensation_gap = (threshold - failed_average).quantize(Decimal("0.01"))
-        can_compensate = (
-            failed_average is not None
-            and failed_average < threshold
-            and compensation_gap <= max_gap
-        )
-        if can_compensate and not _is_terminal_level(enrollment.academic_class.level):
-            decision = DECISION_PROMOTED_WITH_DEBT
-            rule_code = RULE_COMPENSATED_SEMESTER_DEBT
-            requires_academic_debt = True
-            debt_subjects = _debt_subjects_from_semester(failed_semester)
-            reasons = [
-                (
-                    f"{_semester_label(failed_semester)} non valide mais dans l'ecart "
-                    f"autorise de {max_gap:.2f} point(s)."
-                ),
-                "Passage autorise avec dette academique a rattraper l'annee suivante.",
-            ]
-        elif can_compensate:
-            decision = DECISION_REPEATED
-            rule_code = RULE_TERMINAL_DEBT_BLOCKED
-            reasons.append("Un niveau terminal ne peut pas etre cloture avec une dette academique.")
-        else:
-            decision = DECISION_REPEATED
-            rule_code = RULE_SEMESTER_GAP_TOO_LARGE
-            reasons.append(f"Ecart superieur au maximum autorise de {max_gap:.2f} point(s).")
     else:
-        decision = DECISION_REPEATED
-        rule_code = RULE_SEMESTER_GAP_TOO_LARGE
+        validated = []
+        non_validated = []
+        for result in semester_results:
+            if result.get("is_validated"):
+                validated.append(result)
+            else:
+                non_validated.append(result)
+
+        if len(validated) == len(semester_results):
+            decision = DECISION_VALIDE
+            rule_code = RULE_ALL_SEMESTERS_VALIDATED
+            reasons = ["Tous les semestres sont valides."]
+        elif len(validated) >= 1:
+            failed_semester = non_validated[0]
+            failed_avg = _decimal_or_none(failed_semester.get("average"))
+            is_near = (
+                failed_avg is not None
+                and failed_avg >= threshold - gap
+            )
+            if is_near:
+                decision = DECISION_ADMISSIBLE
+                rule_code = RULE_ADMISSIBLE_GAP
+                requires_academic_debt = True
+                debt_subjects = _debt_subjects_from_semester(failed_semester)
+                create_academic_debts(enrollment, failed_semester)
+                reasons = [
+                    f"{_semester_label(failed_semester)} non valide (moyenne={failed_avg:.2f}) "
+                    f"mais dans la marge d'admissibilite de {gap:.2f} point(s) sous le seuil de {threshold:.2f}.",
+                    "Admissible avec dette academique a rattraper.",
+                ]
+            else:
+                decision = DECISION_NON_ADMIS
+                rule_code = RULE_GAP_TOO_LARGE
+                reasons.append(
+                    f"{_semester_label(failed_semester)} trop faible (moyenne={failed_avg:.2f}, "
+                    f"seuil={threshold:.2f}, marge max={gap:.2f})."
+                )
+        else:
+            decision = DECISION_NON_ADMIS
+            rule_code = RULE_NO_SEMESTER_VALIDATED
+            reasons.append("Aucun semestre valide.")
+
+    logger.info(
+        f"Decision annuelle: enrollment={enrollment.id}, "
+        f"decision={decision}, regle={rule_code}, dette={requires_academic_debt}"
+    )
 
     return {
         "decision": decision,
         "rule_code": rule_code,
         "rule_label": {
             RULE_ALL_SEMESTERS_VALIDATED: "Semestres valides",
-            RULE_COMPENSATED_SEMESTER_DEBT: "Compensation avec dette",
+            RULE_ADMISSIBLE_GAP: "Admissible avec marge",
             RULE_NO_SEMESTER_VALIDATED: "Aucun semestre valide",
-            RULE_SEMESTER_GAP_TOO_LARGE: "Ecart trop important",
+            RULE_GAP_TOO_LARGE: "Ecart trop important",
             RULE_INCOMPLETE_GRADES: "Notes incompletes",
-            RULE_TERMINAL_DEBT_BLOCKED: "Dette interdite en terminal",
         }.get(rule_code, rule_code),
         "annual_result": annual_result,
-        "annual_average": annual_result.get("average"),
+        "annual_average": None,
         "threshold": threshold,
-        "compensation_max_gap": max_gap,
-        "compensation_gap": compensation_gap,
+        "admissibility_gap": gap,
         "requires_academic_debt": requires_academic_debt,
         "debt_subjects": debt_subjects,
         "reasons": reasons,
@@ -285,11 +353,12 @@ def compute_year_result(student, academic_year):
 
     s1_result = compute_semester_result(semesters[1], enrollment) if 1 in semesters else None
     s2_result = compute_semester_result(semesters[2], enrollment) if 2 in semesters else None
-    annual_result = compute_annual_result(enrollment)
     annual_decision = compute_annual_decision(enrollment)
 
     s1_validated = bool(s1_result and s1_result.get("is_validated"))
     s2_validated = bool(s2_result and s2_result.get("is_validated"))
+
+    decision_code = annual_decision.get("decision", DECISION_NON_ADMIS)
 
     return {
         "student": student_obj,
@@ -309,9 +378,6 @@ def compute_year_result(student, academic_year):
             "status": "VALIDÉ" if s2_validated else "NON VALIDÉ",
             "is_validated": s2_validated,
         },
-        "annual_result": annual_result,
         "annual_decision": annual_decision,
-        "decision": "ADMIS" if annual_result["is_validated"] else (
-            "INCOMPLET" if not annual_result["is_complete"] else _decision_from_semesters(s1_validated, s2_validated)
-        ),
+        "decision": decision_code,
     }

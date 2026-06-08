@@ -45,14 +45,15 @@
                     <td><span class="badge">{{ task.get_status_display }}</span></td>
                     <td>
                         <div class="actions">
+                            <button type="button" class="btn" hx-get="{% url 'secretary:task_update' task.id %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Modifier</button>
                             {% if task.status == "pending" %}
-                                <form method="post" hx-post="{% url 'secretary:task_start' task.id %}" hx-target="body" hx-swap="none">
+                                <form method="post" action="{% url 'secretary:task_start' task.id %}">
                                     {% csrf_token %}
                                     <button class="btn" type="submit">Prendre en charge</button>
                                 </form>
                             {% endif %}
                             {% if task.status != "completed" %}
-                                <form method="post" hx-post="{% url 'secretary:task_complete' task.id %}" hx-target="body" hx-swap="none">
+                                <form method="post" action="{% url 'secretary:task_complete' task.id %}">
                                     {% csrf_token %}
                                     <button class="btn" type="submit">Terminer</button>
                                 </form>

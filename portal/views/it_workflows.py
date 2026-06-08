@@ -5,10 +5,11 @@ from io import BytesIO
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import FileResponse, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils import timezone
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape
 from reportlab.lib.units import mm
@@ -69,6 +70,7 @@ from portal.selectors.informaticien import grade_entries_for_class, support_tick
 from portal.models import SupportAuditLog, SupportTicket
 from students.models import Student
 from portal.views.admin_grades import _build_notes_grid_context
+from communication.models.notifications import CommunicationNotification
 
 
 def _require_it_support(request):
@@ -134,6 +136,187 @@ def _build_notes_workflow_context(request, *, toast=None):
 
 
 @login_required
+def it_notes_kpi(request):
+    if get_user_position(request.user) != "it_support":
+        return HttpResponseForbidden("Acces refuse.")
+
+    from academics.models import AcademicEnrollment, ECGrade, AcademicDebt
+    from django.db.models import Count
+
+    from portal.services.notes_workflow import get_notes_state
+
+    branch = get_user_branch(request.user)
+    classes_qs = get_it_academic_classes(branch=branch)
+
+    class_id = (request.GET.get("class_id") or "").strip()
+    semester_id = (request.GET.get("semester_id") or "").strip()
+
+    academic_class = get_object_or_404(classes_qs, pk=int(class_id)) if class_id.isdigit() else None
+    semester = get_object_or_404(Semester.objects.select_related("academic_class"), pk=int(semester_id)) if semester_id.isdigit() and academic_class else None
+
+    if not academic_class or not semester:
+        return HttpResponse("Selection invalide", status=400)
+
+    enrollments = AcademicEnrollment.objects.filter(
+        academic_class=academic_class,
+        academic_year=academic_class.academic_year,
+        is_active=True,
+    )
+    enrollment_count = enrollments.count()
+
+    ec_count = semester.ues.aggregate(total=Count("ecs", distinct=True))["total"] or 0
+    expected_grades = enrollment_count * ec_count
+
+    entered_grades = ECGrade.objects.filter(
+        enrollment__in=enrollments,
+        ec__ue__semester=semester,
+        normal_score__isnull=False,
+    ).count()
+
+    validated_grades = ECGrade.objects.filter(
+        enrollment__in=enrollments,
+        ec__ue__semester=semester,
+        is_validated=True,
+    ).count()
+
+    failed_grades = ECGrade.objects.filter(
+        enrollment__in=enrollments,
+        ec__ue__semester=semester,
+        final_score__isnull=False,
+        is_validated=False,
+    ).count()
+
+    pending_debts = AcademicDebt.objects.filter(
+        academic_class=academic_class,
+        semester=semester,
+        status="pending",
+    ).count()
+
+    progress = int((entered_grades / expected_grades) * 100) if expected_grades else 0
+
+    state = get_notes_state(academic_class=academic_class, semester=semester)
+
+    context = {
+        "enrollment_count": enrollment_count,
+        "entered_grades": entered_grades,
+        "expected_grades": expected_grades,
+        "validated_grades": validated_grades,
+        "failed_grades": failed_grades,
+        "pending_debts": pending_debts,
+        "progress": min(progress, 100),
+        "state_code": state.code if state else "empty",
+        "state_label": state.label if state else "Non commence",
+        "ec_count": ec_count,
+        "class_id": class_id,
+        "semester_id": semester_id,
+    }
+
+    return render(request, "portal/informaticien/partials/notes_kpi.html", context)
+
+
+@login_required
+def it_workflow_section(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    context = _build_notes_workflow_context(request)
+    academic_class = context.get("selected_class")
+    semester = context.get("selected_semester")
+    state = context.get("state")
+    if not academic_class or not semester or state is None:
+        return HttpResponse("Selection invalide", status=400)
+    from ui.components.notes.notes_workflow_bar import build_workflow_bar_data
+    has_candidates = bool(state.retake_candidates_count) if state else None
+    workflow_bar = build_workflow_bar_data(state.code, has_candidates=has_candidates)
+    return render(request, "notes/notes_workflow_section.html", {
+        "academic_class": academic_class,
+        "semester": semester,
+        "state": state,
+        "actions": context.get("actions", []),
+        "workflow_bar": workflow_bar,
+        "drawer_mode": bool(request.GET.get("drawer")),
+    })
+
+
+@login_required
+def it_notes_decisions(request):
+    if get_user_position(request.user) != "it_support":
+        return HttpResponseForbidden("Acces refuse.")
+
+    from portal.selectors import get_it_academic_classes
+    from academics.models import AcademicEnrollment, AcademicDebt
+    from academics.services.semester import compute_semester_result
+
+    branch = get_user_branch(request.user)
+    classes_qs = get_it_academic_classes(branch=branch)
+
+    class_id = (request.GET.get("class_id") or "").strip()
+    semester_id = (request.GET.get("semester_id") or "").strip()
+
+    academic_class = get_object_or_404(classes_qs, pk=int(class_id)) if class_id.isdigit() else None
+
+    if not academic_class:
+        return HttpResponse("", status=200)
+
+    enrollments = AcademicEnrollment.objects.filter(
+        academic_class=academic_class,
+        academic_year=academic_class.academic_year,
+        is_active=True,
+    ).select_related("student__student_profile__inscription__candidature")
+
+    semesters = list(academic_class.semesters.all().order_by("number"))
+    s1 = semesters[0] if len(semesters) > 0 else None
+    s2 = semesters[1] if len(semesters) > 1 else None
+
+    decisions = []
+    for enrollment in enrollments:
+        s1_result = compute_semester_result(s1, enrollment) if s1 else None
+        s2_result = compute_semester_result(s2, enrollment) if s2 else None
+
+        s1_decision = "NON ADMIS"
+        s2_decision = "NON ADMIS"
+
+        if s1_result and s1_result.get("credit_obtained", 0) >= s1_result.get("credit_required", 1):
+            s1_decision = "VALIDÉ"
+
+        if s2_result and s2_result.get("credit_obtained", 0) >= s2_result.get("credit_required", 1):
+            s2_decision = "VALIDÉ"
+
+        s1_ok = s1_decision in ("VALIDÉ", "ADMISSIBLE")
+        s2_ok = s2_decision in ("VALIDÉ", "ADMISSIBLE")
+        if s1_decision == "VALIDÉ" and s2_decision == "VALIDÉ":
+            year_decision = "VALIDÉ"
+        elif s1_ok and s2_ok:
+            year_decision = "ADMISSIBLE"
+        else:
+            year_decision = "NON ADMIS"
+
+        active_debts = AcademicDebt.objects.filter(
+            enrollment=enrollment,
+            status="pending",
+        ).select_related("ec")
+
+        debt_names = [f"{d.ec.title} (S{d.semester.number})" for d in active_debts]
+
+        decisions.append({
+            "student_name": enrollment.student.student_profile.full_name,
+            "s1": s1_decision,
+            "s2": s2_decision,
+            "year": year_decision,
+            "debts": debt_names,
+        })
+
+    active_debts_count = AcademicDebt.objects.filter(
+        academic_class=academic_class,
+        status="pending",
+    ).count()
+
+    return render(request, "portal/informaticien/partials/notes_decisions.html", {
+        "decisions": decisions,
+        "debts_count": active_debts_count,
+    })
+
+
+@login_required
 def it_notes_flow_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
@@ -186,6 +369,8 @@ def it_notes_workflow_action(request):
             "publier_session_normale": "Session normale publiee. Le rattrapage peut maintenant etre prepare.",
             "activer_rattrapage": "Rattrapage active. Seules les notes de rattrapage restent modifiables.",
             "publier_resultats_finaux": "Resultats finaux publies. Les releves et exports sont deblocables.",
+            "generer_decisions_annuelles": "Decisions annuelles generees avec bulletins.",
+            "generer_bulletins": "Bulletins semestriels generes.",
         }
         toast = {"level": "success", "message": messages.get(action, "Workflow notes mis a jour.")}
     except ValidationError as exc:
@@ -208,7 +393,7 @@ def it_notes_workflow_action(request):
         _build_notes_workflow_context(request, toast=toast),
     )
     if successful:
-        response["HX-Trigger"] = "it-modal-close"
+        response["HX-Trigger"] = '{"it-modal-close": "", "kpi-update": "", "workflow-update": ""}'
     return response
 
 
@@ -250,7 +435,7 @@ def load_notes_workspace(request):
     )
     return render(
         request,
-        "portal/admin/grades/partials/notes_grid.html",
+        "portal/admin/grades/partials/notes_maquette.html",
         {
             **grid_context,
             "embedded_in_dashboard": True,
@@ -1348,3 +1533,177 @@ def _draw_student_card(pdf, *, student, academic_class=None):
     pdf.setFont("Helvetica-Bold", 7)
     pdf.drawCentredString(width - 20 * mm, 8 * mm, "Signature / cachet")
     pdf.showPage()
+
+
+@login_required
+def it_notifications_workspace(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+
+    user = request.user
+
+    # Return just the unread count badge (used by the bell icon)
+    if request.GET.get("count_only"):
+        unread = CommunicationNotification.objects.filter(
+            recipient=user, read_at__isnull=True,
+        ).count()
+        badge = (
+            f'<span id="it-notif-badge" class="absolute -right-1 -top-1 grid min-h-[18px] min-w-[18px] '
+            f'place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white">'
+            f'{unread}</span>'
+        )
+        return HttpResponse(badge)
+
+    # Dropdown partial for the bell icon (7 latest notifications)
+    if request.GET.get("partial") == "dropdown":
+        from communication.selectors import get_user_notifications, get_user_unread_count
+        notifs = get_user_notifications(user, limit=7)
+        unread = get_user_unread_count(user)
+        return render(request, "portal/informaticien/partials/notifications_dropdown_it.html", {
+            "notifications": notifs,
+            "unread_count": unread,
+        })
+
+    q = request.GET.get("q", "")
+    channel = request.GET.get("channel", "all")
+    status_filter = request.GET.get("status", "")
+    priority = request.GET.get("priority", "")
+    source = request.GET.get("source", "")
+    page = request.GET.get("page", 1)
+    notification_id = request.GET.get("notification_id")
+
+    qs = CommunicationNotification.objects.filter(
+        Q(recipient=user) | Q(legacy_source__icontains="system"),
+    )
+
+    if q:
+        qs = qs.filter(Q(title__icontains=q) | Q(body__icontains=q))
+    if channel and channel != "all":
+        qs = qs.filter(channel=channel)
+    if status_filter == "unread":
+        qs = qs.filter(read_at__isnull=True)
+    elif status_filter == "read":
+        qs = qs.filter(read_at__isnull=False)
+    elif status_filter == "failed":
+        qs = qs.filter(status=CommunicationNotification.STATUS_FAILED)
+    if priority:
+        qs = qs.filter(priority=priority)
+    if source:
+        qs = qs.filter(Q(event__source_app__icontains=source) | Q(legacy_source__icontains=source))
+
+    qs = qs.select_related("event", "recipient").prefetch_related("deliveries").order_by("-created_at")
+
+    paginator = Paginator(qs, 12)
+    try:
+        page_obj = paginator.page(page)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.page(1)
+
+    notifications = list(page_obj)
+    selected_notification = None
+    if notification_id:
+        try:
+            selected_notification = CommunicationNotification.objects.filter(
+                id=notification_id,
+            ).select_related("event").prefetch_related("deliveries").first()
+        except ValueError:
+            pass
+
+    all_user_notifs = CommunicationNotification.objects.filter(recipient=user)
+    stats = {
+        "total": all_user_notifs.count(),
+        "unread": all_user_notifs.filter(read_at__isnull=True).count(),
+        "critical": all_user_notifs.filter(priority=CommunicationNotification.PRIORITY_CRITICAL).count(),
+        "email": all_user_notifs.filter(channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL).count(),
+        "failed": all_user_notifs.filter(status=CommunicationNotification.STATUS_FAILED).count(),
+        "by_source": list(
+            all_user_notifs.values("event__source_app").annotate(total=Count("id")).order_by("-total")[:5]
+        ),
+    }
+    unread_count = stats["unread"]
+
+    filters = {
+        "q": q,
+        "channel": channel,
+        "status": status_filter,
+        "priority": priority,
+        "source": source,
+    }
+
+    return render(request, "portal/informaticien/workflows/notifications_workspace.html", {
+        "notifications": notifications,
+        "page_obj": page_obj,
+        "stats": stats,
+        "unread_count": unread_count,
+        "channels": CommunicationNotification.CHANNEL_CHOICES,
+        "priorities": CommunicationNotification.PRIORITY_CHOICES,
+        "sources": list(
+            CommunicationNotification.objects.filter(recipient=user)
+            .values_list("event__source_app", flat=True)
+            .distinct()[:10]
+        ),
+        "filters": filters,
+        "selected_notification": selected_notification,
+        "toast": None,
+    })
+
+
+@login_required
+def it_notifications_action(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+
+    if request.method != "POST":
+        return HttpResponse("Methode non autorisee.", status=405)
+
+    user = request.user
+    action = request.POST.get("action", "")
+    notification_id = request.POST.get("notification_id")
+
+    toast = None
+
+    if action == "mark_read" and notification_id:
+        updated = CommunicationNotification.objects.filter(
+            id=notification_id, recipient=user, read_at__isnull=True,
+        ).update(read_at=timezone.now(), status=CommunicationNotification.STATUS_READ)
+        if updated:
+            toast = {"level": "success", "message": "Notification marquee comme lue."}
+        else:
+            toast = {"level": "error", "message": "Notification deja lue ou introuvable."}
+
+    elif action == "mark_unread" and notification_id:
+        CommunicationNotification.objects.filter(
+            id=notification_id, recipient=user,
+        ).update(read_at=None, status=CommunicationNotification.STATUS_DELIVERED)
+        toast = {"level": "success", "message": "Notification marquee comme non lue."}
+
+    elif action == "mark_all_read":
+        count = CommunicationNotification.objects.filter(
+            recipient=user, read_at__isnull=True,
+        ).update(read_at=timezone.now(), status=CommunicationNotification.STATUS_READ)
+        toast = {"level": "success", "message": f"{count} notification(s) marquee(s) comme lue(s)."}
+
+    else:
+        toast = {"level": "error", "message": f"Action inconnue: {action}"}
+
+    # Re-render workspace with updated state
+    from django.http import QueryDict
+    get_params = QueryDict(mutable=True)
+    for key in ("channel", "status", "priority", "source", "q", "page"):
+        val = request.POST.get(key, "")
+        if val:
+            get_params[key] = val
+
+    from django.test.client import RequestFactory
+    factory = RequestFactory()
+    fake_get = factory.get(f"/?{get_params.urlencode()}")
+    fake_get.user = user
+    fake_get.GET = get_params
+    fake_get.META = request.META
+
+    response = it_notifications_workspace(fake_get)
+    if hasattr(response, "context_data"):
+        response.context_data["toast"] = toast
+    elif hasattr(response, "context"):
+        response.context["toast"] = toast
+    return response

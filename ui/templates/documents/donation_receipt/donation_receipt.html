@@ -1,0 +1,87 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reçu de Don — ESFE</title>
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 10px; line-height: 1.5;
+      color: #1a1a2e;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .watermark { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+    .watermark img { width: 70%; height: auto; opacity: 0.04; filter: grayscale(100%); }
+    .page { position: relative; z-index: 1; width: 210mm; min-height: 297mm; padding: 15mm 18mm 12mm; display: flex; flex-direction: column; }
+    .header { text-align: center; border-bottom: 2px solid #1a3a6b; padding-bottom: 10px; margin-bottom: 12px; }
+    .header-logo { width: 100px; height: auto; margin-bottom: 8px; }
+    .header-school { font-size: 16px; font-weight: 700; color: #1a3a6b; text-transform: uppercase; letter-spacing: 1.2px; margin: 4px 0 2px; }
+    .header-tagline { font-size: 9px; font-weight: 600; color: #b8860b; letter-spacing: 3px; text-transform: uppercase; margin: 0 0 4px; }
+    .header-address { font-size: 8px; color: #555; margin: 0; }
+    .document-title { text-align: center; margin: 20px 0 14px; }
+    .document-title h1 { font-size: 18px; font-weight: 700; color: #1a3a6b; letter-spacing: 4px; text-transform: uppercase; margin: 0; padding: 10px 20px; border: 2px solid #1a3a6b; display: inline-block; }
+    .meta-grid { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 20px; margin-bottom: 14px; padding: 8px 12px; background: #f5f7fb; border-radius: 4px; font-size: 9px; }
+    .meta-grid .meta-item { white-space: nowrap; }
+    .meta-grid .meta-label { font-weight: 600; color: #444; }
+    .section-block { margin-bottom: 12px; }
+    .section-title { font-size: 11px; font-weight: 700; color: #1a3a6b; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #d0d5e0; padding-bottom: 3px; margin: 0 0 6px; }
+    .info-line { font-size: 10px; margin: 1px 0; line-height: 1.6; }
+    .info-line .info-label { font-weight: 600; display: inline-block; min-width: 100px; }
+    .amount-box { margin: 10px 0; padding: 10px 14px; background: #f0f4fa; border-left: 4px solid #1a3a6b; border-radius: 3px; }
+    .amount-box .amount-line { font-size: 16px; font-weight: 700; color: #1a3a6b; display: flex; justify-content: space-between; align-items: center; }
+    .amount-box .amount-line .amount { font-size: 18px; }
+    .amount-box .meta-line { font-size: 9px; color: #555; margin: 2px 0 0; }
+    .legal-text { margin: 14px 0 8px; font-size: 8.5px; font-style: italic; color: #666; text-align: center; line-height: 1.5; }
+    .signature-row { display: flex; justify-content: space-between; margin: 16px 0 8px; padding: 0 10px; }
+    .signature-block { text-align: center; min-width: 120px; }
+    .signature-block .signature-line { width: 130px; height: 1px; background: #444; margin: 4px auto 2px; }
+    .signature-block .signature-label { font-size: 9px; font-weight: 600; color: #444; }
+    .footer { margin-top: auto; padding-top: 10px; border-top: 1px solid #d0d5e0; text-align: center; font-size: 8px; color: #777; }
+    .footer .footer-tagline { font-weight: 600; color: #b8860b; letter-spacing: 2px; text-transform: uppercase; font-size: 8px; margin-top: 3px; }
+  </style>
+</head>
+<body>
+  <div class="watermark"><img src="{{ logo_url }}" alt=""></div>
+  <div class="page">
+    <div class="header">
+      <img src="{{ logo_url }}" alt="ESFE" class="header-logo">
+      <div class="header-school">École de Santé Félix Houphouët-Boigny</div>
+      <div class="header-tagline">Demain, c'est aujourd'hui</div>
+      <div class="header-address">Djélibougou • Face à la Maison de l'Automobile<br>BP 00223 • Bamako • Mali</div>
+    </div>
+    <div class="document-title"><h1>REÇU DE DON</h1></div>
+    <div class="meta-grid">
+      {% if receipt_number %}<span class="meta-item"><span class="meta-label">Reçu N° :</span> {{ receipt_number }}</span>{% endif %}
+      {% if date %}<span class="meta-item"><span class="meta-label">Date :</span> {{ date }}</span>{% endif %}
+      {% if branch_name %}<span class="meta-item"><span class="meta-label">Annexe :</span> {{ branch_name }}</span>{% endif %}
+    </div>
+    <div class="section-block">
+      <div class="section-title">Donateur</div>
+      <div class="info-line"><span class="info-label">Nom :</span> {{ donor_name }}</div>
+      {% if motif %}<div class="info-line"><span class="info-label">Motif :</span> {{ motif }}</div>{% endif %}
+      {% if description %}<div class="info-line"><span class="info-label">Description :</span> {{ description }}</div>{% endif %}
+    </div>
+    {% if amount %}
+    <div class="amount-box">
+      <div class="amount-line"><span>Montant du don</span><span class="amount">{{ amount }} FCFA</span></div>
+      {% if payment_method %}<div class="meta-line">Mode : {{ payment_method }}{% if payment_reference %} — Réf : {{ payment_reference }}{% endif %}</div>{% endif %}
+    </div>
+    {% endif %}
+    <div class="legal-text">Ce reçu de don constitue une preuve officielle. L'École de Santé Félix Houphouët-Boigny remercie le donateur pour sa générosité.</div>
+    <div class="signature-row">
+      <div class="signature-block"><div class="signature-line"></div><div class="signature-label">Signature</div></div>
+      <div class="signature-block"><div class="signature-line"></div><div class="signature-label">Cachet de l'école</div></div>
+    </div>
+    <div class="footer">
+      <div>BP 00223 • Bamako • Mali &nbsp;|&nbsp; contact@esfe.ml • www.esfe.ml</div>
+      <div class="footer-tagline">Demain, c'est aujourd'hui</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attestation d'Inscription — ESFE</title>
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 10px; line-height: 1.5;
+      color: #1a1a2e;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .watermark { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+    .watermark img { width: 70%; height: auto; opacity: 0.04; filter: grayscale(100%); }
+    .page { position: relative; z-index: 1; width: 210mm; min-height: 297mm; padding: 20mm 22mm 15mm; display: flex; flex-direction: column; }
+    .header { text-align: center; border-bottom: 2px solid #1a3a6b; padding-bottom: 12px; margin-bottom: 20px; }
+    .header-logo { width: 100px; height: auto; margin-bottom: 8px; }
+    .header-school { font-size: 16px; font-weight: 700; color: #1a3a6b; text-transform: uppercase; letter-spacing: 1.2px; margin: 4px 0 2px; }
+    .header-tagline { font-size: 9px; font-weight: 600; color: #b8860b; letter-spacing: 3px; text-transform: uppercase; margin: 0 0 4px; }
+    .header-address { font-size: 8px; color: #555; margin: 0; }
+    .document-title { text-align: center; margin: 20px 0 25px; }
+    .document-title h1 { font-size: 16px; font-weight: 700; color: #1a3a6b; letter-spacing: 3px; text-transform: uppercase; margin: 0; }
+    .certificate-body { flex: 1; text-align: justify; font-size: 11px; line-height: 1.8; margin: 15px 0; }
+    .certificate-body p { margin: 10px 0; }
+    .certificate-body .student-name { font-weight: 700; font-size: 13px; color: #1a3a6b; }
+    .certificate-body .programme-name { font-weight: 700; }
+    .certificate-body .accent { color: #1a3a6b; font-weight: 600; }
+    .info-block { margin: 15px 0; padding: 10px 14px; background: #f5f7fb; border-radius: 4px; font-size: 10px; }
+    .info-block .row { display: flex; margin: 2px 0; }
+    .info-block .label { font-weight: 600; min-width: 100px; color: #444; }
+    .signature-row { display: flex; justify-content: flex-end; margin: 25px 0 10px; }
+    .signature-block { text-align: center; min-width: 160px; }
+    .signature-block .signature-line { width: 160px; height: 1px; background: #444; margin: 4px auto 2px; }
+    .signature-block .signature-label { font-size: 9px; font-weight: 600; color: #444; }
+    .footer { margin-top: auto; padding-top: 10px; border-top: 1px solid #d0d5e0; text-align: center; font-size: 8px; color: #777; }
+    .footer .footer-tagline { font-weight: 600; color: #b8860b; letter-spacing: 2px; text-transform: uppercase; font-size: 8px; margin-top: 3px; }
+  </style>
+</head>
+<body>
+  <div class="watermark"><img src="{{ logo_url }}" alt=""></div>
+  <div class="page">
+    <div class="header">
+      <img src="{{ logo_url }}" alt="ESFE" class="header-logo">
+      <div class="header-school">École de Santé Félix Houphouët-Boigny</div>
+      <div class="header-tagline">Demain, c'est aujourd'hui</div>
+      <div class="header-address">Djélibougou • Face à la Maison de l'Automobile<br>BP 00223 • Bamako • Mali</div>
+    </div>
+    <div class="document-title"><h1>ATTESTATION D'INSCRIPTION</h1></div>
+    <div class="certificate-body">
+      <p>Je soussigné, Directeur de l'<span class="accent">École de Santé Félix Houphouët-Boigny (ESFe)</span>, atteste que :</p>
+      <p style="text-align:center; margin:15px 0;"><span class="student-name">{{ student_name }}</span></p>
+      <p>est régulièrement inscrit(e) pour l'année académique <span class="accent">{{ academic_year }}</span> dans notre établissement.</p>
+      <div class="info-block">
+        {% if student_matricule %}<div class="row"><span class="label">Matricule :</span> {{ student_matricule }}</div>{% endif %}
+        {% if student_birth %}<div class="row"><span class="label">Date de naissance :</span> {{ student_birth }}</div>{% endif %}
+        {% if student_phone %}<div class="row"><span class="label">Téléphone :</span> {{ student_phone }}</div>{% endif %}
+        {% if programme %}<div class="row"><span class="label">Programme :</span> {{ programme }}</div>{% endif %}
+        {% if level %}<div class="row"><span class="label">Niveau :</span> {{ level }}</div>{% endif %}
+        {% if branch_name %}<div class="row"><span class="label">Annexe :</span> {{ branch_name }}</div>{% endif %}
+        {% if inscription_date %}<div class="row"><span class="label">Date d'inscription :</span> {{ inscription_date }}</div>{% endif %}
+      </div>
+      <p>En foi de quoi, la présente attestation lui est délivrée pour servir et valoir ce que de droit.</p>
+    </div>
+    <div class="signature-row">
+      <div class="signature-block">
+        <div class="signature-line"></div>
+        <div class="signature-label">{{ director_name|default:"Le Directeur" }}</div>
+      </div>
+    </div>
+    <div class="footer">
+      <div>BP 00223 • Bamako • Mali &nbsp;|&nbsp; contact@esfe.ml • www.esfe.ml</div>
+      <div class="footer-tagline">Demain, c'est aujourd'hui</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,198 @@
+{% if toast %}
+  <section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
+{% endif %}
+
+<section class="workflow-stack">
+  <div class="workflow-band {% if stats.critical %}workflow-band-ready_to_validate{% elif stats.unread %}workflow-band-in_progress{% else %}workflow-band-validated{% endif %}">
+    <div>
+      <p class="workflow-kicker">Communication</p>
+      <h3>Notifications et messages</h3>
+      <p>Lecture des alertes internes, suivi des emails et contrôle des messages rattachés à votre compte.</p>
+    </div>
+    <span>{{ unread_count }} non lue{{ unread_count|pluralize }}</span>
+  </div>
+
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <div class="workflow-table-shell"><p class="workflow-kicker">In-app</p><h3>{{ stats.total }}</h3><p class="workflow-muted">Notifications internes</p></div>
+    <div class="workflow-table-shell"><p class="workflow-kicker">Non lues</p><h3>{{ stats.unread }}</h3><p class="workflow-muted">À traiter</p></div>
+    <div class="workflow-table-shell"><p class="workflow-kicker">Critiques</p><h3>{{ stats.critical }}</h3><p class="workflow-muted">Priorité haute</p></div>
+    <div class="workflow-table-shell"><p class="workflow-kicker">Emails</p><h3>{{ stats.email }}</h3><p class="workflow-muted">Canaux externes</p></div>
+    <div class="workflow-table-shell"><p class="workflow-kicker">Échecs</p><h3>{{ stats.failed }}</h3><p class="workflow-muted">À vérifier</p></div>
+  </div>
+
+  <form
+    class="workflow-context"
+    hx-get="{% url 'accounts_portal:it_notifications_workspace' %}"
+    hx-target="#it-workspace"
+    hx-swap="innerHTML"
+  >
+    <label>Recherche
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="Titre, contenu, source...">
+    </label>
+    <label>Canal
+      <select name="channel">
+        <option value="all" {% if filters.channel == "all" %}selected{% endif %}>Tous les canaux</option>
+        {% for value,label in channels %}
+          <option value="{{ value }}" {% if filters.channel == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Statut
+      <select name="status">
+        <option value="" {% if not filters.status %}selected{% endif %}>Tous les statuts</option>
+        <option value="unread" {% if filters.status == "unread" %}selected{% endif %}>Non lues</option>
+        <option value="read" {% if filters.status == "read" %}selected{% endif %}>Lues</option>
+        <option value="failed" {% if filters.status == "failed" %}selected{% endif %}>Échecs</option>
+      </select>
+    </label>
+    <label>Priorité
+      <select name="priority">
+        <option value="" {% if not filters.priority %}selected{% endif %}>Toutes priorités</option>
+        {% for value,label in priorities %}
+          <option value="{{ value }}" {% if filters.priority == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Source
+      <select name="source">
+        <option value="" {% if not filters.source %}selected{% endif %}>Toutes sources</option>
+        {% for source in sources %}
+          <option value="{{ source }}" {% if filters.source == source %}selected{% endif %}>{{ source }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div style="grid-column: 1 / -1;" class="flex flex-wrap justify-end gap-2">
+      <button class="workflow-btn workflow-btn-primary" type="submit">
+        <i data-lucide="filter" class="mr-2 h-4 w-4"></i>
+        Filtrer
+      </button>
+      <button
+        class="workflow-btn workflow-btn-secondary"
+        type="button"
+        hx-post="{% url 'accounts_portal:it_notifications_action' %}"
+        hx-target="#it-workspace"
+        hx-swap="innerHTML"
+        hx-include="closest form"
+        hx-vals='{"action":"mark_all_read"}'
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+        x-on:click="$dispatch('notify', {message: 'Marquage de toutes les notifications comme lues...', type: 'info'})"
+      >
+        <i data-lucide="check-check" class="mr-2 h-4 w-4"></i>
+        Tout marquer lu
+      </button>
+    </div>
+  </form>
+
+  <div class="workflow-split">
+    <section class="workflow-table-shell">
+      <div class="workflow-table-head">
+        <div>
+          <p class="workflow-kicker">Flux</p>
+          <h3>{{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }}</h3>
+        </div>
+      </div>
+
+      <div class="workflow-list">
+        {% for notification in notifications %}
+          <article class="{% if not notification.read_at %}border-blue-200 bg-blue-50/60{% endif %}">
+            <div class="min-w-0">
+              <strong>{{ notification.title }}</strong>
+              <span>{{ notification.body|default:"Notification ESFE"|truncatechars:140 }}</span>
+              <span>
+                {{ notification.get_priority_display }} - {{ notification.get_channel_display }} - {{ notification.created_at|date:"d/m/Y H:i" }}
+                {% if notification.event %} - {{ notification.event.source_app }}{% elif notification.legacy_source %} - {{ notification.legacy_source }}{% endif %}
+              </span>
+            </div>
+            <div class="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                class="workflow-btn workflow-btn-secondary"
+                hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?notification_id={{ notification.id }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q|urlencode }}&page={{ page_obj.number }}"
+                hx-target="#it-workspace"
+                hx-swap="innerHTML"
+              >
+                Ouvrir
+              </button>
+              <button
+                type="button"
+                class="workflow-btn {% if notification.read_at %}workflow-btn-secondary{% else %}workflow-btn-primary{% endif %}"
+                hx-post="{% url 'accounts_portal:it_notifications_action' %}"
+                hx-target="#it-workspace"
+                hx-swap="innerHTML"
+                hx-vals='{"action":"{% if notification.read_at %}mark_unread{% else %}mark_read{% endif %}","notification_id":"{{ notification.id }}","channel":"{{ filters.channel }}","status":"{{ filters.status }}","priority":"{{ filters.priority }}","source":"{{ filters.source }}","q":"{{ filters.q|escapejs }}","page":"{{ page_obj.number }}"}'
+                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                x-on:click="$dispatch('notify', {message: '{{ notification.read_at|yesno:"Marquage comme non lu...,Marquage comme lu..." }}', type: 'info'})"
+              >
+                {% if notification.read_at %}Non lu{% else %}Lu{% endif %}
+              </button>
+            </div>
+          </article>
+        {% empty %}
+          <div class="workflow-empty">Aucune notification ne correspond aux filtres.</div>
+        {% endfor %}
+      </div>
+
+      {% if page_obj.has_other_pages %}
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <span class="workflow-muted">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+          <div class="flex gap-2">
+            {% if page_obj.has_previous %}
+              <button class="workflow-btn workflow-btn-secondary" type="button" hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?page={{ page_obj.previous_page_number }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q|urlencode }}" hx-target="#it-workspace" hx-swap="innerHTML">Précédent</button>
+            {% endif %}
+            {% if page_obj.has_next %}
+              <button class="workflow-btn workflow-btn-secondary" type="button" hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?page={{ page_obj.next_page_number }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q|urlencode }}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </section>
+
+    <aside class="workflow-table-shell">
+      <div class="workflow-table-head">
+        <div>
+          <p class="workflow-kicker">Lecture</p>
+          <h3>Détail</h3>
+        </div>
+      </div>
+      {% if selected_notification %}
+        <div class="workflow-list">
+          <article>
+            <div>
+              <strong>{{ selected_notification.title }}</strong>
+              <span>{{ selected_notification.body|default:"Aucun détail complémentaire." }}</span>
+            </div>
+          </article>
+          <article><div><strong>Priorité</strong><span>{{ selected_notification.get_priority_display }}</span></div></article>
+          <article><div><strong>Canal</strong><span>{{ selected_notification.get_channel_display }}</span></div></article>
+          <article><div><strong>Statut</strong><span>{{ selected_notification.get_status_display }}</span></div></article>
+          <article><div><strong>Source</strong><span>{% if selected_notification.event %}{{ selected_notification.event.source_app }}{% else %}{{ selected_notification.legacy_source|default:"Système" }}{% endif %}</span></div></article>
+          <article><div><strong>Reçu</strong><span>{{ selected_notification.created_at|date:"d/m/Y H:i" }}</span></div></article>
+          <article><div><strong>Lu</strong><span>{{ selected_notification.read_at|date:"d/m/Y H:i"|default:"Non lu" }}</span></div></article>
+        </div>
+        <div class="mt-4">
+          <p class="workflow-kicker">Livraisons</p>
+          <div class="workflow-list">
+            {% for delivery in selected_notification.deliveries.all %}
+              <article><div><strong>{{ delivery.get_channel_display }}</strong><span>{{ delivery.provider|default:"Interne" }} - {{ delivery.get_status_display }}{% if delivery.error_message %} - {{ delivery.error_message }}{% endif %}</span></div></article>
+            {% empty %}
+              <article><div><strong>Aucune livraison rattachée</strong><span>Notification interne ou historique sans trace de livraison.</span></div></article>
+            {% endfor %}
+          </div>
+        </div>
+      {% else %}
+        <div class="workflow-empty">Sélectionnez une notification pour ouvrir sa fiche détaillée.</div>
+      {% endif %}
+
+      <div class="mt-4">
+        <p class="workflow-kicker">Sources récentes</p>
+        <div class="workflow-list">
+          {% for row in stats.by_source %}
+            <article><div><strong>{{ row.event__source_app|default:"Système" }}</strong><span>{{ row.total }} notification{{ row.total|pluralize }}</span></div></article>
+          {% empty %}
+            <article><div><strong>Aucune source</strong><span>Pas encore de source récente.</span></div></article>
+          {% endfor %}
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>

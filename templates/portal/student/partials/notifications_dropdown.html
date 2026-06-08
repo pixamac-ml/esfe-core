@@ -1,0 +1,43 @@
+{% load component_tags %}
+<div class="notification-dropdown-header">
+  <span class="text-sm font-black text-[color:var(--text)]">Notifications</span>
+  <span class="notification-dropdown-badge">{{ unread_count }}</span>
+</div>
+
+<div class="notification-dropdown-list">
+  {% if notifications %}
+    {% for n in notifications %}
+      <button
+        type="button"
+        class="notification-dropdown-item"
+        :class="{ 'is-unread': {{ n.is_read|yesno:'false,true' }} }"
+        @click="closeNotificationDropdown(); openNotificationDetailById({{ n.id }})"
+      >
+        <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
+          <i data-lucide="{{ n.icon }}" style="width:16px;height:16px;"></i>
+        </div>
+        <div class="min-w-0 flex-1 text-left">
+          <strong class="block truncate text-xs font-extrabold text-[color:var(--text)]">
+            {{ n.name }}
+            {% if not n.is_read %}<span class="ml-1 inline-block h-2 w-2 rounded-full bg-blue-500"></span>{% endif %}
+          </strong>
+          <p class="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--muted)]">{{ n.text }}</p>
+          <span class="mt-0.5 block text-[10px] font-bold text-[color:var(--muted-2)]">{{ n.time }}</span>
+        </div>
+      </button>
+    {% endfor %}
+  {% else %}
+    <div class="notification-dropdown-empty">
+      <i data-lucide="bell-off" style="width:28px;height:28px;"></i>
+      <p class="mt-2 text-sm font-semibold text-[color:var(--muted)]">Aucune notification</p>
+      <p class="text-xs text-[color:var(--muted-2)]">Pas de nouvelles alertes pour le moment.</p>
+    </div>
+  {% endif %}
+</div>
+
+<div class="notification-dropdown-footer">
+  <button type="button" class="flex w-full items-center justify-center gap-2 text-xs font-extrabold text-[color:var(--school-primary)]" @click="closeNotificationDropdown(); goToMessages();">
+    <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>
+    Voir toutes les notifications
+  </button>
+</div>

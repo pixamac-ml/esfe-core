@@ -1,0 +1,103 @@
+{% if academic_class %}
+<div class="space-y-4">
+  <div class="flex items-start justify-between gap-3">
+    <div>
+      <p class="text-xs font-black uppercase tracking-[0.24em] text-violet-600">
+        {% if editing_slot %}Modifier le creneau{% else %}Nouveau creneau{% endif %}
+      </p>
+      <h3 class="mt-1 text-lg font-extrabold text-slate-900">
+        {{ academic_class.display_name }}
+      </h3>
+      <p class="mt-1 text-xs font-semibold text-slate-500">
+        Modele hebdomadaire · recurrence par jour de semaine.
+      </p>
+    </div>
+    <button type="button"
+            onclick="window.sgCloseDrawer && window.sgCloseDrawer()"
+            class="rounded-lg border border-slate-200 px-2 py-1 text-sm font-bold text-slate-500 hover:bg-slate-50">
+      ✕
+    </button>
+  </div>
+
+  <form
+    method="post"
+    action="{% url weekly_slot_save_url academic_class.id %}"
+    hx-post="{% url weekly_slot_save_url academic_class.id %}"
+    hx-target="#supervisor-workspace"
+    hx-swap="innerHTML"
+    hx-on::after-request="if(event.detail.successful){ window.sgCloseDrawer && window.sgCloseDrawer(); }"
+    class="space-y-4"
+  >
+    {% csrf_token %}
+    <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+    <input type="hidden" name="action" value="{% if editing_slot %}update{% else %}create{% endif %}" />
+    {% if editing_slot %}<input type="hidden" name="slot_id" value="{{ editing_slot.id }}" />{% endif %}
+    <input type="hidden" name="from_drawer" value="1" />
+
+    <div>
+      <label class="mb-2 block text-sm font-bold text-slate-700">Jour</label>
+      <select name="weekday" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold">
+        {% for val, label in weekday_choices %}
+        <option value="{{ val }}" {% if editing_slot and editing_slot.weekday == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="mb-2 block text-sm font-bold text-slate-700">Debut</label>
+        <input name="start_time" type="time" required
+               {% if editing_slot %}value="{{ editing_slot.start_time }}"{% endif %}
+               class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold" />
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-bold text-slate-700">Fin</label>
+        <input name="end_time" type="time" required
+               {% if editing_slot %}value="{{ editing_slot.end_time }}"{% endif %}
+               class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold" />
+      </div>
+    </div>
+
+    <div>
+      <label class="mb-2 block text-sm font-bold text-slate-700">Matiere (EC)</label>
+      <select name="ec_id" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold">
+        <option value="">Choisir…</option>
+        {% for ec in ecs %}
+        <option value="{{ ec.id }}" {% if editing_slot and editing_slot.ec_id == ec.id %}selected{% endif %}>{{ ec.ue.code }} — {{ ec.title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="mb-2 block text-sm font-bold text-slate-700">Enseignant</label>
+      <select name="teacher_id" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold">
+        <option value="">Choisir…</option>
+        {% for t in teachers %}
+        <option value="{{ t.id }}" {% if editing_slot and editing_slot.teacher_id == t.id %}selected{% endif %}>{{ t.get_full_name|default:t.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="mb-2 block text-sm font-bold text-slate-700">Salle</label>
+      <input name="room" type="text" value="{% if editing_slot %}{{ editing_slot.room }}{% endif %}"
+             placeholder="Ex: A102"
+             class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold" />
+    </div>
+
+    <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
+      <button type="button"
+              onclick="window.sgCloseDrawer && window.sgCloseDrawer()"
+              class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+        Annuler
+      </button>
+      <button type="submit"
+              class="rounded-xl bg-violet-600 px-4 py-2 text-sm font-extrabold text-white shadow-sm hover:bg-violet-700">
+        {% if editing_slot %}Enregistrer{% else %}Creer le creneau{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% else %}
+<p class="text-sm font-semibold text-slate-500">Aucune classe selectionnee.</p>
+{% endif %}

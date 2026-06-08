@@ -381,3 +381,149 @@ Priorités absolues :
 3. ✅ **Fait** : passer les URLs dures du shop en `{% url %}` dans tous les templates shop
 
 Le reste tient la route.
+
+
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│  [ LOGO ESFE ]                                              │
+│                                                             │
+│      ÉCOLE DE SANTÉ FÉLIX HOUPHOUËT-BOIGNY                 │
+│                                                             │
+│               DEMAIN, C'EST AUJOURD'HUI                    │
+│                                                             │
+│ Djélibougou • Face à la Maison de l'Automobile             │
+│ BP 00223 • Bamako • Mali                                   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                  REÇU DE PAIEMENT                           │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Reçu N° : REC-2026-000125                                  │
+│ Date : 01 Juin 2026                                         │
+│ Année Académique : 2025 - 2026                             │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ ÉTUDIANT                                                    │
+│                                                             │
+│ Nom : Mohamed Aly Camara                                    │
+│ Matricule : ESFE-2026-001                                   │
+│ Formation : Licence Sciences Infirmières                    │
+│ Niveau : Licence 1                                          │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ DÉTAIL DE LA FACTURATION                                    │
+│                                                             │
+│ ┌───────────────────────────────────────────────────────┐   │
+│ │ Désignation          │ Qté │ PU       │ Total         │   │
+│ ├───────────────────────────────────────────────────────┤   │
+│ │ Frais Inscription    │ 1   │ 50 000   │ 50 000 FCFA  │   │
+│ │ Tranche Scolarité    │ 1   │ 75 000   │ 75 000 FCFA  │   │
+│ └───────────────────────────────────────────────────────┘   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Montant Payé :                               125 000 FCFA  │
+│                                                             │
+│ Mode : Orange Money                                         │
+│ Référence : OM54872145                                      │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Ce reçu constitue une preuve officielle de paiement.       │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Signature                           Cachet de l'école      │
+│                                                             │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ BP 00223 • Bamako • Mali                                   │
+│ contact@esfe.ml • www.esfe.ml                              │
+│                                                             │
+│                DEMAIN, C'EST AUJOURD'HUI                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+Filigrane que je recommande
+
+Derrière tout le document :
+
+          ESFE
+
+géant au centre
+
+ou
+
+      LOGO ESFE
+
+géant
+
+avec :
+
+opacity: 0.04;
+Filigrane encore plus professionnel
+
+Au lieu du logo :
+
+Image du bâtiment principal.
+
+opacity: 0.03;
+filter: grayscale(100%);
+
+Résultat :
+
+Le bâtiment apparaît derrière le tableau.
+
+Comme dans les diplômes universitaires.
+
+Pour les factures boutique
+
+Même design.
+
+On change simplement :
+
+REÇU DE PAIEMENT
+
+par
+
+FACTURE D'ACHAT
+Pour les salaires
+
+Même design.
+
+On remplace :
+
+ÉTUDIANT
+
+par
+
+EMPLOYÉ
+Pour les remboursements
+
+Même design.
+
+On ajoute un badge :
+
+REMBOURSEMENT
+
+en rouge.
+
+C'est justement pour cela que je te conseille de créer un seul composant Django :
+
+BaseDocumentTemplate
+
+et ensuite :
+
+ReceiptTemplate
+InvoiceTemplate
+SalaryTemplate
+RefundTemplate
+
+héritent tous du même design.
+
+Ainsi, toute la plateforme ESFE garde une identité visuelle cohérente, que le document vienne du dashboard étudiant, de la boutique, du module finance ou d'un email PDF.

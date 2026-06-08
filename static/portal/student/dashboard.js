@@ -625,7 +625,7 @@
 
   document.body.addEventListener("htmx:responseError", (evt) => {
     const target = evt.detail && evt.detail.target;
-    if (!target) return;
+    if (!target || !target.dataset.sectionUrl) return;
     target.dataset.sectionLoaded = "0";
     target.innerHTML = `
       <div class="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">

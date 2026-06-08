@@ -314,6 +314,18 @@ def _validate_content_file_extension(*, content_type, uploaded_file):
     if allowed_extensions and extension not in allowed_extensions:
         raise ValidationError("Le format du fichier ne correspond pas au type de contenu choisi.")
 
+    allowed_mimes = {
+        ECContent.CONTENT_TYPE_PDF: {"application/pdf"},
+        ECContent.CONTENT_TYPE_DOC: {"application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+        ECContent.CONTENT_TYPE_EXCEL: {"application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv"},
+        ECContent.CONTENT_TYPE_PPT: {"application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+        ECContent.CONTENT_TYPE_VIDEO: {"video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/webm"},
+        ECContent.CONTENT_TYPE_IMAGE: {"image/png", "image/jpeg", "image/gif", "image/webp"},
+        ECContent.CONTENT_TYPE_AUDIO: {"audio/mpeg", "audio/wav", "audio/ogg", "audio/mp4"},
+    }.get(content_type)
+    if allowed_mimes and uploaded_file.content_type not in allowed_mimes:
+        raise ValidationError("Le type MIME du fichier ne correspond pas au type de contenu choisi.")
+
 
 def _serialize_support_content(content):
     file_name = Path(content.file.name).name if content.file else ""

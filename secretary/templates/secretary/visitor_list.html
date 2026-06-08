@@ -46,8 +46,9 @@
                     <td>{{ visitor.departed_at|date:"d/m/Y H:i"|default:"-" }}</td>
                     <td><span class="badge">{{ visitor.get_status_display }}</span></td>
                     <td>
+                        <button type="button" class="btn" hx-get="{% url 'secretary:visitor_update' visitor.id %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Modifier</button>
                         {% if visitor.status != "completed" %}
-                            <form method="post" hx-post="{% url 'secretary:visitor_complete' visitor.id %}" hx-target="body" hx-swap="none">
+                            <form method="post" action="{% url 'secretary:visitor_complete' visitor.id %}">
                                 {% csrf_token %}
                                 <button class="btn" type="submit">Cloturer</button>
                             </form>

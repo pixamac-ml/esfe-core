@@ -3910,6 +3910,7 @@ def supervisor_planner_workspace(request):
 @_position_required({"academic_supervisor"})
 def supervisor_planner_hub(request):
     branch, class_id, week_start = _parse_supervisor_planner_request(request)
+    drawer_mode = (request.GET.get("drawer") or "").strip() == "1"
     if branch is None:
         return render(
             request,
@@ -3928,6 +3929,7 @@ def supervisor_planner_hub(request):
         class_id=class_id,
         week_start=week_start,
     )
+    context["drawer"] = drawer_mode
     _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
     return render(
         request,
@@ -3986,6 +3988,8 @@ def supervisor_weekly_slots_workspace(request, class_id: int):
     edit_raw = (request.GET.get("edit") or "").strip()
     editing_slot_id = int(edit_raw) if edit_raw.isdigit() else None
 
+    drawer_form = (request.GET.get("drawer_form") or "").strip() == "1"
+
     try:
         context = _build_weekly_slots_workspace_context(
             request,
@@ -3995,9 +3999,10 @@ def supervisor_weekly_slots_workspace(request, class_id: int):
             editing_slot_id=editing_slot_id,
         )
     except AcademicClass.DoesNotExist:
+        template = "portal/staff/supervisor/partials/weekly_slot_form_drawer.html" if drawer_form else "portal/staff/supervisor/partials/weekly_slots_workspace.html"
         return render(
             request,
-            "portal/staff/supervisor/partials/weekly_slots_workspace.html",
+            template,
             {
                 "toast": {"level": "error", "message": "Classe introuvable pour cette annexe."},
                 "academic_class": None,
@@ -4005,7 +4010,8 @@ def supervisor_weekly_slots_workspace(request, class_id: int):
         )
 
     _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
-    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+    template = "portal/staff/supervisor/partials/weekly_slot_form_drawer.html" if drawer_form else "portal/staff/supervisor/partials/weekly_slots_workspace.html"
+    return render(request, template, context)
 
 
 @_position_required({"academic_supervisor"})

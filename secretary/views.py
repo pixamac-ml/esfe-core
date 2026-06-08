@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db.models import Count
 
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -68,6 +69,11 @@ from .services import (
     register_visitor,
     search_academic_classes,
     search_students,
+    update_appointment,
+    update_document,
+    update_registry_entry,
+    update_task,
+    update_visitor,
 )
 
 
@@ -237,6 +243,19 @@ def secretary_dashboard(request):
     )
     context["recent_registry"] = context["registry_page"].object_list
 
+    registry_qs = get_registry_queryset({"archived": False, "active_only": True}, user=request.user, branch=branch)
+    type_counts = registry_qs.values("entry_type").annotate(count=Count("id")).order_by("-count")
+    total = sum(tc["count"] for tc in type_counts) or 1
+    context["registry_type_distribution"] = [
+        {
+            "entry_type": tc["entry_type"],
+            "label": dict(RegistryEntry.ENTRY_TYPE_CHOICES).get(tc["entry_type"], tc["entry_type"]),
+            "count": tc["count"],
+            "pct": round(tc["count"] / total * 100),
+        }
+        for tc in type_counts
+    ]
+
     context["open_visits_page"] = _paginate(
         request,
         get_active_visits_queryset(user=request.user, branch=branch),
@@ -403,6 +422,41 @@ def registry_create(request):
 
 
 @login_required
+def registry_update(request, pk):
+    ensure_secretary_access(request.user)
+    entry = get_object_or_404(get_registry_queryset({}, user=request.user), pk=pk)
+    form = RegistryEntryForm(
+        request.POST or None, request.FILES or None,
+        instance=entry, **_form_kwargs(request),
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            update_registry_entry(entry, **form.cleaned_data)
+            messages.success(request, "Entree du registre modifiee.")
+            if _is_htmx(request):
+                return _modal_close_response("registry", "kpis")
+            return redirect("secretary:registry_list")
+        except ValidationError as error:
+            form.add_error(None, _validation_error_message(error))
+    return _render_create_modal_or_page(
+        request,
+        "secretary/modals/form_modal.html",
+        "secretary/registry_form.html",
+        {
+            "form": form,
+            "page_title": "Modifier l'entree du registre",
+            "modal_kicker": "Registre",
+            "modal_description": "Modifier les informations de l'entree.",
+            "submit_label": "Enregistrer les modifications",
+            "return_url": "secretary:registry_list",
+            "form_action_url": "secretary:registry_update",
+            "form_action_pk": entry.pk,
+            "registry_routing_rules": get_registry_routing_rules_for_ui(),
+        },
+    )
+
+
+@login_required
 @require_POST
 def registry_mark_processed(request, pk):
     ensure_secretary_access(request.user)
@@ -495,6 +549,39 @@ def appointment_create(request):
 
 
 @login_required
+def appointment_update(request, pk):
+    ensure_secretary_access(request.user)
+    appointment = get_object_or_404(get_appointments_queryset({}, user=request.user), pk=pk)
+    form = AppointmentForm(
+        request.POST or None, instance=appointment, **_form_kwargs(request),
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            update_appointment(appointment, **form.cleaned_data)
+            messages.success(request, "Rendez-vous modifie.")
+            if _is_htmx(request):
+                return _modal_close_response("appointments", "kpis")
+            return redirect("secretary:appointment_list")
+        except ValidationError as error:
+            form.add_error(None, _validation_error_message(error))
+    return _render_create_modal_or_page(
+        request,
+        "secretary/modals/form_modal.html",
+        "secretary/appointment_form.html",
+        {
+            "form": form,
+            "page_title": "Modifier le rendez-vous",
+            "modal_kicker": "Agenda",
+            "modal_description": "Modifier les informations du rendez-vous.",
+            "submit_label": "Enregistrer les modifications",
+            "return_url": "secretary:appointment_list",
+            "form_action_url": "secretary:appointment_update",
+            "form_action_pk": appointment.pk,
+        },
+    )
+
+
+@login_required
 @require_POST
 def appointment_complete(request, pk):
     ensure_secretary_access(request.user)
@@ -519,6 +606,39 @@ def visitor_list(request):
         {
             "page_obj": _paginate(request, queryset),
             "filters": _common_filters(request),
+        },
+    )
+
+
+@login_required
+def visitor_update(request, pk):
+    ensure_secretary_access(request.user)
+    visitor = get_object_or_404(get_visits_queryset({}, user=request.user), pk=pk)
+    form = VisitorLogForm(
+        request.POST or None, instance=visitor, **_form_kwargs(request),
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            update_visitor(visitor, **form.cleaned_data)
+            messages.success(request, "Visite modifiee.")
+            if _is_htmx(request):
+                return _modal_close_response("visits", "kpis")
+            return redirect("secretary:visitor_list")
+        except ValidationError as error:
+            form.add_error(None, _validation_error_message(error))
+    return _render_create_modal_or_page(
+        request,
+        "secretary/modals/form_modal.html",
+        "secretary/visitor_form.html",
+        {
+            "form": form,
+            "page_title": "Modifier la visite",
+            "modal_kicker": "Accueil",
+            "modal_description": "Modifier les informations de la visite.",
+            "submit_label": "Enregistrer les modifications",
+            "return_url": "secretary:visitor_list",
+            "form_action_url": "secretary:visitor_update",
+            "form_action_pk": visitor.pk,
         },
     )
 
@@ -611,6 +731,40 @@ def document_receipt_create(request):
 
 
 @login_required
+def document_receipt_update(request, pk):
+    ensure_secretary_access(request.user)
+    document = get_object_or_404(get_documents_queryset({}, user=request.user), pk=pk)
+    form = DocumentReceiptForm(
+        request.POST or None, request.FILES or None,
+        instance=document, **_form_kwargs(request),
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            update_document(document, **form.cleaned_data)
+            messages.success(request, "Document modifie.")
+            if _is_htmx(request):
+                return _modal_close_response("documents", "kpis")
+            return redirect("secretary:document_receipt_list")
+        except ValidationError as error:
+            form.add_error(None, _validation_error_message(error))
+    return _render_create_modal_or_page(
+        request,
+        "secretary/modals/form_modal.html",
+        "secretary/document_receipt_form.html",
+        {
+            "form": form,
+            "page_title": "Modifier le document",
+            "modal_kicker": "Pieces",
+            "modal_description": "Modifier les informations du document.",
+            "submit_label": "Enregistrer les modifications",
+            "return_url": "secretary:document_receipt_list",
+            "form_action_url": "secretary:document_receipt_update",
+            "form_action_pk": document.pk,
+        },
+    )
+
+
+@login_required
 @require_POST
 def document_receipt_archive(request, pk):
     ensure_secretary_access(request.user)
@@ -680,6 +834,39 @@ def task_create(request):
             "submit_label": "Enregistrer la tache",
             "return_url": "secretary:task_list",
             "form_action_url": "secretary:task_create",
+        },
+    )
+
+
+@login_required
+def task_update(request, pk):
+    ensure_secretary_access(request.user)
+    task = get_object_or_404(get_tasks_queryset({}, user=request.user), pk=pk)
+    form = SecretaryTaskForm(
+        request.POST or None, instance=task, **_form_kwargs(request),
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            update_task(task, **form.cleaned_data)
+            messages.success(request, "Tache modifiee.")
+            if _is_htmx(request):
+                return _modal_close_response("tasks", "kpis")
+            return redirect("secretary:task_list")
+        except ValidationError as error:
+            form.add_error(None, _validation_error_message(error))
+    return _render_create_modal_or_page(
+        request,
+        "secretary/modals/form_modal.html",
+        "secretary/task_form.html",
+        {
+            "form": form,
+            "page_title": "Modifier la tache",
+            "modal_kicker": "Suivi",
+            "modal_description": "Modifier les informations de la tache.",
+            "submit_label": "Enregistrer les modifications",
+            "return_url": "secretary:task_list",
+            "form_action_url": "secretary:task_update",
+            "form_action_pk": task.pk,
         },
     )
 

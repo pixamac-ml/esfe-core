@@ -16,3 +16,4 @@ class CoreConfig(AppConfig):
         import ui.components.about.about_values
         import ui.components.about.about_stats
         import ui.components.about.about_cta
+        import ui.components.grades.maquette.maquette

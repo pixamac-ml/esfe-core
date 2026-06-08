@@ -8,11 +8,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.text import slugify
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.pdfgen import canvas
-from reportlab.platypus import Table, TableStyle
+from core.pdf_documents import generate_pdf as generate_esfe_pdf
 
 from accounts.models import BranchCashMovement
 from payments.models import PaymentAgent
@@ -349,7 +345,33 @@ def validate_shop_payment(payment, user=None):
         payment.status = ShopPayment.STATUS_VALIDATED
         payment.receipt_number = payment.reference
         payment.paid_at = timezone.now()
-        pdf_bytes = render_shop_receipt_pdf(payment)
+
+        order = payment.order
+        items = []
+        for item in order.items.select_related("product", "variant"):
+            label = item.product.name
+            if item.variant:
+                label = f"{label} ({item.variant.label})"
+            items.append({
+                "label": label,
+                "quantity": str(item.quantity),
+                "unit_price": f"{item.unit_price:,}".replace(",", " "),
+                "total": f"{item.line_total:,} FCFA".replace(",", " "),
+            })
+
+        customer_name = order.buyer_display
+        pdf_bytes = generate_esfe_pdf("esfe_shop_invoice", {
+            "invoice_number": payment.receipt_number,
+            "date": payment.paid_at.strftime("%d %B %Y"),
+            "customer_name": customer_name,
+            "customer_email": getattr(order, "customer_email", ""),
+            "customer_phone": getattr(order, "customer_phone", ""),
+            "branch_name": order.branch.name if order.branch_id else "",
+            "items": items,
+            "total_amount": f"{payment.amount:,}".replace(",", " "),
+            "payment_method": payment.get_method_display(),
+            "payment_reference": payment.reference or "",
+        })
         payment.receipt_pdf.save(f"recu-boutique-{payment.receipt_number}.pdf", ContentFile(pdf_bytes), save=False)
         payment.save()
 

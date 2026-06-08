@@ -85,6 +85,7 @@ class AcademicResultCalculationTests(TestCase):
             level="L1",
             study_level="LICENCE",
             validation_threshold=Decimal("10.00"),
+            admissibility_gap=Decimal("0.50"),
             is_active=True,
         )
         self.semester = Semester.objects.create(
@@ -93,8 +94,8 @@ class AcademicResultCalculationTests(TestCase):
             total_required_credits=Decimal("6.00"),
         )
         ue = UE.objects.create(semester=self.semester, code="RES101", title="Calcul")
-        self.ec_one = EC.objects.create(ue=ue, title="Matiere A", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
-        self.ec_two = EC.objects.create(ue=ue, title="Matiere B", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+        self.ec_one = EC.objects.create(ue=ue, title="Matiere A", credit_required=Decimal("3.00"), coefficient=Decimal("2.00"))
+        self.ec_two = EC.objects.create(ue=ue, title="Matiere B", credit_required=Decimal("3.00"), coefficient=Decimal("2.00"))
         candidature = Candidature.objects.create(
             programme=self.programme,
             branch=self.branch,
@@ -194,8 +195,8 @@ class AcademicResultCalculationTests(TestCase):
 
         decision = compute_annual_decision(self.enrollment)
 
-        self.assertEqual(decision["decision"], "promoted_with_debt")
-        self.assertEqual(decision["rule_code"], "compensated_semester_debt")
+        self.assertEqual(decision["decision"], "ADMISSIBLE")
+        self.assertEqual(decision["rule_code"], "admissible_gap")
         self.assertTrue(decision["requires_academic_debt"])
         self.assertEqual(len(decision["debt_subjects"]), 2)
 
@@ -215,8 +216,8 @@ class AcademicResultCalculationTests(TestCase):
 
         decision = compute_annual_decision(self.enrollment)
 
-        self.assertEqual(decision["decision"], "repeated")
-        self.assertEqual(decision["rule_code"], "semester_gap_too_large")
+        self.assertEqual(decision["decision"], "NON_ADMIS")
+        self.assertEqual(decision["rule_code"], "gap_too_large")
 
 
 class AcademicContextResolverTests(TestCase):

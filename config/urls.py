@@ -4,7 +4,7 @@ URL configuration for config project.
 
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
-from django.urls import path, include, re_path
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse
@@ -74,7 +74,4 @@ if settings.DEBUG:
         document_root=settings.MEDIA_ROOT,
     )
 
-# Fallback final: toute URL non resolue renvoie la page 404 specialisee.
-urlpatterns += [
-    re_path(r"^(?P<unmatched_path>.*)$", core_views.fallback_404, name="fallback_404"),
-]
+# Les URLs non resolues sont gérées par handler404 (custom_404).

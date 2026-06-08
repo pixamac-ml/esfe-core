@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
+
+logger = logging.getLogger("esfe.reenrollment")
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -8,7 +11,7 @@ from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicEnrollment, AcademicYear
 from academics.services.academic_positioning import get_positioning_fee_for_level
-from academics.services.year import compute_annual_decision, compute_annual_result
+from academics.services.year import DECISION_VALIDE, DECISION_ADMISSIBLE, DECISION_NON_ADMIS, carry_forward_debts, compute_annual_decision, compute_annual_result
 from accounts.access import get_user_position
 from accounts.dashboards.helpers import is_executive, is_finance, is_manager
 from admissions.models import Candidature
@@ -18,8 +21,21 @@ from portal.services.it_support_service import log_support_action
 from students.models import Student, StudentYearDecision
 
 
+def _semester_averages(enrollment):
+    result = compute_annual_decision(enrollment)
+    averages = [
+        Decimal(str(sr.get("average")))
+        for sr in result.get("semester_results", [])
+        if sr.get("average") is not None
+    ]
+    return averages
+
+
 def _annual_average(enrollment):
-    return compute_annual_result(enrollment).get("average")
+    averages = _semester_averages(enrollment)
+    if not averages:
+        return None
+    return (sum(averages) / len(averages)).quantize(Decimal("0.01"))
 
 
 def _decision_from_annual_result(*, enrollment, annual_result):
@@ -102,6 +118,17 @@ def _audit_decision(*, decision, actor, action_type, details):
     )
 
 
+DECISION_MAP_NEW_TO_OLD = {
+    DECISION_VALIDE: StudentYearDecision.DECISION_PROMOTED,
+    DECISION_ADMISSIBLE: StudentYearDecision.DECISION_PROMOTED_WITH_DEBT,
+    DECISION_NON_ADMIS: StudentYearDecision.DECISION_REPEATED,
+}
+
+
+def _map_decision(annual_decision_code):
+    return DECISION_MAP_NEW_TO_OLD.get(annual_decision_code, StudentYearDecision.DECISION_REPEATED)
+
+
 TARGET_DECISIONS = {
     StudentYearDecision.DECISION_PROMOTED,
     StudentYearDecision.DECISION_PROMOTED_WITH_DEBT,
@@ -132,12 +159,7 @@ def _decision_payload_from_rule(annual_decision):
         "rule_code": annual_decision.get("rule_code"),
         "rule_label": annual_decision.get("rule_label"),
         "threshold": str(annual_decision.get("threshold") or ""),
-        "compensation_max_gap": str(annual_decision.get("compensation_max_gap") or ""),
-        "compensation_gap": (
-            str(annual_decision.get("compensation_gap"))
-            if annual_decision.get("compensation_gap") is not None
-            else None
-        ),
+        "admissibility_gap": str(annual_decision.get("admissibility_gap") or ""),
         "requires_academic_debt": bool(annual_decision.get("requires_academic_debt")),
         "debt_subjects": annual_decision.get("debt_subjects", []),
         "reasons": annual_decision.get("reasons", []),
@@ -218,7 +240,7 @@ def build_reenrollment_candidates(*, source_year=None, source_class=None, branch
         annual_decision = compute_annual_decision(enrollment)
         annual_result = annual_decision["annual_result"]
         annual_average = annual_decision.get("annual_average")
-        proposed_decision = annual_decision["decision"]
+        proposed_decision = _map_decision(annual_decision["decision"])
         proposed_decision_label = dict(StudentYearDecision.DECISION_CHOICES).get(proposed_decision, proposed_decision)
         candidates.append(
             {
@@ -320,6 +342,14 @@ def archive_enrollment_for_transition(*, enrollment, archived_at=None):
     return enrollment
 
 
+def _carry_forward_debts(source_enrollment, target_enrollment):
+    """
+    Reporte les dettes academiques non soldees vers la nouvelle inscription.
+    Delegue a academics.services.year.carry_forward_debts().
+    """
+    carry_forward_debts(source_enrollment, target_enrollment)
+
+
 def _resolve_target_class(*, source_enrollment, target_academic_year, decision, target_class=None):
     if target_class is not None:
         return target_class
@@ -377,14 +407,14 @@ def propose_student_decision(
     provided_average = annual_average is not None
     annual_average = annual_average if provided_average else _annual_average(source_enrollment)
     annual_decision = compute_annual_decision(source_enrollment)
-    annual_result = annual_decision["annual_result"]
+    decision_from_rule = _map_decision(annual_decision["decision"])
     decision = decision or (
         _decision_from_average(academic_class=source_enrollment.academic_class, annual_average=annual_average)
         if provided_average
-        else annual_decision["decision"]
+        else decision_from_rule
     )
-    if decision in ACADEMIC_RULE_DECISIONS and decision != annual_decision["decision"] and not provided_average:
-        expected_label = dict(StudentYearDecision.DECISION_CHOICES).get(annual_decision["decision"], annual_decision["decision"])
+    if decision in ACADEMIC_RULE_DECISIONS and decision != decision_from_rule and not provided_average:
+        expected_label = dict(StudentYearDecision.DECISION_CHOICES).get(decision_from_rule, decision_from_rule)
         raise ValidationError(
             "La decision academique doit suivre le calcul automatique. "
             f"Decision attendue: {expected_label}."
@@ -730,6 +760,8 @@ def apply_student_decision(*, decision, actor):
         target_enrollment.is_archived = False
         target_enrollment.archived_at = None
         target_enrollment.save(update_fields=["status", "is_active", "is_archived", "archived_at"])
+
+    _carry_forward_debts(source_enrollment, target_enrollment)
 
     decision.student.current_academic_enrollment = target_enrollment
     decision.student.save(update_fields=["current_academic_enrollment"])

@@ -134,24 +134,35 @@
       white-space:normal;
       word-break:break-word;
     }
-    /* All 5 header rows stick to top; higher z-index = on top when stacked */
-    .notes-grid thead tr:nth-child(1) th{position:sticky;top:0;z-index:9}
-    .notes-grid thead tr:nth-child(2) th{position:sticky;top:0;z-index:8}
-    .notes-grid thead tr:nth-child(3) th{position:sticky;top:0;z-index:7}
-    .notes-grid thead tr:nth-child(4) th{position:sticky;top:0;z-index:6}
-    .notes-grid thead tr:nth-child(5) th{position:sticky;top:0;z-index:5}
-    /* Make first 3 header cells in all rows stick to left */
+    /* All 5 header rows stick to top; z-index decouples so row1 is on top of row2 etc. */
+    .notes-grid thead tr th{position:sticky;top:0}
+    .notes-grid thead tr:nth-child(1) th{z-index:9}
+    .notes-grid thead tr:nth-child(2) th{z-index:8}
+    .notes-grid thead tr:nth-child(3) th{z-index:7}
+    .notes-grid thead tr:nth-child(4) th{z-index:6}
+    .notes-grid thead tr:nth-child(5) th{z-index:5}
+    /* Make first 3 header cells in all rows stick to left — higher z-index to stay above row cells */
     .notes-grid thead th.checkboxCol,
     .notes-grid thead th.numCol,
     .notes-grid thead th.nameCol{position:sticky;background:#eef3ff}
-    .notes-grid thead th.checkboxCol{left:0;z-index:25}
-    .notes-grid thead th.numCol{left:var(--sticky-check-width);z-index:24}
-    .notes-grid thead th.nameCol{left:calc(var(--sticky-check-width) + var(--sticky-index-width));z-index:23}
+    .notes-grid thead th.checkboxCol{left:0;z-index:20}
+    .notes-grid thead th.numCol{left:var(--sticky-check-width);z-index:19}
+    .notes-grid thead th.nameCol{left:calc(var(--sticky-check-width) + var(--sticky-index-width));z-index:18}
     .notes-grid thead th.nameCol{background:#fff}
-    .notes-grid .block{background:#dbeafe;color:#17306b;font-weight:bold}
+    /* Sticky-left cells in the thead that also stick to top — use highest z-index to avoid overlap */
+    .notes-grid thead tr th.checkboxCol,
+    .notes-grid thead tr th.numCol,
+    .notes-grid thead tr th.nameCol{z-index:30}
+    .notes-grid .ue-block{
+      background:#dbeafe;color:#17306b;font-weight:bold;font-size:13px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      border-left:2px solid #94a3b8 !important;
+      border-right:2px solid #94a3b8 !important;
+      border-bottom:2px solid #94a3b8;
+    }
     .notes-grid .unit{background:#ede9fe;color:#4c1d95;font-weight:bold}
     .notes-grid .semester{background:#f1f5f9;font-weight:bold}
-    .notes-grid .nameCol{min-width:240px;text-align:left;font-weight:bold;background:#fff;position:sticky;z-index:13}
+    .notes-grid .nameCol{min-width:240px;text-align:left;font-weight:bold;background:#fff;position:sticky}
     .notes-grid .numCol{min-width:52px;background:#fff;position:sticky}
     .notes-grid .leftLabel{background:#f8fafc;font-weight:bold}
     .notes-grid .v{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;line-height:1;min-width:30px}
@@ -198,6 +209,32 @@
     }
     @media (max-width: 700px){
       .notes-grid .import-grid{grid-template-columns:1fr}
+    }
+    @media print{
+      @page{size:A3 landscape;margin:6mm}
+      .notes-grid .action-toolbar,
+      .notes-grid .import-feedback,
+      .notes-grid .toolbar-actions,
+      .notes-grid .session-switch,
+      .notes-grid .import-inline,
+      .notes-grid .action-cell{display:none !important}
+      .notes-grid .table-wrap{overflow:visible;max-height:none;max-width:100%;border:none}
+      .notes-grid .sheet-card{border:none;border-radius:0;box-shadow:none}
+      .notes-grid .sheet-head{display:none}
+      .notes-grid .main{gap:0}
+      .notes-grid table{min-width:100%;font-size:9px}
+      .notes-grid th,.notes-grid td{padding:4px 5px;font-size:9px}
+      .notes-grid thead tr th{position:static;background:#eef3ff !important}
+      .notes-grid .score-input{display:none}
+      .notes-grid .score-stack{min-height:auto}
+      .notes-grid .notes-grid-scroll{overflow:visible}
+      .notes-grid .ue-block{background:#dbeafe !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .notes-grid .unit{background:#ede9fe !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .notes-grid .semester{background:#f1f5f9 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .notes-grid .cell-ok{background:#dcfce7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .notes-grid .cell-bad{background:#fee2e2 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .notes-grid .score-token.normal{border-color:#cbd5e1}
+      .notes-grid .checkboxCol,.notes-grid .numCol,.notes-grid .nameCol{position:static;box-shadow:none}
     }
   </style>
 
@@ -258,21 +295,21 @@
           <tr>
             <th colspan="3">Etudiants</th>
             {% for ue in ues %}
-              <th colspan="{{ ue.ecs.count|add:ue.ecs.count|add:ue.ecs.count|add:3 }}" class="block">
-                {{ ue.code }} - {{ ue.title }}
-              </th>
+               <th colspan="{{ ue.ecs.count|add:ue.ecs.count|add:ue.ecs.count|add:3 }}" class="ue-block">{{ ue.code }} — {{ ue.title|truncatechars:55 }}</th>
             {% endfor %}
             <th colspan="3" class="semester">RESULTAT DU SEMESTRE</th>
             <th rowspan="4" class="semester">Actions</th>
           </tr>
 
           <tr>
-            <th colspan="3" class="v">Matieres</th>
+            <th class="checkboxCol"></th>
+            <th class="numCol"></th>
+            <th class="nameCol"></th>
             {% for ue in ues %}
               {% for ec in ue.ecs.all %}
-                <th colspan="3">{{ ec.title }}</th>
+                <th colspan="3" class="ec-title">{{ ec.title|truncatechars:35 }}</th>
               {% endfor %}
-              <th colspan="3" class="unit">Unite</th>
+              <th colspan="3" class="unit">Unite {{ ue.code }}</th>
             {% endfor %}
             <th colspan="3" class="semester"></th>
           </tr>
@@ -320,16 +357,17 @@
             {% for ue in ues %}
               {% for ec in ue.ecs.all %}
                 <th class="v">Note</th>
-                <th class="v">Note coef.</th>
-                <th class="v">Credits obtenus</th>
+                <th class="v">Coef.</th>
+                <th class="v">Cred.</th>
               {% endfor %}
               <th class="v unit">Note</th>
-              <th class="v unit">Note coef.</th>
-              <th class="v unit">Credits obtenus</th>
+              <th class="v unit">Coef.</th>
+              <th class="v unit">Cred.</th>
             {% endfor %}
-            <th class="v semester">Moyenne</th>
-            <th class="v semester">Pourcentage</th>
-            <th class="v semester">Credits</th>
+            <th class="v semester">Moy.</th>
+            <th class="v semester">%</th>
+            <th class="v semester">Cred.</th>
+            <th class="semester" style="writing-mode:initial;transform:none">Actions</th>
           </tr>
           </thead>
           <tbody>

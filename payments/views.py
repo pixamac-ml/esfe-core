@@ -6,6 +6,7 @@
 
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.db import transaction
@@ -96,9 +97,8 @@ def student_initiate_payment(request, token):
     # Validation du formulaire
     if not form.is_valid():
         logger.warning(
-            "Formulaire paiement invalide: token=%s data=%s errors=%s",
+            "Formulaire paiement invalide: token=%s errors=%s",
             token,
-            dict(request.POST),
             form.errors.get_json_data(),
         )
         context["payment_form"] = form
@@ -309,9 +309,13 @@ def initiate_cash_session(request, token):
 # 4. AFFICHAGE REÇU
 # ==================================================
 
+@login_required
 def receipt_public_detail(request, receipt_number):
     payment = get_object_or_404(Payment, receipt_number=receipt_number, status="validated")
     inscription = payment.inscription
+
+    if not request.user.is_staff and inscription.student.user != request.user:
+        raise Http404("Reçu introuvable.")
 
     return render(request, "payments/receipt_detail.html", {
         "payment": payment,
@@ -325,8 +329,12 @@ def receipt_public_detail(request, receipt_number):
 # 5. TÉLÉCHARGEMENT REÇU PDF
 # ==================================================
 
+@login_required
 def receipt_pdf(request, receipt_number):
     payment = get_object_or_404(Payment, receipt_number=receipt_number, status="validated")
+
+    if not request.user.is_staff and payment.inscription.student.user != request.user:
+        raise Http404("Reçu introuvable.")
 
     if not payment.receipt_pdf:
         raise Http404("Le reçu PDF n'est pas disponible.")
@@ -339,6 +347,7 @@ def receipt_pdf(request, receipt_number):
 # ==================================================
 
 @require_GET
+@login_required
 def agents_list(request):
     query = request.GET.get("q", "").strip()
 
@@ -346,10 +355,10 @@ def agents_list(request):
         return JsonResponse({"agents": []})
 
     agents = PaymentAgent.objects.select_related("user").filter(is_active=True).filter(
-        Q(user__first_name__icontains=query) | Q(user__last_name__icontains=query) | Q(agent_code__icontains=query)
+        Q(user__first_name__icontains=query) | Q(user__last_name__icontains=query)
     )[:10]
 
-    return JsonResponse({"agents": [{"id": a.id, "name": a.user.get_full_name(), "code": a.agent_code} for a in agents]})
+    return JsonResponse({"agents": [{"id": a.id, "name": a.user.get_full_name()} for a in agents]})
 
 
 # ==================================================

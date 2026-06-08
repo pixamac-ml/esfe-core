@@ -67,7 +67,7 @@ from .dashboards.manager_dashboard import *
 
 
 from .dashboards.htmx_manager import *
-from .dashboards.htmx_manager import donation_create, export_report_xlsx
+from .dashboards.htmx_manager import donation_create, export_report_xlsx, widget_cash_balance, widget_scope_bar, widget_alerts_badge, widget_today_payments, widget_active_sessions, widget_sidebar_badges
 
 
 app_name = "accounts"
@@ -444,4 +444,14 @@ urlpatterns = [
     # RECHERCHE
     # =============================================
     path("htmx/manager/search/", global_search, name="htmx_search"),
+
+    # =============================================
+    # WIDGETS LIVE
+    # =============================================
+    path("widget/cash-balance/", widget_cash_balance, name="widget_cash_balance"),
+    path("widget/scope-bar/", widget_scope_bar, name="widget_scope_bar"),
+    path("widget/alerts-badge/", widget_alerts_badge, name="widget_alerts_badge"),
+    path("widget/today-payments/", widget_today_payments, name="widget_today_payments"),
+    path("widget/active-sessions/", widget_active_sessions, name="widget_active_sessions"),
+    path("widget/sidebar-badges/", widget_sidebar_badges, name="widget_sidebar_badges"),
 ]

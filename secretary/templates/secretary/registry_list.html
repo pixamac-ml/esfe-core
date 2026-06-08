@@ -53,20 +53,21 @@
                     <td>{{ entry.created_at|date:"d/m/Y H:i" }}</td>
                     <td>
                         <div class="actions">
+                            <button type="button" class="btn" hx-get="{% url 'secretary:registry_update' entry.id %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Modifier</button>
                             {% if entry.status == "pending" %}
-                                <form method="post" hx-post="{% url 'secretary:registry_start' entry.id %}" hx-target="body" hx-swap="none">
+                                <form method="post" action="{% url 'secretary:registry_start' entry.id %}">
                                     {% csrf_token %}
                                     <button class="btn" type="submit">Prendre en charge</button>
                                 </form>
                             {% endif %}
                             {% if entry.status != "completed" %}
-                                <form method="post" hx-post="{% url 'secretary:registry_mark_processed' entry.id %}" hx-target="body" hx-swap="none">
+                                <form method="post" action="{% url 'secretary:registry_mark_processed' entry.id %}">
                                     {% csrf_token %}
                                     <button class="btn" type="submit">Marquer traite</button>
                                 </form>
                             {% endif %}
                             {% if not entry.is_archived %}
-                                <form method="post" hx-post="{% url 'secretary:registry_archive' entry.id %}" hx-target="body" hx-swap="none">
+                                <form method="post" action="{% url 'secretary:registry_archive' entry.id %}">
                                     {% csrf_token %}
                                     <button class="btn btn-danger" type="submit">Archiver</button>
                                 </form>

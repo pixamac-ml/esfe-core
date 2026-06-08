@@ -1,0 +1,76 @@
+{# ── Modale de confirmation réutilisable ──
+   Variables attendues (toutes optionnelles sauf modal_id) :
+     - modal_id     : identifiant unique (requis)
+     - title        : titre affiché en haut
+     - body         : contenu HTML libre (description, liste, compteurs…)
+     - tone         : "primary" | "warning" | "danger" (defaut: primary)
+     - confirm_label: texte du bouton de validation
+     - cancel_label : texte du bouton d'annulation
+     - confirm_url  : URL POST/GET du formulaire de confirmation (defaut: "#")
+     - hx_target    : cible HTMX de l'action (defaut: #supervisor-workspace)
+     - hx_swap      : swap HTMX (defaut: innerHTML)
+     - hx_trigger   : optionnel declencheur HTMX additionnel
+     - hx_post|get  : verbe HTMX ("hx-post" par defaut)
+     - extra_inputs : liste de inputs caches supplementaires [{name, value}]
+     - form_id      : id du <form> (defaut: f"form-{modal_id}")
+     - open_attr    : ouvre la modale automatiquement au render
+#}
+<div id="{{ modal_id }}"
+     class="sg-modal fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 {% if not open_attr %}hidden{% endif %}"
+     role="dialog" aria-modal="true" aria-labelledby="{{ modal_id }}-title">
+  <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+    <div class="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <p class="text-xs font-black uppercase tracking-[0.24em] {% if tone == 'danger' %}text-rose-600{% elif tone == 'warning' %}text-amber-600{% else %}text-blue-600{% endif %}">
+          {{ confirm_label|default:"Confirmer" }}
+        </p>
+        <h3 id="{{ modal_id }}-title" class="mt-1 text-lg font-extrabold text-slate-900">{{ title }}</h3>
+      </div>
+      <button type="button"
+              data-modal-close="{{ modal_id }}"
+              class="rounded-lg border border-slate-200 px-2 py-1 text-sm font-bold text-slate-500 hover:bg-slate-50">
+        ✕
+      </button>
+    </div>
+
+    {% if body %}
+    <div class="mb-5 text-sm text-slate-600">{{ body }}</div>
+    {% endif %}
+
+    {% if confirm_url %}
+    <form id="{{ form_id|default:modal_id|add:'-form' }}"
+          method="post"
+          action="{{ confirm_url }}"
+          {% if hx_post %}hx-post="{{ confirm_url }}"{% else %}hx-post="{{ confirm_url }}"{% endif %}
+          hx-target="{{ hx_target|default:'#supervisor-workspace' }}"
+          hx-swap="{{ hx_swap|default:'innerHTML' }}"
+          hx-on::after-request="document.getElementById('{{ modal_id }}')?.classList.add('hidden')"
+          class="flex flex-wrap items-center justify-end gap-3">
+      {% csrf_token %}
+      {% for input in extra_inputs %}
+        <input type="hidden" name="{{ input.name }}" value="{{ input.value }}" />
+      {% endfor %}
+      <button type="button"
+              data-modal-close="{{ modal_id }}"
+              class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+        {{ cancel_label|default:"Annuler" }}
+      </button>
+      <button type="submit"
+              class="rounded-xl px-4 py-2 text-sm font-extrabold text-white shadow-sm
+                     {% if tone == 'danger' %}bg-rose-600 hover:bg-rose-700
+                     {% elif tone == 'warning' %}bg-amber-600 hover:bg-amber-700
+                     {% else %}bg-blue-600 hover:bg-blue-700{% endif %}">
+        {{ confirm_label|default:"Confirmer" }}
+      </button>
+    </form>
+    {% else %}
+    <div class="flex justify-end gap-3">
+      <button type="button"
+              data-modal-close="{{ modal_id }}"
+              class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+        {{ cancel_label|default:"Fermer" }}
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</div>

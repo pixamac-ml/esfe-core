@@ -48,13 +48,13 @@
           >
             Voir / Modifier
           </button>
-          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML" x-on:submit="$dispatch('notify', {message: '{% if row.user.is_active %}Désactivation en cours...{% else %}Activation en cours...{% endif %}', type: 'info'})">
             {% csrf_token %}
             <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
             <input type="hidden" name="action" value="toggle_active">
             <button class="workflow-btn workflow-btn-secondary" type="submit">{% if row.user.is_active %}Desactiver{% else %}Activer{% endif %}</button>
           </form>
-          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML" x-on:submit="$dispatch('notify', {message: 'Réinitialisation du mot de passe en cours...', type: 'info'})">
             {% csrf_token %}
             <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
             <input type="hidden" name="action" value="reset_password">

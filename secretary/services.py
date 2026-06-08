@@ -232,6 +232,13 @@ def register_visitor(*, created_by, **data):
 
 
 @transaction.atomic
+def update_visitor(visitor, **data):
+    for field, value in data.items():
+        setattr(visitor, field, value)
+    return _clean_instance(visitor)
+
+
+@transaction.atomic
 def close_visit(visitor, departed_at=None):
     if visitor.is_archived:
         raise ValidationError("Une visite archivee ne peut pas etre cloturee.")
@@ -291,6 +298,16 @@ def get_today_appointments(*, user=None, branch=None):
 
 
 @transaction.atomic
+def update_appointment(appointment, **data):
+    scheduled_at = data.get("scheduled_at", appointment.scheduled_at)
+    assigned_to = data.get("assigned_to", appointment.assigned_to)
+    prevent_conflicts(scheduled_at=scheduled_at, assigned_to=assigned_to, exclude_id=appointment.pk)
+    for field, value in data.items():
+        setattr(appointment, field, value)
+    return _clean_instance(appointment)
+
+
+@transaction.atomic
 def complete_appointment(appointment):
     if appointment.is_archived:
         raise ValidationError("Un rendez-vous archive ne peut pas etre complete.")
@@ -314,6 +331,13 @@ def start_document_processing(document):
         document.status = DocumentReceipt.STATUS_IN_PROGRESS
     elif document.status == DocumentReceipt.STATUS_COMPLETED:
         raise ValidationError("Ce document a deja ete traite.")
+    return _clean_instance(document)
+
+
+@transaction.atomic
+def update_document(document, **data):
+    for field, value in data.items():
+        setattr(document, field, value)
     return _clean_instance(document)
 
 
@@ -359,6 +383,13 @@ def assign_task(task, user):
     task.assigned_to = user
     if task.status == SecretaryTask.STATUS_PENDING:
         task.status = SecretaryTask.STATUS_IN_PROGRESS
+    return _clean_instance(task)
+
+
+@transaction.atomic
+def update_task(task, **data):
+    for field, value in data.items():
+        setattr(task, field, value)
     return _clean_instance(task)
 
 

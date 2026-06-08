@@ -1,0 +1,15 @@
+{% load humanize %}
+<div id="widget-today-payments"
+     class="dg-kpi-card"
+     style="border-top:3px solid #16a34a; cursor:default;"
+     hx-get="{% url 'accounts:widget_today_payments' %}"
+     hx-trigger="every 30s, paymentUpdated from:body, dashboardStatsUpdated from:body"
+     hx-swap="outerHTML">
+  <div class="dg-kpi-icon-wrap bg-emerald-50 text-emerald-600"><i class="fa-solid fa-sack-dollar"></i></div>
+  <div class="dg-kpi-label" style="color:#16a34a;">Encaissement mois</div>
+  <div class="dg-kpi-value">{{ month_total|intcomma }}</div>
+  <div class="dg-kpi-detail">
+    Aujourd'hui: {{ today_total|intcomma }} ({{ today_count }} paiement{{ today_count|pluralize }})
+    &middot; <span style="color:#d97706;">{{ pending_count }} en attente ({{ pending_amount|intcomma }} FCFA)</span>
+  </div>
+</div>

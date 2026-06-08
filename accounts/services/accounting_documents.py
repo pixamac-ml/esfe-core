@@ -4,11 +4,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.pdfgen import canvas
-from reportlab.platypus import Table, TableStyle
+from core.pdf_documents import generate_pdf as generate_esfe_pdf
 
 from accounts.models import AccountingDocumentSequence, BranchCashMovement
 
@@ -163,7 +159,20 @@ def ensure_cash_movement_receipt(movement):
     ensure_cash_movement_reference(movement)
     if movement.receipt_pdf:
         return movement.receipt_pdf
-    pdf_bytes = render_cash_movement_receipt_pdf(movement)
+
+    pdf_bytes = generate_esfe_pdf("esfe_cash_receipt", {
+        "receipt_number": movement.receipt_number or movement.reference,
+        "reference": movement.reference or "",
+        "date": movement.created_at.strftime("%d/%m/%Y %H:%M"),
+        "branch_name": movement.branch.name if movement.branch_id else "",
+        "movement_type": movement.get_movement_type_display(),
+        "source": movement.get_source_display(),
+        "operation_date": movement.movement_date.strftime("%d/%m/%Y"),
+        "label": movement.label or "",
+        "amount": f"{movement.amount:,}".replace(",", " "),
+        "agent": movement.created_by.get_full_name() if movement.created_by_id else "",
+        "notes": movement.notes or "",
+    })
     movement.receipt_pdf.save(
         f"piece-caisse-{movement.receipt_number}.pdf",
         ContentFile(pdf_bytes),

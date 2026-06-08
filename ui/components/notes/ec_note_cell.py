@@ -5,5 +5,5 @@ from django_components import component
 class ECNoteCell(component.Component):
     template_name = "notes/ec_note_cell.html"
 
-    def get_context_data(self, row, ec_row):
-        return {"row": row, "ec_row": ec_row}
+    def get_context_data(self, row, ec_row, session_type=None):
+        return {"row": row, "ec_row": ec_row, "session_type": session_type}

@@ -347,7 +347,7 @@ def bulletin_detail_view(request, bulletin_id):
     )
     if not can_view_student_academic_report(request.user, bulletin.student, academic_class=bulletin.academic_class):
         raise PermissionDenied("Acces refuse a ce bulletin.")
-    return render(request, "academics/reports/bulletin.html", build_bulletin_context(bulletin))
+    return render(request, "academics/reports/bulletin_esfe.html", build_bulletin_context(bulletin))
 
 
 @login_required
@@ -366,7 +366,7 @@ def bulletin_pdf_view(request, bulletin_id):
     if not can_view_student_academic_report(request.user, bulletin.student, academic_class=bulletin.academic_class):
         raise PermissionDenied("Acces refuse a ce bulletin.")
     context = build_bulletin_context(bulletin)
-    pdf_bytes, backend_error = _render_pdf_from_template(request, "academics/reports/bulletin.html", context)
+    pdf_bytes, backend_error = _render_pdf_from_template(request, "academics/reports/bulletin_esfe.html", context)
     if backend_error is not None:
         return backend_error
     response = HttpResponse(pdf_bytes, content_type="application/pdf")

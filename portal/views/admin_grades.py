@@ -1,4 +1,7 @@
+from datetime import date
 from decimal import Decimal, InvalidOperation
+
+from django.utils.text import slugify
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch
@@ -7,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 
 from academics.models import AcademicEnrollment, EC, ECGrade, Semester
-from academics.services.grading import apply_ec_grade, compute_ec_status, resolve_threshold
+from academics.services.grading import apply_ec_grade, compute_ec_status, resolve_ec_threshold, resolve_threshold
 from academics.services.semester import compute_semester_result
 from academics.services.ue import compute_ue_result
 from academics.services.workflow import can_publish_semester, get_semester_permissions
@@ -261,13 +264,12 @@ def _build_notes_grid_context(*, academic_class, semester, requested_session_typ
 
 
 def _build_excel_row(enrollment, semester, ues, index, active_session_type="normal", updated_ec_id=None):
-    threshold = resolve_threshold(enrollment)
     permissions = get_semester_permissions(semester)
     can_edit_current_session = (
         permissions["can_enter_retake"]
         if active_session_type == "retake"
-        else permissions["can_enter_normal"]
-    )
+        else permissions["can_enter_normal"
+    ])
     grades_by_ec_id = {
         grade.ec_id: grade
         for grade in ECGrade.objects.filter(
@@ -293,6 +295,7 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
         # IMPORTANT: on itère sur la même hiérarchie EC que celle utilisée par le header.
         # Ainsi, le nombre de cellules par UE reste strictement identique entre header et body.
         for ec in ue.ecs.all():
+            ec_threshold = resolve_ec_threshold(ec.coefficient)
             row = ue_rows_by_ec_id.get(ec.id, {
                 "ec": ec,
                 "note_coefficient": Decimal("0.00"),
@@ -306,10 +309,10 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
             if grade:
                 edit_score = grade.retake_score if active_session_type == "retake" else grade.normal_score
                 final_score = grade.final_score
-            is_retake_editable = can_edit_retake_grade(grade=grade, threshold=threshold)
-            ec_status = compute_ec_status(final_score, threshold)
+            is_retake_editable = can_edit_retake_grade(grade=grade, threshold=ec_threshold)
+            ec_status = compute_ec_status(final_score, ec_threshold)
             display_status = (
-                compute_ec_status(grade.normal_score if grade else None, threshold)
+                compute_ec_status(grade.normal_score if grade else None, ec_threshold)
                 if active_session_type == "normal"
                 else ec_status
             )
@@ -366,7 +369,10 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
         "student_id": enrollment.student.student_profile.id,
         "semester_id": semester.id,
         "student_profile_id": enrollment.student.student_profile.id,
+        "student_matricule": enrollment.student.student_profile.matricule,
         "student_name": enrollment.student.student_profile.full_name,
+        "student_first_name": enrollment.student.student_profile.inscription.candidature.first_name,
+        "student_last_name": enrollment.student.student_profile.inscription.candidature.last_name,
         "ue_blocks": ue_blocks,
         "semester_average": semester_result["average"],
         "semester_average_display": _format_decimal(semester_result["average"]),
@@ -441,9 +447,10 @@ def save_grade(request):
         if note < Decimal("0") or note > Decimal("20"):
             return HttpResponse("La note doit etre comprise entre 0 et 20.", status=400)
 
+        ec_threshold = resolve_ec_threshold(ec.coefficient)
         if session_type == "retake":
             grade = ECGrade.objects.filter(enrollment=enrollment, ec=ec).first()
-            if not can_edit_retake_grade(grade=grade, threshold=resolve_threshold(enrollment)):
+            if not can_edit_retake_grade(grade=grade, threshold=ec_threshold):
                 return HttpResponse("Seules les matieres non validees peuvent etre modifiees au rattrapage.", status=403)
             if grade is None:
                 return HttpResponse("Note normale requise avant saisie du rattrapage.", status=400)
@@ -460,8 +467,9 @@ def save_grade(request):
     else:
         grade = ECGrade.objects.filter(enrollment=enrollment, ec=ec).first()
         if grade:
+            ec_threshold = resolve_ec_threshold(ec.coefficient)
             if session_type == "retake":
-                if not can_edit_retake_grade(grade=grade, threshold=resolve_threshold(enrollment)):
+                if not can_edit_retake_grade(grade=grade, threshold=ec_threshold):
                     return HttpResponse("Seules les matieres non validees peuvent etre modifiees au rattrapage.", status=403)
                 grade.retake_score = None
             else:
@@ -502,10 +510,12 @@ def save_grade(request):
 
     html = render_to_string(
         "portal/admin/grades/partials/excel_row.html",
-        {"row": row},
+        {"row": row, "active_session_type": session_type},
         request=request,
     )
-    return HttpResponse(html)
+    response = HttpResponse(html)
+    response["HX-Trigger"] = '{"kpi-update": "", "workflow-update": ""}'
+    return response
 
 
 @login_required
@@ -609,7 +619,7 @@ def it_notes_grid_view(request):
     )
     return render(
         request,
-        "portal/admin/grades/partials/notes_grid.html",
+        "portal/admin/grades/partials/notes_maquette.html",
         {
             **context,
             "embedded_in_dashboard": True,
@@ -633,4 +643,106 @@ def it_notes_workspace_view(request):
         request,
         "portal/staff/partials/it_notes_workspace.html",
         selection_context,
+    )
+
+
+try:
+    from weasyprint import HTML
+except Exception:
+    HTML = None
+
+
+@login_required
+def class_grade_sheet_pdf_view(request, class_id, semester_id):
+    if get_user_position(request.user) != "it_support":
+        return HttpResponseForbidden("Acces refuse.")
+
+    if HTML is None:
+        return HttpResponse(
+            "WeasyPrint n'est pas installe ou ses dependances systeme sont manquantes.",
+            status=500,
+            content_type="text/plain; charset=utf-8",
+        )
+
+    fmt = request.GET.get("format", "a4").lower()
+    if fmt not in ("a3", "a4"):
+        fmt = "a4"
+
+    from portal.views.it_grades_import import build_it_grade_selection_context
+
+    selection_context = build_it_grade_selection_context(
+        request.user,
+        class_id=class_id,
+        semester_id=semester_id,
+    )
+    academic_class = selection_context["selected_class"]
+    semester = selection_context["selected_semester"]
+    if academic_class is None or semester is None:
+        return HttpResponse("Classe ou semestre invalide.", status=400)
+
+    context = _build_notes_grid_context(
+        academic_class=academic_class,
+        semester=semester,
+        requested_session_type="normal",
+    )
+    context["today"] = date.today()
+    context["print_format"] = fmt
+
+    ues = context.get("ues", [])
+    chunk_size = 3
+    context["ue_chunks"] = [ues[i:i + chunk_size] for i in range(0, len(ues), chunk_size)]
+
+    html = render_to_string(
+        "academics/reports/class_grade_sheet_pdf.html",
+        context,
+        request=request,
+    )
+    pdf_bytes = HTML(string=html, base_url=request.build_absolute_uri()).write_pdf(
+        presentational_hints=True,
+    )
+
+    filename = f"releve-classe-{slugify(academic_class.name)}-s{semester.number}-{fmt}.pdf"
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Content-Length"] = len(pdf_bytes)
+    return response
+
+
+@login_required
+def class_grade_sheet_print_view(request, class_id, semester_id):
+    if get_user_position(request.user) != "it_support":
+        return HttpResponseForbidden("Acces refuse.")
+
+    fmt = request.GET.get("format", "a4").lower()
+    if fmt not in ("a3", "a4"):
+        fmt = "a4"
+
+    from portal.views.it_grades_import import build_it_grade_selection_context
+
+    selection_context = build_it_grade_selection_context(
+        request.user,
+        class_id=class_id,
+        semester_id=semester_id,
+    )
+    academic_class = selection_context["selected_class"]
+    semester = selection_context["selected_semester"]
+    if academic_class is None or semester is None:
+        return HttpResponse("Classe ou semestre invalide.", status=400)
+
+    context = _build_notes_grid_context(
+        academic_class=academic_class,
+        semester=semester,
+        requested_session_type="normal",
+    )
+    context["today"] = date.today()
+    context["print_format"] = fmt
+
+    ues = context.get("ues", [])
+    chunk_size = 3
+    context["ue_chunks"] = [ues[i:i + chunk_size] for i in range(0, len(ues), chunk_size)]
+
+    return render(
+        request,
+        "academics/reports/class_grade_sheet_print.html",
+        context,
     )

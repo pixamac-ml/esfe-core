@@ -1,0 +1,276 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relevé de Notes — ESFE</title>
+  <style>
+    @page { size: A4 landscape; margin: 8mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 8px; line-height: 1.3;
+      color: #1a1a2e;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .watermark {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 0; pointer-events: none;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .watermark img { width: 70%; height: auto; opacity: 0.04; filter: grayscale(100%); }
+    .page {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column;
+      min-height: 100%;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #1a3a6b;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
+    }
+    .header-logo { width: 80px; height: auto; margin-bottom: 4px; }
+    .header-school {
+      font-size: 14px; font-weight: 700; color: #1a3a6b;
+      text-transform: uppercase; letter-spacing: 1px;
+      margin: 2px 0 1px;
+    }
+    .header-tagline {
+      font-size: 8px; font-weight: 600; color: #b8860b;
+      letter-spacing: 2px; text-transform: uppercase;
+      margin: 0 0 2px;
+    }
+    .header-contact { font-size: 7px; color: #555; margin: 0; }
+
+    .report-title {
+      text-align: center; margin: 6px 0 8px;
+    }
+    .report-title h1 {
+      font-size: 14px; font-weight: 700; color: #1a3a6b;
+      letter-spacing: 3px; text-transform: uppercase;
+      margin: 0; padding: 6px 16px;
+      border: 2px solid #1a3a6b;
+      display: inline-block;
+    }
+    .info-block {
+      margin-bottom: 6px;
+      padding: 4px 8px;
+      background: #f5f7fb;
+      border: 1px solid #d0d5e0;
+      font-size: 8px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px 20px;
+    }
+    .info-grid .row { display: flex; }
+    .info-grid .label { font-weight: 600; color: #444; min-width: 100px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7.5px;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #888;
+      padding: 2px 3px;
+      text-align: center;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+    th {
+      background: #1a3a6b;
+      color: #fff;
+      font-weight: 600;
+      font-size: 6.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .left { text-align: left; }
+    .right { text-align: right; }
+    .bg-valid { background: #e8f5e9; }
+    .bg-fail { background: #fff3e0; }
+    .ue-row td { font-weight: 600; background: #f0f4fa; }
+    .total-row td { font-weight: 700; background: #e3eaf5; border-top: 2px solid #1a3a6b; }
+    .footer {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid #d0d5e0;
+      text-align: center;
+      font-size: 7px;
+      color: #777;
+    }
+    .footer .footer-tagline {
+      font-weight: 600; color: #b8860b;
+      letter-spacing: 1px; text-transform: uppercase;
+      font-size: 7px; margin-top: 2px;
+    }
+    .signature-row {
+      display: flex; justify-content: space-between;
+      margin-top: 10px; font-size: 8px;
+    }
+    .signature-box { text-align: center; min-width: 150px; }
+    .signature-box .line { width: 150px; height: 1px; background: #444; margin: 3px auto; }
+    .legend { font-size: 6.5px; color: #555; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="watermark">
+    <img src="{% static 'institution/logo_esfe.png' %}" alt="">
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <img src="{% static 'institution/logo_esfe.png' %}" alt="ESFE" class="header-logo">
+      <div class="header-school">École de Santé Félix Houphouët-Boigny</div>
+      <div class="header-tagline">Demain, c'est aujourd'hui</div>
+      <div class="header-contact">Djélibougou • BP 00223 • Bamako • Mali</div>
+      <div class="header-contact">Tel : 76-37-88-66 / 66-37-88-66</div>
+    </div>
+
+    <div class="report-title">
+      <h1>RELEVÉ DE NOTES</h1>
+    </div>
+
+    <div class="info-block">
+      <div class="info-grid">
+        <div class="row"><span class="label">Année Universitaire :</span> {{ bulletin.academic_year }}</div>
+        <div class="row"><span class="label">Semestre :</span> {% if semester_result %}{{ semester_result.semester.number }}{% endif %}</div>
+        <div class="row"><span class="label">Département :</span> {{ department_name|default:"" }}</div>
+        <div class="row"><span class="label">N° Matricule :</span> {{ student_matricule }}</div>
+        <div class="row"><span class="label">Nom :</span> {{ student_last_name|default:"" }}</div>
+        <div class="row"><span class="label">Prénom :</span> {{ student_first_name|default:student_full_name }}</div>
+        <div class="row"><span class="label">Date et lieu de naissance :</span> {{ student_birth_info|default:"-" }}</div>
+        <div class="row"><span class="label">Domaine :</span> {{ domain_name|default:"" }}</div>
+        <div class="row"><span class="label">Filière :</span> {{ programme_name|default:"" }}</div>
+      </div>
+    </div>
+
+    {% if bulletin.bulletin_type == "semester" and semester_result %}
+    <table>
+      <thead>
+        <tr>
+          <th colspan="4">Unités d'Enseignement (U.E)</th>
+          <th colspan="7">Matière(s) constitutive(s) de l'unité d'enseignement</th>
+          <th colspan="4">Résultats obtenus</th>
+        </tr>
+        <tr>
+          <th style="width:6%">Code</th>
+          <th style="width:16%">Nature</th>
+          <th style="width:5%">Crédits</th>
+          <th style="width:3%">Coef</th>
+          <th style="width:14%">Intitulé(s)</th>
+          <th style="width:4%">Crédits</th>
+          <th style="width:3%">Coef</th>
+          <th style="width:5%">Note</th>
+          <th style="width:6%">Note × Coef</th>
+          <th style="width:5%">Crédits</th>
+          <th style="width:7%">Moy. UE</th>
+          <th style="width:7%">Note × Coef UE</th>
+          <th style="width:6%">Crédits UE</th>
+          <th style="width:7%">Moy. %</th>
+          <th style="width:6%">Crédits</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ue_res in semester_result.ue_results %}
+          {% with ue=ue_res.ue rows=ue_res.rows %}
+            {% for ec_row in rows %}
+              <tr>
+                {% if forloop.first %}
+                  <td rowspan="{{ rows|length }}">{{ ue.code }}</td>
+                  <td rowspan="{{ rows|length }}" class="left">{{ ue.title }}</td>
+                  <td rowspan="{{ rows|length }}">{{ ue_res.credit_required_display }}</td>
+                  <td rowspan="{{ rows|length }}">{{ ue.coefficient }}</td>
+                {% endif %}
+                <td class="left">{{ ec_row.ec.title }}</td>
+                <td>{{ ec_row.credit_required_display }}</td>
+                <td>{{ ec_row.ec_coefficient_display }}</td>
+                <td class="{% if ec_row.note < 10 %}bg-fail{% else %}bg-valid{% endif %}">{{ ec_row.note_display }}</td>
+                <td>{{ ec_row.note_coefficient_display }}</td>
+                <td>{{ ec_row.credit_obtained_display }}</td>
+                {% if forloop.first %}
+                  <td rowspan="{{ rows|length }}">{{ ue_res.average_display }}</td>
+                  <td rowspan="{{ rows|length }}">{{ ue_res.total_note_coefficients_display }}</td>
+                  <td rowspan="{{ rows|length }}">{{ ue_res.credit_obtained_display }}</td>
+                  <td rowspan="{{ rows|length }}">{{ semester_result.average_display }}%</td>
+                  <td rowspan="{{ rows|length }}">{{ semester_result.credit_obtained_display }}</td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          {% endwith %}
+        {% endfor %}
+        <tr class="total-row">
+          <td colspan="4" class="left">Total Semestre {{ semester_result.semester.number }}</td>
+          <td colspan="5"></td>
+          <td>{{ semester_result.credit_obtained_display }} / {{ semester_result.credit_required_display }}</td>
+          <td>{{ semester_result.average_display }}</td>
+          <td></td>
+          <td></td>
+          <td>{{ semester_result.percentage_display }}%</td>
+          <td>{{ semester_result.credit_obtained_display }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="legend">
+      <strong>Décision :</strong> {{ bulletin.decision|default:"-" }} &nbsp;|&nbsp;
+      <strong>Mention :</strong> {{ bulletin.mention|default:"-" }} &nbsp;|&nbsp;
+      <strong>Statut :</strong> {{ semester_result.status|upper }}
+    </div>
+    {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Semestre</th>
+          <th>Moyenne</th>
+          <th>Crédits obtenus</th>
+          <th>Crédits requis</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in bulletin.snapshot.semesters %}
+          <tr>
+            <td>S{{ forloop.counter }}</td>
+            <td>{{ item.average|default:"-" }}</td>
+            <td>{{ item.credit_obtained }}</td>
+            <td>{{ item.credit_required }}</td>
+            <td>{{ item.status }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="legend">
+      <strong>Décision :</strong> {{ bulletin.decision|default:"-" }} &nbsp;|&nbsp;
+      <strong>Mention :</strong> {{ bulletin.mention|default:"-" }}
+    </div>
+    {% endif %}
+
+    <div class="signature-row">
+      <div>
+        <strong>Observations :</strong><br>
+        ..................................................................................<br>
+        ..................................................................................
+      </div>
+      <div class="signature-box">
+        <div>San, le ..................................</div>
+        <div class="line"></div>
+        <div><strong>Le Directeur Général</strong></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>BP 00223 • Bamako • Mali &nbsp;|&nbsp; contact@esfe.ml • www.esfe.ml</div>
+      <div class="footer-tagline">Demain, c'est aujourd'hui</div>
+    </div>
+  </div>
+</body>
+</html>

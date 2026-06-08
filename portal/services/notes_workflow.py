@@ -6,8 +6,10 @@ from django.core.exceptions import ValidationError
 from django.db.models import Count
 
 from academics.models import AcademicEnrollment, ECGrade, Semester
-from academics.services.grading import compute_ec_status
+from academics.services.documents import generate_annual_bulletins_for_class, generate_semester_bulletins_for_class
+from academics.services.grading import compute_ec_status, resolve_ec_threshold
 from academics.services.semester import compute_semester_result
+from academics.services.year import create_academic_debts
 from accounts.dashboards.helpers import get_user_branch
 from portal.models import SupportAuditLog
 from portal.services.it_support_service import log_support_action
@@ -28,6 +30,8 @@ ACTION_PUBLISH_NORMAL = "publier_session_normale"
 ACTION_PREVIEW_RETAKE = "ouvrir_rattrapage"
 ACTION_ACTIVATE_RETAKE = "activer_rattrapage"
 ACTION_PUBLISH_FINAL = "publier_resultats_finaux"
+ACTION_GENERATE_DECISIONS = "generer_decisions_annuelles"
+ACTION_GENERATE_BULLETINS = "generer_bulletins"
 
 
 @dataclass(frozen=True)
@@ -71,7 +75,6 @@ def get_retake_candidates(*, academic_class, semester) -> list[RetakeCandidate]:
     if not academic_class or not semester:
         return []
 
-    threshold = academic_class.validation_threshold or 10
     enrollments = list(
         AcademicEnrollment.objects.select_related(
             "student__student_profile__inscription__candidature",
@@ -97,7 +100,8 @@ def get_retake_candidates(*, academic_class, semester) -> list[RetakeCandidate]:
     for enrollment in enrollments:
         failed_subjects = []
         for grade in grades_by_enrollment.get(enrollment.id, []):
-            normal_status = compute_ec_status(grade.normal_score, threshold)
+            ec_threshold = resolve_ec_threshold(grade.ec.coefficient)
+            normal_status = compute_ec_status(grade.normal_score, ec_threshold)
             if normal_status != "failed" and grade.retake_score is None:
                 continue
             failed_subjects.append(
@@ -237,7 +241,10 @@ def get_available_actions(*, state: NotesWorkflowState | None):
         STATE_READY_TO_PUBLISH_FINAL: [
             {"code": ACTION_PUBLISH_FINAL, "label": "Publier resultats finaux", "style": "primary"},
         ],
-        STATE_FINAL_PUBLISHED: [],
+        STATE_FINAL_PUBLISHED: [
+            {"code": ACTION_GENERATE_DECISIONS, "label": "Generer decisions annuelles", "style": "secondary"},
+            {"code": ACTION_GENERATE_BULLETINS, "label": "Generer bulletins", "style": "primary"},
+        ],
     }
     return actions_by_state.get(state.code, [])
 
@@ -322,6 +329,32 @@ def apply_notes_workflow_action(*, actor, academic_class, semester, action):
             action_type=SupportAuditLog.ACTION_RESULTS_SENT,
             target_label=f"Publication finale {academic_class.display_name} S{semester.number}",
             details=f"Resultats finaux publies pour {enrollments.count()} etudiant(s).",
+        )
+        return
+
+    if action == ACTION_GENERATE_DECISIONS:
+        if semester.status != Semester.STATUS_PUBLISHED:
+            raise ValidationError("Les decisions annuelles ne peuvent etre generees qu'apres publication finale.")
+        bulletins = generate_annual_bulletins_for_class(academic_class=academic_class, actor=actor, publish=True)
+        log_support_action(
+            actor=actor,
+            branch=get_user_branch(actor),
+            action_type=SupportAuditLog.ACTION_RESULTS_SENT,
+            target_label=f"Decisions annuelles {academic_class.display_name}",
+            details=f"{len(bulletins)} bulletin(s) annuel(s) generes avec decisions.",
+        )
+        return
+
+    if action == ACTION_GENERATE_BULLETINS:
+        if semester.status != Semester.STATUS_PUBLISHED:
+            raise ValidationError("Les bulletins ne peuvent etre generes qu'apres publication finale.")
+        bulletins = generate_semester_bulletins_for_class(academic_class=academic_class, semester=semester, actor=actor, publish=True)
+        log_support_action(
+            actor=actor,
+            branch=get_user_branch(actor),
+            action_type=SupportAuditLog.ACTION_RESULTS_SENT,
+            target_label=f"Bulletins {academic_class.display_name} S{semester.number}",
+            details=f"{len(bulletins)} bulletin(s) semestriel(s) generes.",
         )
         return
 

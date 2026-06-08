@@ -601,6 +601,8 @@ def contact_view(request):
 # ==========================================================
 
 def custom_404(request, exception):
+    logger.info(f"404 | Path={request.path}")
+
     formations_home = (
         Programme.objects
         .filter(is_active=True)

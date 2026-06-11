@@ -28,6 +28,9 @@ EMAIL_TEMPLATE_REGISTRY = {
     "payment_receipt_email": {
         "html_template": "emails/base_communication.html",
     },
+    "diploma_ready": {
+        "html_template": "emails/academics/diploma_ready.html",
+    },
 }
 
 RESERVED_METADATA_KEYS = {

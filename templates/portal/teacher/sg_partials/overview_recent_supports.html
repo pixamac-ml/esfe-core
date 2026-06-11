@@ -1,0 +1,23 @@
+<div class="sg-panel">
+  <div class="sg-panel-title">Derniers supports</div>
+  {% if recent_supports %}
+    <div class="message-list">
+      {% for s in recent_supports|slice:":3" %}
+      <div class="sg-action-card">
+        <div><div class="sg-action-label" style="font-size:.8rem;">{{ s.titre|truncatechars:32 }}</div><div class="sg-action-sub" style="font-size:.68rem;">{{ s.chapitre.classe.nom|default:"-" }} · {{ s.date_publication|date:"d/m/Y" }}</div></div>
+        {% if s.fichier %}
+        <a href="{{ s.fichier.url }}" class="sg-btn sg-btn-outline" style="min-height:28px;font-size:.65rem;" target="_blank"><i class="fa-solid fa-download"></i></a>
+        {% endif %}
+      </div>
+      {% empty %}
+      <div class="sg-empty" style="padding:16px 0;"><div class="sg-empty-text" style="font-size:.75rem;">Aucun.</div></div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="sg-empty" style="padding:24px 0;">
+      <div class="sg-empty-icon"><i class="fa-solid fa-folder-open"></i></div>
+      <div class="sg-empty-text">Aucun support depose.</div>
+    </div>
+  {% endif %}
+  <div style="margin-top:8px;"><a href="?section=supports" class="sg-link">Gerer les supports</a></div>
+</div>

@@ -1,0 +1,68 @@
+{% load component_tags %}
+
+<div class="mb-5 flex items-start justify-between gap-3">
+  <div>
+    <p class="student-section-kicker">Diplomes</p>
+    <h3 class="mt-1 student-section-title">Mes diplomes obtenus</h3>
+  </div>
+  {% component "status_badge" label="Diplomes" tone="primary" icon="award" %}{% endcomponent %}
+</div>
+
+{% if awards %}
+  <div class="grid gap-4">
+    {% for award in awards %}
+      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 transition hover:shadow-md">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0 flex-1">
+            <div class="mb-2 flex items-center gap-2">
+              <i data-lucide="award" class="text-amber-500" style="width:20px;height:20px;"></i>
+              <h4 class="text-base font-black text-[color:var(--text)]">{{ award.diploma.name|default:award.programme.name }}</h4>
+            </div>
+            <dl class="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+              <div>
+                <dt class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Reference</dt>
+                <dd class="font-semibold text-[color:var(--text)]">{{ award.reference }}</dd>
+              </div>
+              <div>
+                <dt class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Annee academique</dt>
+                <dd class="font-semibold text-[color:var(--text)]">{{ award.academic_year.name }}</dd>
+              </div>
+              <div>
+                <dt class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Moyenne finale</dt>
+                <dd class="font-semibold text-[color:var(--text)]">{{ award.final_average|default:"-" }}{% if award.mention %} / {{ award.mention }}{% endif %}</dd>
+              </div>
+              <div>
+                <dt class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Statut</dt>
+                <dd>
+                  {% if award.status == "delivered" %}
+                    {% component "status_badge" label="Delivre" tone="success" icon="check-circle-2" %}{% endcomponent %}
+                  {% else %}
+                    {% component "status_badge" label="Pret" tone="info" icon="clock-3" %}{% endcomponent %}
+                  {% endif %}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div class="flex shrink-0 flex-col gap-2">
+            <a href="{% url 'academics:diploma_award_detail' award.id %}" target="_blank"
+               class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-bold text-[color:var(--school-primary)] transition hover:bg-[color:var(--school-primary)] hover:text-white">
+              <i data-lucide="eye" style="width:14px;height:14px;"></i>
+              Voir
+            </a>
+            <a href="{% url 'academics:diploma_award_pdf' award.id %}" target="_blank"
+               class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-bold text-[color:var(--school-primary)] transition hover:bg-[color:var(--school-primary)] hover:text-white">
+              <i data-lucide="file-text" style="width:14px;height:14px;"></i>
+              PDF
+            </a>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center">
+    <i data-lucide="award" class="mx-auto mb-3 text-[color:var(--muted)]" style="width:40px;height:40px;"></i>
+    <p class="text-sm font-bold text-[color:var(--muted)]">Aucun diplome pour le moment.</p>
+    <p class="mt-1 text-xs text-[color:var(--muted)]">Les diplomes apparaissent ici une fois votre cycle termine et valide par la Direction Generale.</p>
+  </div>
+{% endif %}

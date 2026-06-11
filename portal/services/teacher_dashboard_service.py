@@ -4,14 +4,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from django.core.exceptions import ValidationError
-from django.db import OperationalError, ProgrammingError
+from django.db import OperationalError, ProgrammingError, transaction
 from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicScheduleEvent, EC, ECChapter, ECContent, LessonLog, WeeklyScheduleSlot
 from academics.services.lesson_log_service import get_teacher_lesson_logs
 from academics.services.schedule_service import get_teacher_next_events, get_teacher_week_schedule
-from accounts.models import UserPreference
+from accounts.models import BranchCashMovement, TeacherHonorariumEntry, UserPreference
 from portal.models import AccountSupportState
 from students.models import Student, TeacherAttendance
 from portal.models import TeacherDashboardPreference
@@ -180,7 +180,7 @@ def _resolve_teacher_class(*, teacher, branch, class_id):
 def _content_prefetch():
     return Prefetch(
         "contents",
-        queryset=ECContent.objects.order_by("order", "id"),
+        queryset=ECContent.objects.select_related("chapter").order_by("order", "id"),
     )
 
 
@@ -342,6 +342,8 @@ def _serialize_support_content(content):
         "text_content": text_content,
         "text_excerpt": f"{text_content[:140]}..." if len(text_content) > 140 else text_content,
         "order": content.order,
+        "chapter_id": content.chapter_id,
+        "ec_id": content.chapter.ec_id,
         "is_video": content.content_type == ECContent.CONTENT_TYPE_VIDEO,
         "is_file_based": bool(content.file),
         "has_video_url": bool(video_url),
@@ -358,6 +360,142 @@ def _serialize_support_chapter(chapter):
         "content_count": len(contents),
         "contents": contents,
     }
+
+
+def get_teacher_content_for_edit(*, teacher, branch, content_id):
+    content = (
+        ECContent.objects.select_related(
+            "chapter__ec",
+            "chapter__ec__ue__semester__academic_class",
+        )
+        .filter(
+            pk=content_id,
+            is_active=True,
+            chapter__ec__ue__semester__academic_class__is_active=True,
+        )
+        .first()
+    )
+    if content is None:
+        raise ValidationError("Contenu introuvable.")
+    academic_class = content.chapter.ec.ue.semester.academic_class
+    teacher_ec_ids = {
+        ec.id
+        for ec in _get_teacher_ecs_for_class(
+            teacher=teacher,
+            branch=branch,
+            academic_class=academic_class,
+        )
+    }
+    if content.chapter.ec_id not in teacher_ec_ids:
+        raise ValidationError("Ce contenu ne vous appartient pas.")
+    serialized = _serialize_support_content(content)
+    serialized["class_id"] = academic_class.id
+    return serialized
+
+
+@transaction.atomic
+def update_teacher_content(*, teacher, branch, content_id, title, content_type, chapter_id, file, video_url, text_content):
+    content = (
+        ECContent.objects.select_related(
+            "chapter__ec",
+            "chapter__ec__ue__semester__academic_class",
+        )
+        .filter(pk=content_id, is_active=True)
+        .first()
+    )
+    if content is None:
+        raise ValidationError("Contenu introuvable.")
+    teacher_ec_ids = {
+        ec.id
+        for ec in _get_teacher_ecs_for_class(
+            teacher=teacher,
+            branch=branch,
+            academic_class=content.chapter.ec.ue.semester.academic_class,
+        )
+    }
+    if content.chapter.ec_id not in teacher_ec_ids:
+        raise ValidationError("Ce contenu ne vous appartient pas.")
+
+    title = (title or "").strip()
+    if not title:
+        raise ValidationError("Le titre du support est obligatoire.")
+    video_url = (video_url or "").strip() or None
+    text_content = (text_content or "").strip()
+
+    allowed_types = {choice[0] for choice in ECContent.CONTENT_TYPE_CHOICES}
+    if content_type not in allowed_types:
+        raise ValidationError("Type de contenu invalide.")
+
+    file_based_types = {
+        ECContent.CONTENT_TYPE_PDF,
+        ECContent.CONTENT_TYPE_DOC,
+        ECContent.CONTENT_TYPE_EXCEL,
+        ECContent.CONTENT_TYPE_PPT,
+        ECContent.CONTENT_TYPE_IMAGE,
+        ECContent.CONTENT_TYPE_AUDIO,
+    }
+
+    if content_type in file_based_types:
+        if file:
+            content.file = file
+            _validate_content_file_extension(content_type=content_type, uploaded_file=file)
+        elif not content.file:
+            raise ValidationError("Un fichier est requis pour ce type de contenu.")
+    else:
+        content.file = None
+
+    if content_type == ECContent.CONTENT_TYPE_VIDEO:
+        if not video_url:
+            raise ValidationError("Une URL video est requise pour ce type de contenu.")
+        content.video_url = video_url
+    else:
+        content.video_url = None
+
+    if content_type == ECContent.CONTENT_TYPE_TEXT:
+        if not text_content:
+            raise ValidationError("Un texte est requis pour ce type de contenu.")
+        content.text_content = text_content
+    else:
+        content.text_content = ""
+
+    if chapter_id is not None:
+        chapter = ECChapter.objects.filter(pk=chapter_id, ec=content.chapter.ec).first()
+        if chapter is None:
+            raise ValidationError("Chapitre invalide.")
+        content.chapter = chapter
+
+    content.title = title
+    content.content_type = content_type
+    content.full_clean()
+    content.save()
+    return content
+
+
+@transaction.atomic
+def delete_teacher_content(*, teacher, branch, content_id):
+    content = (
+        ECContent.objects.select_related(
+            "chapter__ec",
+            "chapter__ec__ue__semester__academic_class",
+        )
+        .filter(pk=content_id, is_active=True)
+        .first()
+    )
+    if content is None:
+        raise ValidationError("Contenu introuvable.")
+    teacher_ec_ids = {
+        ec.id
+        for ec in _get_teacher_ecs_for_class(
+            teacher=teacher,
+            branch=branch,
+            academic_class=content.chapter.ec.ue.semester.academic_class,
+        )
+    }
+    if content.chapter.ec_id not in teacher_ec_ids:
+        raise ValidationError("Ce contenu ne vous appartient pas.")
+    content.is_active = False
+    content.save()
+    return content
 
 
 def _serialize_support_ec(ec):
@@ -755,6 +893,64 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
             }
         )
 
+    # Honoraires data
+    teacher_hours = {"month_hours": 0, "total_hours": 0}
+    teacher_payments = {"pending_count": 0, "paid_count": 0, "recent_payments": []}
+    teacher_hour_rows = []
+    if branch:
+        current_month_start = today.replace(day=1)
+        year_start = today.replace(month=1, day=1)
+
+        honorarium_entries = TeacherHonorariumEntry.objects.filter(
+            branch=branch,
+            teacher=teacher,
+        ).order_by("-period_month")
+
+        for entry in honorarium_entries:
+            if entry.period_month == current_month_start:
+                teacher_hours["month_hours"] = float(entry.validated_hours)
+            if entry.period_month >= year_start:
+                teacher_hours["total_hours"] += float(entry.validated_hours)
+
+            status_map = {
+                TeacherHonorariumEntry.STATUS_DRAFT: ("pending", "A verifier"),
+                TeacherHonorariumEntry.STATUS_READY: ("pending", "Disponible"),
+                TeacherHonorariumEntry.STATUS_PARTIAL: ("partial", "Retrait partiel"),
+                TeacherHonorariumEntry.STATUS_PAID: ("paid", "Paye"),
+            }
+            status_slug, status_label = status_map.get(entry.status, ("draft", "Brouillon"))
+
+            teacher_hour_rows.append({
+                "month_label": entry.period_month.strftime("%B %Y"),
+                "hours": float(entry.validated_hours),
+                "tarif": entry.hourly_rate,
+                "gross_amount": entry.gross_amount,
+                "status": status_slug,
+                "status_display": status_label,
+            })
+
+            if entry.status in (TeacherHonorariumEntry.STATUS_READY, TeacherHonorariumEntry.STATUS_DRAFT):
+                teacher_payments["pending_count"] += 1
+            elif entry.status in (TeacherHonorariumEntry.STATUS_PAID, TeacherHonorariumEntry.STATUS_PARTIAL):
+                teacher_payments["paid_count"] += 1
+
+        # Cash movements for this teacher's honoraria
+        teacher_entry_pks = list(honorarium_entries.values_list("pk", flat=True))
+        if teacher_entry_pks:
+            ref_pattern = "|".join(f"^HON-{pk}-" for pk in teacher_entry_pks)
+            recent_cash = BranchCashMovement.objects.filter(
+                branch=branch,
+                source=BranchCashMovement.SOURCE_HONORARIUM,
+                source_reference__regex=ref_pattern,
+                movement_date__gte=year_start,
+            ).order_by("-movement_date", "-created_at")[:10]
+            for cm in recent_cash:
+                teacher_payments["recent_payments"].append({
+                    "label": cm.label,
+                    "date": cm.movement_date,
+                    "montant": cm.amount,
+                })
+
     context = {
         **base_context_builder(
             request,
@@ -811,6 +1007,9 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
         "teacher_attendance_summary": teacher_attendance_summary,
         "next_event_focus": next_event_focus,
         "teacher_insights": teacher_insights,
+        "teacher_hours": teacher_hours,
+        "teacher_payments": teacher_payments,
+        "teacher_hour_rows": teacher_hour_rows,
     }
     return context
 
@@ -1052,11 +1251,18 @@ def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
         log_qs = log_qs.filter(branch=branch)
     lesson_log = log_qs.first()
 
+    teacher_marked_present = TeacherAttendance.objects.filter(
+        teacher=teacher,
+        schedule_event=schedule_event,
+        status=TeacherAttendance.STATUS_PRESENT,
+    ).exists()
+
     return {
         "branch": branch,
         "schedule_event": schedule_event,
         "lesson_log": lesson_log,
         "toast": toast,
+        "teacher_marked_present": teacher_marked_present,
         "lesson_log_status_choices": [
             (LessonLog.STATUS_DONE, "Fait"),
             (LessonLog.STATUS_CANCELLED, "Annule"),

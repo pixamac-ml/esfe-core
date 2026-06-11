@@ -11,10 +11,10 @@
       <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=analytics')">
         <i class="fa-solid fa-download"></i>Exporter
       </button>
-      <select class="dg-filter" style="height:36px; font-size:.75rem;">
-        <option>6 derniers mois</option>
-        <option selected>12 derniers mois</option>
-        <option>Cette annee</option>
+      <select class="dg-filter" style="height:36px; font-size:.75rem;" onchange="dgRefreshSection('analytics')">
+        <option value="6m" {% if dashboard_period == '6m' %}selected{% endif %}>6 derniers mois</option>
+        <option value="12m" {% if dashboard_period == '12m' or not dashboard_period %}selected{% endif %}>12 derniers mois</option>
+        <option value="this_year" {% if dashboard_period == 'this_year' %}selected{% endif %}>Cette annee</option>
       </select>
     </div>
   </div>
@@ -74,10 +74,8 @@
       <div style="height:220px; background:#f8fafc; border-radius:8px; padding:12px; margin-bottom:12px;">
         <canvas id="dgMonthlyChart"></canvas>
       </div>
-      <!-- Trend indicator -->
-      <div class="dg-bar-item">
-        <div class="dg-bar-label"><span>Jan-Juin 2026</span><span style="color:#16a34a; font-weight:900;">+24% vs 2025</span></div>
-        <div class="dg-bar-track"><div class="dg-bar-fill" style="width:100%; background:#2563eb;"></div></div>
+      <div style="font-size:.65rem; font-weight:700; color:#64748b; margin-top:6px;">
+        Total candidatures: {{ analytics.total_candidatures|default:0|intcomma }} · Total inscriptions: {{ analytics.active_inscriptions|default:0|intcomma }}
       </div>
     </div>
     <div class="dg-panel">
@@ -119,16 +117,16 @@
       <div class="dg-panel-title">Indicateurs cles</div>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
         <div style="text-align:center; padding:12px; background:#eff6ff; border-radius:8px;">
-          <div style="font-size:1.4rem; font-weight:900; color:#2563eb;">72%</div>
-          <div style="font-size:.6rem; font-weight:800; color:#475569;">Taux reussite</div>
+          <div style="font-size:1.4rem; font-weight:900; color:#2563eb;">{{ analytics.total_candidatures|default:0|intcomma }}</div>
+          <div style="font-size:.6rem; font-weight:800; color:#475569;">Candidatures</div>
         </div>
         <div style="text-align:center; padding:12px; background:#f0fdf4; border-radius:8px;">
-          <div style="font-size:1.4rem; font-weight:900; color:#16a34a;">+18%</div>
-          <div style="font-size:.6rem; font-weight:800; color:#475569;">Croissance etuds</div>
+          <div style="font-size:1.4rem; font-weight:900; color:#16a34a;">{{ analytics.active_inscriptions|default:0|intcomma }}</div>
+          <div style="font-size:.6rem; font-weight:800; color:#475569;">Inscriptions</div>
         </div>
         <div style="text-align:center; padding:12px; background:#f5f3ff; border-radius:8px;">
-          <div style="font-size:1.4rem; font-weight:900; color:#7c3aed;">89%</div>
-          <div style="font-size:.6rem; font-weight:800; color:#475569;">Taux retention</div>
+          <div style="font-size:1rem; font-weight:900; color:#7c3aed;">{{ analytics.admission_conversion_rate|default:0 }}%</div>
+          <div style="font-size:.6rem; font-weight:800; color:#475569;">Taux conversion</div>
         </div>
         <div style="text-align:center; padding:12px; background:#fef3c7; border-radius:8px;">
           <div style="font-size:1.4rem; font-weight:900; color:#d97706;">{{ analytics.average_students_per_class|default:0 }}</div>

@@ -1,0 +1,50 @@
+{% if toast %}
+<div class="sg-toast-inline sg-toast-{{ toast.level }}">{{ toast.message }}</div>
+{% if toast.level == 'success' %}
+<script>window.setTimeout(function(){ sgClose(); sgToast('Profil mis a jour', '', 'success'); sgPlaySound('success'); }, 800);</script>
+{% endif %}
+{% endif %}
+
+<div class="sg-modal-header">
+  <div>
+    <div class="sg-modal-title"><i class="fa-regular fa-pen-to-square" style="margin-right:8px;color:#2563eb;"></i>Modifier mon profil</div>
+    <div class="sg-modal-sub">Mettez a jour vos informations personnelles.</div>
+  </div>
+  <button type="button" onclick="sgClose()" class="sg-modal-close" aria-label="Fermer"><i class="fa-solid fa-xmark"></i></button>
+</div>
+
+<form method="post" action="{% url 'accounts_portal:teacher_edit_profile_modal' %}"
+      hx-post="{% url 'accounts_portal:teacher_edit_profile_modal' %}"
+      hx-target="#sg-modal-content" hx-swap="innerHTML">
+  {% csrf_token %}
+  <div class="sg-form-grid">
+    <div class="field">
+      <label><i class="fa-regular fa-user" style="margin-right:4px;"></i>Nom</label>
+      <input type="text" name="nom" class="sg-form-input" value="{{ nom }}" placeholder="Votre nom">
+    </div>
+    <div class="field">
+      <label><i class="fa-regular fa-user" style="margin-right:4px;"></i>Prenoms</label>
+      <input type="text" name="prenoms" class="sg-form-input" value="{{ prenoms }}" placeholder="Vos prenoms">
+    </div>
+    <div class="field">
+      <label><i class="fa-regular fa-envelope" style="margin-right:4px;"></i>Email</label>
+      <input type="email" name="email" class="sg-form-input" value="{{ email }}" placeholder="email@exemple.com">
+    </div>
+    <div class="field">
+      <label><i class="fa-solid fa-phone" style="margin-right:4px;"></i>Telephone</label>
+      <input type="text" name="telephone" class="sg-form-input" value="{{ telephone }}" placeholder="+223 XX XX XX XX">
+    </div>
+    <div class="field">
+      <label><i class="fa-solid fa-flask" style="margin-right:4px;"></i>Specialite</label>
+      <input type="text" name="specialite" class="sg-form-input" value="{{ specialite }}" placeholder="Mathematiques, Physique...">
+    </div>
+    <div class="field">
+      <label><i class="fa-solid fa-coins" style="margin-right:4px;"></i>Tarif horaire (FCFA)</label>
+      <input type="text" name="tarif_horaire" class="sg-form-input" value="{{ tarif_horaire }}" placeholder="ex: 5000">
+    </div>
+  </div>
+  <div class="sg-modal-footer">
+    <button type="button" onclick="sgClose()" class="sg-btn sg-btn-outline">Annuler</button>
+    <button type="submit" class="sg-btn sg-btn-primary"><i class="fa-regular fa-floppy-disk"></i>Enregistrer</button>
+  </div>
+</form>

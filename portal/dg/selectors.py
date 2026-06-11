@@ -4,7 +4,7 @@ from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicEnrollment
-from accounts.models import BranchExpense, Profile
+from accounts.models import BranchExpense, BranchMonthlyClosure, Profile
 from admissions.models import Candidature
 from branches.models import Branch
 from inscriptions.models import Inscription
@@ -65,6 +65,9 @@ def get_dg_base_querysets(branch_ids):
             user_type="staff",
             employment_status="active",
         ).filter(Q(branch_id__in=branch_ids) | Q(branch__isnull=True)),
+        "monthly_closures": BranchMonthlyClosure.objects.filter(
+            branch_id__in=branch_ids,
+        ).select_related("branch", "validated_by"),
         "branch_filter": branch_filter,
     }
 

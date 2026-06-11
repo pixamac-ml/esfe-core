@@ -139,7 +139,8 @@
         { label: "Notifications", icon: "bell", target: "messages" },
         { label: "Encadrement", icon: "users-round", target: "teachers" },
         { label: "Parametres", icon: "settings-2", target: "settings" },
-        { label: "Boutique", icon: "shopping-bag", target: "shop" }
+        { label: "Boutique", icon: "shopping-bag", target: "shop" },
+        { label: "Mes diplomes", icon: "award", target: "diplomas" }
       ],
       sectionMeta: [
         {
@@ -197,6 +198,13 @@
           title: "Mes commandes boutique",
           description: "Consultez vos commandes, suivez leur statut et effectuez les paiements.",
           badge: "Section boutique"
+        },
+        {
+          key: "diplomas",
+          kicker: "Diplomes",
+          title: "Mes diplomes",
+          description: "Consultez vos diplomes obtenus en fin de cycle.",
+          badge: "Section diplomes"
         }
       ],
       courses: [],

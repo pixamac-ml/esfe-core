@@ -74,13 +74,18 @@
     /* === GRID : transposition de la maquette Excel === */
     .maq-grid {
       display: grid;
-      /* Largeurs définies via --meta-num, --meta-name, --ec-col, --unit-col, --result-col */
+      /* Colonnes generees par UE: chaque UE a (ecs.count*3) EC + 3 UE colonnes */
       grid-template-columns:
         var(--meta-num)                     /* N°  */
         var(--meta-name)                     /* NOM */
         var(--meta-name)                     /* PRENOMS */
-        repeat(var(--maq-ec-count, 0), minmax(var(--ec-col), 1fr))
-        repeat(var(--maq-ue-count, 0), minmax(var(--unit-col), 1fr))
+        {% for ue in ues %}
+          {% widthratio ue.ecs.count 1 3 as ec_tracks %}
+          repeat({{ ec_tracks }}, minmax(var(--ec-col), 1fr))
+          var(--unit-col)                    /* UE moyenne */
+          var(--unit-col)                    /* UE note coef. */
+          var(--unit-col)                    /* UE credits */
+        {% endfor %}
         var(--result-col)                    /* MOYENNE  */
         var(--result-col)                    /* %        */
         var(--result-col);                   /* CRÉDITS  */
@@ -106,7 +111,6 @@
     }
 
     .maq-cell--h {
-      position: sticky;
       background: #eef3ff;
       font-weight: 700;
       z-index: 5;
@@ -119,10 +123,10 @@
     .maq-cell--h-label { background: #f8fafc; text-align: left; }
 
     /* Empilement vertical des 5 lignes d'header */
-    .maq-cell--h-row1 { top: 0;        z-index: 9; }
-    .maq-cell--h-row2 { top: 0;        z-index: 8; }
-    .maq-cell--h-row3 { top: 0;        z-index: 7; }
-    .maq-cell--h-row4 { top: 0;        z-index: 6; }
+    .maq-cell--h-row1 { top: -500px; }
+    .maq-cell--h-row2 { top: -500px; }
+    .maq-cell--h-row3 { top: -500px; }
+    .maq-cell--h-row4 { top: -500px; }
     .maq-cell--h-row5 { top: 0;        z-index: 5; }
 
     /* === Colonnes meta figées à gauche === */
@@ -135,9 +139,9 @@
     .maq-cell--meta-num   { left: 0;                                z-index: 14; }
     .maq-cell--meta-name  { left: var(--meta-num);                  z-index: 13; }
     .maq-cell--meta-prenom{ left: calc(var(--meta-num) + var(--meta-name)); z-index: 12; }
-    .maq-cell--h.meta-num   { left: 0;                                z-index: 24; }
-    .maq-cell--h.meta-name  { left: var(--meta-num);                  z-index: 23; }
-    .maq-cell--h.meta-prenom{ left: calc(var(--meta-num) + var(--meta-name)); z-index: 22; }
+    .maq-cell--h.meta-num   { position: sticky; left: 0;                                z-index: 24; }
+    .maq-cell--h.meta-name  { position: sticky; left: var(--meta-num);                  z-index: 23; }
+    .maq-cell--h.meta-prenom{ position: sticky; left: calc(var(--meta-num) + var(--meta-name)); z-index: 22; }
 
     /* === Colonnes résultats figées à droite === */
     .maq-cell--res,
@@ -147,13 +151,13 @@
       font-weight: 700;
       z-index: 3;
     }
-    .maq-cell--h.res { z-index: 6; background: #f1f5f9; }
+    .maq-cell--h.res { position: sticky; z-index: 6; background: #f1f5f9; }
     .maq-cell--res-1 { right: calc(var(--result-col) * 2); z-index: 11; }
     .maq-cell--res-2 { right: var(--result-col);          z-index: 11; }
     .maq-cell--res-3 { right: 0;                          z-index: 11; }
-    .maq-cell--h.res-1 { right: calc(var(--result-col) * 2); z-index: 21; }
-    .maq-cell--h.res-2 { right: var(--result-col);          z-index: 21; }
-    .maq-cell--h.res-3 { right: 0;                          z-index: 21; }
+    .maq-cell--h.res-1 { position: sticky; right: calc(var(--result-col) * 2); z-index: 21; }
+    .maq-cell--h.res-2 { position: sticky; right: var(--result-col);          z-index: 21; }
+    .maq-cell--h.res-3 { position: sticky; right: 0;                          z-index: 21; }
 
     /* Coin haut-gauche (intersection header × meta) */
     .maq-cell--corner {
@@ -199,6 +203,84 @@
       border-color: var(--primary);
       background: #eff6ff;
     }
+
+    /* === Pile note éditable (score-stack copié depuis notes_grid.html) === */
+    .score-input {
+      width: 100%;
+      text-align: center;
+      border: 1px solid var(--line-dark);
+      padding: 7px 4px;
+      border-radius: 8px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      outline: none;
+      position: relative;
+      z-index: 20;
+      font-variant-numeric: tabular-nums;
+    }
+    .score-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(29, 78, 216, .12);
+    }
+    .score-input:disabled {
+      background: #e2e8f0;
+      color: #64748b;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .score-input.is-saved {
+      border-color: #16a34a;
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, .14);
+    }
+    .score-input.htmx-request {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    .score-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      min-height: 74px;
+    }
+    .score-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+      width: 100%;
+      gap: 3px;
+      color: #334155;
+      font-size: 10px;
+      line-height: 1.15;
+    }
+    .score-token {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      border: 1px solid rgba(148, 163, 184, .45);
+      background: rgba(255, 255, 255, .7);
+      border-radius: 6px;
+      padding: 3px 2px;
+    }
+    .score-token.normal  { border-color: #cbd5e1; background: #f8fafc; }
+    .score-token.retake  { border-color: #fdba74; background: #ffedd5; }
+    .score-token.final   { border-color: #86efac; background: #dcfce7; }
+    .score-token-label {
+      color: #64748b;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    .score-token-value {
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 10px;
+    }
+    .score-token.retake .score-token-label,
+    .score-token.retake .score-token-value { color: #c2410c; }
+    .score-token.final .score-token-label,
+    .score-token.final .score-token-value { color: #15803d; }
     /* === Color coding par statut (déjà calculé par le service) === */
     .maq-cell--ok    { background: var(--ok-soft); }
     .maq-cell--bad   { background: var(--bad-soft); }
@@ -241,6 +323,8 @@
     @media (max-width: 1200px) {
       .maq-cell--meta,
       .maq-cell--res { position: static; }
+      .score-input { display: none; }
+      .score-stack { min-height: auto; }
     }
   </style>
 
@@ -249,8 +333,9 @@
     (function() {
       var root = document.currentScript.previousElementSibling.parentElement;
       if (!root || !root.classList.contains('maq-root')) return;
-      root.style.setProperty('--maq-ec-count', root.dataset.totalEcs || '0');
-      root.style.setProperty('--maq-ue-count', root.dataset.totalUes || '0');
+      // Chaque EC occupe 3 colonnes (Note / Note coef. / Credit) et chaque UE 3 colonnes
+      root.style.setProperty('--maq-ec-count', (parseInt(root.dataset.totalEcs) || 0) * 3);
+      root.style.setProperty('--maq-ue-count', (parseInt(root.dataset.totalUes) || 0) * 3);
     })();
   </script>
 
@@ -381,17 +466,17 @@
         {% for row in rows %}
           <div class="maq-row-student maq-row"
                data-row-id="{{ row.student_id }}"
-               data-enrollment-id="{{ row.enrollment_id|default:'' }}">
+               data-enrollment-id="{{ row.enrollment.id|default:'' }}">
 
             {# --- Métadonnées figées à gauche --- #}
             <div class="maq-cell maq-cell--meta maq-cell--meta-num">
               {{ forloop.counter }}
             </div>
             <div class="maq-cell maq-cell--meta maq-cell--meta-name">
-              {{ row.last_name|default:"" }}
+              {{ row.student_last_name|default:"" }}
             </div>
             <div class="maq-cell maq-cell--meta maq-cell--meta-prenom">
-              {{ row.first_name|default:"" }}
+              {{ row.student_first_name|default:"" }}
             </div>
 
             {# --- Pour chaque UE : ECs + Unité synthétique --- #}
@@ -427,8 +512,8 @@
             <div class="maq-cell maq-cell--res maq-cell--res-2">
               {{ row.semester_percentage_display|default:"0,00" }}%
             </div>
-            <div class="maq-cell maq-cell--res maq-cell--res-3 {% if row.semester_credit_obtained == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">
-              {{ row.semester_credit_obtained_display|default:"0,00" }}
+            <div class="maq-cell maq-cell--res maq-cell--res-3 {% if row.semester_credits == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">
+              {{ row.semester_credits_display|default:"0,00" }}
             </div>
           </div>
         {% endfor %}

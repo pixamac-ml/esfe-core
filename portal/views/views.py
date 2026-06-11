@@ -69,8 +69,12 @@ from portal.services.teacher_dashboard_service import (
     _validate_content_file_extension,
     build_teacher_support_workspace_context,
     build_teacher_settings_context,
+    delete_teacher_content,
+    get_teacher_content_for_edit,
+    update_teacher_content,
     update_teacher_dashboard_preference,
 )
+from students.models import TeacherAttendance
 from portal.services.director import (
     build_director_classroom_ops_context,
     build_director_document_context,
@@ -119,6 +123,14 @@ from portal.dg.actions_service import (
     escalate_student_case,
     resolve_attendance_alert,
     resolve_student_case,
+)
+from portal.dg.executive_actions import (
+    arbitrate_decision,
+    deliver_diploma,
+    nominate_branch_manager,
+    publish_class_diplomas,
+    transition_branch_cycle,
+    validate_closure,
 )
 from students.models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, StudentCase, StudentYearDecision
 from students.services.attendance_service import (
@@ -2151,12 +2163,51 @@ def teacher_portal(request):
     if not can_access(request.user, "view_portal", "teacher"):
         return _deny_portal_access(request)
 
+    branch = _resolve_academic_branch(request)
+    section = request.GET.get("section", "overview")
+
+    if section == "search":
+        q = (request.GET.get("q") or "").strip()
+        if branch and len(q) >= 1:
+            from students.models import Student
+
+            classes = AcademicClass.objects.filter(
+                branch=branch,
+            ).filter(
+                Q(name__icontains=q) | Q(level__icontains=q) | Q(programme__title__icontains=q)
+            )[:5]
+
+            ecs = EC.objects.filter(
+                ue__semester__academic_class__branch=branch,
+                teachingassignment__teacher__user=request.user,
+            ).filter(
+                Q(title__icontains=q) | Q(ue__code__icontains=q)
+            ).distinct()[:5]
+
+            students = Student.objects.filter(
+                inscription__candidature__branch=branch,
+                is_active=True,
+            ).filter(
+                Q(matricule__icontains=q)
+                | Q(inscription__candidature__first_name__icontains=q)
+                | Q(inscription__candidature__last_name__icontains=q)
+            ).distinct()[:5]
+
+            return render(request, "portal/partials/teacher_search_results.html", {
+                "q": q,
+                "classes": classes,
+                "ecs": ecs,
+                "students": students,
+            })
+        return render(request, "portal/partials/teacher_search_results.html", {"q": q})
+
     context = build_teacher_dashboard_context(
         request,
-        branch=_resolve_academic_branch(request),
+        branch=branch,
         base_context_builder=_build_portal_context,
     )
-    return render(request, "portal/teacher.html", context)
+    context["active_section"] = section if section in ("overview", "classes", "supports", "schedule", "logs", "salary", "notifications", "settings") else "overview"
+    return render(request, "portal/teacher/sg_dashboard.html", context)
 
 
 @_position_required({"teacher"})
@@ -2198,10 +2249,10 @@ def teacher_support_workspace(request):
     support_target = (
         request.POST.get("support_target")
         or request.GET.get("support_target")
-        or "#teacher-modal-panel"
+        or "#sg-drawer-content"
     ).strip()
     if not support_target.startswith("#"):
-        support_target = "#teacher-modal-panel"
+        support_target = "#sg-drawer-content"
 
     try:
         parsed_class_id = _parse_id(class_id)
@@ -2221,6 +2272,69 @@ def teacher_support_workspace(request):
             selected_ec = context["selected_ec"]
             selected_chapter = context["selected_chapter"]
             action = (request.POST.get("action") or "").strip()
+
+            if action in ("edit_content", "delete_content", "fetch_content"):
+                content_id = _parse_id(request.POST.get("content_id"))
+                if content_id is None:
+                    raise ValidationError("Identifiant du contenu manquant.")
+
+                if action == "fetch_content":
+                    editing_content = get_teacher_content_for_edit(
+                        teacher=request.user,
+                        branch=branch,
+                        content_id=content_id,
+                    )
+                    context = build_teacher_support_workspace_context(
+                        request, branch=branch,
+                        class_id=editing_content["class_id"],
+                        ec_id=editing_content.get("ec_id"),
+                        chapter_id=editing_content.get("chapter_id"),
+                    )
+                    context["teacher_support_target"] = support_target
+                    context["editing_content"] = editing_content
+                    return render(request, "portal/partials/teacher_support_workspace.html", context)
+
+                elif action == "edit_content":
+                    edit_content_id = content_id
+                    chapter_id_edit = _parse_id(request.POST.get("chapter_id"))
+                    updated = update_teacher_content(
+                        teacher=request.user,
+                        branch=branch,
+                        content_id=edit_content_id,
+                        title=request.POST.get("content_title"),
+                        content_type=request.POST.get("content_type"),
+                        chapter_id=chapter_id_edit,
+                        file=request.FILES.get("file"),
+                        video_url=request.POST.get("video_url"),
+                        text_content=request.POST.get("text_content"),
+                    )
+                    toast_message = f"Support '{updated.title}' modifie avec succes."
+                    context = build_teacher_support_workspace_context(
+                        request, branch=branch,
+                        class_id=parsed_class_id,
+                        ec_id=parsed_ec_id,
+                        chapter_id=updated.chapter_id,
+                        toast={"level": "success", "message": toast_message},
+                    )
+                    context["teacher_support_target"] = support_target
+                    return render(request, "portal/partials/teacher_support_workspace.html", context)
+
+                elif action == "delete_content":
+                    deleted = delete_teacher_content(
+                        teacher=request.user,
+                        branch=branch,
+                        content_id=content_id,
+                    )
+                    toast_message = f"Support '{deleted.title}' supprime avec succes."
+                    context = build_teacher_support_workspace_context(
+                        request, branch=branch,
+                        class_id=parsed_class_id,
+                        ec_id=parsed_ec_id,
+                        chapter_id=parsed_chapter_id,
+                        toast={"level": "success", "message": toast_message},
+                    )
+                    context["teacher_support_target"] = support_target
+                    return render(request, "portal/partials/teacher_support_workspace.html", context)
 
             if selected_class is None:
                 raise ValidationError("Aucune classe disponible pour ce compte.")
@@ -2429,6 +2543,43 @@ def teacher_settings_workspace(request):
 
 
 @_position_required({"teacher"})
+def teacher_content_viewer(request, content_id: int):
+    branch = _resolve_academic_branch(request)
+    try:
+        content = ECContent.objects.select_related("chapter__ec").get(
+            pk=content_id,
+            is_active=True,
+        )
+        if content.chapter is None:
+            raise ValidationError("Ce contenu n'est pas rattache a un chapitre.")
+        ec = content.chapter.ec
+        branch_match = (
+            ec.ue.semester.academic_class.branch_id == branch.id
+            if branch else True
+        )
+        if not branch_match:
+            raise ValidationError("Contenu non accessible pour cette annexe.")
+
+        if content.content_type == ECContent.CONTENT_TYPE_TEXT:
+            rendered_text = content.text_content
+        else:
+            rendered_text = ""
+
+        context = {
+            "content": content,
+            "rendered_text": rendered_text,
+            "branch": branch,
+        }
+    except (ValidationError, ECContent.DoesNotExist) as exc:
+        error_message = exc.messages[0] if isinstance(exc, ValidationError) and exc.messages else str(exc)
+        context = {
+            "content": None,
+            "error": error_message,
+        }
+    return render(request, "portal/partials/teacher_content_viewer.html", context)
+
+
+@_position_required({"teacher"})
 def teacher_lesson_log_panel(request, event_id: int):
     branch = _resolve_academic_branch(request)
 
@@ -2474,6 +2625,25 @@ def teacher_lesson_log_panel(request, event_id: int):
                     updated_by=request.user,
                     **payload,
                 )
+
+            mark_present = request.POST.get("mark_present") == "1"
+            if mark_present:
+                TeacherAttendance.objects.update_or_create(
+                    teacher=request.user,
+                    schedule_event=schedule_event,
+                    branch=schedule_event.branch,
+                    defaults={
+                        "date": timezone.localdate(schedule_event.start_datetime),
+                        "status": TeacherAttendance.STATUS_PRESENT,
+                        "recorded_by": request.user,
+                    },
+                )
+            else:
+                TeacherAttendance.objects.filter(
+                    teacher=request.user,
+                    schedule_event=schedule_event,
+                ).delete()
+
             context = build_teacher_lesson_log_context(
                 request,
                 branch=branch,
@@ -4860,6 +5030,80 @@ def dg_diploma_action(request):
             "skipped": result["skipped"],
         }
     )
+
+
+@login_required
+def dg_exec_action(request):
+    """Point d'entrée unique pour les actions DG réelles (nommer, diplômer, valider, arbitrer, cycle)."""
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    if request.method != "POST":
+        return HttpResponseBadRequest("Méthode invalide.")
+
+    action = (request.POST.get("action") or "").strip()
+    try:
+        if action == "nominate_manager":
+            branch_id = int(request.POST["branch_id"])
+            user_id = int(request.POST["user_id"])
+            result = nominate_branch_manager(actor=request.user, branch_id=branch_id, user_id=user_id)
+        elif action == "deliver_diploma":
+            award_id = int(request.POST["award_id"])
+            result = deliver_diploma(actor=request.user, award_id=award_id)
+        elif action == "validate_closure":
+            closure_id = int(request.POST["closure_id"])
+            result = validate_closure(actor=request.user, closure_id=closure_id)
+        elif action == "arbitrate_decision":
+            decision_id = int(request.POST["decision_id"])
+            approve = (request.POST.get("approve") or "").strip().lower() in {"1", "true", "oui"}
+            reason = (request.POST.get("reason") or "").strip()
+            result = arbitrate_decision(actor=request.user, decision_id=decision_id, approve=approve, reason=reason)
+        elif action == "publish_class_diplomas":
+            class_id = int(request.POST["class_id"])
+            result = publish_class_diplomas(actor=request.user, class_id=class_id)
+        elif action == "transition_cycle":
+            cycle_id = int(request.POST["cycle_id"])
+            target_status = (request.POST.get("target_status") or "").strip()
+            result = transition_branch_cycle(actor=request.user, cycle_id=cycle_id, target_status=target_status)
+        else:
+            return JsonResponse({"ok": False, "message": "Action DG inconnue."}, status=400)
+    except (Branch.DoesNotExist, AcademicDiplomaAward.DoesNotExist,
+            BranchMonthlyClosure.DoesNotExist, StudentYearDecision.DoesNotExist,
+            KeyError, ValueError) as exc:
+        return JsonResponse({"ok": False, "message": f"Erreur : {exc}"}, status=404)
+    return JsonResponse(result)
+
+
+@login_required
+def dg_assign_manager_modal(request):
+    """Popup pour choisir un utilisateur à nommer gestionnaire d'une annexe."""
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    branch_id = (request.GET.get("branch_id") or "").strip()
+    branch = None
+    if branch_id.isdigit():
+        branch = Branch.objects.filter(pk=int(branch_id), is_active=True).first()
+    candidates = User.objects.filter(is_active=True).exclude(profile__position__in=["student"]).select_related("profile").order_by("last_name", "first_name")[:50]
+    return render(request, "portal/dg/modals/assign_manager.html", {
+        "branch": branch,
+        "candidates": candidates,
+    })
+
+
+@login_required
+def dg_closure_detail(request):
+    """Drawer détaillant une clôture mensuelle."""
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    closure_id = (request.GET.get("closure_id") or "").strip()
+    closure = None
+    if closure_id.isdigit():
+        closure = BranchMonthlyClosure.objects.select_related("branch", "created_by", "validated_by").filter(pk=int(closure_id)).first()
+    return render(request, "portal/dg/modals/closure_detail.html", {
+        "closure": closure,
+    })
 
 
 @login_required

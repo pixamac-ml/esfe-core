@@ -11,8 +11,8 @@
       <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=branch')">
         <i class="fa-solid fa-eye"></i>Vue detaillee
       </button>
-      <button type="button" class="dg-btn dg-btn-primary">
-        <i class="fa-solid fa-plus"></i>Nouvelle annexe
+      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
+        <i class="fa-solid fa-user-plus"></i>Recruter staff
       </button>
     </div>
   </div>
@@ -84,6 +84,12 @@
         <span style="color:#ef4444;">Non assignee</span>
         {% endif %}
       </div>
+      {% if not item.manager_name or item.manager_name == 'Non assigne' %}
+      <button type="button" class="dg-btn dg-btn-warning" style="width:100%; font-size:.65rem; height:28px; margin-bottom:6px; justify-content:center;"
+        onclick="event.stopPropagation(); dgOpenModal('{% url 'accounts_portal:dg_assign_manager_modal' %}?branch_id={{ item.branch.id }}')">
+        <i class="fa-solid fa-user-tie"></i>Nommer un manager
+      </button>
+      {% endif %}
       <div style="display:flex; gap:6px;">
         <button type="button" class="dg-btn dg-btn-outline" style="flex:1; font-size:.65rem; height:30px; justify-content:center;"
           onclick="event.stopPropagation(); dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=branch&branch_id={{ item.branch.id }}')">
@@ -135,7 +141,15 @@
           {% for item in branch_summaries %}
           <tr>
             <td class="font-black" style="color:#2563eb;">{{ item.branch.name }}</td>
-            <td>{{ item.manager_name|default:"—" }}</td>
+            <td>
+              {{ item.manager_name|default:"—" }}
+              {% if not item.manager_name or item.manager_name == 'Non assigne' or item.manager_name == '—' %}
+              <button type="button" class="dg-btn dg-btn-warning" style="font-size:.6rem; height:22px; padding:0 .3rem; margin-left:4px;"
+                onclick="dgOpenModal('{% url 'accounts_portal:dg_assign_manager_modal' %}?branch_id={{ item.branch.id }}')">
+                <i class="fa-solid fa-user-tie"></i>
+              </button>
+              {% endif %}
+            </td>
             <td>{{ item.student_count|intcomma }}</td>
             <td>{{ item.class_count|intcomma }}</td>
             <td>{{ item.active_inscription_count|intcomma }}</td>

@@ -249,6 +249,18 @@ def academics_partial(request):
 
 @login_required
 @role_required("student")
+def diplomas_partial(request):
+    student = getattr(request.user, "student_profile", None)
+    awards = []
+    if student:
+        awards = student.academic_diploma_awards.select_related(
+            "programme", "academic_year", "diploma", "branch"
+        ).filter(status__in=("ready", "delivered")).order_by("-awarded_at", "-created_at")
+    return render(request, "portal/student/partials/diplomas_student.html", {"awards": awards})
+
+
+@login_required
+@role_required("student")
 def finance_partial(request):
     context = get_finance_widget(request.user)
     return render(request, "portal/student/partials/finance.html", context)

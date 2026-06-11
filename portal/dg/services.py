@@ -285,6 +285,10 @@ def _build_finance(base, branch_summaries):
             BranchExpense.STATUS_PAID,
         }
     ).aggregate(total=Sum("amount"))["total"])
+    closures = list(
+        base["monthly_closures"]
+        .order_by("-period_month", "branch__name")[:12]
+    )
     return {
         "revenue": revenue,
         "expenses": expenses,
@@ -302,6 +306,7 @@ def _build_finance(base, branch_summaries):
             .order_by("-paid_at")[:8]
         ),
         "top_revenue_branches": sorted(branch_summaries, key=lambda item: item["revenue_total"], reverse=True)[:5],
+        "closures": closures,
     }
 
 

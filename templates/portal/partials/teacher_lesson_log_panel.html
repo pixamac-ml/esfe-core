@@ -1,62 +1,108 @@
 {% if toast %}
-<div class="mb-4 rounded-2xl border px-4 py-3 text-sm font-semibold {% if toast.level == 'error' %}border-rose-200 bg-rose-50 text-rose-700{% elif toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-700{% else %}border-slate-200 bg-slate-50 text-slate-700{% endif %}">
-  {{ toast.message }}
-</div>
+<div class="sg-toast-inline sg-toast-{{ toast.level }}">{{ toast.message }}</div>
 {% endif %}
 
 {% if schedule_event %}
-<article class="space-y-5">
-  <div class="rounded-2xl bg-cyan-950 px-5 py-5 text-white">
-    <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-200">Cahier de texte</p>
-    <h3 class="mt-2 text-xl font-black">{{ schedule_event.ec.title }}</h3>
-    <p class="mt-2 text-sm font-semibold text-slate-100">{{ schedule_event.academic_class.display_name }} - {{ schedule_event.start_datetime|date:"D d/m/Y" }}</p>
-    <p class="mt-2 text-xs text-cyan-100">{{ schedule_event.start_datetime|date:"H:i" }} - {{ schedule_event.end_datetime|date:"H:i" }} - {{ schedule_event.location|default:"Salle non precisee" }}</p>
+<div class="sg-drawer-page">
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#15575b,#0e3a3d);">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+      <div>
+        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-book"></i> Cahier de texte</div>
+        <div class="sg-drawer-hero-title">{{ schedule_event.ec.title }}</div>
+        <div class="sg-drawer-hero-meta">
+          {{ schedule_event.academic_class.display_name }} &middot; {{ schedule_event.start_datetime|date:"D d/m/Y" }} &middot; {{ schedule_event.start_datetime|date:"H:i" }} - {{ schedule_event.end_datetime|date:"H:i" }}
+        </div>
+        <div class="sg-drawer-hero-meta">{{ schedule_event.location|default:"Salle non precisee" }}</div>
+      </div>
+      <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
+        <i class="fa-solid fa-xmark"></i> Fermer
+      </button>
+    </div>
   </div>
 
-  <form method="post" action="{% url 'accounts_portal:teacher_lesson_log_panel' schedule_event.id %}" class="space-y-4" hx-post="{% url 'accounts_portal:teacher_lesson_log_panel' schedule_event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" onsubmit="return false;">
-    {% csrf_token %}
-    <div>
-      <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Statut</label>
-      <select name="status" class="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none">
-        {% for value, label in lesson_log_status_choices %}
-        <option value="{{ value }}"{% if lesson_log and lesson_log.status == value %} selected{% elif not lesson_log and value == 'done' %} selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
+  <div class="sg-drawer-body">
+    <form method="post" action="{% url 'accounts_portal:teacher_lesson_log_panel' schedule_event.id %}" hx-post="{% url 'accounts_portal:teacher_lesson_log_panel' schedule_event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" onsubmit="return false;">
+      {% csrf_token %}
 
-    <div>
-      <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Contenu du cours</label>
-      <textarea name="content" rows="5" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 outline-none" placeholder="Resume du cours, points traites, progression...">{{ lesson_log.content|default:"" }}</textarea>
-    </div>
+      <div class="sg-drawer-section">
+        <div class="sg-drawer-section-title"><i class="fa-solid fa-flag"></i> Statut de la seance</div>
+        <div class="field">
+          <select name="status" class="sg-form-select" style="height:44px;">
+            {% for value, label in lesson_log_status_choices %}
+            <option value="{{ value }}"{% if lesson_log and lesson_log.status == value %} selected{% elif not lesson_log and value == 'done' %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
 
-    <div>
-      <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Travaux / devoirs</label>
-      <textarea name="homework" rows="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 outline-none" placeholder="Travaux donnes a la classe...">{{ lesson_log.homework|default:"" }}</textarea>
-    </div>
+      <div class="sg-drawer-section">
+        <div class="sg-drawer-section-title"><i class="fa-solid fa-pen"></i> Contenu du cours</div>
+        <div class="field">
+          <textarea name="content" rows="5" class="sg-form-input" placeholder="Resume du cours, points traites, progression...">{{ lesson_log.content|default:"" }}</textarea>
+        </div>
+      </div>
 
-    <div>
-      <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Observations</label>
-      <textarea name="observations" rows="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-900 outline-none" placeholder="Retard, ajustement, incident, remarque utile...">{{ lesson_log.observations|default:"" }}</textarea>
-    </div>
+      <div class="sg-drawer-section">
+        <div class="sg-drawer-section-title"><i class="fa-solid fa-briefcase"></i> Travaux / devoirs</div>
+        <div class="field">
+          <textarea name="homework" rows="3" class="sg-form-input" placeholder="Travaux donnes a la classe...">{{ lesson_log.homework|default:"" }}</textarea>
+        </div>
+      </div>
 
-    {% if lesson_log %}
-    <div class="rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500">
-      Derniere mise a jour : {{ lesson_log.updated_at|date:"d/m/Y H:i" }}
-    </div>
-    {% endif %}
+      <div class="sg-drawer-section">
+        <div class="sg-drawer-section-title"><i class="fa-solid fa-note-sticky"></i> Observations</div>
+        <div class="field">
+          <textarea name="observations" rows="3" class="sg-form-input" placeholder="Retard, ajustement, incident, remarque utile...">{{ lesson_log.observations|default:"" }}</textarea>
+        </div>
+      </div>
 
-    <div class="flex flex-wrap gap-3">
-      <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-cyan-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-cyan-500">
-        {% if lesson_log %}Mettre a jour{% else %}Enregistrer{% endif %}
-      </button>
-      <button type="button" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50" hx-get="{% url 'accounts_portal:teacher_class_detail' schedule_event.academic_class_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML">
-        Aperçu classe
-      </button>
-    </div>
-  </form>
-</article>
+      <div class="sg-drawer-section">
+        <div class="sg-drawer-section-title"><i class="fa-solid fa-check-circle"></i> Ma presence</div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:.82rem;">
+            <input type="checkbox" name="mark_present" value="1"{% if teacher_marked_present %} checked{% endif %} style="width:18px;height:18px;accent-color:#16a34a;">
+            Je certifie etre present(e) pour cette seance
+          </label>
+        </div>
+      </div>
+
+      {% if lesson_log %}
+      <div style="padding:8px 4px 16px;font-size:.72rem;font-weight:600;color:#94a3b8;">
+        <i class="fa-regular fa-clock"></i> Derniere mise a jour : {{ lesson_log.updated_at|date:"d/m/Y H:i" }}
+      </div>
+      {% endif %}
+
+      <div style="display:flex;gap:10px;padding:4px 0 8px;">
+        <button type="submit" class="sg-btn sg-btn-primary" style="min-height:40px;font-size:.78rem;">
+          <i class="fa-solid fa-floppy-disk"></i> {% if lesson_log %}Mettre a jour{% else %}Enregistrer{% endif %}
+        </button>
+        <button type="button" class="sg-btn sg-btn-outline" style="min-height:40px;font-size:.78rem;" hx-get="{% url 'accounts_portal:teacher_class_detail' schedule_event.academic_class_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+          <i class="fa-solid fa-arrow-left"></i> Apercu classe
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 {% else %}
-<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm font-semibold text-slate-500">
-  Cours introuvable.
+<div class="sg-drawer-page">
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#991b1b,#7f1d1d);">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+      <div>
+        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-triangle-exclamation"></i> Erreur</div>
+        <div class="sg-drawer-hero-title">Cours introuvable</div>
+      </div>
+      <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
+        <i class="fa-solid fa-xmark"></i> Fermer
+      </button>
+    </div>
+  </div>
+  <div class="sg-drawer-body">
+    <div class="sg-drawer-empty" style="min-height:40vh;">
+      <div>
+        <div class="sg-drawer-empty-icon"><i class="fa-solid fa-file-circle-exclamation"></i></div>
+        <div class="sg-drawer-empty-text">Ce cours n'est pas accessible.</div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endif %}

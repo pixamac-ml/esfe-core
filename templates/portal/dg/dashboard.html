@@ -1568,129 +1568,7 @@ function dgRefreshSection(section) {
     position.addEventListener('change', sync);
     sync();
   }
-function dgBuildCharts() {
-    if (!window.Chart) return;
-    // Sparklines removed — replaced with CSS bars in partials
-    // Risk chart removed — replaced with CSS bars in priority_table.html
-    // Finance chart removed — replaced with CSS bars in finance/summary.html
-    // Monthly chart removed — replaced with CSS bars in analytics/charts.html
-    // Realtime chart removed — replaced with CSS bars in realtime/monitoring.html
 
-    // Only build charts that still exist (e.g., legacy canvas elements)
-    function safeSpark(id, data, color) {
-      const canvas = document.getElementById(id);
-      if (!canvas || canvas.dataset.chartReady) return;
-      canvas.dataset.chartReady = '1';
-      new Chart(canvas, {
-        type: 'line',
-        data: {
-          labels: data.map((_, i) => i),
-          datasets: [{ data: data, borderColor: color, backgroundColor: color + '18', fill: true, tension: .42, borderWidth: 2, pointRadius: 0 }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { enabled: false } },
-          scales: { x: { display: false }, y: { display: false } }
-        }
-      });
-    }
-    // Keep sparklines if they still exist on the page
-    const sparkExists = document.getElementById('dgSparkStudents');
-    if (sparkExists) {
-      safeSpark('dgSparkStudents', [12, 16, 15, 20, 18, 24, 23, 25, 31, 35, 32, 40], '#2563eb');
-      safeSpark('dgSparkRevenue', [8, 10, 9, 13, 12, 16, 17, 20, 25, 31, 36, 44], '#16a34a');
-      safeSpark('dgSparkAlerts', [5, 8, 6, 11, 9, 7, 12, 8, 6, 5, 7, 9], '#f43f5e');
-    }
-
-    const risk = document.getElementById('dgRiskChart');
-    if (risk && !risk.dataset.chartReady) {
-      risk.dataset.chartReady = '1';
-      new Chart(risk, {
-        type: 'doughnut',
-        data: {
-          labels: {{ analytics.risk_labels_json|safe }},
-          datasets: [{
-            data: {{ analytics.risk_values_json|safe }},
-            backgroundColor: ['#ef4444', '#f97316', '#2563eb', '#64748b'],
-            borderColor: '#fff',
-            borderWidth: 4,
-            cutout: '68%'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '72%',
-          animation: { duration: 900, easing: 'easeOutQuart' },
-          plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } }
-        }
-      });
-    }
-    const finance = document.getElementById('dgFinanceChart');
-    if (finance && !finance.dataset.chartReady) {
-      finance.dataset.chartReady = '1';
-      new Chart(finance, {
-        type: 'bar',
-        data: {
-          labels: ['Revenus', 'Depenses'],
-          datasets: [{
-            data: [{{ finance.revenue|default:0 }}, {{ finance.expenses|default:0 }}],
-            backgroundColor: ['#16a34a', '#ef4444'],
-            borderRadius: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } },
-          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' } } }
-        }
-      });
-    }
-    const monthly = document.getElementById('dgMonthlyChart');
-    if (monthly && !monthly.dataset.chartReady) {
-      monthly.dataset.chartReady = '1';
-      new Chart(monthly, {
-        type: 'bar',
-        data: {
-          labels: {{ analytics.monthly_labels_json|safe }},
-          datasets: [
-            { label: 'Candidatures', data: {{ analytics.monthly_candidatures_json|safe }}, backgroundColor: '#2563eb', borderRadius: 6 },
-            { label: 'Paiements', data: {{ analytics.monthly_payments_json|safe }}, backgroundColor: '#16a34a', borderRadius: 6 }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 900, easing: 'easeOutQuart' },
-          plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } },
-          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' } } }
-        }
-      });
-    }
-    const realtime = document.getElementById('dgRealtimeChart');
-    if (realtime && !realtime.dataset.chartReady) {
-      realtime.dataset.chartReady = '1';
-      new Chart(realtime, {
-        type: 'line',
-        data: {
-          labels: ['00:00','02:00','04:00','06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00'],
-          datasets: [
-            { label: 'Inscriptions', data: [0, 8, 12, 18, 34, 52, 64, 81, 92, 108, 118, 128], borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)', fill: true, tension: .34, borderWidth: 3 },
-            { label: 'Paiements', data: [0, 5, 9, 13, 24, 37, 46, 58, 73, 84, 96, 110], borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.08)', fill: true, tension: .34, borderWidth: 3 }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 900, easing: 'easeOutQuart' },
-          plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8 } }, tooltip: { backgroundColor: '#0f172a', titleColor: '#fff', bodyColor: '#e2e8f0' } },
-          scales: { x: { grid: { display: false } }, y: { grid: { color: '#e5e7eb' }, beginAtZero: true } }
-        }
-});
-    }
-  }
   function dgBuildCharts() {
     if (!window.Chart) return;
     window.dgChartInstances = window.dgChartInstances || {};
@@ -1795,10 +1673,10 @@ function dgBuildCharts() {
       return new Chart(canvas, {
         type: 'line',
         data: {
-          labels: ['00:00','02:00','04:00','06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00'],
+          labels: {{ realtime.chart_labels|default:"['00:00','02:00','04:00','06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00']"|safe }},
           datasets: [
-            { label: 'Inscriptions', data: [0, 8, 12, 18, 34, 52, 64, 81, 92, 108, 118, 128], borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)', fill: true, tension: .34, borderWidth: 3 },
-            { label: 'Paiements', data: [0, 5, 9, 13, 24, 37, 46, 58, 73, 84, 96, 110], borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.08)', fill: true, tension: .34, borderWidth: 3 }
+            { label: 'Inscriptions', data: {{ realtime.chart_inscriptions|default:"[0,0,0,0,0,0,0,0,0,0,0,0]"|safe }}, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)', fill: true, tension: .34, borderWidth: 3 },
+            { label: 'Paiements', data: {{ realtime.chart_payments|default:"[0,0,0,0,0,0,0,0,0,0,0,0]"|safe }}, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.08)', fill: true, tension: .34, borderWidth: 3 }
           ]
         },
         options: {

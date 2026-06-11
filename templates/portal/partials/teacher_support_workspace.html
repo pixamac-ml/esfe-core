@@ -1,246 +1,281 @@
 {% if toast %}
-<div class="mb-4 rounded-2xl border px-4 py-3 text-sm font-semibold {% if toast.level == 'error' %}border-rose-200 bg-rose-50 text-rose-700{% elif toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-700{% else %}border-slate-200 bg-slate-50 text-slate-700{% endif %}">
-  {{ toast.message }}
-</div>
+<div class="sg-toast-inline sg-toast-{{ toast.level }}">{{ toast.message }}</div>
 {% endif %}
 
 {% url 'accounts_portal:teacher_support_workspace' as teacher_support_workspace_url %}
 {% if not teacher_support_workspace_url %}{% url 'teacher_support_workspace' as teacher_support_workspace_url %}{% endif %}
-{% with support_target=teacher_support_target|default:"#teacher-modal-panel" %}
+{% with support_target=teacher_support_target|default:"#sg-drawer-content" %}
 
-<div class="space-y-5" x-data="{ modalSupport: false, contentType: 'pdf', uploading: false, uploadPercent: 0 }">
-  <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Depot direct</p>
-        <h2 class="mt-1 text-xl font-black text-slate-900">Televerser un cours</h2>
-        <p class="mt-1 text-sm text-slate-500">Choisissez la classe, la matiere, puis deposez le fichier.</p>
+<div class="sg-drawer-page">
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#1e3a5f,#1e293b);">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+      <div style="flex:1;">
+        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-folder-open"></i> Supports de cours &mdash; Gestion</div>
+        <div class="sg-drawer-hero-title">
+          {% if selected_ec %}{{ selected_ec.title }}
+          {% elif selected_class %}{{ selected_class.display_name }}
+          {% else %}Deposer et organiser vos supports{% endif %}
+        </div>
+        <div class="sg-drawer-hero-meta">
+          {% if selected_ec %}Classe: {{ selected_class.display_name }} &middot; {{ selected_ec_summary.chapter_count }} chapitre(s), {{ selected_ec_summary.content_count }} support(s){% endif %}
+        </div>
       </div>
-      {% if selected_class %}
-      <span class="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{{ selected_class.display_name }}</span>
+      <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
+        <i class="fa-solid fa-xmark"></i> Fermer
+      </button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">
+      <div class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
+        <i class="fa-solid fa-layer-group"></i> {{ teacher_support_ecs|length }} matiere(s)
+      </div>
+      <div class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
+        <i class="fa-solid fa-table-cells"></i> {{ teacher_support_classes|length }} classe(s)
+      </div>
+      {% if selected_ec_summary %}
+      <div class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
+        <i class="fa-solid fa-file"></i> {{ selected_ec_summary.content_count }} support(s)
+      </div>
       {% endif %}
     </div>
-
-    <div class="mt-4 flex flex-wrap gap-2">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;">
       {% for row in teacher_support_classes %}
-      <button type="button" hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}&support_target={{ support_target|urlencode }}" hx-target="{{ support_target }}" hx-swap="innerHTML" class="min-h-9 rounded-xl border px-3 py-2 text-xs font-bold transition {% if selected_class and selected_class.id == row.class_id %}border-blue-500 bg-blue-600 text-white{% else %}border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100{% endif %}">
+      <button type="button"
+              hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}&support_target={{ support_target|urlencode }}"
+              hx-target="{{ support_target }}" hx-swap="innerHTML"
+              class="sg-drawer-hero-badge" style="cursor:pointer;background:{% if selected_class and selected_class.id == row.class_id %}rgba(37,99,235,.35){% else %}rgba(255,255,255,.08){% endif %};border:1px solid rgba(255,255,255,.12);">
         {{ row.class_name }}
       </button>
-      {% empty %}
-      <span class="text-sm font-semibold text-slate-500">Aucune classe rattachee a votre compte.</span>
       {% endfor %}
     </div>
   </div>
 
-  {% if selected_class %}
-    {% if teacher_support_ecs %}
-    <div class="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
-      <aside class="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div class="border-b border-slate-200 px-4 py-3">
-          <h3 class="text-sm font-black text-slate-900">Matieres</h3>
-          <p class="mt-1 text-xs text-slate-500">Cliquez sur la matiere du cours a deposer.</p>
-        </div>
-        <div class="divide-y divide-slate-100">
+  <div class="sg-drawer-body">
+    {% if selected_class %}
+    <div class="sg-drawer-grid">
+      <div class="sg-drawer-section">
+        <div class="sg-drawer-section-title"><i class="fa-solid fa-book-open"></i> Matieres</div>
+        {% if teacher_support_ecs %}
+        <div style="display:grid;gap:6px;">
           {% for ec in teacher_support_ecs %}
-          <button type="button" hx-get="{{ teacher_support_workspace_url }}?class_id={{ selected_class.id }}&ec_id={{ ec.id }}&support_target={{ support_target|urlencode }}" hx-target="{{ support_target }}" hx-swap="innerHTML" class="block w-full px-4 py-3 text-left transition hover:bg-slate-50 {% if selected_ec and selected_ec.id == ec.id %}bg-blue-50{% endif %}">
-            <span class="block text-sm font-bold text-slate-900">{{ ec.title }}</span>
-            <span class="mt-1 block text-xs text-slate-500">{{ ec.ue_code|default:"-" }} - {{ ec.chapter_count }} chapitre(s), {{ ec.content_count }} support(s)</span>
+          <button type="button"
+                  hx-get="{{ teacher_support_workspace_url }}?class_id={{ selected_class.id }}&ec_id={{ ec.id }}&support_target={{ support_target|urlencode }}"
+                  hx-target="{{ support_target }}" hx-swap="innerHTML"
+                  class="sg-action-card{% if selected_ec and selected_ec.id == ec.id %}" style="border-color:#2563eb;background:#eff6ff;{% endif %}">
+            <div>
+              <div class="sg-action-label" style="font-size:.82rem;">{{ ec.title }}</div>
+              <div class="sg-action-sub">{{ ec.ue_code|default:"-" }} &middot; {{ ec.chapter_count }} chapitre(s)</div>
+            </div>
+            <span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">{{ ec.content_count }}</span>
           </button>
           {% endfor %}
         </div>
-      </aside>
-
-      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        {% if selected_ec %}
-        <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Cours selectionne</p>
-            <h3 class="mt-1 text-xl font-black text-slate-900">{{ selected_ec.title }}</h3>
-            <p class="mt-1 text-sm text-slate-500">Le support sera visible dans le dashboard etudiant de cette classe.</p>
-          </div>
-          {% if selected_ec_summary %}
-          <span class="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">{{ selected_ec_summary.content_count }} support(s)</span>
-          {% endif %}
-        </div>
-
-        <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p class="text-sm font-black text-slate-900">Deposer un support pour ce cours</p>
-              <p class="mt-1 text-xs font-semibold text-slate-600">Fichier, video ou texte, avec chapitre existant ou nouveau chapitre.</p>
-            </div>
-            <button type="button" @click="modalSupport=true; contentType='pdf'; uploadPercent=0; uploading=false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700">
-              Televerser un cours
-            </button>
-          </div>
-        </div>
         {% else %}
-        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-          <p class="text-base font-black text-slate-900">Choisissez une matiere</p>
-          <p class="mt-1 text-sm text-slate-500">Le formulaire de depot apparaitra ici.</p>
+        <div class="sg-drawer-empty" style="padding:32px 0;">
+          <div class="sg-drawer-empty-icon"><i class="fa-solid fa-book"></i></div>
+          <div class="sg-drawer-empty-text">Aucune matiere rattachee a cette classe.</div>
         </div>
         {% endif %}
-      </section>
+      </div>
+
+      <div class="sg-drawer-section">
+        <div class="sg-drawer-section-title"><i class="fa-solid fa-upload"></i> Depot de support</div>
+        {% if selected_ec %}
+        <div class="sg-action-card" style="border-color:#bfdbfe;background:#eff6ff;margin-bottom:12px;cursor:default;">
+          <div>
+            <div class="sg-action-label" style="font-size:.82rem;">{{ selected_ec.title }}</div>
+            <div class="sg-action-sub">Deposer un fichier, une video ou du texte</div>
+          </div>
+          <button type="button" class="sg-btn sg-btn-primary" onclick="sgToggleUploadForm()" id="sg-upload-btn">
+            <i class="fa-solid fa-plus"></i> Nouveau
+          </button>
+        </div>
+
+        <div id="sg-upload-form" style="{% if not editing_content %}display:none;{% endif %}">
+          <form method="post" enctype="multipart/form-data"
+                hx-post="{{ teacher_support_workspace_url }}"
+                hx-target="{{ support_target }}" hx-swap="innerHTML"
+                hx-encoding="multipart/form-data"
+                hx-trigger="submit"
+                hx-disabled-elt="find button[type='submit']">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="{% if editing_content %}edit_content{% else %}create_content{% endif %}">
+            {% if editing_content %}
+            <input type="hidden" name="content_id" value="{{ editing_content.id }}">
+            {% endif %}
+            <input type="hidden" name="support_target" value="{{ support_target }}">
+            {% if selected_class %}
+            <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+            <input type="hidden" name="ec_id" value="{{ selected_ec.id }}">
+            {% endif %}
+
+            <div class="sg-form-grid">
+              <div class="field">
+                <label>Chapitre</label>
+                <select name="chapter_id" class="sg-form-select" style="height:40px;">
+                  {% for chapter in teacher_support_chapters %}
+                  <option value="{{ chapter.id }}" {% if editing_content and editing_content.chapter_id == chapter.id %}selected{% elif selected_chapter and selected_chapter.id == chapter.id %}selected{% endif %}>{{ chapter.title }}</option>
+                  {% endfor %}
+                  <option value="">Depot simple (sans chapitre)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Nouveau chapitre <span style="font-weight:600;color:#94a3b8;">(optionnel)</span></label>
+                <input type="text" name="new_chapter_title" class="sg-form-input" style="height:40px;" placeholder="Ex: Chapitre 2">
+              </div>
+            </div>
+
+            <div class="field" style="margin-top:12px;">
+              <label>Titre du support <span style="color:#ef4444;">*</span></label>
+              <input type="text" name="content_title" required class="sg-form-input" style="height:40px;" placeholder="Ex: Cours 3 - Les derivees" value="{{ editing_content.title|default:"" }}">
+            </div>
+
+            <div class="sg-form-grid" style="margin-top:12px;">
+              <div class="field">
+                <label>Type <span style="color:#ef4444;">*</span></label>
+                <select name="content_type" class="sg-form-select" style="height:40px;" onchange="sgToggleContentType(this.value, true)">
+                  {% for value, label in content_type_choices %}
+                  <option value="{{ value }}"{% if editing_content and editing_content.content_type == value %} selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field" id="sg-file-field"{% if editing_content and editing_content.content_type != 'pdf' and editing_content.content_type != 'doc' and editing_content.content_type != 'excel' and editing_content.content_type != 'ppt' and editing_content.content_type != 'image' and editing_content.content_type != 'audio' %} style="display:none;"{% endif %}>
+                <label>Fichier{% if not editing_content %} <span style="color:#ef4444;">*</span>{% endif %}</label>
+                <input type="file" name="file" class="sg-form-input" style="padding-top:7px;">
+                {% if editing_content and editing_content.file_url %}
+                <div style="font-size:.7rem;color:#64748b;margin-top:4px;">Fichier actuel: {{ editing_content.file_name }}. Laissez vide pour garder le fichier existant.</div>
+                {% endif %}
+              </div>
+              <div class="field" id="sg-video-field"{% if not editing_content or editing_content.content_type != 'video' %} style="display:none;"{% endif %}>
+                <label>URL <span style="color:#ef4444;">*</span></label>
+                <input type="url" name="video_url" class="sg-form-input" style="height:40px;" placeholder="https://youtube.com/..." value="{{ editing_content.video_url|default:"" }}">
+              </div>
+            </div>
+
+            <div class="field" id="sg-text-field"{% if not editing_content or editing_content.content_type != 'text' %} style="display:none;margin-top:12px;"{% else %} style="margin-top:12px;"{% endif %}>
+              <label>Texte du cours <span style="color:#ef4444;">*</span></label>
+              <textarea name="text_content" rows="5" class="sg-form-input" placeholder="Redigez le contenu...">{{ editing_content.text_content|default:"" }}</textarea>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+              <button type="button" class="sg-btn sg-btn-outline" style="min-height:38px;font-size:.75rem;" onclick="sgToggleUploadForm()">Annuler</button>
+              <button type="submit" class="sg-btn sg-btn-primary" style="min-height:38px;font-size:.75rem;" id="sg-submit-support">
+                <i class="fa-solid fa-{% if editing_content %}pen{% else %}upload{% endif %}"></i> {% if editing_content %}Modifier le support{% else %}Deposer le support{% endif %}
+              </button>
+            </div>
+          </form>
+        </div>
+        {% else %}
+        <div class="sg-drawer-empty" style="padding:32px 0;">
+          <div class="sg-drawer-empty-icon"><i class="fa-solid fa-hand-pointer"></i></div>
+          <div class="sg-drawer-empty-text">Selectionnez une matiere pour deposer un support.</div>
+        </div>
+        {% endif %}
+      </div>
     </div>
 
     {% if selected_ec %}
-    <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div class="border-b border-slate-200 px-4 py-3">
-        <h3 class="text-sm font-black text-slate-900">Supports deja deposes</h3>
-        <p class="mt-1 text-xs text-slate-500">{{ selected_ec.title }}</p>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full min-w-[720px] text-sm">
-          <thead class="bg-slate-50 text-[11px] font-black uppercase text-slate-600">
+    <div class="sg-drawer-section">
+      <div class="sg-drawer-section-title"><i class="fa-solid fa-table-list"></i> Supports deposes &mdash; {{ selected_ec_summary.content_count }} document(s)</div>
+      <div style="overflow-x:auto;">
+        <table class="sg-drawer-table">
+          <thead>
             <tr>
-              <th class="px-4 py-3 text-left">Support</th>
-              <th class="px-4 py-3 text-left">Chapitre</th>
-              <th class="px-4 py-3 text-left">Type</th>
-              <th class="px-4 py-3 text-right">Acces</th>
+              <th>Support</th>
+              <th>Chapitre</th>
+              <th>Type</th>
+              <th style="text-align:right;">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody>
             {% for chapter in teacher_support_chapters %}
               {% for content in chapter.contents %}
-              <tr class="hover:bg-slate-50">
-                <td class="px-4 py-3 font-semibold text-slate-900">{{ content.title }}</td>
-                <td class="px-4 py-3 text-slate-500">{{ chapter.title }}</td>
-                <td class="px-4 py-3 text-slate-500">{{ content.content_type_label }}</td>
-                <td class="px-4 py-3 text-right">
-                  {% if content.file_url %}
-                  <a href="{{ content.file_url }}" target="_blank" class="inline-flex h-8 items-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-blue-600 hover:bg-slate-50">Ouvrir</a>
-                  {% elif content.video_url %}
-                  <a href="{{ content.video_url }}" target="_blank" rel="noopener" class="inline-flex h-8 items-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-blue-600 hover:bg-slate-50">Video</a>
-                  {% elif content.has_text_content %}
-                  <span class="inline-flex h-8 items-center rounded-lg bg-slate-100 px-3 text-xs font-bold text-slate-700">Texte</span>
+              <tr>
+                <td style="font-weight:900;">{{ content.title }}</td>
+                <td style="color:#64748b;">{{ chapter.title }}</td>
+                <td><span class="sg-badge-sm sg-badge-gray">{{ content.content_type_label }}</span></td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <div style="display:flex;gap:4px;justify-content:flex-end;">
+                  {% if content.file_url or content.video_url or content.has_text_content %}
+                  <button type="button" class="sg-btn" style="min-height:30px;font-size:.65rem;background:#1e293b;border-color:#1e293b;color:#fff;" hx-get="{% url 'accounts_portal:teacher_content_viewer' content.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+                    <i class="fa-solid fa-eye"></i>
+                  </button>
                   {% endif %}
+                  <button type="button" class="sg-btn" style="min-height:30px;font-size:.65rem;background:#2563eb;border-color:#2563eb;color:#fff;" hx-post="{{ teacher_support_workspace_url }}" hx-target="{{ support_target }}" hx-swap="innerHTML" hx-include="closest .sg-drawer-page" hx-vals='{"action":"fetch_content","content_id":"{{ content.id }}","support_target":"{{ support_target }}"}' hx-trigger="click">
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                  <button type="button" class="sg-btn" style="min-height:30px;font-size:.65rem;background:#dc2626;border-color:#dc2626;color:#fff;" onclick="sgConfirmDelete({{ content.id }}, '{{ content.title|escapejs }}')">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                  </div>
                 </td>
               </tr>
               {% endfor %}
             {% empty %}
-            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Aucun chapitre pour cette matiere.</td></tr>
+            <tr><td colspan="4"><div class="sg-drawer-empty" style="padding:32px 0;"><div class="sg-drawer-empty-text">Aucun support pour cette matiere.</div></div></td></tr>
+            {% for content in chapter.contents %}<!-- end row -->{% endfor %}
             {% endfor %}
           </tbody>
         </table>
       </div>
-    </section>
-    {% endif %}
-    {% else %}
-    <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-      <p class="text-base font-black text-slate-900">Aucune matiere rattachee</p>
-      <p class="mt-1 text-sm text-slate-500">La direction doit rattacher au moins une matiere a cette classe.</p>
     </div>
     {% endif %}
-  {% else %}
-  <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-    <p class="text-base font-black text-slate-900">Aucune classe rattachee</p>
-    <p class="mt-1 text-sm text-slate-500">La direction doit rattacher une classe a cet enseignant.</p>
+    {% else %}
+    <div class="sg-drawer-section">
+      <div class="sg-drawer-empty" style="padding:48px 0;">
+        <div class="sg-drawer-empty-icon"><i class="fa-solid fa-school"></i></div>
+        <div class="sg-drawer-empty-text">Selectionnez une classe pour commencer.</div>
+      </div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
-
-  {% if selected_class and selected_ec %}
-  <div x-show="modalSupport" x-cloak class="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/55 px-4 py-6" @keydown.escape.window="if (!uploading) modalSupport=false">
-    <div class="absolute inset-0" @click="if (!uploading) modalSupport=false"></div>
-    <section class="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" @click.stop>
-      <header class="border-b border-slate-200 px-5 py-4">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-xs font-black uppercase tracking-[0.18em] text-blue-600">{{ selected_class.display_name }}</p>
-            <h3 class="mt-1 text-xl font-black text-slate-900">Televerser un cours</h3>
-            <p class="mt-1 text-sm text-slate-500">{{ selected_ec.title }}</p>
-          </div>
-          <button type="button" :disabled="uploading" @click="modalSupport=false" class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
-            x
-          </button>
-        </div>
-      </header>
-
-      <form
-        method="post"
-        enctype="multipart/form-data"
-        hx-post="{{ teacher_support_workspace_url }}"
-        hx-target="{{ support_target }}"
-        hx-swap="innerHTML"
-        hx-encoding="multipart/form-data"
-        hx-disabled-elt="find button[type='submit']"
-        hx-on:htmx:before-request="uploading=true; uploadPercent=0"
-        hx-on:htmx:xhr:progress="if(event.detail.lengthComputable){ uploadPercent=Math.round((event.detail.loaded/event.detail.total)*100) }"
-        hx-on:htmx:after-request="uploading=false"
-        class="overflow-y-auto px-5 py-5"
-      >
-        {% csrf_token %}
-        <input type="hidden" name="action" value="create_content">
-        <input type="hidden" name="support_target" value="{{ support_target }}">
-        <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-        <input type="hidden" name="ec_id" value="{{ selected_ec.id }}">
-
-        <div class="grid gap-4 lg:grid-cols-2">
-          <div>
-            <label class="mb-1 block text-xs font-bold text-slate-700">Chapitre</label>
-            <select name="chapter_id" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-              {% for chapter in teacher_support_chapters %}
-              <option value="{{ chapter.id }}" {% if selected_chapter and selected_chapter.id == chapter.id %}selected{% endif %}>{{ chapter.title }}</option>
-              {% endfor %}
-              <option value="">Depot simple</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-bold text-slate-700">Nouveau chapitre</label>
-            <input type="text" name="new_chapter_title" placeholder="Ex: Chapitre 1 - Introduction" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-          </div>
-        </div>
-
-        <div class="mt-4">
-          <label class="mb-1 block text-xs font-bold text-slate-700">Titre du support <span class="text-rose-500">*</span></label>
-          <input type="text" name="content_title" required placeholder="Ex: Cours 1 - Introduction generale" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-        </div>
-
-        <div class="mt-4 grid gap-4 lg:grid-cols-2">
-          <div>
-            <label class="mb-1 block text-xs font-bold text-slate-700">Type <span class="text-rose-500">*</span></label>
-            <select name="content_type" x-model="contentType" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-              {% for value, label in content_type_choices %}
-              <option value="{{ value }}">{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div x-show="['pdf', 'doc', 'excel', 'ppt', 'image', 'audio'].includes(contentType)" x-cloak>
-            <label class="mb-1 block text-xs font-bold text-slate-700">Fichier <span class="text-rose-500">*</span></label>
-            <input type="file" name="file" x-bind:required="['pdf', 'doc', 'excel', 'ppt', 'image', 'audio'].includes(contentType)" class="h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:text-xs file:font-bold">
-          </div>
-          <div x-show="contentType === 'video'" x-cloak>
-            <label class="mb-1 block text-xs font-bold text-slate-700">URL video <span class="text-rose-500">*</span></label>
-            <input type="url" name="video_url" x-bind:required="contentType === 'video'" placeholder="https://..." class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-          </div>
-        </div>
-
-        <div class="mt-4" x-show="contentType === 'text'" x-cloak>
-          <label class="mb-1 block text-xs font-bold text-slate-700">Texte du cours <span class="text-rose-500">*</span></label>
-          <textarea name="text_content" x-bind:required="contentType === 'text'" rows="6" placeholder="Redigez le contenu du cours..." class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></textarea>
-        </div>
-
-        <div x-show="uploading" x-cloak class="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-          <div class="flex items-center justify-between text-xs font-bold text-blue-700">
-            <span>Televersement en cours</span>
-            <span x-text="uploadPercent + '%'"></span>
-          </div>
-          <div class="mt-2 h-2 overflow-hidden rounded-full bg-white">
-            <div class="h-full rounded-full bg-blue-600 transition-all" :style="`width: ${uploadPercent}%`"></div>
-          </div>
-        </div>
-
-        <footer class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" :disabled="uploading" @click="modalSupport=false" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
-            Annuler
-          </button>
-          <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">
-            <span x-show="!uploading">Deposer le support</span>
-            <span x-show="uploading" x-cloak>Envoi...</span>
-          </button>
-        </footer>
-      </form>
-    </section>
-  </div>
-  {% endif %}
 </div>
+
+<script>
+function sgToggleUploadForm() {
+  var form = document.getElementById('sg-upload-form');
+  var btn = document.getElementById('sg-upload-btn');
+  if (!form) return;
+  var isOpen = form.style.display !== 'none';
+  form.style.display = isOpen ? 'none' : 'block';
+  if (btn) btn.style.display = isOpen ? 'inline-flex' : 'none';
+  if (isOpen) {
+    var editInput = form.querySelector('input[name="action"]');
+    if (editInput) editInput.value = 'create_content';
+    var contentIdInput = form.querySelector('input[name="content_id"]');
+    if (contentIdInput) contentIdInput.remove();
+    form.querySelector('input[name="content_title"]').value = '';
+    form.querySelector('select[name="content_type"]').value = 'pdf';
+    sgToggleContentType('pdf');
+    form.querySelector('input[name="video_url"]').value = '';
+    form.querySelector('textarea[name="text_content"]').value = '';
+    form.querySelector('button[type="submit"]').innerHTML = '<i class="fa-solid fa-upload"></i> Deposer le support';
+  }
+}
+function sgToggleContentType(val) {
+  var isFile = ['pdf', 'doc', 'excel', 'ppt', 'image', 'audio'].includes(val);
+  var isVideo = val === 'video';
+  var isText = val === 'text';
+  var fileField = document.getElementById('sg-file-field');
+  var videoField = document.getElementById('sg-video-field');
+  var textField = document.getElementById('sg-text-field');
+  if (fileField) fileField.style.display = isFile ? '' : 'none';
+  if (videoField) videoField.style.display = isVideo ? '' : 'none';
+  if (textField) textField.style.display = isText ? '' : 'none';
+}
+function sgConfirmDelete(contentId, contentTitle) {
+  if (!confirm('Supprimer le support "' + contentTitle + '" ? Cette action est irreversible.')) return;
+  var form = document.getElementById('sg-upload-form');
+  if (!form) return;
+  var csrf = form.querySelector('input[name="csrfmiddlewaretoken"]');
+  var vals = {action: 'delete_content', content_id: contentId, support_target: '{{ support_target|escapejs }}'};
+  {% if selected_class %}vals.class_id = {{ selected_class.id }};{% endif %}
+  {% if selected_ec %}vals.ec_id = {{ selected_ec.id }};{% endif %}
+  htmx.ajax('POST', '{{ teacher_support_workspace_url|escapejs }}', {
+    target: '{{ support_target|escapejs }}',
+    swap: 'innerHTML',
+    values: vals,
+    headers: {'X-CSRFToken': csrf ? csrf.value : ''}
+  });
+}
+</script>
 {% endwith %}

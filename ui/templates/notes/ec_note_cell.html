@@ -1,4 +1,4 @@
-<td class="score-cell {% if ec_row.display_status == 'validated' %}cell-ok{% elif ec_row.display_status == 'failed' %}cell-bad{% else %}cell-empty{% endif %}">
+<div class="maq-cell maq-cell--note score-cell {% if ec_row.display_status == 'validated' %}maq-cell--ok{% elif ec_row.display_status == 'failed' %}maq-cell--bad{% else %}maq-cell--empty{% endif %}">
   <div class="score-stack">
     <input
       class="score-input w-full border p-1{% if row.updated_ec_id == ec_row.ec.id %} is-saved{% endif %}"
@@ -12,8 +12,8 @@
       autocomplete="off"
       hx-post="{% url 'accounts_portal:save_grade' %}"
       hx-trigger="blur, keyup[key=='Enter']"
-      hx-include="closest td"
-      hx-target="closest tr"
+      hx-include="closest .score-cell"
+      hx-target="closest .maq-row-student"
       hx-swap="outerHTML"
       hx-vals='{"student_id": "{{ row.student_id }}"}'
       {% if row.active_session_type == "retake" and not ec_row.is_retake_editable %}disabled title="Matiere validee en session normale"{% endif %}
@@ -31,4 +31,4 @@
   <input type="hidden" name="enrollment_id" value="{{ row.enrollment.id }}">
   <input type="hidden" name="ec_id" value="{{ ec_row.ec.id }}">
   <input type="hidden" name="session_type" value="{{ row.active_session_type }}">
-</td>
+</div>

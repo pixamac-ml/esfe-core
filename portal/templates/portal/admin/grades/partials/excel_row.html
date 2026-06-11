@@ -1,50 +1,45 @@
 {% load component_tags %}
-<tr>
-  {% component "student_identity_column" row=row %}{% endcomponent %}
+<div class="maq-row-student maq-row"
+     data-row-id="{{ row.student_id }}"
+     data-enrollment-id="{{ row.enrollment.id|default:'' }}">
+
+  <div class="maq-cell maq-cell--meta maq-cell--meta-num">{{ row.index }}</div>
+  <div class="maq-cell maq-cell--meta maq-cell--meta-name">{{ row.student_last_name|default:"" }}</div>
+  <div class="maq-cell maq-cell--meta maq-cell--meta-prenom">{{ row.student_first_name|default:"" }}</div>
 
   {% for ue_block in row.ue_blocks %}
     {% for ec_row in ue_block.rows %}
       {% component "ec_note_cell" row=row ec_row=ec_row %}{% endcomponent %}
 
-      <td class="metric-cell {% if ec_row.display_status == 'validated' %}cell-ok{% elif ec_row.display_status == 'failed' %}cell-bad{% else %}cell-empty{% endif %}">
+      <div class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}">
         {{ ec_row.note_coefficient_display|default:"0,00" }}
-      </td>
+      </div>
 
-      <td class="credit-cell {% if ec_row.display_status == 'validated' %}cell-ok{% elif ec_row.display_status == 'failed' %}cell-bad{% else %}cell-empty{% endif %}">
+      <div class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}">
         {{ ec_row.credit_obtained_display|default:"0,00" }}
-      </td>
+      </div>
     {% endfor %}
 
-    <td class="unit unit-summary">
+    <div class="maq-cell maq-cell--unit">
       {{ ue_block.average_display|default:"0,00" }}
-    </td>
+    </div>
 
-    <td class="unit unit-summary">
+    <div class="maq-cell maq-cell--unit">
       {{ ue_block.total_note_coefficients_display|default:"0,00" }}
-    </td>
+    </div>
 
-    <td class="unit unit-summary {% if ue_block.credit_obtained == 0 %}cell-bad{% else %}cell-ok{% endif %}">
+    <div class="maq-cell maq-cell--unit {% if ue_block.credit_obtained == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">
       {{ ue_block.credit_obtained_display|default:"0,00" }}
-    </td>
+    </div>
   {% endfor %}
 
-  {% component "semester_summary" row=row %}{% endcomponent %}
-
-  <td class="action-cell">
-    {% if row.student_profile_id and row.semester_id and row.can_generate_reports %}
-      <div class="action-stack">
-        <a href="{% url 'academics:student_semester_report' row.student_profile_id row.semester_id %}"
-           class="row-action primary">
-            Voir releve
-        </a>
-        <a href="{% url 'academics:student_semester_pdf' row.student_id row.semester_id %}"
-           target="_blank"
-           class="row-action dark">
-            PDF
-        </a>
-      </div>
-    {% else %}
-      <span class="text-xs text-gray-400">{{ row.report_lock_reason|default:"Action indisponible pour ce statut." }}</span>
-    {% endif %}
-  </td>
-</tr>
+  <div class="maq-cell maq-cell--res maq-cell--res-1">
+    {{ row.semester_average_display|default:"0,00" }}
+  </div>
+  <div class="maq-cell maq-cell--res maq-cell--res-2">
+    {{ row.semester_percentage_display|default:"0,00" }}%
+  </div>
+  <div class="maq-cell maq-cell--res maq-cell--res-3 {% if row.semester_credits == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">
+    {{ row.semester_credits_display|default:"0,00" }}
+  </div>
+</div>

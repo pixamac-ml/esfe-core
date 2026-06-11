@@ -1,0 +1,315 @@
+{% extends "portal/teacher/sg_base.html" %}
+{% load humanize %}
+{% block title %}Dashboard Enseignant ESFE{% endblock %}
+
+{% block content %}
+{% include "portal/teacher/sg_partials/scope.html" %}
+
+<!-- Nav tabs -->
+<div class="sg-nav-tabs">
+  <a class="sg-nav-tab {% if active_section == 'overview' %}active{% endif %}" href="?section=overview" data-section="overview">Accueil</a>
+  <a class="sg-nav-tab {% if active_section == 'classes' %}active{% endif %}" href="?section=classes" data-section="classes">Mes classes</a>
+  <a class="sg-nav-tab {% if active_section == 'supports' %}active{% endif %}" href="?section=supports" data-section="supports">Supports</a>
+  <a class="sg-nav-tab {% if active_section == 'schedule' %}active{% endif %}" href="?section=schedule" data-section="schedule">Planning</a>
+  <a class="sg-nav-tab {% if active_section == 'logs' %}active{% endif %}" href="?section=logs" data-section="logs">Cahier texte</a>
+  <a class="sg-nav-tab {% if active_section == 'salary' %}active{% endif %}" href="?section=salary" data-section="salary">Honoraires</a>
+  <a class="sg-nav-tab {% if active_section == 'notifications' %}active{% endif %}" href="?section=notifications" data-section="notifications">Notifications</a>
+  <a class="sg-nav-tab {% if active_section == 'settings' %}active{% endif %}" href="?section=settings" data-section="settings">Parametres</a>
+</div>
+
+<!-- =========== SECTION: OVERVIEW =========== -->
+<div class="sg-section-panel {% if active_section == 'overview' %}is-active{% endif %}" data-sg-panel="overview" {% if active_section != 'overview' %}hidden{% endif %}>
+  {% include "portal/teacher/sg_partials/overview_kpis.html" %}
+
+  <div class="sg-row-2" style="margin-bottom:16px;">
+    {% include "portal/teacher/sg_partials/overview_today.html" %}
+    {% include "portal/teacher/sg_partials/overview_upcoming.html" %}
+  </div>
+
+  <div class="sg-row-3">
+    {% include "portal/teacher/sg_partials/overview_recent_logs.html" %}
+    {% include "portal/teacher/sg_partials/overview_recent_supports.html" %}
+    {% include "portal/teacher/sg_partials/overview_actions.html" %}
+  </div>
+
+  {% if teacher_insights %}
+  <div class="sg-panel" style="margin-top:16px;">
+    <div class="sg-panel-title">Points d'attention</div>
+    <div class="message-list">
+      {% for insight in teacher_insights %}
+      <a href="?section={{ insight.section }}" class="sg-action-card" style="border-left:4px solid {% if insight.tone == 'danger' %}#ef4444{% elif insight.tone == 'warning' %}#f59e0b{% elif insight.tone == 'success' %}#16a34a{% else %}#2563eb{% endif %};">
+        <div>
+          <div class="sg-action-label">{{ insight.label }}</div>
+          <div class="sg-action-sub">{{ insight.message }}</div>
+        </div>
+        <span class="sg-badge-sm {% if insight.tone == 'danger' %}sg-badge-red{% elif insight.tone == 'warning' %}sg-badge-amber{% elif insight.tone == 'success' %}sg-badge-green{% else %}sg-badge-blue{% endif %}">Voir</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- =========== SECTION: CLASSES =========== -->
+<div class="sg-section-panel {% if active_section == 'classes' %}is-active{% endif %}" data-sg-panel="classes" {% if active_section != 'classes' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-school" style="color:#2563eb;margin-right:8px;"></i>Mes classes et effectifs</div>
+      <div class="sg-section-hero-sub">Consultation des classes, des etudiants et des matieres que vous assurez.</div>
+    </div>
+    <span class="sg-scope-chip">{{ class_focus_rows|length }} classe(s) active(s)</span>
+  </div>
+  <div class="sg-row-4" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ class_focus_rows|length }}</div><div class="sg-stat-lbl">Classes</div></div>
+    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ teacher_kpis.subjects_count }}</div><div class="sg-stat-lbl">Matieres</div></div>
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ teacher_kpis.visible_students }}</div><div class="sg-stat-lbl">Etudiants</div></div>
+    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ week_start|date:"Y" }}</div><div class="sg-stat-lbl">Annee</div></div>
+  </div>
+  <div class="sg-panel">
+    <div class="sg-section-header">
+      <div>
+        <div class="sg-panel-title" style="margin:0;">Classes rattachees</div>
+        <div class="sg-section-header-sub">Cliquez sur une ligne pour voir le detail.</div>
+      </div>
+    </div>
+    <div class="sg-table-wrap">
+      <table class="sg-table">
+        <thead>
+          <tr>
+            <th>Classe</th>
+            <th>Programme</th>
+            <th>Effectif</th>
+            <th>Matieres</th>
+            <th>Seances</th>
+            <th>Prochaine</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in class_focus_rows %}
+          <tr>
+            <td style="font-weight:900;">{{ row.class_name }}</td>
+            <td>{{ row.programme_title }}</td>
+            <td>{{ row.student_count }} etudiant(s)</td>
+            <td>{{ row.subjects|join:", "|default:"A confirmer" }}</td>
+            <td>{{ row.event_count }} / {{ row.slot_count }} creneau(x)</td>
+            <td>{% if row.next_event %}{{ row.next_event.start_datetime|date:"d/m H:i" }}{% else %}Non planifiee{% endif %}</td>
+            <td style="text-align:right;">
+              <button type="button" class="sg-btn sg-btn-outline" hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" style="min-height:30px;font-size:.68rem;">
+                <i class="fa-regular fa-eye"></i>Apercu
+              </button>
+              {% if row.next_event %}
+              <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' row.next_event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" style="min-height:30px;font-size:.68rem;">
+                <i class="fa-solid fa-pen"></i>Cahier
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-solid fa-school"></i></div><div class="sg-empty-text">Aucune classe rattachee a votre compte.</div></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- =========== SECTION: SUPPORTS =========== -->
+<div class="sg-section-panel {% if active_section == 'supports' %}is-active{% endif %}" data-sg-panel="supports" {% if active_section != 'supports' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-folder-open" style="color:#d97706;margin-right:8px;"></i>Supports de cours</div>
+      <div class="sg-section-hero-sub">Deposez et organisez vos supports par classe, matiere et chapitre.</div>
+    </div>
+    <div class="sg-section-actions">
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'accounts_portal:teacher_support_workspace' %}?support_target=%23sg-drawer-content" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+        <i class="fa-solid fa-plus"></i>Deposer un support
+      </button>
+    </div>
+  </div>
+  <div class="sg-row-4" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ class_focus_rows|length }}</div><div class="sg-stat-lbl">Classes</div></div>
+    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ teacher_support_stats.chapters }}</div><div class="sg-stat-lbl">Chapitres</div></div>
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ teacher_support_stats.contents }}</div><div class="sg-stat-lbl">Supports</div></div>
+    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ teacher_support_stats.files }}</div><div class="sg-stat-lbl">Fichiers</div></div>
+  </div>
+  <div class="sg-panel">
+    <div class="sg-section-header">
+      <div>
+        <div class="sg-panel-title" style="margin:0;">Depot rapide</div>
+        <div class="sg-section-header-sub">Choisissez une classe pour deposer un support.</div>
+      </div>
+    </div>
+    <div class="sg-action-grid">
+      {% for row in class_focus_rows %}
+      <button type="button" class="sg-action-card" hx-get="{% url 'accounts_portal:teacher_support_workspace' %}?class_id={{ row.class_id }}&support_target=%23sg-drawer-content" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+        <div>
+          <div class="sg-action-label">{{ row.class_name }}</div>
+          <div class="sg-action-sub">{{ row.subjects|join:", "|truncatechars:60 }}</div>
+        </div>
+        <span class="sg-action-count" style="background:#dbeafe;color:#2563eb;"><i class="fa-solid fa-upload"></i></span>
+      </button>
+      {% empty %}
+      <div class="sg-empty" style="grid-column:1/-1;">
+        <div class="sg-empty-icon"><i class="fa-solid fa-folder-open"></i></div>
+        <div class="sg-empty-text">Aucune classe rattachee.</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- =========== SECTION: SCHEDULE =========== -->
+<div class="sg-section-panel {% if active_section == 'schedule' %}is-active{% endif %}" data-sg-panel="schedule" {% if active_section != 'schedule' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-regular fa-calendar-days" style="color:#2563eb;margin-right:8px;"></i>Mon emploi du temps</div>
+      <div class="sg-section-hero-sub">Vision hebdomadaire de vos cours, classes et salles.</div>
+    </div>
+    <span class="sg-scope-chip">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</span>
+  </div>
+  <div class="sg-row-4" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ teacher_kpis.today_courses }}</div><div class="sg-stat-lbl">Aujourd'hui</div></div>
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ teacher_kpis.week_courses }}</div><div class="sg-stat-lbl">Cette semaine</div></div>
+    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ class_focus_rows|length }}</div><div class="sg-stat-lbl">Classes</div></div>
+    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ teacher_kpis.weekly_rooms }}</div><div class="sg-stat-lbl">Salles</div></div>
+  </div>
+  <div class="sg-panel">
+    <div class="sg-section-header">
+      <div>
+        <div class="sg-panel-title" style="margin:0;">Planning hebdomadaire</div>
+      </div>
+      <span class="sg-scope-chip">{{ teacher_kpis.scheduled_days }} jour(s)</span>
+    </div>
+    <div class="sg-table-wrap">
+      <table class="sg-table">
+        <thead>
+          <tr>
+            <th>Jour</th>
+            <th>Horaire</th>
+            <th>Cours</th>
+            <th>Classe</th>
+            <th>Salle</th>
+            <th style="text-align:right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if teaching_days %}
+            {% for day in teaching_days %}
+              {% for event in day.events %}
+              <tr>
+                <td><div style="font-weight:900;">{{ day.label }}</div><div style="font-size:.65rem;color:#94a3b8;">{{ day.date|date:"d/m" }}</div></td>
+                <td>{{ event.time_range }}</td>
+                <td style="font-weight:900;">{{ event.title }}</td>
+                <td>{{ event.class_name }}</td>
+                <td>{{ event.location|default:"-" }}</td>
+                <td style="text-align:right;">
+                  <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" style="min-height:30px;font-size:.68rem;">
+                    <i class="fa-solid fa-pen"></i>Cahier
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            {% endfor %}
+          {% else %}
+          <tr><td colspan="6"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-regular fa-calendar-days"></i></div><div class="sg-empty-text">Aucun cours planifie sur cette semaine.</div></div></td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- =========== SECTION: LOGS =========== -->
+<div class="sg-section-panel {% if active_section == 'logs' %}is-active{% endif %}" data-sg-panel="logs" {% if active_section != 'logs' %}hidden{% endif %}>
+  <div class="sg-section-hero">
+    <div>
+      <div class="sg-section-hero-title"><i class="fa-solid fa-book-open" style="color:#16a34a;margin-right:8px;"></i>Cahier de texte</div>
+      <div class="sg-section-hero-sub">Suivi et completion de votre cahier de texte.</div>
+    </div>
+    <span class="sg-scope-chip">{{ pending_lesson_logs_count }} en attente</span>
+  </div>
+  <div class="sg-row-4" style="margin-bottom:16px;">
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ recent_lesson_logs|length }}</div><div class="sg-stat-lbl">Recents</div></div>
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ week_lesson_logs_count }}</div><div class="sg-stat-lbl">Cette semaine</div></div>
+    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ pending_lesson_logs_count }}</div><div class="sg-stat-lbl">En attente</div></div>
+    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ teacher_kpis.month_done_logs }}</div><div class="sg-stat-lbl">Ce mois</div></div>
+  </div>
+
+  {% if pending_lesson_log_rows %}
+  <div class="sg-panel" style="margin-bottom:16px;border-left:4px solid #ef4444;">
+    <div class="sg-section-header">
+      <div>
+        <div class="sg-panel-title" style="margin:0;color:#ef4444;">Cours a completer</div>
+        <div class="sg-section-header-sub">Ces cours passes n'ont pas encore de cahier de texte.</div>
+      </div>
+      <span class="sg-badge-sm sg-badge-red">{{ pending_lesson_logs_count }} urgent</span>
+    </div>
+    <div class="message-list">
+      {% for event in pending_lesson_log_rows %}
+      <div class="sg-action-card">
+        <div>
+          <div class="sg-action-label">{{ event.ec.title }}</div>
+          <div class="sg-action-sub">{{ event.academic_class.display_name }} · {{ event.start_datetime|date:"d/m/Y H:i" }}</div>
+        </div>
+        <button type="button" class="sg-btn sg-btn-danger" hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" style="min-height:30px;font-size:.68rem;">
+          <i class="fa-solid fa-pen"></i>Saisir
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="sg-panel">
+    <div class="sg-panel-title">Derniers cahiers saisis</div>
+    <div class="sg-table-wrap">
+      <table class="sg-table">
+        <thead>
+          <tr>
+            <th>Cours</th>
+            <th>Classe</th>
+            <th>Date</th>
+            <th>Statut</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in recent_lesson_logs %}
+          <tr>
+            <td style="font-weight:900;">{{ log.ec.title }}</td>
+            <td>{{ log.academic_class.display_name }}</td>
+            <td>{{ log.date|date:"d/m/Y" }} · {{ log.start_time|time:"H:i" }}</td>
+            <td><span class="sg-badge-sm {% if log.status == 'done' %}sg-badge-green{% elif log.status == 'absent_teacher' %}sg-badge-red{% else %}sg-badge-gray{% endif %}">{{ log.get_status_display }}</span></td>
+            <td style="text-align:right;">
+              {% if log.schedule_event_id %}
+              <button type="button" class="sg-btn sg-btn-outline" hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' log.schedule_event_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" style="min-height:30px;font-size:.68rem;">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-solid fa-book-open"></i></div><div class="sg-empty-text">Aucun cahier recent.</div></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- =========== SECTION: SALARY =========== -->
+<div class="sg-section-panel {% if active_section == 'salary' %}is-active{% endif %}" data-sg-panel="salary" {% if active_section != 'salary' %}hidden{% endif %}>
+  {% include "portal/teacher/sg_partials/salary.html" %}
+</div>
+
+<!-- =========== SECTION: NOTIFICATIONS =========== -->
+<div class="sg-section-panel {% if active_section == 'notifications' %}is-active{% endif %}" data-sg-panel="notifications" {% if active_section != 'notifications' %}hidden{% endif %}>
+  {% include "portal/teacher/sg_partials/notifications.html" %}
+</div>
+
+<!-- =========== SECTION: SETTINGS =========== -->
+<div class="sg-section-panel {% if active_section == 'settings' %}is-active{% endif %}" data-sg-panel="settings" {% if active_section != 'settings' %}hidden{% endif %}>
+  {% include "portal/teacher/sg_partials/settings.html" %}
+</div>
+{% endblock %}

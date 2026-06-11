@@ -71,6 +71,133 @@
     backdrop-filter: blur(10px);
   }
 
+  /* ===== SG DRAWER ===== */
+  .sg-drawer-backdrop {
+    position: fixed; inset: 0; z-index: 125;
+    background: rgba(15,23,42,.48);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .22s ease, visibility .22s ease;
+  }
+  .sg-drawer-backdrop.is-visible { opacity: 1; visibility: visible; pointer-events: auto; }
+  .sg-drawer {
+    position: fixed; top: 0; bottom: 0; right: 0; z-index: 135;
+    width: min(860px, 100vw); height: 100%;
+    display: flex; flex-direction: column;
+    background: #f6f8fc; color: #0f172a;
+    transform: translateX(100%);
+    transition: transform .26s cubic-bezier(.4,0,.2,1);
+    box-shadow: -8px 0 40px rgba(15,23,42,.12);
+  }
+  .sg-drawer.is-open { transform: translateX(0); }
+  .sg-drawer-header {
+    flex: 0 0 auto; height: 60px; min-height: 60px;
+    display: flex; align-items: center; justify-content: flex-end;
+    padding: 0 18px; border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+  }
+  .sg-drawer-close-btn {
+    width: 38px; height: 38px;
+    border: 1px solid #e2e8f0; border-radius: 10px;
+    background: #fff; cursor: pointer;
+    display: grid; place-items: center;
+    color: #94a3b8; transition: all .15s;
+  }
+  .sg-drawer-close-btn:hover { background: #fee2e2; border-color: #fecaca; color: #ef4444; }
+  .sg-drawer-content {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .sg-drawer-page {
+    flex: 1 1 auto; display: flex; flex-direction: column;
+    max-width: 100%;
+  }
+  .sg-drawer-hero {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #fff; padding: 24px 24px 20px;
+    flex: 0 0 auto;
+  }
+  .sg-drawer-hero-sub { font-size:.6rem;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:#7dd3fc; }
+  .sg-drawer-hero-title { font-size:1.5rem;font-weight:900;margin-top:6px; }
+  .sg-drawer-hero-meta { font-size:.82rem;font-weight:700;margin-top:6px;color:#cbd5e1; }
+  .sg-drawer-hero-badge { display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 12px;font-size:.7rem;font-weight:900;background:rgba(255,255,255,.1);color:#fff; }
+  .sg-drawer-body { flex: 1 1 auto; padding: 20px 24px; display: grid; gap: 18px; max-width: 100%; }
+  .sg-drawer-section { background:#fff; border:1px solid #dfe7f3; border-radius:16px; padding:18px; box-shadow:0 4px 16px rgba(15,23,42,.04); }
+  .sg-drawer-section-title { font-size:.7rem;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:#64748b;margin-bottom:14px;display:flex;align-items:center;gap:8px; }
+  .sg-drawer-section-title i { color:#2563eb; }
+  .sg-drawer-stats { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+  .sg-drawer-stat { background:#f8fafc;border-radius:12px;padding:14px;text-align:center; }
+  .sg-drawer-stat-val { font-size:1.5rem;font-weight:900;color:#0f172a; }
+  .sg-drawer-stat-lbl { font-size:.6rem;font-weight:800;text-transform:uppercase;color:#94a3b8;margin-top:2px;letter-spacing:.08em; }
+  .sg-drawer-table { width:100%;border-collapse:collapse; }
+  .sg-drawer-table th { padding:10px 12px;border-bottom:1px solid #e7edf6;background:#fbfcff;color:#64748b;font-size:.62rem;font-weight:950;text-transform:uppercase;text-align:left;white-space:nowrap; }
+  .sg-drawer-table td { padding:12px;border-bottom:1px solid #f1f5f9;font-size:.78rem; }
+  .sg-drawer-table tr:hover td { background:#f8fbff; }
+  .sg-drawer-grid { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+  .sg-drawer-empty { text-align:center;padding:48px 16px;color:#94a3b8;flex:1;display:grid;place-items:center; }
+  .sg-drawer-empty-icon { font-size:2.2rem;opacity:.3;margin-bottom:10px; }
+  .sg-drawer-empty-text { font-size:.85rem;font-weight:700; }
+  @media (max-width:768px) {
+    .sg-drawer { width:100vw; }
+    .sg-drawer-stats { grid-template-columns:1fr; }
+    .sg-drawer-grid { grid-template-columns:1fr; }
+    .sg-drawer-body { padding:14px; }
+  }
+
+  /* ===== SG VIEWER (fullscreen overlay) ===== */
+  .sg-viewer-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(8,15,30,.8);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .25s ease, visibility .25s ease;
+  }
+  .sg-viewer-backdrop.is-visible { opacity: 1; visibility: visible; pointer-events: auto; }
+  .sg-viewer {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 210;
+    display: flex; flex-direction: column;
+    background: #f6f8fc;
+    transform: scale(.96); opacity: 0;
+    pointer-events: none;
+    transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .22s ease;
+    border-radius: 20px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.5);
+    max-width: 1400px; margin: 20px auto;
+    height: calc(100vh - 40px);
+  }
+  .sg-viewer.is-open {
+    transform: scale(1); opacity: 1; pointer-events: auto;
+    border-radius: 16px;
+  }
+  .sg-viewer-content {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sg-viewer-empty {
+    flex: 1; display: grid; place-items: center;
+    color: #94a3b8; font-size: .85rem; font-weight: 700;
+  }
+  .sg-viewer-empty-icon { font-size: 2.5rem; opacity: .3; margin-bottom: 12px; }
+  .sg-viewer-toolbar {
+    flex: 0 0 auto; height: 56px; min-height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px; background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .sg-viewer-toolbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .sg-viewer-toolbar-title { font-size: .95rem; font-weight: 900; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sg-viewer-toolbar-sub { font-size: .65rem; font-weight: 700; color: #94a3b8; }
+  .sg-viewer-toolbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .sg-viewer-body {
+    flex: 1 1 auto; min-height: 0; overflow: auto;
+    display: grid; place-items: start;
+    background: #f1f5f9; padding: 20px;
+  }
+  .sg-viewer-body iframe {
+    width: 100%; height: 100%; border: none;
+    border-radius: 8px; background: #fff;
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+  }
+
   .teacher-sidebar {
     background: linear-gradient(180deg, #061b34 0%, #0b2747 100%);
     box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.08);
@@ -79,14 +206,6 @@
   .teacher-icon {
     width: 18px;
     height: 18px;
-  }
-
-  .teacher-modal-shell {
-    pointer-events: none;
-  }
-
-  .teacher-modal-shell.is-open {
-    pointer-events: auto;
   }
 
   .teacher-dashboard-page {
@@ -186,7 +305,7 @@
         <button
           x-show="sidebarOpen"
           hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' upcoming_events.0.id %}"
-          hx-target="#teacher-modal-panel"
+          hx-target="#sg-drawer-content"
           hx-swap="innerHTML"
           class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition text-left"
         >
@@ -198,7 +317,7 @@
         <button
           x-show="sidebarOpen"
           hx-get="{% url 'accounts_portal:teacher_class_detail' class_focus_rows.0.class_id %}"
-          hx-target="#teacher-modal-panel"
+          hx-target="#sg-drawer-content"
           hx-swap="innerHTML"
           class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition text-left"
         >
@@ -209,7 +328,7 @@
         <button
           x-show="sidebarOpen"
           hx-get="{{ teacher_support_workspace_url }}?class_id={{ class_focus_rows.0.class_id }}"
-          hx-target="#teacher-modal-panel"
+          hx-target="#sg-drawer-content"
           hx-swap="innerHTML"
           class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/10 transition text-left"
         >
@@ -316,7 +435,7 @@
           <div class="flex flex-wrap items-center gap-3">
             <div class="h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2">{{ today|date:"d/m/Y" }}</div>
             {% if upcoming_events %}
-            <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' upcoming_events.0.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold">Aperçu du prochain cours</button>
+            <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' upcoming_events.0.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="h-11 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold">Aperçu du prochain cours</button>
             {% endif %}
           </div>
         </div>
@@ -387,7 +506,7 @@
                     <p class="text-sm text-slate-500">{{ event.academic_class.display_name }} · {{ event.location|default:"Salle non precisee" }}</p>
                   </div>
                 </div>
-                <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-blue-50 text-blue-600 text-sm font-semibold">Aperçu</button>
+                <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-blue-50 text-blue-600 text-sm font-semibold">Aperçu</button>
               </div>
               {% empty %}
               <div class="p-6 text-sm text-slate-500">Aucun cours aujourd'hui.</div>
@@ -405,7 +524,7 @@
                   <p class="text-sm text-slate-500">{{ event.class_name }}</p>
                   <p class="text-xs text-slate-400 mt-1">{{ event.weekday_label|title }} · {{ event.time_range }}</p>
                 </div>
-                <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-semibold">Aperçu</button>
+                <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-semibold">Aperçu</button>
               </div>
               {% empty %}
               <div class="p-6 text-sm text-slate-500">Aucun cours a venir.</div>
@@ -483,11 +602,11 @@
                   <td class="px-5 py-4 text-slate-600">{% if row.next_event %}{{ row.next_event.start_datetime|date:"d/m H:i" }}{% else %}Non planifiee{% endif %}</td>
                   <td class="px-5 py-4">
                     <div class="flex justify-end gap-2">
-                      <button hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Aperçu classe">
+                      <button hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Aperçu classe">
                         <i data-lucide="eye" class="teacher-icon text-slate-700"></i>
                       </button>
                       {% if row.next_event %}
-                      <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' row.next_event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Saisir le cahier">
+                      <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' row.next_event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Saisir le cahier">
                         <i data-lucide="square-pen" class="teacher-icon text-slate-700"></i>
                       </button>
                       {% endif %}
@@ -561,7 +680,7 @@
                 {% if teacher_support_workspace_url %}
                 <button hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}&support_target=%23teacher-supports-workspace" hx-target="#teacher-supports-workspace" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">Ajouter / gerer</button>
                 {% endif %}
-                <button hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700">Aperçu classe</button>
+                <button hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700">Aperçu classe</button>
               </div>
             </div>
             {% empty %}
@@ -628,8 +747,8 @@
                       <td class="px-5 py-4 text-slate-600">{{ event.location|default:"Salle non precisee" }}</td>
                       <td class="px-5 py-4">
                         <div class="flex justify-end gap-2">
-                          <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100">Aperçu</button>
-                          <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Cahier</button>
+                          <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-100">Aperçu</button>
+                          <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Cahier</button>
                         </div>
                       </td>
                     </tr>
@@ -689,7 +808,7 @@
                   <td class="px-5 py-4">
                     <div class="flex justify-end gap-2">
                       {% if log.schedule_event_id %}
-                      <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' log.schedule_event_id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Voir le detail">
+                      <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' log.schedule_event_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100" title="Voir le detail">
                         <i data-lucide="eye" class="teacher-icon text-slate-700"></i>
                       </button>
                       {% endif %}
@@ -711,7 +830,7 @@
             {% for event in pending_lesson_log_rows %}
             <div class="p-4 flex items-center justify-between gap-3 hover:bg-slate-50">
               <div><p class="font-semibold text-slate-900">{{ event.ec.title }}</p><p class="text-sm text-slate-500">{{ event.academic_class.display_name }} · {{ event.start_datetime|date:"d/m/Y H:i" }}</p></div>
-              <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#teacher-modal-panel" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-semibold">Completer le cahier</button>
+              <button hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-semibold">Completer le cahier</button>
             </div>
             {% endfor %}
           </div>
@@ -735,22 +854,52 @@
     </section>
   </main>
 
-  <div class="teacher-modal-shell fixed inset-0 z-[180]" :class="{ 'is-open': actionPanelOpen }" x-show="actionPanelOpen" x-cloak>
-    <div class="absolute inset-0 bg-slate-950/35" @click="actionPanelOpen = false"></div>
-    <aside class="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl border-l border-slate-200 flex flex-col" @click.stop>
-      <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+  <!-- ===== SG DRAWER (slide-in) ===== -->
+  <div class="sg-drawer-backdrop" id="sg-drawer-backdrop"></div>
+  <div class="sg-drawer" id="sg-drawer">
+    <div class="sg-drawer-header">
+      <button type="button" class="sg-drawer-close-btn" id="sg-drawer-close-btn" title="Fermer">
+        <i class="fa-solid fa-xmark" style="font-size:1.1rem;"></i>
+      </button>
+    </div>
+    <div class="sg-drawer-content" id="sg-drawer-content">
+      <div class="sg-drawer-empty">
         <div>
-          <h3 class="text-xl font-black text-slate-900">Aperçu enseignant</h3>
-          <p class="text-sm text-slate-500 mt-1">Classes, supports et cahier sans quitter le dashboard.</p>
+          <div class="sg-drawer-empty-icon"><i class="fa-solid fa-arrow-pointer"></i></div>
+          <div class="sg-drawer-empty-text">Selectionne une classe, un cours ou un support.</div>
         </div>
-        <button type="button" @click="actionPanelOpen = false" class="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100">
-          <i data-lucide="x" class="teacher-icon"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SG VIEWER (fullscreen overlay) ===== -->
+  <div class="sg-viewer-backdrop" id="sg-viewer-backdrop"></div>
+  <div class="sg-viewer" id="sg-viewer">
+    <div class="sg-viewer-toolbar">
+      <div class="sg-viewer-toolbar-left">
+        <i class="fa-solid fa-eye" style="color:#2563eb;font-size:1rem;"></i>
+        <div>
+          <div class="sg-viewer-toolbar-title">Visualisation du contenu</div>
+          <div class="sg-viewer-toolbar-sub">Support de cours</div>
+        </div>
+      </div>
+      <div class="sg-viewer-toolbar-right">
+        <button type="button" class="sg-btn sg-btn-sm sg-btn-ghost" id="sg-viewer-download-btn" title="Telecharger" style="display:none;">
+          <i class="fa-solid fa-download"></i>
+        </button>
+        <button type="button" class="sg-drawer-close-btn" id="sg-viewer-close-btn" title="Fermer">
+          <i class="fa-solid fa-xmark" style="font-size:1.1rem;"></i>
         </button>
       </div>
-      <div id="teacher-modal-panel" class="flex-1 overflow-y-auto p-6 teacher-scrollbar">
-        <div class="rounded-2xl border-2 border-dashed border-slate-200 px-5 py-12 text-center text-sm font-semibold text-slate-500 bg-slate-50">Selectionne une classe, un cours ou un support depuis les sections du dashboard.</div>
+    </div>
+    <div class="sg-viewer-content" id="sg-viewer-content">
+      <div class="sg-viewer-empty">
+        <div>
+          <div class="sg-viewer-empty-icon"><i class="fa-solid fa-file"></i></div>
+          <div class="sg-viewer-empty-text">Aucun contenu a afficher.</div>
+        </div>
       </div>
-    </aside>
+    </div>
   </div>
 </div>
 
@@ -760,7 +909,6 @@
       sidebarOpen: {{ teacher_dashboard_preference.sidebar_collapsed|yesno:"false,true" }},
       activeSection: "{{ teacher_dashboard_preference.default_section|default:'overview' }}",
       darkMode: {{ teacher_dashboard_preference.dark_mode|yesno:"true,false" }},
-      actionPanelOpen: false,
       search: "",
       searchOpen: false,
       searchResults: [],
@@ -837,24 +985,66 @@
     });
   });
 
-  document.body.addEventListener("htmx:afterSwap", (event) => {
-    if (event.target && event.target.id === "teacher-modal-panel") {
-      if (window.teacherDashboardController) {
-        window.teacherDashboardController.actionPanelOpen = true;
-      }
-      if (window.lucide) {
-        lucide.createIcons();
-      }
+  /* ===== Drawer / Viewer JS ===== */
+  function sgOpenDrawer() {
+    const drawer = document.getElementById('sg-drawer');
+    const backdrop = document.getElementById('sg-drawer-backdrop');
+    if (drawer) drawer.classList.add('is-open');
+    if (backdrop) backdrop.classList.add('is-visible');
+    document.body.style.overflow = 'hidden';
+    if (window.lucide) queueMicrotask(() => lucide.createIcons());
+  }
+
+  function sgCloseDrawer() {
+    const drawer = document.getElementById('sg-drawer');
+    const backdrop = document.getElementById('sg-drawer-backdrop');
+    if (drawer) drawer.classList.remove('is-open');
+    if (backdrop) backdrop.classList.remove('is-visible');
+    if (!document.querySelector('.sg-drawer.is-open, .sg-viewer.is-open')) {
+      document.body.style.overflow = '';
+    }
+  }
+
+  function sgOpenViewer() {
+    const viewer = document.getElementById('sg-viewer');
+    const backdrop = document.getElementById('sg-viewer-backdrop');
+    if (viewer) viewer.classList.add('is-open');
+    if (backdrop) backdrop.classList.add('is-visible');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function sgCloseViewer() {
+    const viewer = document.getElementById('sg-viewer');
+    const backdrop = document.getElementById('sg-viewer-backdrop');
+    if (viewer) viewer.classList.remove('is-open');
+    if (backdrop) backdrop.classList.remove('is-visible');
+    if (!document.querySelector('.sg-drawer.is-open, .sg-viewer.is-open')) {
+      document.body.style.overflow = '';
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('#sg-drawer-backdrop')) sgCloseDrawer();
+    if (e.target.closest('#sg-drawer-close-btn')) sgCloseDrawer();
+    if (e.target.closest('#sg-viewer-backdrop')) sgCloseViewer();
+    if (e.target.closest('#sg-viewer-close-btn')) sgCloseViewer();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      const viewer = document.getElementById('sg-viewer');
+      const drawer = document.getElementById('sg-drawer');
+      if (viewer && viewer.classList.contains('is-open')) sgCloseViewer();
+      else if (drawer && drawer.classList.contains('is-open')) sgCloseDrawer();
     }
   });
 
-  document.body.addEventListener("htmx:beforeRequest", (event) => {
-    const elt = event.detail && event.detail.elt ? event.detail.elt : null;
-    if (!elt) return;
-    const target = elt.getAttribute("hx-target");
-    if (target === "#teacher-modal-panel" && window.teacherDashboardController) {
-      window.teacherDashboardController.actionPanelOpen = true;
-    }
+  document.body.addEventListener('htmx:afterSwap', function (event) {
+    const target = event.detail?.target;
+    if (!target) return;
+    if (target.id === 'sg-drawer-content' && target.innerHTML.trim()) sgOpenDrawer();
+    if (target.id === 'sg-viewer-content' && target.innerHTML.trim()) sgOpenViewer();
+    if (window.lucide) queueMicrotask(() => lucide.createIcons());
   });
 </script>
 {% endblock %}

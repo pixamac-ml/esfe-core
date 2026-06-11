@@ -11,12 +11,7 @@
       <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=workflow')">
         <i class="fa-solid fa-eye"></i>Vue detaillee
       </button>
-      <button type="button" class="dg-btn dg-btn-outline">
-        <i class="fa-solid fa-file-import"></i>Import CSV
-      </button>
-      <button type="button" class="dg-btn dg-btn-primary">
-        <i class="fa-solid fa-play"></i>Lancer passage
-      </button>
+
     </div>
   </div>
 
@@ -82,27 +77,18 @@
     {% endfor %}
   </div>
 
-  <!-- Status tabs -->
-  <div style="display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap;">
-    <button type="button" class="dg-btn dg-btn-outline">Tous ({{ workflow.total|default:0 }})</button>
-    <button type="button" class="dg-btn dg-btn-success">
-      <i class="fa-solid fa-check-circle"></i>Valides ({{ workflow.steps.3.count|default:0 }})
-    </button>
-    <button type="button" class="dg-btn dg-btn-warning">
-      <i class="fa-solid fa-clock"></i>En attente ({{ workflow.blocked_count|default:0 }})
-    </button>
-    <button type="button" class="dg-btn dg-btn-danger">
-      <i class="fa-solid fa-ban"></i>Bloques ({{ workflow.blocked_count|default:0 }})
-    </button>
+  <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; font-size:.72rem; font-weight:800; color:#64748b;">
+    <span><i class="fa-solid fa-list"></i> Total: {{ workflow.total|default:0 }}</span>
+    <span style="color:#16a34a;"><i class="fa-solid fa-check-circle"></i> Valides: {{ workflow.steps.3.count|default:0 }}</span>
+    <span style="color:#d97706;"><i class="fa-solid fa-clock"></i> En attente: {{ workflow.blocked_count|default:0 }}</span>
+    <span style="color:#ef4444;"><i class="fa-solid fa-ban"></i> Bloques: {{ workflow.blocked_count|default:0 }}</span>
   </div>
 
   <!-- Workflow table -->
   <div class="dg-panel">
     <div class="dg-section-header">
       <div class="dg-panel-title" style="margin:0;">Dossiers de passage</div>
-      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.68rem; height:30px;">
-        <i class="fa-solid fa-download"></i>Exporter
-      </button>
+
     </div>
     <div class="dg-table-wrap">
       <table class="dg-table">
@@ -137,13 +123,28 @@
             </td>
             <td>
               <div style="display:flex; gap:4px;">
-                <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;"
-                  onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=workflow&step=blocked&id={{ row.id }}')">
-                  <i class="fa-solid fa-check"></i>Valider
-                </button>
+                <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgSubmitAction(this)">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="arbitrate_decision">
+                  <input type="hidden" name="decision_id" value="{{ row.id }}">
+                  <input type="hidden" name="approve" value="1">
+                  <input type="hidden" name="reason" value="Valide par le Directeur General">
+                  <button type="submit" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;">
+                    <i class="fa-solid fa-check"></i>Approuver
+                  </button>
+                </form>
+                <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgSubmitAction(this)">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="arbitrate_decision">
+                  <input type="hidden" name="decision_id" value="{{ row.id }}">
+                  <input type="hidden" name="approve" value="0">
+                  <button type="submit" class="dg-btn dg-btn-danger" style="font-size:.65rem; height:28px; padding:0 .5rem;">
+                    <i class="fa-solid fa-ban"></i>Rejeter
+                  </button>
+                </form>
                 <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;"
                   onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=workflow&step=blocked&id={{ row.id }}')">
-                  <i class="fa-solid fa-eye"></i>Voir
+                  <i class="fa-solid fa-eye"></i>
                 </button>
               </div>
             </td>
@@ -206,6 +207,7 @@
             <td>{{ row.student_count|intcomma }}</td>
             <td>{{ row.awards_count|intcomma }}</td>
             <td class="text-right">
+              <div style="display:flex; gap:4px; justify-content:flex-end;">
               <form method="post" action="{% url 'accounts_portal:dg_diploma_action' %}" class="inline-flex js-dg-diploma-form">
                 {% csrf_token %}
                 <input type="hidden" name="class_id" value="{{ row.class.id }}">
@@ -213,6 +215,17 @@
                   <i class="fa-solid fa-scroll"></i>Preparer
                 </button>
               </form>
+              {% if row.awards_count %}
+              <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgSubmitAction(this)">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="publish_class_diplomas">
+                <input type="hidden" name="class_id" value="{{ row.class.id }}">
+                <button type="submit" class="dg-btn dg-btn-success" style="font-size:.68rem; height:30px;">
+                  <i class="fa-solid fa-check"></i>Delivrer
+                </button>
+              </form>
+              {% endif %}
+              </div>
             </td>
           </tr>
           {% empty %}

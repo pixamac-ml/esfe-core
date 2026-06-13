@@ -1,24 +1,10 @@
 {% extends "secretary/base.html" %}
 {% load humanize %}
+{% load secretary_badges %}
 {% block title %}Dashboard Secretariat ESFE{% endblock %}
 
 {% block content %}
 {% include "secretary/partials/dashboard_scope.html" %}
-
-<!-- Nav tabs - server-backed links; works even without JavaScript -->
-<div class="sg-nav-tabs">
-  <a class="sg-nav-tab {% if active_section == 'overview' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=overview" data-section="overview">Vue globale</a>
-  <a class="sg-nav-tab {% if active_section == 'registry' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=registry" data-section="registry">Registre</a>
-  <a class="sg-nav-tab {% if active_section == 'visits' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=visits" data-section="visits">Visiteurs</a>
-  <a class="sg-nav-tab {% if active_section == 'classes' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=classes" data-section="classes">Classes</a>
-  <a class="sg-nav-tab {% if active_section == 'students' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=students" data-section="students">Etudiants</a>
-  <a class="sg-nav-tab {% if active_section == 'appointments' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=appointments" data-section="appointments">Rendez-vous</a>
-  <a class="sg-nav-tab {% if active_section == 'deposits' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=deposits" data-section="deposits">Depots</a>
-  <a class="sg-nav-tab {% if active_section == 'reports' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=reports" data-section="reports">Rapports</a>
-  <a class="sg-nav-tab {% if active_section == 'salary' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=salary" data-section="salary">Salaire</a>
-  <a class="sg-nav-tab {% if active_section == 'notifications' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=notifications" data-section="notifications">Notifications</a>
-  <a class="sg-nav-tab {% if active_section == 'settings' %}active{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=settings" data-section="settings">Parametres</a>
-</div>
 
 <!-- =========== SECTION: OVERVIEW =========== -->
 <div class="sg-section-panel {% if active_section == 'overview' %}is-active{% endif %}" data-sg-panel="overview" {% if active_section != 'overview' %}hidden{% endif %}>
@@ -30,26 +16,25 @@
     <div class="sg-panel">
       <div class="sg-panel-title">Actions rapides</div>
       <div class="sg-action-grid">
-        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
           <div><div class="sg-action-label" style="color:#2563eb;"><i class="fa-solid fa-book-medical"></i> Registre</div><div class="sg-action-sub">Accueil parent, visiteur, paiement</div></div><span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">+</span>
         </button>
-        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
           <div><div class="sg-action-label" style="color:#7c3aed;"><i class="fa-solid fa-user-plus"></i> Visite</div><div class="sg-action-sub">Arrivee et sortie</div></div><span class="sg-action-count" style="background:#f5f3ff;color:#7c3aed;">+</span>
         </button>
-        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
           <div><div class="sg-action-label" style="color:#16a34a;"><i class="fa-regular fa-calendar-plus"></i> RDV</div><div class="sg-action-sub">Agenda direction/service</div></div><span class="sg-action-count" style="background:#dcfce7;color:#16a34a;">+</span>
         </button>
-        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
           <div><div class="sg-action-label" style="color:#d97706;"><i class="fa-solid fa-box"></i> Depot</div><div class="sg-action-sub">Document, colis, livraison</div></div><span class="sg-action-count" style="background:#fef3c7;color:#d97706;">+</span>
         </button>
       </div>
       <div class="sg-divider"></div>
       <div class="sg-panel-title">Routage intelligent</div>
       <div class="sg-section-header-sub" style="margin-bottom:12px;">Chaque entree registre est automatiquement orientee vers le service competent.</div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Paiement scolarite</span><span>Gestionnaire</span></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Depot colis</span><span>Surveillance</span></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Retrait diplome</span><span>Direction etudes</span></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>Reclamation</span><span>Administration</span></div></div>
+      {% for entry_type, rule in registry_routing_summary.items %}
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>{{ rule.label }}</span><span style="display:flex;align-items:center;gap:6px;"><span class="sg-priority-pill {{ rule.priority|priority_pill_class }}">{% if rule.priority|is_urgent_priority %}<span class="sg-priority-dot"></span>{% endif %}{{ rule.priority_label }}</span>{{ rule.target_service }}</span></div></div>
+      {% endfor %}
     </div>
   </div>
 
@@ -69,7 +54,7 @@
     </div>
     <div class="sg-section-actions">
       <a class="sg-btn sg-btn-outline" href="{% url 'secretary:registry_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
-      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
         <i class="fa-solid fa-plus"></i>Nouvelle entree
       </button>
     </div>
@@ -85,18 +70,33 @@
       <div class="sg-section-header"><div class="sg-panel-title" style="margin:0;">Entrees recentes</div></div>
       <div class="sg-table-wrap">
         <table class="sg-table">
-          <thead><tr><th>N</th><th>Type</th><th>Visiteur</th><th>Etudiant</th><th>Service</th><th>Statut</th></tr></thead>
+          <thead><tr><th>N</th><th>Type</th><th>Visiteur</th><th>Etudiant</th><th>Service</th><th>Statut</th><th></th></tr></thead>
           <tbody>
             {% for item in recent_registry %}
             <tr>
-              <td style="font-family:monospace;">{{ item.registry_number|default:item.pk }}</td>
+              <td class="sg-mono">{{ item.registry_number|default:item.pk }}</td>
               <td style="font-weight:900;">{{ item.get_entry_type_display }}</td>
               <td>{{ item.visitor_name|default:"-" }}</td>
               <td>{% if item.related_student %}{{ item.related_student.full_name }}{% else %}-{% endif %}</td>
               <td>{{ item.target_service|default:"Accueil" }}</td>
-              <td><span class="sg-badge-sm sg-badge-blue">{{ item.get_status_display }}</span></td>
+              <td><span class="sg-badge-sm {{ item.status|status_badge_class }}">{{ item.get_status_display }}</span></td>
+              <td>
+                <button type="button" class="sg-btn sg-btn-outline" style="height:30px;font-size:.68rem;padding:0 .6rem;" hx-get="{% url 'secretary:registry_detail' item.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" title="Voir le detail et l'historique">
+                  <i class="fa-solid fa-clock-rotate-left"></i>
+                </button>
+              </td>
             </tr>
-            {% empty %}<tr><td colspan="6"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-solid fa-book-open"></i></div><div class="sg-empty-text">Aucune entree recente.</div></div></td></tr>{% endfor %}
+            {% empty %}
+            <tr><td colspan="7">
+              <div class="sg-empty">
+                <div class="sg-empty-icon"><i class="fa-solid fa-book-open"></i></div>
+                <div class="sg-empty-text">Aucune entree recente.</div>
+                <button type="button" class="sg-btn sg-btn-outline sg-empty-action" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+                  <i class="fa-solid fa-plus"></i>Nouvelle entree
+                </button>
+              </div>
+            </td></tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
@@ -142,7 +142,7 @@
     </div>
     <div class="sg-section-actions">
       <a class="sg-btn sg-btn-outline" href="{% url 'secretary:visitor_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
-      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
         <i class="fa-solid fa-plus"></i>Nouveau passage
       </button>
     </div>
@@ -161,9 +161,17 @@
         {% for item in today_visits_rows %}
         <div class="sg-action-card">
           <div><div class="sg-action-label">{{ item.full_name }}</div><div class="sg-action-sub">{{ item.arrived_at|date:"H:i" }} - {{ item.reason|default:"Accueil" }}</div></div>
-          <span class="sg-badge-sm sg-badge-green">{{ item.get_status_display }}</span>
+          <span class="sg-badge-sm {{ item.status|status_badge_class }}">{{ item.get_status_display }}</span>
         </div>
-        {% empty %}<div class="sg-empty"><div class="sg-empty-icon"><i class="fa-solid fa-user-clock"></i></div><div class="sg-empty-text">Aucun passage aujourd'hui.</div></div>{% endfor %}
+        {% empty %}
+        <div class="sg-empty">
+          <div class="sg-empty-icon"><i class="fa-solid fa-user-clock"></i></div>
+          <div class="sg-empty-text">Aucun passage aujourd'hui.</div>
+          <button type="button" class="sg-btn sg-btn-outline sg-empty-action" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+            <i class="fa-solid fa-plus"></i>Nouveau passage
+          </button>
+        </div>
+        {% endfor %}
       </div>
       {% if today_visits_page.has_other_pages %}
         <div class="sg-pagination">
@@ -251,7 +259,7 @@
     </div>
     <div class="sg-section-actions">
       <a class="sg-btn sg-btn-outline" href="{% url 'secretary:appointment_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
-      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
         <i class="fa-solid fa-plus"></i>Nouveau RDV
       </button>
     </div>
@@ -272,7 +280,7 @@
     </div>
     <div class="sg-section-actions">
       <a class="sg-btn sg-btn-outline" href="{% url 'secretary:document_receipt_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
-      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
         <i class="fa-solid fa-plus"></i>Nouveau depot
       </button>
     </div>
@@ -288,9 +296,9 @@
     <div class="sg-panel">
       <div class="sg-panel-title">Processus de remise</div>
       <div class="sg-section-header-sub" style="margin-bottom:12px;">Les depots suivent un circuit de traitement en 3 etapes.</div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>1. Depot identifie</span><span>Recu et numerote</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:100%;background:#2563eb;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>2. Destinataire notifie</span><span>En attente de remise</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:65%;background:#7c3aed;"></div></div></div>
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>3. Remise confirmee</span><span>Traite</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:30%;background:#16a34a;"></div></div></div>
+      {% for step in document_process_funnel %}
+      <div class="sg-bar-item"><div class="sg-bar-label"><span>{{ step.label }}</span><span>{{ step.sub }}</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:{{ step.pct }}%;background:{{ step.color }};"></div></div></div>
+      {% endfor %}
     </div>
   </div>
 </div>
@@ -302,12 +310,12 @@
       <div class="sg-section-hero-title"><i class="fa-solid fa-money-bill-wave" style="color:#16a34a;margin-right:8px;"></i>Salaire et fiche de paie</div>
       <div class="sg-section-hero-sub">Consultation personnelle. Les modifications et paiements restent gerees par le gestionnaire habilite.</div>
     </div>
-    <span class="sg-scope-chip">Base: {{ secretary_profile.salary_base|default:0|intcomma }} FCFA</span>
+    <span class="sg-scope-chip sg-mono">Base: {{ secretary_profile.salary_base|default:0|intcomma }} FCFA</span>
   </div>
   <div class="sg-row-3" style="margin-bottom:16px;">
-    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ secretary_profile.salary_base|default:0|intcomma }}</div><div class="sg-stat-lbl">Base FCFA</div></div>
-    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{% if latest_salary_entry %}{{ latest_salary_entry.net_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Net dernier mois</div></div>
-    <div class="sg-stat-box" style="background:#fffbeb;"><div class="sg-stat-val" style="color:#d97706;">{% if latest_salary_entry %}{{ latest_salary_entry.remaining_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Reste a retirer</div></div>
+    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val sg-mono" style="color:#16a34a;">{{ secretary_profile.salary_base|default:0|intcomma }}</div><div class="sg-stat-lbl">Base FCFA</div></div>
+    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val sg-mono" style="color:#2563eb;">{% if latest_salary_entry %}{{ latest_salary_entry.net_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Net dernier mois</div></div>
+    <div class="sg-stat-box" style="background:#fffbeb;"><div class="sg-stat-val sg-mono" style="color:#d97706;">{% if latest_salary_entry %}{{ latest_salary_entry.remaining_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Reste a retirer</div></div>
   </div>
   <div class="sg-row-2">
     <div class="sg-panel">
@@ -319,11 +327,11 @@
             {% for entry in salary_entries %}
               <tr>
                 <td style="font-weight:900;">{{ entry.period_month|date:"F Y" }}</td>
-                <td>{{ entry.base_salary|intcomma }}</td>
-                <td>{{ entry.allowances|intcomma }}</td>
-                <td>{{ entry.deductions|add:entry.advances|intcomma }}</td>
-                <td style="font-weight:900;">{{ entry.net_salary|intcomma }}</td>
-                <td>{{ entry.paid_amount|intcomma }}</td>
+                <td class="sg-mono">{{ entry.base_salary|intcomma }}</td>
+                <td class="sg-mono">{{ entry.allowances|intcomma }}</td>
+                <td class="sg-mono">{{ entry.deductions|add:entry.advances|intcomma }}</td>
+                <td class="sg-mono" style="font-weight:900;">{{ entry.net_salary|intcomma }}</td>
+                <td class="sg-mono">{{ entry.paid_amount|intcomma }}</td>
                 <td><span class="sg-badge-sm {% if entry.status == 'paid' %}sg-badge-green{% elif entry.status == 'ready' %}sg-badge-blue{% elif entry.status == 'partial' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ entry.get_status_display }}</span></td>
               </tr>
             {% empty %}

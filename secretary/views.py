@@ -1,6 +1,7 @@
 import json
 
 from django.contrib import messages
+from django.contrib.messages import get_messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
@@ -10,6 +11,8 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -47,6 +50,7 @@ from .selectors import (
     get_visits_queryset,
 )
 from .services import (
+    archive_appointment,
     archive_document,
     archive_registry_entry,
     complete_appointment,
@@ -65,6 +69,7 @@ from .services import (
     get_secretary_class_students,
     get_student_snapshot,
     mark_registry_processed,
+    move_registry_entry_status,
     register_document,
     register_visitor,
     search_academic_classes,
@@ -153,28 +158,45 @@ def _dashboard_section(request):
     return section if section in SECRETARY_DASHBOARD_SECTIONS else "overview"
 
 
-def _trigger_payload(*groups, close_modal=False):
+SECRETARY_TOAST_TONES = {"success": "success", "error": "error", "warning": "notification", "info": "notification", "debug": "notification"}
+SECRETARY_TOAST_TITLES = {"success": "Succes", "error": "Erreur", "warning": "Attention", "info": "Information", "debug": "Information"}
+
+
+def _pending_messages_toasts(request):
+    toasts = []
+    for message in get_messages(request):
+        toasts.append({
+            "title": SECRETARY_TOAST_TITLES.get(message.tags, "Information"),
+            "body": str(message),
+            "tone": SECRETARY_TOAST_TONES.get(message.tags, "notification"),
+        })
+    return toasts
+
+
+def _trigger_payload(*groups, close_drawer=False, toasts=None):
     payload = {}
-    if close_modal:
-        payload["secretary-modal-close"] = True
+    if close_drawer:
+        payload["secretary-drawer-close"] = True
     for group in groups:
         event_name = SECRETARY_REFRESH_EVENTS.get(group)
         if event_name:
             payload[event_name] = True
     if groups:
         payload[SECRETARY_REFRESH_EVENTS["sidebar"]] = True
+    if toasts:
+        payload["secretary-toast"] = toasts
     return payload
 
 
-def _modal_close_response(*groups):
+def _drawer_close_response(request, *groups):
     response = HttpResponse("", content_type="text/html")
-    response["HX-Trigger"] = json.dumps(_trigger_payload(*groups, close_modal=True))
+    response["HX-Trigger"] = json.dumps(_trigger_payload(*groups, close_drawer=True, toasts=_pending_messages_toasts(request)))
     return response
 
 
-def _refresh_response(*groups):
+def _refresh_response(request, *groups):
     response = HttpResponse("", content_type="text/html")
-    response["HX-Trigger"] = json.dumps(_trigger_payload(*groups))
+    response["HX-Trigger"] = json.dumps(_trigger_payload(*groups, toasts=_pending_messages_toasts(request)))
     return response
 
 
@@ -190,9 +212,9 @@ def _validation_error_message(error):
     return str(error)
 
 
-def _render_create_modal_or_page(request, modal_template, page_template, context):
+def _render_create_drawer_or_page(request, drawer_template, page_template, context):
     if _is_htmx(request):
-        return render(request, modal_template, context)
+        return render(request, drawer_template, context)
     return render(request, page_template, context)
 
 
@@ -255,6 +277,48 @@ def secretary_dashboard(request):
         }
         for tc in type_counts
     ]
+
+    documents_for_funnel = get_documents_queryset({}, user=request.user, branch=branch)
+    document_status_counts = {
+        row["status"]: row["count"]
+        for row in documents_for_funnel.values("status").annotate(count=Count("id"))
+    }
+    documents_total = sum(document_status_counts.values()) or 1
+    notified_count = sum(
+        document_status_counts.get(status, 0)
+        for status in (
+            DocumentReceipt.STATUS_IN_PROGRESS,
+            DocumentReceipt.STATUS_TRANSFERRED,
+            DocumentReceipt.STATUS_COMPLETED,
+            DocumentReceipt.STATUS_ARCHIVED,
+        )
+    )
+    delivered_count = sum(
+        document_status_counts.get(status, 0)
+        for status in (DocumentReceipt.STATUS_COMPLETED, DocumentReceipt.STATUS_ARCHIVED)
+    )
+    context["document_process_funnel"] = [
+        {
+            "label": "1. Depot identifie",
+            "sub": "Recu et numerote",
+            "pct": 100 if document_status_counts else 0,
+            "color": "#2563eb",
+        },
+        {
+            "label": "2. Destinataire notifie",
+            "sub": "En attente de remise",
+            "pct": round(notified_count / documents_total * 100),
+            "color": "#7c3aed",
+        },
+        {
+            "label": "3. Remise confirmee",
+            "sub": "Traite",
+            "pct": round(delivered_count / documents_total * 100),
+            "color": "#16a34a",
+        },
+    ]
+
+    context["registry_routing_summary"] = get_registry_routing_rules_for_ui()
 
     context["open_visits_page"] = _paginate(
         request,
@@ -368,6 +432,100 @@ def secretary_preferences_update(request):
     return redirect(f"{reverse('secretary:secretary_dashboard')}?section=settings")
 
 
+KANBAN_STATUSES = [
+    (RegistryEntry.STATUS_PENDING, "En attente"),
+    (RegistryEntry.STATUS_IN_PROGRESS, "En cours"),
+    (RegistryEntry.STATUS_TRANSFERRED, "Transfere"),
+    (RegistryEntry.STATUS_COMPLETED, "Traite"),
+]
+KANBAN_STATUS_ORDER = [status for status, _ in KANBAN_STATUSES]
+KANBAN_STATUS_LABELS = dict(KANBAN_STATUSES)
+
+
+def _kanban_filters(request):
+    return {
+        "q": request.GET.get("q", "").strip(),
+        "priority": request.GET.get("priority", "").strip(),
+        "target_service": request.GET.get("target_service", "").strip(),
+        "archived": False,
+        "active_only": True,
+    }
+
+
+def _kanban_querystring(filters):
+    params = {key: filters[key] for key in ("q", "priority", "target_service") if filters.get(key)}
+    return f"?{urlencode(params)}" if params else ""
+
+
+def _kanban_columns(request, filters):
+    queryset = get_registry_queryset(filters, user=request.user)
+    entries_by_status = {status: [] for status in KANBAN_STATUS_ORDER}
+    for entry in queryset:
+        if entry.status not in entries_by_status:
+            continue
+        allowed = entry.get_allowed_status_transitions()
+        entry.kanban_moves = [
+            (status, KANBAN_STATUS_LABELS[status])
+            for status in KANBAN_STATUS_ORDER
+            if status != entry.status and status in allowed
+        ]
+        entries_by_status[entry.status].append(entry)
+    return [
+        {"status": status, "label": label, "entries": entries_by_status[status], "count": len(entries_by_status[status])}
+        for status, label in KANBAN_STATUSES
+    ]
+
+
+def _registry_target_services(request):
+    return (
+        get_registry_queryset({"archived": False, "active_only": True}, user=request.user)
+        .exclude(target_service="")
+        .order_by("target_service")
+        .values_list("target_service", flat=True)
+        .distinct()
+    )
+
+
+@login_required
+def registry_kanban(request):
+    ensure_secretary_access(request.user)
+    filters = _kanban_filters(request)
+    return render(
+        request,
+        "secretary/registry_kanban.html",
+        {
+            "columns": _kanban_columns(request, filters),
+            "filters": filters,
+            "querystring": _kanban_querystring(filters),
+            "priority_choices": RegistryEntry.PRIORITY_CHOICES,
+            "target_service_choices": _registry_target_services(request),
+        },
+    )
+
+
+@login_required
+@require_POST
+def registry_kanban_move(request, pk, new_status):
+    ensure_secretary_access(request.user)
+    entry = get_object_or_404(get_registry_queryset({}, user=request.user), pk=pk)
+    try:
+        move_registry_entry_status(entry, new_status)
+        messages.success(request, "Statut de l'entree mis a jour.")
+    except ValidationError as error:
+        messages.info(request, _validation_error_message(error))
+    filters = _kanban_filters(request)
+    response = render(
+        request,
+        "secretary/partials/registry_kanban_board.html",
+        {
+            "columns": _kanban_columns(request, filters),
+            "querystring": _kanban_querystring(filters),
+        },
+    )
+    response["HX-Trigger"] = json.dumps(_trigger_payload("registry", "kpis", toasts=_pending_messages_toasts(request)))
+    return response
+
+
 @login_required
 def registry_list(request):
     ensure_secretary_access(request.user)
@@ -400,13 +558,13 @@ def registry_create(request):
             create_registry_entry(created_by=request.user, **form.cleaned_data)
             messages.success(request, "Entree de registre enregistree.")
             if _is_htmx(request):
-                return _modal_close_response("registry", "kpis")
+                return _drawer_close_response(request, "registry", "kpis")
             return redirect("secretary:registry_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/registry_form.html",
         {
             "form": form,
@@ -434,13 +592,13 @@ def registry_update(request, pk):
             update_registry_entry(entry, **form.cleaned_data)
             messages.success(request, "Entree du registre modifiee.")
             if _is_htmx(request):
-                return _modal_close_response("registry", "kpis")
+                return _drawer_close_response(request, "registry", "kpis")
             return redirect("secretary:registry_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/registry_form.html",
         {
             "form": form,
@@ -467,7 +625,7 @@ def registry_mark_processed(request, pk):
     except ValidationError as error:
         messages.info(request, _validation_error_message(error))
     if _is_htmx(request):
-        return _refresh_response("registry", "kpis")
+        return _refresh_response(request, "registry", "kpis")
     return redirect("secretary:registry_list")
 
 
@@ -483,8 +641,31 @@ def registry_start(request, pk):
     except ValidationError as error:
         messages.info(request, _validation_error_message(error))
     if _is_htmx(request):
-        return _refresh_response("registry", "kpis")
+        return _refresh_response(request, "registry", "kpis")
     return redirect("secretary:registry_list")
+
+
+@login_required
+def registry_detail(request, pk):
+    ensure_secretary_access(request.user)
+    entry = get_object_or_404(get_registry_queryset({}, user=request.user), pk=pk)
+    history_events = []
+    for event in reversed(entry.history or []):
+        at = event.get("at")
+        parsed_at = parse_datetime(at) if at else None
+        if parsed_at and timezone.is_aware(parsed_at):
+            parsed_at = timezone.localtime(parsed_at)
+        history_events.append({
+            "at": parsed_at,
+            "by": event.get("by", ""),
+            "action": event.get("action", ""),
+            "details": event.get("details") or {},
+        })
+    return render(
+        request,
+        "secretary/partials/registry_detail_drawer.html",
+        {"entry": entry, "history_events": history_events},
+    )
 
 
 @login_required
@@ -498,7 +679,7 @@ def registry_archive(request, pk):
     except ValidationError as error:
         messages.info(request, _validation_error_message(error))
     if _is_htmx(request):
-        return _refresh_response("registry", "kpis")
+        return _refresh_response(request, "registry", "kpis")
     return redirect("secretary:registry_list")
 
 
@@ -528,13 +709,13 @@ def appointment_create(request):
             create_appointment(created_by=request.user, **form.cleaned_data)
             messages.success(request, "Rendez-vous cree.")
             if _is_htmx(request):
-                return _modal_close_response("appointments", "kpis")
+                return _drawer_close_response(request, "appointments", "kpis")
             return redirect("secretary:appointment_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/appointment_form.html",
         {
             "form": form,
@@ -557,16 +738,16 @@ def appointment_update(request, pk):
     )
     if request.method == "POST" and form.is_valid():
         try:
-            update_appointment(appointment, **form.cleaned_data)
+            update_appointment(appointment, actor=request.user, **form.cleaned_data)
             messages.success(request, "Rendez-vous modifie.")
             if _is_htmx(request):
-                return _modal_close_response("appointments", "kpis")
+                return _drawer_close_response(request, "appointments", "kpis")
             return redirect("secretary:appointment_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/appointment_form.html",
         {
             "form": form,
@@ -592,7 +773,22 @@ def appointment_complete(request, pk):
     except ValidationError as error:
         messages.info(request, _validation_error_message(error))
     if _is_htmx(request):
-        return _refresh_response("appointments", "kpis")
+        return _refresh_response(request, "appointments", "kpis")
+    return redirect("secretary:appointment_list")
+
+
+@login_required
+@require_POST
+def appointment_archive(request, pk):
+    ensure_secretary_access(request.user)
+    appointment = get_object_or_404(get_appointments_queryset({}, user=request.user), pk=pk)
+    try:
+        archive_appointment(appointment)
+        messages.success(request, "Rendez-vous archive.")
+    except ValidationError as error:
+        messages.info(request, _validation_error_message(error))
+    if _is_htmx(request):
+        return _refresh_response(request, "appointments", "kpis")
     return redirect("secretary:appointment_list")
 
 
@@ -622,13 +818,13 @@ def visitor_update(request, pk):
             update_visitor(visitor, **form.cleaned_data)
             messages.success(request, "Visite modifiee.")
             if _is_htmx(request):
-                return _modal_close_response("visits", "kpis")
+                return _drawer_close_response(request, "visits", "kpis")
             return redirect("secretary:visitor_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/visitor_form.html",
         {
             "form": form,
@@ -654,7 +850,7 @@ def visitor_complete(request, pk):
     except ValidationError:
         messages.info(request, "Cette visite etait deja cloturee.")
     if _is_htmx(request):
-        return _refresh_response("visits", "kpis")
+        return _refresh_response(request, "visits", "kpis")
     return redirect("secretary:visitor_list")
 
 
@@ -667,13 +863,13 @@ def visitor_create(request):
             register_visitor(created_by=request.user, **form.cleaned_data)
             messages.success(request, "Visite enregistree.")
             if _is_htmx(request):
-                return _modal_close_response("visits", "kpis")
+                return _drawer_close_response(request, "visits", "kpis")
             return redirect("secretary:visitor_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/visitor_form.html",
         {
             "form": form,
@@ -710,13 +906,13 @@ def document_receipt_create(request):
             register_document(received_by=request.user, **form.cleaned_data)
             messages.success(request, "Document enregistre.")
             if _is_htmx(request):
-                return _modal_close_response("documents", "kpis")
+                return _drawer_close_response(request, "documents", "kpis")
             return redirect("secretary:document_receipt_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/document_receipt_form.html",
         {
             "form": form,
@@ -743,13 +939,13 @@ def document_receipt_update(request, pk):
             update_document(document, **form.cleaned_data)
             messages.success(request, "Document modifie.")
             if _is_htmx(request):
-                return _modal_close_response("documents", "kpis")
+                return _drawer_close_response(request, "documents", "kpis")
             return redirect("secretary:document_receipt_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/document_receipt_form.html",
         {
             "form": form,
@@ -775,7 +971,7 @@ def document_receipt_archive(request, pk):
     except ValidationError as error:
         messages.info(request, _validation_error_message(error))
     if _is_htmx(request):
-        return _refresh_response("documents", "kpis")
+        return _refresh_response(request, "documents", "kpis")
     return redirect("secretary:document_receipt_list")
 
 
@@ -791,7 +987,7 @@ def document_receipt_start(request, pk):
     except ValidationError as error:
         messages.info(request, _validation_error_message(error))
     if _is_htmx(request):
-        return _refresh_response("documents", "kpis")
+        return _refresh_response(request, "documents", "kpis")
     return redirect("secretary:document_receipt_list")
 
 
@@ -818,13 +1014,13 @@ def task_create(request):
             create_task(created_by=request.user, **form.cleaned_data)
             messages.success(request, "Tache creee.")
             if _is_htmx(request):
-                return _modal_close_response("tasks", "kpis")
+                return _drawer_close_response(request, "tasks", "kpis")
             return redirect("secretary:task_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/task_form.html",
         {
             "form": form,
@@ -847,16 +1043,16 @@ def task_update(request, pk):
     )
     if request.method == "POST" and form.is_valid():
         try:
-            update_task(task, **form.cleaned_data)
+            update_task(task, actor=request.user, **form.cleaned_data)
             messages.success(request, "Tache modifiee.")
             if _is_htmx(request):
-                return _modal_close_response("tasks", "kpis")
+                return _drawer_close_response(request, "tasks", "kpis")
             return redirect("secretary:task_list")
         except ValidationError as error:
             form.add_error(None, _validation_error_message(error))
-    return _render_create_modal_or_page(
+    return _render_create_drawer_or_page(
         request,
-        "secretary/modals/form_modal.html",
+        "secretary/drawers/form_drawer.html",
         "secretary/task_form.html",
         {
             "form": form,
@@ -882,7 +1078,7 @@ def task_complete(request, pk):
     except ValidationError as error:
         messages.info(request, _validation_error_message(error))
     if _is_htmx(request):
-        return _refresh_response("tasks", "kpis")
+        return _refresh_response(request, "tasks", "kpis")
     return redirect("secretary:task_list")
 
 
@@ -898,7 +1094,7 @@ def task_start(request, pk):
     except ValidationError as error:
         messages.info(request, _validation_error_message(error))
     if _is_htmx(request):
-        return _refresh_response("tasks", "kpis")
+        return _refresh_response(request, "tasks", "kpis")
     return redirect("secretary:task_list")
 
 
@@ -920,6 +1116,43 @@ def student_snapshot_view(request, student_id):
             "student_schedule": student_schedule,
         })
     return JsonResponse(snapshot)
+
+
+COMMAND_PALETTE_ACTIONS = [
+    {"label": "Nouvelle entree registre", "icon": "fa-solid fa-book-medical", "keywords": "registre entree accueil parent paiement colis", "url_name": "registry_create", "drawer": True},
+    {"label": "Nouveau rendez-vous", "icon": "fa-regular fa-calendar-plus", "keywords": "rdv rendez-vous agenda", "url_name": "appointment_create", "drawer": True},
+    {"label": "Nouvelle visite", "icon": "fa-solid fa-user-plus", "keywords": "visite visiteur arrivee sortie", "url_name": "visitor_create", "drawer": True},
+    {"label": "Nouveau depot / document", "icon": "fa-solid fa-box", "keywords": "depot document colis livraison diplome", "url_name": "document_receipt_create", "drawer": True},
+    {"label": "Nouvelle tache", "icon": "fa-solid fa-list-check", "keywords": "tache todo action", "url_name": "task_create", "drawer": True},
+    {"label": "Vue Kanban du registre", "icon": "fa-solid fa-table-columns", "keywords": "kanban registre tableau colonnes", "url_name": "registry_kanban", "drawer": False},
+    {"label": "Registre administratif", "icon": "fa-solid fa-book-open", "keywords": "registre liste journal", "url_name": "registry_list", "drawer": False},
+    {"label": "Rendez-vous", "icon": "fa-regular fa-calendar", "keywords": "rendez-vous agenda liste", "url_name": "appointment_list", "drawer": False},
+    {"label": "Visites", "icon": "fa-solid fa-door-open", "keywords": "visites liste entrees sorties", "url_name": "visitor_list", "drawer": False},
+    {"label": "Documents et depots", "icon": "fa-solid fa-box-archive", "keywords": "documents depots liste", "url_name": "document_receipt_list", "drawer": False},
+    {"label": "Taches du secretariat", "icon": "fa-solid fa-list-check", "keywords": "taches liste todo", "url_name": "task_list", "drawer": False},
+    {"label": "Ouvrir une classe", "icon": "fa-solid fa-chalkboard-user", "keywords": "classe eleves etudiants effectif", "url_name": "secretary_dashboard", "url_query": "?section=classes", "drawer": False},
+]
+
+
+@login_required
+def htmx_command_palette(request):
+    ensure_secretary_access(request.user)
+    query = request.GET.get("q", "").strip()
+    students = search_students(query, user=request.user)[:5] if len(query) >= 2 else []
+    query_lower = query.lower()
+    actions = []
+    for action in COMMAND_PALETTE_ACTIONS:
+        if query and query_lower not in action["label"].lower() and query_lower not in action["keywords"]:
+            continue
+        actions.append({
+            **action,
+            "url": reverse(f"secretary:{action['url_name']}") + action.get("url_query", ""),
+        })
+    return render(
+        request,
+        "secretary/partials/command_palette_results.html",
+        {"query": query, "students": students, "actions": actions},
+    )
 
 
 @login_required
@@ -1126,14 +1359,6 @@ def htmx_documents_pending(request):
     )
     context["pending_documents_rows"] = context["documents_page"].object_list
     return render(request, "secretary/partials/dashboard_documents_pending.html", context)
-
-
-@login_required
-def htmx_auto_assign(request):
-    ensure_secretary_access(request.user)
-    return HttpResponse(
-        '<div class="message">Affectation automatique prete pour integration metier future.</div>'
-    )
 
 
 @login_required

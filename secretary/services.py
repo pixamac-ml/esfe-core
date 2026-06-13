@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -5,6 +6,8 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from accounts.dashboards.helpers import get_user_branch
+from communication.models import CommunicationNotification
+from communication.services.notification_service import NotificationService
 from academics.services.schedule_service import get_student_week_schedule
 from students.models import StudentAttendance
 from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
@@ -30,10 +33,28 @@ from .selectors import (
 )
 
 
+User = get_user_model()
+
+
 def _clean_instance(instance):
     instance.full_clean()
     instance.save()
     return instance
+
+
+def _notify_recipient(*, recipient, actor, event_type, title, body, metadata, legacy_source, legacy_object_id):
+    NotificationService.notify_user(
+        recipient=recipient,
+        actor=actor,
+        event_type=event_type,
+        title=title,
+        body=body,
+        source_app="secretary",
+        channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+        metadata=metadata,
+        legacy_source=legacy_source,
+        legacy_object_id=legacy_object_id,
+    )
 
 
 REGISTRY_ROUTING_RULES = {
@@ -86,6 +107,44 @@ REGISTRY_ROUTING_RULES = {
         "actions": ["Identifier enfant", "Orienter interlocuteur", "Tracer echange"],
     },
 }
+
+
+# Positions du personnel a notifier lorsqu'une entree de registre est routee
+# vers un service cible (voir REGISTRY_ROUTING_RULES). Cle = entry_type.
+ROUTING_NOTIFICATION_POSITIONS = {
+    RegistryEntry.TYPE_SCHOOL_PAYMENT: ("branch_manager",),
+    RegistryEntry.TYPE_PACKAGE_DEPOSIT: ("academic_supervisor",),
+    RegistryEntry.TYPE_SCHOOL_DELIVERY: ("branch_manager",),
+    RegistryEntry.TYPE_APPOINTMENT_REQUEST: ("director_of_studies",),
+    RegistryEntry.TYPE_DIPLOMA_WITHDRAWAL: ("director_of_studies",),
+    RegistryEntry.TYPE_COMPLAINT: ("branch_manager",),
+    RegistryEntry.TYPE_EXTERNAL_VISITOR: ("branch_manager",),
+    RegistryEntry.TYPE_PARENT_VISIT: ("director_of_studies",),
+}
+
+
+def _notify_registry_routing(entry, *, actor, event_type, title, body):
+    positions = ROUTING_NOTIFICATION_POSITIONS.get(entry.entry_type)
+    if not positions or not entry.branch_id:
+        return
+    rule = REGISTRY_ROUTING_RULES.get(entry.entry_type, {})
+    recipients = User.objects.filter(
+        profile__position__in=positions, profile__branch_id=entry.branch_id
+    ).exclude(pk=getattr(actor, "pk", None)).distinct()
+    for recipient in recipients:
+        _notify_recipient(
+            recipient=recipient,
+            actor=actor,
+            event_type=event_type,
+            title=title,
+            body=body,
+            metadata={
+                "registry_entry_id": entry.pk,
+                "target_service": rule.get("target_service", "Accueil"),
+            },
+            legacy_source="secretary_registry",
+            legacy_object_id=str(entry.pk),
+        )
 
 
 def get_registry_routing_rules_for_ui():
@@ -172,7 +231,16 @@ def create_registry_entry(*, created_by, **data):
         data["event_identifier"] = event_identifier
     data["history"] = [_history_event(created_by, "creation", {"entry_type": data.get("entry_type")})]
     entry = RegistryEntry(created_by=created_by, **data)
-    return _clean_instance(entry)
+    entry = _clean_instance(entry)
+    rule = REGISTRY_ROUTING_RULES.get(entry.entry_type, {})
+    _notify_registry_routing(
+        entry,
+        actor=created_by,
+        event_type="secretary_registry_routed",
+        title=f"Registre route vers {rule.get('target_service', 'Accueil')}",
+        body=entry.title,
+    )
+    return entry
 
 
 @transaction.atomic
@@ -190,9 +258,35 @@ def start_registry_entry_processing(entry):
 @transaction.atomic
 def update_registry_entry(entry, **data):
     data = apply_registry_routing(data)
+    new_status = data.get("status")
+    previous_status = entry.status
+    entry.validate_status_transition(new_status)
     for field, value in data.items():
         setattr(entry, field, value)
+    if new_status and new_status != previous_status:
+        entry.history.append(_history_event(None, "changement_statut", {
+            "from": previous_status,
+            "to": new_status,
+        }))
     entry.history.append(_history_event(None, "mise_a_jour"))
+    return _clean_instance(entry)
+
+
+@transaction.atomic
+def move_registry_entry_status(entry, new_status):
+    if entry.is_archived:
+        raise ValidationError("Une entree archivee ne peut pas etre deplacee.")
+    entry.validate_status_transition(new_status)
+    previous_status = entry.status
+    if new_status == previous_status:
+        return entry
+    entry.status = new_status
+    if new_status == RegistryEntry.STATUS_COMPLETED and not entry.closed_at:
+        entry.closed_at = timezone.now()
+    entry.history.append(_history_event(None, "changement_statut", {
+        "from": previous_status,
+        "to": new_status,
+    }))
     return _clean_instance(entry)
 
 
@@ -214,12 +308,6 @@ def archive_registry_entry(entry):
     entry.is_active = False
     entry.status = RegistryEntry.STATUS_ARCHIVED
     entry.history.append(_history_event(None, "archive"))
-    return _clean_instance(entry)
-
-
-@transaction.atomic
-def link_registry_to_student(entry, student):
-    entry.related_student = student
     return _clean_instance(entry)
 
 
@@ -264,7 +352,19 @@ def create_appointment(*, created_by, **data):
     assigned_to = data.get("assigned_to")
     prevent_conflicts(scheduled_at=scheduled_at, assigned_to=assigned_to)
     appointment = Appointment(created_by=created_by, **data)
-    return _clean_instance(appointment)
+    appointment = _clean_instance(appointment)
+    if appointment.assigned_to_id and appointment.assigned_to_id != created_by.id:
+        _notify_recipient(
+            recipient=appointment.assigned_to,
+            actor=created_by,
+            event_type="secretary_appointment_assigned",
+            title="Nouveau rendez-vous assigne",
+            body=f"{appointment.title} - {appointment.scheduled_at:%d/%m/%Y %H:%M}",
+            metadata={"appointment_id": appointment.pk},
+            legacy_source="secretary_appointment",
+            legacy_object_id=str(appointment.pk),
+        )
+    return appointment
 
 
 @transaction.atomic
@@ -298,13 +398,30 @@ def get_today_appointments(*, user=None, branch=None):
 
 
 @transaction.atomic
-def update_appointment(appointment, **data):
+def update_appointment(appointment, actor=None, **data):
     scheduled_at = data.get("scheduled_at", appointment.scheduled_at)
     assigned_to = data.get("assigned_to", appointment.assigned_to)
     prevent_conflicts(scheduled_at=scheduled_at, assigned_to=assigned_to, exclude_id=appointment.pk)
+    previous_assigned_to_id = appointment.assigned_to_id
     for field, value in data.items():
         setattr(appointment, field, value)
-    return _clean_instance(appointment)
+    appointment = _clean_instance(appointment)
+    if (
+        appointment.assigned_to_id
+        and appointment.assigned_to_id != previous_assigned_to_id
+        and (actor is None or appointment.assigned_to_id != actor.id)
+    ):
+        _notify_recipient(
+            recipient=appointment.assigned_to,
+            actor=actor,
+            event_type="secretary_appointment_assigned",
+            title="Rendez-vous assigne",
+            body=f"{appointment.title} - {appointment.scheduled_at:%d/%m/%Y %H:%M}",
+            metadata={"appointment_id": appointment.pk},
+            legacy_source="secretary_appointment",
+            legacy_object_id=str(appointment.pk),
+        )
+    return appointment
 
 
 @transaction.atomic
@@ -318,9 +435,28 @@ def complete_appointment(appointment):
 
 
 @transaction.atomic
+def archive_appointment(appointment):
+    if appointment.is_archived:
+        raise ValidationError("Ce rendez-vous est deja archive.")
+    appointment.is_archived = True
+    appointment.is_active = False
+    appointment.status = Appointment.STATUS_ARCHIVED
+    return _clean_instance(appointment)
+
+
+@transaction.atomic
 def register_document(*, received_by, **data):
     document = DocumentReceipt(received_by=received_by, **data)
-    return _clean_instance(document)
+    document = _clean_instance(document)
+    if document.related_registry_id:
+        _notify_registry_routing(
+            document.related_registry,
+            actor=received_by,
+            event_type="secretary_document_deposited",
+            title="Document depose pour une entree routee",
+            body=document.title,
+        )
+    return document
 
 
 @transaction.atomic
@@ -352,11 +488,6 @@ def archive_document(document):
     return _clean_instance(document)
 
 
-@transaction.atomic
-def link_document_to_registry(document, registry_entry):
-    document.related_registry = registry_entry
-    return _clean_instance(document)
-
 
 def get_recent_documents(limit=5, *, user=None, branch=None):
     return get_recent_documents_queryset(limit=limit, user=user, branch=branch)
@@ -365,7 +496,19 @@ def get_recent_documents(limit=5, *, user=None, branch=None):
 @transaction.atomic
 def create_task(*, created_by, **data):
     task = SecretaryTask(created_by=created_by, **data)
-    return _clean_instance(task)
+    task = _clean_instance(task)
+    if task.assigned_to_id and task.assigned_to_id != created_by.id:
+        _notify_recipient(
+            recipient=task.assigned_to,
+            actor=created_by,
+            event_type="secretary_task_assigned",
+            title="Nouvelle tache assignee",
+            body=task.title,
+            metadata={"task_id": task.pk},
+            legacy_source="secretary_task",
+            legacy_object_id=str(task.pk),
+        )
+    return task
 
 
 @transaction.atomic
@@ -387,10 +530,27 @@ def assign_task(task, user):
 
 
 @transaction.atomic
-def update_task(task, **data):
+def update_task(task, actor=None, **data):
+    previous_assigned_to_id = task.assigned_to_id
     for field, value in data.items():
         setattr(task, field, value)
-    return _clean_instance(task)
+    task = _clean_instance(task)
+    if (
+        task.assigned_to_id
+        and task.assigned_to_id != previous_assigned_to_id
+        and (actor is None or task.assigned_to_id != actor.id)
+    ):
+        _notify_recipient(
+            recipient=task.assigned_to,
+            actor=actor,
+            event_type="secretary_task_assigned",
+            title="Tache assignee",
+            body=task.title,
+            metadata={"task_id": task.pk},
+            legacy_source="secretary_task",
+            legacy_object_id=str(task.pk),
+        )
+    return task
 
 
 @transaction.atomic
@@ -619,7 +779,3 @@ def get_secretary_recent_messages(user, limit=10):
 
 def get_secretary_notifications(user, limit=10):
     return selector_notifications(user, limit=limit)
-
-
-def assign_student_to_class_if_needed(*args, **kwargs):
-    return None

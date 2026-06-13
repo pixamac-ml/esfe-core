@@ -1,0 +1,50 @@
+{% load secretary_badges %}
+<div id="sg-kanban-board" class="sg-kanban-board">
+  {% for column in columns %}
+    <div class="sg-kanban-column">
+      <div class="sg-kanban-column-head">
+        <span class="sg-kanban-column-title">{{ column.label }}</span>
+        <span class="sg-kanban-count">{{ column.count }}</span>
+      </div>
+      <div class="sg-kanban-cards">
+        {% for entry in column.entries %}
+          <div class="sg-kanban-card {% if entry.priority|is_urgent_priority %}is-immediate{% endif %}">
+            <div class="sg-kanban-card-head">
+              <span
+                class="sg-kanban-card-title"
+                hx-get="{% url 'secretary:registry_detail' entry.pk %}"
+                hx-target="#sg-drawer-content"
+                hx-swap="innerHTML"
+              >{{ entry.registry_number|default:entry.pk }}</span>
+              <span class="sg-priority-pill {{ entry.priority|priority_pill_class }}">{% if entry.priority|is_urgent_priority %}<span class="sg-priority-dot"></span>{% endif %}{{ entry.get_priority_display }}</span>
+            </div>
+            <div class="sg-kanban-card-sub">
+              {{ entry.get_entry_type_display }}<br>
+              {% if entry.visitor_name %}{{ entry.visitor_name }} - {% endif %}{{ entry.target_service|default:"Accueil" }}
+            </div>
+            <div class="sg-kanban-card-actions">
+              <button
+                type="button"
+                class="sg-kanban-move-btn"
+                hx-get="{% url 'secretary:registry_detail' entry.pk %}"
+                hx-target="#sg-drawer-content"
+                hx-swap="innerHTML"
+              ><i class="fa-solid fa-eye"></i>Detail</button>
+              {% for move_status, move_label in entry.kanban_moves %}
+                <button
+                  type="button"
+                  class="sg-kanban-move-btn"
+                  hx-post="{% url 'secretary:registry_kanban_move' entry.pk move_status %}{{ querystring }}"
+                  hx-target="#sg-kanban-board"
+                  hx-swap="outerHTML"
+                ><i class="fa-solid fa-arrow-right"></i>{{ move_label }}</button>
+              {% endfor %}
+            </div>
+          </div>
+        {% empty %}
+          <div class="sg-kanban-empty">Aucune entree.</div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>

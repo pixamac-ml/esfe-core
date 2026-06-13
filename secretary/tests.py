@@ -19,6 +19,7 @@ from .services import (
     create_registry_entry,
     create_task,
     mark_registry_processed,
+    move_registry_entry_status,
     register_document,
     register_visitor,
     start_registry_entry_processing,
@@ -260,6 +261,78 @@ class RegistryEntryServiceTests(SecretaryTestMixin, TestCase):
         with self.assertRaises(ValidationError):
             start_registry_entry_processing(entry)
 
+    def test_update_registry_entry_valid_status_transition_records_history(self):
+        entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+        updated = update_registry_entry(entry, status=RegistryEntry.STATUS_IN_PROGRESS)
+        self.assertEqual(updated.status, RegistryEntry.STATUS_IN_PROGRESS)
+        status_event, update_event = updated.history[-2], updated.history[-1]
+        self.assertEqual(status_event["action"], "changement_statut")
+        self.assertEqual(status_event["details"]["from"], RegistryEntry.STATUS_PENDING)
+        self.assertEqual(status_event["details"]["to"], RegistryEntry.STATUS_IN_PROGRESS)
+        self.assertEqual(update_event["action"], "mise_a_jour")
+
+    def test_update_registry_entry_invalid_status_transition_raises(self):
+        entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+        archive_registry_entry(entry)
+        with self.assertRaises(ValidationError):
+            update_registry_entry(entry, status=RegistryEntry.STATUS_PENDING)
+
+    def test_move_registry_entry_status_valid_transition(self):
+        entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+        moved = move_registry_entry_status(entry, RegistryEntry.STATUS_IN_PROGRESS)
+        self.assertEqual(moved.status, RegistryEntry.STATUS_IN_PROGRESS)
+        status_event = moved.history[-1]
+        self.assertEqual(status_event["action"], "changement_statut")
+        self.assertEqual(status_event["details"]["from"], RegistryEntry.STATUS_PENDING)
+        self.assertEqual(status_event["details"]["to"], RegistryEntry.STATUS_IN_PROGRESS)
+
+    def test_move_registry_entry_status_preserves_routing_fields(self):
+        entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_SCHOOL_PAYMENT,
+        )
+        target_service = entry.target_service
+        priority = entry.priority
+        moved = move_registry_entry_status(entry, RegistryEntry.STATUS_TRANSFERRED)
+        self.assertEqual(moved.target_service, target_service)
+        self.assertEqual(moved.priority, priority)
+
+    def test_move_registry_entry_status_invalid_transition_raises(self):
+        entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+        mark_registry_processed(entry)
+        with self.assertRaises(ValidationError):
+            move_registry_entry_status(entry, RegistryEntry.STATUS_PENDING)
+
+    def test_move_registry_entry_status_archived_raises(self):
+        entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+        archive_registry_entry(entry)
+        with self.assertRaises(ValidationError):
+            move_registry_entry_status(entry, RegistryEntry.STATUS_IN_PROGRESS)
+
+    def test_move_registry_entry_status_same_status_is_noop(self):
+        entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+        history_length = len(entry.history)
+        moved = move_registry_entry_status(entry, RegistryEntry.STATUS_PENDING)
+        self.assertEqual(len(moved.history), history_length)
+
 
 class AppointmentServiceTests(SecretaryTestMixin, TestCase):
     def test_create_appointment(self):
@@ -462,6 +535,40 @@ class RegistryEditViewTests(SecretaryTestMixin, TestCase):
         })
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("secretary:registry_list"))
+
+    def test_regular_user_cannot_access(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_other_branch_secretary_cannot_access(self):
+        self.client.force_login(self.other_secretary)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 404)
+
+
+class RegistryDetailViewTests(SecretaryTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+        update_registry_entry(self.entry, status=RegistryEntry.STATUS_IN_PROGRESS)
+        self.entry.refresh_from_db()
+        self.url = reverse("secretary:registry_detail", args=[self.entry.pk])
+
+    def test_get_returns_200_for_secretary(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Historique")
+
+    def test_history_timeline_renders_events(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url, HTTP_HX_REQUEST="true")
+        self.assertContains(response, "fa-circle-plus")
+        self.assertContains(response, "fa-right-left")
 
     def test_regular_user_cannot_access(self):
         self.client.force_login(self.regular_user)
@@ -724,3 +831,133 @@ class ScopeTests(SecretaryTestMixin, TestCase):
         qs = get_tasks_queryset(user=self.secretary)
         self.assertIn(task, qs)
         self.assertEqual(qs.count(), 1)
+
+
+# =================== KANBAN VIEW TESTS ===================
+
+class RegistryKanbanViewTests(SecretaryTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+        RegistryEntry.objects.create(
+            title="Autre annexe",
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+            created_by=self.other_secretary,
+            branch=self.other_branch,
+        )
+        self.url = reverse("secretary:registry_kanban")
+
+    def test_get_returns_200_for_secretary(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "En attente")
+        self.assertContains(response, "En cours")
+        self.assertContains(response, "Transfere")
+        self.assertContains(response, "Traite")
+
+    def test_entry_appears_in_pending_column(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url)
+        self.assertContains(response, self.entry.registry_number)
+
+    def test_other_branch_entry_not_visible(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Autre annexe")
+
+    def test_priority_filter_excludes_non_matching_entries(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url, {"priority": RegistryEntry.PRIORITY_HIGH})
+        self.assertNotContains(response, self.entry.registry_number)
+
+    def test_regular_user_cannot_access(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+
+class RegistryKanbanMoveViewTests(SecretaryTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.entry = create_registry_entry(
+            created_by=self.secretary,
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+        )
+
+    def _url(self, entry, new_status):
+        return reverse("secretary:registry_kanban_move", args=[entry.pk, new_status])
+
+    def test_valid_transition_updates_status_and_history(self):
+        self.client.force_login(self.secretary)
+        response = self.client.post(self._url(self.entry, RegistryEntry.STATUS_IN_PROGRESS), HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.status, RegistryEntry.STATUS_IN_PROGRESS)
+        status_event = self.entry.history[-1]
+        self.assertEqual(status_event["action"], "changement_statut")
+        self.assertEqual(status_event["details"]["to"], RegistryEntry.STATUS_IN_PROGRESS)
+
+    def test_invalid_transition_keeps_previous_status(self):
+        update_registry_entry(self.entry, status=RegistryEntry.STATUS_COMPLETED)
+        self.entry.refresh_from_db()
+        self.client.force_login(self.secretary)
+        response = self.client.post(self._url(self.entry, RegistryEntry.STATUS_PENDING), HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.status, RegistryEntry.STATUS_COMPLETED)
+
+    def test_response_renders_kanban_board_with_trigger_header(self):
+        self.client.force_login(self.secretary)
+        response = self.client.post(self._url(self.entry, RegistryEntry.STATUS_IN_PROGRESS), HTTP_HX_REQUEST="true")
+        self.assertContains(response, "sg-kanban-board")
+        self.assertIn("HX-Trigger", response.headers)
+
+    def test_get_not_allowed(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self._url(self.entry, RegistryEntry.STATUS_IN_PROGRESS))
+        self.assertEqual(response.status_code, 405)
+
+    def test_regular_user_cannot_access(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.post(self._url(self.entry, RegistryEntry.STATUS_IN_PROGRESS))
+        self.assertEqual(response.status_code, 403)
+
+    def test_other_branch_secretary_gets_404(self):
+        self.client.force_login(self.other_secretary)
+        response = self.client.post(self._url(self.entry, RegistryEntry.STATUS_IN_PROGRESS))
+        self.assertEqual(response.status_code, 404)
+
+
+# =================== COMMAND PALETTE TESTS ===================
+
+class CommandPaletteViewTests(SecretaryTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("secretary:htmx_command_palette")
+
+    def test_empty_query_returns_actions_without_students_section(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Nouvelle entree registre")
+        self.assertNotContains(response, "Etudiants")
+
+    def test_query_matches_action_by_keyword(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url, {"q": "kanban"}, HTTP_HX_REQUEST="true")
+        self.assertContains(response, "Vue Kanban du registre")
+        self.assertNotContains(response, "Nouvelle tache")
+
+    def test_query_with_no_matches_shows_empty_state(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(self.url, {"q": "zzzzzzz"}, HTTP_HX_REQUEST="true")
+        self.assertContains(response, "Aucun resultat")
+
+    def test_regular_user_cannot_access(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 403)

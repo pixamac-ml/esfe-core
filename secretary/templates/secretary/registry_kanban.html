@@ -1,0 +1,37 @@
+{% extends "secretary/base.html" %}
+
+{% block title %}Registre - Kanban{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="page-header">
+        <div>
+            <h1>Registre administratif - Vue Kanban</h1>
+            <p class="help-text">Faites avancer une entree vers la colonne suivante via les boutons d'action, en respectant les transitions de statut autorisees.</p>
+        </div>
+        <div class="actions">
+            <a class="btn" href="{% url 'secretary:registry_list' %}"><i class="fa-solid fa-list"></i> Vue liste</a>
+            <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">Nouvelle entree</button>
+        </div>
+    </div>
+
+    <form method="get" class="filters">
+        <input class="secretary-input" type="text" name="q" value="{{ filters.q }}" placeholder="Numero, visiteur, type, service, matricule...">
+        <select class="secretary-input" name="priority">
+            <option value="">Toutes priorites</option>
+            {% for value, label in priority_choices %}
+                <option value="{{ value }}" {% if filters.priority == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <select class="secretary-input" name="target_service">
+            <option value="">Tous services</option>
+            {% for service in target_service_choices %}
+                <option value="{{ service }}" {% if filters.target_service == service %}selected{% endif %}>{{ service }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn" type="submit">Filtrer</button>
+    </form>
+
+    {% include "secretary/partials/registry_kanban_board.html" %}
+</section>
+{% endblock %}

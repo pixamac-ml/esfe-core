@@ -1,0 +1,729 @@
+=================================================================
+ANALYSE CRITIQUE DU DASHBOARD DG — CE QUI CLOCHE VRAIMENT
+ESFE - École de Santé FHB - Mali
+=================================================================
+
+ATTENTION : Ce qui suit est une analyse honnête. Le dashboard
+est VISUELLEMENT impressionnant mais creux sur le fond.
+
+=================================================================
+1. CE QUI MARCHE VRAIMENT (les points solides)
+=================================================================
+
+✅ Filtrage par annexe — Les querysets utilisent correctement
+   `branch_id__in` dans `get_dg_base_querysets()`. Le scope est
+   réellement respecté. Point fort.
+
+✅ Lecture des données — KPIs, revenus, dépenses, effectifs,
+   alertes : tout est lu de la base en temps réel. Les chiffres
+   sont vrais.
+
+✅ Export CSV/XLSX — L'export fonctionne pour 7 jeux de données.
+   C'est utilisable pour le reporting.
+
+✅ Recrutement staff — Crée réellement User + Profile avec mot
+   de passe temporaire, email optionnel, audit log. C'est la seule
+   action métier qui fait vraiment quelque chose de concret.
+
+✅ Drawer et navigation — L'UX est fluide, le drawer latéral
+   fonctionne bien, les sections se chargent en HTMX.
+
+✅ Horloge live — Un détail, mais qui donne une impression de
+   sérieux. Et elle tick vraiment chaque seconde.
+
+=================================================================
+2. CE QUI EST PROBLÉMATIQUE (les gros défauts)
+=================================================================
+
+🚩 PROBLÈME #1 — GRAPHIQUES "TEMPS RÉEL" FAUX
+   Fichier : templates/portal/dg/dashboard.html:1798-1801
+
+   Les données du graphique "Temps réel" sont des CONSTANTES en
+   dur dans le code JavaScript :
+     data: [0, 8, 12, 18, 34, 52, 64, 81, 92, 108, 118, 128]
+
+   Ce n'est PAS du temps réel. C'est du maquillage. Le DG regarde
+   un graphique qui semble montrer une activité croissante mais
+   qui ne reflète AUCUNE donnée réelle.
+
+   Les commentaires dans dgBuildCharts() l'avouent :
+     "Sparklines removed — replaced with CSS bars in partials"
+   Les développeurs ont abandonné les graphiques réels.
+
+🚩 PROBLÈME #2 — ACTIONS MÉTIERS SUPERFICIELLES
+   Fichier : portal/dg/actions_service.py
+
+   Les 4 actions disponibles sont creuses :
+
+   • "Résoudre alerte d'assiduité" (l.20-33) :
+     Met juste is_resolved = True + audit log. Pas de commentaire,
+     pas de pièce jointe, pas de notification au surveillant,
+     pas de suivi. Un booléen.
+
+   • "Résoudre cas étudiant" (l.36-49) :
+     Appelle case.resolve(actor) + audit log. Idem.
+
+   • "Escalader cas étudiant" (l.52-71) :
+     Change le statut + crée une note automatique. Pas de
+     destinataire réel, pas d'escalade vers qui que ce soit.
+
+   • "Suivi finance" (l.74-109) :
+     Crée un SUPPORT TICKET (ticket de support technique !).
+     Ce n'est pas une relance financière. Aucun email n'est
+     envoyé, aucune notification réelle. Le DG clique sur
+     "Relancer" et ça crée juste un ticket dans la base.
+
+   Aucune de ces actions n'a d'effet réel dans le monde métier.
+
+🚩 PROBLÈME #3 — BOUTONS DÉCORATIFS (fantômes)
+   Fichier : templates/portal/dg/partials/workflows/reenrollment.html
+
+   • Bouton "Import CSV" (l.15) : pas de handler, pas d'action,
+     pas d'endpoint. C'est un bouton mort.
+   • Bouton "Lancer passage" (l.17-19) : idem, bouton mort.
+   • Pagination des alertes (priority_table.html:140-143) :
+     les boutons "1", "2", chevrons n'ont aucun handler JS.
+
+   Ces éléments donnent l'illusion d'un dashboard complet mais
+   ne font rien.
+
+🚩 PROBLÈME #4 — WORKFLOW DE PASSAGE SANS ACTION RÉELLE
+   Le DG voit les dossiers bloqués (workflow.blocked_rows) et
+   les boutons "Valider" / "Voir" (reenrollment.html:140-148).
+   Mais ces boutons ouvrent juste un drawer d'information.
+   Il n'existe PAS d'endpoint POST pour valider un passage
+   individuellement depuis le dashboard DG.
+
+   Le DG peut regarder mais pas agir.
+
+🚩 PROBLÈME #5 — PAS DE GÉNÉRATION DE PAIE AUTOMATIQUE
+   Fichier : portal/dg/rh_service.py
+
+   La règle métier (AGENTS.md) dit :
+     "Auto-generate payslips when STAFF user is created"
+
+   Mais create_staff_from_recruitment() (l.21-107) crée juste
+   User + Profile avec salary_base. Il n'y a AUCUNE création
+   de fiche de paie, aucun signal, aucune génération de bulletin.
+   Le salaire est stocké mais jamais utilisé.
+
+🚩 PROBLÈME #6 — ABSENCE D'ACTIONS FINANCIÈRES CONCRÈTES
+
+   Ce que le DG NE PEUT PAS FAIRE depuis son dashboard :
+   • Valider/annuler un paiement
+   • Approuver/rejeter une dépense
+   • Générer un bilan comptable
+   • Faire une clôture mensuelle (pourtant dans les règles métier)
+   • Relancer un parent par email/SMS depuis le dashboard
+   • Voir l'historique des clôtures
+
+   La section Finance montre les chiffres mais n'offre AUCUNE
+   action. Le DG est spectateur.
+
+🚩 PROBLÈME #7 — PAS DE VÉRIFICATION MÉTIER DANS LES ACTIONS
+
+   Les actions comme resolve_attendance_alert() ne vérifient pas
+   que l'alerte est dans une branche que le DG peut voir.
+   C'est vrai que le DG voit tout (is_global = True), mais si
+   demain on restreint le scope, les actions ne suivront pas.
+
+🚩 PROBLÈME #8 — ARCHITECTURE DU CODE FRAGILE
+   Fichier : portal/dg/services.py (1193 lignes)
+
+   C'est un énorme fichier monolithique qui fait TOUT :
+   parsing des paramètres, construction des KPIs, alertes,
+   workflow, finance, analytics, planning, RH...
+
+   La moindre erreur dans _parse_period_scope ou _resolve_branch_scope
+   peut casser TOUT le dashboard. Pas de tests unitaires trouvés.
+
+=================================================================
+3. CE QU'IL FAUDRAIT POUR QUE CE SOIT VRAIMENT UN DASHBOARD DG
+=================================================================
+
+Actions métier réelles à implémenter :
+  • Validation de paiement en attente (avec reçu)
+  • Relance financière automatisée (email/SMS)
+  • Approbation de dépense (workflow valideur)
+  • Clôture mensuelle (archivage + reset indicateurs)
+  • Génération de fiche de paie automatique
+  • Validation de passage (endpoint POST réel)
+  • Alertes avec notifications réelles (email, WebSocket)
+  • Rapport financier exportable (bilan, compte de résultat)
+
+Données réelles :
+  • Graphiques temps réel avec vraies données (WebSocket/API)
+  • Pagination fonctionnelle des alertes
+  • Import CSV qui marche vraiment
+
+Qualité du code :
+  • Tests unitaires pour chaque action et chaque calcul
+  • Découpage du monolithe services.py en modules métier
+  • Gestion d'erreurs robuste (try/except partout)
+
+=================================================================
+5. INVENTAIRE COMPLET DE TOUT CE QUI NE MARCHE PAS
+=================================================================
+
+[5.1] BOUTONS SANS AUCUN HANDLER (morts / décoratifs)
+------------------------------------------------------
+
+  Section Workflows (reenrollment.html) :
+    • "Import CSV"          (l.15) — pas d'onclick, pas de handler JS
+    • "Lancer passage"      (l.17-19) — idem, bouton mort
+    • "Exporter"            (l.103-105) — pas d'onclick
+    • Filtres "Tous / Valides / En attente / Bloqués"
+                            (l.87-96) — pas de handler
+
+  Section Alertes (priority_table.html) :
+    • Filtres "Toutes / Absences / Finance / Étudiants"
+                            (l.54-65) — pas de handler
+    • Pagination "1 / 2 / < / >"
+                            (l.140-143) — pas de handler
+
+  Section Finance (summary.html) :
+    • "Rapport mensuel"     (l.14-16) — pas d'onclick
+    • "Nouvelle" transaction (l.61-63) — pas d'onclick
+    • "Exporter"            (l.11-13) — ouvre un drawer, n'exporte PAS
+
+  Section Annexes (performance_table.html) :
+    • "Nouvelle annexe"     (l.14-16) — pas d'onclick
+
+  Section Analytics (charts.html) :
+    • "Exporter"            (l.11-13) — ouvre un drawer, n'exporte PAS
+    • Select période        (l.14-18) — pas d'onchange, ne fait rien
+
+  Section RH/Staff (staff.html) :
+    • Filtre "Tous"         (l.54-56) — pas d'onclick
+    • "Affecter" par staff  (l.104-106) — pas d'onclick
+    • "Contrat" par staff   (l.107-109) — pas d'onclick
+
+  Section Schedule (overview.html) :
+    • "Exporter" planning   (l.91-93) — pas d'onclick
+
+  Section Temps réel (monitoring.html) :
+    • "Pause"               (l.12-14) — pas d'onclick du tout
+
+  TOTAL : 20 boutons morts / décoratifs
+
+[5.2] DONNÉES FAUSSES OU EN DUR (hardcodées)
+---------------------------------------------
+
+  • Graphique "Temps réel" :
+    Fichier : dashboard.html:1798-1801
+    Les données sont des CONSTANTES :
+      data: [0, 8, 12, 18, 34, 52, 64, 81, 92, 108, 118, 128]
+    Ce n'est PAS du temps réel. Jamais actualisé.
+
+  • Sparklines KPIs (dashboard.html:1601-1603) :
+      data: [12, 16, 15, 20, 18, 24, 23, 25, 31, 35, 32, 40]  (étudiants)
+      data: [8, 10, 9, 13, 12, 16, 17, 20, 25, 31, 36, 44]    (revenus)
+      data: [5, 8, 6, 11, 9, 7, 12, 8, 6, 5, 7, 9]            (alertes)
+    Données fictives. Le commentaire l'admet :
+      "// Sparklines removed — replaced with CSS bars"
+
+  • Section Analytics (charts.html:122-132) :
+      "Taux réussite"       = 72 % (constant, pas calculé)
+      "Croissance étudiants" = +18 % (constant, pas calculé)
+      "Taux rétention"      = 89 % (constant, pas calculé)
+
+  • Section Finance (summary.html:118-136) :
+      Répartition des dépenses en POURCENTAGES FIXES :
+      Salaires 39%, Fournitures 20%, Équipement 15%, etc.
+      Ce n'est PAS basé sur les vraies dépenses.
+
+  • Indicateur "Jan-Juin 2026 vs 2025" (charts.html:79) :
+      "+24% vs 2025" — valeur en dur, pas calculée
+
+  • Animation pulse CSS (monitoring.html:70) :
+      animation:pulse 1.5s infinite
+      La règle @keyframes pulse n'est JAMAIS définie nulle part.
+      Le point vert "LIVE" ne pulse pas.
+
+[5.3] FONCTIONNALITÉS QUI ONT L'AIR RÉELLES MAIS NE FONT RIEN
+--------------------------------------------------------------
+
+  • "Résoudre alerte" :
+    Met juste is_resolved=True. Pas de commentaire, pas de
+    notification, pas d'email, pas de suivi. Un booléen.
+
+  • "Suivi finance" (Relancer) :
+    Crée un SupportTicket (ticket technique). N'envoie PAS
+    d'email, ne notifie personne, ne relance PAS le parent.
+    C'est un ticket dans une base de données.
+
+  • "Escalader cas étudiant" :
+    Change le statut en base. Pas de destinataire, pas d'email,
+    pas de notification réelle. Le cas est "escaladé" vers
+    personne.
+
+  • Workflow "Valider" un passage :
+    Les boutons Valider/Voir (reenrollment.html:140-148)
+    ouvrent juste un DRAWER. Il n'existe AUCUN endpoint POST
+    pour valider un passage individuellement.
+
+  • Génération de fiche de paie :
+    create_staff_from_recruitment() stocke salary_base mais
+    ne crée AUCUNE fiche de paie. Pourtant AGENTS.md demande :
+    "Auto-generate payslips when STAFF user is created"
+
+[5.4] BOGUES ET INCOHÉRENCES
+-----------------------------
+
+  • "Enseignants" dans RH (staff.html:39) :
+    Le compteur affiche toujours rh.active_staff (le total),
+    pas le vrai nombre d'enseignants. Bug d'affichage.
+
+  • Pagination des alertes :
+    Les boutons 1/2 existent mais n'ont pas de mécanisme de
+    pagination côté serveur. Le queryset limite à 8 alertes
+    (_build_alerts line 113: [:8]), donc la page 2 n'existe pas.
+
+  • N/A dans les textes (monitoring.html:81-83) :
+    Les caractères â€” apparaissent à cause d'encodages
+    inconsistants (em dash vs espace insécable).
+
+  • Graphique Finance (finance/summary.html:114) :
+    Le canvas id="dgFinanceChart" affiche Revenus vs Dépenses
+    MAIS le JS (dashboard.html) le construit comme un bar chart
+    avec seulement 2 barres. L'analyse réelle des dépenses est
+    remplacée par des pourcentages fixes.
+
+[5.5] FONCTIONNALITÉS DG ATTENDUES MAIS ABSENTES
+--------------------------------------------------
+
+  Ce que le DG ne peut PAS faire (pourtant nécessaire) :
+    • Valider/annuler un paiement en attente
+    • Approuver/rejeter une dépense
+    • Générer un bilan comptable ou état des créances
+    • Faire une clôture mensuelle (archivage + reset)
+    • Relancer un parent par email/SMS depuis le dashboard
+    • Générer la fiche de paie d'un staff
+    • Voir l'historique des clôtures mensuelles
+    • Envoyer une notification réelle (email, WebSocket)
+    • Déclencher un workflow de validation
+    • Affecter un manager à une annexe
+    • Voir le détail des honoraires enseignants
+    • Gérer les versements bancaires (DG doit voir par annexe)
+
+[5.6] ARCHITECTURE FRAGILE
+----------------------------
+
+  • services.py fait 1193 lignes MONOLITHIQUES
+  • Aucun test unitaire trouvé pour les actions DG
+  • Pas de try/except dans _parse_period_scope, _resolve_branch_scope
+  • Les actions (resolve_attendance_alert) ne vérifient PAS que
+    l'alerte est dans le scope de l'utilisateur
+  • Chart.js chargé depuis CDN externe (pas de fallback local)
+  • Le commentaire "Sparklines removed" montre un abandon de
+    fonctionnalité sans nettoyage du code mort
+
+[5.7] RÉSUMÉ CHIFFRÉ
+---------------------
+
+  ✓ KPIs réels depuis la base : ~30 indicateurs
+  ✓ Boutons qui marchent vraiment : ~15 (navigation, drawer, modal)
+  ✗ Boutons morts / décoratifs : 20
+  ✗ Valeurs en dur / fausses : 8
+  ✗ Actions métiers superficielles : 4 sur 4
+  ✗ Fonctionnalités métier attendues absentes : ~12
+
+=================================================================
+6. VERDICT
+=================================================================
+
+Le dashboard DG est une magnifique coquille visuelle :
+  ✓ UI moderne, fluide, avec Alpine.js
+  ✓ Filtrage par annexe qui fonctionne
+  ✓ Données lues en temps réel
+  ✓ Export fonctionnel
+
+Mais dès qu'on gratte un peu :
+  ✗ 20 boutons ne font rien (décoratifs)
+  ✗ Les graphiques "temps réel" sont des constantes en dur
+  ✗ Les 4 actions métiers sont superficielles (booléens, tickets)
+  ✗ 8 valeurs en dur (taux réussite, croissance, dépenses...)
+  ✗ Pas de validation de passage, de paie, de clôture
+  ✗ Pas de notifications réelles (email, SMS, WebSocket)
+  ✗ Le code est un monolithe non testé (1193 lignes)
+
+C'est un dashboard de CONSULTATION, pas d'ACTION.
+Le DG peut voir, mais il ne peut pas vraiment GÉRER.
+Pour être crédible, il faudrait implémenter ~12 actions métiers
+réelles et remplacer toutes les données factices.
+
+=================================================================
+7. CE QUE LE DG DEVRAIT VRAIMENT POUVOIR FAIRE (vision corrigée)
+=================================================================
+
+   J'ai compris mon erreur. Le DG n'est pas là pour faire le
+   travail des managers, secrétaires, caissiers ou comptables.
+   Ces gens sont déjà payés pour ça. Le DG est le PATRON.
+   Son rôle c'est de GOUVERNER, pas d'opérer.
+
+   Voici donc la vraie vision, en deux axes naturels :
+
+   AXE 1 — GESTION ADMINISTRATIVE DES ANNEXES
+   (ce que le DG fait pour diriger ses établissements)
+
+   AXE 2 — PILOTAGE ÉDUCATIF ET DIPLÔMES
+   (ce que le DG fait en tant que garant de la formation)
+
+   Chaque action est à son niveau. Il regarde, valide,
+   décide. Il ne touche pas à l'opérationnel.
+
+=================================================================
+AXE 1 — GESTION ADMINISTRATIVE DES ANNEXES
+=================================================================
+
+   1.1 — NOMINATION DES MANAGERS D'ANNEXE
+   ───────────────────────────────────────
+   Le DG nomme et révoque les managers. C'est son pouvoir
+   le plus important. Sans manager, une annexe est une
+   barque sans capitaine.
+
+   Ce qui existe déjà :
+   • Le modèle Branch a un champ "manager" (ForeignKey vers User)
+   • Le dashboard liste les annexes avec/sans manager
+   • Les KPIs montrent "branches_without_manager"
+
+   Ce qui manque :
+   • Un bouton "Nommer un manager" sur chaque annexe
+   • Un formulaire : choisir un utilisateur parmi le staff
+   • Une action POST qui fait : branch.manager = user
+   • Un audit log + notification au nouveau manager
+   • Un bouton "Remplacer le manager" ou "Révoquer"
+
+   Où ça se place :
+   • Section Annexes → chaque carte d'annexe
+   • Drawer annexe → onglet "Manager"
+   • Ça remplace le bouton mort "Nouvelle annexe"
+
+   Pourquoi c'est du niveau DG :
+   Le manager est son représentant direct sur place.
+   C'est lui qui gère le personnel, les finances, les
+   inscriptions. Le DG lui donne les clés. C'est son
+   équipe, il la choisit.
+
+   1.2 — VALIDATION DES CLÔTURES MENSUELLES
+   ─────────────────────────────────────────
+   Chaque mois, chaque annexe fait sa clôture (bilan
+   entrées/sorties, salaires payés, résultats). Le DG
+   valide ou rejette. C'est son contrôle financier.
+
+   Ce qui existe déjà :
+   • BranchMonthlyClosure (modèle complet avec tous les
+     champs : revenus, dépenses, salaires, honoraires,
+     résultat net, statuts draft→validated→closed)
+   • Les données sont déjà calculables depuis Payment,
+     BranchExpense, PayrollEntry
+
+   Ce qui manque :
+   • Une vue "Clôtures du mois" dans la section Finance
+   • Un tableau : Annexe | Revenus | Dépenses | Résultat
+     | Statut | Action
+   • Un bouton "Créer la clôture" qui calcule tout
+     automatiquement pour une annexe
+   • Un bouton "Valider" ou "Rejeter avec motif"
+   • Une fois validée, les indicateurs sont figés
+     (snapshot). Archivage consultable.
+
+   Où ça se place :
+   • Section Finance → sous-section "Clôtures mensuelles"
+   • Drawer finance → historique des clôtures par annexe
+
+   Pourquoi c'est du niveau DG :
+   Personne d'autre ne peut valider la clôture. C'est le
+   feu vert du DG. Après validation, on peut faire le
+   versement bancaire et démarrer le mois suivant.
+
+   1.3 — VERSEMENTS BANCAIRES (vue DG)
+   ────────────────────────────────────
+   Le DG ne fait pas les virements. Mais il DOIT voir
+   tous les versements bancaires effectués par annexe.
+   C'est sa visibilité financière.
+
+   Ce qui existe déjà :
+   • BranchBankTransfer (modèle avec banque, référence,
+     date, montant, justificatif, commentaire)
+   • Lié 1:1 à BranchMonthlyClosure
+
+   Ce qui manque :
+   • Une vue "Versements bancaires" consolidée
+   • Tableau : Annexe | Banque | Référence | Date |
+     Montant | Justificatif (PDF)
+   • Filtre par annexe, par mois
+   • Le DG peut voir, pas besoin de créer
+
+   Où ça se place :
+   • Section Finance → sous-section "Versements bancaires"
+   • Drawer finance par annexe
+
+   1.4 — RECRUTEMENT STRATÉGIQUE (staff de direction)
+   ───────────────────────────────────────────────────
+   Le recrutement DG existe déjà (dg_recruit_staff) et
+   c'est bien. Mais il manque :
+
+   Ce qui manque :
+   • Après recrutement, génération automatique de la
+     première fiche de paie (PayrollEntry)
+   • Le staff est créé → sa paie doit exister dans le
+     système pour le mois en cours
+   • Ce n'est pas le DG qui paie, c'est le système qui
+     prépare. Le gestionnaire n'a pas à le faire manuellement.
+
+   1.5 — ALERTES ES CALADÉES (escalade réelle)
+   ────────────────────────────────────────────
+   Actuellement, "escalader un cas" ne fait rien.
+   Dans la vraie vie, quand un cas est escaladé au DG :
+
+   Ce qui devrait se passer :
+   • Changement de statut → "escaladed_to_dg"
+   • Notification réelle au DG (in-app + email)
+   • Le cas apparaît dans une section spéciale
+     "Cas à trancher" sur le dashboard DG
+   • Le DG lit, tranche (valide/rejette/demande plus)
+   • Sa décision est renvoyée à l'équipe concernée
+   • Tout est audité
+
+   C'est déjà le début de ce qui existe (resolve_case,
+   escalate_case) mais sans les notifications ni le
+   suivi. Il faut juste les connecter.
+
+   1.6 — AUDIT GLOBAL
+   ──────────────────
+   Le DG doit pouvoir auditer l'activité de toutes les
+   annexes : qui a fait quoi, quand, où.
+
+   Ce qui existe déjà :
+   • SupportAuditLog (modèle complet)
+   • Export audit (dg_export kind=audit)
+
+   Ce qui manque :
+   • Une section "Audit" dans le dashboard
+   • Filtres : annexe, action, acteur, date
+   • Tableau lisible des actions récentes
+   • Le drawer audit est déjà codé mais pas accessible
+     depuis la navigation principale
+
+=================================================================
+AXE 2 — PILOTAGE ÉDUCATIF ET DIPLÔMES
+=================================================================
+
+   2.1 — DÉLIVRANCE DES DIPLÔMES DE FIN DE CYCLE
+   ──────────────────────────────────────────────
+   C'est LE pouvoir exclusif du DG. Lui seul délivre
+   les diplômes. Les étudiants ne sont officiellement
+   diplômés que quand le DG signe.
+
+   Ce qui existe déjà :
+   • dg_diploma_action (endpoint POST qui prépare les
+     AcademicDiplomaAward pour une classe terminale)
+   • dg_section "workflows" affiche les classes
+     candidates (L3, M2)
+   • Le modèle AcademicDiplomaAward existe
+
+   Ce qui manque :
+   • Un bouton "Publier les diplômes" qui change le
+     statut de "prepared" à "published"
+   • Quand publié : chaque étudiant reçoit une
+     notification + email "Félicitations, vous êtes
+     diplômé"
+   • Une vue "Historique des diplômes délivrés" :
+     Classe | Promotion | Date délivrance | Nombre
+   • Le DG peut voir les diplômes en attente de sa
+     signature
+   • Un tableau de bord "Taux de diplomation" par
+     annexe, par programme
+
+   Pourquoi c'est du niveau DG :
+   Le diplôme engage l'école. C'est la signature du DG
+   qui authentifie la formation. Personne d'autre ne
+   peut le faire.
+
+   2.2 — VALIDATION DES CYCLES ACADÉMIQUES
+   ────────────────────────────────────────
+   Chaque annexe a un cycle académique (préparation,
+   inscriptions ouvertes, actif, examens, clôture).
+   Le DG ouvre et ferme les grandes étapes.
+
+   Ce qui existe déjà :
+   • BranchAcademicCycle (modèle avec statuts :
+     draft→preparation→registration_open→active→
+     exams→deliberation→closing→closed→archived)
+
+   Ce qui manque :
+   • Une section "Cycles académiques" dans le dashboard
+   • Tableau : Annexe | Année | Statut actuel | Action
+   • Bouton "Ouvrir les inscriptions" → passe en
+     registration_open
+   • Bouton "Lancer les examens" → passe en exams
+   • Bouton "Clôturer l'année" → passe en closed
+   • Chaque action est auditable et irréversible
+     (ou avec confirmation)
+
+   Pourquoi c'est du niveau DG :
+   Le calendrier académique est une décision stratégique.
+   Le DG décide quand on recrute, quand on examine,
+   quand on diplôme.
+
+   2.3 — VALIDATION DES DÉCISIONS DE PASSAGE (arbitrage)
+   ──────────────────────────────────────────────────────
+   Normalement, les décisions de passage sont traitées
+   par les équipes pédagogiques et financières. Mais
+   quand il y a un litige, un cas bloqué, une situation
+   spéciale → ça monte au DG.
+
+   Ce qui existe déjà :
+   • StudentYearDecision (workflow en 4 étapes)
+   • Les dossiers bloqués sont listés dans la section
+     Workflows
+
+   Ce qui manque :
+   • Un statut "escaladed_to_dg" dans le workflow
+   • Les cas bloqués depuis plus de X jours montent
+     automatiquement au DG
+   • Le DG peut : VALIDER le passage en force,
+     REJETER, ou DEMANDER UN COMPLÉMENT
+   • Sa décision est définitive et auditable
+   • Notification à l'équipe pédagogique après décision
+
+   Où ça se place :
+   • Section Workflows → onglet "Arbitrage DG"
+   • Drawer workflow → décision DG
+
+   2.4 — TABLEAU DE BORD ÉDUCATIF CONSOLIDÉ
+   ─────────────────────────────────────────
+   Le DG doit voir la santé académique de toutes ses
+   annexes d'un coup d'œil.
+
+   Ce qui existe déjà :
+   • analytics.class_fill_rate (taux de remplissage)
+   • analytics.overloaded_classes (classes surchargées)
+   • analytics.top_programmes (programmes populaires)
+   • schedule couvre l'emploi du temps
+
+   Ce qui manque (vraies données, pas de constantes) :
+   • Taux de réussite par annexe (calculé depuis
+     StudentYearDecision avec status "promoted")
+   • Taux d'abandon (StudentYearDecision "abandoned")
+   • Taux de présence (AttendanceRollSheet)
+   • Progression vs année précédente
+   • Graphiques avec VRAIES données, pas des constantes
+
+   Les données fausses à remplacer d'urgence :
+   • Graphique "Temps réel" → constantes JS
+   • Taux réussite 72 % → en dur
+   • Croissance étudiants +18 % → en dur
+   • Taux rétention 89 % → en dur
+   • Répartition dépenses → pourcentages fixes
+
+   2.5 — GESTION DES PROGRAMMES ET FORMATIONS
+   ───────────────────────────────────────────
+   Le DG voit quels programmes marchent, lesquels
+   attirent le plus d'étudiants, lesquels sont en
+   perte de vitesse.
+
+   Ce qui existe déjà :
+   • analytics.top_programmes (top 5 programmes)
+   • analytics.monthly_table (données mensuelles)
+
+   Ce qui manque :
+   • Analyse comparative : L1→L2→L3 (taux de rétention
+     par niveau)
+   • Programmes les plus rentables financièrement
+   • Programmes avec le plus d'alertes/abandons
+   • Vue "Santé des programmes" : inscriptions,
+     abandons, diplômés, revenus
+
+=================================================================
+8. RÉSUMÉ DES ACTIONS DG (ce qui est vraiment de son niveau)
+=================================================================
+
+   ┌─────────────────────────────────────────────────────────────┐
+   │  AXE ADMINISTRATIF                    │  AXE ÉDUCATIF       │
+   ├─────────────────────────────────────────────────────────────┤
+   │                                   │                        │
+   │  1. Nommer/révoquer les managers  │  6. Délivrer diplômes  │
+   │     d'annexe                      │     (pouvoir exclusif) │
+   │                                   │                        │
+   │  2. Valider les clôtures          │  7. Ouvrir/fermer les  │
+   │     mensuelles des annexes        │     cycles académiques │
+   │                                   │                        │
+   │  3. Voir les versements           │  8. Arbitrer les cas   │
+   │     bancaires consolidés          │     de passage bloqués │
+   │                                   │                        │
+   │  4. Recruter le staff de          │  9. Voir les stats     │
+   │     direction (existe déjà)       │     éducatives         │
+   │                                   │     consolidées        │
+   │  5. Voir les alertes escaladées   │                        │
+   │     et trancher                   │  10. Analyser les      │
+   │                                   │      programmes par    │
+   │                                   │      performance       │
+   └─────────────────────────────────────────────────────────────┘
+
+   Ce que le DG NE DOIT PAS faire (opérationnel) :
+   ❌ Valider les paiements individuels (→ caissier/secrétaire)
+   ❌ Approuver les dépenses individuelles (→ manager)
+   ❌ Générer les fiches de paie (→ gestionnaire)
+   ❌ Relancer les parents (→ secrétariat)
+   ❌ Saisir les notes (→ enseignants)
+   ❌ Gérer l'emploi du temps (→ secrétariat pédagogique)
+
+=================================================================
+9. CE QU'IL FAUT CHANGER DANS LE DASHBOARD (actions concrètes)
+=================================================================
+
+   PRIORITÉ 1 — Données factices à remplacer (cosmétique mais
+   important pour la crédibilité)
+   ─────────────────────────────────────────────────────────────
+   • Graphique "temps réel" : mettre de vraies données
+   • Taux réussite / croissance / rétention : calculer depuis
+     les modèles au lieu de valeurs en dur
+   • Répartition dépenses : utiliser les vraies catégories
+   • Supprimer les 20 boutons morts ou leur donner une action
+
+   PRIORITÉ 2 — Actions DG manquantes (le cœur du métier)
+   ─────────────────────────────────────────────────────────────
+   • Nommer un manager d'annexe (bouton + endpoint)
+   • Valider une clôture mensuelle (bouton + endpoint)
+   • Publier les diplômes préparés (statut published)
+   • Notifications réelles quand le DG agit
+   • Section "Cas à trancher" pour l'arbitrage
+
+   PRIORITÉ 3 — Nouvelles sections à créer
+   ─────────────────────────────────────────────────────────────
+   • Section "Cycles académiques" (ouvrir/fermer)
+   • Section "Clôtures mensuelles" (créer/valider)
+   • Section "Versements bancaires" (consultation)
+   • Section "Diplômes" (historique + publication)
+   • Section "Audit" (filtres + tableau)
+
+=================================================================
+10. NOTE FINALE
+=================================================================
+
+   Le dashboard DG a une base solide : les données sont là,
+   les modèles existent, la structure est bonne. Mais il
+   souffre de deux défauts :
+
+   1. Il confond consultation et action. Le DG voit tout
+      mais ne peut rien faire. Il est spectateur.
+
+   2. Les actions proposées (résoudre alerte, escalader cas)
+      sont trop opérationnelles. C'est du travail de
+      surveillant ou de secrétaire déguisé en action DG.
+
+   La correction est simple :
+   • Garder tout ce qui est visuel et navigation (c'est bien)
+   • Nettoyer les données factices et boutons morts
+   • Ajouter les 5-6 vraies actions de niveau DG
+   • Faire en sorte que chaque action DG ait un effet réel
+     (notification, changement de statut visible, audit)
+
+   Le DG doit pouvoir dire en ouvrant son dashboard :
+   "Aujourd'hui je nomme un manager à Bamako-Coura,
+   je valide la clôture de Kalaban-Coro, je publie les
+   diplômes de la promotion L3 2025-2026, et je tranche
+   deux cas d'étudiants bloqués."
+   C'est ça, un dashboard DG qui sert à quelque chose.

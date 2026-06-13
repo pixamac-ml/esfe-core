@@ -9,7 +9,10 @@
             <h1>Registre administratif</h1>
             <p class="help-text">Moteur central des evenements administratifs, avec routage et numerotation automatique.</p>
         </div>
-        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Nouvelle entree</button>
+        <div class="actions">
+            <a class="btn" href="{% url 'secretary:registry_kanban' %}"><i class="fa-solid fa-table-columns"></i> Vue Kanban</a>
+            <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">Nouvelle entree</button>
+        </div>
     </div>
 
     <form method="get" class="filters">
@@ -53,7 +56,8 @@
                     <td>{{ entry.created_at|date:"d/m/Y H:i" }}</td>
                     <td>
                         <div class="actions">
-                            <button type="button" class="btn" hx-get="{% url 'secretary:registry_update' entry.id %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Modifier</button>
+                            <button type="button" class="btn" hx-get="{% url 'secretary:registry_detail' entry.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">Detail</button>
+                            <button type="button" class="btn" hx-get="{% url 'secretary:registry_update' entry.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">Modifier</button>
                             {% if entry.status == "pending" %}
                                 <form method="post" action="{% url 'secretary:registry_start' entry.id %}">
                                     {% csrf_token %}

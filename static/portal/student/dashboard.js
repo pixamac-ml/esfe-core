@@ -323,7 +323,7 @@
         this.searchOpen = true;
 
         // Charge les sections paresseuses pour que la recherche couvre tout le dashboard.
-        ["courses", "schedule", "messages", "academics", "settings"].forEach((key) => this.ensureSectionLoaded(key));
+        ["courses", "schedule", "messages", "academics", "settings", "shop", "diplomas"].forEach((key) => this.ensureSectionLoaded(key));
 
         const results = [];
         const pushResult = (scope, title, snippet, sectionKey, uniqueKey) => {
@@ -347,7 +347,7 @@
         this.courses.forEach((course) => {
           const hay = this.normalizeSearch(`${course.title} ${course.code} ${course.ue} ${course.teacher}`);
           if (hay.includes(query)) {
-            pushResult("Cours", course.title, `Semestre ${course.semester} Â· ${course.code}`, "courses", `course-${course.id}`);
+            pushResult("Cours", course.title, `Semestre ${course.semester} · ${course.code}`, "courses", `course-${course.id}`);
           }
         });
 
@@ -515,6 +515,7 @@
         if (sectionKey === "academics") idsToLoad.push("academics");
         if (sectionKey === "settings") idsToLoad.push("settings");
         if (sectionKey === "shop") idsToLoad.push("shop");
+        if (sectionKey === "diplomas") idsToLoad.push("diplomas");
 
         idsToLoad.forEach((elementId) => {
           const el = document.getElementById(elementId);

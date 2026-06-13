@@ -1,0 +1,428 @@
+================================================================
+AUDIT - DASHBOARD ETUDIANT
+================================================================
+Fichiers principaux :
+- templates/portal/student/dashboard.html (page-cadre, Alpine.js "studentDashboard()")
+- templates/portal/student/partials/*.html (9 sections + sous-panneaux)
+- static/portal/student/dashboard.js (~650 lignes, logique Alpine + lazy-load HTMX)
+- static/portal/student/dashboard.css (theme, ~1234 lignes)
+- static/portal/student/course_immersive.js (lecteur de cours "Academy")
+- portal/student/urls.py (17 routes, app_name="portal_student")
+- portal/student/views.py (713 lignes)
+- portal/student/services.py (950 lignes, toute la logique de donnees)
+- portal/student/widgets/academics.py, finance.py, profile.py
+- portal/student/profile_service.py (centre de gestion du compte)
+
+Acces : /portal/student-dashboard/. Filtrage naturel par etudiant connecte
+(get_student_academic_snapshot(user) -> student/enrollment/class/programme/
+annee/niveau/ECs/statut). Pas de notion d'"annexe transverse" ici puisque
+chaque etudiant ne voit que SES propres donnees -> pas de risque de fuite
+inter-annexe sur ce dashboard (contrairement au DE/Gestionnaire).
+
+----------------------------------------------------------------
+0. ARCHITECTURE GENERALE
+----------------------------------------------------------------
+- dashboard.html est un shell Alpine (x-data="studentDashboard()") avec
+  9 sections en x-show : overview, courses, schedule, messages, academics,
+  teachers, diplomas, shop, settings.
+- Chaque section (sauf overview) est chargee en lazy-load via HTMX la
+  premiere fois qu'on y navigue : attribut data-section-url +
+  data-section-loaded="0", puis ensureSectionLoaded(sectionKey) declenche
+  htmx.ajax(...) et bascule data-section-loaded a "1".
+- ✅ Le theme CSS (--school-primary: #1e4f6f, --school-secondary: #1db5b0,
+  --school-accent: #f39c12, palette dans dashboard.css :root) correspond
+  REELLEMENT a la palette compilee du projet (tailwind.config.js : primary
+  DEFAULT #1e4f6f, secondary #1db5b0, accent #f39c12). C'est un GROS point
+  positif compare au dashboard DE (qui charge Tailwind CDN avec une palette
+  bleu marine totalement differente). Le dashboard etudiant est visuellement
+  "raccorde" au reste du site.
+- ✅ Mode sombre fonctionnel : classe .dark-preview sur student-dashboard-page
+  qui re-definit toutes les variables CSS (surface/card/text/muted/...). Pas
+  un gadget cosmetique : ca couvre vraiment toutes les surfaces (topbar,
+  cartes, texte, bordures).
+- ✅ Responsive serieux : breakpoints 1199px / 991px / 640px qui reorganisent
+  la sidebar (off-canvas mobile), la grille academy, le lecteur de cours, etc.
+
+----------------------------------------------------------------
+1. ACCUEIL (section "overview")
+----------------------------------------------------------------
+- hero_student.html : salutation, mini-calendrier (mois courant, navigation
+  prev/next), carte "Prochain cours" (next_course), grille de
+  "priority_actions" (jusqu'a 4 cartes).
+- get_student_priority_actions(student, snapshot, next_course, stats) genere
+  des actions VRAIMENT dynamiques et utiles :
+  - prochain cours a venir
+  - completion du profil (% + lien vers Parametres si incomplet)
+  - messages non lus (lien vers Notifications)
+  - reste a payer (lien vers Finance, si > 0)
+  - statut academique (si "pending"/"error" -> message explicite)
+  - "Reprendre mes cours" (dernier contenu non termine)
+  ✅ Contrairement a beaucoup de dashboards "demo", ces cartes refletent
+  l'etat REEL de l'etudiant (pas de texte statique).
+- overview_schedule_quick.html : apercu du planning de la semaine (4
+  evenements max), bouton "Voir tout" -> goToSection('schedule', ...).
+- 🚩 stats_student.html existe (43 lignes, mini_stats/progress_bars/results)
+  mais n'est INCLUS NULLE PART. get_student_stats(student) calcule ces
+  donnees (utilisees ailleurs pour priority_actions) mais le template dedie
+  est mort. A confirmer si un futur dev voulait l'integrer dans l'accueil
+  (ca donnerait une vue "progression globale" en plus des priority actions).
+
+----------------------------------------------------------------
+2. MES COURS (section "courses" - vue "Academy")
+----------------------------------------------------------------
+- courses_student.html (242 lignes) : catalogue style "academy" avec filtres
+  Alpine (semestre, statut, recherche texte), pagination cote client,
+  cartes de cours (academy-cover-1..4 selon index, badges "verrouille"/
+  "obligatoire", barre de progression).
+- Chaque carte a 2 actions :
+  - "Apercu" -> openCoursePreview(ec_preview_url, titre) (si semestre
+    deverrouille)
+  - "Ouvrir" -> openCourseDetail(ec_detail_url, titre) (si semestre
+    deverrouille)
+- isSemesterUnlocked('{{ course.semester }}') (cote client) reflete
+  is_semester_unlocked_for_enrollment(enrollment, semester_number) (cote
+  serveur, dans ec_detail/ec_preview) -> ✅ coherent : meme si quelqu'un
+  bypass le JS, le serveur renvoie PermissionDenied pour un semestre
+  verrouille (403, pas juste un cache visuel).
+- ✅ _apply_course_semester_unlocks (services.py) calcule cet etat une
+  seule fois pour toute la liste -> pas de N requetes redondantes par carte.
+
+----------------------------------------------------------------
+3. LECTEUR DE COURS "ACADEMY" (overlay ec_detail / ec_preview)
+----------------------------------------------------------------
+- openCourseDetail() charge ec_detail (avec ?partial=1 -> rend
+  partials/ec_detail_panel.html) dans #studentCourseDetailBody, en plein
+  ecran (student-detail-shell.is-course-reader).
+- ec_detail_panel.html (135 lignes) : vrai lecteur "Academy" avec
+  Alpine "studentCourseImmersive()" (course_immersive.js) :
+  - sidebar "Playlist" : chapitres -> lecons, avec icone check pour les
+    lecons terminees, % de progression par lecon, barre de progression
+    globale (total_completed/total_active).
+  - zone principale : navigation Precedent/Suivant entre lecons
+    (prevLesson/nextLesson, bases sur l'ordre du player_bundle JSON),
+    affichage du titre de la lecon active.
+  - ec_content_lesson.html (103 lignes) gere TOUS les types de contenu :
+    video (fichier local OU embed externe OU URL directe), audio, image,
+    PDF (iframe), texte (whitespace-pre-line), document bureau (avec
+    fallback Office Online embed ou bouton "Ouvrir dans le lecteur" /
+    "Telecharger"). Bouton "Marquer termine" (data-complete-content) +
+    tracking auto de progression (data-track-content / data-media-progress-
+    content) pour video/audio/iframe/texte/image.
+  - "Lecteur integre" (docViewerUrl) : overlay plein ecran pour ouvrir un
+    fichier non-previsualisable dans un iframe.
+  ✅ C'est de loin la fonctionnalite la plus "produit fini" de tout
+  l'audit jusqu'ici : gestion fine des cas (chapitres vides, contenu non
+  publie, contenu sans ressource, etc.) avec des messages explicites a
+  chaque etat.
+- ec_preview.html (123 lignes) : version "allegee" affichee dans
+  openCoursePreview() (modale plus petite, is-course-preview). Choisit un
+  preview_content (priorite : has_inline_preview, sinon
+  has_accessible_source). Gere les memes types de contenu en plus compact,
+  avec lien "Ouvrir" -> openCourseDetail (bascule vers le lecteur complet).
+  ✅ Bonne separation "apercu rapide" vs "lecteur complet", logique view
+  (ec_preview) tres proche de ec_detail (memes controles d'acces /
+  verrouillage de semestre).
+- 🚩 Encodage : dans dashboard.js, performGlobalSearch() construit un
+  sous-titre de resultat avec un caractere mal encode :
+    `Semestre ${course.semester} Â· ${course.code}`
+  -> "Â·" au lieu de "·" (point median). Visible dans le panneau de
+  recherche globale (icone loupe en haut du dashboard) quand on tape un
+  nom de cours. Petit defaut visuel mais facilement repere si le DG fait
+  une recherche en live.
+
+----------------------------------------------------------------
+4. CALENDRIER (section "schedule")
+----------------------------------------------------------------
+- calendar_student.html (221 lignes) : planning hebdomadaire complet,
+  gere plusieurs cas de figure :
+  - emploi du temps base sur un "weekly template" si dispo
+  - sinon recherche de la semaine la plus proche avec des creneaux
+  - creneaux "extra" (hors template), jours vides, affectations non
+    planifiees signalees a part
+  - chaque evenement est colore/stylise selon son statut
+  ✅ Beaucoup plus robuste que le simple "tableau de creneaux" qu'on voit
+  sur d'autres dashboards : pas d'ecran vide si la semaine courante n'a
+  rien de programme.
+
+----------------------------------------------------------------
+5. NOTIFICATIONS (section "messages", libelle sidebar "Notifications")
+----------------------------------------------------------------
+- messages_student.html (156 lignes) : stats en tete (total / non lus /
+  par categorie), badges de categorie (_notification_category), liste
+  paginee avec marquer lu/non lu par item + "Tout marquer comme lu"
+  (mark_message_read/unread/mark_all_messages_read -> JsonResponse,
+  appellent CommunicationNotification).
+- Le compteur unread_messages_count alimente a la fois le badge de la
+  cloche dans la topbar et la priority action "messages non lus" sur
+  l'accueil. ✅ Coherent entre les 2 emplacements.
+- 🚩 A NOTER : la route "notifications_partial" (et son template
+  partials/notifications.html, 51 lignes) sont un chemin SEPARE et MORT
+  (voir section CODE MORT). C'est bien messages_partial / messages_student.html
+  qui est la vraie destination -> pas de bug fonctionnel, mais source de
+  confusion pour un futur dev qui tomberait sur "notifications_partial" en
+  pensant que c'est la bonne page.
+
+----------------------------------------------------------------
+6. MA SITUATION ACADEMIQUE (section "academics")
+----------------------------------------------------------------
+- academics.html (125 lignes) : carte identite (formation/classe/annee/
+  statut), carte synthese (credits/moyenne/valides/echoues+en attente),
+  cartes par semestre (semester_rows), tableau des notes (grade_rows).
+- get_student_results_summary(student) calcule moyenne ponderee,
+  validation_rate, compteurs valides/echoues/en attente, et regroupe par
+  semestre. get_student_academic_snapshot gere 3 etats (pending/error/
+  assigned) avec des academic_status_message explicites si l'etudiant n'a
+  pas encore d'inscription academique ou de classe assignee.
+  ✅ Tres bonne gestion des etats "incomplets" (un etudiant nouvellement
+  inscrit, pas encore affecte a une classe, voit un message clair plutot
+  qu'un tableau vide ou une erreur 500).
+
+----------------------------------------------------------------
+7. EQUIPE ENSEIGNANTE (section "teachers")
+----------------------------------------------------------------
+- teachers_student.html (170 lignes) : cartes enseignants construites a
+  partir de DirectorTeacherAssignment + WeeklyScheduleSlot +
+  AcademicScheduleEvent (get_student_teachers). Modal par enseignant avec
+  3 onglets : Profil / Creneaux / Contact.
+- ✅ Classes utilitaires Tailwind (primary-50, primary-700, etc.) bien
+  definies dans tailwind.config.js -> pas de classes "fantomes" ici
+  (verifie, contrairement a une suspicion initiale).
+
+----------------------------------------------------------------
+8. MES DIPLOMES (section "diplomas")
+----------------------------------------------------------------
+- diplomas_student.html (68 lignes) : liste des academic_diploma_awards
+  avec status in ("ready", "delivered"), liens vers
+  academics:diploma_award_detail / academics:diploma_award_pdf (URLs
+  verifiees, elles existent bien dans academics/urls.py).
+- 🚩🚩 BUG BLOQUANT (le plus important de tout cet audit) : la section
+  "diplomas" affiche en PERMANENCE "Chargement des diplomes..." et ne se
+  charge JAMAIS.
+  Cause precise : dashboard.js, fonction ensureSectionLoaded(sectionKey)
+  (lignes ~506-518) ne gere QUE :
+    courses, schedule, messages, academics, settings, shop
+  -> "diplomas" est ABSENT de cette liste, donc idsToLoad reste vide et
+  l'appel htmx.ajax(...) qui chargerait diplomas_partial n'est jamais
+  declenche, meme si l'utilisateur clique sur "Mes diplomes" dans le menu.
+  Le template diplomas_student.html, la vue diplomas_partial, l'URL et le
+  modele sont tous fonctionnels -> il manque UNE ligne :
+    if (sectionKey === "diplomas") idsToLoad.push("diplomas");
+  -> A CORRIGER EN PRIORITE ABSOLUE avant la presentation : c'est un item
+  du menu principal qui semble "casse" a l'oeil nu (spinner infini), pour
+  un correctif d'une ligne.
+
+----------------------------------------------------------------
+9. BOUTIQUE (section "shop")
+----------------------------------------------------------------
+- shop_orders_student.html (point d'entree de la section "shop") : 3
+  sous-onglets Alpine (Mes commandes / Mon panier / Catalogue), chacun
+  charge en lazy-load (shop-cart-target / shop-catalog-target) via
+  htmx.ajax au premier clic.
+- shop_catalog_student.html : grille de produits (image ou icone
+  "package"), badge stock (is_low_stock), badge "Obligatoire"
+  (is_required), formulaire POST -> shop:student_create_required_order.
+- shop_cart_student.html : commandes en attente de paiement
+  (pending_orders), total_due, lien vers le detail de commande.
+- Lien externe "Vitrine" -> shop:public_catalog (nouvel onglet,
+  target="_blank") : ✅ correctement marque comme externe (icone
+  external-link) contrairement au module "Passages" du dashboard DE qui
+  ne l'etait pas.
+- ✅ "Commander un article" ouvre shop:student_required_modal en HTMX dans
+  #shop-order-modal-target -> integration propre, pas de redirection
+  pleine page.
+- A VERIFIER en live : le fil "commande -> shop:student_order_detail ->
+  hx-target=#shop" suppose que le detail de commande sait revenir
+  correctement vers les 3 onglets (orders/cart/catalog) sans casser l'etat
+  Alpine "shopTab". A tester une fois en cliquant sur une commande puis en
+  revenant en arriere.
+
+----------------------------------------------------------------
+10. PARAMETRES (section "settings" - centre de gestion du compte)
+----------------------------------------------------------------
+- settings_student.html (213 lignes) : banniere de completion du profil
+  (get_profile_completion -> percent + alert_level + message), 5 onglets :
+  Profil / Academique / Documents / Finance / Compte.
+  - Profil : update_settings_profile (email/telephone, valides via
+    update_editable_fields).
+  - Documents : liste get_student_documents (manquant/en_attente/valide
+    par rapport aux documents requis de la formation), upload via
+    update_settings_document (hx-encoding="multipart/form-data" -> ✅
+    correctement configure pour l'upload de fichier en HTMX).
+  - Finance : INCLUT finance.html (get_finance_widget -> total_du/total_paye/
+    reste, 6 derniers paiements). C'est le SEUL endroit ou finance.html est
+    reellement utilise.
+  - Compte : update_settings_account (localisation/adresse/bio) +
+    update_settings_preferences (notifications email/in-app/sms, mode
+    compact, sidebar repliee, autorefresh) + update_settings_password
+    (avec validation Django standard + reset du flag must_change_password).
+- ✅ profile_service.py est propre et complet : completion de profil basee
+  sur des criteres reels (champs candidature + documents obligatoires +
+  affectation academique), messages d'alerte a 3 niveaux (success/warning/
+  critical), toutes les vues update_settings_* repassent par
+  _render_settings_response pour re-rendre settings_student.html a jour
+  (pas de redirection complete, coherent avec le HTMX).
+- 🚩 widgets/profile.py (get_profile_widget) est DEAD CODE : seule la vue
+  profile_partial (elle-meme jamais liee dans aucun template/menu)
+  l'utilise. Le VRAI "profil" est gere par profile_service.get_profile_data,
+  utilise par settings_partial. -> get_profile_widget + profile_partial +
+  partials/profile.html (3 fichiers) forment une chaine morte parallele.
+
+----------------------------------------------------------------
+11. PAGES HORS-DASHBOARD (plein ecran, hors SPA HTMX)
+----------------------------------------------------------------
+- portal/student/courses.html (102 lignes) et portal/student/ec_detail.html
+  (34 lignes) sont des templates "plein page" (extends base.html, SANS
+  vider les blocs public_navbar/public_footer/public_floating_widget,
+  contrairement a dashboard.html qui les vide explicitement).
+- Ils correspondent aux vues student_courses (URL
+  portal_student:student_courses) et ec_detail SANS ?partial=1.
+- D'apres le code analyse, le flux normal du dashboard (cartes "Mes cours"
+  -> openCoursePreview/openCourseDetail) utilise TOUJOURS ec_detail/
+  ec_preview avec ?partial=1, donc reste dans l'overlay HTMX. Le seul lien
+  trouve vers ces pages "plein ecran" est ec_detail.html -> bouton "Retour
+  aux matieres" -> student_courses (boucle interne entre les 2 pages
+  plein-ecran).
+- 🚩 A VERIFIER : si un etudiant atteint ces pages (lien direct, favori,
+  ancien lien partage, etc.), il verra la navbar/footer DU SITE PUBLIC
+  au-dessus/en-dessous d'un contenu stylise "dashboard" (variables CSS
+  --school-*), ce qui donnera un rendu hybride incoherent. Soit ces 2
+  templates devraient aussi vider public_navbar/public_footer/
+  public_floating_widget comme dashboard.html, soit ces routes/templates
+  sont des vestiges d'une version anterieure du dashboard (avant le
+  passage au tout-HTMX) et pourraient etre retires si plus utilises.
+
+----------------------------------------------------------------
+12. CODE MORT RECAPITULATIF
+----------------------------------------------------------------
+Templates jamais inclus / vues jamais liees depuis un menu ou un lien :
+- partials/stats_student.html (43 lignes) - donnees calculees
+  (get_student_stats) mais template jamais rendu.
+- partials/profile.html + vue profile_partial + URL profile_partial +
+  widgets/profile.get_profile_widget -> chaine morte parallele a
+  profile_service (le vrai centre de profil est dans "settings").
+- partials/notifications.html (51 lignes) + vue notifications_partial +
+  URL notifications_partial + widgets/notifications.get_notifications_widget
+  -> chaine morte; la vraie page "Notifications" est messages_student.html
+  via messages_partial.
+- partials/courses_preview_student.html - a verifier l'usage, aucune
+  reference trouvee dans les templates audites (probable reliquat d'une
+  ancienne version de l'apercu de cours, remplace par ec_preview.html).
+- partials/notifications_dropdown.html - nom en collision avec
+  communication/partials/notifications_dropdown.html (le vrai dropdown de
+  notifications globales utilise dans la topbar). Celui sous
+  portal/student/partials/ semble etre un doublon non utilise.
+- partials/notification_detail_drawer.html, partials/events_student.html -
+  aucune reference trouvee, probables reliquats.
+
+================================================================
+CE QUI MARCHE VRAIMENT (points forts a montrer au DG)
+================================================================
+✅ Theme visuel parfaitement aligne avec la palette officielle du projet
+   (#1e4f6f / #1db5b0 / #f39c12) -> contrairement au dashboard DE, aucune
+   rupture de charte graphique en changeant de dashboard.
+✅ Mode sombre reellement fonctionnel sur l'ensemble du dashboard.
+✅ Lecteur de cours "Academy" tres complet : playlist par chapitres,
+   navigation precedent/suivant, suivi de progression par lecon, support
+   de tous les formats (video/audio/image/PDF/texte/documents bureau avec
+   fallback Office Online), marquage "termine".
+✅ Verrouillage des semestres coherent cote client (boutons grises) ET
+   cote serveur (PermissionDenied si on force l'URL d'un semestre
+   verrouille).
+✅ "Priority actions" sur l'accueil 100% dynamiques (prochain cours,
+   profil incomplet, messages non lus, reste a payer, statut academique,
+   reprise de cours) -> pas de placeholder statique.
+✅ Gestion academique robuste face aux etats incomplets (etudiant pas
+   encore affecte a une classe -> message clair, pas d'erreur/ecran vide).
+✅ Planning hebdomadaire qui gere les cas limites (pas de template, semaine
+   sans creneaux, creneaux hors-template, affectations non planifiees).
+✅ Centre de parametres (5 onglets) complet et coherent : profil, documents
+   (upload multipart fonctionnel), finance, preferences, mot de passe.
+✅ Boutique integree en HTMX (catalogue/panier/commandes/modale obligatoire)
+   sans rupture de SPA, avec un lien "Vitrine" correctement marque comme
+   externe.
+
+================================================================
+CE QUI EST PROBLEMATIQUE / A AMELIORER
+================================================================
+🚩 1. BUG BLOQUANT - "Mes diplomes" ne se charge JAMAIS : il manque une
+   ligne dans ensureSectionLoaded() (static/portal/student/dashboard.js,
+   ~ligne 506-518) :
+     if (sectionKey === "diplomas") idsToLoad.push("diplomas");
+   Sans ca, le clic sur "Mes diplomes" dans le menu laisse affiche
+   indefiniment "Chargement des diplomes...". Tout le reste (vue, URL,
+   template, modele) fonctionne -> correctif d'une ligne, IMPACT VISUEL
+   ELEVE en demo. A CORRIGER EN PRIORITE.
+
+🚩 2. Encodage casse dans la recherche globale (dashboard.js,
+   performGlobalSearch, ~ligne 350) : "Â·" au lieu de "·" dans le
+   sous-titre des resultats "Cours". A corriger (probleme d'encodage du
+   fichier source, remplacer par le bon caractere ou par un "-").
+
+🚩 3. performGlobalSearch() ne pre-charge que
+   ["courses","schedule","messages","academics","settings"] (ligne ~326)
+   avant de chercher -> "shop" et "diplomas" ne sont jamais inclus dans les
+   resultats de recherche globale meme une fois ces sections visitees.
+   Impact mineur (la recherche globale ne couvre pas la boutique/les
+   diplomes), mais incoherent avec l'intitule "recherche globale".
+
+🚩 4. partials/stats_student.html (vue "progression globale" avec
+   mini_stats/progress_bars/results) est calcule par get_student_stats()
+   mais n'est inclus dans AUCUNE section -> donnee prete, UI non branchee.
+   Pourrait enrichir l'accueil si le temps le permet (sinon, code mort a
+   nettoyer).
+
+🚩 5. Plusieurs chaines mortes (vue + URL + template, parfois + widget) :
+   - profile_partial / partials/profile.html / widgets/profile.py
+     (get_profile_widget) - doublon non utilise de profile_service.
+   - notifications_partial / partials/notifications.html /
+     widgets/notifications.py (get_notifications_widget) - doublon non
+     utilise de messages_partial.
+   - partials/courses_preview_student.html, partials/notifications_dropdown.html
+     (collision de nom avec le vrai dropdown communication/),
+     partials/notification_detail_drawer.html, partials/events_student.html.
+   -> Sans impact utilisateur direct, mais source de confusion pour la
+   maintenance ("est-ce que je dois modifier celui-ci ou celui-la ?").
+   A nettoyer si le temps le permet, pas urgent pour lundi.
+
+🚩 6. Pages "plein ecran" portal/student/courses.html et
+   portal/student/ec_detail.html n'effacent pas les blocs
+   public_navbar/public_footer/public_floating_widget (contrairement a
+   dashboard.html). Le flux normal (overlay HTMX avec ?partial=1) ne les
+   atteint pas, mais si un lien direct/ancien y mene, le rendu sera
+   hybride (navbar publique + style dashboard). A verifier si ces routes
+   sont encore censees etre accessibles ; si oui, harmoniser comme
+   dashboard.html, si non, envisager leur suppression.
+
+🚩 7. A TESTER EN LIVE : navigation commande -> shop:student_order_detail
+   (hx-target="#shop") -> retour vers les onglets Mes commandes/Panier/
+   Catalogue. Le swap remplace tout #shop, donc l'etat Alpine local
+   "shopTab" et les data-loaded des sous-onglets (cart/catalog) sont
+   probablement reinitialises a chaque retour -> a confirmer que ce n'est
+   pas gênant (re-chargement du panier/catalogue a chaque fois qu'on revient
+   d'une commande, simplement un peu de latence supplementaire).
+
+================================================================
+RESUME POUR LA PRESENTATION DE LUNDI
+================================================================
+Le dashboard ETUDIANT est, dans l'ensemble, le PLUS ABOUTI et le PLUS
+COHERENT visuellement de tous les dashboards audites jusqu'ici : theme
+aligne avec le site, mode sombre fonctionnel, lecteur de cours "Academy"
+tres complet et bien pense (chapitres/lecons/progression/multi-format),
+verrouillage de semestres coherent client+serveur, planning et situation
+academique qui gerent bien les cas limites.
+
+Par ordre de priorite avant lundi :
+  1) CORRIGER LE BUG "Mes diplomes" (1 ligne dans dashboard.js,
+     ensureSectionLoaded) -> sans ca, un item du menu principal semble
+     casse a l'oeil nu (spinner infini). PRIORITE ABSOLUE, 5 min.
+  2) Corriger l'encodage "Â·" -> "·" dans performGlobalSearch (dashboard.js).
+     2 min, evite un detail "sale" si le DG teste la recherche.
+  3) Tester en live le flux Boutique : commande -> detail -> retour vers
+     les onglets (verifier que rien ne reste bloque/charge en double).
+  4) Si le temps le permet : decider du sort des chaines mortes
+     (profile_partial / notifications_partial / templates orphelins) et
+     des pages plein-ecran courses.html / ec_detail.html (harmoniser ou
+     supprimer).
+  5) Optionnel : brancher partials/stats_student.html sur l'accueil pour
+     une vue "progression globale" supplementaire (donnees deja calculees
+     par get_student_stats).

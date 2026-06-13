@@ -8,9 +8,19 @@
     {% for item in pending_documents_rows %}
     <div class="sg-action-card">
       <div><div class="sg-action-label">{{ item.title }}</div><div class="sg-action-sub">{{ item.submitted_by_name }} - {{ item.received_at|date:"d/m H:i" }}</div></div>
-      <span class="sg-badge-sm sg-badge-amber">{{ item.get_status_display }}</span>
+      <form method="post" hx-post="{% url 'secretary:document_receipt_start' item.id %}" hx-target="closest .sg-action-card" hx-swap="outerHTML swap:180ms" data-sg-optimistic="fade-remove">{% csrf_token %}
+        <button class="sg-btn sg-btn-success" style="height:28px;font-size:.65rem;"><i class="fa-solid fa-hand-holding"></i>Prendre en charge</button>
+      </form>
     </div>
-    {% empty %}<div class="sg-empty">Aucune piece en attente.</div>{% endfor %}
+    {% empty %}
+    <div class="sg-empty">
+      <div class="sg-empty-icon"><i class="fa-solid fa-box-archive"></i></div>
+      <div class="sg-empty-text">Aucune piece en attente.</div>
+      <button type="button" class="sg-btn sg-btn-outline sg-empty-action" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+        <i class="fa-solid fa-plus"></i>Nouveau depot
+      </button>
+    </div>
+    {% endfor %}
   </div>
   {% if documents_page.has_other_pages %}
     <div class="sg-pagination">

@@ -1,0 +1,520 @@
+=================================================================
+ANALYSE CRITIQUE DU DASHBOARD ENSEIGNANT — CE QUI CLOCHE VRAIMENT
+ESFE - École de Santé FHB - Mali
+=================================================================
+
+ATTENTION : Ce qui suit est une analyse honnête. Le dashboard
+a été récemment amélioré (édition, suppression, présence) mais
+il reste des points à vérifier avant production.
+
+=================================================================
+1. CE QUI MARCHE VRAIMENT (les points solides)
+=================================================================
+
+✅ Filtrage par annexe — Tous les querysets utilisent le branch
+   de l'utilisateur. Un enseignant ne voit que ses classes, ses
+   ECs, ses contenus. Scope rigoureux.
+
+✅ Lecture des données en temps réel — KPIs, planning, classes,
+   honoraires, cahiers de texte : tout vient de la base. Rien
+   en dur.
+
+✅ Dépot de support de cours — L'enseignant peut uploader des
+   fichiers (PDF, DOC, Excel, PPT, Image, Audio), des URLs vidéo
+   (YouTube, Vimeo), ou du texte. Validation extension + MIME.
+   Chapitres créés à la volée. Fonctionnel.
+
+✅ Cahier de texte (lesson log) — Création et mise à jour avec
+   statut (Fait/Annulé/Planifié), contenu du cours, devoirs,
+   observations. Lié au schedule_event. Fonctionnel.
+
+✅ Honoraires — L'enseignant voit ses heures du mois, total année,
+   bordereaux en attente/payés, montant brut, tarif horaire, et
+   les paiements récents avec date et montant. Données réelles.
+
+✅ Planning hebdomadaire — Vue des cours planifiés avec créneaux
+   horaires, salles, actions rapides.
+
+✅ Édition d'un support (AJOUTÉ) — L'enseignant peut modifier le
+   titre, le chapitre, le type, le fichier/l'URL/le texte d'un
+   contenu déjà uploadé. Formulaire pré-rempli.
+
+✅ Suppression d'un support (AJOUTÉ) — Soft-delete via is_active=False.
+   Confirmation JavaScript. Le contenu n'est plus visible mais reste
+   en base.
+
+✅ Présence enseignant (AJOUTÉ) — Case à cocher dans le cahier de
+   texte "Je certifie être présent(e) pour cette séance". Crée
+   un enregistrement TeacherAttendance avec le schedule_event.
+
+✅ Navigation par onglets — 8 sections accessibles : Accueil,
+   Mes classes, Supports, Planning, Cahier texte, Honoraires,
+   Notifications, Paramètres. UX fluide avec drawer HTMX.
+
+✅ Dashboard preferences — Mode sombre, sidebar, compact, section
+   par défaut. Persistant en base.
+
+✅ Export des supports — Les fichiers sont stockés et accessibles.
+   L'enseignant peut les ouvrir/télécharger.
+
+=================================================================
+2. CE QUI EST PROBLÉMATIQUE (les défauts)
+=================================================================
+
+🚩 PROBLÈME #1 — PAS DE SUIVI DES ÉTUDIANTS PAR L'ENSEIGNANT
+   Fichier : portal/views/views.py:teacher_class_detail()
+
+   L'enseignant voit ses classes, mais il ne peut PAS voir
+   les notes de ses étudiants, ni leurs absences, ni leur
+   progression. La vue "détail classe" montre les infos de
+   base (effectif, programme, créneaux) mais pas de données
+   pédagogiques.
+
+   Ce que l'enseignant NE PEUT PAS faire depuis son dashboard :
+   • Voir les notes des étudiants à sa matière
+   • Saisir/éditer des notes
+   • Voir le relevé d'absences des étudiants
+   • Voir la progression individuelle
+   • Communiquer avec les étudiants (pas de messagerie)
+
+   Pourtant dans la vraie vie, un enseignant a besoin de ça
+   pour savoir où en sont ses élèves.
+
+🚩 PROBLÈME #2 — PAS D'ÉDITION DU CHAPITRE
+   Les chapitres sont créés à la volée lors du dépot, mais
+   il n'y a AUCUN moyen de :
+   • Renommer un chapitre
+   • Supprimer un chapitre vide
+   • Réordonner les chapitres (drag & drop)
+
+   Si un enseignant crée "Chapitre 1" puis "Chapitre 3" en
+   oubliant le 2, il est coincé.
+
+🚩 PROBLÈME #3 — ORGANISATION DES SUPPORTS LIMITÉE
+   La table des supports montre les contenus groupés par
+   chapitre, mais :
+   • Pas de tri manuel des contenus dans un chapitre
+   • Pas de vue "tous les supports" de la matière
+   • Pas de recherche dans les supports (important quand
+     on a 50+ fichiers)
+   • Pas de vignette/preview pour les fichiers autres
+     que PDF ou vidéo
+
+🚩 PROBLÈME #4 — HONORAIRES : PAS DE DÉTAIL PAR MOIS
+   L'enseignant voit ses honoraires mais ne peut PAS :
+   • Voir le détail des heures validées (quelles séances ?)
+   • Voir l'historique des bordereaux signés
+   • Télécharger un relevé d'honoraires PDF
+   • Voir le calcul du montant net (après retenues ?)
+
+   Le tarif horaire est affiché mais l'enseignant ne peut
+   pas savoir si le calcul est correct.
+
+🚩 PROBLÈME #5 — CAHIER DE TEXTE : PAS DE VALIDATION
+   Le cahier de texte est enregistré mais :
+   • Pas de workflow de validation (personne ne vérifie
+     que le cahier est correct)
+   • Pas de notification en cas de cahier en retard
+   • Pas d'export PDF du cahier de texte
+   • Pas d'historique des modifications (les anciennes
+     versions sont perdues)
+
+   Pourtant le cahier de texte est un document officiel
+   qui devrait être tracé.
+
+🚩 PROBLÈME #6 — PAS DE GESTION DES ABSENCES ENSEIGNANT
+   L'enseignant peut maintenant marquer sa présence (case
+   à cocher), mais :
+   • Pas de justificatif en cas d'absence
+   • Pas de workflow "déclarer une absence" (prévenir
+     l'administration)
+   • Pas de vue calendrier des présences/absences
+   • Pas de notification automatique au secrétariat si
+     l'enseignant est absent
+
+   L'enseignant est soit présent, soit rien. En cas
+   d'absence imprévue, il n'y a aucun moyen de le signaler
+   depuis le dashboard.
+
+🚩 PROBLÈME #7 — NOTIFICATIONS PEU EXPLOITÉES
+   L'onglet Notifications existe et affiche les notifications,
+   mais :
+   • Pas de notification push (WebSocket) temps réel
+   • Pas d'email quand un cours est modifié/annulé
+   • Pas de notification quand les honoraires sont payés
+   • Pas de rappel pour le cahier de texte en retard
+   • Pas de notification de la part de l'administration
+
+   Les notifications sont juste stockées en base et
+   doivent être lues manuellement.
+
+🚩 PROBLÈME #8 — PAS DE COMMUNICATION AVEC L'ADMINISTRATION
+   L'enseignant ne peut PAS :
+   • Envoyer un message au secrétariat
+   • Poser une question au directeur des études
+   • Signaler un problème (salle, matériel, emploi du temps)
+   • Voir les annonces de l'administration
+
+   Aucun canal de communication intégré au dashboard.
+
+🚩 PROBLÈME #9 — PAS DE SYNC HONORAIRES / SÉANCES RÉELLES
+   Les honoraires sont basés sur TeacherHonorariumEntry
+   (créé par le gestionnaire), pas sur les séances
+   réellement effectuées par l'enseignant.
+
+   Idéalement, quand l'enseignant marque "Fait" dans le
+   cahier de texte + "Présent", les heures devraient être
+   automatiquement comptabilisées pour ses honoraires.
+   Actuellement, c'est le gestionnaire qui saisit les
+   heures manuellement dans TeacherHonorariumEntry.
+
+   L'enseignant subit ses honoraires, il ne les déclare pas.
+
+🚩 PROBLÈME #10 — PAS DE STATISTIQUES PERSONNELLES
+   L'enseignant n'a pas de vue synthétique sur :
+   • Son taux de présence (présent/retard/absent)
+   • Son nombre de séances effectuées vs planifiées
+   • La progression dans le programme (% du cours couvert)
+   • Le nombre d'étudiants par classe
+   • La moyenne de ses classes
+
+   La section Accueil donne quelques KPIs mais pas de
+   tableau de bord personnel consolidé.
+
+=================================================================
+3. CE QU'IL FAUDRAIT POUR QUE CE SOIT VRAIMENT UN DASHBOARD
+ENSEIGNANT
+=================================================================
+
+Actions métier réelles à implémenter :
+  • Gestion des notes (saisie, édition, visualisation par classe)
+  • Communication (messagerie administration, signalement)
+  • Déclaration d'absence avec justificatif
+  • Export PDF du cahier de texte
+  • Export PDF relevé d'honoraires
+  • Vue étudiants (liste, progression, notes)
+
+Améliorations UX :
+  • Tri et recherche dans les supports
+  • Drag & drop réorganisation chapitres/contenus
+  • Vignettes/preview pour tous les types de fichiers
+  • Calendrier présence/absence
+
+Données réelles :
+  • Stats personnelles : taux présence, séances effectuées
+  • Sync séances faites → honoraires
+  • Notifications push WebSocket
+
+Qualité du code :
+  • Tests unitaires pour les actions récemment ajoutées
+  • Vérification que l'édition/suppression gère bien les
+    fichiers orphelins (nettoyage storage)
+  • Gestion d'erreurs dans les templates (si un fichier
+    manque sur le disque mais est référencé en base)
+
+=================================================================
+4. INVENTAIRE COMPLET DE TOUT CE QUI EST PRÉSENT
+=================================================================
+
+[4.1] SECTIONS DU DASHBOARD (8 onglets)
+---------------------------------------
+
+  Accueil (overview) :
+    • KPIs : nombre de classes, cours du jour, cahiers en attente
+    • Cours du jour avec bouton "Cahier"
+    • Cours à venir
+    • Derniers cahiers de texte (3 derniers)
+    • Derniers supports déposés
+    • Actions rapides : déposer, cahier, planning, honoraires
+    • Points d'attention (cahiers en attente, supports manquants)
+    ✅ Fonctionnel
+
+  Mes classes (classes) :
+    • Tableau des classes : programme, effectif, matières,
+      séances, prochaine séance, actions (Aperçu, Cahier)
+    • Drawer détail classe : infos planning, étudiants, matières
+    ✅ Fonctionnel
+    ❌ Manque : notes des étudiants, absences, progression
+
+  Supports (supports) :
+    • Sélection classe → matière
+    • Création de chapitres
+    • Upload fichier / URL vidéo / texte
+    • Tableau des contenus par chapitre
+    • Boutons : Ouvrir, Éditer (AJOUTÉ), Supprimer (AJOUTÉ)
+    • Formulaire édition pré-rempli (AJOUTÉ)
+    ✅ Fonctionnel (après ajouts)
+    ❌ Manque : tri, recherche, réorganisation chapitres
+
+  Planning (schedule) :
+    • Vue semaine : événements par jour
+    • Créneaux horaires, salles
+    • Bouton "Cahier" par événement
+    ✅ Fonctionnel
+
+  Cahier texte (logs) :
+    • Cahiers en attente (alerte rouge)
+    • Derniers cahiers avec statut
+    • Drawer édition : statut, contenu, devoirs, observations
+    • Case à cocher présence enseignant (AJOUTÉ)
+    ✅ Fonctionnel (après ajouts)
+    ❌ Manque : export PDF, validation, historique versions
+
+  Honoraires (salary) :
+    • Stats : heures mois, total année, bordereaux en attente/payés
+    • Tableau : mois, heures, tarif, montant brut, statut
+    • Paiements récents (date, montant)
+    ✅ Fonctionnel
+    ❌ Manque : détail par séance, export, calcul net
+
+  Notifications :
+    • Liste des notifications lues/non lues
+    ✅ Fonctionnel
+    ❌ Manque : push temps réel, email, rappels
+
+  Paramètres (settings) :
+    • Profil (nom, email, téléphone, spécialité, tarif)
+    • Mode sombre, sidebar, compact, section par défaut
+    • Liens : modifier profil, changer mot de passe
+    ✅ Fonctionnel
+
+[4.2] BOUTONS ET ACTIONS QUI MARCHENT
+--------------------------------------
+
+  Navigation :
+    • 8 onglets avec changement de section via ?section=
+    ✓ Marche
+
+  Supports :
+    • Sélection classe (boutons cliquables)
+    • Sélection matière (boutons cliquables)
+    • Créer chapitre (action POST)
+    • Déposer support (upload fichier/URL/texte)
+    • Ouvrir support (drawer viewer)
+    • Éditer support (AJOUTÉ, formulaire pré-rempli)
+    • Supprimer support (AJOUTÉ, confirmation + soft-delete)
+    ✓ Marche
+
+  Classes :
+    • Aperçu classe (drawer avec infos)
+    • Cahier (lien vers section logs)
+    ✓ Marche
+
+  Planning :
+    • Cahier (drawer édition cahier de texte)
+    ✓ Marche
+
+  Cahier texte :
+    • Créer / Mettre à jour (status, contenu, devoirs, obs.)
+    • Marquer présence (AJOUTÉ)
+    ✓ Marche
+
+  Honoraires :
+    • Consultation (tableau + paiements récents)
+    ✓ Marche
+
+  Paramètres :
+    • Sauvegarder préférences
+    ✓ Marche
+
+[4.3] BOUTONS MANQUANTS OU À AMÉLIORER
+---------------------------------------
+
+  • Pas de bouton "Exporter" dans Cahier texte
+  • Pas de bouton "Voir notes" dans Mes classes
+  • Pas de bouton "Déclarer absence"
+  • Pas de bouton "Contacter administration"
+  • Pas de recherche dans Supports
+  • Pas de tri dans Supports
+  • Pas de réorganisation des chapitres
+
+[4.4] DONNÉES EN DUR (hardcodées) — VÉRIFIÉ
+---------------------------------------------
+
+  • Aucune donnée en dur trouvée. Tous les chiffres viennent
+    de la base de données. RAS.
+  ✅ Propre
+
+=================================================================
+5. RÉSUMÉ CHIFFRÉ
+=================================================================
+
+  ✓ KPIs réels depuis la base : ~25 indicateurs
+  ✓ Actions qui marchent vraiment : ~15 (navigation, CRUD)
+  ✓ Fonctionnalités ajoutées (cette session) : 3 (éditer,
+    supprimer, présence)
+  ✗ Fonctionnalités métier manquantes importantes : ~6
+    (notes, messagerie, absence, export, sync honoraires,
+    stats personnelles)
+  ✗ Améliorations UX souhaitables : ~5 (tri, recherche,
+    réorganisation, preview, calendrier)
+  ✗ Workflow validation manquant : 1 (cahier de texte validé)
+
+=================================================================
+6. VERDICT
+=================================================================
+
+Le dashboard enseignant est solide sur les bases :
+  ✓ Navigation fluide (HTMX, 8 onglets)
+  ✓ CRUD supports complet (déposer + éditer + supprimer)
+  ✓ Cahier de texte fonctionnel avec présence
+  ✓ Honoraires lisibles
+  ✓ Filtrage par annexe rigoureux
+  ✓ Aucune donnée en dur
+
+Mais il reste un dashboard de GESTION DE CONTENU, pas un
+véritable outil pédagogique :
+
+  ✗ L'enseignant ne peut pas suivre ses étudiants (notes,
+    absences, progression)
+  ✗ L'enseignant ne peut pas communiquer avec l'administration
+  ✗ L'enseignant ne peut pas déclarer une absence
+  ✗ Les honoraires ne sont pas liés aux séances réellement
+    effectuées
+  ✗ Pas d'export ni de validation du cahier de texte
+
+C'est un dashboard de CONSULTATION + DÉPOT, pas un outil
+de TRAVAIL PÉDAGOGIQUE AU QUOTIDIEN.
+
+Pour la production :
+  ✅ Le dashboard est utilisable en l'état (un enseignant
+     peut déposer ses cours, remplir son cahier, voir ses
+     honoraires)
+  ⚠️ Mais pour être un vrai outil de travail, il manque
+     les notes et la communication
+
+=================================================================
+7. CE QUE L'ENSEIGNANT DEVRAIT VRAIMENT POUVOIR FAIRE
+=================================================================
+
+   RAPPEL : Un enseignant a 3 missions principales :
+   1. ENSEIGNER (préparer, dispenser, évaluer)
+   2. TRACER (cahier de texte, progression)
+   3. SE SIGNALER (absences, problèmes, besoins)
+
+   MISSION 1 — ENSEIGNER
+   ──────────────────────
+   • Déposer ses cours (supports)              ✅ fait
+   • Éditer/supprimer ses cours                ✅ fait
+   • Saisir les notes des étudiants            ❌ manque
+   • Voir la progression de ses classes        ❌ manque
+   • Voir les absences de ses étudiants        ❌ manque
+   • Planifier ses séances                     ⚠️ partiel (lecture)
+
+   MISSION 2 — TRACER
+   ──────────────────
+   • Remplir le cahier de texte                ✅ fait
+   • Marquer sa présence                       ✅ fait
+   • Exporter le cahier de texte               ❌ manque
+   • Voir ses honoraires                       ✅ fait
+   • Exporter son relevé d'honoraires          ❌ manque
+   • Voir son historique de présence           ❌ manque
+
+   MISSION 3 — COMMUNIQUER
+   ────────────────────────
+   • Signaler une absence                      ❌ manque
+   • Contacter l'administration                ❌ manque
+   • Voir les annonces                         ❌ manque
+   • Recevoir les notifications push           ❌ manque
+
+=================================================================
+8. PRIORITÉS POUR LA PRODUCTION
+=================================================================
+
+   PRIORITÉ 1 — Indispensable avant production
+   ────────────────────────────────────────────
+   • Gestion des notes étudiantes (saisie/édition par EC et
+     par classe) — C'est LE minimum pour un enseignant
+   • Déclaration d'absence avec justificatif — vital pour
+     l'administration
+
+   PRIORITÉ 2 — Très souhaitable
+   ──────────────────────────────
+   • Communication administration (messagerie intégrée)
+   • Notifications réelles (WebSocket)
+   • Vue liste des étudiants avec progression
+
+   PRIORITÉ 3 — Confort
+   ─────────────────────
+   • Export PDF cahier de texte
+   • Export PDF relevé d'honoraires
+   • Recherche dans les supports
+   • Réorganisation chapitres/contenus
+   • Sync séances faites → honoraires
+   • Calendrier présence/absence
+   • Statistiques personnelles (taux présence, séances faites)
+
+=================================================================
+9. CE QUI A ÉTÉ AJOUTÉ CETTE SESSION
+=================================================================
+
+   AVANT :
+   ┌───────────────────────────────────────┬──────────┐
+   │ Fonctionnalité                        │ Statut   │
+   ├───────────────────────────────────────┼──────────┤
+   │ Voir les honoraires payés             │ ✅ OK    │
+   │ Déposer un support de cours           │ ✅ OK    │
+   │ Cahier de texte (cours fait/annulé)   │ ✅ OK    │
+   │ Supprimer un support                  │ ❌        │
+   │ Éditer un support                     │ ❌        │
+   │ Marquer sa présence                   │ ❌        │
+   └───────────────────────────────────────┴──────────┘
+
+   APRÈS :
+   ┌───────────────────────────────────────┬──────────┐
+   │ Fonctionnalité                        │ Statut   │
+   ├───────────────────────────────────────┼──────────┤
+   │ Voir les honoraires payés             │ ✅ OK    │
+   │ Déposer un support de cours           │ ✅ OK    │
+   │ Cahier de texte (cours fait/annulé)   │ ✅ OK    │
+   │ Supprimer un support                  │ ✅ AJOUTÉ│
+   │ Éditer un support                     │ ✅ AJOUTÉ│
+   │ Marquer sa présence                   │ ✅ AJOUTÉ│
+   └───────────────────────────────────────┴──────────┘
+
+   Fichiers modifiés :
+   • portal/services/teacher_dashboard_service.py
+     — get_teacher_content_for_edit()
+     — update_teacher_content()
+     — delete_teacher_content()
+     — build_teacher_lesson_log_context() → teacher_marked_present
+   • portal/views/views.py
+     — teacher_support_workspace() : 3 actions (fetch/edit/delete)
+     — teacher_lesson_log_panel() : traitement mark_present
+   • templates/portal/partials/teacher_support_workspace.html
+     — Boutons Éditer/Supprimer, formulaire pré-rempli
+   • templates/portal/partials/teacher_lesson_log_panel.html
+     — Checkbox présence enseignant
+
+=================================================================
+10. NOTE FINALE
+=================================================================
+
+   Le dashboard enseignant a une base saine : pas de données
+   en dur, pas de boutons complètement morts, un CRUD complet
+   sur les supports, un cahier de texte fonctionnel avec suivi
+   de présence, des honoraires lisibles.
+
+   Il est MEILLEUR que le dashboard DG sur plusieurs points :
+   • Pas de données factices (DG a 8 valeurs en dur)
+   • Pas de boutons morts (DG en a 20)
+   • Actions qui font vraiment ce qu'elles disent
+   (DG a 4 actions superficielles)
+
+   Ce qui lui manque, c'est le CŒUR DU MÉTIER : la relation
+   enseignant-étudiant. Pas de notes, pas de suivi, pas de
+   communication.
+
+   Pour la production immédiate :
+   ✅ Un enseignant peut arriver, déposer ses cours, remplir
+      son cahier, marquer sa présence et voir ses honoraires.
+      C'est utilisable.
+
+   Pour un vrai dashboard enseignant utile au quotidien :
+   ❌ Il faut ajouter les notes (saisie + consultation)
+   ❌ Il faut ajouter la déclaration d'absence
+   ❌ Il faut ajouter la communication administration
+
+   Le dashboard actuel est un excellent outil de DÉPOT ET TRACABILITÉ.
+   Pour être un outil PÉDAGOGIQUE, il manque encore 2-3 briques
+   essentielles.

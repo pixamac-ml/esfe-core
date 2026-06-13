@@ -9,7 +9,7 @@
             <h1>Journal des visiteurs</h1>
             <p class="help-text">Historisation des visites et suivi des entrees encore ouvertes.</p>
         </div>
-        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Nouvelle visite</button>
+        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">Nouvelle visite</button>
     </div>
 
     <form method="get" class="filters">
@@ -46,7 +46,7 @@
                     <td>{{ visitor.departed_at|date:"d/m/Y H:i"|default:"-" }}</td>
                     <td><span class="badge">{{ visitor.get_status_display }}</span></td>
                     <td>
-                        <button type="button" class="btn" hx-get="{% url 'secretary:visitor_update' visitor.id %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Modifier</button>
+                        <button type="button" class="btn" hx-get="{% url 'secretary:visitor_update' visitor.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">Modifier</button>
                         {% if visitor.status != "completed" %}
                             <form method="post" action="{% url 'secretary:visitor_complete' visitor.id %}">
                                 {% csrf_token %}

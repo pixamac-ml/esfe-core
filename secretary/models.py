@@ -21,6 +21,19 @@ class SecretaryStatusMixin(models.Model):
         (STATUS_ARCHIVED, "Archive"),
     ]
 
+    # Table formelle des transitions de statut autorisees. Les etats
+    # COMPLETED/CANCELLED ne peuvent plus que mener a ARCHIVED, et ARCHIVED
+    # est terminal (coherent avec les controles deja presents dans
+    # services.py : entree archivee = non reprenable).
+    STATUS_TRANSITIONS = {
+        STATUS_PENDING: {STATUS_IN_PROGRESS, STATUS_TRANSFERRED, STATUS_COMPLETED, STATUS_CANCELLED, STATUS_ARCHIVED},
+        STATUS_IN_PROGRESS: {STATUS_PENDING, STATUS_TRANSFERRED, STATUS_COMPLETED, STATUS_CANCELLED, STATUS_ARCHIVED},
+        STATUS_TRANSFERRED: {STATUS_IN_PROGRESS, STATUS_COMPLETED, STATUS_CANCELLED, STATUS_ARCHIVED},
+        STATUS_COMPLETED: {STATUS_ARCHIVED},
+        STATUS_CANCELLED: {STATUS_ARCHIVED},
+        STATUS_ARCHIVED: set(),
+    }
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -28,6 +41,22 @@ class SecretaryStatusMixin(models.Model):
 
     class Meta:
         abstract = True
+
+    def get_allowed_status_transitions(self):
+        return self.STATUS_TRANSITIONS.get(self.status, set())
+
+    def validate_status_transition(self, new_status):
+        if not new_status or new_status == self.status:
+            return
+        if new_status not in self.get_allowed_status_transitions():
+            status_labels = dict(self.STATUS_CHOICES)
+            raise ValidationError({
+                "status": (
+                    f"Transition de statut non autorisee : "
+                    f"« {status_labels.get(self.status, self.status)} » -> "
+                    f"« {status_labels.get(new_status, new_status)} »."
+                )
+            })
 
 
 class RegistryEntry(SecretaryStatusMixin):

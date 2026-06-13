@@ -1,0 +1,47 @@
+{% if students %}
+  <div class="sg-cmdk-section-title">Etudiants</div>
+  {% for student in students %}
+    <button
+      type="button"
+      class="sg-cmdk-item"
+      hx-get="{% url 'secretary:student_snapshot' student.id %}"
+      hx-target="#sg-drawer-content"
+      hx-swap="innerHTML"
+      onclick="sgCloseCommandPalette()"
+    >
+      <span class="sg-cmdk-icon"><i class="fa-solid fa-user-graduate"></i></span>
+      <span class="sg-cmdk-item-text">
+        <span class="sg-cmdk-item-label">{{ student.full_name }}</span>
+        <span class="sg-cmdk-item-sub">{{ student.matricule }} - {{ student.programme_title }}</span>
+      </span>
+    </button>
+  {% endfor %}
+{% endif %}
+
+{% if actions %}
+  <div class="sg-cmdk-section-title">Actions</div>
+  {% for action in actions %}
+    {% if action.drawer %}
+      <button
+        type="button"
+        class="sg-cmdk-item"
+        hx-get="{{ action.url }}"
+        hx-target="#sg-drawer-content"
+        hx-swap="innerHTML"
+        onclick="sgCloseCommandPalette()"
+      >
+        <span class="sg-cmdk-icon"><i class="{{ action.icon }}"></i></span>
+        <span class="sg-cmdk-item-text"><span class="sg-cmdk-item-label">{{ action.label }}</span></span>
+      </button>
+    {% else %}
+      <a class="sg-cmdk-item" href="{{ action.url }}" onclick="sgCloseCommandPalette()">
+        <span class="sg-cmdk-icon"><i class="{{ action.icon }}"></i></span>
+        <span class="sg-cmdk-item-text"><span class="sg-cmdk-item-label">{{ action.label }}</span></span>
+      </a>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{% if query and not students and not actions %}
+  <div class="sg-empty">Aucun resultat pour "{{ query }}".</div>
+{% endif %}

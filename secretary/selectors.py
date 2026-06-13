@@ -66,6 +66,12 @@ def get_registry_queryset(filters=None, *, user=None, branch=None):
             | Q(related_staff__profile__branch=resolved_branch)
         ),
     )
+    priority = ((filters or {}).get("priority") or "").strip()
+    if priority:
+        queryset = queryset.filter(priority=priority)
+    target_service = ((filters or {}).get("target_service") or "").strip()
+    if target_service:
+        queryset = queryset.filter(target_service=target_service)
     if q:
         queryset = queryset.filter(
             Q(title__icontains=q)

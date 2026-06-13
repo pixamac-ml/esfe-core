@@ -1,3 +1,4 @@
+{% load secretary_badges %}
 <div id="sg-appointments-today"
      class="sg-panel"
      hx-get="{% url 'secretary:htmx_appointments_today' %}"
@@ -5,17 +6,34 @@
      hx-swap="outerHTML">
   <div class="sg-table-wrap">
     <table class="sg-table">
-      <thead><tr><th>Heure</th><th>Titre</th><th>Visiteur</th><th>Assigne a</th><th>Statut</th></tr></thead>
+      <thead><tr><th>Heure</th><th>Titre</th><th>Visiteur</th><th>Assigne a</th><th>Statut</th><th>Action</th></tr></thead>
       <tbody>
         {% for item in today_appointments_rows %}
         <tr>
-          <td style="font-weight:900;">{{ item.scheduled_at|date:"H:i" }}</td>
+          <td class="sg-mono" style="font-weight:900;">{{ item.scheduled_at|date:"H:i" }}</td>
           <td>{{ item.title }}</td>
           <td>{{ item.person_name }}</td>
           <td>{{ item.assigned_to|default:"-" }}</td>
-          <td><span class="sg-badge-sm sg-badge-green">{{ item.get_status_display }}</span></td>
+          <td><span class="sg-badge-sm {{ item.status|status_badge_class }}">{{ item.get_status_display }}</span></td>
+          <td>
+            {% if item.status != "completed" %}
+            <form method="post" hx-post="{% url 'secretary:appointment_complete' item.id %}" hx-target="closest tr" hx-swap="outerHTML swap:180ms" data-sg-optimistic="fade-remove">{% csrf_token %}
+              <button class="sg-btn sg-btn-success" style="height:28px;font-size:.65rem;"><i class="fa-solid fa-check"></i>Cloturer</button>
+            </form>
+            {% else %}-{% endif %}
+          </td>
         </tr>
-        {% empty %}<tr><td colspan="5" class="sg-empty">Aucun rendez-vous aujourd'hui.</td></tr>{% endfor %}
+        {% empty %}
+        <tr><td colspan="6">
+          <div class="sg-empty">
+            <div class="sg-empty-icon"><i class="fa-regular fa-calendar-days"></i></div>
+            <div class="sg-empty-text">Aucun rendez-vous aujourd'hui.</div>
+            <button type="button" class="sg-btn sg-btn-outline sg-empty-action" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+              <i class="fa-solid fa-plus"></i>Nouveau rendez-vous
+            </button>
+          </div>
+        </td></tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>

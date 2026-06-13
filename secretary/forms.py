@@ -83,6 +83,23 @@ class RegistryEntryForm(SecretaryBaseForm):
             "description": forms.Textarea(attrs={"rows": 3}),
             "exited_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
         }
+        labels = {
+            "title": "Objet de l'entree",
+            "entry_type": "Type d'entree",
+            "visitor_name": "Nom du visiteur",
+            "visitor_phone": "Telephone",
+            "visitor_email": "E-mail",
+            "related_student": "Etudiant concerne",
+            "related_staff": "Personnel concerne",
+            "student_class_label": "Classe de l'etudiant",
+            "motive": "Motif de la venue",
+            "description": "Description",
+            "priority": "Priorite",
+            "target_service": "Service destinataire",
+            "status": "Etat",
+            "exited_at": "Heure de sortie",
+            "attachment": "Piece jointe",
+        }
 
     def clean_exited_at(self):
         exited_at = self.cleaned_data.get("exited_at")
@@ -98,6 +115,7 @@ class AppointmentForm(SecretaryBaseForm):
         self.fields["related_staff"].queryset = self._branch_user_queryset()
 
     scheduled_at = forms.DateTimeField(
+        label="Date et heure",
         input_formats=["%Y-%m-%dT%H:%M"],
         widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
     )
@@ -117,6 +135,18 @@ class AppointmentForm(SecretaryBaseForm):
             "status",
             "notes",
         ]
+        labels = {
+            "title": "Titre du rendez-vous",
+            "person_name": "Nom de la personne",
+            "phone": "Telephone",
+            "email": "E-mail",
+            "reason": "Motif",
+            "assigned_to": "Assigne a",
+            "related_student": "Etudiant concerne",
+            "related_staff": "Personnel concerne",
+            "status": "Etat",
+            "notes": "Notes",
+        }
 
     def clean_scheduled_at(self):
         scheduled_at = self.cleaned_data["scheduled_at"]
@@ -131,10 +161,12 @@ class VisitorLogForm(SecretaryBaseForm):
         self.fields["related_staff"].queryset = self._branch_user_queryset()
 
     arrived_at = forms.DateTimeField(
+        label="Heure d'arrivee",
         input_formats=["%Y-%m-%dT%H:%M"],
         widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
     )
     departed_at = forms.DateTimeField(
+        label="Heure de depart",
         required=False,
         input_formats=["%Y-%m-%dT%H:%M"],
         widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
@@ -152,6 +184,14 @@ class VisitorLogForm(SecretaryBaseForm):
             "departed_at",
             "status",
         ]
+        labels = {
+            "full_name": "Nom complet",
+            "phone": "Telephone",
+            "reason": "Motif de la visite",
+            "related_student": "Etudiant concerne",
+            "related_staff": "Personnel concerne",
+            "status": "Etat",
+        }
 
     def clean_arrived_at(self):
         arrived_at = self.cleaned_data["arrived_at"]
@@ -183,6 +223,16 @@ class DocumentReceiptForm(SecretaryBaseForm):
             "status",
             "file",
         ]
+        labels = {
+            "title": "Titre du document",
+            "description": "Description",
+            "submitted_by_name": "Depose par",
+            "submitted_by_phone": "Telephone du deposant",
+            "related_student": "Etudiant concerne",
+            "related_registry": "Entree de registre liee",
+            "status": "Etat",
+            "file": "Piece jointe",
+        }
 
 
 class SecretaryTaskForm(SecretaryBaseForm):
@@ -201,3 +251,12 @@ class SecretaryTaskForm(SecretaryBaseForm):
             "related_student",
             "due_date",
         ]
+        labels = {
+            "title": "Titre de la tache",
+            "description": "Description",
+            "priority": "Priorite",
+            "status": "Etat",
+            "assigned_to": "Assigne a",
+            "related_student": "Etudiant concerne",
+            "due_date": "Date d'echeance",
+        }

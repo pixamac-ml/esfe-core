@@ -9,7 +9,7 @@
             <h1>Rendez-vous</h1>
             <p class="help-text">Agenda du secretariat avec controle de conflits.</p>
         </div>
-        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Nouveau rendez-vous</button>
+        <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">Nouveau rendez-vous</button>
     </div>
 
     <form method="get" class="filters">
@@ -46,15 +46,21 @@
                     <td>{{ appointment.assigned_to|default:"-" }}</td>
                     <td><span class="badge">{{ appointment.get_status_display }}</span></td>
                     <td>
-                        <button type="button" class="btn" hx-get="{% url 'secretary:appointment_update' appointment.id %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">Modifier</button>
-                        {% if appointment.status != "completed" %}
-                            <form method="post" action="{% url 'secretary:appointment_complete' appointment.id %}">
-                                {% csrf_token %}
-                                <button class="btn" type="submit">Cloturer</button>
-                            </form>
-                        {% else %}
-                            <span class="help-text">Aucune action</span>
-                        {% endif %}
+                        <div class="actions">
+                            <button type="button" class="btn" hx-get="{% url 'secretary:appointment_update' appointment.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">Modifier</button>
+                            {% if appointment.status != "completed" %}
+                                <form method="post" action="{% url 'secretary:appointment_complete' appointment.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn" type="submit">Cloturer</button>
+                                </form>
+                            {% endif %}
+                            {% if not appointment.is_archived %}
+                                <form method="post" action="{% url 'secretary:appointment_archive' appointment.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-danger" type="submit">Archiver</button>
+                                </form>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
             {% empty %}

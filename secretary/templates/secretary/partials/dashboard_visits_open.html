@@ -11,7 +11,7 @@
         {% for item in open_visits_rows %}
         <tr>
           <td style="font-weight:900;">{{ item.full_name }}</td>
-          <td>{{ item.arrived_at|date:"H:i" }}</td>
+          <td class="sg-mono">{{ item.arrived_at|date:"H:i" }}</td>
           <td>{{ item.reason|default:"Accueil" }}</td>
           <td>{% if item.related_student %}{{ item.related_student.full_name }}{% else %}-{% endif %}</td>
           <td>
@@ -20,7 +20,17 @@
             </form>
           </td>
         </tr>
-        {% empty %}<tr><td colspan="5" class="sg-empty">Aucune visite ouverte.</td></tr>{% endfor %}
+        {% empty %}
+        <tr><td colspan="5">
+          <div class="sg-empty">
+            <div class="sg-empty-icon"><i class="fa-solid fa-user-clock"></i></div>
+            <div class="sg-empty-text">Aucune visite ouverte.</div>
+            <button type="button" class="sg-btn sg-btn-outline sg-empty-action" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+              <i class="fa-solid fa-plus"></i>Nouveau passage
+            </button>
+          </div>
+        </td></tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>

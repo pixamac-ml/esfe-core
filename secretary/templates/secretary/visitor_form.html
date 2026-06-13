@@ -3,16 +3,23 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<section class="panel">
-    <div class="page-header">
-        <h1>{{ page_title }}</h1>
-        <a class="btn" href="{% url 'secretary:visitor_list' %}">Retour</a>
+<section class="sg-panel">
+    <div class="sg-section-hero">
+        <div>
+            <p class="sg-badge-sm sg-badge-blue">{{ modal_kicker|default:"Accueil" }}</p>
+            <div class="sg-section-hero-title" style="margin-top:8px;">{{ page_title }}</div>
+            <div class="sg-section-hero-sub">{{ modal_description|default:"Enregistrer ou modifier la visite d'un visiteur." }}</div>
+        </div>
+        <div class="sg-section-actions">
+            <a class="sg-btn sg-btn-outline" href="{% url 'secretary:visitor_list' %}"><i class="fa-solid fa-arrow-left"></i>Retour</a>
+        </div>
     </div>
-    <form method="post" class="grid">
+
+    <form method="post" style="display:grid;gap:16px;">
         {% csrf_token %}
-        {{ form.as_p }}
-        <div class="actions">
-            <button class="btn btn-primary" type="submit">Enregistrer</button>
+        {% include "secretary/partials/form_fields.html" %}
+        <div class="sg-section-actions">
+            <button class="sg-btn sg-btn-primary" type="submit"><i class="fa-solid fa-check"></i>{{ submit_label|default:"Enregistrer" }}</button>
         </div>
     </form>
 </section>

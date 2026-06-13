@@ -1,3 +1,4 @@
+{% load secretary_badges %}
 <div id="sg-overview-tasks"
      class="sg-panel"
      hx-get="{% url 'secretary:htmx_overview_tasks' %}"
@@ -7,9 +8,22 @@
   <div class="message-list">
     {% for item in pending_tasks_rows %}
     <div class="sg-action-card">
-      <div><div class="sg-action-label">{{ item.title }}</div><div class="sg-action-sub">{{ item.get_priority_display }} - {{ item.due_date|date:"d/m"|default:"Sans date" }}</div></div>
-      <span class="sg-badge-sm {% if item.priority == 'urgent' %}sg-badge-red{% else %}sg-badge-amber{% endif %}">{{ item.get_status_display }}</span>
+      <div>
+        <div class="sg-action-label">{{ item.title }}</div>
+        <div class="sg-action-sub" style="display:flex;align-items:center;gap:6px;">
+          <span class="sg-priority-pill {{ item.priority|priority_pill_class }}">{% if item.priority|is_urgent_priority %}<span class="sg-priority-dot"></span>{% endif %}{{ item.get_priority_display }}</span>
+          {{ item.due_date|date:"d/m"|default:"Sans date" }}
+        </div>
+      </div>
+      <form method="post" hx-post="{% url 'secretary:task_start' item.id %}" hx-target="closest .sg-action-card" hx-swap="outerHTML swap:180ms" data-sg-optimistic="fade-remove">{% csrf_token %}
+        <button class="sg-btn sg-btn-success" style="height:28px;font-size:.65rem;"><i class="fa-solid fa-play"></i>Demarrer</button>
+      </form>
     </div>
-    {% empty %}<div class="sg-empty">Aucune tache urgente.</div>{% endfor %}
+    {% empty %}
+    <div class="sg-empty">
+      <div class="sg-empty-icon"><i class="fa-solid fa-list-check"></i></div>
+      <div class="sg-empty-text">Aucune tache urgente.</div>
+    </div>
+    {% endfor %}
   </div>
 </div>

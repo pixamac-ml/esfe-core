@@ -1,3 +1,4 @@
+{% load secretary_badges %}
 <div id="sg-overview-registry"
      class="sg-panel"
      hx-get="{% url 'secretary:htmx_overview_registry' %}"
@@ -8,7 +9,7 @@
       <div class="sg-section-header-title">Flux administratif du jour</div>
       <div class="sg-section-header-sub">Registre, rendez-vous, visites et taches urgentes</div>
     </div>
-    <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-modal-content" hx-swap="innerHTML" hx-on:htmx:after-request="sgOpen()">
+    <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
       <i class="fa-solid fa-plus"></i>Nouvelle entree
     </button>
   </div>
@@ -18,19 +19,30 @@
       <tbody>
         {% for item in pending_registry_rows %}
         <tr>
-          <td style="font-family:monospace;">{{ item.registry_number|default:item.pk }}</td>
+          <td class="sg-mono">{{ item.registry_number|default:item.pk }}</td>
           <td style="font-weight:900;">{{ item.get_entry_type_display }}</td>
           <td>{{ item.visitor_name|default:item.title }}</td>
           <td>{{ item.target_service|default:"Accueil" }}</td>
-          <td><span class="sg-badge-sm {% if item.priority == 'immediate' %}sg-badge-red{% elif item.priority == 'high' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ item.get_priority_display }}</span></td>
-          <td>
+          <td><span class="sg-priority-pill {{ item.priority|priority_pill_class }}">{% if item.priority|is_urgent_priority %}<span class="sg-priority-dot"></span>{% endif %}{{ item.get_priority_display }}</span></td>
+          <td style="display:flex;gap:6px;align-items:center;">
+            <button type="button" class="sg-btn sg-btn-outline" style="height:30px;font-size:.68rem;padding:0 .6rem;" hx-get="{% url 'secretary:registry_detail' item.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" title="Voir le detail et l'historique">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </button>
             <form method="post" hx-post="{% url 'secretary:registry_mark_processed' item.id %}" hx-target="closest tr" hx-swap="outerHTML swap:180ms" data-sg-optimistic="fade-remove">{% csrf_token %}
               <button class="sg-btn sg-btn-success" style="height:30px;font-size:.68rem;" type="submit"><i class="fa-solid fa-check"></i>Traiter</button>
             </form>
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="sg-empty">Aucune entree en attente.</td></tr>
+        <tr><td colspan="6">
+          <div class="sg-empty">
+            <div class="sg-empty-icon"><i class="fa-solid fa-book-open"></i></div>
+            <div class="sg-empty-text">Aucune entree en attente.</div>
+            <button type="button" class="sg-btn sg-btn-outline sg-empty-action" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+              <i class="fa-solid fa-plus"></i>Nouvelle entree
+            </button>
+          </div>
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>

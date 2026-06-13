@@ -1,0 +1,277 @@
+================================================================
+AUDIT - DASHBOARD DIRECTEUR DES ETUDES (DE)
+================================================================
+Fichiers principaux :
+- templates/portal/staff/director_dashboard.html (page-cadre, Alpine.js)
+- templates/portal/staff/director/partials/workspace.html (contenu HTMX, ~1440 lignes)
+- templates/portal/staff/director/partials/drawers/*.html (tiroirs lateraux)
+- templates/portal/staff/director/partials/panels/*.html (panneaux dans tiroirs)
+- portal/views/views.py : _render_director_dashboard, _build_director_workspace_context,
+  director_workspace, director_drawer, director_results_action, director_bulletin_action,
+  director_teacher_*, director_transfer_*, director_planner_*
+- portal/services/director/*.py (classroom_ops, teacher_assignment, document_workflow, transfer_workflow)
+- academics/services/schedule_service.py (get_director_schedule_overview)
+- academics/services/grading.py (resolve_threshold, compute_semester_result)
+
+Filtrage par annexe : _resolve_academic_branch(request) -> get_user_branch(user).
+Toutes les requetes (classes, enseignants, documents, transferts, planning) sont
+filtrees par cette annexe. Les actions POST (validation/publication de semestre,
+assignation enseignant, etc.) re-verifient explicitement branch_id et renvoient
+une ValidationError "Action hors annexe refusee." en cas d'incoherence. -> Bon point,
+la regle "filtrage obligatoire par annexe" est globalement bien respectee ici.
+
+----------------------------------------------------------------
+1. ACCUEIL (section "home")
+----------------------------------------------------------------
+- 5 cartes KPI en haut (etudiants, classes, enseignants, alertes, etc.) calculees
+  depuis director_overview (get_director_schedule_overview) + class_cards.
+- Liste d'alertes ("home_alerts_count" affiche dans le sidebar comme badge).
+- Tableau "Resultats par classe" : reprend class_cards avec workflow_bucket
+  (ready / in_progress / rejected) -> donne une vue rapide de l'etat de
+  validation/publication par classe.
+- "Statistiques rapides" + un doughnut Chart.js ("averageChart") qui utilise
+  reellement results_class_queues + published_count.
+  ✅ Contrairement au dashboard DG, ce graphique est branche sur des donnees
+  reelles (pas un faux graphique statique).
+- "Dernieres activites" (liste recente, a verifier que la source de donnees
+  est bien a jour / non statique).
+- "Actions rapides" : grille de 8 boutons vers les autres sections (home,
+  results, academic, students, teachers, assignments, publications, etc.)
+
+----------------------------------------------------------------
+2. PILOTAGE DES CLASSES / OPERATIONS (section "operations")
+----------------------------------------------------------------
+- Liste des classes de l'annexe (class_cards), chacune avec :
+  - effectif (student_count)
+  - nombre de semestres (semester_count)
+  - progression (progress)
+  - compteurs ready_to_validate / ready_to_publish / published
+  - workflow_bucket (ready / in_progress / rejected)
+  - compteurs de cours planned/completed/cancelled (via le planning hebdo)
+- En cliquant sur une classe -> tiroir "operation_drawer.html" :
+  - KPIs Etudiants / Semestres / Cours de la semaine
+  - boutons de navigation (voir resultats, voir etudiants, etc.)
+  - "Reperes rapides" : semester_rows (6 premiers) + weekly_events (8 premiers)
+  ✅ Le mapping entre classroom_ops_service.build_director_classroom_ops_context
+  et le tiroir est coherent (semester_rows / weekly_events bien utilises).
+
+----------------------------------------------------------------
+3. CLASSES & NIVEAUX (section "academic")
+----------------------------------------------------------------
+- Vue detaillee de la classe selectionnee : _director_semester_rows calcule par
+  semestre un etat (publie / pret_publication / pret_validation / en_cours /
+  pas_de_notes) avec un "tone" (couleur) et des flags can_validate /
+  can_publish / can_generate / bulletins_count.
+- 🚩 PROBLEME : une carte KPI "Semestres" est dupliquee dans cette section
+  (workspace.html lignes ~203-212) : la meme valeur (selected_class_rows|length)
+  est affichee deux fois avec un style/etiquette legerement different.
+  -> A nettoyer (probable copier-coller oublie), sinon ca donne une impression
+  de dashboard "bricole" pendant la presentation.
+
+----------------------------------------------------------------
+4. ETUDIANTS (section "students")
+----------------------------------------------------------------
+- Liste des etudiants de la classe selectionnee (selected_class_students),
+  recherche possible via student_q.
+- 🚩 LIMITE : la liste est plafonnee a 40 resultats ([:40]) sans pagination.
+  Pour les grandes classes (ou recherches larges), des etudiants restent
+  invisibles sans aucun indicateur "voir plus" / pagination. Meme remarque
+  que sur le dashboard enseignant.
+- Tiroir "student_drawer.html" -> "student_detail_panel.html" :
+  🚩 TRES MAIGRE : affiche seulement Classe / Inscription / Matricule / Email
+  + 3 boutons de navigation (voir la classe / voir les resultats / ouvrir
+  transferts). Aucun resume des notes, de la presence, ou du parcours de
+  l'etudiant. Pour un "fiche etudiant" cote direction des etudes, on
+  s'attendrait a minima a un mini-recap des resultats par semestre.
+
+----------------------------------------------------------------
+5. ENSEIGNANTS (section "teachers")
+----------------------------------------------------------------
+- build_director_teacher_assignment_context : liste des enseignants de
+  l'annexe, recherche (teacher_q), assignations existantes (DirectorTeacherAssignment).
+- director_teacher_create : creation d'un compte enseignant (modal +
+  create_teacher_with_account).
+- director_teacher_assign : modal d'assignation (ajout/retrait), avec
+  room_label + planned_hours obligatoires, et verification de l'annexe.
+- director_teacher_document_upload / director_teacher_documents_modal /
+  director_teacher_document_review : gestion des documents enseignants
+  (upload, consultation, validation/verification).
+- director_teacher_contract_download : telechargement PDF du contrat
+  (generate_teacher_contract_pdf), avec verification d'annexe (HttpResponseForbidden
+  si hors annexe). ✅ Bon controle d'acces.
+
+----------------------------------------------------------------
+6. AFFECTATIONS / PLANNING (section "assignments" + planificateur)
+----------------------------------------------------------------
+- build_director_planning_assignment_context : vue d'ensemble des affectations.
+- director_planner_hub / director_planner_view_workspace / director_planner_workspace /
+  director_weekly_slots_workspace / director_weekly_slot_save / director_week_materialize /
+  director_month_materialize / director_create_schedule_event : reprennent les
+  memes templates partages que le surveillant general
+  (templates/portal/staff/supervisor/partials/*.html) via role_prefix="director".
+- 🚩 A VERIFIER AVANT LA PRESENTATION : la suite de tests
+  portal/test_supervisor_planner.py echoue actuellement (4 echecs + 1 erreur sur
+  16 tests), notamment via reverse("accounts_portal:supervisor_weekly_slot_form", ...)
+  qui n'existe pas (le vrai mecanisme est *_weekly_slots_workspace?drawer_form=1&edit=<id>).
+  C'est probablement un bug de test obsolete plutot qu'une fonctionnalite cassee,
+  mais comme le DE partage exactement ce meme mecanisme (role_prefix="director"),
+  il vaut mieux cliquer manuellement sur "Modifier un creneau" dans le planning DE
+  pour confirmer que le tiroir de modification s'ouvre bien en conditions reelles.
+
+----------------------------------------------------------------
+7. RESULTATS (section "results")
+----------------------------------------------------------------
+- Plus grosse section : pour chaque classe/semestre, affiche result_table_rows,
+  result_anomalies (via resolve_threshold) et result_summary (via
+  compute_semester_result).
+- Formulaires Valider / Rejeter / Publier (director_results_action) :
+  - "validate" -> STATUS_FINALIZED (necessite can_publish_semester = toutes les
+    notes saisies)
+  - "publish" -> STATUS_PUBLISHED
+  - "reject" -> retour en arriere, trace dans
+    request.session["director_rejected_semester_ids"]
+  - Verification d'annexe systematique (ValidationError si hors annexe). ✅
+- Le tiroir "result_drawer.html" -> "result_semester_panel.html" duplique ces
+  memes formulaires Valider/Rejeter/Publier (en fermant le tiroir au succes) :
+  c'est volontaire (acces rapide depuis le tiroir), mais ca veut dire qu'il y a
+  DEUX endroits a maintenir si la logique des formulaires change -> a garder en tete.
+
+----------------------------------------------------------------
+8. RELEVES & PUBLICATIONS (section "publications")
+----------------------------------------------------------------
+- Generation des bulletins de semestre / annuels par classe via
+  director_bulletin_action (actions generate_semester_class / generate_annual_class),
+  controle par can_manage_bulletins(user, academic_class).
+- 🚩 INCOHERENCE DE PERMISSIONS : director_bulletin_action est protege par
+  @_position_required({"director_of_studies", "super_admin"}) uniquement.
+  C'est la SEULE vue director_* (parmi toutes celles auditees) qui EXCLUT
+  executive_director et deputy_executive_director, alors que ces roles ont
+  acces a presque toutes les autres actions du dashboard DE.
+  -> A clarifier : est-ce volontaire (le DG ne doit pas generer de bulletins) ou
+  un oubli lors de l'ajout de cette vue ? A trancher avant la presentation pour
+  eviter une question genante du DG ("pourquoi je ne peux pas generer ce bulletin ?").
+- diploma_candidate_classes : classes terminales (L3/M2) entierement publiees,
+  eligibles a la generation de diplomes. can_manage_diplomas reserve a
+  executive_director/deputy_executive_director uniquement (coherent avec le
+  fait que c'est une decision de direction generale).
+
+----------------------------------------------------------------
+9. DOSSIERS & TRANSFERTS (section "documents")
+----------------------------------------------------------------
+- build_director_document_context : documents enseignants (upload, revue,
+  validation) -> director_teacher_document_review.
+- build_director_transfer_context : demandes de transfert de classe/ecole
+  -> director_transfer_create (creation), director_transfer_review (validation/refus).
+- 🚩 CODE MORT : dans _build_director_workspace_context (vers les lignes
+  726-745), une liste "document_workflows" est construite avec 3 entrees
+  ("Contrats enseignants", "Dossiers enseignants", "Transferts classe / ecole")
+  toutes marquees "status": "backend_a_implanter". Or ces fonctionnalites sont
+  DEJA implementees (document_context / transfer_context, sections ci-dessus) !
+  Cette liste n'est utilisee dans AUCUN template (verifie par recherche).
+  -> A supprimer : risque de confusion pour un futur developpeur qui croirait
+  ces features "a faire" alors qu'elles existent deja et fonctionnent.
+
+----------------------------------------------------------------
+10. PASSAGES / REINSCRIPTIONS (lien externe "Passages")
+----------------------------------------------------------------
+- Le module "Passages" (reenrollment_workspace / reenrollment_propose /
+  reenrollment_decision_action, sous /workflows/reenrollment/) est accessible
+  depuis le sidebar comme un LIEN EXTERNE (full page reload), contrairement a
+  tous les autres modules qui sont des panneaux HTMX charges dans
+  #director-workspace.
+  🚩 Casse l'experience "SPA" du reste du dashboard : l'utilisateur quitte le
+  dashboard DE pour atterrir sur une page completement differente (sans le
+  sidebar / la mise en page habituelle), ce qui peut paraitre incoherent
+  pendant une demo live.
+
+----------------------------------------------------------------
+11. PARAMETRES (fallback "settings")
+----------------------------------------------------------------
+- Section generique "Parametres et contexte" en fin de workspace.html : affiche
+  des infos de contexte (annexe, role, etc.) plutot que de vrais reglages
+  configurables. A confirmer si c'est volontaire (page d'info) ou si on
+  s'attend a y trouver des preferences modifiables.
+
+================================================================
+CE QUI MARCHE VRAIMENT (points forts a montrer au DG)
+================================================================
+✅ Filtrage par annexe rigoureux et verifie a chaque action (vues + services).
+✅ Workflow semestre complet et coherent : validation -> publication -> generation
+   de bulletins, avec etats/couleurs (tone) clairs par semestre.
+✅ Graphique d'accueil (doughnut) base sur de VRAIES donnees (contrairement au
+   dashboard DG qui a un graphique factice statique).
+✅ Gestion enseignants assez complete : creation de compte, assignation,
+   documents (upload/validation), contrat PDF telechargeable, tout avec
+   verification d'annexe.
+✅ Gestion des transferts et des diplomes (classes terminales) bien integree
+   dans le meme workspace.
+✅ Planning/emploi du temps partage avec le surveillant general (reutilisation
+   de code propre via role_prefix).
+
+================================================================
+CE QUI EST PROBLEMATIQUE / A AMELIORER
+================================================================
+🚩 1. VISUEL/DESIGN : le dashboard DE charge Tailwind via CDN
+   (https://cdn.tailwindcss.com) + Chart.js CDN + Lucide icons, avec une
+   palette bleu marine fonce (#061B34) / bleu accent (#2563eb). Cela ne
+   correspond PAS au theme compile du projet (static/public/css/main.css,
+   palette #1e4f6f / #1db5b0 / #f39c12) ni a priori aux autres dashboards.
+   -> Pour "LE VISUEL" demande par l'utilisateur, c'est le point le plus
+   visible : soit on harmonise la palette du DE avec le theme du projet, soit
+   on accepte que chaque dashboard ait son propre style (mais alors le DG le
+   remarquera probablement en passant de l'un a l'autre).
+
+🚩 2. CODE MORT "document_workflows" (3 entrees "backend_a_implanter") jamais
+   affiche dans aucun template, alors que les fonctionnalites correspondantes
+   existent deja sous un autre nom (document_context / transfer_context).
+   -> A supprimer de _build_director_workspace_context (portal/views/views.py,
+   ~lignes 726-745).
+
+🚩 3. DOUBLON visuel : carte KPI "Semestres" apparait deux fois dans la section
+   "academic" de workspace.html (~lignes 203-212), meme valeur affichee deux
+   fois avec un style different. -> A nettoyer.
+
+🚩 4. Fiche etudiant (student_detail_panel.html) trop pauvre : seulement
+   Classe/Inscription/Matricule/Email + 3 boutons, aucun resume de notes ou
+   d'assiduite. -> A enrichir si le temps le permet (au minimum : derniers
+   resultats par semestre).
+
+🚩 5. Liste des etudiants plafonnee a 40 ([:40]) sans pagination ni indicateur
+   "X autres etudiants non affiches". -> Risque d'incomprehension sur les
+   grandes classes.
+
+🚩 6. Suite de tests portal/test_supervisor_planner.py en echec (4 echecs +
+   1 erreur / 16 tests), notamment a cause d'un nom d'URL obsolete
+   ("supervisor_weekly_slot_form" qui n'existe plus). Le DE partage exactement
+   ce mecanisme de planning -> tester manuellement le bouton "Modifier un
+   creneau" dans le planning DE avant la presentation pour etre sur que ca
+   fonctionne reellement (le test est probablement juste obsolete, mais a
+   verifier en live).
+
+🚩 7. Incoherence de permissions sur director_bulletin_action (generation des
+   bulletins) : seul {"director_of_studies", "super_admin"} y a acces, alors
+   que TOUTES les autres vues director_* incluent aussi executive_director et
+   deputy_executive_director. -> Decider si c'est intentionnel (sinon, ajouter
+   ces roles pour la coherence et eviter une question du DG en demo).
+
+🚩 8. Le module "Passages" (reinscriptions) est un lien externe en pleine page
+   qui sort completement du dashboard HTMX, contrairement a tous les autres
+   modules. -> Soit l'integrer comme un panneau HTMX comme le reste, soit
+   indiquer clairement (icone "lien externe") que ca ouvre une autre page,
+   pour ne pas surprendre pendant la demo.
+
+================================================================
+RESUME POUR LA PRESENTATION DE LUNDI
+================================================================
+Le dashboard DE est SOLIDE sur le fond : filtrage par annexe rigoureux,
+workflow semestre/bulletins complet et coherent, gestion enseignants/
+documents/transferts fonctionnelle, et un vrai graphique (pas un faux comme
+le DG). Les points a corriger en priorite avant lundi, par ordre d'impact
+visuel/risque pendant la demo :
+  1) Doublon carte "Semestres" (cosmetique, 5 min a corriger)
+  2) Verifier manuellement le bouton "Modifier un creneau" du planning
+  3) Trancher la question des permissions sur la generation de bulletins
+  4) Decider quoi faire de l'incoherence visuelle Tailwind CDN vs theme du
+     projet (le plus gros chantier, peut-etre hors scope pour lundi)
+  5) Nettoyer le code mort "document_workflows" (cosmetique cote code, sans
+     impact visuel direct)

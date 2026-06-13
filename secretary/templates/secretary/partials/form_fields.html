@@ -1,0 +1,26 @@
+{% if form.non_field_errors %}
+    <ul class="errors">
+        {% for error in form.non_field_errors %}
+            <li><i class="fa-solid fa-triangle-exclamation"></i>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<div class="sg-form-grid">
+    {% for field in form.visible_fields %}
+        <div class="field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="sg-required">*</span>{% endif %}</label>
+            {{ field }}
+            {% if field.help_text %}<p class="sg-form-note">{{ field.help_text }}</p>{% endif %}
+            {% if field.errors %}
+                <ul class="errors">
+                    {% for error in field.errors %}
+                        <li><i class="fa-solid fa-triangle-exclamation"></i>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    {% endfor %}
+</div>
+
+{% for field in form.hidden_fields %}{{ field }}{% endfor %}

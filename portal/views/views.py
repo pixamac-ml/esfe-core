@@ -2694,7 +2694,7 @@ def finance_portal(request):
 
 @_position_required({"secretary"})
 def secretary_portal(request):
-    return redirect("accounts_portal:portal_dashboard")
+    return redirect("secretary:secretary_dashboard")
 
 
 @_position_required({"admissions"})

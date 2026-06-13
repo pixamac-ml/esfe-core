@@ -5,11 +5,9 @@
 ## Quick start
 
 ```powershell
-# activate venv first
-pip install -r requirements.txt
-npm install
+pip install -r requirements.txt; if ($?) { npm install }
 python manage.py migrate
-npm run watch:css       # tailwind dev (output: static/public/css/main.css)
+npm run watch:css       # standalone tailwindcss CLI → static/public/css/main.css
 python manage.py runserver
 ```
 
@@ -17,56 +15,36 @@ python manage.py runserver
 
 | Task | Command |
 |------|---------|
-| Run tests (all) | `python manage.py test` |
-| Run tests (single app) | `python manage.py test core` |
-| Run tests (no Postgres/Redis) | `python manage.py test --settings=config.settings_test_local core` |
+| Tests (all) | `python manage.py test` |
+| Tests (single app) | `python manage.py test core` |
+| Tests (no Postgres/Redis) | `python manage.py test --settings=config.settings_test_local core` |
+| Django checks | `python manage.py check` |
 | Tailwind watch | `npm run watch:css` |
 | Tailwind build | `npm run build:css` |
 | Seed data | `python manage.py seed_<tab>` (see `seed_bundle/`) |
 
-Use `--settings=config.settings_test_local` for isolated testing — swaps to SQLite, MD5PasswordHasher, InMemoryChannelLayer, restricted URL conf (`config.urls_test_local`).
+Use `--settings=config.settings_test_local` for isolated testing — swaps to SQLite + `test_db.sqlite3`, MD5PasswordHasher, InMemoryChannelLayer, restricted URL conf (`config.urls_test_local`).
 
 ## Architecture
 
-- **ASGI primary** (`config.asgi`) — daphne/channels. HTTP wrapped in `ClientDisconnectSafeASGIApp` (swallows `CancelledError`). WebSocket via `communication.realtime.routing`
+- **ASGI primary** (`config.asgi`) — daphne/channels. HTTP wrapped in `ClientDisconnectSafeASGIApp` (swallows `CancelledError`). WebSocket via `communication.realtime.routing`. Disable with `ENABLE_WEBSOCKETS=False`.
 - **WSGI fallback** (`config.wsgi`) — gunicorn + whitenoise for HTTP
-- **~20 Django apps** — monolithic layout:
-  - `core` / `ui` — home, about, SEO, sitemap, django-components entry (registered in `core/apps.py:CoreConfig.ready()`)
+- **~20 Django apps** — monolithic layout. Key groups:
+  - `core` / `ui` — home, about, SEO, sitemap, django-components registration (`core/apps.py:CoreConfig.ready()`)
   - `accounts` / `portal` / `secretary` / `students` — user dashboards
   - `admissions` / `inscriptions` / `payments` / `academic_cycle` / `academics` — core school workflows
   - `shop`, `blog`, `news`, `community`, `formations`, `branches`, `superadmin`, `marketing`
   - `communication` — email (Brevo SMTP via `.env`), realtime/WebSocket, notifications
-- **Access system** in `accounts/access.py` — `can_access()`, `get_user_scope()`. Full mapping at `accounts/ACCESS_MAPPING.md`
-- **Settings** (`config.settings`) loads `.env` at project root. Postgres in dev/prod, SQLite in `settings_test_local`
-- **Channels layers**: Redis if `REDIS_URL` + `channels_redis` available, else InMemory
-- **Tailwind** via PostCSS — `static/src/css/input.css` → `static/public/css/main.css`
-- **Email**: custom `StableSMTPEmailBackend` in `core.mail_backends`; provider "brevo" via SMTP
-- **PDF**: weasyprint (legal pages), reportlab (elsewhere)
-- **Rich text**: django-ckeditor-5. **HTMX**: `django_htmx.middleware.HtmxMiddleware`. **Admin theme**: django-jazzmin
-
-## URL layout
-
-```
-/                           core:home
-/admin/                     Django admin
-/accounts/                  auth + accounts
-/portal/                    accounts_portal namespace
-/portal/student-dashboard/  student portal
-/secretary/                 secretary dashboard
-/admissions/, /inscriptions/, /payments/, /academic-cycle/
-/formations/, /students/, /academics/
-/blog/, /actualites/        news namespace
-/shop/                      shop namespace
-/community/, /communication/ communication namespace
-/marketing/                 marketing namespace
-/superadmin/, /surveillance/general/
-```
-
-Full URL config: `config/urls.py` (includes `fallback_404` catch-all). Test URL conf: `config/urls_test_local.py` (subset, some app URLs excluded).
+- **Access system**: `accounts/access.py` — `can_access()`, `get_user_scope()`. Full mapping at `accounts/ACCESS_MAPPING.md`
+- **Settings** (`config.settings`) loads `.env` at project root. Postgres in dev/prod, SQLite in `settings_test_local`. DB config via `DATABASE_URL` env var or individual `DB_*` vars.
+- **Channels layers**: Redis if `REDIS_URL` + `channels_redis` available, else InMemory.
+- **Email**: custom `StableSMTPEmailBackend` in `core.mail_backends`; provider "brevo" via SMTP. Config: `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` in `.env`.
+- **PDF**: weasyprint (legal pages), reportlab (elsewhere).
+- **Tailwind**: standalone CLI (`tailwindcss -i/-o`), not PostCSS runner. Output: `static/src/css/input.css` → `static/public/css/main.css`.
 
 ## Django components
 
-Registered in `core/apps.py:CoreConfig.ready()` via explicit imports. All components under `ui/components/`:
+Registered in `core/apps.py:CoreConfig.ready()` — explicit imports. All components under `ui/components/`:
 
 ```python
 import ui.components.<category>.<name>.<name>
@@ -83,18 +61,21 @@ import ui.components.<category>.<name>.<name>
 
 Entrypoints in `accounts/dashboards/`:
 - `manager_dashboard.py` — main dashboard views
-- `htmx_manager.py` — HTMX actions (candidatures, inscriptions, payments, cash sessions, salaries, honoraria, expenses, donations, closures, reports)
+- `htmx_manager.py` — central HTMX dispatch (candidatures, inscriptions, payments, cash sessions, salaries, honoraria, expenses, donations, closures, reports)
 - `htmx_caisse.py`, `htmx_candidatures.py`, `htmx_depenses.py`, `htmx_honoraires.py`, `htmx_inscriptions.py`, `htmx_paiements.py`, `htmx_salaires.py` — per-domain HTMX
-- `htmx_admissions.py` / `htmx_finance.py` — legacy HTMX views
+- `htmx_admissions.py`, `htmx_finance.py` — legacy HTMX views
+- `htmx_global.py`, `htmx_utils.py`, `htmx_widgets.py` — shared HTMX helpers
+- `executive_dashboard.py`, `finance_dashboard.py`, `admissions_dashboard.py` — alternate dashboards
+- `exports.py`, `querysets.py` — Excel export & query helpers
 - `permissions.py` / `helpers.py` — `is_manager()`, `get_user_branch()`
 
 ### Critical business rules
 
 **Filtrage obligatoire par annexe** — All data MUST be filtered by the user's branch (`annexe`). No cross-branch visibility. This is the single most critical rule.
 
-**Salaires staff** — Auto-generate payslips when STAFF user is created (informaticien, surveillant, directeur_etudes, secretaire, secretaire_adjointe, gestionnaire, gardien). Staff model must have `salaire`. Never ask the gestionnaire to create them manually. Workflow: verify → correct → validate → pay.
+**Salaires staff** — Auto-generated by `accounts/signals.py:auto_prepare_payroll_on_salary_change` when a staff Profile's `salary_base > 0`. Staff roles: informaticien, surveillant, directeur_etudes, secretaire, secretaire_adjointe, gestionnaire, gardien. Never ask the gestionnaire to create them manually. Workflow: verify → correct → validate → pay.
 
-**Honoraires enseignants** — Never mix with staff salaries. Teacher model must have `tarif_horaire`. System: fetch validated hours × tarif → auto-generate payment sheet.
+**Honoraires enseignants** — Never mix with staff salaries. Auto-generated by `accounts/signals.py:auto_prepare_honorarium_on_rate_change` when `teacher_hourly_rate > 0`. System: fetch validated hours × tarif → auto-generate payment sheet.
 
 **Rapports** — Daily, weekly, monthly, custom. Excel format (`accounts/services/excel_reports.py`). Include: admissions, inscriptions, payments, donations, shop sales, expenses, salaries, honoraria, net result.
 
@@ -105,13 +86,13 @@ Entrypoints in `accounts/dashboards/`:
 ## Testing
 
 - Vanilla `unittest`/`TestCase` — no pytest, no CI config
+- `tests.py` in each app directory; `accounts/test_manager_workflows.py` has critical business workflow tests; `academic_cycle/tests/` has multi-file test suite
 - `settings_test_local` bypasses Postgres/Redis — use for quick smoke tests
-- Test URL conf (`urls_test_local.py`) is a subset — some app URLs not included
-- `tests.py` files live inside each app directory. Additional test files exist in `accounts/` and `academic_cycle/tests/`
+- Test URL conf (`urls_test_local.py`) is a subset — some app URLs excluded
 
 ## Constraints
 
 - **`.env` contains real secrets** — do not commit, do not expose in logs
 - `media/` is gitignored — uploaded files not in repo
-- `staticfiles/` is gitignored — run `build:css` before deploy
-- No pre-commit hooks, no lint/typecheck config — rely on Django's own checks
+- `staticfiles/` is gitignored — run `npm run build:css` before deploy
+- No pre-commit hooks, no lint/typecheck config — rely on `python manage.py check` and `manage.py test`

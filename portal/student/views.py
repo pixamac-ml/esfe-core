@@ -33,10 +33,8 @@ from .profile_service import (
     update_account_preferences,
     update_editable_fields,
 )
-from .widgets.profile import get_profile_widget
 from .widgets.academics import get_academics_widget, get_student_academic_snapshot
 from .widgets.finance import get_finance_widget
-from .widgets.notifications import get_notifications_widget
 from shop.services.shop_service import get_required_shop_context
 
 
@@ -235,13 +233,6 @@ def dashboard(request):
 
 @login_required
 @role_required("student")
-def profile_partial(request):
-    context = get_profile_widget(request.user)
-    return render(request, "portal/student/partials/profile.html", context)
-
-
-@login_required
-@role_required("student")
 def academics_partial(request):
     context = get_academics_widget(request.user)
     return render(request, "portal/student/partials/academics.html", context)
@@ -277,13 +268,6 @@ def settings_partial(request):
 def _render_settings_response(request, context):
     context["finance_widget"] = get_finance_widget(request.user)
     return render(request, "portal/student/partials/settings_student.html", context)
-
-
-@login_required
-@role_required("student")
-def notifications_partial(request):
-    context = get_notifications_widget(request.user)
-    return render(request, "portal/student/partials/notifications.html", context)
 
 
 @login_required

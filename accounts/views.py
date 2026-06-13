@@ -105,14 +105,14 @@ def dashboard_redirect(request):
     if position == "director_of_studies":
         return redirect("accounts_portal:portal_director")
 
+    if position == "secretary":
+        return redirect("accounts_portal:portal_secretary")
+
     if check_finance_access(user):
         return redirect("accounts:finance_dashboard")
 
     if is_manager(user):
         return redirect("accounts:manager_dashboard")
-
-    if position == "secretary":
-        return redirect("accounts_portal:portal_secretary")
 
     if position == "marketing_manager":
         return redirect("marketing:dashboard")

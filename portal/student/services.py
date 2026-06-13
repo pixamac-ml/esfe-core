@@ -13,7 +13,6 @@ from payments.models import Payment
 from .profile_service import get_profile_completion, get_profile_data
 from portal.student.widgets.academics import get_academics_widget
 from portal.student.widgets.academics import get_student_academic_snapshot
-from portal.student.widgets.profile import get_profile_widget
 
 
 def _get_student_branch(student, enrollment):
@@ -872,7 +871,6 @@ def get_student_overview_data(user):
             "academic_programme": snapshot["academic_programme"],
             "academic_year": snapshot["academic_year"],
             "academic_level": snapshot["academic_level"],
-            "profile_widget": get_profile_widget(user),
             "page_title": "Dashboard etudiant",
             "subtitle": "Vue d'ensemble de votre parcours academique",
         }
@@ -907,7 +905,6 @@ def get_student_overview_data(user):
         "academic_programme": snapshot["academic_programme"],
         "academic_year": snapshot["academic_year"],
         "academic_level": snapshot["academic_level"],
-        "profile_widget": get_profile_widget(user),
         "page_title": "Dashboard etudiant",
         "subtitle": "Vue d'ensemble de votre parcours academique",
     }

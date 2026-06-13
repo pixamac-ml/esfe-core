@@ -1,0 +1,645 @@
+=================================================================
+ANALYSE CRITIQUE DU DASHBOARD GESTIONNAIRE — CE QUI MARCHE,
+CE QUI NE MARCHE PAS
+ESFE - École de Santé FHB - Mali
+=================================================================
+
+ATTENTION : Ce qui suit est une analyse honnête. Contrairement au
+dashboard DG (voir dg.txt), le dashboard gestionnaire est en très
+grande partie un dashboard d'ACTION réelle : filtrage par annexe
+rigoureux, écritures comptables réelles, signaux automatiques de
+paie/honoraires, notifications réelles, clôture mensuelle et
+versements bancaires fonctionnels. Mais il reste des incohérences,
+du code mort, des données en dur résiduelles et des gaps par
+rapport aux promesses d'AGENTS.md.
+
+=================================================================
+1. CE QUI MARCHE VRAIMENT (les points solides)
+=================================================================
+
+✅ Filtrage par annexe — Systématique et correct. Vérifié dans
+   TOUS les fichiers htmx_*.py (candidatures, inscriptions,
+   paiements, caisse, salaires, honoraires, dépenses, dons,
+   clôture, versements) ET dans `_manager_context()`
+   (accounts/dashboards/manager_dashboard.py:98-882). Chaque
+   queryset filtre par `branch=request.branch`,
+   `candidature__branch=request.branch` ou
+   `inscription__candidature__branch=request.branch`. Aucune
+   fuite cross-annexe constatée. C'est le point le plus solide
+   de tout le dashboard, et il dépasse largement la qualité du
+   filtrage du dashboard DG.
+
+✅ Candidatures — Workflow complet et réel :
+   `htmx_candidatures.py` : under_review, accept (déclenche
+   `openInscriptionPositioning` via HX-Trigger), reject (motif
+   obligatoire), to_complete, delete (soft-delete, uniquement si
+   rejetée et sans inscription liée). Tous écrivent
+   `reviewed_by`/`reviewed_at`. Boutons réels (hx-post), pas de
+   décoration.
+
+✅ Inscriptions — `inscription_create()` crée réellement
+   l'inscription via `create_inscription_from_candidature()`,
+   valide les frais de positionnement
+   (`get_positioning_fee_for_level()`). Filtrage par annexe OK.
+
+✅ Paiements — `payment_validate` crée un `BranchCashMovement`
+   (SOURCE_STUDENT_PAYMENT) + `FinancialLog`
+   (ACTION_PAYMENT_VALIDATED). `payment_cancel` log
+   ACTION_PAYMENT_CANCELLED + `update_financial_state()`.
+   `payment_correct` exige de taper "CORRIGER" et passe par
+   `correct_validated_payment_amount()` avec FinancialLog complet.
+   Tout est tracé.
+
+✅ Caisse — Sessions cash réelles (code de paiement, expiration,
+   régénération, annulation), `cash_session_complete` crée
+   Payment + BranchCashMovement + FinancialLog dans une
+   transaction atomique. `cash_sync` appelle vraiment
+   `sync_student_payment_cash_movements()`
+   (accounts/services/manager_intelligence.py:50-83) qui scanne
+   les paiements validés non synchronisés et crée les mouvements
+   manquants. `cash_movement_receipt` génère un vrai PDF via
+   `ensure_cash_movement_receipt`.
+
+✅ Salaires staff — Auto-génération CONFORME à AGENTS.md.
+   `accounts/signals.py:auto_prepare_payroll_on_salary_change`
+   (l.75-121) crée bien une `PayrollEntry` DRAFT dès que
+   `salary_base > 0` sur un profil staff (exclut student/teacher
+   et user_type="public"). Si le salaire change alors que la
+   fiche est encore DRAFT, elle est mise à jour avec une note
+   "[salaire mis à jour automatiquement]". Le dashboard expose
+   ensuite `salary_detail`, `salary_upsert`, `salary_pay` (vérifie
+   `remaining_salary` et `available_cash`, crée un
+   BranchCashMovement SOURCE_PAYROLL), `salary_advance`
+   (initialise la fiche si absente avec note explicite),
+   `salary_prepare_all`
+   (→ `prepare_missing_payroll_entries()`) et
+   `salary_pay_ready_all`
+   (→ `mark_ready_payroll_entries_available()`,
+   notifications RÉELLES via `notify_salary_available()`,
+   communication.services.NotificationService, canaux
+   IN_APP + WEBSOCKET, déduplication par
+   CommunicationNotification existante).
+
+✅ Honoraires enseignants — Même qualité, JAMAIS mélangé avec
+   les salaires staff (conforme AGENTS.md). Signal
+   `auto_prepare_honorarium_on_rate_change` (signals.py:127-173)
+   crée la fiche TeacherHonorariumEntry dès
+   `teacher_hourly_rate > 0` et `position == "teacher"`.
+   `teacher_honorarium_prepare_all` recalcule en plus les heures
+   validées depuis `LessonLog` (status=DONE,
+   validated_by__isnull=False) — un calcul réel, pas un chiffre
+   inventé (manager_intelligence.py:122-138).
+   `teacher_honorarium_pay_ready_all` envoie de vraies
+   notifications via `notify_teacher_honorarium_available()`.
+
+✅ Dépenses — `expense_create`, `expense_approve`
+   (`can_be_approved`), `expense_reject` (bloque si déjà payée),
+   `expense_pay` (`select_for_update()`, crée un
+   BranchCashMovement SOURCE_EXPENSE). Test
+   `ManagerExpenseWorkflowTests` confirme le mouvement de caisse
+   réel (montant exact vérifié).
+
+✅ Dons — `donation_create` crée un Donation + un
+   BranchCashMovement SOURCE_DONATION, synchronisé et déclenche
+   un toast. Couvert par
+   `ManagerDonationWorkflowTests.test_donation_creates_cash_movement_and_toast`
+   (accounts/test_manager_workflows.py:249-265).
+
+✅ Clôture mensuelle — `BranchMonthlyClosure` existe avec tous
+   les champs attendus (total_entries, total_exits,
+   student_revenue, shop_revenue, salary_paid, honorarium_paid,
+   expenses_paid, result_amount, bank_transfer_amount, status,
+   notes, validated_by/at, closed_at, archived_at). L'action
+   `monthly_closure_create`
+   (accounts/dashboards/htmx_depenses.py:108-221) calcule les
+   totaux RÉELS depuis `BranchCashMovement` sur la période, puis
+   `update_or_create` par (branch, period_month) — donc AUCUNE
+   suppression, l'historique par mois est conservé et consultable
+   (table "Périodes / Etat / Résultat / Versement" dans la section
+   "Honoraires & clôture"). Conforme à la règle AGENTS.md "Never
+   delete data. Create consultable archives."
+
+✅ Versements bancaires — `BranchBankTransfer` (OneToOne avec
+   BranchMonthlyClosure) a EXACTEMENT les champs demandés par
+   AGENTS.md : banque, référence, date, montant, justificatif
+   (FileField "proof"), commentaire. Le formulaire
+   `monthly_closure_form.html` les expose tous, y compris l'upload
+   de pièce justificative. Création réelle via
+   `BranchBankTransfer.objects.update_or_create(closure=closure,
+   ...)`. Le DG peut les consulter par annexe (table "Banque /
+   Référence / Date / Montant / Commentaire").
+
+✅ Export Excel — `manager_export_report_xlsx` →
+   `export_branch_report_xlsx()`
+   (accounts/services/excel_reports.py:174-293) génère un vrai
+   classeur openpyxl avec sections "Situation de la période",
+   "Détail des mouvements", "Derniers mouvements de caisse"
+   (200 lignes max), "Statistiques du mois". Testé et fonctionnel
+   (`ManagerExportReportTests.test_export_xlsx_returns_file`,
+   content-type vérifié).
+
+✅ Recherche rapide — `quick_results` (manager_dashboard.py:
+   749-771) cherche réellement candidatures/inscriptions/
+   paiements filtrés par annexe (`base_candidatures`,
+   `base_inscriptions`, `base_payments` sont déjà scopés en amont
+   dans `_manager_context`).
+
+✅ Widgets temps réel — `widget_cash_balance`,
+   `widget_today_payments`, `widget_active_sessions`,
+   `widget_scope_bar` lisent tous des agrégats réels
+   (Sum/aggregate) filtrés par branche, rafraîchis via HTMX sur
+   évènements `cashBalanceUpdated`, `candidatureUpdated`,
+   `paymentUpdated`, `dashboardStatsUpdated`.
+
+✅ Indicateurs et alertes "intelligence" —
+   `build_manager_intelligence_context()`
+   (manager_intelligence.py:409-552) calcule de vraies priorités
+   (paiements non synchronisés, fiches de paie manquantes,
+   honoraires manquants, salaires/honoraires restants, dépenses
+   approuvées à payer, inscriptions en attente de paiement) et de
+   vraies alertes (solde de caisse négatif, caisse insuffisante
+   pour couvrir les engagements). Ce ne sont pas des seuils
+   inventés, ce sont des calculs sur les données de l'annexe.
+
+✅ Tests de workflow — `accounts/test_manager_workflows.py`
+   (377 lignes) couvre candidatures (under_review/accept/reject/
+   delete), paiements (validate crédite la caisse, cancel),
+   dépenses (approve change le statut, pay crée le mouvement),
+   dons (mouvement + toast), contrôle d'accès cross-branche
+   (`test_manager_a_cannot_see_branch_b_candidatures`,
+   `test_unauthorized_user_gets_403`), rendu de toutes les
+   sections, et export Excel. C'est nettement plus de couverture
+   que ce qui existe pour le dashboard DG ("Aucun test unitaire
+   trouvé pour les actions DG" — dg.txt:313).
+
+=================================================================
+2. CE QUI EST PROBLÉMATIQUE
+=================================================================
+
+🚩 PROBLÈME #1 — BARRES "LECTURE CAISSE" EN DUR (données fausses)
+   Fichier : accounts/templates/accounts/dashboard/
+             manager_dashboard.html:1006,1010,1014,1018,1022
+
+   Dans la section Caisse, le panneau "Lecture caisse" affiche 5
+   barres de progression avec des largeurs CSS codées en dur :
+     width:75%, width:55%, width:45%, width:35%, width:65%
+   censées représenter respectivement
+   `cash_stats.student_receipts_month`, `expenses_paid_month`,
+   `salary_paid_month`, `honorarium_paid_month` et
+   `estimated_month_balance`. Ces pourcentages NE SONT PAS
+   calculés à partir des valeurs réelles affichées juste à côté
+   (les montants en FCFA, eux, sont réels). Résultat : un
+   gestionnaire dont les recettes du mois sont à zéro verra
+   quand même une barre à 75%. C'est le même type de
+   "maquillage visuel" déjà identifié dans dg.txt (PROBLÈME #1,
+   "graphiques temps réel faux").
+
+🚩 PROBLÈME #2 — CODE MORT DANS LE WIDGET SIDEBAR (alertes
+   toujours à zéro, branche inutilisée)
+   Fichier : accounts/dashboards/htmx_widgets.py:200-202
+
+       alerts_count = Donation.objects.filter(
+           branch=branch, date__gte=timezone.now().date().replace(day=1),
+       ).count() if False else 0
+
+   La condition `if False` rend la requête `Donation.objects...`
+   complètement inerte : `alerts_count` vaut TOUJOURS 0, et n'est
+   même pas transmis au contexte du template (seuls
+   `candidatures_pending` et `pending_payments` sont renvoyés,
+   widget_sidebar_badges l.203-210). C'est du code mort qui
+   suggère une fonctionnalité d'alerte abandonnée en cours de
+   développement.
+
+🚩 PROBLÈME #3 — TROIS TEMPLATES ORPHELINS NON UTILISÉS
+   Fichiers :
+     accounts/templates/accounts/dashboard/manager_candidatures.html
+     accounts/templates/accounts/dashboard/manager_inscriptions.html
+     accounts/templates/accounts/dashboard/manager_paiements.html
+
+   Ces trois fichiers existent, ont leur propre style (bandeau
+   "Poste gestionnaire" en dégradé, cartes de stats différentes
+   du dashboard principal) et se référencent mutuellement via
+   `{% url 'accounts:manager_inscriptions' %}` /
+   `manager_paiements` / `manager_candidatures`. MAIS aucune vue
+   Python ne fait `render(..., "manager_candidatures.html", ...)`
+   — grep confirmé sur tout `accounts/*.py`. Les vues
+   `manager_candidatures`, `manager_inscriptions`,
+   `manager_paiements`
+   (accounts/dashboards/manager_dashboard.py:902-914) appellent
+   toutes `_render_manager_dashboard(request, "...")`, qui rend
+   `manager_dashboard.html` (le même template que la vue
+   principale avec `?section=...`). Ces trois templates sont donc
+   du code 100% mort, jamais affiché à l'utilisateur — mais ils
+   restent dans le repo et pourraient induire en erreur un futur
+   développeur qui les modifierait en pensant qu'ils sont actifs.
+
+🚩 PROBLÈME #4 — PARTIAL "manager_salary_row.html" JAMAIS RENDU
+   Fichier : accounts/templates/accounts/dashboard/partials/
+             manager_salary_row.html
+
+   Ce partial (ligne de tableau pour un employé avec bouton
+   "Gérer" → `htmx_manager_salary_detail`) n'est référencé par
+   AUCUN `render()` dans `htmx_salaires.py` (grep confirmé : les
+   actions salaires renvoient
+   `manager_salary_redirect_response()`, c.-à-d. un HX-Redirect
+   plein écran, jamais un swap de ligne). Le tableau "Salaires"
+   du dashboard principal utilise une boucle inline dans
+   `manager_dashboard.html`, pas ce partial. Fichier mort, ou
+   vestige d'une UI HTMX "swap de ligne" abandonnée au profit du
+   redirect complet.
+
+🚩 PROBLÈME #5 — EXPORT EXCEL INCOMPLET PAR RAPPORT À AGENTS.md
+   Fichier : accounts/services/excel_reports.py:174-293
+
+   AGENTS.md (l.80) précise que les rapports doivent inclure :
+   "admissions, inscriptions, payments, donations, shop sales,
+   expenses, salaries, honoraria, net result."
+   Le contenu réel de `report_rows` dans
+   `export_branch_report_xlsx()` couvre : Total entrées/sorties,
+   Paiements scolaires, Ventes boutique, Dons/Donations,
+   Dépenses, Salaires, Honoraires enseignants, Solde net — soit
+   8 lignes. AUCUNE statistique de candidatures (admissions) ni
+   d'inscriptions n'apparaît dans l'export, alors que la section
+   "Rapport" du dashboard affiche pourtant des chiffres
+   d'inscriptions/candidatures dans les KPIs annuels
+   (`annual_revenue_*`, l.1108-1136 du template). L'export Excel
+   n'est donc pas un miroir complet de ce que le gestionnaire voit
+   ni de ce qu'AGENTS.md promet.
+
+🚩 PROBLÈME #6 — CLÔTURE MENSUELLE : LE WORKFLOW DRAFT/VALIDATED
+   N'EST JAMAIS UTILISÉ
+   Fichier : accounts/dashboards/htmx_depenses.py:183-203
+
+   Le modèle `BranchMonthlyClosure` définit 3 statuts :
+   STATUS_DRAFT (par défaut), STATUS_VALIDATED, STATUS_CLOSED —
+   ce qui suggère un cycle de vie en plusieurs étapes (brouillon
+   → validation → clôture définitive), avec des responsables et
+   horodatages distincts à chaque étape
+   (`validated_by/validated_at` vs `closed_at`).
+
+   En pratique, `monthly_closure_create` fait passer la clôture
+   DIRECTEMENT à `STATUS_CLOSED` en une seule action, et renseigne
+   `validated_by`, `validated_at` ET `closed_at` simultanément à
+   `timezone.now()`. Il n'existe AUCUNE action pour créer une
+   clôture en DRAFT, la corriger, puis la VALIDER séparément
+   avant de la CLOSE.
+
+   Ce n'est pas un "bug" au sens strict (l'action fonctionne, ne
+   supprime rien, archive correctement par mois via
+   `update_or_create`), mais c'est un écart entre ce que le modèle
+   suggère (workflow de validation à plusieurs niveaux, peut-être
+   destiné à une revue DG avant verrouillage définitif) et ce que
+   l'UI permet réellement (un seul clic = clôture définitive,
+   sans étape de relecture). Si l'intention métier est qu'un DG ou
+   un comptable valide AVANT clôture définitive, cette étape
+   n'existe pas dans le dashboard gestionnaire.
+
+🚩 PROBLÈME #7 — HELPERS MORTS DANS helpers.py
+   Fichier : accounts/dashboards/helpers.py
+
+   `is_admissions()`, `is_finance()`, `is_executive()` sont
+   définis mais ne sont appelés NULLE PART dans le code (grep
+   confirmé sur tout le repo). Seul `is_manager()` est
+   effectivement utilisé par `manager_required`. Ces trois
+   fonctions sont du code mort qui laisse penser que le dashboard
+   gestionnaire gère plusieurs rôles alternatifs, alors que ces
+   rôles ("admissions", "finance", "executive") sont en réalité
+   gérés par des dashboards complètement séparés
+   (`admissions_dashboard.py`, `finance_dashboard.py`,
+   `executive_dashboard.py`) avec leurs propres fonctions de
+   permission dans `permissions.py`
+   (`check_admissions_access`, `check_finance_access`,
+   `check_executive_access`).
+
+🚩 PROBLÈME #8 — DEUX IMPLÉMENTATIONS DIFFÉRENTES DE
+   `manager_required`
+   Fichiers :
+     accounts/dashboards/manager_dashboard.py:33-45
+     accounts/dashboards/htmx_utils.py (manager_required)
+
+   La version de `manager_dashboard.py` REDIRIGE vers une page
+   403 si l'utilisateur n'a pas de branche/n'est pas
+   gestionnaire. La version de `htmx_utils.py` renvoie
+   directement une réponse HTTP 403 "Non autorisé" (confirmé par
+   `ManagerAccessControlTests.test_unauthorized_user_gets_403`,
+   qui teste précisément ce code 403 sur une vue HTMX). Les deux
+   décorateurs portent le même nom mais ont un comportement
+   différent selon qu'on est sur une vue de page complète ou une
+   vue HTMX. Ce n'est pas forcément un bug (les deux usages sont
+   cohérents avec leur contexte : redirect pour page complète,
+   403 pour fragment HTMX), mais le nommage identique de deux
+   décorateurs au comportement différent est une source de
+   confusion potentielle pour la maintenance.
+
+🚩 PROBLÈME #9 — htmx_admissions.py / htmx_finance.py : NE FONT
+   PAS PARTIE DU DASHBOARD GESTIONNAIRE MAIS SONT PRÉSENTÉS COMME
+   "ENTRYPOINTS" DANS AGENTS.md
+   Fichier : AGENTS.md:66 ("htmx_admissions.py, htmx_finance.py —
+   legacy HTMX views")
+
+   Vérification faite : ces deux fichiers sont importés dans
+   `accounts/urls.py` (lignes 29-58) et utilisés EXCLUSIVEMENT par
+   `admissions_dashboard.py` et `finance_dashboard.py` — deux
+   dashboards PARALLÈLES pour des groupes "admissions"/"finance",
+   distincts du groupe "gestionnaire". Aucune fonction de
+   `htmx_admissions.py`/`htmx_finance.py` n'est appelée depuis
+   `manager_dashboard.html` ou les fichiers `htmx_*` du
+   gestionnaire. AGENTS.md les liste dans la section "Manager
+   (gestionnaire) dashboard / Entrypoints" ce qui est trompeur :
+   ce sont des vestiges d'un système de dashboards par rôle
+   (admissions / finance / executive) qui semble avoir été
+   remplacé par le dashboard gestionnaire unifié, mais qui
+   n'a pas été retiré ni d'AGENTS.md ni du code.
+
+=================================================================
+3. CE QUI FONCTIONNE MAIS MÉRITERAIT D'ÊTRE VÉRIFIÉ EN CONDITIONS
+   RÉELLES
+=================================================================
+
+⚠️ Pattern `hx-target="body" hx-swap="beforeend"` — Les boutons
+   "Pré-calculer les fiches" / "Notifier les fiches disponibles"
+   (salaires, l.~840-850), "Synchroniser encaissements" (caisse)
+   et "Pré-calculer les honoraires" / "Notifier les honoraires
+   disponibles" (clôture, l.1162-1163) utilisent tous
+   `hx-target="body" hx-swap="beforeend"`. Or les handlers
+   correspondants
+   (`salary_prepare_all`, `salary_pay_ready_all`,
+   `teacher_honorarium_prepare_all`,
+   `teacher_honorarium_pay_ready_all`, `cash_sync`) renvoient
+   `manager_section_notice_redirect_response()`, qui pose un
+   header `HX-Redirect`. HTMX traite `HX-Redirect` en PRIORITÉ et
+   ignore `hx-target`/`hx-swap` — donc en pratique le clic
+   provoque une redirection pleine page (rechargement de la
+   section avec un message de notice), et non un "append" en fin
+   de `<body>`. Le comportement final est correct (l'utilisateur
+   voit le résultat), mais l'attribut `hx-swap="beforeend"` est
+   trompeur/inutile dans le code — un signe que ces boutons ont
+   été migrés d'un pattern "fragment inséré" vers "redirect" sans
+   nettoyer les attributs HTMX devenus obsolètes.
+
+⚠️ `cash_session_create` exige un `PaymentAgent` actif rattaché
+   au gestionnaire (`get_current_agent`). Si aucun profil
+   `PaymentAgent` n'existe pour ce gestionnaire dans cette
+   annexe, le bouton "Générer une session cash" renvoie un message
+   d'erreur HTML (403) plutôt qu'une session — ce n'est pas un
+   bouton mort, mais son fonctionnement dépend d'une donnée de
+   configuration (PaymentAgent) qui doit être créée en amont
+   (admin ou seed). À vérifier que tous les comptes
+   "gestionnaire" en production ont bien un PaymentAgent actif.
+
+=================================================================
+4. INVENTAIRE CHIFFRÉ
+=================================================================
+
+[4.1] BOUTONS / ACTIONS — RÉELS vs MORTS
+-------------------------------------------
+  ✓ Candidatures : 6 actions hx-post/hx-get réelles (detail,
+    under_review, accept, to_complete, reject, delete)
+  ✓ Inscriptions : detail + positionnement réels
+  ✓ Paiements : detail, validate, cancel, correct — tous réels
+  ✓ Caisse : créer session, régénérer, annuler, encaisser,
+    mouvement manuel, synchroniser, reçu PDF — tous réels
+  ✓ Salaires : detail/gérer, pré-calculer, notifier — réels
+    (redirect complet, pas de swap)
+  ✓ Honoraires : idem salaires — réels
+  ✓ Dépenses : créer, approuver, rejeter, payer — tous réels
+  ✓ Dons : créer don — réel
+  ✓ Clôture : formulaire clôture + versement bancaire — réel
+  ✓ Export Excel : 1 bouton réel (manager_export_report_xlsx)
+  ✗ "Voir inscriptions" / liens croisés dans
+    manager_candidatures.html / manager_inscriptions.html /
+    manager_paiements.html : présents mais ces templates ne sont
+    JAMAIS rendus → 0 utilisateur ne les voit
+  ✗ manager_salary_row.html : bouton "Gérer" défini mais partial
+    jamais inclus par une vue
+
+  TOTAL boutons fonctionnels recensés : ~25 (un nombre
+  nettement supérieur au dashboard DG, qui n'en comptait que
+  ~15 avec 20 boutons morts).
+  TOTAL fichiers de code mort identifiés : 4
+  (3 templates orphelins + 1 partial non rendu)
+
+[4.2] DONNÉES EN DUR / FAUSSES
+---------------------------------
+  • 5 barres "Lecture caisse" à largeur fixe
+    (manager_dashboard.html:1006,1010,1014,1018,1022)
+  • 1 variable morte toujours à 0
+    (htmx_widgets.py:200-202, alerts_count if False else 0)
+
+  C'est BEAUCOUP moins que le dashboard DG (8 valeurs en dur,
+  dont des graphiques entièrement fictifs). La quasi-totalité
+  des KPIs, stats, et tableaux du dashboard gestionnaire sont
+  calculés depuis la base à chaque requête.
+
+[4.3] FILTRAGE PAR ANNEXE — VÉRIFICATION PAR DOMAINE
+--------------------------------------------------------
+  ✅ Candidatures        — branch=request.branch (toutes les vues)
+  ✅ Inscriptions        — candidature__branch=request.branch
+  ✅ Paiements           — inscription__candidature__branch=
+                            request.branch
+  ✅ Caisse / mouvements — branch=request.branch
+  ✅ Salaires (staff)    — branch=branch, exclude
+                            position in (student, teacher),
+                            exclude user_type=public
+  ✅ Honoraires enseignants — branch=branch, position=teacher
+  ✅ Dépenses            — branch=request.branch
+  ✅ Dons                — branch=request.branch
+  ✅ Clôture mensuelle   — branch=request.branch,
+                            update_or_create(branch, period_month)
+  ✅ Versements bancaires — branch=request.branch,
+                            OneToOne avec closure de l'annexe
+  ✅ Rapports / Export   — filename inclut le code annexe,
+                            requêtes scopées branch=request.branch
+  ✅ Recherche rapide    — basée sur base_candidatures/
+                            base_inscriptions/base_payments déjà
+                            scopés
+  ✅ Widgets (sidebar, cash balance, alerts, sessions) — tous
+                            branch=request.branch
+
+  AUCUNE fuite cross-annexe détectée dans le code source. Le test
+  `test_manager_a_cannot_see_branch_b_candidatures` confirme ce
+  comportement à l'exécution pour au moins le domaine
+  candidatures.
+
+[4.4] NOTIFICATIONS / EMAILS RÉELS
+---------------------------------------
+  ✅ `notify_salary_available()` — NotificationService.notify_user,
+     canaux IN_APP + WEBSOCKET, déduplication via
+     CommunicationNotification existante. RÉEL.
+  ✅ `notify_teacher_honorarium_available()` — idem, RÉEL.
+  ⚠️ Aucun email SMTP (Brevo) explicite déclenché depuis le
+     dashboard gestionnaire — les notifications passent par
+     CommunicationNotification (in-app/websocket), pas par email.
+     Ce n'est pas forcément un défaut (AGENTS.md ne demande pas
+     d'email pour ces évènements), mais à noter si l'attente
+     métier était "email au salarié quand sa fiche est prête".
+
+[4.5] AUTO-GÉNÉRATION PAIE / HONORAIRES (signals.py)
+---------------------------------------------------------
+  ✅ auto_prepare_payroll_on_salary_change — conforme AGENTS.md,
+     vérifié ligne par ligne (signals.py:75-121)
+  ✅ auto_prepare_honorarium_on_rate_change — conforme AGENTS.md,
+     jamais mélangé avec les salaires staff (filtre
+     position == "teacher" exclusif), vérifié ligne par ligne
+     (signals.py:127-173)
+  ✅ prepare_missing_payroll_entries /
+     prepare_missing_teacher_honorarium_entries — recalcul de
+     rattrapage manuel via boutons "Pré-calculer", avec calcul
+     réel des heures validées (LessonLog) pour les honoraires
+
+[4.6] TESTS — COUVERTURE
+------------------------------
+  ✅ Candidatures : under_review, accept, reject (motif),
+     delete (conditionnel) — 5 tests
+  ✅ Paiements : validate (crédite caisse, montant vérifié),
+     cancel — 2 tests
+  ✅ Dépenses : approve (statut + HX-Redirect), pay (mouvement
+     de caisse, montant vérifié) — 2 tests
+  ✅ Dons : création + mouvement de caisse + toast — 1 test
+  ✅ Contrôle d'accès : filtrage cross-branche (candidatures),
+     403 sur action HTMX non autorisée — 2 tests
+  ✅ Rendu de toutes les sections (overview, candidatures,
+     inscriptions, paiements, dépenses, caisse, rapport, clôture,
+     dons) — 9 tests "smoke" (status 200 uniquement)
+  ✅ Export Excel : content-type vérifié — 1 test
+
+  ✗ AUCUN test pour : salaires (salary_pay, salary_advance,
+    salary_prepare_all, salary_pay_ready_all), honoraires
+    enseignants (tout le module), clôture mensuelle
+    (monthly_closure_create — ni le calcul des totaux, ni la
+    création du BranchBankTransfer, ni le statut CLOSED), sessions
+    cash (cash_session_create/regenerate/cancel/complete),
+    synchronisation caisse (cash_sync), inscriptions
+    (inscription_create), widgets HTMX individuels.
+  ✗ Les tests "smoke" de rendu de section ne vérifient QUE le
+    code 200 — ils ne vérifient pas que les données affichées
+    sont correctes ni que le filtrage par annexe s'applique dans
+    CES sections (seul "candidatures" est testé pour le
+    cross-branche).
+
+  Sur ~13 modules fonctionnels (candidatures, inscriptions,
+  paiements, caisse, salaires, honoraires, dépenses, dons,
+  clôture, versements bancaires, rapports, recherche, widgets),
+  4 ont une couverture de comportement réelle (candidatures,
+  paiements, dépenses, dons), et les domaines les plus sensibles
+  financièrement (salaires, honoraires, clôture, versements
+  bancaires) n'ont AUCUN test de comportement — uniquement un
+  test de rendu de page à 200.
+
+=================================================================
+5. VERDICT
+=================================================================
+
+Le dashboard gestionnaire est, de très loin, le dashboard le plus
+SOLIDE et le plus HONNÊTE de ceux audités jusqu'ici (comparé à
+dg.txt et enseignant.txt) :
+
+  ✓ Le filtrage par annexe est rigoureux et vérifié partout
+  ✓ Les actions ont de vrais effets en base (mouvements de
+    caisse, journaux financiers, statuts, notifications)
+  ✓ La paie staff et les honoraires enseignants sont
+    auto-générés exactement comme décrit dans AGENTS.md, et
+    jamais mélangés
+  ✓ La clôture mensuelle archive sans supprimer, et les
+    versements bancaires ont tous les champs requis
+  ✓ L'export Excel fonctionne et est testé
+  ✓ Les tests couvrent les workflows les plus critiques
+    (candidatures, paiements, dépenses, dons)
+
+Mais il reste :
+
+  ✗ Quelques résidus de "maquillage visuel" (barres caisse en
+    dur) — mineur mais à corriger car c'est exactement le type
+    de défaut dénoncé pour le DG
+  ✗ Du code mort accumulé (3 templates orphelins, 1 partial non
+    rendu, 1 bloc `if False`, 3 helpers de rôle jamais appelés) —
+    pas dangereux mais source de confusion pour la maintenance
+  ✗ Un export Excel qui ne couvre pas tout ce que promet
+    AGENTS.md (candidatures/inscriptions absentes)
+  ✗ Un modèle de clôture à 3 statuts dont 2 (DRAFT, VALIDATED) ne
+    sont jamais utilisés en pratique — soit le modèle est
+    surdimensionné, soit il manque une étape de validation
+    intermédiaire dans l'UI
+  ✗ Les domaines financiers les plus sensibles (salaires,
+    honoraires, clôture, versements bancaires) n'ont aucun test
+    de comportement, seulement un test de rendu
+
+VERDICT GLOBAL : Ce dashboard est globalement PRÊT POUR LA
+PRODUCTION sur le plan fonctionnel (les actions marchent, les
+écritures comptables sont correctes, le filtrage est sûr). Les
+points faibles identifiés sont des finitions (UI, code mort,
+tests manquants sur la paie/honoraires/clôture) plutôt que des
+défauts structurels. Avant mise en production à grande échelle,
+il faudrait prioritairement : 1) corriger les barres en dur
+(risque d'image trompeuse pour le gestionnaire/DG), 2) ajouter des
+tests sur salaires/honoraires/clôture/versements (ce sont les
+flux les plus sensibles à l'erreur financière), 3) nettoyer le
+code mort identifié, 4) compléter l'export Excel avec
+candidatures/inscriptions, 5) décider si le workflow
+DRAFT→VALIDATED→CLOSED de la clôture doit être implémenté ou si
+le modèle doit être simplifié pour ne garder que CLOSED.
+
+=================================================================
+6. RECOMMANDATIONS PRIORISÉES
+=================================================================
+
+PRIORITÉ HAUTE (avant prod / corrections rapides) :
+  1. Remplacer les largeurs fixes du panneau "Lecture caisse"
+     (manager_dashboard.html:1006-1022) par un calcul réel des
+     proportions à partir de `cash_stats` (ex: via
+     `{% widthratio %}` comme déjà utilisé ligne 1125 pour les
+     recettes annuelles).
+  2. Ajouter des tests de comportement pour : salary_pay,
+     salary_advance, salary_prepare_all, salary_pay_ready_all,
+     teacher_honorarium_* (équivalents), monthly_closure_create
+     (calcul des totaux + création BranchBankTransfer + statut
+     final), cash_session_create/complete/cancel.
+  3. Supprimer ou nettoyer `htmx_widgets.py:200-202`
+     (le bloc `if False else 0` mort).
+
+PRIORITÉ MOYENNE :
+  4. Supprimer les 3 templates orphelins
+     (manager_candidatures.html, manager_inscriptions.html,
+     manager_paiements.html) ou les reconnecter intentionnellement
+     si une UI alternative est prévue — actuellement ils sont
+     juste un risque de confusion.
+  5. Supprimer `manager_salary_row.html` (partial mort) ou
+     l'utiliser réellement si un mode "swap de ligne" est
+     souhaité pour les actions salaires/honoraires.
+  6. Compléter `export_branch_report_xlsx()` avec les sections
+     candidatures/admissions et inscriptions promises par
+     AGENTS.md.
+  7. Nettoyer `helpers.py` : retirer `is_admissions()`,
+     `is_finance()`, `is_executive()` si réellement jamais
+     utilisés, ou documenter pourquoi ils existent encore.
+
+PRIORITÉ BASSE :
+  8. Clarifier dans AGENTS.md que `htmx_admissions.py` et
+     `htmx_finance.py` appartiennent aux dashboards
+     admissions/finance/executive et NON au dashboard
+     gestionnaire, pour éviter toute confusion future.
+  9. Décider du sort du workflow DRAFT/VALIDATED/CLOSED de
+     BranchMonthlyClosure : soit implémenter une étape de
+     validation intermédiaire (par ex. validation DG avant
+     clôture définitive), soit simplifier le modèle pour
+     refléter la réalité (clôture directe = CLOSED).
+  10. Vérifier en environnement réel que tous les comptes
+      "gestionnaire" disposent d'un profil PaymentAgent actif
+      (sinon "Générer une session cash" échoue silencieusement
+      avec un message d'erreur HTML).
+
+=================================================================
+7. NOTE FINALE
+=================================================================
+
+Contrairement au dashboard DG (façade impressionnante, fond creux)
+et dans la même veine que ce qui a été observé pour le dashboard
+enseignant, le dashboard gestionnaire fait ce qu'il prétend faire.
+La majorité des défauts relevés ici sont des défauts de FINITION
+(données en dur résiduelles, code mort accumulé au fil des
+itérations, tests incomplets sur les modules les plus récents) et
+non des défauts de CONCEPTION ou de SÉCURITÉ. Le filtrage par
+annexe — la règle métier la plus critique du projet selon
+AGENTS.md — est appliqué avec une rigueur exemplaire sur
+l'ensemble des 11 sections du dashboard. C'est la base la plus
+saine sur laquelle construire la suite.

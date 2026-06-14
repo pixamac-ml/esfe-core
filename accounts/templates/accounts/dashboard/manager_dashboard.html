@@ -137,6 +137,32 @@
   .dg-empty-text { font-size: .8rem; font-weight: 700; }
   .dg-footer { text-align: center; padding: 10px; color: #94a3b8; font-size: .68rem; font-weight: 600; }
 
+  /* ===== FORMS - CHAMPS STYLISES ===== */
+  .dg-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+  .dg-field { display: flex; flex-direction: column; }
+  .dg-field-wide { grid-column: 1 / -1; }
+  .dg-field-checkbox { flex-direction: row; }
+  .dg-field label { font-size: .72rem; font-weight: 800; color: #475569; display: flex; align-items: center; gap: .4rem; margin-bottom: 6px; }
+  .dg-required { color: #ef4444; margin-left: 2px; font-weight: 900; }
+  .dg-form-note { font-size: .68rem; color: #94a3b8; margin-top: 4px; }
+  .dg-input {
+    width: 100%; border: 1px solid #dbe3ef; border-radius: .65rem; background: #fff;
+    padding: .6rem .85rem; font-size: .82rem; font-weight: 600; color: #0f172a;
+    transition: border-color .15s, box-shadow .15s; outline: none;
+  }
+  .dg-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  textarea.dg-input { min-height: 90px; resize: vertical; }
+  .dg-input-wrap { position: relative; display: flex; }
+  .dg-input-wrap .dg-input-icon { position: absolute; left: .85rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: .78rem; pointer-events: none; }
+  .dg-input-wrap .dg-input { padding-left: 2.35rem; }
+  .dg-checkbox-label { display: flex; align-items: center; gap: .6rem; border: 1px solid #dbe3ef; border-radius: .65rem; padding: .6rem .85rem; cursor: pointer; transition: border-color .15s, background .15s; width: 100%; font-size: .78rem; font-weight: 700; color: #334155; }
+  .dg-checkbox-label:hover { border-color: #bfdbfe; background: #f8fbff; }
+  .dg-checkbox-label input[type=checkbox] { width: 18px; height: 18px; flex-shrink: 0; accent-color: #2563eb; }
+  .dg-form-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+  .errors { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+  .errors li { display: flex; align-items: flex-start; gap: 6px; font-size: .68rem; font-weight: 700; color: #ef4444; }
+  .errors li i { font-size: .65rem; flex-shrink: 0; margin-top: 1px; }
+
   #modal-container { position: fixed; inset: 0; z-index: 100; }
   #modal-container.hidden { display: none !important; }
 
@@ -159,7 +185,7 @@
 
   @media (max-width: 768px) {
     body { overflow: auto; }
-    .dg-row-2, .dg-row-3, .dg-row-4, .dg-action-grid, .dg-pill-grid, .dg-kpi-grid { grid-template-columns: 1fr; }
+    .dg-row-2, .dg-row-3, .dg-row-4, .dg-action-grid, .dg-pill-grid, .dg-kpi-grid, .dg-form-grid { grid-template-columns: 1fr; }
     .dg-content-wrap { padding: 12px; }
   }
 </style>
@@ -884,15 +910,10 @@
               <div class="dg-panel-title">Nouvelle depense</div>
               <form method="post" action="{% url 'accounts:htmx_manager_expense_create' %}" enctype="multipart/form-data" class="space-y-3">
                 {% csrf_token %}
-                {{ expense_form.title }}
-                {{ expense_form.category }}
-                {{ expense_form.amount }}
-                {{ expense_form.expense_date }}
-                {{ expense_form.supplier }}
-                {{ expense_form.reference }}
-                {{ expense_form.receipt }}
-                {{ expense_form.notes }}
-                <button class="dg-btn dg-btn-primary" type="submit">Creer la depense</button>
+                {% include "accounts/dashboard/partials/dg_form_fields.html" with form=expense_form %}
+                <div class="dg-form-footer">
+                  <button class="dg-btn dg-btn-primary" type="submit"><i class="fa-solid fa-plus"></i>Creer la depense</button>
+                </div>
               </form>
             </div>
             <div class="dg-panel" style="box-shadow:none; background:#f8fafc; border-radius:12px;">
@@ -984,14 +1005,10 @@
               <div class="dg-panel-title">Mouvement manuel</div>
               <form method="post" action="{% url 'accounts:htmx_manager_cash_movement_create' %}" class="space-y-3">
                 {% csrf_token %}
-                {{ cash_form.movement_type }}
-                {{ cash_form.source }}
-                {{ cash_form.amount }}
-                {{ cash_form.label }}
-                {{ cash_form.movement_date }}
-                {{ cash_form.reference }}
-                {{ cash_form.notes }}
-                <button class="dg-btn dg-btn-primary" type="submit">Creer mouvement</button>
+                {% include "accounts/dashboard/partials/dg_form_fields.html" with form=cash_form %}
+                <div class="dg-form-footer">
+                  <button class="dg-btn dg-btn-primary" type="submit"><i class="fa-solid fa-plus"></i>Creer mouvement</button>
+                </div>
               </form>
               <div class="mt-4 flex flex-wrap gap-2">
                 <button class="dg-btn dg-btn-success" type="button" hx-post="{% url 'accounts:htmx_manager_cash_sync' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend"><i class="fa-solid fa-arrows-rotate"></i>Synchroniser encaissements</button>

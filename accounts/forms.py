@@ -218,9 +218,9 @@ class PayrollEntryForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in ["period_month", "base_salary", "allowances", "deductions", "advances"]:
-            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+            self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["notes"].widget.attrs.update({
-            "class": TEXTAREA_CLASS,
+            "class": "dg-input",
             "placeholder": "Observations internes sur la paie du mois...",
         })
 
@@ -245,9 +245,9 @@ class TeacherHonorariumEntryForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in ["period_month", "hourly_rate", "validated_hours", "adjustments", "deductions", "advances"]:
-            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+            self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["notes"].widget.attrs.update({
-            "class": TEXTAREA_CLASS,
+            "class": "dg-input",
             "placeholder": "Observations internes sur les honoraires du mois...",
         })
 
@@ -268,10 +268,10 @@ class BranchMonthlyClosureForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in ["period_month", "bank_transfer_amount"]:
-            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+            self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["bank_transfer_amount"].required = False
         self.fields["notes"].widget.attrs.update({
-            "class": TEXTAREA_CLASS,
+            "class": "dg-input",
             "placeholder": "Motif de cloture ou observations de fin de periode...",
         })
 
@@ -295,15 +295,15 @@ class BranchBankTransferForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in ["bank_name", "reference", "transfer_date", "amount"]:
-            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+            self.fields[field_name].widget.attrs.update({"class": "dg-input"})
             self.fields[field_name].required = False
         self.fields["proof"].widget.attrs.update({
-            "class": INPUT_CLASS,
+            "class": "dg-input",
             "accept": ".pdf,image/jpeg,image/png,image/webp",
         })
         self.fields["proof"].required = False
         self.fields["comment"].widget.attrs.update({
-            "class": TEXTAREA_CLASS,
+            "class": "dg-input",
             "placeholder": "Commentaire interne sur le versement bancaire...",
         })
         self.fields["comment"].required = False
@@ -329,13 +329,13 @@ class BranchExpenseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in ["title", "category", "amount", "expense_date", "supplier"]:
-            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+            self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["receipt"].widget.attrs.update({
-            "class": INPUT_CLASS,
+            "class": "dg-input",
             "accept": ".pdf,image/jpeg,image/png,image/webp",
         })
         self.fields["notes"].widget.attrs.update({
-            "class": TEXTAREA_CLASS,
+            "class": "dg-input",
             "placeholder": "Motif, details ou justification interne...",
         })
 
@@ -359,9 +359,9 @@ class BranchCashMovementForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in ["movement_type", "source", "amount", "label", "movement_date"]:
-            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+            self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["notes"].widget.attrs.update({
-            "class": TEXTAREA_CLASS,
+            "class": "dg-input",
             "placeholder": "Commentaire interne sur ce mouvement...",
         })
 
@@ -386,8 +386,8 @@ class DonationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name in ["donor_name", "amount", "date", "motif", "payment_method", "receipt_number"]:
-            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS})
+            self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["description"].widget.attrs.update({
-            "class": TEXTAREA_CLASS,
+            "class": "dg-input",
             "placeholder": "Remerciements ou note...",
         })

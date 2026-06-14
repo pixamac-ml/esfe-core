@@ -1,4 +1,4 @@
-{% load humanize %}
+{% load humanize dashboard_forms %}
 <div class="space-y-4">
     {% if closure_error %}
     <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ closure_error }}</div>
@@ -26,14 +26,7 @@
     <form method="post" action="{% url 'accounts:htmx_manager_monthly_closure_create' %}" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
         {% csrf_token %}
         <div class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {{ closure_form.period_month }}
-                {{ closure_form.bank_transfer_amount }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-2">Notes de cloture</label>
-                {{ closure_form.notes }}
-            </div>
+            {% include "accounts/dashboard/partials/dg_form_fields.html" with form=closure_form %}
 
             <input type="hidden" name="total_entries" value="{{ period_summary.total_revenue|default:0 }}">
             <input type="hidden" name="total_exits" value="{{ period_summary.charges_paid|default:0 }}">
@@ -54,18 +47,35 @@
                 <p class="text-xs uppercase tracking-wide text-slate-400">Versement bancaire</p>
                 <h3 class="text-lg font-semibold text-slate-900 mt-1">Enregistrer le reliquat verse</h3>
             </div>
-            <div class="grid grid-cols-1 gap-3">
-                {{ transfer_form.bank_name }}
-                {{ transfer_form.reference }}
-                {{ transfer_form.transfer_date }}
+            <div class="dg-form-grid" style="grid-template-columns:1fr;">
+                <div class="dg-field">
+                    <label for="{{ transfer_form.bank_name.id_for_label }}"><i class="fa-solid {{ "bank_name"|field_icon }}"></i>{{ transfer_form.bank_name.label }}</label>
+                    <div class="dg-input-wrap"><i class="fa-solid {{ "bank_name"|field_icon }} dg-input-icon"></i>{{ transfer_form.bank_name }}</div>
+                </div>
+                <div class="dg-field">
+                    <label for="{{ transfer_form.reference.id_for_label }}"><i class="fa-solid {{ "reference"|field_icon }}"></i>{{ transfer_form.reference.label }}</label>
+                    <div class="dg-input-wrap"><i class="fa-solid {{ "reference"|field_icon }} dg-input-icon"></i>{{ transfer_form.reference }}</div>
+                </div>
+                <div class="dg-field">
+                    <label for="{{ transfer_form.transfer_date.id_for_label }}"><i class="fa-solid {{ "transfer_date"|field_icon }}"></i>{{ transfer_form.transfer_date.label }}</label>
+                    <div class="dg-input-wrap"><i class="fa-solid {{ "transfer_date"|field_icon }} dg-input-icon"></i>{{ transfer_form.transfer_date }}</div>
+                </div>
                 <input type="hidden" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
-                {{ transfer_form.proof }}
-                {{ transfer_form.comment }}
+                <div class="dg-field">
+                    <label for="{{ transfer_form.proof.id_for_label }}"><i class="fa-solid {{ "proof"|field_icon }}"></i>{{ transfer_form.proof.label }}</label>
+                    {{ transfer_form.proof }}
+                </div>
+                <div class="dg-field">
+                    <label for="{{ transfer_form.comment.id_for_label }}"><i class="fa-solid {{ "comment"|field_icon }}"></i>{{ transfer_form.comment.label }}</label>
+                    {{ transfer_form.comment }}
+                </div>
             </div>
-            <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
-                <i class="fas fa-lock"></i>
-                Cloturer la periode
-            </button>
+            <div class="dg-form-footer">
+                <button type="submit" class="dg-btn dg-btn-primary" style="width:100%;">
+                    <i class="fa-solid fa-lock"></i>
+                    Cloturer la periode
+                </button>
+            </div>
         </div>
     </form>
 </div>

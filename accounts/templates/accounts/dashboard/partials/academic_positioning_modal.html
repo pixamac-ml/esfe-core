@@ -1,3 +1,4 @@
+{% load dashboard_forms %}
 <div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
     <div class="relative w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
@@ -50,40 +51,46 @@
                 class="mt-5 space-y-5"
             >
                 {% csrf_token %}
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                        <label for="academic-level-{{ candidature.id }}" class="mb-2 block text-sm font-medium text-slate-700">Niveau academique</label>
-                        <select
-                            id="academic-level-{{ candidature.id }}"
-                            name="academic_level"
-                            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm"
-                        >
-                            <option value="">Choisir un niveau</option>
-                            {% for level in positioning.available_levels %}
-                            <option value="{{ level }}" {% if selected_level == level %}selected{% endif %}>{{ level }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="academic-class-{{ candidature.id }}" class="mb-2 block text-sm font-medium text-slate-700">Classe existante</label>
-                        <select
-                            id="academic-class-{{ candidature.id }}"
-                            name="academic_class"
-                            class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm"
-                            required
-                        >
-                            <option value="">Choisir une classe</option>
-                            {% for academic_class in positioning.available_classes %}
-                            <option
-                                value="{{ academic_class.id }}"
-                                data-level="{{ academic_class.level|upper }}"
-                                data-fee="{{ academic_class.positioning_fee|default:'' }}"
-                                {% if selected_class_id == academic_class.id|stringformat:"s" %}selected{% endif %}
+                <div class="dg-form-grid">
+                    <div class="dg-field">
+                        <label for="academic-level-{{ candidature.id }}"><i class="fa-solid {{ "academic_level"|field_icon }}"></i>Niveau academique</label>
+                        <div class="dg-input-wrap">
+                            <i class="fa-solid {{ "academic_level"|field_icon }} dg-input-icon"></i>
+                            <select
+                                id="academic-level-{{ candidature.id }}"
+                                name="academic_level"
+                                class="dg-input"
                             >
-                                {{ academic_class.display_name|default:academic_class.level }}
-                            </option>
-                            {% endfor %}
-                        </select>
+                                <option value="">Choisir un niveau</option>
+                                {% for level in positioning.available_levels %}
+                                <option value="{{ level }}" {% if selected_level == level %}selected{% endif %}>{{ level }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="dg-field">
+                        <label for="academic-class-{{ candidature.id }}"><i class="fa-solid {{ "academic_class"|field_icon }}"></i>Classe existante<span class="dg-required">*</span></label>
+                        <div class="dg-input-wrap">
+                            <i class="fa-solid {{ "academic_class"|field_icon }} dg-input-icon"></i>
+                            <select
+                                id="academic-class-{{ candidature.id }}"
+                                name="academic_class"
+                                class="dg-input"
+                                required
+                            >
+                                <option value="">Choisir une classe</option>
+                                {% for academic_class in positioning.available_classes %}
+                                <option
+                                    value="{{ academic_class.id }}"
+                                    data-level="{{ academic_class.level|upper }}"
+                                    data-fee="{{ academic_class.positioning_fee|default:'' }}"
+                                    {% if selected_class_id == academic_class.id|stringformat:"s" %}selected{% endif %}
+                                >
+                                    {{ academic_class.display_name|default:academic_class.level }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
                 </div>
 

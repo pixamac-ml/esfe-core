@@ -643,3 +643,102 @@ annexe — la règle métier la plus critique du projet selon
 AGENTS.md — est appliqué avec une rigueur exemplaire sur
 l'ensemble des 11 sections du dashboard. C'est la base la plus
 saine sur laquelle construire la suite.
+
+================================================================================
+PHASE A - STYLISATION DES FORMULAIRES (alignement sur le dashboard secrétaire)
+================================================================================
+
+Objectif : amener les formulaires du dashboard gestionnaire au même
+niveau de finition que ceux du dashboard secrétaire (Phase D de
+`secretaire.txt`) — icônes par champ, wrapper d'input stylisé,
+gestion uniforme des erreurs/aide/champs requis, pieds de formulaire
+homogènes.
+
+1. Nouveau templatetag `accounts/templatetags/dashboard_forms.py`
+   - Filtre `field_icon` : mapping nom de champ -> icône FontAwesome
+     (défaut "fa-pen"). Couvre tous les champs des 7 formulaires
+     gestionnaire (paie, honoraires, clôture mensuelle, virement
+     bancaire, dépenses, mouvements de caisse, dons) ainsi que les
+     deux selects de positionnement académique (`academic_level`,
+     `academic_class`).
+   - Filtre `widget_type` : renvoie la classe du widget Django du
+     champ, utilisé pour décider de la mise en page (pleine largeur
+     pour textarea/fichier/multi-select/checkbox).
+
+2. Nouveau partial partagé
+   `accounts/templates/accounts/dashboard/partials/dg_form_fields.html`
+   - Équivalent du `form_fields.html` du secrétaire, namespacé `dg-*` :
+     grille 2 colonnes (`dg-form-grid`, 1 colonne sous 768px), icône
+     dans le label + icône dans le champ (sauf textarea/fichier),
+     champs requis marqués par `dg-required`, aide (`dg-form-note`),
+     erreurs de champ et globales (`.errors`), checkboxes en cartes
+     cliquables (`dg-checkbox-label`), champs larges en pleine largeur
+     (`dg-field-wide`).
+   - Inclus par les 7 formulaires gestionnaire ci-dessous.
+
+3. Nouveau bloc CSS "FORMS - CHAMPS STYLISES" dans
+   `manager_dashboard.html` (`<style>` de la page, donc disponible
+   pour tout le contenu injecté via HTMX dans `#modal-content` et pour
+   les re-rendus d'erreur en `outerHTML`)
+   - `.dg-form-grid`, `.dg-field`, `.dg-field-wide`, `.dg-field-checkbox`,
+     `.dg-required`, `.dg-form-note`, `.dg-input` (bordure `#dbe3ef`,
+     rayon `.65rem`, focus ring bleu), `.dg-input-wrap` + `.dg-input-icon`
+     (icône positionnée dans le champ), `.dg-checkbox-label`,
+     `.dg-form-footer`, `.errors`/`.errors li`/`.errors li i`.
+   - `.dg-form-grid` ajouté à la règle de collapse mobile
+     (`@media max-width: 768px` -> 1 colonne).
+
+4. `accounts/forms.py` — les 7 formulaires exclusifs au dashboard
+   gestionnaire (`PayrollEntryForm`, `TeacherHonorariumEntryForm`,
+   `BranchMonthlyClosureForm`, `BranchBankTransferForm`,
+   `BranchExpenseForm`, `BranchCashMovementForm`, `DonationForm`)
+   passent de `INPUT_CLASS`/`TEXTAREA_CLASS` (classes Tailwind
+   partagées avec le reste du projet) à `"dg-input"`. Les autres
+   formulaires (hors dashboard gestionnaire) ne sont pas touchés.
+
+5. Templates réécrits pour utiliser `dg_form_fields.html`
+   - `donation_form.html` : remplacé entièrement par l'include.
+   - `manager_expense_form.html` / `manager_cash_movement_form.html` :
+     wrapper `<form>` (+ encart d'info) conservé, champs remplacés
+     par l'include, bouton final en `.dg-btn.dg-btn-primary` avec
+     icône.
+   - Les deux rendus initiaux en dur dans `manager_dashboard.html`
+     (formulaires dépense et mouvement de caisse de la section
+     "Caisse") utilisent désormais le même include, supprimant la
+     duplication avec les partials ci-dessus.
+   - `payroll_modal.html` / `teacher_honorarium_modal.html` : la
+     grille de champs en dur (period_month, base_salary, allowances,
+     deductions, advances/validated_hours, notes) est remplacée par
+     l'include ; les champs `payment_amount` / `advance_amount`
+     (formulaires de retrait/avance, non liés à un Django Form)
+     passent en classe `dg-input`.
+   - `monthly_closure_form.html` : `closure_form` via l'include ;
+     `transfer_form` (bank_name, reference, transfer_date, proof,
+     comment) stylisé manuellement en `dg-field`/`dg-input-wrap` car
+     son champ `amount` est rendu séparément en hidden
+     (`bank_transfer_amount` du `closure_form`) pour éviter un
+     conflit de `name="amount"` entre les deux formulaires. Bouton
+     final "Clôturer la période" en `.dg-btn.dg-btn-primary`.
+   - `academic_positioning_modal.html` : les deux `<select>`
+     (`academic_level`, `academic_class`) ne sont pas des champs de
+     Django Form — stylisés manuellement en `dg-field`/`dg-input-wrap`
+     avec les icônes `field_icon` correspondantes.
+
+6. Tests
+   - `manage.py check --settings=config.settings_test_local` : OK,
+     aucun problème détecté.
+   - Chargement des 9 templates modifiés via `get_template()` : OK
+     (pas d'erreur de syntaxe Django).
+   - La suite `accounts` complète (`manage.py test
+     --settings=config.settings_test_local accounts`) comporte des
+     échecs préexistants sans rapport avec cette phase : la quasi
+     totalité provient de `AxesBackendRequestParameterRequired`
+     (le helper `_login` de `test_manager_workflows.py` appelle
+     `client.login()` sans `request=`, incompatible avec la
+     configuration django-axes actuelle de `config/settings.py`),
+     plus quelques échecs liés à `UserPreference.internal_rules_accepted_at`
+     (migration `0020_userpreference_internal_rules_accepted_at`
+     encore non appliquée). Ces deux sujets sont indépendants du
+     dashboard gestionnaire et de cette phase de stylisation.
+
+Phase A terminée.

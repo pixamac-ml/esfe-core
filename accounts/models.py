@@ -246,6 +246,142 @@ class UserPreference(models.Model):
         return f"Preferences de {self.user.username}"
 
 
+class SensitiveActionRequest(models.Model):
+    """Demande de modification sur une operation financiere deja finalisee.
+
+    Le workflow ne bloque jamais la creation initiale d'une operation : il
+    s'applique uniquement quand la gestionnaire tente de corriger une erreur
+    sur une operation deja validee/payee. Un code OTP est alors envoye au DG
+    et a la DGA ; la modification reelle n'est appliquee qu'apres saisie du
+    bon code, dans le delai imparti.
+    """
+
+    ACTION_PAYMENT_EDIT = "payment_edit"
+    ACTION_PAYMENT_CANCEL = "payment_cancel"
+    ACTION_PAYROLL_EDIT = "payroll_edit"
+    ACTION_HONORARIUM_EDIT = "honorarium_edit"
+
+    ACTION_CHOICES = [
+        (ACTION_PAYMENT_EDIT, "Modification d'un paiement valide"),
+        (ACTION_PAYMENT_CANCEL, "Annulation d'un paiement valide"),
+        (ACTION_PAYROLL_EDIT, "Modification d'une fiche de paie deja payee"),
+        (ACTION_HONORARIUM_EDIT, "Modification d'un honoraire deja paye"),
+    ]
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_EXPIRED = "expired"
+    STATUS_CANCELLED = "cancelled"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "En attente de validation"),
+        (STATUS_APPROVED, "Validee"),
+        (STATUS_EXPIRED, "Expiree"),
+        (STATUS_CANCELLED, "Annulee"),
+    ]
+
+    OTP_VALIDITY_MINUTES = 5
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="sensitive_action_requests",
+        db_index=True,
+    )
+    action_type = models.CharField(max_length=30, choices=ACTION_CHOICES, db_index=True)
+    target_model = models.CharField(max_length=60, help_text="Nom du modele cible (ex: Payment).")
+    target_id = models.PositiveBigIntegerField()
+    reason = models.TextField(blank=True, help_text="Motif explique par la gestionnaire.")
+    previous_state = models.JSONField(default=dict, blank=True)
+    requested_state = models.JSONField(default=dict, blank=True)
+
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="sensitive_action_requests",
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sensitive_action_approvals",
+    )
+
+    otp_code_hash = models.CharField(max_length=128)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    expires_at = models.DateTimeField()
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Demande d'action sensible"
+        verbose_name_plural = "Demandes d'action sensible"
+        indexes = [
+            models.Index(fields=["branch", "status"]),
+            models.Index(fields=["target_model", "target_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_action_type_display()} #{self.target_id} ({self.get_status_display()})"
+
+    @property
+    def is_expired(self):
+        return self.status == self.STATUS_PENDING and timezone.now() > self.expires_at
+
+
+class FinancialAuditLog(models.Model):
+    """Trace immuable des actions financieres sensibles effectivement appliquees."""
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="financial_audit_logs",
+        db_index=True,
+    )
+    action_type = models.CharField(max_length=30)
+    target_model = models.CharField(max_length=60)
+    target_id = models.PositiveBigIntegerField()
+    previous_state = models.JSONField(default=dict, blank=True)
+    new_state = models.JSONField(default=dict, blank=True)
+    performed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="financial_audit_logs",
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="financial_audit_approvals",
+    )
+    sensitive_action_request = models.ForeignKey(
+        SensitiveActionRequest,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_entries",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Log d'audit financier"
+        verbose_name_plural = "Logs d'audit financier"
+        indexes = [
+            models.Index(fields=["branch", "created_at"]),
+            models.Index(fields=["target_model", "target_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.action_type} #{self.target_id} par {self.performed_by}"
+
+
 class PayrollEntry(models.Model):
     STATUS_DRAFT = "draft"
     STATUS_READY = "ready"

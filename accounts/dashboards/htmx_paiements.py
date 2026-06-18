@@ -7,11 +7,16 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from accounts.models import BranchCashMovement
+from accounts.models import BranchCashMovement, SensitiveActionRequest
 from payments.models import FinancialLog, Payment
 
 from accounts.services.accounting_documents import create_cash_movement
 from accounts.services.manager_intelligence import payment_cash_reference
+from accounts.services.sensitive_actions import (
+    SensitiveActionError,
+    confirm_sensitive_action,
+    request_sensitive_action,
+)
 from payments.services.corrections import correct_validated_payment_amount, financial_logs_for_payment
 
 from accounts.dashboards.htmx_utils import manager_required
@@ -81,13 +86,90 @@ def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
         return response
 
     try:
+        otp_request = request_sensitive_action(
+            branch=request.branch,
+            action_type=SensitiveActionRequest.ACTION_PAYMENT_EDIT,
+            target_model="Payment",
+            target_id=payment.pk,
+            previous_state={"amount": payment.amount},
+            requested_state={"amount": new_amount},
+            requested_by=request.user,
+            reason=reason,
+        )
+    except SensitiveActionError as exc:
+        response = render(
+            request,
+            "accounts/dashboard/partials/payment_modal.html",
+            {
+                "payment": payment,
+                "financial_logs": financial_logs_for_payment(payment)[:20],
+                "corrections": payment.corrections.select_related("corrected_by").all()[:10],
+                "correction_error": str(exc),
+                "correction_new_amount": raw_amount,
+                "correction_reason": reason,
+            },
+        )
+        response.status_code = 400
+        return response
+
+    response = render(
+        request,
+        "accounts/dashboard/partials/payment_modal.html",
+        {
+            "payment": payment,
+            "financial_logs": financial_logs_for_payment(payment)[:20],
+            "corrections": payment.corrections.select_related("corrected_by").all()[:10],
+            "otp_request_id": otp_request.pk,
+            "otp_new_amount": new_amount,
+            "otp_reason": reason,
+            "otp_validity_minutes": SensitiveActionRequest.OTP_VALIDITY_MINUTES,
+        },
+    )
+    response["HX-Trigger"] = json.dumps({
+        "showToast": {
+            "message": "Code de validation envoye au DG et a la DGA. Saisissez-le pour confirmer.",
+            "type": "info",
+        },
+    })
+    return response
+
+
+@manager_required
+@require_POST
+def payment_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
+    payment = get_object_or_404(
+        Payment.objects.select_related(
+            "inscription",
+            "inscription__candidature",
+            "inscription__candidature__branch",
+        ),
+        pk=pk,
+        inscription__candidature__branch=request.branch,
+        status=Payment.STATUS_VALIDATED,
+    )
+    otp_request_id = request.POST.get("otp_request_id")
+    otp_code = (request.POST.get("otp_code") or "").strip()
+
+    def _apply(otp_request):
+        new_amount = otp_request.requested_state.get("amount")
         correct_validated_payment_amount(
             payment=payment,
             new_amount=new_amount,
-            reason=reason,
-            actor=request.user,
+            reason=otp_request.reason,
+            actor=otp_request.requested_by,
         )
-    except ValidationError as exc:
+        payment.refresh_from_db()
+        return {"amount": payment.amount}
+
+    try:
+        confirm_sensitive_action(
+            request_id=otp_request_id,
+            code=otp_code,
+            approver=request.user,
+            apply_callback=_apply,
+        )
+    except (SensitiveActionError, ValidationError, SensitiveActionRequest.DoesNotExist) as exc:
+        message = " ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
         payment.refresh_from_db()
         response = render(
             request,
@@ -96,9 +178,8 @@ def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
                 "payment": payment,
                 "financial_logs": financial_logs_for_payment(payment)[:20],
                 "corrections": payment.corrections.select_related("corrected_by").all()[:10],
-                "correction_error": " ".join(exc.messages),
-                "correction_new_amount": raw_amount,
-                "correction_reason": reason,
+                "otp_request_id": otp_request_id,
+                "otp_error": message,
             },
         )
         response.status_code = 400
@@ -112,7 +193,7 @@ def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
             "payment": payment,
             "financial_logs": financial_logs_for_payment(payment)[:20],
             "corrections": payment.corrections.select_related("corrected_by").all()[:10],
-            "correction_success": "Correction enregistree et caisse synchronisee.",
+            "correction_success": "Correction validee par le DG/DGA et caisse synchronisee.",
         },
     )
     response["HX-Trigger"] = json.dumps({

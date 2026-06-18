@@ -52,11 +52,40 @@
                 </div>
             </div>
 
-            {% if payment.status == 'validated' %}
+            {% if otp_request_id %}
+            <div class="rounded-2xl border border-violet-200 bg-violet-50 p-5 space-y-4">
+                <div>
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-violet-800">Validation DG / DGA requise</h3>
+                    <p class="mt-1 text-sm text-violet-800">
+                        Un code de validation a ete envoye au Directeur General et a la Directrice Generale Adjointe.
+                        Saisissez-le ci-dessous pour confirmer la correction (validite : {{ otp_validity_minutes|default:5 }} minutes).
+                    </p>
+                </div>
+                {% if otp_error %}
+                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{{ otp_error }}</div>
+                {% endif %}
+                <form
+                    hx-post="{% url 'accounts:htmx_payment_correct_confirm_otp' payment.id %}"
+                    hx-target="#modal-content"
+                    hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    class="flex flex-col gap-4 sm:flex-row sm:items-end">
+                    <input type="hidden" name="otp_request_id" value="{{ otp_request_id }}">
+                    <div class="flex-1">
+                        <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Code de validation</label>
+                        <input type="text" name="otp_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456" class="w-full rounded-xl border border-violet-200 bg-white px-4 py-3 text-center text-lg font-bold tracking-widest text-slate-900" required>
+                    </div>
+                    <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700">
+                        <i class="fas fa-shield-halved"></i>
+                        Confirmer
+                    </button>
+                </form>
+            </div>
+            {% elif payment.status == 'validated' %}
             <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
                 <div>
                     <h3 class="text-sm font-semibold uppercase tracking-wide text-amber-800">Correction controlee</h3>
-                    <p class="mt-1 text-sm text-amber-800">Toute correction met a jour la caisse, le solde du dossier et l'historique financier.</p>
+                    <p class="mt-1 text-sm text-amber-800">Toute correction met a jour la caisse, le solde du dossier et l'historique financier. Une validation DG/DGA par code sera demandee.</p>
                 </div>
                 {% if correction_error %}
                 <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{{ correction_error }}</div>

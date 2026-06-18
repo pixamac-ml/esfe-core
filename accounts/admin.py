@@ -7,8 +7,10 @@ from accounts.models import (
     BranchExpense,
     BranchMonthlyClosure,
     Donation,
+    FinancialAuditLog,
     PayrollEntry,
     Profile,
+    SensitiveActionRequest,
     TeacherHonorariumEntry,
 )
 
@@ -82,3 +84,21 @@ class DonationAdmin(admin.ModelAdmin):
     list_filter = ("branch", "motif", "payment_method", "date")
     search_fields = ("donor_name", "description", "receipt_number")
     autocomplete_fields = ("branch", "cash_movement", "created_by")
+
+
+@admin.register(SensitiveActionRequest)
+class SensitiveActionRequestAdmin(admin.ModelAdmin):
+    list_display = ("action_type", "target_model", "target_id", "branch", "requested_by", "status", "created_at", "expires_at")
+    list_filter = ("branch", "action_type", "status")
+    search_fields = ("target_model", "reason")
+    autocomplete_fields = ("branch", "requested_by", "approved_by")
+    readonly_fields = ("otp_code_hash", "created_at", "resolved_at")
+
+
+@admin.register(FinancialAuditLog)
+class FinancialAuditLogAdmin(admin.ModelAdmin):
+    list_display = ("action_type", "target_model", "target_id", "branch", "performed_by", "approved_by", "created_at")
+    list_filter = ("branch", "action_type")
+    search_fields = ("target_model",)
+    autocomplete_fields = ("branch", "performed_by", "approved_by", "sensitive_action_request")
+    readonly_fields = ("created_at",)

@@ -187,6 +187,44 @@ Analyse complète du code existant (modèles, vues, services, templates, URLs).
 
 ---
 
+## PLAN DE TRAVAIL — Vers la production (validé le 18/06/2026)
+
+Issu d'une session d'analyse 360° (backend + frontend) du dashboard gestionnaire, en vue d'un usage en production avec un volume important d'inscriptions/paiements.
+
+### Phase 1 — Sécurité financière & anti-fraude (fondation)
+1. ⏳ **Audit log financier** : trace immuable de toute action sensible (qui, quoi, quand, ancien/nouveau état) par gestionnaire/annexe. — `FinancialAuditLog`, fait.
+2. ⏳ **OTP post-modification** : se déclenche uniquement quand la gestionnaire modifie/annule une opération **déjà finalisée** (jamais à la création). Code envoyé au DG + DGA avec contexte complet, validité 5 minutes, expiration → annulation + message clair. — `SensitiveActionRequest` + `accounts/services/sensitive_actions.py`, fait pour les paiements (`payment_correct`). À étendre aux salaires/honoraires.
+
+### Phase 2 — Caisse & comptabilité fiable
+3. ❌ Affichage caisse clarifié : solde réel/palpable, total entrées, total sorties, justificatifs liés, relevé avec solde courant après chaque mouvement.
+4. ❌ Contrôle budgétaire salaires : vérifier que la caisse couvre la masse salariale avant paiement, blocage avec message clair sinon, possibilité d'avance partielle. Priorité salaires > autres dépenses.
+5. ❌ Clôture mensuelle intelligente : versement bancaire **suggéré automatiquement** (solde restant) mais **ajustable**, fonds de roulement possible pour le mois suivant.
+6. ❌ Reçus systématiques sur chaque opération.
+7. ❌ Dons — champ direction (`reçu` / `donné`/bourse) pour ne pas mélanger entrées et sorties.
+
+### Phase 3 — Automatisation & assistance quotidienne
+8. ❌ Scheduler réel (cron) : génération anticipée salaires/honoraires (1-2 semaines avant), synchronisation caisse automatique via signal sur paiement validé.
+9. ❌ Notifications employé/enseignant à chaque paiement de salaire/honoraire.
+10. ❌ Centre de tâches "à traiter aujourd'hui" : candidatures en attente, dépenses à approuver, fiches prêtes, stock bas, clôture en retard.
+
+### Phase 4 — Nouvelles fonctionnalités métier
+11. ❌ Module Coupons / codes de réduction (inscription + boutique) avec reporting.
+12. ❌ Rapports enrichis (coupons, dons par direction, tendances mois/mois).
+
+### Phase 5 — Finitions UX & robustesse
+13. ❌ `hx-confirm` sur actions groupées (pré-calcul, notifier en masse, sync caisse).
+14. ❌ Toasts de confirmation systématiques (ex: approve/reject dépenses actuellement silencieux).
+15. ❌ Validation HTML5 (`required`, `pattern`) sur formulaires montants/dates.
+16. ❌ Boutique : sessions cash actives visibles dans le panneau manager (déjà signalé), URLs en dur restantes.
+17. ❌ Tests end-to-end : paiement salaire/honoraire réel, sessions caisse, workflow OTP.
+
+### Phase 6 — Préparation dashboard DG (session future)
+18. ❌ Vue DG dédiée exploitant `FinancialAuditLog` (filtrable par annexe/gestionnaire/action/période).
+
+**Ordre d'exécution** : Phase 1 → 2 → 3 → 4 → 5 (Phase 6 différée à une session dédiée DG).
+
+---
+
 ## Journal des sessions
 
 ### Session du 31/05/2026 — Export Excel + Visibilité DG
@@ -256,6 +294,33 @@ Analyse complète du code existant (modèles, vues, services, templates, URLs).
    - Partiels `donation_form.html` et `donation_row.html`
 
 **Prochaine priorité :** Tests d'intégration bout en bout.
+
+### Session du 18/06/2026 — Phase 1 : Audit financier + OTP anti-fraude
+
+**Objectif :** Premier chantier du plan de production (voir section "PLAN DE TRAVAIL" ci-dessus) — sécuriser les modifications a posteriori d'opérations financières déjà finalisées.
+
+**Fait :**
+1. ✅ **Modèles** — `accounts/models.py` :
+   - `SensitiveActionRequest` : demande de modification sur une opération déjà finalisée. Code OTP haché (sha256), expiration 5 min, types d'action (paiement, salaire, honoraire), états (pending/approved/expired/cancelled).
+   - `FinancialAuditLog` : trace immuable de chaque action sensible effectivement appliquée (état avant/après, qui a demandé, qui a approuvé).
+   - Migration `accounts/migrations/0020_sensitiveactionrequest_financialauditlog_and_more.py` générée et testée (`migrate` OK sur sqlite).
+2. ✅ **Service** — `accounts/services/sensitive_actions.py` :
+   - `request_sensitive_action()` : crée la demande, génère le code, notifie (in-app + email) tous les profils `executive_director`/`deputy_executive_director` actifs.
+   - `confirm_sensitive_action()` : vérifie code + expiration (atomique, `select_for_update`), applique la modification via un callback, écrit le `FinancialAuditLog`.
+   - `expire_stale_requests()` : à brancher sur le futur scheduler (Phase 3) pour nettoyer les demandes oubliées.
+3. ✅ **Intégration paiements** — `accounts/dashboards/htmx_paiements.py` :
+   - `payment_correct` ne corrige plus directement : il crée la `SensitiveActionRequest` et affiche un écran "code envoyé au DG/DGA".
+   - Nouvel endpoint `payment_correct_confirm_otp` (URL `htmx_payment_correct_confirm_otp`) : vérifie le code et applique réellement la correction.
+   - Template `payment_modal.html` : nouveau bloc violet "Validation DG/DGA requise" avec saisie du code.
+4. ✅ **Admin** — `SensitiveActionRequestAdmin`, `FinancialAuditLogAdmin` dans `accounts/admin.py`.
+5. ✅ Vérifié : `python manage.py check` (0 erreur), `migrate` (OK), pas de cassure des URLs.
+
+**Limitations connues / à faire en suite de Phase 1 :**
+- Le workflow OTP n'est branché que sur `payment_correct`. Les actions équivalentes sur `PayrollEntry`/`TeacherHonorariumEntry` (modification d'une fiche déjà payée) utilisent le même service mais ne sont pas encore câblées dans `htmx_salaires.py`/`htmx_honoraires.py`.
+- Pas encore de vue DG dédiée pour consulter `FinancialAuditLog` (prévu Phase 6).
+- Tests automatisés du workflow OTP pas encore écrits (le run de `accounts.test_manager_workflows` existant échoue actuellement pour une raison indépendante : incompatibilité `django-axes` avec `Client.login()` dans l'environnement de test, pré-existante à cette session).
+
+**Prochaine priorité :** Phase 2 (caisse claire + contrôle budgétaire salaires + clôture ajustable).
 
 ### Session du 31/05/2026 (suite 2) — Dons dans rapport Excel + Workflow boutique étudiant
 

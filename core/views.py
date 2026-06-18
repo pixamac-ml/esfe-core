@@ -368,6 +368,9 @@ def home(request):
     ).order_by("order")[:3]
 
     branches = Branch.objects.filter(is_active=True).select_related("manager").order_by("name")[:8]
+    annexes_names = json.dumps(
+        list(Branch.objects.filter(is_active=True).order_by("name").values_list("name", flat=True)[:8])
+    )
 
     why_blocks = [
         {
@@ -446,6 +449,7 @@ def home(request):
         "testimonials": testimonials,
         "why_blocks": why_blocks,
         "annexes": branches,
+        "annexes_names": annexes_names,
         **get_institution_context(),
     }
 

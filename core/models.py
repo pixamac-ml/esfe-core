@@ -190,7 +190,7 @@ class SiteConfiguration(models.Model):
     )
     home_hero_title = models.CharField(
         max_length=255,
-        default="ESFE",
+        default="École de Santé Félix Houphouët-Boigny Mali",
         verbose_name="Titre Hero Accueil"
     )
     home_hero_subtitle = models.CharField(

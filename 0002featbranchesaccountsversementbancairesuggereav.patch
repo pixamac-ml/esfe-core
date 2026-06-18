@@ -1,0 +1,221 @@
+From 27ab18c7bc020a185d51611065334b436cfeec73 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 18 Jun 2026 10:34:29 +0000
+Subject: [PATCH 2/2] feat(branches,accounts): versement bancaire suggere avec
+ fonds de roulement
+
+Ajoute un fonds de roulement configurable par annexe et pre-remplit
+intelligemment le montant du versement bancaire a la cloture mensuelle
+(caisse disponible - reserve), tout en restant ajustable par la
+gestionnaire. Corrige aussi un bug ou le montant du versement n'etait
+pas synchronise avec une saisie manuelle.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015ePjhhBknPBFyxxdz3RUa9
+---
+ AUDIT_GESTIONNAIRE.md                         | 18 ++++++++++++++
+ accounts/dashboards/htmx_depenses.py          | 10 ++++++--
+ accounts/dashboards/manager_dashboard.py      |  4 +++-
+ .../partials/monthly_closure_form.html        | 23 +++++++++++++++++-
+ branches/admin.py                             |  2 +-
+ .../0003_branch_cash_reserve_target.py        | 24 +++++++++++++++++++
+ branches/models.py                            | 12 ++++++++++
+ 7 files changed, 88 insertions(+), 5 deletions(-)
+ create mode 100644 branches/migrations/0003_branch_cash_reserve_target.py
+
+diff --git a/AUDIT_GESTIONNAIRE.md b/AUDIT_GESTIONNAIRE.md
+index bf694bd..ed6d615 100644
+--- a/AUDIT_GESTIONNAIRE.md
++++ b/AUDIT_GESTIONNAIRE.md
+@@ -322,6 +322,24 @@ Issu d'une session d'analyse 360° (backend + frontend) du dashboard gestionnair
+ 
+ **Prochaine priorité :** Phase 2 (caisse claire + contrôle budgétaire salaires + clôture ajustable).
+ 
++### Session du 18/06/2026 — Phase 2 (premier incrément) : versement bancaire suggéré avec fonds de roulement
++
++**Objectif :** point (g) du plan — pré-remplir intelligemment le montant du versement bancaire à la clôture mensuelle, tout en laissant la gestionnaire ajuster, et en réservant un fonds de roulement pour le mois suivant.
++
++**Fait :**
++1. ✅ `branches/models.py` : nouveau champ `Branch.cash_reserve_target` (fonds de roulement cible, configurable par annexe). Migration `branches/migrations/0003_branch_cash_reserve_target.py` générée et testée.
++2. ✅ `branches/admin.py` : champ visible/éditable dans l'admin Django (`list_display`).
++3. ✅ `accounts/dashboards/manager_dashboard.py` : calcule `suggested_transfer_amount = max(caisse disponible - fonds de roulement, 0)` et pré-remplit `closure_form` avec cette valeur (au lieu de 0 en dur).
++4. ✅ `accounts/dashboards/htmx_depenses.py` (`monthly_closure_create`) : les deux chemins d'erreur (formulaire clôture invalide, formulaire versement invalide) renvoient désormais aussi `cash_reserve_target`/`suggested_transfer_amount`, pour ne pas perdre l'information en cas de correction.
++5. ✅ `monthly_closure_form.html` : bloc explicatif affichant le fonds de roulement et le montant suggéré ; corrigé un bug pré-existant où le champ caché `amount` (utilisé pour créer le `BranchBankTransfer`) ne se synchronisait pas avec une modification manuelle du montant par la gestionnaire — ajout d'un petit script qui synchronise les deux champs en direct.
++6. ✅ Vérifié : `python manage.py check` (0 erreur), `migrate` (OK) sur les deux apps modifiées.
++
++**Limitations connues / à faire en suite de Phase 2 :**
++- Le `cash_reserve_target` est pour l'instant configurable uniquement via l'admin Django (pas encore d'écran dédié pour la gestionnaire ou la DG).
++- Reste à faire pour clore Phase 2 : refonte de l'affichage caisse (solde palpable + entrées/sorties + justificatifs + relevé style "compte bancaire"), et contrôle budgétaire formel avant paiement de salaires (le blocage existe déjà partiellement dans `pay_ready_payroll_entries`/`pay_ready_teacher_honorarium_entries` côté `manager_intelligence.py`, mais sans message explicite ni vue de simulation avant paiement).
++
++**Prochaine priorité :** poursuite Phase 2 — refonte de l'affichage caisse et message de contrôle budgétaire explicite avant paiement de la paie.
++
+ ### Session du 31/05/2026 (suite 2) — Dons dans rapport Excel + Workflow boutique étudiant
+ 
+ **Fait :**
+diff --git a/accounts/dashboards/htmx_depenses.py b/accounts/dashboards/htmx_depenses.py
+index 59c8de5..21dba56 100644
+--- a/accounts/dashboards/htmx_depenses.py
++++ b/accounts/dashboards/htmx_depenses.py
+@@ -109,6 +109,8 @@ def expense_pay(request: HttpRequest, pk: int) -> HttpResponse:
+ @require_POST
+ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
+     closure_form = BranchMonthlyClosureForm(request.POST)
++    available_cash_balance = get_branch_cash_balance(request.branch)
++    suggested_transfer_amount = max(available_cash_balance - request.branch.cash_reserve_target, 0)
+     if not closure_form.is_valid():
+         response = render(
+             request,
+@@ -116,7 +118,9 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
+             {
+                 "closure_form": closure_form,
+                 "transfer_form": BranchBankTransferForm(request.POST, request.FILES),
+-                "available_cash_balance": get_branch_cash_balance(request.branch),
++                "available_cash_balance": available_cash_balance,
++                "cash_reserve_target": request.branch.cash_reserve_target,
++                "suggested_transfer_amount": suggested_transfer_amount,
+                 "closure_error": "Verifiez les champs du formulaire de cloture.",
+             },
+         )
+@@ -173,7 +177,9 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
+             {
+                 "closure_form": closure_form,
+                 "transfer_form": transfer_form,
+-                "available_cash_balance": get_branch_cash_balance(request.branch),
++                "available_cash_balance": available_cash_balance,
++                "cash_reserve_target": request.branch.cash_reserve_target,
++                "suggested_transfer_amount": suggested_transfer_amount,
+                 "closure_error": "Verifiez les champs du versement bancaire.",
+             },
+         )
+diff --git a/accounts/dashboards/manager_dashboard.py b/accounts/dashboards/manager_dashboard.py
+index bfce844..03dff48 100644
+--- a/accounts/dashboards/manager_dashboard.py
++++ b/accounts/dashboards/manager_dashboard.py
+@@ -851,9 +851,11 @@ def _manager_context(request, active_section="overview"):
+         "cash_sources": BranchCashMovement.SOURCE_CHOICES,
+         "closure_form": BranchMonthlyClosureForm(initial={
+             "period_month": payroll_month,
+-            "bank_transfer_amount": 0,
++            "bank_transfer_amount": max(get_branch_cash_balance(branch) - branch.cash_reserve_target, 0),
+         }),
+         "available_cash_balance": get_branch_cash_balance(branch),
++        "cash_reserve_target": branch.cash_reserve_target,
++        "suggested_transfer_amount": max(get_branch_cash_balance(branch) - branch.cash_reserve_target, 0),
+         "transfer_form": BranchBankTransferForm(initial={
+             "transfer_date": today,
+             "amount": 0,
+diff --git a/accounts/templates/accounts/dashboard/partials/monthly_closure_form.html b/accounts/templates/accounts/dashboard/partials/monthly_closure_form.html
+index 9fffee8..00db6b4 100644
+--- a/accounts/templates/accounts/dashboard/partials/monthly_closure_form.html
++++ b/accounts/templates/accounts/dashboard/partials/monthly_closure_form.html
+@@ -23,6 +23,15 @@
+         </div>
+     </div>
+ 
++    <div class="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-800">
++        <p>
++            <span class="font-semibold">Fonds de roulement a conserver : {{ cash_reserve_target|default:0|intcomma }} FCFA.</span>
++            Versement bancaire suggere (caisse disponible - fonds de roulement) :
++            <span class="font-bold">{{ suggested_transfer_amount|default:0|intcomma }} FCFA</span>.
++            Ce montant est pre-rempli ci-dessous, vous pouvez l'ajuster avant de cloturer.
++        </p>
++    </div>
++
+     <form method="post" action="{% url 'accounts:htmx_manager_monthly_closure_create' %}" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+         {% csrf_token %}
+         <div class="space-y-4">
+@@ -58,7 +67,7 @@
+                 {{ transfer_form.bank_name }}
+                 {{ transfer_form.reference }}
+                 {{ transfer_form.transfer_date }}
+-                <input type="hidden" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
++                <input type="hidden" id="transfer-amount-sync" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
+                 {{ transfer_form.proof }}
+                 {{ transfer_form.comment }}
+             </div>
+@@ -69,3 +78,15 @@
+         </div>
+     </form>
+ </div>
++<script>
++(function () {
++    const bankTransferInput = document.getElementById("id_bank_transfer_amount");
++    const syncInput = document.getElementById("transfer-amount-sync");
++    if (!bankTransferInput || !syncInput) {
++        return;
++    }
++    bankTransferInput.addEventListener("input", function () {
++        syncInput.value = bankTransferInput.value || 0;
++    });
++})();
++</script>
+diff --git a/branches/admin.py b/branches/admin.py
+index 6a59878..327815a 100644
+--- a/branches/admin.py
++++ b/branches/admin.py
+@@ -6,7 +6,7 @@ from .models import Branch
+ 
+ @admin.register(Branch)
+ class BranchAdmin(admin.ModelAdmin):
+-    list_display = ["name", "code", "city", "is_active"]
++    list_display = ["name", "code", "city", "is_active", "cash_reserve_target"]
+     list_filter = ["is_active", "city"]
+     search_fields = ["name", "code"]
+     prepopulated_fields = {"slug": ("name",)}
+\ No newline at end of file
+diff --git a/branches/migrations/0003_branch_cash_reserve_target.py b/branches/migrations/0003_branch_cash_reserve_target.py
+new file mode 100644
+index 0000000..d430cae
+--- /dev/null
++++ b/branches/migrations/0003_branch_cash_reserve_target.py
+@@ -0,0 +1,24 @@
++# Generated by Django 6.0.5 on 2026-06-18 10:32
++
++from django.db import migrations, models
++
++
++class Migration(migrations.Migration):
++
++    dependencies = [
++        ("branches", "0002_branch_image"),
++    ]
++
++    operations = [
++        migrations.AddField(
++            model_name="branch",
++            name="cash_reserve_target",
++            field=models.DecimalField(
++                decimal_places=2,
++                default=0,
++                help_text="Montant a conserver en caisse a chaque cloture mensuelle pour couvrir les depenses imprevues du mois suivant. Le versement bancaire suggere est calcule en consequence.",
++                max_digits=12,
++                verbose_name="Fonds de roulement cible",
++            ),
++        ),
++    ]
+diff --git a/branches/models.py b/branches/models.py
+index 2ef3175..51218c2 100644
+--- a/branches/models.py
++++ b/branches/models.py
+@@ -52,6 +52,18 @@ class Branch(models.Model):
+ 
+     accepts_online_registration = models.BooleanField(default=True)
+ 
++    cash_reserve_target = models.DecimalField(
++        max_digits=12,
++        decimal_places=2,
++        default=0,
++        verbose_name="Fonds de roulement cible",
++        help_text=(
++            "Montant a conserver en caisse a chaque cloture mensuelle pour couvrir "
++            "les depenses imprevues du mois suivant. Le versement bancaire suggere "
++            "est calcule en consequence."
++        ),
++    )
++
+     created_at = models.DateTimeField(auto_now_add=True)
+ 
+     class Meta:
+-- 
+2.43.0
+

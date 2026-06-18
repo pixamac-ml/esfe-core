@@ -93,7 +93,7 @@ class Command(BaseCommand):
         # Singleton SiteConfiguration
         site_configuration = SiteConfiguration.objects.first()
         site_defaults = {
-            "home_hero_title": "ESFé Mali",
+            "home_hero_title": "École de Santé Félix Houphouët-Boigny Mali",
             "home_hero_subtitle": "Former les cadres de la santé au Mali",
             "about_vision_title": "Notre Vision",
             "about_vision_text": (

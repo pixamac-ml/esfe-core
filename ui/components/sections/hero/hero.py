@@ -6,7 +6,7 @@ class Hero(component.Component):
 
     def get_context_data(
         self,
-        title="ESFE",
+        title="École de Santé Félix Houphouët-Boigny Mali",
         subtitle="",
         image_url="",
         logo_url="",

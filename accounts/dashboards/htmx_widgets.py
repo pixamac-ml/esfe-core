@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from admissions.models import Candidature
-from accounts.models import BranchCashMovement, BranchExpense, Donation, PayrollEntry, Profile, TeacherHonorariumEntry
+from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile, TeacherHonorariumEntry
 from accounts.services.manager_intelligence import build_manager_intelligence_context, get_branch_cash_balance
 from inscriptions.models import Inscription
 from payments.models import Payment
@@ -197,9 +197,6 @@ def widget_sidebar_badges(request: HttpRequest) -> HttpResponse:
         inscription__is_archived=False,
         status=Payment.STATUS_PENDING,
     ).count()
-    alerts_count = Donation.objects.filter(
-        branch=branch, date__gte=timezone.now().date().replace(day=1),
-    ).count() if False else 0
     return render(
         request,
         "accounts/dashboard/partials/widget_sidebar_badges.html",

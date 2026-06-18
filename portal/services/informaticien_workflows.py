@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import transaction
 from django.urls import reverse
 
@@ -21,13 +22,25 @@ from portal.selectors.informaticien import (
     enrollments_without_grades_for_branch,
     support_tickets_for_branch,
 )
-from portal.services.notes_workflow import get_notes_state
+from portal.services.notes_workflow import (
+    STATE_READY_TO_PUBLISH_FINAL,
+    STATE_READY_TO_PUBLISH_NORMAL,
+    get_notes_state,
+)
 from portal.services.it_support_service import (
     assign_support_ticket,
     create_support_ticket,
     log_support_action,
     update_support_ticket_status,
 )
+
+
+def _page_queryset(queryset, page_number, *, per_page):
+    paginator = Paginator(queryset, per_page)
+    try:
+        return paginator.page(page_number or 1)
+    except (EmptyPage, PageNotAnInteger):
+        return paginator.page(1)
 
 
 @dataclass
@@ -83,7 +96,7 @@ def build_home_context(*, branch):
                 resume_target = item
             if state.missing_grades and state.entered_grades:
                 incomplete_classes.append(item)
-            if state.code == "ready_to_calculate":
+            if state.code in (STATE_READY_TO_PUBLISH_NORMAL, STATE_READY_TO_PUBLISH_FINAL):
                 calculable_classes.append(item)
 
     blocked_accounts = AccountSupportState.objects.select_related("user__profile").filter(
@@ -105,13 +118,14 @@ def build_home_context(*, branch):
     }
 
 
-def build_support_context(*, branch, status="", toast=None):
-    tickets = support_tickets_for_branch(branch=branch, status=status)
+def build_support_context(*, branch, status="", toast=None, page=1):
+    tickets_page = _page_queryset(support_tickets_for_branch(branch=branch, status=status), page, per_page=20)
     return {
         "branch": branch,
         "status": status,
         "status_choices": SupportTicket.STATUS_CHOICES,
-        "tickets": list(tickets[:80]),
+        "tickets": list(tickets_page.object_list),
+        "tickets_page": tickets_page,
         "toast": toast,
     }
 
@@ -143,10 +157,12 @@ def resolve_branch_ticket(*, actor, branch, ticket, resolution=""):
     )
 
 
-def build_audit_context(*, branch):
+def build_audit_context(*, branch, page=1):
+    logs_page = _page_queryset(audit_logs_for_branch(branch=branch), page, per_page=25)
     return {
         "branch": branch,
-        "logs": list(audit_logs_for_branch(branch=branch)[:120]),
+        "logs": list(logs_page.object_list),
+        "logs_page": logs_page,
     }
 
 
@@ -231,10 +247,10 @@ def build_structure_context(*, branch):
     }
 
 
-def build_supervision_context(*, branch):
-    classes_without_notes = list(classes_without_notes_for_branch(branch=branch)[:40])
-    ecs_without_teacher = list(ecs_without_schedule_teacher_for_branch(branch=branch)[:40])
-    enrollments_without_grades = list(enrollments_without_grades_for_branch(branch=branch)[:40])
+def build_supervision_context(*, branch, page=1):
+    classes_without_notes = list(classes_without_notes_for_branch(branch=branch)[:100])
+    ecs_without_teacher = list(ecs_without_schedule_teacher_for_branch(branch=branch)[:100])
+    enrollments_without_grades = list(enrollments_without_grades_for_branch(branch=branch)[:200])
     alerts = []
     for academic_class in classes_without_notes:
         semester = academic_class.semesters.order_by("number").first()
@@ -273,7 +289,7 @@ def build_supervision_context(*, branch):
         semesters__status="FINALIZED",
         is_active=True,
     ).distinct()
-    for academic_class in calculated_not_sent[:30]:
+    for academic_class in calculated_not_sent[:60]:
         semester = academic_class.semesters.filter(status="FINALIZED").order_by("number").first()
         query = f"?classe={academic_class.id}"
         if semester:
@@ -286,7 +302,7 @@ def build_supervision_context(*, branch):
             "action_url": f"{reverse('accounts_portal:it_notes_flow_workspace')}{query}",
         })
     open_tickets = support_tickets_for_branch(branch=branch).exclude(status=SupportTicket.STATUS_RESOLVED)
-    for ticket in open_tickets[:30]:
+    for ticket in open_tickets[:60]:
         alerts.append({
             "level": "warning",
             "title": "Ticket ouvert",
@@ -294,9 +310,11 @@ def build_supervision_context(*, branch):
             "action_label": "Traiter",
             "action_url": reverse("accounts_portal:it_support_flow_workspace"),
         })
+    alerts_page = _page_queryset(alerts, page, per_page=20)
     return {
         "branch": branch,
-        "alerts": alerts[:80],
+        "alerts": alerts_page.object_list,
+        "alerts_page": alerts_page,
     }
 
 

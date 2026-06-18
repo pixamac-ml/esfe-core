@@ -2,103 +2,92 @@
 
 <h3 class="text-lg font-semibold text-primary-700 flex items-center gap-2">
 <i data-lucide="award"></i>
-Badges
+Badges ({{ badges.count }})
 </h3>
 
+{% if gamification %}
+<div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 flex items-center gap-4">
+    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-amber-500 shadow-sm text-xl">
+        <i class="fa-solid fa-{{ gamification.get_level_icon_class }}"></i>
+    </span>
+    <div class="flex-1">
+        <div class="flex items-center justify-between text-sm">
+            <span class="font-semibold text-amber-800">{{ gamification.get_level_title }} - Niveau {{ gamification.level }}</span>
+            <span class="text-amber-600">{{ gamification.total_xp }} XP</span>
+        </div>
+        <div class="mt-1 h-2 bg-white/70 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-amber-400 to-orange-500" style="width: {{ gamification.xp_progress }}%"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if badges %}
 <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+    {% for ub in badges %}
+    <div class="group relative bg-white p-6 rounded-xl border-2 shadow-sm text-center hover:shadow-md transition"
+         style="border-color: {{ ub.badge.get_rarity_color }}40; background: linear-gradient(135deg, {{ ub.badge.get_rarity_color }}10, {{ ub.badge.get_rarity_color }}20);">
 
-<!-- BADGE DÉBUTANT -->
+        <div class="flex justify-center mb-3 text-3xl">
+            {{ ub.badge.icon }}
+        </div>
 
-<div class="bg-white p-6 rounded-xl border border-primary-100 shadow-sm text-center hover:shadow-md transition">
+        <p class="font-semibold text-primary-700">
+            {{ ub.badge.name }}
+        </p>
 
-<div class="flex justify-center mb-3 text-yellow-500">
-<i data-lucide="award" class="w-8 h-8"></i>
+        <p class="text-xs text-gray-500 mt-1">
+            {{ ub.badge.description }}
+        </p>
+
+        <div class="text-xs mt-2 flex items-center justify-center gap-1" style="color: {{ ub.badge.get_rarity_color }}">
+            <i data-lucide="check-circle" class="w-3 h-3"></i>
+            {{ ub.badge.get_rarity_display }} - Obtenu le {{ ub.earned_at|date:"d/m/Y" }}
+        </div>
+    </div>
+    {% endfor %}
 </div>
-
-<p class="font-semibold text-primary-700">
-Débutant
-</p>
-
-<p class="text-xs text-gray-500 mt-1">
-Première réponse publiée
-</p>
-
-<div class="text-xs text-green-600 mt-2 flex items-center justify-center gap-1">
-<i data-lucide="check-circle" class="w-3 h-3"></i>
-Obtenu
+{% else %}
+<div class="text-center py-8 text-gray-500">
+    <i class="fa-solid fa-award text-4xl mb-2 block text-gray-300"></i>
+    <p>Aucun badge pour le moment</p>
+    <p class="text-sm">Participez pour en débloquer !</p>
 </div>
+{% endif %}
 
+{% if next_badges %}
+<div>
+    <h4 class="text-sm font-semibold text-gray-600 mb-3">À débloquer</h4>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        {% for item in next_badges %}
+        <div class="bg-white p-6 rounded-xl border border-primary-100 shadow-sm text-center opacity-50">
+
+            <div class="flex justify-center mb-3 text-3xl text-gray-400">
+                {{ item.badge.icon }}
+            </div>
+
+            <p class="font-semibold text-gray-500">
+                {{ item.badge.name }}
+            </p>
+
+            <p class="text-xs text-gray-400 mt-1">
+                {{ item.badge.description }}
+            </p>
+
+            {% if item.target %}
+            <div class="text-xs text-gray-400 mt-2">
+                Progression : {{ item.current }} / {{ item.target }}
+            </div>
+            {% else %}
+            <div class="text-xs text-gray-400 mt-2">
+                Non débloqué
+            </div>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+    </div>
 </div>
-
-
-<!-- BADGE CONTRIBUTEUR -->
-
-<div class="bg-white p-6 rounded-xl border border-primary-100 shadow-sm text-center opacity-40">
-
-<div class="flex justify-center mb-3 text-gray-400">
-<i data-lucide="star" class="w-8 h-8"></i>
-</div>
-
-<p class="font-semibold text-gray-500">
-Contributeur
-</p>
-
-<p class="text-xs text-gray-400 mt-1">
-10 réponses utiles
-</p>
-
-<div class="text-xs text-gray-400 mt-2">
-Progression : 3 / 10
-</div>
-
-</div>
-
-
-<!-- BADGE EXPERT -->
-
-<div class="bg-white p-6 rounded-xl border border-primary-100 shadow-sm text-center opacity-40">
-
-<div class="flex justify-center mb-3 text-gray-400">
-<i data-lucide="medal" class="w-8 h-8"></i>
-</div>
-
-<p class="font-semibold text-gray-500">
-Expert
-</p>
-
-<p class="text-xs text-gray-400 mt-1">
-50 réponses utiles
-</p>
-
-<div class="text-xs text-gray-400 mt-2">
-Progression : 3 / 50
-</div>
-
-</div>
-
-
-<!-- BADGE SPÉCIALISTE -->
-
-<div class="bg-white p-6 rounded-xl border border-primary-100 shadow-sm text-center opacity-40">
-
-<div class="flex justify-center mb-3 text-gray-400">
-<i data-lucide="brain" class="w-8 h-8"></i>
-</div>
-
-<p class="font-semibold text-gray-500">
-Spécialiste
-</p>
-
-<p class="text-xs text-gray-400 mt-1">
-Activité dominante dans un domaine
-</p>
-
-<div class="text-xs text-gray-400 mt-2">
-Non débloqué
-</div>
-
-</div>
-
-</div>
+{% endif %}
 
 </div>

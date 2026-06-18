@@ -190,6 +190,14 @@ class GamificationProfile(models.Model):
         }
         return icons.get(self.level, "🌱")
 
+    def get_level_icon_class(self):
+        """Retourne le nom de l'icône FontAwesome (sans préfixe) du niveau"""
+        icons = {
+            1: "seedling", 2: "leaf", 3: "book", 4: "graduation-cap", 5: "star",
+            6: "medal", 7: "gem", 8: "crown", 9: "trophy", 10: "fire",
+        }
+        return icons.get(self.level, "seedling")
+
 
 # ==========================
 # TRANSACTIONS XP

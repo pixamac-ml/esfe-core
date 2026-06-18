@@ -1,0 +1,975 @@
+================================================================================
+AUDIT CRITIQUE - DASHBOARD INFORMATICIEN (role "it_support")
+================================================================================
+Perimetre : `portal/views/it_workflows.py` (1709 lignes), `portal/views/views.py`
+(`_render_it_dashboard`, `it_portal`), `portal/services/informaticien_workflows.py`
+(350 lignes), `portal/services/notes_workflow.py` (361 lignes),
+`portal/selectors/it_workflow_selectors.py`, `portal/views/it_grades_import.py`
+(legacy), `portal/urls.py` (~50 routes `it_*`), templates
+`templates/portal/informaticien/` (27 fichiers) + legacy
+`templates/portal/staff/informaticien_dashboard.html`,
+`portal/templates/portal/staff/it_grades_import.html`,
+`dashboard_informaticien.html` (racine du repo).
+
+Clarification prealable importante :
+- Le role "informaticien" (position="it_support") est mappe vers le role
+  canonique `staff_admin` (accounts/access.py ligne 34), et fait partie de
+  `positions = {"super_admin", "it_support"}` (ligne 150).
+- A la connexion, `portal_dashboard` (portal/views/views.py) detecte
+  position=="it_support" et appelle `_render_it_dashboard()` (lignes
+  2039-2052), qui construit le contexte via
+  `build_home_context()` / `build_it_grade_selection_context()` et rend
+  `portal/informaticien/dashboard.html`.
+- => CONTRAIREMENT au cas de la secretaire, le routage standard n'est PAS un
+  cul-de-sac : `test_portal_dashboard_renders_it_dashboard_from_single_entry`
+  (accounts/tests.py) confirme que cette route fonctionne reellement.
+- Il existe en plus une route `portal_it` -> `it_portal()` (portal/views/views.py
+  lignes 2716-2717) qui ne fait que `redirect("accounts_portal:portal_dashboard")`
+  - un stub mort mais inoffensif (voir PROBLEME 7).
+- Le dashboard est "100% dynamique cote navigateur" : une coquille Alpine.js
+  (`itFlowDashboard()` dans dashboard.html) + ~50 routes HTMX qui chargent des
+  "workspaces" dans `#it-workspace`.
+
+CONSTAT GENERAL : ce dashboard est BEAUCOUP plus mature que ne l'etait celui de
+la secretaire au depart de son propre audit. La majorite des fonctionnalites
+metier critiques (notes, structure academique, comptes, archives, support,
+import/export, cartes) sont REELLEMENT implementees, branch-aware, et en
+grande partie testees. Les problemes ici ne sont pas "il manque tout", mais
+"plusieurs morceaux deja construits ne sont pas branches dans l'interface,
+et 2-3 bugs de logique se cachent dans du code par ailleurs solide".
+
+
+================================================================================
+1. CE QUI MARCHE VRAIMENT
+================================================================================
+
+[1.1] Filtrage obligatoire par annexe - respecte dans (presque) tout
+------------------------------------------------------------------
+`portal/selectors/it_workflow_selectors.py` centralise l'acces aux classes,
+semestres et etudiants : `get_it_academic_classes()`, `get_it_semesters_for_class()`,
+`get_it_students_for_class()` filtrent systematiquement par
+`academic_class__branch=branch` (et excluent les classes archivees). Le branch
+est resolu via `get_user_branch(request.user)` (accounts/access.py).
+
+`portal/services/informaticien_workflows.py` applique la meme regle a tout le
+reste : `build_home_context`, `build_support_context`, `build_audit_context`,
+`build_import_context`, `build_structure_context`, `build_supervision_context`
+prennent tous un `branch` en parametre et filtrent leurs querysets dessus
+(`AccountSupportState.objects... filter(user__profile__branch=branch)`,
+`SupportAuditLog... filter(branch=branch)`, etc.).
+
+`it_workflows.py` ajoute une seconde ligne de defense pour les actions cote
+formulaire : `_same_branch_or_forbidden()` (lignes 84-89) verifie explicitement
+que l'objet cible (classe, etudiant, compte) appartient bien a la meme annexe
+que l'utilisateur avant toute action de modification - sinon HttpResponseForbidden.
+=> Teste explicitement : `test_it_cross_branch_access_rejected` (accounts/tests.py
+ligne ~2063).
+
+EXCEPTION CONNUE : le catalogue (Language/Profession) n'est PAS filtre par
+annexe - c'est volontaire dans le code actuel (donnees globales/referentiels),
+mais merite discussion (voir PROBLEME 5).
+
+[1.2] Machine a etats des notes - `portal/services/notes_workflow.py`
+------------------------------------------------------------------
+Vrai etat machine, pas une simulation :
+- Etats : STATE_EMPTY -> STATE_IN_PROGRESS -> STATE_READY_TO_PUBLISH_NORMAL ->
+  STATE_NORMAL_PUBLISHED -> STATE_RETAKE_IN_PROGRESS ->
+  STATE_READY_TO_PUBLISH_FINAL -> STATE_FINAL_PUBLISHED, pilotes par
+  `Semester.status` (STATUS_DRAFT/STATUS_NORMAL_ENTRY/STATUS_NORMAL_LOCKED/
+  STATUS_RETAKE_ENTRY/STATUS_FINALIZED/STATUS_PUBLISHED).
+- `get_notes_state()` calcule l'etat reel a partir des notes saisies
+  (notes manquantes, notes en attente de calcul, etc.) - pas un statut
+  declaratif.
+- `get_available_actions()` retourne dynamiquement les actions valides pour
+  l'etat courant (verrouiller, publier normal, ouvrir rattrapage, publier
+  final...).
+- `apply_notes_workflow_action()` applique l'action, journalise dans
+  `SupportAuditLog` via `log_support_action()`, et est appele par
+  `it_notes_workflow_action()` (it_workflows.py lignes 349-397).
+- `get_retake_candidates()` / `can_edit_retake_grade()` : seuls les etudiants
+  effectivement eligibles au rattrapage (note < seuil) peuvent voir leur note
+  de rattrapage editee - empeche de "forcer" un resultat, conformement a
+  `reponse_role_informaticien.md` ("Il ne doit pas avoir de bouton 'Forcer
+  passage'").
+
+[1.3] KPIs reels par classe/semestre - `it_notes_kpi`
+------------------------------------------------------------------
+`it_notes_kpi()` (it_workflows.py lignes 139-214) calcule reellement :
+effectif, notes saisies/attendues, notes validees, notes en echec,
+dettes academiques en attente, pourcentage de progression - tout est requete
+sur les modeles reels (pas de chiffres en dur). Rendu dans
+`portal/informaticien/partials/notes_kpi.html`, branche via hx-get dans
+`ui/templates/notes/notes_workflow.html` (hx-trigger="load, kpi-update from:body").
+
+[1.4] Decision annuelle officielle - `academics/services/year.py`
+------------------------------------------------------------------
+`compute_annual_decision(enrollment)` (lignes 231-322) implemente la VRAIE
+logique : VALIDE / ADMISSIBLE / NON_ADMIS, en s'appuyant sur
+`AcademicClass.admissibility_gap` (defaut 2.00), et cree les
+`AcademicDebt` via `create_academic_debts()` quand ADMISSIBLE. C'est cette
+fonction qui devrait etre la SEULE source de verite pour les decisions
+annuelles (voir PROBLEME 2 - `it_notes_decisions` ne l'utilise pas).
+
+[1.5] Import / export Excel reels (openpyxl)
+------------------------------------------------------------------
+- `it_import_workspace` / `it_import_upload` (it_workflows.py lignes 635-697) :
+  upload reel d'un fichier Excel, previsualisation via `_build_import_preview()`
+  / `ImportFeedback`, puis `import_notes_file()` (informaticien_workflows.py,
+  `@transaction.atomic`, verifie l'annexe avant import) ecrit reellement les
+  notes en base.
+- `it_export_notes_excel()` (lignes 700-780) genere un classeur a 3 feuilles
+  (Notes classe / Anomalies / Resultats) avec openpyxl, et journalise
+  `ACTION_EXCEL_EXPORTED` dans `SupportAuditLog`.
+=> Couvert par `test_it_import_workspace_renders` et
+   `test_it_import_upload_processes_file` (accounts/tests.py).
+
+[1.6] Gestion de la structure academique - `it_structure_workspace`
+------------------------------------------------------------------
+`build_structure_context()` liste les classes (`[:120]`), les classes sans
+notes (`[:30]`), les EC sans enseignant (`[:30]`) - toutes filtrees par annexe.
+CRUD reel via `it_structure_drawer` / `it_structure_modal` / `it_structure_action`,
+avec validation (`full_clean`) et messages d'erreur affiches dans le drawer.
+=> Couvert par `test_it_structure_workspace_renders`,
+   `test_it_structure_create_*`, `test_it_structure_validation_error`.
+
+[1.7] Archivage / restauration de classes - `it_archives_workspace`
+------------------------------------------------------------------
+`it_archives_workspace`, `it_archives_action`, `it_archive_detail` permettent
+d'archiver une classe (et ses inscriptions) et de la restaurer, avec
+historique consultable. => Couvert par `test_it_archive_class_and_restore`.
+
+[1.8] Gestion des comptes utilisateurs - `it_accounts_flow_workspace`
+------------------------------------------------------------------
+Actions reelles et protegees : `it_toggle_account`, `it_reset_password`,
+`it_suspend_account`, `it_reactivate_account`, `it_unblock_account`,
+`it_update_account_email`, via `it_user_modal` / `it_user_modal_save`.
+Toutes passent par `_same_branch_or_forbidden()`. `AccountSupportState`
+materialise les comptes bloques/suspendus (utilise aussi par
+`build_home_context` pour `blocked_accounts`).
+=> Couvert par `test_it_toggle_staff_account`, `test_it_reset_password`.
+
+[1.9] Cartes etudiants PDF - `it_cards_workspace`
+------------------------------------------------------------------
+`it_class_cards_pdf` / `it_student_card_pdf` generent de vraies cartes PDF
+(reportlab) par classe ou par etudiant.
+
+[1.10] Tickets de support - `it_support_flow_workspace`
+------------------------------------------------------------------
+`create_branch_ticket` / `take_branch_ticket` / `resolve_branch_ticket`
+(informaticien_workflows.py) + actions `it_create_ticket`, `it_assign_ticket`,
+`it_update_ticket_status`, `it_comment_ticket` - cycle de vie complet d'un
+ticket, journalise dans `SupportAuditLog`.
+
+[1.11] Journal d'audit - `it_audit_workspace` (BACKEND OK, UI absent)
+------------------------------------------------------------------
+`build_audit_context()` retourne les 120 dernieres entrees `SupportAuditLog`
+de l'annexe, avec template `audit_workspace.html` dedie et fonctionnel au
+niveau backend. PROBLEME : aucune entree de navigation ne pointe vers cette
+route (voir PROBLEME 1).
+
+[1.12] Panneau de supervision - `it_supervision_workspace` (BACKEND OK, UI absent)
+------------------------------------------------------------------
+`build_supervision_context()` agrege exactement le type d'alertes que
+`reponse_role_informaticien.md` decrit comme essentiel pour le role : classes
+avec notes incompletes, EC sans enseignant, comptes bloques, tickets ouverts,
+alertes "bloquantes" (`[:80]`). Template `supervision_workspace.html` existe et
+est fonctionnel. PROBLEME : aucune entree de navigation (voir PROBLEME 1).
+
+[1.13] Catalogue referentiels - `it_catalog_workspace` (BACKEND OK, UI absent)
+------------------------------------------------------------------
+`build_catalog_context()` / `create_catalog_item()` permettent de gerer les
+referentiels Language/Profession. Fonctionnel mais sans entree de navigation
+(voir PROBLEME 1) et non filtre par annexe (voir PROBLEME 5).
+
+[1.14] Accueil dynamique - `home_workspace.html` / `it_home_workspace`
+------------------------------------------------------------------
+Page d'accueil "Accueil" entierement pilotee par les donnees :
+`resume_target`, `incomplete_classes`, `import_errors`, `blocked_accounts`
+viennent tous de requetes reelles, avec etats vides corrects ("Aucune classe
+incomplete", etc.). Seul `calculable_classes` est casse (voir PROBLEME 3).
+
+[1.15] Parametres d'annexe - `it_branch_settings_workspace`
+------------------------------------------------------------------
+`get_branch_settings()` / `update_branch_settings()` lisent/ecrivent un vrai
+modele `BranchITSettings` (portal/models.py ~343-366), avec `full_clean()` et
+journalisation `ACTION_BRANCH_SETTINGS_UPDATED`. Accessible via le menu profil
+("Parametres annexe").
+
+[1.16] Couverture de tests existante
+------------------------------------------------------------------
+15 tests `it_*` dans `accounts/tests.py` (lignes 1619-2063+, classe
+`PortalPhaseOneTests`) couvrant : rendu du dashboard IT, acces grades,
+notes inline, filtres workspace notes, grille HTMX, modals
+publication normale/rattrapage, blocage edition rattrapage si deja valide,
+structure (rendu/creation/erreur validation), import (rendu/upload), archive +
+restauration, toggle compte, reset mot de passe, rejet cross-branch.
+=> C'est nettement plus que ce que la secretaire avait au depart de son audit.
+
+
+================================================================================
+2. CE QUI EST PROBLEMATIQUE
+================================================================================
+
+PROBLEME 1 : 3 workspaces entierement construits mais INVISIBLES dans le menu
+------------------------------------------------------------------------------
+`templates/portal/informaticien/dashboard.html`, tableau `modules` (lignes
+438-449) et `openModule()` (lignes 504-523) : seulement 10 entrees -
+accueil, notes, structure, import, archives, cartes, comptes, support,
+notifications, parametres.
+
+Or `portal/urls.py` definit aussi (et les vues + templates existent et
+fonctionnent cote backend) :
+- `it_audit_workspace` (ligne 331) -> `audit_workspace.html`
+- `it_supervision_workspace` (ligne 342) -> `supervision_workspace.html`
+- `it_catalog_workspace` (ligne 343) -> `catalog_workspace.html`
+
+Aucune des trois n'apparait dans `modules`/`openModule`, ni dans aucun autre
+template sous `templates/portal/informaticien/` (verifie par grep global).
+=> Ce sont des fonctionnalites COMPLETES (logique + template + branch-scoping)
+qui n'ont jamais ete reliees a l'UI. C'est exactement le type de "trou de
+navigation" que l'audit de la secretaire avait identifie comme prioritaire
+(section "matrice de routage dynamique", Phase A).
+=> IMPACT : `it_supervision_workspace` est en particulier celui qui correspond
+le mieux a la description du role dans `reponse_role_informaticien.md`
+("anomalies bloquantes, notes incompletes, EC sans enseignant, tickets
+ouverts") - c'est probablement le module le plus "vendeur" pour une
+presentation et il est actuellement injoignable sans taper l'URL a la main.
+
+PROBLEME 2 : `it_notes_decisions` reimplemente (mal) la logique de decision annuelle
+------------------------------------------------------------------------------
+`it_workflows.py` lignes 241-316 (`it_notes_decisions`) recalcule "a la main"
+les decisions par semestre et la decision annuelle, AU LIEU d'appeler
+`compute_annual_decision()` (academics/services/year.py lignes 231-322), qui
+est la fonction officielle utilisee ailleurs dans le projet (et qui gere
+correctement VALIDE / ADMISSIBLE / NON_ADMIS + creation des `AcademicDebt`).
+
+Consequence concrete : dans `it_notes_decisions`, chaque decision de semestre
+ne peut valoir que "VALIDE" ou "NON ADMIS" (jamais "ADMISSIBLE"), donc la
+branche `elif s1_ok and s2_ok: year_decision = "ADMISSIBLE"` est du CODE MORT
+- elle ne peut structurellement jamais s'executer. Un etudiant qui devrait
+etre "ADMISSIBLE" (avec creation de dette academique via
+`create_academic_debts()`) sera donc classe soit VALIDE soit NON_ADMIS par
+cette vue, ce qui DIVERGE du calcul officiel utilise par ailleurs (bulletins,
+portail etudiant, etc.).
+
+De plus, la route `it_notes_decisions` (portal/urls.py ligne 316) n'est
+appelee depuis AUCUN template du dashboard informaticien (seulement
+referencee dans `test_urls.py`) - c'est donc a la fois un bug de logique ET
+une fonctionnalite non branchee a l'UI.
+
+PROBLEME 3 : bug "ready_to_calculate" - la section "Resultats" de l'accueil est morte
+------------------------------------------------------------------------------
+`portal/services/informaticien_workflows.py` ligne 86, dans
+`build_home_context()` :
+
+    if state.code == "ready_to_calculate":
+        calculable_classes.append(item)
+
+Or `notes_workflow.py` ne definit AUCUN etat avec le code
+`"ready_to_calculate"`. Les codes reels sont : `empty`, `in_progress`,
+`ready_to_publish_normal`, `normal_published`, `retake_in_progress`,
+`ready_to_publish_final`, `final_published`.
+
+=> `calculable_classes` est donc TOUJOURS une liste vide, quel que soit l'etat
+reel des classes. Dans `home_workspace.html`, le bloc "Resultats - pretes a
+calculer" (avec le bouton "Generer resultats") affiche donc systematiquement
+"Aucune classe prete a calculer", MEME quand une classe a un semestre
+effectivement pret a etre publie (`ready_to_publish_normal`/
+`ready_to_publish_final`).
+=> Petite cause (un seul comparateur de chaine), gros effet visible (une
+section entiere de l'accueil semble "ne jamais avoir rien a faire").
+Note : la classe CSS `.workflow-band-ready_to_calculate` existe aussi
+(dashboard.html ligne 42) et est donc elle aussi morte.
+
+PROBLEME 4 : deux parcours d'import de notes concurrents (cf. audit precedent)
+------------------------------------------------------------------------------
+Confirme et precise par rapport a `audit_import_notes_informaticien.txt` :
+- Parcours moderne, integre au dashboard : `it_import_workspace` /
+  `it_import_upload` (HTMX, dans le menu "Import").
+- Parcours legacy, autonome : `it_grades_import_view`
+  (portal/views/it_grades_import.py, 115 lignes) + template
+  `portal/templates/portal/staff/it_grades_import.html` (292 lignes), avec sa
+  propre fonction `_build_import_preview()` (avec `meta_rows`) et
+  `build_it_grade_selection_context()`, qui DUPLIQUENT la logique de
+  `informaticien_workflows.py`.
+- Le parcours legacy est accessible uniquement via l'URL directe
+  `it/grades/import/` (route `it_grades_import` ligne ~467) - AUCUN lien dans
+  `dashboard.html` ou ses workspaces n'y mene. Il est donc orphelin du point
+  de vue navigation, mais reste un code actif (et teste ?) qui duplique
+  ~115+292 = 407 lignes de logique/presentation deja couvertes par le
+  parcours moderne.
+
+PROBLEME 5 : catalogue (Language/Profession) non filtre par annexe
+------------------------------------------------------------------------------
+`build_catalog_context()` / `create_catalog_item()` (informaticien_workflows.py)
+gerent `Language` et `Profession` SANS filtre `branch`. C'est en contradiction
+directe avec la regle centrale du CLAUDE.md ("filtrage obligatoire par
+annexe. Aucune visibilite cross-annexe."). Cela peut etre un choix
+deliberement assume (referentiels globaux partages entre annexes), mais ce
+n'est documente nulle part - a clarifier/trancher explicitement, sinon une
+annexe peut creer/modifier des entrees visibles par toutes les autres.
+
+PROBLEME 6 : ~1259 lignes de templates legacy totalement orphelins
+------------------------------------------------------------------------------
+Aucune reference `.py` (vues/urls) ni `.html` (include/extends) vers :
+- `templates/portal/staff/informaticien_dashboard.html` (500 lignes)
+- `dashboard_informaticien.html` a la RACINE du repo (467 lignes) - tres
+  probablement une maquette de design jamais integree
+- `portal/templates/portal/staff/it_grades_import.html` (292 lignes, voir
+  PROBLEME 4 - orphelin du point de vue NAVIGATION mais sa vue Python est
+  encore active)
+Total code mort confirme (templates jamais render ou jamais lies) : au moins
+967 lignes (500 + 467), potentiellement 1259 en comptant le parcours import
+legacy complet.
+
+PROBLEME 7 : route `portal_it` / `it_portal` - stub mort (mineur)
+------------------------------------------------------------------------------
+`portal/views/views.py` lignes 2716-2717 :
+
+    def it_portal(request):
+        return redirect("accounts_portal:portal_dashboard")
+
+Montee sur `path("it/", it_portal, name="portal_it")` (portal/urls.py:310).
+Contrairement au cas de la secretaire, ce n'est PAS un cul-de-sac (la
+redirection retombe sur le vrai dashboard informaticien), mais la route
+elle-meme ne sert a rien et peut semer la confusion (deux URLs "racine IT"
+differentes : `/portal/dashboard/` qui fonctionne et `/portal/it/` qui
+redirige dessus).
+
+PROBLEME 8 : limites de troncature codees en dur, sans pagination ni indication
+------------------------------------------------------------------------------
+De nombreuses listes sont tronquees silencieusement :
+- `build_audit_context` : logs `[:120]`
+- `build_structure_context` : classes `[:120]`, classes sans notes `[:30]`,
+  EC sans enseignant `[:30]`
+- `build_supervision_context` : alertes diverses `[:40]`/`[:30]`, alertes
+  finales `[:80]`
+- `it_cards_workspace` : etudiants `[:80]`
+Aucun de ces ecrans n'indique a l'utilisateur "X resultats sur Y" ni n'offre
+de pagination/recherche - au-dela du seuil, des donnees disparaissent
+silencieusement de la vue informaticien.
+
+PROBLEME 9 : trous de couverture de tests
+------------------------------------------------------------------------------
+Sur ~50 routes `it_*`, seules ~15 sont couvertes par des tests explicites.
+NON testes a ce jour : `it_notes_decisions`, `it_notes_kpi`, `it_workflow_section`,
+`it_home_workspace`, `it_export_notes_excel`, `it_cards_workspace`,
+`it_catalog_workspace`/`it_catalog_action`, `it_supervision_workspace`,
+`it_branch_settings_save`, `it_audit_workspace`, `it_support_flow_workspace`/
+`it_support_flow_action`, `it_notifications_workspace`/`it_notifications_action`,
+`it_my_account_workspace`/`it_my_account_save`, `it_user_modal_save`,
+`it_archive_detail`. En particulier, les deux bugs (PROBLEME 2 et 3) seraient
+detectes immediatement par un test qui compare le resultat de
+`it_notes_decisions`/`build_home_context` a `compute_annual_decision()` /
+`get_notes_state()` sur un cas "ADMISSIBLE"/"ready_to_publish_normal".
+
+
+================================================================================
+3. CE QU'IL FAUDRAIT
+================================================================================
+
+PRIORITE IMMEDIATE (corrections rapides, fort impact visuel pour la
+presentation - quelques lignes chacune) :
+
+1. Ajouter les 3 entrees de navigation manquantes (PROBLEME 1) :
+   - Dans `dashboard.html`, tableau `modules` (lignes ~438-449) : ajouter
+     "supervision" (Anomalies/Alertes), "audit" (Journal), "catalogue"
+     (Referentiels).
+   - Dans `openModule()` (lignes ~504-523) : mapper ces 3 cles vers
+     `it_supervision_workspace`, `it_audit_workspace`, `it_catalog_workspace`
+     via `htmx.ajax` (meme pattern que les 10 entrees existantes).
+   - Priorite a "supervision" : c'est le module le plus directement aligne
+     avec la description du role dans `reponse_role_informaticien.md`.
+
+2. Corriger le bug `"ready_to_calculate"` (PROBLEME 3) :
+   - `informaticien_workflows.py` ligne 86 : remplacer
+     `if state.code == "ready_to_calculate":` par le code d'etat reel qui
+     correspond a "semestre complet, pret a publier/calculer" - tres
+     probablement `notes_workflow.STATE_READY_TO_PUBLISH_NORMAL` (et/ou
+     `STATE_READY_TO_PUBLISH_FINAL` selon la phase). Verifier aussi la classe
+     CSS `.workflow-band-ready_to_calculate` (dashboard.html ligne 42) qui
+     devra etre alignee avec le meme code d'etat.
+
+3. Decider du sort de `it_notes_decisions` (PROBLEME 2) :
+   - Option A (recommandee si le temps le permet) : reecrire
+     `it_notes_decisions()` pour appeler `compute_annual_decision()` par
+     etudiant au lieu de recalculer une logique partielle - elimine la
+     divergence et la branche morte "ADMISSIBLE" d'un coup.
+   - Option B (si pas le temps avant la presentation) : au minimum,
+     documenter/commenter que cette vue est une version simplifiee et NE PAS
+     la brancher dans l'UI tant qu'elle n'est pas alignee - eviter
+     d'introduire un ecran "Decisions" qui afficherait des resultats
+     incoherents avec les bulletins officiels.
+
+PRIORITE 2 (apres la presentation, structurant) :
+
+4. Unifier les deux parcours d'import (PROBLEME 4) : soit supprimer
+   `it_grades_import_view`/son template et rediriger l'URL legacy vers
+   `it_import_workspace`, soit migrer les ameliorations de l'import legacy
+   (matching MATRICULE/ENROLLMENT_ID, etc.) dans `_build_import_preview()`
+   commun puis supprimer le doublon.
+
+5. Trancher et appliquer le filtrage par annexe du catalogue (PROBLEME 5) :
+   soit ajouter `branch` aux modeles Language/Profession et filtrer comme le
+   reste, soit documenter explicitement que ces referentiels sont globaux par
+   conception.
+
+6. Nettoyer le code mort (PROBLEME 6 et 7) : supprimer
+   `templates/portal/staff/informaticien_dashboard.html`,
+   `dashboard_informaticien.html` (racine), et la route `portal_it`/`it_portal`
+   si confirmes inutilises (un grep global suffit a re-verifier avant
+   suppression).
+
+PRIORITE 3 (qualite/robustesse) :
+
+7. Ajouter des tests pour les routes listees en PROBLEME 9, en priorite
+   `it_notes_decisions` (regression test du bug ADMISSIBLE),
+   `it_home_workspace`/`build_home_context` (regression test du bug
+   `ready_to_calculate`), et `it_supervision_workspace`/`it_audit_workspace`/
+   `it_catalog_workspace` une fois branches dans l'UI.
+
+8. Remplacer les troncatures silencieuses `[:N]` (PROBLEME 8) par une
+   pagination simple ou au minimum un message "Affichage des N premiers
+   resultats sur TOTAL".
+
+
+================================================================================
+4. INVENTAIRE COMPLET (routes `it_*`, ~50 routes)
+================================================================================
+
+Accueil
+  it_home_workspace                 - OK, data-driven (sauf calculable_classes,
+                                       voir PROBLEME 3)
+
+Notes
+  it_notes_flow_workspace           - OK (selection classe/semestre)
+  it_notes_kpi                      - OK, KPIs reels, branche via hx-get
+  it_workflow_section                - OK, branche (notes_workflow.html)
+  it_notes_decisions                 - PROBLEME 2 : logique divergente + non
+                                        branche a l'UI
+  it_notes_workflow_action           - OK, passe par notes_workflow.py
+  it_notes_retake_modal               - OK
+  it_notes_grid / it_notes_workspace  - OK (grille HTMX)
+  it_grade_sheet_pdf / _print          - OK (PDF/impression bulletin classe)
+
+Structure academique
+  it_structure_workspace / _drawer
+  / _modal / _action                 - OK, CRUD + validation, teste
+
+Import / Export
+  it_import_workspace / _upload      - OK, integre, teste
+  it_export_notes_excel              - OK, export 3 feuilles openpyxl
+  it_grades_import (legacy)          - PROBLEME 4 : doublon orphelin de
+                                        navigation (407 lignes)
+
+Archives
+  it_archives_workspace / _action
+  / it_archive_detail                - OK, teste (creation+restauration)
+
+Comptes
+  it_accounts_flow_workspace / _action
+  it_user_modal / _save              - OK, cross-branch protege, teste
+  it_toggle_account / reset_password /
+  suspend / reactivate / unblock /
+  update_account_email               - OK
+
+Cartes
+  it_cards_workspace                 - OK (liste, troncature [:80] non signalee)
+  it_class_cards_pdf / it_student_card_pdf - OK, PDF reportlab
+
+Support
+  it_support_flow_workspace / _action
+  it_create_ticket / assign / status /
+  comment                            - OK, cycle de vie complet, audit log
+
+Audit / Journal
+  it_audit_workspace                 - PROBLEME 1 : backend OK, AUCUNE entree
+                                        de navigation
+
+Supervision
+  it_supervision_workspace           - PROBLEME 1 : backend OK (le plus aligne
+                                        avec le role IT), AUCUNE entree de nav
+
+Catalogue
+  it_catalog_workspace / _action     - PROBLEME 1 (pas de nav) + PROBLEME 5
+                                        (pas de filtrage annexe)
+
+Notifications
+  it_notifications_workspace / _action - OK, branche (menu)
+
+Parametres annexe
+  it_branch_settings_workspace / _save - OK, branche (menu profil), modele
+                                        BranchITSettings reel
+
+Mon compte
+  it_my_account_workspace / _save    - OK, branche (menu profil)
+
+Surveillance
+  it_surveillance_workspace /
+  it_surveillance_student_followup   - OK, route distincte (non auditee en
+                                        detail - perimetre limite par le temps)
+
+Panneaux (sidebar/topbar)
+  it_diagnostics_panel / it_accounts_panel
+  / it_support_panel                  - OK
+
+Routage
+  portal_dashboard -> _render_it_dashboard - OK, point d'entree reel et teste
+  portal_it -> it_portal              - PROBLEME 7 : stub mort, redirection
+                                        inutile mais inoffensive
+
+
+================================================================================
+5. RESUME CHIFFRE
+================================================================================
+
+- ~50 routes `it_*` dans portal/urls.py
+- 27 templates sous `templates/portal/informaticien/`
+- `portal/views/it_workflows.py` : 1709 lignes
+- `portal/services/informaticien_workflows.py` : 350 lignes
+- `portal/services/notes_workflow.py` : 361 lignes (machine a etats reelle)
+- 15 tests `it_*` explicites (accounts/tests.py) sur ~50 routes -> ~30% de
+  couverture directe
+- 3 workspaces complets (audit, supervision, catalogue) sans entree de
+  navigation -> 0% accessibles depuis l'UI standard
+- 2 bugs de logique confirmes (decisions annuelles divergentes, section
+  "Resultats" de l'accueil toujours vide)
+- ~967 lignes de templates legacy 100% orphelins (informaticien_dashboard.html
+  + dashboard_informaticien.html racine), + 407 lignes de parcours d'import
+  legacy orphelin de navigation
+- 1 route stub (`portal_it`) inutile mais inoffensive
+
+
+================================================================================
+6. VERDICT
+================================================================================
+
+Le dashboard informaticien est, de loin, le plus avance des dashboards audites
+jusqu'ici dans ce projet : machine a etats de notes reelle, decision annuelle
+officielle disponible (meme si pas utilisee partout), import/export Excel
+fonctionnels, gestion de structure academique avec validation, archivage,
+gestion de comptes cross-branch-safe, cartes PDF, tickets de support, journal
+d'audit, panneau de supervision - tout cela EXISTE et fonctionne au niveau
+backend.
+
+Le probleme n'est PAS "construire des fonctionnalites manquantes" mais :
+1. RELIER ce qui est deja construit (3 workspaces orphelins de navigation,
+   dont le plus important pour le role : la supervision/anomalies) ;
+2. CORRIGER deux bugs de logique localises et bien identifies (un
+   comparateur de chaine errone, et une fonction qui n'appelle pas la bonne
+   logique de decision) ;
+3. NETTOYER le code mort issu d'iterations precedentes (templates legacy,
+   parcours d'import duplique, route stub).
+
+Pour une presentation demain, les points 1 et 2 sont des changements courts,
+localises, a faible risque, et ont un impact visuel/fonctionnel immediat -
+ils sont les candidats naturels a traiter en priorite.
+
+
+================================================================================
+7. PRIORITES
+================================================================================
+
+P1 (avant presentation - faible risque, fort impact) :
+  - Brancher `it_supervision_workspace`, `it_audit_workspace`,
+    `it_catalog_workspace` dans le menu (PROBLEME 1)
+  - Corriger le bug `"ready_to_calculate"` dans `build_home_context`
+    (PROBLEME 3)
+  - Decider/corriger `it_notes_decisions` (PROBLEME 2) - au minimum ne pas
+    l'exposer tel quel dans l'UI
+
+P2 (apres presentation) :
+  - Unifier les deux parcours d'import de notes (PROBLEME 4)
+  - Trancher le filtrage par annexe du catalogue (PROBLEME 5)
+  - Nettoyer templates legacy + route `portal_it` (PROBLEME 6, 7)
+
+P3 (qualite long terme) :
+  - Combler les trous de couverture de tests (PROBLEME 9)
+  - Remplacer les troncatures `[:N]` par pagination/affichage explicite
+    (PROBLEME 8)
+
+
+================================================================================
+8. SUIVI DES CORRECTIONS APPLIQUEES
+================================================================================
+
+[FAIT] PROBLEME 1 - Navigation des 3 workspaces orphelins
+------------------------------------------------------------------------------
+`templates/portal/informaticien/dashboard.html` :
+- Tableau `modules` : ajout de 3 entrees apres "support" -> "supervision"
+  (Anomalies/alertes), "audit" (Journal d audit), "catalog" (Catalogue
+  langues/professions).
+- `openModule()` : ajout du mapping vers `it_supervision_workspace`,
+  `it_audit_workspace`, `it_catalog_workspace`.
+- Nettoyage des classes CSS `.workflow-band-*` mortes (anciens codes
+  `ready_to_calculate`/`calculated`/`sent_to_director`), remplacees par les
+  vrais codes d'etat (`ready_to_publish_normal`, `normal_published`,
+  `retake_in_progress`, `ready_to_publish_final`, `final_published`).
+Verifie : `manage.py check` OK, suite de tests PortalPhaseOneTests (57 tests)
+re-executee avant/apres -> memes 4 echecs preexistants (non lies).
+
+[FAIT] PROBLEME 3 - Bug "ready_to_calculate" dans build_home_context
+------------------------------------------------------------------------------
+`portal/services/informaticien_workflows.py` : remplacement de
+`if state.code == "ready_to_calculate":` par
+`if state.code in (STATE_READY_TO_PUBLISH_NORMAL, STATE_READY_TO_PUBLISH_FINAL):`
+(import des constantes depuis `notes_workflow`). La section "Resultats - pretes
+a calculer" de l'accueil informaticien affiche desormais reellement les
+classes/semestres prets a etre publies.
+
+[FAIT] Maquette de saisie des notes (`ui/templates/grades/maquette/maquette.html`)
+------------------------------------------------------------------------------
+Demande utilisateur : la grille CSS Grid de saisie des notes (affichee dans
+le workspace "Notes" du dashboard informaticien) avait des lignes/colonnes
+"derangees". 3 bugs CSS identifies et corriges :
+
+1. Les 3 cellules "coin" des lignes d'en-tete 1 a 4 (libelles "Etudiants",
+   "Matieres", "Credits requis", "Coefficients") utilisaient la classe
+   `.maq-cell--corner` (`position: sticky; top: 0; left: 0; z-index: 30`).
+   Cette regle entrait en conflit avec `top: -500px` (mecanisme d'empilement/
+   collapse des 4 premieres lignes d'en-tete au scroll vertical) : les 4
+   cellules "coin" restaient figees en haut alors que le reste de leur ligne
+   defilait -> en-tetes desalignes au scroll. Remplace par `meta-num` (coherent
+   avec la colonne N°, et heritage correct de `top: -500px`). Regle CSS
+   `.maq-cell--corner` (devenue inutilisee) supprimee.
+
+2. La 2e cellule meta des lignes d'en-tete 1 a 4 (colonne "NOM") etait classee
+   `meta-num` au lieu de `meta-name` -> elle se collait a `left: 0` (meme
+   position que la colonne N°) au scroll horizontal, chevauchant la colonne
+   N°. Corrige en `meta-name` (sticky `left: var(--meta-num)`, coherent avec
+   le corps du tableau et la ligne 5).
+
+3. Les cellules d'en-tete "RESULTAT DU SEMESTRE" / coefficients / credits
+   (lignes 1 a 4, span 3 colonnes, colonnes figees a droite) utilisaient le
+   selecteur CSS `.maq-cell--h.res` qui ne correspondait a AUCUN element
+   (classe reelle = `maq-cell--h-res`) -> ces en-tetes n'etaient pas figes a
+   droite et defilaient hors champ alors que les colonnes resultats du corps
+   restaient figees, laissant le bloc resultats sans en-tete au scroll
+   horizontal. Selecteur corrige en `.maq-cell--h-res` + ajout de `right: 0`.
+
+Verifie : `manage.py check` OK, `test_it_notes_grid_htmx_returns_shared_maquette`
+passe. Verification visuelle dans le navigateur en attente (utilisateur en
+cours de verification).
+
+[FAIT] Pagination des sections Audit / Supervision / Support
+------------------------------------------------------------------------------
+Demande utilisateur : mettre en place la pagination sur les sections du
+dashboard informaticien, en priorite Audit + Supervision + Support (ces 3
+sections retournaient des listes tronquees en dur - `[:120]`, `[:80]`,
+`[:80]` - sans aucun moyen de voir le reste des donnees).
+
+`portal/services/informaticien_workflows.py` :
+- Nouvelle fonction utilitaire `_page_queryset(queryset, page_number, *,
+  per_page)` (Paginator + fallback page 1 sur EmptyPage/PageNotAnInteger),
+  meme convention que `_paginate_items` dans `portal/views/it_workflows.py`.
+- `build_audit_context(*, branch, page=1)` : pagine `audit_logs_for_branch`
+  (25 lignes/page), retourne `logs` (page courante) + `logs_page` (objet
+  Page pour les controles de pagination).
+- `build_support_context(*, branch, status="", toast=None, page=1)` : pagine
+  `support_tickets_for_branch` (20 lignes/page), retourne `tickets` +
+  `tickets_page`.
+- `build_supervision_context(*, branch, page=1)` : les alertes restent
+  construites en combinant 5 sources (classes sans notes, EC sans
+  enseignant, etudiants sans notes, resultats calcules non envoyes, tickets
+  ouverts) ; les plafonds par categorie sont releves (100/100/200/60/60 au
+  lieu de 40/40/40/30/30) puis la liste complete d'alertes est paginee via
+  `_page_queryset` (20 alertes/page) -> `alerts` (page courante) +
+  `alerts_page`.
+
+`portal/views/it_workflows.py` : `it_audit_workspace`, `it_supervision_workspace`
+et `it_support_flow_workspace` lisent desormais `request.GET.get("page")` et
+le transmettent au context builder correspondant. `it_support_flow_action`
+inchange (retombe sur la page 1 apres une action).
+
+Templates et composants mis a jour pour afficher "Page X / Y - Z resultats"
++ boutons Precedent/Suivant (HTMX, memes classes `workflow-btn
+workflow-btn-secondary` que `structure_workspace.html`) :
+- `templates/portal/informaticien/workflows/audit_workspace.html`,
+  `supervision_workspace.html`, `support_workspace.html` : passage de
+  `logs_page` / `alerts_page` / `tickets_page` aux composants.
+- `ui/components/informaticien/audit_log_table.py`,
+  `supervision_panel.py`, `support_panel.py` : nouveau parametre
+  `*_page=None` transmis au template.
+- `ui/templates/informaticien/audit_log_table.html`,
+  `supervision_panel.html`, `support_panel.html` : bloc de pagination ajoute
+  apres `.workflow-list`, affiche uniquement si
+  `*_page.paginator.num_pages > 1`. Le filtre `status` est preserve dans les
+  liens de pagination du support.
+
+Verifie : `manage.py check` OK. Smoke test temporaire (GET HTMX sur les 3
+workspaces + `?page=1` + `?page=999` hors limites) -> 200 OK dans tous les
+cas, puis retire (pas de suite de tests dediee a ces 3 vues - cf. PROBLEME 9).
+
+A faire ensuite (demande utilisateur, differe) : revue du style visuel des
+champs de selection (`<select>`) du dashboard informaticien - largeur,
+padding, coherence avec `dg-input`/`dg-form-grid`.
+
+[FAIT] PROBLEME 2 / 9.1 - `it_notes_decisions` utilise maintenant la decision
+officielle `compute_annual_decision()`
+------------------------------------------------------------------------------
+Demande utilisateur : "corrige l'ecran it_notes_decisions pour utiliser
+compute_annual_decision" (suite a l'explication donnee en 9.1 sur les deux
+calculs divergents).
+
+`portal/views/it_workflows.py` (`it_notes_decisions`) :
+- Suppression du calcul "fait maison" (S1/S2 valides uniquement si
+  `credit_obtained >= credit_required`, branche "ADMISSIBLE" inatteignable).
+- Pour chaque inscription, appel a `compute_annual_decision(enrollment)`
+  (meme fonction que les bulletins et la reinscription) :
+  - "Annee" affiche directement `result["decision"]`
+    (VALIDE -> "VALIDÉ", ADMISSIBLE -> "ADMISSIBLE", NON_ADMIS -> "NON ADMIS").
+  - "S1"/"S2" affichent l'etat `is_validated` de chaque semestre renvoye dans
+    `result["semester_results"]` ("VALIDÉ"/"NON ADMIS"), ou "—" si la classe
+    n'a pas ce semestre (ex. classe a un seul semestre).
+  - Les dettes academiques affichees viennent toujours de
+    `AcademicDebt.objects.filter(enrollment=..., status="pending")` - et sont
+    maintenant reellement creees quand la decision est ADMISSIBLE, car
+    `compute_annual_decision()` appelle `create_academic_debts()`.
+- Suppression du parametre `semester_id` qui n'etait jamais utilise.
+
+`templates/portal/informaticien/partials/notes_decisions.html` : ajout d'un
+badge gris neutre pour la valeur "—" (semestre inexistant) sur les colonnes
+S1/S2.
+
+Resultat concret : un etudiant valide en S1 mais proche du seuil en S2 (dans
+la marge d'admissibilite de la classe, 2 points par defaut) apparait
+desormais "ADMISSIBLE" dans cet ecran - exactement comme sur son bulletin
+officiel - avec ses dettes academiques listees dans la colonne "Dettes
+actives". Les deux calculs (bulletin et ce tableau) ne peuvent plus diverger,
+puisque c'est exactement la meme fonction.
+
+Verifie : `manage.py check` OK. Nouveau test
+`test_it_notes_decisions_uses_official_annual_decision` (dans
+`accounts/tests.py`, classe `PortalPhaseOneTests`) - cree un etudiant avec
+S1 valide (moyenne 14, seuil LICENCE = 12) et S2 dans la marge d'admissibilite
+(moyenne 11, seuil - marge = 12 - 2 = 10), verifie que la reponse contient
+"ADMISSIBLE" et que 2 `AcademicDebt` "pending" sont crees. Test conserve
+(contrairement au smoke test de pagination) car il garde un oeil sur cette
+regression precise.
+
+
+================================================================================
+9. CE QUI RESTE A FAIRE - EXPLIQUE SIMPLEMENT
+================================================================================
+
+Ce qui suit reprend les memes constats que les sections precedentes, mais
+explique CONCRETEMENT ce que ca veut dire pour un utilisateur (informaticien,
+directeur, etudiant) et ce qu'on propose de faire pour chaque point.
+
+--------------------------------------------------------------------------
+9.1 [RESOLU - voir section 8] LE PLUS IMPORTANT : les "decisions de fin
+    d'annee" des etudiants etaient calculees DEUX FOIS, avec DEUX RESULTATS
+    DIFFERENTS
+--------------------------------------------------------------------------
+
+Corrige (Option A appliquee) : `it_notes_decisions` appelle desormais
+`compute_annual_decision()`, exactement comme les bulletins. Le cas
+"ADMISSIBLE" peut maintenant apparaitre dans cet ecran. Detail complet en
+section 8, entree "[FAIT] PROBLEME 2 / 9.1".
+
+Description du probleme d'origine (laissee pour memoire) :
+
+Concretement :
+- Quand le systeme decide si un etudiant est "VALIDE" (passe en annee
+  superieure), "ADMISSIBLE" (passe mais avec une ou deux matieres a repasser
+  / dette academique) ou "NON ADMIS" (redouble), il existe UNE SEULE bonne
+  facon officielle de calculer ca : la fonction `compute_annual_decision()`.
+  C'est elle qui est utilisee pour les bulletins et le portail etudiant.
+
+- Mais l'ecran "it_notes_decisions" du dashboard informaticien (pas encore
+  visible dans le menu, donc personne ne le voit pour l'instant) refait ce
+  calcul A LA MAIN, en moins complet. Resultat : dans CET ecran-la, un
+  etudiant qui devrait etre "ADMISSIBLE" (rattrapage/dette) sera affiche soit
+  "VALIDE" soit "NON ADMIS" - jamais "ADMISSIBLE". Le cas "ADMISSIBLE"
+  n'arrive JAMAIS dans cet ecran, alors qu'il arrive normalement dans les
+  bulletins officiels.
+
+Pourquoi c'est le plus important :
+- Tant que cet ecran reste cache (pas dans le menu), ce n'est PAS dangereux
+  - personne ne s'en sert.
+- MAIS si un jour quelqu'un l'ajoute au menu (ou s'en sert pour annoncer des
+  resultats), il y aura un ecran qui dit "Karim = NON ADMIS" alors que son
+  bulletin officiel dit "Karim = ADMISSIBLE (rattrapage)". Deux sources de
+  verite differentes = confusion garantie devant un directeur ou un parent.
+
+Ce qu'on propose :
+- Option A (la bonne, prend un peu plus de temps) : reecrire cet ecran pour
+  qu'il appelle la MEME fonction officielle `compute_annual_decision()` que
+  les bulletins. Un seul calcul, partout les memes resultats.
+- Option B (rapide, en attendant) : ne rien casser, mais ajouter une note/
+  flag clair dans le code pour dire "ne pas brancher cet ecran au menu tant
+  que l'option A n'est pas faite" - pour eviter qu'on l'active par erreur
+  plus tard.
+
+--------------------------------------------------------------------------
+9.2 Le "catalogue" (langues, professions) est visible/modifiable par TOUTES
+    les annexes
+--------------------------------------------------------------------------
+
+Concretement :
+- Dans l'ecran "Catalogue" (recemment ajoute au menu), un informaticien peut
+  ajouter/modifier une langue ou une profession dans la liste. Cette liste
+  N'EST PAS separee par annexe : si l'informaticien de l'annexe de Bamako
+  ajoute "Anglais des affaires", ca apparait AUSSI pour l'annexe de Kati,
+  Segou, etc.
+
+- C'est en contradiction avec la regle de base du projet : "aucune annexe ne
+  doit voir les donnees d'une autre annexe".
+
+Deux lectures possibles :
+- Soit c'est volontaire : ce sont des "listes de reference" partagees (les
+  langues/professions sont les memes partout, ca ne devrait pas changer
+  d'une annexe a l'autre) - dans ce cas, AUCUN CODE A CHANGER, juste le
+  documenter clairement (ex: un petit texte dans l'ecran "Liste partagee
+  entre toutes les annexes").
+- Soit ce n'est pas voulu : chaque annexe devrait avoir SA propre liste -
+  dans ce cas il faut ajouter un champ "annexe" a ces deux listes et filtrer
+  comme partout ailleurs.
+
+Ce qu'on propose :
+- A nous de decider ensemble : est-ce que les langues/professions DOIVENT
+  etre les memes pour toutes les annexes (cas le plus probable, ce sont des
+  referentiels generaux comme "Francais", "Anglais", "Medecin", "Avocat"), ou
+  est-ce que chaque annexe a ses propres specialites ?
+- Si "memes pour toutes les annexes" -> on ajoute juste une petite phrase
+  dans l'ecran pour que ce soit clair, et on ferme le sujet (5 minutes).
+- Si "chaque annexe a sa liste" -> travail un peu plus consequent (modele de
+  donnees + filtrage), a planifier a part.
+
+--------------------------------------------------------------------------
+9.3 Deux facons d'importer les notes depuis Excel, dont une "fantome"
+--------------------------------------------------------------------------
+
+Concretement :
+- Il existe DEUX systemes pour importer un fichier Excel de notes :
+  1. Le systeme "moderne", celui que l'informaticien voit et utilise dans le
+     menu "Import" du dashboard - c'est celui-la qui marche et qui est teste.
+  2. Un ANCIEN systeme (environ 400 lignes de code), qui marche encore au
+     niveau technique mais qui n'a PLUS AUCUN LIEN/BOUTON depuis le
+     dashboard. On ne peut y acceder qu'en tapant une adresse web precise a
+     la main - personne ne le fait, donc personne ne s'en sert, mais le code
+     est toujours la, a maintenir/tester pour rien.
+
+Risque concret :
+- Aucun risque immediat (personne n'y va). Le risque, c'est que dans 6 mois,
+  quelqu'un modifie une regle d'import (ex: nouvelle colonne obligatoire)
+  dans le systeme moderne, OUBLIE de la repercuter dans l'ancien systeme (vu
+  qu'il est invisible), et si jamais quelqu'un retombe sur l'ancien lien un
+  jour, il importera des notes avec les ANCIENNES regles -> erreurs
+  silencieuses.
+
+Ce qu'on propose :
+- Supprimer purement et simplement l'ancien systeme (vue + template, ~400
+  lignes) et rediriger son URL vers le systeme moderne. Pas de perte de
+  fonctionnalite pour personne, juste moins de code mort a porter.
+
+--------------------------------------------------------------------------
+9.4 Des pages web "fantomes" qui n'existent plus pour personne
+--------------------------------------------------------------------------
+
+Concretement :
+- Il y a environ 1000 lignes de pages web (templates HTML) qui datent de
+  versions precedentes du dashboard informaticien : une ancienne version
+  complete du dashboard (~500 lignes) et une "maquette" de design jamais
+  integree (~470 lignes), a la racine meme du projet.
+- Personne ne peut y acceder (aucun bouton, aucun lien, aucune route ne pointe
+  vers elles). Elles ne font de mal a personne, mais :
+  - elles peuvent induire en erreur quelqu'un qui explore le code et croit
+    que c'est "la vraie" page,
+  - elles alourdissent le projet pour rien.
+
+Ce qu'on propose :
+- Suppression simple, en confirmant d'abord par une recherche globale qu'elles
+  ne sont vraiment reliees a rien (ce qui a deja ete fait une fois dans
+  l'audit, a re-verifier juste avant de supprimer par securite).
+
+--------------------------------------------------------------------------
+9.5 Une URL "double" qui ne sert a rien (sans danger)
+--------------------------------------------------------------------------
+
+Concretement :
+- Il existe deux adresses web qui menent toutes les deux au dashboard
+  informaticien : `/portal/dashboard/` (la vraie, utilisee partout) et
+  `/portal/it/` (qui ne fait QUE rediriger vers la premiere).
+- Sans danger, mais ca peut faire poser la question "c'est laquelle la bonne
+  porte d'entree ?" a quelqu'un qui decouvre le projet.
+
+Ce qu'on propose :
+- Supprimer cette route "doublon" - 2 lignes de code, zero impact utilisateur.
+
+--------------------------------------------------------------------------
+9.6 Des listes encore "coupees" sans pagination (en dehors de
+    Audit/Supervision/Support, deja regles)
+--------------------------------------------------------------------------
+
+Concretement, dans 2 ecrans, si la liste est trop longue, le surplus
+disparait SANS PREVENIR (pas de bouton "page suivante", pas de message
+"X sur Y") :
+- Ecran "Structure academique" : la liste des classes (max 120), la liste des
+  "classes sans notes" (max 30) et la liste des "EC sans enseignant" (max 30).
+- Ecran "Cartes etudiants" : la liste des etudiants pour generer les cartes
+  PDF (max 80).
+
+Dans la pratique, si une annexe a moins de classes/etudiants que ces seuils
+(ce qui est probablement le cas pour la plupart des annexes aujourd'hui), CA
+NE SE VOIT PAS. Le risque grandit avec le temps (plus d'eleves, plus de
+classes, plus d'historique).
+
+Ce qu'on propose :
+- Appliquer EXACTEMENT le meme systeme de pagination qu'on vient de faire pour
+  Audit/Supervision/Support (meme fonction `_page_queryset`, memes boutons
+  Precedent/Suivant) a ces 2 ecrans. C'est un travail "copier-coller-adapter"
+  rapide puisque le modele existe deja.
+
+--------------------------------------------------------------------------
+9.7 Peu de "filets de securite" automatiques (tests)
+--------------------------------------------------------------------------
+
+Concretement :
+- Sur environ 50 pages/actions du dashboard informaticien, seules 15
+  declenchent une verification automatique ("test") qui dirait "attention,
+  ca s'est casse" si quelqu'un modifie le code par erreur plus tard.
+- C'est notamment le cas des 2 ecrans les plus sensibles cote "decisions
+  d'etudiants" (section 9.1) et "accueil/resultats" : un test automatique sur
+  ces 2 ecrans aurait detecte les 2 bugs qu'on a deja corriges, AVANT meme
+  qu'ils arrivent en production.
+
+Ce qu'on propose :
+- Pas une urgence en soi, mais a chaque fois qu'on touche a un ecran (comme on
+  vient de le faire pour la pagination), on ajoute un petit test de "ca
+  s'affiche sans erreur" - c'est ce qu'on a fait (puis retire car le sujet
+  etait juste l'affichage). On peut decider de les laisser en place a
+  l'avenir pour construire petit a petit ce filet de securite.
+
+--------------------------------------------------------------------------
+9.8 Cote visuel (frontend) - rappel de ce qui reste, deja convenu
+--------------------------------------------------------------------------
+
+- Les champs de selection (listes deroulantes "<select>") du dashboard
+  informaticien ont une apparence incoherente (largeur, espacement) par
+  rapport au reste du style recent (ex: formulaires du dashboard
+  gestionnaire). C'est le point qu'on avait convenu de traiter APRES la
+  pagination - toujours en attente, prochaine etape naturelle.
+- Les 3 ecrans recemment ajoutes au menu (Audit, Supervision, Catalogue)
+  fonctionnent mais n'ont pas encore ete "polis" visuellement au meme niveau
+  que le reste - a verifier une fois que tu auras navigue dedans.
+
+--------------------------------------------------------------------------
+9.9 EN RESUME - PAR OU COMMENCER ?
+--------------------------------------------------------------------------
+
+Du plus important (pour la fiabilite des donnees etudiants) au plus
+"cosmetique" :
+
+1. (Metier, le plus important) 9.1 - Decisions annuelles divergentes -
+   pas urgent tant que l'ecran reste cache, mais a corriger ou a "verrouiller"
+   avant qu'il soit un jour rendu visible.
+2. (Decision a prendre, rapide) 9.2 - Catalogue partage entre annexes : a
+   trancher en 5 minutes (volontaire ou pas ?).
+3. (Continuite de ce qu'on vient de faire) 9.6 - Pagination Structure +
+   Cartes : meme recette que ce qu'on vient de livrer.
+4. (Nettoyage, sans risque) 9.3, 9.4, 9.5 - Supprimer le code/pages mortes.
+5. (Visuel, deja prevu) 9.8 - Style des `<select>`.
+6. (Long terme) 9.7 - Tests automatiques.
+
+Dis-moi par lequel tu veux qu'on commence.

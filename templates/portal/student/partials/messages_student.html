@@ -104,14 +104,26 @@
                   <span>Priorite: {{ message.priority }}</span>
                 </div>
               </div>
-              <button
-                type="button"
-                class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1.5 text-[11px] font-extrabold text-[color:var(--school-primary)]"
-                @click="expanded = !expanded; if (!isRead) { isRead = true; markMessageRead({{ message.id }}); }"
-              >
-                <i data-lucide="panel-bottom-open" style="width:13px;height:13px;"></i>
-                Ouvrir
-              </button>
+              <div class="flex shrink-0 flex-col items-stretch gap-1.5">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1.5 text-[11px] font-extrabold text-[color:var(--school-primary)]"
+                  @click="expanded = !expanded; if (!isRead) { isRead = true; markMessageRead({{ message.id }}); }"
+                >
+                  <i data-lucide="panel-bottom-open" style="width:13px;height:13px;"></i>
+                  Ouvrir
+                </button>
+                <button
+                  type="button"
+                  x-show="isRead"
+                  x-cloak
+                  class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2.5 py-1.5 text-[11px] font-extrabold text-[color:var(--muted)]"
+                  @click="isRead = false; markMessageUnread({{ message.id }})"
+                >
+                  <i data-lucide="mail" style="width:13px;height:13px;"></i>
+                  Non lu
+                </button>
+              </div>
             </div>
             <div x-show="expanded" x-transition class="mt-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm leading-6 text-[color:var(--text)]">
               {{ message.body|default:message.text }}

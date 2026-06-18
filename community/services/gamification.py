@@ -1,6 +1,7 @@
 """
 Service de gamification - Gère les XP, badges et niveaux
 """
+from django.db import transaction
 from django.db.models import F
 
 from community.models_gamification import (
@@ -70,35 +71,36 @@ class GamificationService:
         if points == 0:
             return 0, False
 
-        profile = cls.get_or_create_profile(user)
-        level_up = profile.add_xp(points, action)
+        with transaction.atomic():
+            profile = cls.get_or_create_profile(user)
+            level_up = profile.add_xp(points, action)
 
-        # Mettre à jour les stats selon l'action
-        update_fields = []
+            # Mettre à jour les stats selon l'action
+            update_fields = []
 
-        if action == "create_topic":
-            profile.topics_created = F("topics_created") + 1
-            update_fields.append("topics_created")
-        elif action == "create_answer":
-            profile.answers_given = F("answers_given") + 1
-            update_fields.append("answers_given")
-        elif action == "answer_accepted":
-            profile.answers_accepted = F("answers_accepted") + 1
-            update_fields.append("answers_accepted")
-        elif action == "receive_upvote":
-            profile.upvotes_received = F("upvotes_received") + 1
-            update_fields.append("upvotes_received")
-        elif action == "give_upvote":
-            profile.upvotes_given = F("upvotes_given") + 1
-            update_fields.append("upvotes_given")
+            if action == "create_topic":
+                profile.topics_created = F("topics_created") + 1
+                update_fields.append("topics_created")
+            elif action == "create_answer":
+                profile.answers_given = F("answers_given") + 1
+                update_fields.append("answers_given")
+            elif action == "answer_accepted":
+                profile.answers_accepted = F("answers_accepted") + 1
+                update_fields.append("answers_accepted")
+            elif action == "receive_upvote":
+                profile.upvotes_received = F("upvotes_received") + 1
+                update_fields.append("upvotes_received")
+            elif action == "give_upvote":
+                profile.upvotes_given = F("upvotes_given") + 1
+                update_fields.append("upvotes_given")
 
-        if update_fields:
-            GamificationProfile.objects.filter(pk=profile.pk).update(
-                **{field: F(field) + 1 for field in update_fields}
-            )
+            if update_fields:
+                GamificationProfile.objects.filter(pk=profile.pk).update(
+                    **{field: F(field) + 1 for field in update_fields}
+                )
 
-        # Vérifier les badges
-        cls.check_badges(user)
+            # Vérifier les badges
+            cls.check_badges(user)
 
         return points, level_up
 
@@ -154,7 +156,13 @@ class GamificationService:
 
     @classmethod
     def update_daily_streak(cls, user):
-        """Met à jour la série quotidienne"""
+        """
+        Met à jour la série quotidienne.
+
+        Returns:
+            bool: True si c'est la première activité du jour (série mise à jour),
+                  False si l'utilisateur a déjà été comptabilisé aujourd'hui.
+        """
         profile = cls.get_or_create_profile(user)
         updated = profile.update_streak()
 
@@ -167,7 +175,7 @@ class GamificationService:
 
             cls.check_badges(user)
 
-        return profile.current_streak
+        return updated
 
     @classmethod
     def get_leaderboard(cls, category="xp", limit=10):

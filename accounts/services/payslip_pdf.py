@@ -1,4 +1,5 @@
 from django.core.files.base import ContentFile
+from django.utils.dateformat import format as date_format
 
 from core.pdf_documents import generate_pdf as generate_esfe_pdf
 
@@ -7,17 +8,15 @@ def build_payroll_pdf(entry):
     employee = entry.employee
     allowances = []
     if entry.allowances:
-        for label, value in entry.allowances.items():
-            allowances.append({"label": label, "amount": f"{value:,} FCFA".replace(",", " ")})
+        allowances.append({"label": "Indemnites", "amount": f"{entry.allowances:,} FCFA".replace(",", " ")})
     deductions = []
     if entry.deductions:
-        for label, value in entry.deductions.items():
-            deductions.append({"label": label, "amount": f"{value:,} FCFA".replace(",", " ")})
+        deductions.append({"label": "Retenues diverses", "amount": f"{entry.deductions:,} FCFA".replace(",", " ")})
 
     pdf_bytes = generate_esfe_pdf("esfe_salary_slip", {
         "slip_number": f"SAL-{entry.period_month}-{entry.employee_id:04d}",
         "date": entry.created_at.strftime("%d %B %Y"),
-        "period": entry.period_month,
+        "period": date_format(entry.period_month, "F Y"),
         "employee_name": employee.get_full_name() if hasattr(employee, "get_full_name") else str(employee),
         "employee_position": getattr(employee.profile, "position", "") if hasattr(employee, "profile") else "",
         "employee_matricule": getattr(employee, "username", str(employee.id)),
@@ -37,13 +36,12 @@ def build_honorarium_pdf(entry):
     teacher = entry.teacher
     deductions = []
     if entry.deductions:
-        for label, value in entry.deductions.items():
-            deductions.append({"label": label, "amount": f"{value:,} FCFA".replace(",", " ")})
+        deductions.append({"label": "Retenues diverses", "amount": f"{entry.deductions:,} FCFA".replace(",", " ")})
 
     pdf_bytes = generate_esfe_pdf("esfe_salary_slip", {
         "slip_number": f"HON-{entry.period_month}-{entry.teacher_id:04d}",
         "date": entry.created_at.strftime("%d %B %Y"),
-        "period": entry.period_month,
+        "period": date_format(entry.period_month, "F Y"),
         "employee_name": teacher.get_full_name() if hasattr(teacher, "get_full_name") else str(teacher),
         "employee_position": "Enseignant",
         "employee_matricule": getattr(teacher, "username", str(teacher.id)),

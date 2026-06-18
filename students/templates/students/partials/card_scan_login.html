@@ -1,0 +1,157 @@
+<!-- Partial HTMX — mode scan carte (injecté dans la page login) -->
+<div id="card-scan-panel" class="space-y-4">
+
+  {% if step == "pin" %}
+    <!-- Étape 2 : saisir le PIN -->
+    <div class="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700 flex items-center gap-2">
+      <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+      </svg>
+      Carte reconnue : <strong>{{ nom_etudiant }}</strong>
+    </div>
+
+    {% if erreur_pin %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600">
+      {{ erreur_pin }}
+    </div>
+    {% endif %}
+
+    <form hx-post="{% url 'students:card_pin_verify' %}"
+          hx-target="#card-scan-panel"
+          hx-swap="outerHTML"
+          class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="carte_id" value="{{ carte_id }}">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Code PIN</label>
+        <input type="password"
+               name="pin"
+               maxlength="8"
+               required
+               autofocus
+               placeholder="Votre code PIN"
+               class="w-full border border-gray-300 rounded-xl px-4 py-3.5 text-sm text-gray-700 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition outline-none">
+      </div>
+      <button type="submit"
+              class="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3 rounded-xl font-semibold transition shadow">
+        Valider le PIN
+      </button>
+    </form>
+
+  {% elif step == "error" %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+      <p class="font-semibold mb-1">Carte non valide</p>
+      <p>{{ message }}</p>
+    </div>
+    <button onclick="demarrerScan()"
+            class="w-full border border-gray-300 text-gray-600 py-2.5 rounded-xl text-sm hover:bg-gray-50 transition">
+      Réessayer
+    </button>
+
+  {% else %}
+    <!-- Étape 1 : caméra -->
+    <p class="text-sm text-gray-600 text-center">
+      Rapprochez votre carte de la caméra pour scanner le QR code.
+    </p>
+
+    <div class="relative rounded-xl overflow-hidden bg-gray-900" style="height: 180px;">
+      <video id="qr-video" class="w-full h-full object-cover" playsinline></video>
+      <div class="absolute inset-0 border-2 border-primary-400 rounded-xl pointer-events-none opacity-60"></div>
+    </div>
+
+    <!-- Feedback scan -->
+    <div id="scan-feedback" class="text-center text-xs text-gray-400 hidden">
+      Analyse en cours…
+    </div>
+
+    <!-- Formulaire caché — soumis par JS après décodage QR -->
+    <form id="card-token-form"
+          hx-post="{% url 'students:card_scan_verify' %}"
+          hx-target="#card-scan-panel"
+          hx-swap="outerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="token" id="card-token-input">
+    </form>
+  {% endif %}
+
+</div>
+
+{% if step == "camera" or not step %}
+<script>
+  (function () {
+    const video = document.getElementById('qr-video');
+    const feedback = document.getElementById('scan-feedback');
+    const form = document.getElementById('card-token-form');
+    const tokenInput = document.getElementById('card-token-input');
+    let scanning = true;
+
+    async function demarrerScan() {
+      scanning = true;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
+        await video.play();
+        scannerFrame();
+      } catch (e) {
+        feedback.textContent = "Impossible d'accéder à la caméra. Vérifiez les permissions (HTTPS requis).";
+        feedback.classList.remove('hidden');
+      }
+    }
+
+    function stopStream() {
+      const stream = video.srcObject;
+      if (stream) stream.getTracks().forEach(t => t.stop());
+    }
+
+    function extraireToken(url) {
+      try {
+        const m = url.match(/\/carte\/v\/([^/?#]+)/);
+        return m ? m[1] : null;
+      } catch (_) { return null; }
+    }
+
+    async function scannerFrame() {
+      if (!scanning) return;
+
+      // Essai avec BarcodeDetector (Chrome/Edge natif)
+      if ('BarcodeDetector' in window) {
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        async function tick() {
+          if (!scanning || video.readyState < 2) { requestAnimationFrame(tick); return; }
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          try {
+            const barcodes = await detector.detect(canvas);
+            if (barcodes.length > 0) {
+              const raw = barcodes[0].rawValue;
+              const token = extraireToken(raw);
+              if (token) {
+                scanning = false;
+                stopStream();
+                feedback.textContent = 'QR détecté — vérification…';
+                feedback.classList.remove('hidden');
+                tokenInput.value = token;
+                htmx.trigger(form, 'submit');
+                return;
+              }
+            }
+          } catch (_) {}
+          requestAnimationFrame(tick);
+        }
+        tick();
+      } else {
+        // Fallback : message d'erreur (jsQR peut être chargé si nécessaire)
+        feedback.textContent = "Scan QR non supporté par ce navigateur. Utilisez Chrome ou Edge.";
+        feedback.classList.remove('hidden');
+      }
+    }
+
+    window.demarrerScan = demarrerScan;
+    demarrerScan();
+  })();
+</script>
+{% endif %}

@@ -6,13 +6,19 @@
 {% block content %}
 <div class="bg-slate-50">
   <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mb-4">
+      <a href="{% url 'community:topic_list' %}" class="inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-primary-600">
+        <i class="fa-solid fa-arrow-left text-xs"></i>
+        Retour à la communauté
+      </a>
+    </div>
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
       <main class="space-y-6">
         <article class="overflow-hidden rounded-[28px] border border-primary-100 bg-white shadow-sm">
           <div class="border-b border-primary-100 bg-gradient-to-r from-primary-50 via-white to-secondary-50 px-6 py-6 sm:px-8">
             <div class="flex flex-wrap items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
               {% if topic.category %}
-                <a href="{% url 'community:topic_by_category' topic.category.pk %}" class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">{{ topic.category.name }}</a>
+                <a href="{% url 'community:topic_by_category' topic.category.slug %}" class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">{{ topic.category.name }}</a>
               {% endif %}
               {% if topic.is_pinned %}
                 <span class="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">Épinglé</span>
@@ -70,51 +76,50 @@
           </div>
         </article>
 
-        <section class="rounded-[28px] border border-primary-100 bg-white p-6 shadow-sm">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Réponses</p>
-              <h2 class="mt-1 text-xl font-bold text-slate-950">Échanges liés à ce sujet</h2>
-            </div>
-            <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
-              {{ answers|length }} réponse{{ answers|length|pluralize }}
-            </span>
-          </div>
+        {% include "community/partials/topic_answers_section.html" %}
 
-          <div class="mt-5 space-y-4">
-            {% for answer in answers %}
-              <article class="rounded-3xl border border-primary-100 p-5 {% if answer.is_accepted %}bg-emerald-50/60{% else %}bg-slate-50{% endif %}">
-                <div class="flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                  <span class="rounded-full bg-white px-2.5 py-1 text-slate-700 shadow-sm">{{ answer.author.get_full_name|default:answer.author.username }}</span>
-                  {% if answer.is_accepted %}
-                    <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700">Réponse validée</span>
-                  {% endif %}
-                </div>
-                <div class="prose prose-slate mt-4 max-w-none">
-                  {{ answer.content|safe }}
-                </div>
-              </article>
-            {% empty %}
-              <div class="rounded-3xl border border-dashed border-primary-200 p-8 text-center text-sm text-slate-500">
-                Aucun échange pour le moment.
+        {% if user.is_authenticated %}
+          {% if not topic.is_locked %}
+            <section class="rounded-[28px] border border-primary-100 bg-white p-6 shadow-sm">
+              <div class="mb-4">
+                <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Répondre</p>
+                <h2 class="mt-1 text-xl font-bold text-slate-950">Ajouter une contribution</h2>
               </div>
-            {% endfor %}
-          </div>
-        </section>
-
-        {% if answer_form %}
-          <section class="rounded-[28px] border border-primary-100 bg-white p-6 shadow-sm">
-            <div class="mb-4">
-              <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Répondre</p>
-              <h2 class="mt-1 text-xl font-bold text-slate-950">Ajouter une contribution</h2>
-            </div>
-            <form method="post" class="space-y-4">
-              {% csrf_token %}
-              {{ answer_form }}
-              <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5">
-                Envoyer la réponse
-              </button>
-            </form>
+              <form
+                hx-post="{% url 'community:add_answer' topic.slug %}"
+                hx-target="#answers-section"
+                hx-swap="outerHTML"
+                hx-indicator="#answer-form-loader"
+                hx-on="htmx:afterRequest: if(event.detail.successful) this.reset()"
+                class="space-y-4"
+              >
+                {% csrf_token %}
+                <textarea
+                  name="content"
+                  rows="4"
+                  required
+                  minlength="10"
+                  placeholder="Partagez une réponse claire, utile et bien argumentée..."
+                  class="w-full rounded-2xl border border-primary-200 px-4 py-3 text-sm text-gray-700 shadow-sm transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                ></textarea>
+                <div class="flex items-center gap-3">
+                  <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5">
+                    Envoyer la réponse
+                  </button>
+                  <span id="answer-form-loader" class="htmx-indicator inline-flex items-center gap-2 text-sm font-semibold text-primary-500">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i> Envoi...
+                  </span>
+                </div>
+              </form>
+            </section>
+          {% else %}
+            <section class="rounded-[28px] border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+              <i class="fa-solid fa-lock mr-2"></i> Ce sujet est verrouillé, les nouvelles réponses ne sont pas autorisées.
+            </section>
+          {% endif %}
+        {% else %}
+          <section class="rounded-[28px] border border-dashed border-primary-200 bg-white p-6 text-center text-sm text-slate-500 shadow-sm">
+            <a href="{% url 'login' %}?next={{ request.path }}" class="font-semibold text-primary-600 hover:text-secondary">Connectez-vous</a> pour participer à la discussion.
           </section>
         {% endif %}
       </main>
@@ -162,7 +167,7 @@
           <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Catégorie</p>
           <div class="mt-4 rounded-2xl bg-slate-50 p-4">
             {% if topic.category %}
-              <a href="{% url 'community:topic_by_category' topic.category.pk %}" class="font-bold text-slate-950">{{ topic.category.name }}</a>
+              <a href="{% url 'community:topic_by_category' topic.category.slug %}" class="font-bold text-slate-950">{{ topic.category.name }}</a>
               <p class="mt-1 text-sm text-slate-500">{{ topic.category.description|default:"Espace de discussion associé à ce thème." }}</p>
             {% else %}
               <p class="text-sm text-slate-500">Aucune catégorie renseignée.</p>
@@ -183,7 +188,7 @@
 
           <div class="space-y-3">
             {% for related in related_topics|slice:":5" %}
-              <a href="{% url 'community:topic_detail' related.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+              <a href="{% url 'community:topic_detail' related.slug %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
                 <p class="line-clamp-2 font-semibold text-slate-950">{{ related.title }}</p>
                 <p class="mt-1 text-sm text-slate-500">{{ related.answer_count|default:0 }} réponse{{ related.answer_count|default:0|pluralize }}</p>
               </a>
@@ -198,4 +203,7 @@
     </div>
   </div>
 </div>
+
+<!-- Conteneur des notifications XP (gamification) -->
+<div id="xp-toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 {% endblock %}

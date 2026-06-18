@@ -10,7 +10,7 @@ Vues principales du module accounts.
 
 import csv
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, get_user_model
 from django.contrib import messages
 from django.urls import reverse
@@ -28,8 +28,9 @@ from .dashboards.helpers import is_manager
 
 from portal.models import AccountSupportState
 
-from .models import Profile, UserPreference
+from .models import Profile, UserPreference, PayrollEntry, TeacherHonorariumEntry
 from .forms import CustomUserCreationForm, ProfileForm, EmailUpdateForm, UserPreferenceForm
+from .services.payslip_pdf import build_payroll_pdf, build_honorarium_pdf
 
 from .dashboards.permissions import (
     check_admissions_access,
@@ -531,3 +532,33 @@ def profile_settings(request):
             }
         )
     return redirect(f"{reverse('accounts:profile')}?tab=settings")
+
+
+@login_required
+def payslip_download(request, pk):
+    """
+    Telechargement de la fiche de paie (PayrollEntry) de l'utilisateur connecte.
+    """
+
+    entry = get_object_or_404(PayrollEntry, pk=pk, employee=request.user)
+    pdf_bytes = build_payroll_pdf(entry)
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    filename = f"fiche-paie-{entry.period_month:%Y-%m}.pdf"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+def honorarium_download(request, pk):
+    """
+    Telechargement du bordereau d'honoraires (TeacherHonorariumEntry) de l'enseignant connecte.
+    """
+
+    entry = get_object_or_404(TeacherHonorariumEntry, pk=pk, teacher=request.user)
+    pdf_bytes = build_honorarium_pdf(entry)
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    filename = f"honoraires-{entry.period_month:%Y-%m}.pdf"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

@@ -505,18 +505,43 @@ def add_answer(request, slug):
 
     # Réponse HTMX
     if request.headers.get("HX-Request"):
-        template_name = "community/partials/answer_item.html"
         if parent:
-            template_name = "community/partials/reply_item.html"
+            html = render_to_string(
+                "community/partials/reply_item.html",
+                {
+                    "answer": answer,
+                    "topic": topic,
+                },
+                request=request
+            )
+        else:
+            accepted_id = topic.accepted_answer_id
+            root_answers = list(
+                Answer.objects
+                .filter(topic=topic, is_deleted=False, parent__isnull=True)
+                .select_related("author", "author__profile")
+                .order_by("-upvotes", "created_at")
+            )
+            for root_answer in root_answers:
+                root_answer.is_accepted = (root_answer.id == accepted_id)
 
-        html = render_to_string(
-            template_name,
-            {
-                "answer": answer,
-                "topic": topic,
-            },
-            request=request
-        )
+            html = render_to_string(
+                "community/partials/topic_answers_section.html",
+                {
+                    "topic": topic,
+                    "answers": root_answers,
+                },
+                request=request
+            )
+
+        xp_points = GamificationService.get_xp_config().get("create_answer", 0)
+        if xp_points:
+            html += render_to_string(
+                "community/partials/gamification/xp_notification.html",
+                {"points": xp_points, "message": "Réponse publiée"},
+                request=request
+            )
+
         return HttpResponse(html)
 
     return HttpResponse(status=204)
@@ -646,7 +671,21 @@ def edit_topic(request, slug):
             updated.is_edited = True
             updated.save()
             form.save_m2m()
+
+            if request.headers.get("HX-Request"):
+                response = HttpResponse()
+                response["HX-Redirect"] = topic.get_absolute_url()
+                return response
+
             return redirect(topic.get_absolute_url())
+
+        if request.headers.get("HX-Request"):
+            html = render_to_string(
+                "community/partials/topic_edit_form.html",
+                {"form": form, "topic": topic},
+                request=request
+            )
+            return HttpResponse(html)
     else:
         form = TopicForm(instance=topic)
 

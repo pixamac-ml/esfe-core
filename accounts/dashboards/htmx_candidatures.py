@@ -65,6 +65,10 @@ def candidature_under_review(request: HttpRequest, pk: int) -> HttpResponse:
 @require_POST
 def candidature_accept(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
+
+    if candidature.status not in ("submitted", "under_review"):
+        return HttpResponse("Cette candidature ne peut plus etre acceptee.", status=400)
+
     candidature.status = "accepted"
     candidature.reviewed_at = timezone.now()
     candidature.reviewed_by = request.user
@@ -88,6 +92,10 @@ def candidature_accept(request: HttpRequest, pk: int) -> HttpResponse:
 @require_POST
 def candidature_reject(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
+
+    if candidature.status not in ("submitted", "under_review"):
+        return HttpResponse("Cette candidature ne peut plus etre refusee.", status=400)
+
     candidature.status = "rejected"
     candidature.rejection_reason = (request.POST.get("reason") or "").strip() or "Rejete par le gestionnaire."
     candidature.reviewed_at = timezone.now()
@@ -98,7 +106,12 @@ def candidature_reject(request: HttpRequest, pk: int) -> HttpResponse:
         "accounts/dashboard/partials/manager_candidature_row.html",
         {"candidature": candidature},
     )
-    response["HX-Trigger"] = json.dumps({"candidatureUpdated": True})
+    response["HX-Trigger"] = json.dumps(
+        {
+            "candidatureUpdated": True,
+            "showToast": {"message": "Candidature refusee.", "type": "warning"},
+        }
+    )
     return response
 
 
@@ -106,6 +119,10 @@ def candidature_reject(request: HttpRequest, pk: int) -> HttpResponse:
 @require_POST
 def candidature_to_complete(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
+
+    if candidature.status not in ("submitted", "under_review"):
+        return HttpResponse("Cette candidature ne peut plus etre marquee a completer.", status=400)
+
     candidature.status = "to_complete"
     candidature.completion_message = (request.POST.get("message") or "").strip() or "Complements demandes par le gestionnaire."
     candidature.reviewed_at = timezone.now()
@@ -116,7 +133,12 @@ def candidature_to_complete(request: HttpRequest, pk: int) -> HttpResponse:
         "accounts/dashboard/partials/manager_candidature_row.html",
         {"candidature": candidature},
     )
-    response["HX-Trigger"] = json.dumps({"candidatureUpdated": True})
+    response["HX-Trigger"] = json.dumps(
+        {
+            "candidatureUpdated": True,
+            "showToast": {"message": "Complement demande au candidat.", "type": "info"},
+        }
+    )
     return response
 
 

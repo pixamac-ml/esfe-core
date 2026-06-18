@@ -518,18 +518,27 @@ def _manager_context(request, active_section="overview"):
         branch=branch,
         period_month=start_of_month,
     ).aggregate(total=Sum("paid_amount"))["total"] or 0
+    estimated_month_balance = cash_in_month - cash_out_month
     cash_stats = {
         "movements": BranchCashMovement.objects.filter(branch=branch).count(),
         "in_month": cash_in_month,
         "out_month": cash_out_month,
         "net_month": cash_in_month - cash_out_month,
-        "estimated_month_balance": cash_in_month - cash_out_month,
+        "estimated_month_balance": estimated_month_balance,
         "available_balance": get_branch_cash_balance(branch),
         "student_receipts_month": total_month,
         "expenses_paid_month": expense_stats["paid_month_amount"],
         "salary_paid_month": salary_paid_month,
         "honorarium_paid_month": honorarium_paid_month,
     }
+    cash_stats["estimated_month_balance_abs"] = abs(estimated_month_balance)
+    cash_stats["bar_max"] = max(
+        cash_stats["student_receipts_month"],
+        cash_stats["expenses_paid_month"],
+        cash_stats["salary_paid_month"],
+        cash_stats["honorarium_paid_month"],
+        cash_stats["estimated_month_balance_abs"],
+    ) or 1
     recent_financial_logs = (
         FinancialLog.objects
         .filter(branch=branch)

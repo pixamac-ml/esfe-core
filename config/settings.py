@@ -5,6 +5,7 @@ Configuration DEV stable ESFE
 
 import os
 import importlib.util
+from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
@@ -128,6 +129,17 @@ AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesStandaloneBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
+
+# ==================================================
+# DJANGO-AXES (protection brute-force connexion)
+# ==================================================
+# Par defaut, axes bloque apres 3 echecs SANS jamais debloquer
+# automatiquement (AXES_COOLOFF_TIME=None -> blocage permanent tant
+# qu'un admin ne lance pas "manage.py axes_reset_username <user>").
+# On assouplit le seuil et on ajoute un deblocage automatique.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=30)
+AXES_RESET_ON_SUCCESS = True
 
 LOGGING = {
     "version": 1,
@@ -363,6 +375,11 @@ CKEDITOR_5_CONFIGS = {
 
 STUDENT_LOGIN_URL = os.getenv("STUDENT_LOGIN_URL", f"{BASE_URL}/student/login/")
 FFMPEG_PATH = os.getenv("FFMPEG_PATH", "ffmpeg")
+
+# Clé dédiée à la signature HMAC des cartes étudiantes.
+# Distincte de SECRET_KEY pour rotation indépendante.
+# Générer : python -c "import secrets; print(secrets.token_urlsafe(50))"
+CARD_SIGNING_KEY = os.getenv("CARD_SIGNING_KEY", "")
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", not DEBUG)

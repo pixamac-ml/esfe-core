@@ -23,6 +23,8 @@ from .views import (
     mark_message_read,
     mark_all_messages_read,
     mark_message_unread,
+    internal_rules_modal,
+    accept_internal_rules_view,
 )
 
 app_name = "portal_student"
@@ -51,4 +53,6 @@ urlpatterns = [
     path("settings/preferences/", update_settings_preferences, name="update_settings_preferences"),
     path("settings/password/", update_settings_password, name="update_settings_password"),
     path("settings/documents/", upload_settings_document, name="upload_settings_document"),
+    path("internal-rules/", internal_rules_modal, name="internal_rules_modal"),
+    path("internal-rules/accept/", accept_internal_rules_view, name="accept_internal_rules"),
 ]

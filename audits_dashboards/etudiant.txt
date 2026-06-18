@@ -426,3 +426,75 @@ Par ordre de priorite avant lundi :
   5) Optionnel : brancher partials/stats_student.html sur l'accueil pour
      une vue "progression globale" supplementaire (donnees deja calculees
      par get_student_stats).
+
+================================================================
+PHASE 1 - TERMINEE
+================================================================
+
+Les 7 points releves ci-dessus sont traites et valides (manage.py check
+propre, 11/11 tests cibles portail etudiant OK) :
+
+1. BUG BLOQUANT "Mes diplomes" corrige
+   - dashboard.js, ensureSectionLoaded() : ajout de
+     `if (sectionKey === "diplomas") idsToLoad.push("diplomas");`.
+     La section "Mes diplomes" charge desormais diplomas_partial au lieu
+     de rester bloquee sur "Chargement des diplomes...".
+
+2. Encodage corrige dans la recherche globale
+   - dashboard.js, performGlobalSearch() : "Â·" -> "·" dans le sous-titre
+     des resultats "Cours".
+
+3. Recherche globale etendue
+   - performGlobalSearch() precharge desormais aussi "shop" et "diplomas"
+     (en plus de courses/schedule/messages/academics/settings), donc la
+     boutique et les diplomes sont couverts par la recherche globale une
+     fois ces sections visitees.
+
+4. partials/stats_student.html branche sur l'accueil
+   - dashboard.html, section "overview" : inclusion de stats_student.html
+     sous overview_schedule_quick.html -> carte "Progression academique"
+     (moyenne, classement, mini-stats, barres de progression) visible des
+     l'arrivee sur le dashboard. get_student_overview_data /
+     get_student_dashboard_data fournissent deja `stats` + `academic_status`
+     dans les 3 etats (pending/error/assigned).
+
+5. Chaines de code mort supprimees
+   - profile_partial (vue + URL + partials/profile.html +
+     widgets/profile.get_profile_widget) et notifications_partial (vue +
+     URL + partials/notifications.html + widgets/notifications.
+     get_notifications_widget) retires (vues, urls.py, services.py,
+     imports).
+   - Templates orphelins supprimes : partials/courses_preview_student.html,
+     partials/notifications_dropdown.html (doublon du vrai dropdown
+     communication/), partials/notification_detail_drawer.html,
+     partials/events_student.html.
+
+6. Pages plein ecran harmonisees
+   - portal/student/courses.html et ec_detail.html : ajout de
+     `{% block public_navbar %}{% endblock %}`,
+     `{% block public_footer %}{% endblock %}` et
+     `{% block public_floating_widget %}{% endblock %}` (meme pattern que
+     dashboard.html) -> plus de rendu hybride navbar publique / style
+     dashboard si ces routes plein-ecran sont atteintes directement.
+
+7. Flux Boutique verifie (revue de code)
+   - shop_orders_student.html (x-data="{shopTab:'orders'}") -> clic sur
+     une commande -> hx-get student_order_detail avec hx-target="#shop"
+     remplace tout #shop par shop/partials/student_order_detail.html.
+   - Bouton "Retour a la boutique" -> hx-get shop_orders_partial sur
+     #shop -> dashboard.js (htmx:afterSwap -> initializeStudentDynamicContent)
+     detecte le nouveau noeud [x-data] sans _x_dataStack et appelle
+     Alpine.initTree() -> shopTab repart proprement sur 'orders', cart/
+     catalog se rechargent en lazy-load au prochain clic (comportement
+     attendu, pas de blocage). Aucun correctif necessaire.
+
+Note generale : contrairement au dashboard secretaire (qui necessitait les
+phases A/B/C pour ajouter badges/etats vides/labels FR/etc. depuis une base
+HTML brute), le dashboard etudiant repose deja sur le meme systeme de
+composants django-components (dashboard_card, status_badge, metric_card,
+empty_state, progress_bar) -> badges de statut unifies, etats vides avec
+message + CTA, et labels FR etaient deja en place AVANT cette phase. Le
+travail restant etait donc cible sur les 7 points ci-dessus, desormais
+tous traites.
+
+Dashboard etudiant : PRET POUR LA PRESENTATION DE LUNDI.

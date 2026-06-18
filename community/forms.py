@@ -49,27 +49,27 @@ class TopicForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Classes TailwindCSS réutilisables
+        # Classes TailwindCSS réutilisables (cohérentes avec le design "communauté")
         base_input = (
-            "w-full border border-gray-300 rounded-xl "
-            "px-4 py-3 text-sm text-gray-800 "
-            "placeholder-gray-400 "
-            "focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 "
-            "hover:border-gray-400 "
+            "w-full border border-primary-100 rounded-2xl "
+            "px-4 py-3 text-sm text-slate-800 "
+            "placeholder-slate-400 "
+            "focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 "
+            "hover:border-primary-200 "
             "transition-all duration-200"
         )
 
         select_input = (
-            "w-full border border-gray-300 rounded-xl "
-            "px-4 py-3 text-sm text-gray-800 bg-white "
-            "focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 "
-            "hover:border-gray-400 "
+            "w-full border border-primary-100 rounded-2xl "
+            "px-4 py-3 text-sm text-slate-800 bg-white "
+            "focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 "
+            "hover:border-primary-200 "
             "transition-all duration-200 "
             "cursor-pointer"
         )
 
         checkbox_input = (
-            "w-5 h-5 text-primary-600 border-gray-300 rounded "
+            "w-5 h-5 text-primary-600 border-primary-200 rounded-md "
             "focus:ring-primary-500 focus:ring-2 "
             "transition-all duration-200 cursor-pointer"
         )

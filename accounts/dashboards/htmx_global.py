@@ -73,7 +73,9 @@ def export_report_xlsx(request: HttpRequest) -> HttpResponse:
         branch=branch, user__is_active=True,
     ).exclude(position="student").exclude(user_type="public").order_by("user__first_name")[:500]
 
-    branch_teacher_profiles: QuerySet[Profile] = branch_staff_profiles.filter(position="teacher")
+    branch_teacher_profiles: QuerySet[Profile] = Profile.objects.filter(
+        branch=branch, user__is_active=True, position="teacher",
+    ).exclude(user_type="public").order_by("user__first_name")[:500]
 
     wb = export_branch_report_xlsx(
         branch=branch,

@@ -114,8 +114,31 @@
                 </div>
             </div>
 
+            <!-- Connexion par carte étudiant -->
+            <div>
+                <button type="button"
+                        id="toggle-card-scan"
+                        class="w-full flex items-center justify-center gap-2 border border-primary-300 text-primary-700 bg-primary-50 hover:bg-primary-100 py-3 rounded-xl font-semibold text-sm transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M3 10h4V6H3v4zm0 8h4v-4H3v4zm6-8h4V6H9v4zm0 8h4v-4H9v4zm6-8h4V6h-4v4zm0 8h4v-4h-4v4z"/>
+                    </svg>
+                    Se connecter avec ma carte étudiant
+                </button>
+
+                <!-- Panneau scan (caché par défaut, chargé via HTMX au clic) -->
+                <div id="card-scan-wrapper" class="hidden mt-4">
+                    <div id="card-scan-panel"
+                         hx-get="{% url 'students:card_scan_verify' %}"
+                         hx-trigger="load"
+                         hx-swap="outerHTML">
+                        <p class="text-center text-sm text-gray-400 py-4">Chargement…</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Lien inscription -->
-            <div class="text-center">
+            <div class="text-center mt-4">
                 <p class="text-sm text-gray-500">
                     Pas encore de compte ?
                     <a href="{% url 'accounts:register' %}{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}"
@@ -129,5 +152,22 @@
 
     </div>
 </section>
+
+{% block extra_js %}
+<script>
+  document.getElementById('toggle-card-scan').addEventListener('click', function () {
+    const wrapper = document.getElementById('card-scan-wrapper');
+    const isHidden = wrapper.classList.contains('hidden');
+    wrapper.classList.toggle('hidden', !isHidden);
+    if (isHidden) {
+      // Déclenche HTMX uniquement au premier affichage
+      const panel = document.getElementById('card-scan-panel');
+      if (panel && panel.getAttribute('hx-get')) {
+        htmx.trigger(panel, 'load');
+      }
+    }
+  });
+</script>
+{% endblock %}
 
 {% endblock %}

@@ -741,4 +741,334 @@ homogènes.
      encore non appliquée). Ces deux sujets sont indépendants du
      dashboard gestionnaire et de cette phase de stylisation.
 
+================================================================================
+AUDIT EMAILS & NOTIFICATIONS (section distincte du dashboard formulaires
+ci-dessus) — PHASE C : CORRECTIONS APPLIQUEES + PHASE D : PROPOSITION DE
+PERFECTIONNEMENT "GRANDE ENTREPRISE" DES EMAILS PORTEURS DE DONNEES
+================================================================================
+
+---------------------------------------------------------------------------
+PHASE C - CORRECTIONS APPLIQUEES (3 bugs corriges sur le pipeline email)
+---------------------------------------------------------------------------
+
+Suite a l'audit du systeme de messages/emails/notifications, 3 bugs ont ete
+corriges et appliques au code :
+
+  1. FIX A (CRITIQUE) - students/services/email.py,
+     send_student_credentials_email() : le contexte de l'email de bienvenue
+     etudiant envoyait "password": None et "temporary_password": None — le
+     mot de passe temporaire n'apparaissait JAMAIS dans l'email de
+     bienvenue, alors que le template (account_created.html) est concu pour
+     l'afficher. Corrige -> "password": raw_password,
+     "temporary_password": raw_password.
+
+  2. FIX B - templates/emails/base_communication.html, pied de page
+     (barre de copyright) : le lien vers le site institutionnel etait casse
+     (<a {{ BASE_URL }}> — variable inexistante, attribut href absent).
+     Corrige -> <a href="{{ institution_website|default:'https://www.esfe-mali.org' }}">
+     www.esfe-mali.org</a>.
+
+  3. FIX C - admissions/signals.py, create_status_notification() : pour les
+     statuts candidature_rejected et candidature_to_complete, le motif de
+     refus (rejection_reason) et le message de complement
+     (completion_message) saisis par l'administration n'etaient JAMAIS
+     transmis au contexte de l'email (les templates affichaient un texte
+     generique de repli). Corrige -> ajout d'un extra_context qui injecte
+     reason/comment (rejected) et admin_comment/comment + message
+     (to_complete) dans le contexte email. Le meme mecanisme a ete etendu a
+     candidature_accepted_with_reserve (admin_comment/comment), necessaire
+     pour le nouveau template de la PHASE D ci-dessous.
+
+Verification : python manage.py check --settings=config.settings_test_local
+-> OK (0 probleme). python manage.py test --settings=config.settings_test_local
+admissions students -> les 2 echecs presents dans admissions.tests
+(test_existing_email_blocks_with_targeted_message et
+test_submission_without_documents_is_allowed) sont PREEXISTANTS et sans
+rapport avec ces 3 corrections (confirme via git stash avant/apres).
+
+---------------------------------------------------------------------------
+PHASE D - PROPOSITION : PERFECTIONNEMENT ET STYLISATION "GRANDE ENTREPRISE"
+DE TOUS LES EMAILS PORTEURS DE DONNÉES (VALIDÉE PAR L'UTILISATEUR — ÉTAPES 1
+ET 2 IMPLÉMENTÉES CI-DESSOUS)
+---------------------------------------------------------------------------
+
+Demande initiale : faire l'inventaire de TOUS les emails qui partent du
+systeme ET qui transportent des donnees personnalisees (candidat, etudiant,
+dossier, acces...), en commencant par : l'email de depot de candidature, les
+notifications de workflow en cours, les emails de bienvenue, et les emails
+contenant les acces — puis perfectionner/styliser le tout au niveau d'une
+grande institution.
+
+0. DECOUVERTE MAJEURE — DU "MATERIEL" DEJA ECRIT MAIS JAMAIS BRANCHE
+
+Il existait dans le code un ensemble complet de templates email "riches"
+(badges, cartes d'information, etapes numerotees, boutons CTA) pour
+exactement les statuts qui manquaient — mais jamais relies a un envoi reel :
+admissions/services/emails.py (5 fonctions mortes -> admission_accepted.html,
+admission_under_review.html, admission_accepted_with_reserve.html,
+admission_rejected.html, admission_complete.html), des imports casses dans
+accounts/dashboard_views.py (~lignes 1075/1124, try/except qui avale un
+ImportError permanent), et templates/emails/student_welcome.html (188
+lignes, orphelin, jamais utilise).
+
+Strategie retenue : recycler le CONTENU de ces templates morts (etapes,
+cartes commentaire/conditions) en les re-habillant dans le PATTERN VISUEL
+deja etabli par les templates actifs (candidate_submitted/accepted/
+rejected/missing_documents/account_created — badge de statut + carte info +
+etapes numerotees en cercle + CTA + footer institutionnel), plutot que
+repartir de zero.
+
+1. PRIORITE 1 — EMAIL DE DEPOT DE CANDIDATURE (candidature_submitted)
+   -> IMPLEMENTE (ETAPE 1) : templates/emails/admissions/candidate_submitted.html
+      complete avec une ligne "Annexe : {{ branch_name }}" dans la carte
+      info (si disponible) et une phrase de delai indicatif ("Vous recevrez
+      une reponse par email dans un delai moyen de 5 a 7 jours ouvres.",
+      surchargeable via {% firstof response_delay ... %}).
+
+2. PRIORITE 2 — NOTIFICATIONS DE WORKFLOW EN COURS
+
+   2.1 candidature_accepted / candidature_rejected / document_missing :
+       deja au bon niveau (badges, cartes, etapes, CTA), motif/message deja
+       personnalises depuis la PHASE C. Rien d'autre a faire.
+
+   2.2 LES 3 STATUTS SANS TEMPLATE DEDIE -> IMPLEMENTE (ETAPE 2) :
+
+     a) candidature_under_review ("Candidature en cours d'analyse")
+        -> Nouveau templates/emails/admissions/candidate_under_review.html
+           (badge indigo "EN COURS D'ANALYSE", carte info
+           Reference/Programme/Annexe/Annee, 3 etapes numerotees reprenant
+           le contenu de admission_under_review.html, CTA "Suivre mon
+           dossier"). Enregistre dans EMAIL_TEMPLATE_REGISTRY sous
+           "candidature_under_review".
+
+     b) candidature_accepted_with_reserve ("Admission acceptee sous reserve")
+        -> Nouveau templates/emails/admissions/candidate_accepted_with_reserve.html
+           (badge ambre "ADMISSION SOUS RESERVE", carte info, carte
+           "Conditions a remplir" alimentee par {{ admin_comment }}/
+           {{ comment }} — admissions/signals.py etendu pour transmettre
+           candidature.admin_comment sur ce statut, meme mecanisme que la
+           PHASE C —, 3 etapes adaptees, CTA ambre "Voir les conditions").
+           Enregistre sous "candidature_accepted_with_reserve".
+
+     c) candidature_to_complete ("Candidature a completer")
+        -> Nouveau templates/emails/admissions/candidate_to_complete.html
+           (badge ambre "DOSSIER A COMPLETER", carte "Commentaire de
+           l'administration" alimentee par completion_message — deja
+           transmis depuis la PHASE C —, bloc optionnel "Elements a
+           fournir" si required_documents/missing_documents sont presents,
+           carte info Reference/Programme/Annexe/Annee, 3 etapes reprenant
+           le contenu de admission_complete.html, CTA ambre "Completer mon
+           dossier"). Enregistre sous "candidature_to_complete".
+
+   2.3 INSCRIPTIONS — LES 7 STATUTS inscription_* (created, awaiting_payment,
+       partial_paid, active, suspended, expired, completed) :
+       NON TRAITE dans cette iteration (volume important, contexte
+       inscriptions/signals.py trop pauvre en donnees — montants/programme
+       absents). A planifier pour une iteration ulterieure, en commencant
+       par awaiting_payment/partial_paid (montant du/paye/solde).
+
+3. PRIORITE 3 — EMAILS DE BIENVENUE (compte etudiant cree)
+   NON TRAITE dans cette iteration (account_created.html deja de tres bon
+   niveau ; pistes restantes : recycler 1-2 blocs de student_welcome.html
+   — mot de la direction, grille de liens utiles — + ajouter branch_name).
+
+4. PRIORITE 4 — EMAILS CONTENANT LES ACCES / IDENTIFIANTS / RECUS
+   - account_created.html (compte etudiant + mot de passe) : le mot de
+     passe temporaire est desormais bien transmis au template grace a la
+     FIX A ci-dessus. Reste a faire (non traite) : brancher le recu de
+     premier paiement (event_type="receipt_generated") sur le template
+     riche existant emails/payments/first_payment_validated.html (mismatch
+     de template_key actuel) + completer le contexte avec
+     amount_due/amount_paid/balance.
+
+5. ET AUTRES : diploma_ready, contact_*, notification_candidature,
+   payment_confirmation — deja au bon niveau, RAS.
+
+---------------------------------------------------------------------------
+RECAPITULATIF DES FICHIERS MODIFIES/CREES (ETAPES 1+2, PHASE C incluse)
+---------------------------------------------------------------------------
+
+  - students/services/email.py (FIX A)
+  - templates/emails/base_communication.html (FIX B)
+  - admissions/signals.py (FIX C + extra_context accepted_with_reserve)
+  - communication/services/template_registry.py (+3 entrees registre)
+  - templates/emails/admissions/candidate_submitted.html (annexe + delai)
+  - templates/emails/admissions/candidate_under_review.html (NOUVEAU)
+  - templates/emails/admissions/candidate_accepted_with_reserve.html (NOUVEAU)
+  - templates/emails/admissions/candidate_to_complete.html (NOUVEAU)
+
+Verification : python manage.py check --settings=config.settings_test_local
+-> OK. python manage.py test --settings=config.settings_test_local admissions
+students -> seuls les 2 echecs preexistants connus (sans rapport).
+
+PROCHAINES ETAPES (non traitees, pour une iteration ulterieure si le temps
+le permet) : ETAPE 3 (recu de premier paiement -> first_payment_validated.html),
+ETAPE 4 (account_created.html : mot de la direction / liens utiles depuis
+student_welcome.html), ETAPE 5 (contexte + templates inscription_*), ETAPE 6
+(nettoyage du code mort : admission_*.html dupliques, admissions/services/emails.py,
+imports casses dans accounts/dashboard_views.py, student_welcome.html une fois
+recycle).
+
+================================================================================
+PHASE D - ETAPES 1 ET 2 IMPLEMENTEES (en attente de revue avant commit)
+================================================================================
+
 Phase A terminée.
+
+================================================================================
+PHASE E - TRAITEMENT DES 9 PROBLEMES DU DASHBOARD GESTIONNAIRE (en attente de
+revue avant commit)
+================================================================================
+
+Cette phase traite les PROBLEME #1 a #9 de la section 2 ci-dessus, ainsi que
+les recommandations correspondantes de la section 6. Resume des decisions et
+correctifs, dans l'ordre de priorite traite :
+
+1. PROBLEME #1 (barres caisse en dur a 75%) -> RESOLU
+   Fichier : accounts/templates/accounts/dashboard/manager_dashboard.html
+   (bloc "Lecture caisse", section caisse).
+   Les 5 barres (recettes etudiants, depenses payees, salaires payes,
+   honoraires enseignants, solde estime) utilisaient toutes une largeur CSS
+   fixe (~75%) independante des montants reels. Remplace par
+   {% widthratio valeur cash_stats.bar_max 100 %}% pour chaque barre, avec
+   un `bar_max` calcule cote vue a partir des montants reels du mois. Les
+   barres refletent maintenant proportionnellement les montants affiches a
+   cote.
+
+2. Section 6, recommandation #2 (tests de comportement manquants) -> RESOLU
+   Fichier : accounts/test_manager_workflows.py
+   Ajout de 4 nouvelles classes de tests (16 tests) :
+     - ManagerSalaryWorkflowTests (5 tests) : preparation salaire, paiement
+       avec mouvement de caisse, rejet si caisse insuffisante, avance sur
+       salaire, notification "salaires disponibles".
+     - ManagerHonorariumWorkflowTests (2 tests) : preparation honoraires
+       enseignant, paiement avec mouvement de caisse.
+     - ManagerMonthlyClosureWorkflowTests (6 tests) : creation en brouillon,
+       validation depuis brouillon, cloture depuis validee, echec validation
+       si pas brouillon, echec cloture si pas validee, echec recreation si
+       pas brouillon.
+     - ManagerCashSessionWorkflowTests (3 tests) : creation session caisse,
+       finalisation (paiement + mouvement de caisse), annulation.
+   Suite complete : 38/38 tests OK (etait 22 avant cette phase).
+   Verification : python manage.py test --settings=config.settings_test_local
+   accounts.test_manager_workflows -> OK.
+
+3. PROBLEME #2 (code mort widget sidebar, alerts_count toujours a 0) -> RESOLU
+   Fichier : accounts/dashboards/htmx_widgets.py:125-129 (widget_alerts_badge)
+   Le bloc `... if False else 0` a ete supprime. `alerts_count` est
+   desormais calcule reellement a partir de
+   `Donation.objects.filter(branch=branch, date__gte=...).count()` et
+   transmis au contexte du template avec `priorities_count`.
+
+4. PROBLEME #3 (3 templates orphelins) -> RESOLU
+   Fichiers supprimes :
+     accounts/templates/accounts/dashboard/manager_candidatures.html
+     accounts/templates/accounts/dashboard/manager_inscriptions.html
+     accounts/templates/accounts/dashboard/manager_paiements.html
+   Confirme via grep qu'aucune vue ne les rendait (toutes les vues
+   manager_candidatures/inscriptions/paiements appellent
+   _render_manager_dashboard -> manager_dashboard.html avec ?section=...).
+
+5. PROBLEME #4 (partial manager_salary_row.html jamais rendu) -> RESOLU
+   Fichier supprime :
+     accounts/templates/accounts/dashboard/partials/manager_salary_row.html
+   Confirme via grep qu'aucun render() dans htmx_salaires.py ne reference ce
+   partial (toutes les actions salaires renvoient un HX-Redirect via
+   manager_salary_redirect_response()).
+
+6. PROBLEME #5 (export Excel incomplet, admissions/inscriptions absentes) ->
+   RESOLU
+   Fichier : accounts/services/excel_reports.py (export_branch_report_xlsx)
+   Ajout d'une section "Admissions & inscriptions" dans report_rows,
+   reprenant les memes statistiques que les KPIs annuels du dashboard
+   (annual_revenue_*) : candidatures recues/acceptees/rejetees,
+   inscriptions creees, montants dus/payes. L'export est maintenant un
+   miroir complet de ce que le gestionnaire voit a l'ecran et de ce
+   qu'AGENTS.md decrit (admissions, inscriptions, payments, donations, shop
+   sales, expenses, salaries, honoraria, net result).
+
+7. PROBLEME #6 (workflow de cloture DRAFT/VALIDATED/CLOSED jamais utilise) ->
+   RESOLU (decision : ajout d'une etape de validation)
+   Apres discussion, la decision retenue est l'OPTION B : faire vivre le
+   workflow en 3 etapes plutot que de documenter le clic unique comme
+   definitif. Implementation :
+     - accounts/dashboards/htmx_depenses.py : `monthly_closure_create` cree
+       desormais la cloture en STATUS_DRAFT uniquement (sans plus renseigner
+       validated_by/validated_at/closed_at a la creation), et refuse
+       (HTTP 400) de modifier une periode qui n'est plus en DRAFT.
+       Deux nouvelles vues :
+         - monthly_closure_validate(request, pk) : DRAFT -> VALIDATED,
+           renseigne validated_by + validated_at. Si la cloture n'est pas en
+           DRAFT, renvoie une redirection HX avec le message
+           "cloture_non_brouillon" et ne modifie rien.
+         - monthly_closure_close(request, pk) : VALIDATED -> CLOSED,
+           renseigne closed_at. Si la cloture n'est pas en VALIDATED, renvoie
+           "cloture_non_validee" et ne modifie rien.
+     - accounts/urls.py:419-420 : nouvelles routes
+       htmx_manager_monthly_closure_validate et
+       htmx_manager_monthly_closure_close.
+     - accounts/templates/accounts/dashboard/manager_dashboard.html (tableau
+       "Cloture", colonne actions) : bouton "Valider" affiche si
+       closure.status == 'draft', bouton "Cloturer" affiche si
+       closure.status == 'validated', tous deux avec hx-confirm explicite
+       (cloture irreversible).
+   Couverture de tests : voir ManagerMonthlyClosureWorkflowTests (point 2
+   ci-dessus), y compris les cas d'echec (validation hors brouillon,
+   cloture hors validee, recreation hors brouillon).
+
+8. PROBLEME #7 (helpers morts dans helpers.py) -> PARTIELLEMENT RESOLU +
+   CORRECTION DE L'AUDIT
+   Fichier : accounts/dashboards/helpers.py
+   Correction importante par rapport au PROBLEME #7 tel que redige
+   initialement : seul `is_admissions()` etait reellement mort (aucun appel
+   dans tout le repo, confirme par grep) et a ete SUPPRIME. En revanche
+   `is_finance()` et `is_executive()` sont bien utilises -- dans
+   portal/services/reenrollment_service.py (lignes 16, 87, 92, 98, 103) --
+   et ont donc ete CONSERVES. L'affirmation initiale du PROBLEME #7 ("les
+   trois fonctions sont du code mort") est donc inexacte pour 2 des 3
+   fonctions ; seule is_admissions() correspondait a la description.
+
+9. PROBLEME #9 (AGENTS.md presente htmx_admissions.py/htmx_finance.py comme
+   entrypoints du dashboard gestionnaire) -> RESOLU
+   Fichier : AGENTS.md (section "Manager (gestionnaire) dashboard /
+   Entrypoints")
+   Ajout d'un paragraphe explicatif precisant que
+   admissions_dashboard.py / finance_dashboard.py / executive_dashboard.py
+   (et leurs fichiers htmx_admissions.py / htmx_finance.py associes) sont des
+   dashboards PARALLELES, distincts du dashboard gestionnaire unifie, geres
+   par des groupes ("admissions", "finance", "executive") separes du groupe
+   "gestionnaire". Cela evite qu'un futur agent/developpeur les confonde avec
+   les entrypoints du dashboard gestionnaire documentes juste au-dessus.
+
+---------------------------------------------------------------------------
+VERIFICATION GLOBALE (fin de phase E)
+---------------------------------------------------------------------------
+
+  - python manage.py check --settings=config.settings_test_local
+    -> System check identified no issues (0 silenced).
+  - python manage.py test --settings=config.settings_test_local
+    accounts.test_manager_workflows
+    -> Ran 38 tests in 11.085s, OK (etait 22 tests avant cette phase).
+
+---------------------------------------------------------------------------
+ETAT DES PROBLEMES #1 A #9 APRES PHASE E
+---------------------------------------------------------------------------
+
+  PROBLEME #1 (barres caisse en dur)              -> RESOLU
+  PROBLEME #2 (code mort widget alertes)          -> RESOLU
+  PROBLEME #3 (3 templates orphelins)             -> RESOLU
+  PROBLEME #4 (partial manager_salary_row.html)   -> RESOLU
+  PROBLEME #5 (export Excel incomplet)            -> RESOLU
+  PROBLEME #6 (cloture DRAFT/VALIDATED/CLOSED)    -> RESOLU (workflow 3 etapes)
+  PROBLEME #7 (helpers morts helpers.py)          -> RESOLU (avec correction :
+                                                     seul is_admissions() etait
+                                                     mort)
+  PROBLEME #8 (2 implementations manager_required) -> NON TRAITE (juge non
+                                                     bloquant, cf. analyse
+                                                     section 2 : comportement
+                                                     coherent avec son contexte
+                                                     d'usage, juste un nommage
+                                                     ambigu)
+  PROBLEME #9 (AGENTS.md entrypoints trompeurs)   -> RESOLU
+
+Phase E terminée.

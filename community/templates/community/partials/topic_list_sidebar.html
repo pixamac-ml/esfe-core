@@ -12,7 +12,7 @@
 
     <div class="space-y-3">
       {% for topic in featured_topics|slice:":4" %}
-        <a href="{% url 'community:topic_detail' topic.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+        <a href="{% url 'community:topic_detail' topic.slug %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
           <div class="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">
             {% if topic.category %}
               <span class="rounded-full bg-white px-2 py-1 text-slate-700 shadow-sm">{{ topic.category.name }}</span>
@@ -48,7 +48,7 @@
 
     <div class="space-y-3">
       {% for topic in recent_topics|slice:":4" %}
-        <a href="{% url 'community:topic_detail' topic.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+        <a href="{% url 'community:topic_detail' topic.slug %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
           <p class="line-clamp-2 font-medium text-slate-950">{{ topic.title }}</p>
           <p class="mt-2 text-sm text-slate-500">
             {% if topic.last_activity_at %}{{ topic.last_activity_at|date:"d/m H:i" }}{% else %}Nouvelle publication{% endif %}
@@ -75,7 +75,7 @@
 
     <div class="space-y-3">
       {% for topic in trending_topics|slice:":4" %}
-        <a href="{% url 'community:topic_detail' topic.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+        <a href="{% url 'community:topic_detail' topic.slug %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
           <div class="flex items-center justify-between gap-3">
             <p class="line-clamp-2 font-medium text-slate-950">{{ topic.title }}</p>
             <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
@@ -107,7 +107,7 @@
 
     <div class="space-y-3">
       {% for topic in unanswered_topics|slice:":4" %}
-        <a href="{% url 'community:topic_detail' topic.pk %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+        <a href="{% url 'community:topic_detail' topic.slug %}" class="block rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
           <p class="line-clamp-2 font-medium text-slate-950">{{ topic.title }}</p>
           <p class="mt-2 text-sm text-slate-500">
             Publié par {{ topic.author.get_full_name|default:topic.author.username }}
@@ -134,7 +134,7 @@
 
     <div class="space-y-3">
       {% for contributor in top_contributors|slice:":5" %}
-        <div class="flex items-center gap-3 rounded-2xl border border-primary-100 p-3">
+        <a href="{% url 'community:public_profile' contributor.username %}" class="flex items-center gap-3 rounded-2xl border border-primary-100 p-3 transition hover:border-primary-200 hover:bg-slate-50">
           <div class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-primary-600 text-sm font-semibold text-white">
             {% if contributor.profile.avatar %}
               <img src="{{ contributor.profile.avatar.url }}" alt="{{ contributor.get_full_name|default:contributor.username }}" class="h-full w-full object-cover" />
@@ -144,9 +144,23 @@
           </div>
           <div class="min-w-0 flex-1">
             <p class="truncate font-medium text-slate-950">{{ contributor.get_full_name|default:contributor.username }}</p>
-            <p class="text-sm text-slate-500">{{ contributor.profile.reputation|default:0 }} points</p>
+            {% if contributor.gamification %}
+              <p class="flex items-center gap-1 text-sm text-slate-500">
+                <i class="fa-solid fa-{{ contributor.gamification.get_level_icon_class }} text-primary-500"></i>
+                <span>{{ contributor.gamification.get_level_title }}</span>
+                <span class="text-slate-300">·</span>
+                <span>{{ contributor.gamification.total_xp }} XP</span>
+              </p>
+            {% else %}
+              <p class="text-sm text-slate-500">{{ contributor.profile.reputation|default:0 }} points</p>
+            {% endif %}
           </div>
-        </div>
+          {% if contributor.badge_count %}
+            <span class="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
+              <i class="fa-solid fa-award"></i> {{ contributor.badge_count }}
+            </span>
+          {% endif %}
+        </a>
       {% empty %}
         <div class="rounded-2xl border border-dashed border-primary-200 p-4 text-sm text-slate-500">
           Les contributeurs apparaîtront ici.

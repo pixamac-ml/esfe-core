@@ -178,8 +178,18 @@ def resolve_channel_policy(event_type, *, default_channels, default_priority, me
     resolved_metadata.setdefault("channel_family", policy.get("channel_family", "notification_in_app"))
     resolved_metadata.setdefault("realtime_behavior", policy.get("realtime_behavior", "none"))
     resolved_metadata.setdefault("policy_audience", policy.get("audience", "generic"))
+
+    channels = tuple(policy.get("channels") or default_channels)
+
+    # Si l'appelant demande explicitement l'envoi d'un email (ex: send_email=True
+    # et l'utilisateur a une adresse email), on respecte cette intention meme si
+    # la politique de l'evenement ne liste pas le canal email par defaut.
+    email_channel = CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL
+    if email_channel in default_channels and email_channel not in channels:
+        channels = channels + (email_channel,)
+
     return {
-        "channels": tuple(policy.get("channels") or default_channels),
+        "channels": channels,
         "priority": policy.get("priority") or default_priority,
         "metadata": resolved_metadata,
     }

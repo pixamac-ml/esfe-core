@@ -42,13 +42,6 @@ def is_manager(user: AbstractBaseUser) -> bool:
     return user_has_group(user, "gestionnaire")
 
 
-def is_admissions(user: AbstractBaseUser) -> bool:
-    """
-    Verifie si l'utilisateur appartient au staff admissions.
-    """
-    return user_has_group(user, "admissions")
-
-
 def is_finance(user: AbstractBaseUser) -> bool:
     """
     Verifie si l'utilisateur appartient au staff finance.

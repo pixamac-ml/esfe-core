@@ -18,6 +18,8 @@ from .views import (
     profile_badges,
     profile_settings,
     dashboard_redirect,
+    payslip_download,
+    honorarium_download,
 )
 
 # Import des dashboards
@@ -174,6 +176,21 @@ urlpatterns = [
         "profile/settings/",
         profile_settings,
         name="profile_settings"
+    ),
+
+
+    # ==========================================================
+    # FICHES DE PAIE - TELECHARGEMENT
+    # ==========================================================
+    path(
+        "payslip/<int:pk>/download/",
+        payslip_download,
+        name="payslip_download"
+    ),
+    path(
+        "honorarium/<int:pk>/download/",
+        honorarium_download,
+        name="honorarium_download"
     ),
 
 
@@ -416,6 +433,8 @@ urlpatterns = [
     path("htmx/manager/honorarium/prepare-all/", teacher_honorarium_prepare_all, name="htmx_manager_teacher_honorarium_prepare_all"),
     path("htmx/manager/honorarium/pay-ready-all/", teacher_honorarium_pay_ready_all, name="htmx_manager_teacher_honorarium_pay_ready_all"),
     path("htmx/manager/closure/create/", monthly_closure_create, name="htmx_manager_monthly_closure_create"),
+    path("htmx/manager/closure/<int:pk>/validate/", monthly_closure_validate, name="htmx_manager_monthly_closure_validate"),
+    path("htmx/manager/closure/<int:pk>/close/", monthly_closure_close, name="htmx_manager_monthly_closure_close"),
 
     # =============================================
     # HTMX ACTIONS - DEPENSES ET CAISSE GESTIONNAIRE

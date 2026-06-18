@@ -69,9 +69,22 @@ def create_status_notification(candidature, notification_type):
         return None
 
     data = NOTIFICATION_MESSAGES[notification_type]
+    message = data["message"]
 
     # CORRIGE: utiliser last_name et first_name au lieu de full_name
     recipient_name = f"{candidature.last_name} {candidature.first_name}"
+
+    extra_context = {}
+    if notification_type == "candidature_rejected" and candidature.rejection_reason:
+        extra_context["reason"] = candidature.rejection_reason
+        extra_context["comment"] = candidature.rejection_reason
+    elif notification_type == "candidature_to_complete" and candidature.completion_message:
+        message = candidature.completion_message
+        extra_context["admin_comment"] = candidature.completion_message
+        extra_context["comment"] = candidature.completion_message
+    elif notification_type == "candidature_accepted_with_reserve" and candidature.admin_comment:
+        extra_context["admin_comment"] = candidature.admin_comment
+        extra_context["comment"] = candidature.admin_comment
 
     recipient_user = _get_candidate_user(candidature.email)
     default_channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
@@ -99,7 +112,7 @@ def create_status_notification(candidature, notification_type):
             "url": "/candidature/",
             "context": {
                 "recipient_name": recipient_name,
-                "message": data["message"],
+                "message": message,
                 "candidate_reference": getattr(candidature, "reference", ""),
                 "programme_name": getattr(getattr(candidature, "programme", None), "title", ""),
                 "programme": getattr(getattr(candidature, "programme", None), "title", ""),
@@ -110,6 +123,7 @@ def create_status_notification(candidature, notification_type):
                 "dashboard_url": "/candidature/",
                 "login_url": "/candidature/",
                 "reference": getattr(candidature, "reference", ""),
+                **extra_context,
             },
         },
     )
@@ -118,7 +132,7 @@ def create_status_notification(candidature, notification_type):
         actor=None,
         event_type=notification_type,
         title=data["title"],
-        body=data["message"],
+        body=message,
         source_app="admissions",
         channels=policy["channels"],
         priority=policy["priority"],

@@ -63,11 +63,11 @@ Entrypoints in `accounts/dashboards/`:
 - `manager_dashboard.py` — main dashboard views
 - `htmx_manager.py` — central HTMX dispatch (candidatures, inscriptions, payments, cash sessions, salaries, honoraria, expenses, donations, closures, reports)
 - `htmx_caisse.py`, `htmx_candidatures.py`, `htmx_depenses.py`, `htmx_honoraires.py`, `htmx_inscriptions.py`, `htmx_paiements.py`, `htmx_salaires.py` — per-domain HTMX
-- `htmx_admissions.py`, `htmx_finance.py` — legacy HTMX views
 - `htmx_global.py`, `htmx_utils.py`, `htmx_widgets.py` — shared HTMX helpers
-- `executive_dashboard.py`, `finance_dashboard.py`, `admissions_dashboard.py` — alternate dashboards
 - `exports.py`, `querysets.py` — Excel export & query helpers
 - `permissions.py` / `helpers.py` — `is_manager()`, `get_user_branch()`
+
+`executive_dashboard.py`, `finance_dashboard.py`, `admissions_dashboard.py` (with their HTMX views `htmx_admissions.py`, `htmx_finance.py`) are **separate, parallel dashboards** for the "executive"/"finance"/"admissions" groups — not part of the gestionnaire dashboard and not called from `manager_dashboard.html` or the gestionnaire `htmx_*` files above.
 
 ### Critical business rules
 

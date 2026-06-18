@@ -589,12 +589,14 @@
                   <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
                       <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_candidature_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-regular fa-eye"></i></button>
+                      {% if item.status == 'submitted' or item.status == 'under_review' %}
                       {% if item.status == 'submitted' %}
                       <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_under_review' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Passer cette candidature en analyse ?"><i class="fa-solid fa-magnifying-glass"></i></button>
                       {% endif %}
                       <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_accept' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Accepter cette candidature ?"><i class="fa-solid fa-check"></i></button>
                       <button type="button" class="dg-btn dg-btn-warning" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_to_complete' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Marquer cette candidature comme a completer ?"><i class="fa-solid fa-pen"></i></button>
                       <button type="button" class="dg-btn dg-btn-danger" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_reject' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Refuser cette candidature ?"><i class="fa-solid fa-xmark"></i></button>
+                      {% endif %}
                       {% if item.status == 'rejected' %}
                       <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem; border-color:#fecaca; color:#ef4444;" hx-post="{% url 'accounts:htmx_candidature_delete' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Supprimer definitivement cette candidature rejetee ?"><i class="fa-regular fa-trash-can"></i></button>
                       {% endif %}
@@ -642,7 +644,7 @@
             <select name="ins_status" class="dg-filter-input">
               <option value="">Tous les statuts</option>
               <option value="active" {% if ins_status == 'active' %}selected{% endif %}>Active</option>
-              <option value="partial" {% if ins_status == 'partial' %}selected{% endif %}>Partielle</option>
+              <option value="partial_paid" {% if ins_status == 'partial_paid' %}selected{% endif %}>Partielle</option>
               <option value="awaiting_payment" {% if ins_status == 'awaiting_payment' %}selected{% endif %}>En attente</option>
               <option value="created" {% if ins_status == 'created' %}selected{% endif %}>Creee</option>
             </select>
@@ -665,14 +667,11 @@
                       {{ item.public_token }}
                     </a>
                   </td>
-                  <td><span class="dg-badge-sm {% if item.status == 'active' %}dg-badge-green{% elif item.status == 'partial' %}dg-badge-amber{% elif item.status == 'awaiting_payment' %}dg-badge-blue{% else %}dg-badge-gray{% endif %}">{{ item.get_status_display }}</span></td>
+                  <td><span class="dg-badge-sm {% if item.status == 'active' %}dg-badge-green{% elif item.status == 'partial_paid' %}dg-badge-amber{% elif item.status == 'awaiting_payment' %}dg-badge-blue{% else %}dg-badge-gray{% endif %}">{{ item.get_status_display }}</span></td>
                   <td>{{ item.balance|intcomma }} FCFA</td>
                   <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
                       <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_inscription_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-regular fa-eye"></i></button>
-                      {% if item.status == 'created' or item.status == 'awaiting_payment' or item.status == 'partial' %}
-                      <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_inscription_positioning' item.candidature.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-solid fa-graduation-cap"></i></button>
-                      {% endif %}
                     </div>
                   </td>
                 </tr>
@@ -874,6 +873,9 @@
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
                       <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-regular fa-eye"></i></button>
                       <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-solid fa-pen"></i></button>
+                      {% if item.current_payroll and item.current_payroll.remaining_salary > 0 %}
+                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()" title="Payer le salaire"><i class="fa-solid fa-money-bill-wave"></i> Payer</button>
+                      {% endif %}
                     </div>
                   </td>
                 </tr>
@@ -1020,23 +1022,23 @@
               <div class="dg-section-header-title">Recettes et charges du mois</div>
               <div class="dg-bar-item">
                 <div class="dg-bar-label"><span>Recettes etudiants</span><span>{{ cash_stats.student_receipts_month|intcomma }} FCFA</span></div>
-                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:75%; background:#16a34a;"></div></div>
+                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:{% widthratio cash_stats.student_receipts_month cash_stats.bar_max 100 %}%; background:#16a34a;"></div></div>
               </div>
               <div class="dg-bar-item">
                 <div class="dg-bar-label"><span>Depenses payees</span><span>{{ cash_stats.expenses_paid_month|intcomma }} FCFA</span></div>
-                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:55%; background:#ef4444;"></div></div>
+                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:{% widthratio cash_stats.expenses_paid_month cash_stats.bar_max 100 %}%; background:#ef4444;"></div></div>
               </div>
               <div class="dg-bar-item">
                 <div class="dg-bar-label"><span>Salaires payes</span><span>{{ cash_stats.salary_paid_month|intcomma }} FCFA</span></div>
-                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:45%; background:#7c3aed;"></div></div>
+                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:{% widthratio cash_stats.salary_paid_month cash_stats.bar_max 100 %}%; background:#7c3aed;"></div></div>
               </div>
               <div class="dg-bar-item">
                 <div class="dg-bar-label"><span>Honoraires enseignants</span><span>{{ cash_stats.honorarium_paid_month|intcomma }} FCFA</span></div>
-                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:35%; background:#0f9d8a;"></div></div>
+                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:{% widthratio cash_stats.honorarium_paid_month cash_stats.bar_max 100 %}%; background:#0f9d8a;"></div></div>
               </div>
               <div class="dg-bar-item">
                 <div class="dg-bar-label"><span>Solde estime</span><span>{{ cash_stats.estimated_month_balance|intcomma }} FCFA</span></div>
-                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:65%; background:#2563eb;"></div></div>
+                <div class="dg-bar-track"><div class="dg-bar-fill" style="width:{% widthratio cash_stats.estimated_month_balance_abs cash_stats.bar_max 100 %}%; background:{% if cash_stats.estimated_month_balance < 0 %}#ef4444{% else %}#2563eb{% endif %};"></div></div>
               </div>
             </div>
           </div>
@@ -1249,7 +1251,7 @@
 
           <div class="dg-table-wrap" style="margin-top:16px;">
             <table class="dg-table">
-              <thead><tr><th>Periode</th><th>Etat</th><th>Resultat</th><th>Versement</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Periode</th><th>Etat</th><th>Resultat</th><th>Versement</th><th>Reference</th><th>Actions</th></tr></thead>
               <tbody>
                 {% for closure in monthly_closures %}
                 <tr>
@@ -1258,9 +1260,18 @@
                   <td>{{ closure.result_amount|intcomma }} FCFA</td>
                   <td>{% if closure.bank_transfer %}{{ closure.bank_transfer.amount|intcomma }} FCFA{% else %}<span class="text-slate-400">-</span>{% endif %}</td>
                   <td>{% if closure.bank_transfer %}{{ closure.bank_transfer.reference }}{% else %}<span class="text-slate-400">Aucun</span>{% endif %}</td>
+                  <td>
+                    {% if closure.status == 'draft' %}
+                    <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .6rem;" hx-post="{% url 'accounts:htmx_manager_monthly_closure_validate' closure.id %}" hx-target="body" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Valider la cloture de {{ closure.period_month|date:"m/Y" }} ? Les montants ne pourront plus etre recalcules."><i class="fa-solid fa-check"></i> Valider</button>
+                    {% elif closure.status == 'validated' %}
+                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .6rem;" hx-post="{% url 'accounts:htmx_manager_monthly_closure_close' closure.id %}" hx-target="body" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Cloturer definitivement {{ closure.period_month|date:"m/Y" }} ? Cette etape est irreversible."><i class="fa-solid fa-lock"></i> Cloturer</button>
+                    {% else %}
+                    <span class="text-slate-400">-</span>
+                    {% endif %}
+                  </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-lock"></i></div><div class="dg-empty-text">Aucune cloture enregistree</div></td></tr>
+                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-lock"></i></div><div class="dg-empty-text">Aucune cloture enregistree</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>

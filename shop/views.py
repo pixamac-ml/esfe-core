@@ -26,6 +26,7 @@ from shop.services.shop_service import (
     create_student_required_order,
     deliver_order,
     get_branch_public_shop_identifier,
+    get_recommended_products_for_student,
     get_required_shop_context,
     get_manager_shop_context,
     mark_order_ready,
@@ -248,11 +249,22 @@ def student_create_required_order(request):
                 return redirect(f"/shop/student/order/{order.pk}/")
             error = "Aucun article selectionne."
 
-    from portal.student.views import shop_catalog_partial
-    catalog_response = shop_catalog_partial(request)
-    catalog_html = catalog_response.content.decode() if hasattr(catalog_response, "content") else str(catalog_response)
-    html = f"""<div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div>{catalog_html}"""
-    return HttpResponse(html)
+    products = get_recommended_products_for_student(request.user)
+    orders = ShopOrder.objects.filter(
+        student=request.user,
+    ).select_related("branch").prefetch_related("items", "payments").order_by("-created_at")[:50]
+    branch_slug = None
+    student_profile = getattr(request.user, "student_profile", None)
+    if student_profile and student_profile.inscription and student_profile.inscription.candidature:
+        branch_slug = student_profile.inscription.candidature.branch.slug
+    return render(request, "portal/student/partials/shop_orders_student.html", {
+        "orders": orders,
+        "branch_slug": branch_slug,
+        "products": products,
+        "active_tab": "catalog",
+        "catalog_preloaded": True,
+        "catalog_error": error,
+    })
 
 
 @login_required

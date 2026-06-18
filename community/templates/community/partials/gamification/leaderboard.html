@@ -1,7 +1,3 @@
-
-Current Process
-Files
-HTML
 {# Classement des membres #}
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
     <!-- Header -->
@@ -21,11 +17,11 @@ HTML
             <!-- Rang -->
             <div class="flex-shrink-0 w-8 text-center">
                 {% if forloop.counter == 1 %}
-                    <span class="text-2xl">🥇</span>
+                    <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><i class="fa-solid fa-trophy text-sm"></i></span>
                 {% elif forloop.counter == 2 %}
-                    <span class="text-2xl">🥈</span>
+                    <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500"><i class="fa-solid fa-medal text-sm"></i></span>
                 {% elif forloop.counter == 3 %}
-                    <span class="text-2xl">🥉</span>
+                    <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-orange-50 text-orange-500"><i class="fa-solid fa-medal text-sm"></i></span>
                 {% else %}
                     <span class="text-lg font-bold text-gray-400">#{{ forloop.counter }}</span>
                 {% endif %}
@@ -33,14 +29,20 @@ HTML
 
             <!-- Avatar + Info -->
             <div class="flex items-center gap-3 flex-1 min-w-0">
-                <img src="{{ entry.user.profile.avatar.url|default:'/static/images/default-avatar.png' }}"
+                {% if entry.user.profile.avatar %}
+                <img src="{{ entry.user.profile.avatar.url }}"
                      alt="{{ entry.user.username }}"
                      class="w-10 h-10 rounded-full object-cover border-2 {% if forloop.counter == 1 %}border-amber-400{% elif forloop.counter == 2 %}border-gray-400{% elif forloop.counter == 3 %}border-amber-600{% else %}border-gray-200{% endif %}">
+                {% else %}
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-primary-700 bg-gradient-to-br from-primary-100 to-primary-200 border-2 {% if forloop.counter == 1 %}border-amber-400{% elif forloop.counter == 2 %}border-gray-400{% elif forloop.counter == 3 %}border-amber-600{% else %}border-gray-200{% endif %}">
+                    {{ entry.user.username|first|upper }}
+                </div>
+                {% endif %}
 
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
                         <span class="font-semibold text-gray-800 truncate">{{ entry.user.username }}</span>
-                        <span class="text-sm" title="Niveau {{ entry.level }}">{{ entry.get_level_icon }}</span>
+                        <span class="text-primary-500" title="Niveau {{ entry.level }}"><i class="fa-solid fa-{{ entry.get_level_icon_class }} text-xs"></i></span>
                     </div>
                     <span class="text-xs text-gray-500">{{ entry.get_level_title }}</span>
                 </div>

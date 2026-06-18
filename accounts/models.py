@@ -235,6 +235,7 @@ class UserPreference(models.Model):
     ui_sidebar_collapsed = models.BooleanField(default=False)
     ui_compact_mode = models.BooleanField(default=False)
     ui_autorefresh = models.BooleanField(default=True)
+    internal_rules_accepted_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -1,6 +1,7 @@
 # students/models.py
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -9,6 +10,17 @@ from branches.models import Branch
 from inscriptions.models import Inscription
 
 User = get_user_model()
+
+
+class GroupeSanguin(models.TextChoices):
+    A_PLUS = "A+", "A+"
+    A_MOINS = "A-", "A−"
+    B_PLUS = "B+", "B+"
+    B_MOINS = "B-", "B−"
+    AB_PLUS = "AB+", "AB+"
+    AB_MOINS = "AB-", "AB−"
+    O_PLUS = "O+", "O+"
+    O_MOINS = "O-", "O−"
 
 
 class Student(models.Model):
@@ -54,6 +66,31 @@ class Student(models.Model):
         max_length=30,
         unique=True,
         db_index=True
+    )
+
+    # =====================================================
+    # DONNÉES CARTE
+    # =====================================================
+
+    photo = models.ImageField(
+        upload_to="students/photos/",
+        blank=True,
+        help_text="Photo d’identité pour la carte étudiant"
+    )
+
+    groupe_sanguin = models.CharField(
+        max_length=3,
+        choices=GroupeSanguin.choices,
+        blank=True,
+        default="",
+        help_text="Groupe sanguin déclaré (non vérifié médicalement)"
+    )
+
+    pin_hash = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+        help_text="Code PIN haché pour l’authentification par carte"
     )
 
     # =====================================================
@@ -157,6 +194,23 @@ class Student(models.Model):
 
         self.is_active = True
         self.save(update_fields=["is_active"])
+
+    def set_pin(self, raw_pin: str) -> None:
+        self.pin_hash = make_password(raw_pin)
+        self.save(update_fields=["pin_hash"])
+
+    def check_pin(self, raw_pin: str) -> bool:
+        if not self.pin_hash:
+            return False
+        return check_password(raw_pin, self.pin_hash)
+
+    @property
+    def has_pin(self) -> bool:
+        return bool(self.pin_hash)
+
+    @property
+    def carte_active(self):
+        return self.cartes.filter(statut="active").order_by("-date_emission").first()
 
 
 class StudentYearDecision(models.Model):
@@ -823,4 +877,86 @@ class StudentCaseNote(models.Model):
 
     def __str__(self):
         return f"Note #{self.pk} — Cas #{self.case_id}"
+
+
+# =============================================================
+# CARTE ÉTUDIANT
+# =============================================================
+
+class StatutCarte(models.TextChoices):
+    ACTIVE = "active", "Active"
+    REVOQUEE = "revoquee", "Révoquée"
+    PERDUE = "perdue", "Perdue"
+    EXPIREE = "expiree", "Expirée"
+
+
+class CarteEtudiant(models.Model):
+    """
+    Carte d'identité estudiantine émise par l'établissement.
+    La validité se vérifie : signature HMAC + statut active + date_expiration >= aujourd'hui.
+    """
+
+    etudiant = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name="cartes",
+    )
+    annee = models.CharField(max_length=9, help_text="Année académique, ex: 2026-2027")
+    code_annexe = models.CharField(max_length=20, help_text="Code annexe, ex: BKO-MORIBA")
+    date_emission = models.DateField(auto_now_add=True)
+    date_expiration = models.DateField()
+    statut = models.CharField(
+        max_length=10,
+        choices=StatutCarte.choices,
+        default=StatutCarte.ACTIVE,
+        db_index=True,
+    )
+    token_version = models.CharField(max_length=4, default="v1")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date_emission"]
+        verbose_name = "Carte étudiant"
+        verbose_name_plural = "Cartes étudiants"
+        indexes = [
+            models.Index(fields=["etudiant", "statut"]),
+            models.Index(fields=["statut", "date_expiration"]),
+        ]
+
+    def __str__(self):
+        return f"Carte {self.etudiant.matricule} — {self.annee} ({self.statut})"
+
+    @property
+    def is_valide(self) -> bool:
+        return (
+            self.statut == StatutCarte.ACTIVE
+            and self.date_expiration >= timezone.localdate()
+        )
+
+    def revoquer(self, motif: str = "revoquee") -> None:
+        if motif not in StatutCarte.values:
+            motif = StatutCarte.REVOQUEE
+        self.statut = motif
+        self.save(update_fields=["statut"])
+
+
+class VerificationLog(models.Model):
+    """Journal des consultations du portail de vérification (RGPD + sécurité)."""
+
+    carte = models.ForeignKey(
+        CarteEtudiant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verifications",
+    )
+    code_tente = models.CharField(max_length=20, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    resultat = models.CharField(max_length=20, default="invalide")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Log de vérification carte"
+        verbose_name_plural = "Logs de vérification carte"
 

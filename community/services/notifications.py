@@ -129,28 +129,6 @@ def notify_new_answer(topic, answer):
             send_email=True,
         )
 
-    previous_responders = (
-        answer.topic.answers.filter(is_deleted=False)
-        .exclude(author=author)
-        .exclude(author=topic.author)
-        .values_list("author_id", flat=True)
-        .distinct()
-    )
-
-    from django.contrib.auth import get_user_model
-
-    user_model = get_user_model()
-    for responder_id in previous_responders:
-        responder = user_model.objects.get(id=responder_id)
-        create_notification(
-            user=responder,
-            actor=author,
-            topic=topic,
-            answer=answer,
-            notification_type="new_answer",
-            send_email=False,
-        )
-
 
 def notify_reply_to_reply(parent_answer, reply):
     if parent_answer.author == reply.author:

@@ -322,7 +322,7 @@
       <div class="sg-panel-title">Historique paie</div>
       <div class="sg-table-wrap">
         <table class="sg-table">
-          <thead><tr><th>Periode</th><th>Base</th><th>Primes</th><th>Retenues</th><th>Net</th><th>Retire</th><th>Statut</th></tr></thead>
+          <thead><tr><th>Periode</th><th>Base</th><th>Primes</th><th>Retenues</th><th>Net</th><th>Retire</th><th>Statut</th><th>PDF</th></tr></thead>
           <tbody>
             {% for entry in salary_entries %}
               <tr>
@@ -333,9 +333,10 @@
                 <td class="sg-mono" style="font-weight:900;">{{ entry.net_salary|intcomma }}</td>
                 <td class="sg-mono">{{ entry.paid_amount|intcomma }}</td>
                 <td><span class="sg-badge-sm {% if entry.status == 'paid' %}sg-badge-green{% elif entry.status == 'ready' %}sg-badge-blue{% elif entry.status == 'partial' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ entry.get_status_display }}</span></td>
+                <td><a href="{% url 'accounts:payslip_download' entry.id %}" target="_blank" class="sg-page-link" title="Telecharger la fiche de paie"><i class="fa-solid fa-file-arrow-down"></i></a></td>
               </tr>
             {% empty %}
-              <tr><td colspan="7"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-regular fa-file-lines"></i></div><div class="sg-empty-text">Aucune fiche de paie disponible pour le moment.</div></div></td></tr>
+              <tr><td colspan="8"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-regular fa-file-lines"></i></div><div class="sg-empty-text">Aucune fiche de paie disponible pour le moment.</div></div></td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -446,31 +447,18 @@
           <div class="sg-section-header-sub">{{ secretary_profile.phone|default:"Telephone non renseigne" }} - {{ secretary_profile.location|default:"Localisation non renseignee" }}</div>
         </div>
       </div>
-      <form method="post" action="{% url 'secretary:profile_update' %}" enctype="multipart/form-data" style="display:grid;gap:12px;">
+      <form method="post" action="{% url 'secretary:profile_update' %}" enctype="multipart/form-data" style="display:grid;gap:16px;">
         {% csrf_token %}
-        <div class="sg-form-grid">
-          {% for field in profile_form.visible_fields %}
-            <div class="field">
-              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {{ field }}
-              {% if field.errors %}<div class="errors">{{ field.errors }}</div>{% endif %}
-            </div>
-          {% endfor %}
-        </div>
-        <div class="sg-section-actions"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer le profil</button></div>
+        {% include "secretary/partials/form_fields.html" with form=profile_form %}
+        <div class="sg-form-footer"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer le profil</button></div>
       </form>
     </div>
     <div class="sg-panel">
       <div class="sg-panel-title">Preferences et securite</div>
-      <form method="post" action="{% url 'secretary:preferences_update' %}" style="display:grid;gap:10px;">
+      <form method="post" action="{% url 'secretary:preferences_update' %}" style="display:grid;gap:16px;">
         {% csrf_token %}
-        {% for field in preference_form.visible_fields %}
-          <label class="sg-action-card" style="justify-content:flex-start;gap:10px;">
-            {{ field }}
-            <span><span class="sg-action-label">{{ field.label }}</span></span>
-          </label>
-        {% endfor %}
-        <div class="sg-section-actions"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer les preferences</button></div>
+        {% include "secretary/partials/form_fields.html" with form=preference_form %}
+        <div class="sg-form-footer"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer les preferences</button></div>
       </form>
       <div class="sg-divider"></div>
       <div class="message-list">

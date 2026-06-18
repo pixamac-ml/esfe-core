@@ -44,7 +44,6 @@ def salary_detail(request: HttpRequest, pk: int) -> HttpResponse:
     form = PayrollEntryForm(instance=payroll_entry)
     if not payroll_entry:
         form.initial.update({
-            "period_month": payroll_month,
             "base_salary": profile.salary_base,
         })
     return render(
@@ -93,6 +92,7 @@ def salary_upsert(request: HttpRequest, pk: int) -> HttpResponse:
     entry = form.save(commit=False)
     entry.branch = request.branch
     entry.employee = profile.user
+    entry.period_month = payroll_month
     entry.updated_by = request.user
     if not entry.pk:
         entry.created_by = request.user

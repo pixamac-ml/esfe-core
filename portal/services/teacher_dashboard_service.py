@@ -927,6 +927,7 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
                 "gross_amount": entry.gross_amount,
                 "status": status_slug,
                 "status_display": status_label,
+                "entry_id": entry.pk,
             })
 
             if entry.status in (TeacherHonorariumEntry.STATUS_READY, TeacherHonorariumEntry.STATUS_DRAFT):

@@ -110,20 +110,20 @@ def _secretary_profile_form(instance):
     for field_name, field in form.fields.items():
         if field_name == "avatar":
             field.widget.attrs.update({
-                "class": "sg-form-input",
+                "class": "secretary-input",
                 "accept": "image/jpeg,image/png,image/webp",
             })
         elif field.widget.__class__.__name__ == "Textarea":
-            field.widget.attrs.update({"class": "sg-form-input", "rows": 3})
+            field.widget.attrs.update({"class": "secretary-input", "rows": 3})
         else:
-            field.widget.attrs.update({"class": "sg-form-input"})
+            field.widget.attrs.update({"class": "secretary-input"})
     return form
 
 
 def _secretary_preference_form(instance):
     form = UserPreferenceForm(instance=instance)
     for field in form.fields.values():
-        field.widget.attrs.update({"style": "width:18px;height:18px;flex-shrink:0;"})
+        field.widget.attrs.update({"class": "secretary-input"})
     return form
 
 

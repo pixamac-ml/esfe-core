@@ -23,3 +23,18 @@
     <section class="workflow-empty">Aucune alerte actionnable detectee.</section>
   {% endfor %}
 </div>
+{% if alerts_page and alerts_page.paginator.num_pages > 1 %}
+<div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+  <p class="text-sm font-bold text-slate-500">
+    Page {{ alerts_page.number }} / {{ alerts_page.paginator.num_pages }} - {{ alerts_page.paginator.count }} alertes
+  </p>
+  <div class="flex flex-wrap gap-2">
+    {% if alerts_page.has_previous %}
+    <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_supervision_workspace' %}?page={{ alerts_page.previous_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Precedent</button>
+    {% endif %}
+    {% if alerts_page.has_next %}
+    <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_supervision_workspace' %}?page={{ alerts_page.next_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

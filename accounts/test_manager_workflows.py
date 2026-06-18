@@ -17,12 +17,13 @@ from formations.models import Programme, Cycle, Diploma, Filiere
 from accounts.models import (
     BranchCashMovement,
     BranchExpense,
+    BranchMonthlyClosure,
     Donation,
     PayrollEntry,
     TeacherHonorariumEntry,
     Profile,
 )
-from payments.models import Payment, PaymentAgent
+from payments.models import CashPaymentSession, Payment, PaymentAgent
 
 
 User = get_user_model()
@@ -50,7 +51,7 @@ def _create_branch(code="TST", name="Test Annexe"):
 
 
 def _login(client, user):
-    client.login(username=user.username, password="pass1234")
+    client.force_login(user)
 
 
 def _create_programme():
@@ -374,3 +375,318 @@ class ManagerExportReportTests(TestCase):
             response["Content-Type"],
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}},
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+)
+class ManagerSalaryWorkflowTests(TestCase):
+    """Workflow salaires : preparer, payer, avance, notifier."""
+
+    def setUp(self):
+        self.branch = _create_branch()
+        self.manager = _create_user("mgr_sal", groups=["gestionnaire"], branch=self.branch)
+        profile = self.manager.profile
+        profile.salary_base = 300000
+        profile.save(update_fields=["salary_base", "updated_at"])
+        self.period_month = date.today().replace(day=1)
+        _login(self.client, self.manager)
+
+    def _seed_cash(self, amount=500000):
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_IN,
+            source=BranchCashMovement.SOURCE_MANUAL,
+            amount=amount,
+            label="Solde initial",
+            created_by=self.manager,
+        )
+
+    def test_salary_prepare_all_creates_entry(self):
+        url = reverse("accounts:htmx_manager_salary_prepare_all")
+        response = self.client.post(
+            url, {"period_month": self.period_month.isoformat()}, HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        entry = PayrollEntry.objects.get(
+            branch=self.branch, employee=self.manager, period_month=self.period_month,
+        )
+        self.assertEqual(entry.base_salary, 300000)
+        self.assertEqual(entry.status, PayrollEntry.STATUS_DRAFT)
+
+    def test_salary_pay_creates_cash_movement(self):
+        self._seed_cash(500000)
+        entry = PayrollEntry.objects.get(
+            branch=self.branch, employee=self.manager, period_month=self.period_month,
+        )
+        entry.status = PayrollEntry.STATUS_READY
+        entry.save()
+        url = reverse("accounts:htmx_manager_salary_pay", args=[entry.id])
+        response = self.client.post(url, {"payment_amount": "100000"}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        entry.refresh_from_db()
+        self.assertEqual(entry.paid_amount, 100000)
+        self.assertTrue(
+            BranchCashMovement.objects.filter(
+                branch=self.branch, source=BranchCashMovement.SOURCE_PAYROLL, amount=100000,
+            ).exists()
+        )
+
+    def test_salary_pay_rejected_when_caisse_insufficient(self):
+        entry = PayrollEntry.objects.get(
+            branch=self.branch, employee=self.manager, period_month=self.period_month,
+        )
+        entry.status = PayrollEntry.STATUS_READY
+        entry.save()
+        url = reverse("accounts:htmx_manager_salary_pay", args=[entry.id])
+        response = self.client.post(url, {"payment_amount": "100000"}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 400)
+        entry.refresh_from_db()
+        self.assertEqual(entry.paid_amount, 0)
+
+    def test_salary_advance_creates_draft_entry_and_cash_movement(self):
+        self._seed_cash(500000)
+        url = reverse("accounts:htmx_manager_salary_advance", args=[self.manager.id])
+        response = self.client.post(
+            url,
+            {"advance_amount": "50000", "period_month": self.period_month.isoformat()},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        entry = PayrollEntry.objects.get(
+            branch=self.branch, employee=self.manager, period_month=self.period_month,
+        )
+        self.assertEqual(entry.advances, 50000)
+        self.assertEqual(entry.status, PayrollEntry.STATUS_DRAFT)
+        self.assertTrue(
+            BranchCashMovement.objects.filter(
+                branch=self.branch, source=BranchCashMovement.SOURCE_PAYROLL, amount=50000,
+            ).exists()
+        )
+
+    def test_salary_pay_ready_all_notifies_employee(self):
+        entry = PayrollEntry.objects.get(
+            branch=self.branch, employee=self.manager, period_month=self.period_month,
+        )
+        entry.status = PayrollEntry.STATUS_READY
+        entry.save()
+        url = reverse("accounts:htmx_manager_salary_pay_ready_all")
+        response = self.client.post(
+            url, {"period_month": self.period_month.isoformat()}, HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("salaires_disponibles_1", response.headers["HX-Redirect"])
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}},
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+)
+class ManagerHonorariumWorkflowTests(TestCase):
+    """Workflow honoraires enseignants : preparer, payer."""
+
+    def setUp(self):
+        self.branch = _create_branch()
+        self.manager = _create_user("mgr_hon", groups=["gestionnaire"], branch=self.branch)
+        self.teacher = _create_user("teacher_hon", branch=self.branch, position="teacher")
+        profile = self.teacher.profile
+        profile.teacher_hourly_rate = 5000
+        profile.save(update_fields=["teacher_hourly_rate", "updated_at"])
+        self.period_month = date.today().replace(day=1)
+        _login(self.client, self.manager)
+
+    def _seed_cash(self, amount=500000):
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_IN,
+            source=BranchCashMovement.SOURCE_MANUAL,
+            amount=amount,
+            label="Solde initial",
+            created_by=self.manager,
+        )
+
+    def test_teacher_honorarium_prepare_all_creates_entry(self):
+        url = reverse("accounts:htmx_manager_teacher_honorarium_prepare_all")
+        response = self.client.post(
+            url, {"period_month": self.period_month.isoformat()}, HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        entry = TeacherHonorariumEntry.objects.get(
+            branch=self.branch, teacher=self.teacher, period_month=self.period_month,
+        )
+        self.assertEqual(entry.hourly_rate, 5000)
+        self.assertEqual(entry.status, TeacherHonorariumEntry.STATUS_DRAFT)
+
+    def test_teacher_honorarium_pay_creates_cash_movement(self):
+        self._seed_cash(500000)
+        entry = TeacherHonorariumEntry.objects.get(
+            branch=self.branch, teacher=self.teacher, period_month=self.period_month,
+        )
+        entry.validated_hours = Decimal("40")
+        entry.status = TeacherHonorariumEntry.STATUS_READY
+        entry.save()
+        url = reverse("accounts:htmx_manager_teacher_honorarium_pay", args=[entry.id])
+        response = self.client.post(url, {"payment_amount": "100000"}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        entry.refresh_from_db()
+        self.assertEqual(entry.paid_amount, 100000)
+        self.assertTrue(
+            BranchCashMovement.objects.filter(
+                branch=self.branch, source=BranchCashMovement.SOURCE_HONORARIUM, amount=100000,
+            ).exists()
+        )
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+)
+class ManagerMonthlyClosureWorkflowTests(TestCase):
+    """Workflow cloture mensuelle : brouillon -> validee -> cloturee."""
+
+    def setUp(self):
+        self.branch = _create_branch()
+        self.manager = _create_user("mgr_clo", groups=["gestionnaire"], branch=self.branch)
+        self.period_month = date.today().replace(day=1)
+        _login(self.client, self.manager)
+
+    def _create_closure(self):
+        url = reverse("accounts:htmx_manager_monthly_closure_create")
+        response = self.client.post(
+            url,
+            {"period_month": self.period_month.isoformat(), "notes": ""},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        return BranchMonthlyClosure.objects.get(branch=self.branch, period_month=self.period_month)
+
+    def test_closure_create_is_draft(self):
+        closure = self._create_closure()
+        self.assertEqual(closure.status, BranchMonthlyClosure.STATUS_DRAFT)
+
+    def test_closure_validate_from_draft(self):
+        closure = self._create_closure()
+        url = reverse("accounts:htmx_manager_monthly_closure_validate", args=[closure.id])
+        response = self.client.post(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        closure.refresh_from_db()
+        self.assertEqual(closure.status, BranchMonthlyClosure.STATUS_VALIDATED)
+        self.assertEqual(closure.validated_by, self.manager)
+        self.assertIsNotNone(closure.validated_at)
+
+    def test_closure_close_from_validated(self):
+        closure = self._create_closure()
+        closure.status = BranchMonthlyClosure.STATUS_VALIDATED
+        closure.validated_by = self.manager
+        closure.validated_at = timezone.now()
+        closure.save(update_fields=["status", "validated_by", "validated_at", "updated_at"])
+        url = reverse("accounts:htmx_manager_monthly_closure_close", args=[closure.id])
+        response = self.client.post(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        closure.refresh_from_db()
+        self.assertEqual(closure.status, BranchMonthlyClosure.STATUS_CLOSED)
+        self.assertIsNotNone(closure.closed_at)
+
+    def test_closure_validate_fails_if_not_draft(self):
+        closure = self._create_closure()
+        closure.status = BranchMonthlyClosure.STATUS_CLOSED
+        closure.save(update_fields=["status", "updated_at"])
+        url = reverse("accounts:htmx_manager_monthly_closure_validate", args=[closure.id])
+        response = self.client.post(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("cloture_non_brouillon", response.headers["HX-Redirect"])
+        closure.refresh_from_db()
+        self.assertEqual(closure.status, BranchMonthlyClosure.STATUS_CLOSED)
+
+    def test_closure_close_fails_if_not_validated(self):
+        closure = self._create_closure()
+        url = reverse("accounts:htmx_manager_monthly_closure_close", args=[closure.id])
+        response = self.client.post(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("cloture_non_validee", response.headers["HX-Redirect"])
+        closure.refresh_from_db()
+        self.assertEqual(closure.status, BranchMonthlyClosure.STATUS_DRAFT)
+
+    def test_closure_recreate_fails_if_not_draft(self):
+        closure = self._create_closure()
+        closure.status = BranchMonthlyClosure.STATUS_VALIDATED
+        closure.save(update_fields=["status", "updated_at"])
+        url = reverse("accounts:htmx_manager_monthly_closure_create")
+        response = self.client.post(
+            url,
+            {"period_month": self.period_month.isoformat(), "notes": ""},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+)
+class ManagerCashSessionWorkflowTests(TestCase):
+    """Workflow sessions caisse : creer, finaliser, annuler."""
+
+    def setUp(self):
+        self.branch = _create_branch()
+        self.manager = _create_user("mgr_cash", groups=["gestionnaire"], branch=self.branch)
+        self.programme = _create_programme()
+        self.candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        self.inscription = Inscription.objects.create(
+            candidature=self.candidature,
+            amount_due=500000,
+            amount_paid=0,
+        )
+        self.inscription.status = Inscription.STATUS_AWAITING_PAYMENT
+        self.inscription.save(update_fields=["status"])
+        self.agent = PaymentAgent.objects.create(
+            user=self.manager, branch=self.branch, agent_code="AGT002", is_active=True,
+        )
+        _login(self.client, self.manager)
+
+    def test_cash_session_create(self):
+        url = reverse("accounts:htmx_manager_cash_session_create", args=[self.inscription.id])
+        response = self.client.post(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            CashPaymentSession.objects.filter(inscription=self.inscription, is_used=False).exists()
+        )
+
+    def test_cash_session_complete_creates_payment_and_cash_movement(self):
+        session = CashPaymentSession.objects.create(
+            inscription=self.inscription,
+            agent=self.agent,
+            verification_code="123456",
+            expires_at=timezone.now() + timedelta(minutes=15),
+        )
+        url = reverse("accounts:htmx_manager_cash_session_complete", args=[session.id])
+        response = self.client.post(url, {"amount": "100000"}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        session.refresh_from_db()
+        self.assertTrue(session.is_used)
+        self.assertTrue(
+            Payment.objects.filter(
+                inscription=self.inscription, status=Payment.STATUS_VALIDATED, amount=100000,
+            ).exists()
+        )
+        self.assertTrue(
+            BranchCashMovement.objects.filter(
+                branch=self.branch, source=BranchCashMovement.SOURCE_STUDENT_PAYMENT, amount=100000,
+            ).exists()
+        )
+
+    def test_cash_session_cancel(self):
+        session = CashPaymentSession.objects.create(
+            inscription=self.inscription,
+            agent=self.agent,
+            verification_code="654321",
+            expires_at=timezone.now() + timedelta(minutes=15),
+        )
+        url = reverse("accounts:htmx_manager_cash_session_cancel", args=[session.id])
+        response = self.client.post(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        session.refresh_from_db()
+        self.assertTrue(session.is_used)

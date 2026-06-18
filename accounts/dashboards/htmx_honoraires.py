@@ -42,7 +42,6 @@ def teacher_honorarium_detail(request: HttpRequest, pk: int) -> HttpResponse:
     form = TeacherHonorariumEntryForm(instance=honorarium_entry)
     if not honorarium_entry:
         form.initial.update({
-            "period_month": payroll_month,
             "hourly_rate": profile.teacher_hourly_rate,
         })
     return render(
@@ -91,6 +90,7 @@ def teacher_honorarium_upsert(request: HttpRequest, pk: int) -> HttpResponse:
     entry = form.save(commit=False)
     entry.branch = request.branch
     entry.teacher = profile.user
+    entry.period_month = payroll_month
     entry.updated_by = request.user
     if not entry.pk:
         entry.created_by = request.user

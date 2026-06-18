@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import password_validation
 from django.core.validators import validate_email
 from django.urls import reverse
+from django.utils import timezone
 
 from admissions.models import CandidatureDocument
 from accounts.models import Profile, UserPreference
@@ -357,3 +358,15 @@ def handle_document_upload(user, file, document_type_id):
         upload.admin_note = ""
         upload.save(update_fields=["file", "is_valid", "is_validated", "admin_note"])
     return get_profile_data(user)
+
+
+def get_internal_rules_status(user):
+    preference, _created = UserPreference.objects.get_or_create(user=user)
+    return {"show_popup": preference.internal_rules_accepted_at is None}
+
+
+def accept_internal_rules(user):
+    preference, _created = UserPreference.objects.get_or_create(user=user)
+    preference.internal_rules_accepted_at = timezone.now()
+    preference.save(update_fields=["internal_rules_accepted_at", "updated_at"])
+    return preference

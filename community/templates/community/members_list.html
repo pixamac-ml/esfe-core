@@ -1,188 +1,136 @@
 {% extends "base.html" %}
-{% block title %}Contributeurs | Communauté{% endblock %}
+{% block title %}Contributeurs - Communauté{% endblock %}
 
 {% block content %}
+<div class="bg-slate-50">
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
 
-<!-- ================= HERO ================= -->
-<section class="relative pt-28 pb-16 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white overflow-hidden">
-    <!-- Effets décoratifs -->
-    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_70%_30%,white,transparent_50%)]"></div>
-    <div class="absolute -bottom-20 -left-20 w-80 h-80 bg-secondary/20 rounded-full blur-3xl"></div>
-
-    <div class="relative max-w-6xl mx-auto px-4">
-        <!-- Bouton retour -->
-        <a href="{% url 'community:topic_list' %}"
-           class="group inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition-all duration-300 mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg"
-                 class="h-4 w-4 transform group-hover:-translate-x-1 transition-transform duration-300"
-                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-            Retour aux discussions
-        </a>
-
-        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div>
-                <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur px-4 py-2 rounded-full text-xs font-semibold uppercase tracking-wide mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                    </svg>
-                    Membres actifs
-                </div>
-
-                <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
-                    Contributeurs de la communauté
-                </h1>
-                <p class="text-primary-100 mt-3 max-w-2xl text-sm leading-relaxed">
-                    Découvrez les membres qui participent activement aux échanges académiques
-                    et partagent leurs connaissances.
-                </p>
-            </div>
-
-            <!-- Statistiques -->
-            <div class="flex items-center gap-4">
-                <div class="bg-white/10 backdrop-blur rounded-xl px-5 py-3 text-center">
-                    <div class="text-2xl font-bold">{{ users_total|default:users|length }}</div>
-                    <div class="text-xs text-primary-200 uppercase tracking-wide">Membre{{ users_total|default:users|length|pluralize }}</div>
-                </div>
-            </div>
-        </div>
+    <div class="mb-4">
+      <a href="{% url 'community:topic_list' %}" class="inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-primary-600">
+        <i class="fa-solid fa-arrow-left text-xs"></i>
+        Retour à la communauté
+      </a>
     </div>
-</section>
 
-<!-- ================= CONTENU ================= -->
-<section class="bg-gray-50 py-16">
-    <div class="max-w-6xl mx-auto px-4">
+    <section class="overflow-hidden rounded-[28px] border border-primary-100 bg-white shadow-sm">
 
-        {% if users %}
-        <!-- Grille des membres -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {% for user in users %}
-            <a href="{% url 'community:public_profile' user.username %}"
-               class="group bg-white rounded-2xl border border-gray-100 shadow-sm p-6
-                      hover:shadow-xl hover:border-primary-200 hover:-translate-y-1
-                      transition-all duration-300">
-
-                <div class="flex items-center gap-4">
-                    <!-- Avatar -->
-                    <div class="relative">
-                        {% if user.profile.avatar %}
-                        <img src="{{ user.profile.avatar.url }}"
-                             alt="{{ user.username }}"
-                             class="w-16 h-16 rounded-full object-cover border-2 border-primary-100
-                                    group-hover:border-primary-300 group-hover:scale-105
-                                    transition-all duration-300">
-                        {% else %}
-                        <div class="w-16 h-16 rounded-full bg-gradient-to-br from-primary-100 to-primary-200
-                                    flex items-center justify-center
-                                    text-primary-700 text-xl font-bold
-                                    group-hover:from-primary-200 group-hover:to-primary-300 group-hover:scale-105
-                                    transition-all duration-300">
-                            {{ user.username|first|upper }}
-                        </div>
-                        {% endif %}
-
-                        <!-- Indicateur de statut (optionnel) -->
-                        {% if user.is_active %}
-                        <span class="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></span>
-                        {% endif %}
-                    </div>
-
-                    <!-- Infos -->
-                    <div class="flex-1 min-w-0">
-                        <div class="font-semibold text-gray-800 truncate
-                                    group-hover:text-primary-600 transition-colors">
-                            {{ user.username }}
-                        </div>
-
-                        {% if user.profile.main_domain %}
-                        <div class="text-xs text-gray-500 truncate mt-0.5">
-                            {{ user.profile.main_domain }}
-                        </div>
-                        {% endif %}
-
-                        <!-- Stats -->
-                        <div class="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                            <span class="inline-flex items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                                </svg>
-                                {{ user.answer_count }} réponse{{ user.answer_count|pluralize }}
-                            </span>
-                            <span class="inline-flex items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                {{ user.topic_count }} sujet{{ user.topic_count|pluralize }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Flèche -->
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         class="h-5 w-5 text-gray-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all duration-300"
-                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </div>
-
-                <!-- Badges ou rôle (si disponible) -->
-                {% if user.is_staff %}
-                <div class="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
-                    {% if user.is_staff %}
-                    <span class="inline-flex items-center gap-1 bg-purple-100 text-purple-700 text-xs font-medium px-2.5 py-1 rounded-full">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                        </svg>
-                        Staff
-                    </span>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-            </a>
-            {% endfor %}
+      <!-- ================= HEADER ================= -->
+      <div class="border-b border-primary-100 bg-gradient-to-r from-primary-50 via-white to-secondary-50 px-6 py-7 sm:px-8">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.22em] text-primary-500">
+              <i class="fa-solid fa-users text-[10px]"></i> Communauté
+            </p>
+            <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
+              Contributeurs de la communauté
+            </h1>
+            <p class="mt-3 max-w-xl text-sm leading-6 text-slate-600">
+              Découvrez les membres qui participent activement aux échanges académiques et
+              partagent leurs connaissances.
+            </p>
+          </div>
+          <div class="rounded-2xl border border-primary-100 bg-white p-4 shadow-sm sm:w-44">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+              <i class="fa-solid fa-user-group text-sm"></i>
+            </span>
+            <p class="mt-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Membres actifs</p>
+            <p class="mt-1 text-2xl font-black text-slate-900">{{ users_total|default:users|length }}</p>
+          </div>
         </div>
+      </div>
 
-        {% if page_obj and page_obj.paginator.num_pages > 1 %}
-        <div class="mt-8 flex items-center justify-between text-sm">
-            <span class="text-gray-500">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-            <div class="flex items-center gap-2">
+      <div class="p-5 sm:p-8">
+        {% if users %}
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {% for user in users %}
+              <a href="{% url 'community:public_profile' user.username %}"
+                 class="group flex items-start gap-4 rounded-2xl border border-primary-100 p-4 transition hover:border-primary-200 hover:bg-slate-50">
+
+                <!-- Avatar -->
+                <div class="relative shrink-0">
+                  {% if user.profile.avatar %}
+                    <img src="{{ user.profile.avatar.url }}" alt="{{ user.username }}"
+                         class="h-14 w-14 rounded-2xl object-cover">
+                  {% else %}
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600 text-lg font-bold text-white">
+                      {{ user.username|first|upper }}
+                    </div>
+                  {% endif %}
+                  {% if user.is_active %}
+                    <span class="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500"></span>
+                  {% endif %}
+                </div>
+
+                <!-- Infos -->
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-bold text-slate-950 transition group-hover:text-primary-600">
+                    {{ user.get_full_name|default:user.username }}
+                  </p>
+
+                  {% if user.profile.main_domain %}
+                    <p class="mt-0.5 truncate text-xs text-slate-500">{{ user.profile.main_domain }}</p>
+                  {% endif %}
+
+                  {% if user.gamification %}
+                    <p class="mt-1 flex items-center gap-1.5 text-xs font-bold text-primary-600">
+                      <i class="fa-solid fa-{{ user.gamification.get_level_icon_class }}"></i>
+                      <span>{{ user.gamification.get_level_title }}</span>
+                      <span class="font-normal text-slate-400">· {{ user.gamification.total_xp }} XP</span>
+                    </p>
+                  {% endif %}
+
+                  <div class="mt-2 flex items-center gap-3 text-xs text-slate-500">
+                    <span class="inline-flex items-center gap-1">
+                      <i class="fa-solid fa-comments text-emerald-500"></i>
+                      {{ user.answer_count }} réponse{{ user.answer_count|pluralize }}
+                    </span>
+                    <span class="inline-flex items-center gap-1">
+                      <i class="fa-solid fa-file-lines text-primary-400"></i>
+                      {{ user.topic_count }} sujet{{ user.topic_count|pluralize }}
+                    </span>
+                  </div>
+
+                  {% if user.is_staff %}
+                    <div class="mt-3 border-t border-primary-100/70 pt-2">
+                      <span class="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-700">
+                        <i class="fa-solid fa-shield-halved"></i> Staff
+                      </span>
+                    </div>
+                  {% endif %}
+                </div>
+
+                <i class="fa-solid fa-chevron-right mt-1 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-primary-500"></i>
+              </a>
+            {% endfor %}
+          </div>
+
+          {% if page_obj and page_obj.paginator.num_pages > 1 %}
+            <div class="mt-6 flex items-center justify-between text-sm">
+              <span class="text-slate-500">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+              <div class="flex items-center gap-2">
                 {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}"
-                   class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition">Prec</a>
+                  <a href="?page={{ page_obj.previous_page_number }}"
+                     class="rounded-xl border border-primary-100 px-3 py-2 font-bold text-primary-700 transition hover:bg-primary-50">Précédent</a>
                 {% endif %}
                 {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}"
-                   class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition">Suiv</a>
+                  <a href="?page={{ page_obj.next_page_number }}"
+                     class="rounded-xl border border-primary-100 px-3 py-2 font-bold text-primary-700 transition hover:bg-primary-50">Suivant</a>
                 {% endif %}
+              </div>
             </div>
-        </div>
-        {% endif %}
+          {% endif %}
 
         {% else %}
-        <!-- État vide -->
-        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-16 text-center">
-            <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-50
-                        flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                </svg>
-            </div>
-
-            <h2 class="text-2xl font-bold text-gray-800 mb-3">
-                Aucun contributeur
-            </h2>
-            <p class="text-gray-600 max-w-md mx-auto">
-                Soyez le premier à contribuer à notre communauté !
-            </p>
-        </div>
+          <div class="rounded-2xl border border-dashed border-primary-200 p-16 text-center">
+            <span class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-400">
+              <i class="fa-solid fa-user-group text-2xl"></i>
+            </span>
+            <h2 class="text-xl font-bold text-slate-950">Aucun contributeur</h2>
+            <p class="mt-2 text-sm text-slate-500">Soyez le premier à contribuer à notre communauté !</p>
+          </div>
         {% endif %}
-
-    </div>
-</section>
-
-<!-- BOTTOM SPACING -->
-<div class="pb-16"></div>
-
+      </div>
+    </section>
+  </div>
+</div>
 {% endblock %}

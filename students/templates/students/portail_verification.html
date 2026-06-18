@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="relative pt-24 pb-12 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
+  <div class="max-w-2xl mx-auto px-4 text-center">
+    <h1 class="text-3xl font-bold">Portail de vérification de carte</h1>
+    <p class="text-primary-100 mt-2 text-sm">
+      Vérifiez l'authenticité d'une carte étudiant ESFE en saisissant le code figurant au verso.
+    </p>
+  </div>
+</section>
+
+<section class="bg-gray-50 py-12">
+  <div class="max-w-lg mx-auto px-4">
+    <div class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100">
+
+      {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 p-4 rounded-xl text-sm
+          {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-700
+          {% else %}bg-green-50 border border-green-200 text-green-700{% endif %}">
+          {{ message }}
+        </div>
+        {% endfor %}
+      {% endif %}
+
+      {% if resultat %}
+        <!-- Résultat de vérification -->
+        <div class="text-center mb-6">
+          {% if resultat.valide %}
+            <div class="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-semibold mb-4">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              Carte valide et authentique
+            </div>
+          {% else %}
+            <div class="inline-flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-full text-sm font-semibold mb-4">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+              </svg>
+              {{ resultat.message }}
+            </div>
+          {% endif %}
+        </div>
+
+        {% if resultat.valide and resultat.carte %}
+          <div class="bg-gray-50 rounded-xl p-4 space-y-2 text-sm mb-6">
+            <div class="flex justify-between">
+              <span class="text-gray-500">Nom</span>
+              <span class="font-semibold">{{ resultat.carte.etudiant.full_name }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Matricule</span>
+              <span class="font-mono font-semibold">{{ resultat.carte.etudiant.matricule }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Formation</span>
+              <span class="font-semibold">{{ resultat.carte.etudiant.programme_title }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Classe</span>
+              <span class="font-semibold">{{ resultat.classe|default:"—" }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Statut</span>
+              <span class="font-semibold text-green-600">Actif</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Valide jusqu'au</span>
+              <span class="font-semibold">{{ resultat.carte.date_expiration|date:"d/m/Y" }}</span>
+            </div>
+          </div>
+        {% endif %}
+
+        <a href="{% url 'students:portail_verification' %}"
+           class="block text-center text-sm text-primary-600 hover:text-primary-700 font-medium">
+          ← Nouvelle vérification
+        </a>
+
+      {% else %}
+        <!-- Formulaire de saisie du code -->
+        <form method="post" class="space-y-5">
+          {% csrf_token %}
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Code de vérification (verso de la carte)
+            </label>
+            <input type="text"
+                   name="code"
+                   placeholder="ex : 3F9A-7C21-D8E4"
+                   maxlength="14"
+                   required
+                   autocomplete="off"
+                   class="w-full border border-gray-300 rounded-xl px-4 py-3.5 text-sm font-mono text-gray-700 placeholder-gray-400 bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all duration-200 outline-none uppercase tracking-widest">
+            <p class="text-xs text-gray-400 mt-1.5">
+              Le code figure au verso de la carte, sous le QR code.
+            </p>
+          </div>
+          <button type="submit"
+                  class="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3.5 rounded-xl font-semibold transition shadow-lg hover:shadow-xl">
+            Vérifier la carte
+          </button>
+        </form>
+
+        <div class="relative my-6">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-gray-200"></div>
+          </div>
+          <div class="relative flex justify-center text-sm">
+            <span class="px-4 bg-white text-gray-400">ou</span>
+          </div>
+        </div>
+
+        <p class="text-center text-xs text-gray-400">
+          Scannez le QR code au verso avec votre téléphone pour une vérification directe.
+        </p>
+      {% endif %}
+
+    </div>
+  </div>
+</section>
+
+{% endblock %}

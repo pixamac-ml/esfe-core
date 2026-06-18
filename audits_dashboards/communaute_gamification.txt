@@ -1,0 +1,296 @@
+================================================================
+AUDIT - GAMIFICATION (MODULE COMMUNAUTE / VITRINE)
+================================================================
+
+================================================================
+PARTIE 1 - PROBLEMES IDENTIFIES ET CORRIGES (1ere passe)
+================================================================
+
+Contexte : revue de la partie gamification (XP, niveaux, badges, streaks,
+classement) de la communaute (forum) cote vitrine, suite a une demande de
+correction avant presentation au DG.
+
+Fichiers principaux :
+- community/views.py (topic_detail, add_answer, vote_answer, profile_badges)
+- community/signals.py (attribution XP via signaux post_save / user_logged_in)
+- community/services/gamification.py (GamificationService : award_xp,
+  check_badges, update_daily_streak, get_leaderboard)
+- community/models_gamification.py (GamificationProfile, BadgeDefinition,
+  UserBadge, XPConfig, XPTransaction, LeaderboardEntry)
+- community/templates/community/leaderboard.html
+- community/templates/community/topic_detail.html
+- community/templates/community/partials/answer_item.html,
+  reply_item.html, profile/badges.html
+- community/templates/community/partials/gamification/level_badge.html,
+  xp_notification.html
+
+----------------------------------------------------------------
+PROBLEMES IDENTIFIES ET CORRIGES
+----------------------------------------------------------------
+
+1. Classement (leaderboard.html) - bug d'affichage
+   - Probleme : le template utilisait {{ entry.answers_count }} et
+     {{ entry.accepted_count }}, des champs qui n'existent PAS sur
+     GamificationProfile -> rendu silencieusement vide (Django n'affiche
+     rien sur un attribut inconnu, donc aucune erreur visible mais colonnes
+     toujours a blanc).
+   - Correction : remplace par les vrais champs answers_given et
+     answers_accepted.
+
+2. Onglet "Badges" du profil - donnees fictives
+   - Probleme : partials/profile/badges.html affichait des badges
+     codes en dur ("Debutant / Contributeur / Expert / Specialiste")
+     avec une fausse progression "3/10", deconnectes de la vraie BDD
+     de badges (BadgeDefinition / UserBadge).
+   - Correction : reecriture complete du template :
+     - en-tete niveau/XP (icone de niveau, titre, total_xp, barre de
+       progression xp_profile)
+     - grille des badges reellement obtenus (icone, nom, description,
+       rarete, date d'obtention)
+     - nouvelle section "A debloquer" : calcule dans profile_badges()
+       (views.py) les 8 prochains badges non obtenus avec la progression
+       reelle vers la premiere condition (answers_count, accepted_answers,
+       upvotes_received, topics_count, streak_days, level)
+     - etat vide explicite si l'utilisateur n'a encore aucun badge
+
+3. Badges/niveau invisibles sur le forum (PROBLEME LE PLUS IMPORTANT)
+   - Probleme racine double :
+     a) le widget level_badge.html (icone + niveau a cote du pseudo)
+        n'etait inclus dans aucun template de reponse.
+     b) topic_detail.html (page principale d'un sujet) ne rendait PAS le
+        partial answer_item.html / reply_item.html pour la liste des
+        reponses : il avait sa propre boucle minimaliste (auteur + texte
+        seulement, sans votes, sans bouton "accepter", sans sous-reponses,
+        sans badge de niveau). Resultat : meme apres ajout du widget dans
+        answer_item.html, RIEN ne serait visible au chargement normal
+        d'une page de sujet (seulement sur une reponse ajoutee en direct
+        via HTMX pendant la session).
+   - Correction :
+     - ajout de {% include ".../level_badge.html" with user=answer.author %}
+       dans answer_item.html ET reply_item.html
+     - topic_detail.html : la boucle "Reponses" rend maintenant
+       answer_item.html pour chaque reponse principale (votes, bouton
+       "accepter", sous-reponses, badge de niveau inclus)
+     - vues.py : ajout de author__gamification aux select_related
+       (reponses principales + sous-reponses prefetchees) pour eviter le
+       N+1 du nouveau widget
+     - correction d'un bug annexe decouvert au passage : answer.is_accepted
+       n'existe pas comme champ -> {% if answer.is_accepted %} etait
+       TOUJOURS faux (le surlignage "Reponse validee" ne s'affichait
+       jamais). Calcul desormais fait dans la vue
+       (answer.is_accepted = answer.id == topic.accepted_answer_id)
+       et transmis au partial.
+
+4. Trois actions XP "mortes" (jamais declenchees)
+   - daily_login + series (streak) :
+     bug dans update_daily_streak() qui retournait profile.current_streak
+     (un entier toujours > 0 apres la 1ere connexion -> aurait donne les XP
+     de connexion quotidienne a CHAQUE connexion, pas une fois par jour).
+     Corrige pour retourner le booleen "premiere activite du jour".
+   - first_topic_of_day (+20 XP au 1er sujet du jour) : signal ajoute.
+   - complete_profile (+30 XP, une seule fois, quand avatar + bio remplis) :
+     signal ajoute, avec verification anti double-attribution via
+     XPTransaction.
+   - Verifie de bout en bout (script de test temporaire, supprime apres) :
+     connexion 1 -> +2 XP "daily_login" ; connexion 2 (meme jour) -> pas de
+     doublon ; bio seule -> 0 XP ; avatar+bio -> +30 XP ; re-sauvegarde ->
+     pas de doublon ; 1er sujet du jour -> +15 (creation) +20 (bonus) = 35 ;
+     2e sujet du jour -> +15 seulement.
+
+5. Pas de feedback visuel a l'obtention d'XP
+   - Ajout de notifications "toast" (+X XP) via swap HTMX OOB
+     (hx-swap-oob="afterbegin:#xp-toast-container"), animation Alpine.js
+     (apparition/disparition automatique apres 3s).
+   - Declenchees sur : creation de reponse (create_answer) et upvote donne
+     (give_upvote, uniquement pour un NOUVEAU vote positif).
+   - Conteneur #xp-toast-container ajoute dans topic_detail.html.
+
+6. Coherence transactionnelle
+   - award_xp() (gamification.py) enveloppe desormais l'ajout d'XP, la mise
+     a jour des stats (F() expressions) et la verification des badges dans
+     un transaction.atomic().
+
+----------------------------------------------------------------
+LAISSE TEL QUEL (hors-scope, faible risque / faible visibilite)
+----------------------------------------------------------------
+- LeaderboardEntry : modele non utilise, laisse en l'etat (le retirer
+  demanderait une migration).
+- Pas de toast XP sur create_topic : cette vue fait un HX-Redirect (rechargement
+  complet de page), un swap OOB n'est pas pertinent sans ajouter le framework
+  de messages Django a base.html.
+- partials/gamification/leaderboard.html ("Top Contributeurs") : widget non
+  branche dans topic_list_sidebar.html.
+- Bloc badges legacy (Profile.badge_gold/silver/bronze) dans
+  public_profile.html : systeme distinct, non casse, laisse en l'etat.
+- Le formulaire principal "Repondre" en bas de topic_detail.html est du code
+  mort preexistant (answer_form n'est jamais passe dans le contexte de la vue
+  -> ne s'affiche jamais). Bug reel mais sans rapport avec la gamification et
+  trop volumineux pour etre traite avant lundi.
+
+----------------------------------------------------------------
+VERIFICATION
+----------------------------------------------------------------
+- python manage.py check --settings=config.settings_test_local -> OK
+- python manage.py test community --settings=config.settings_test_local -> OK
+  (0 test existant, aucune erreur d'import)
+- Scenario de bout en bout (creation utilisateur, connexion, completion de
+  profil, creation de sujets, classement) -> resultats XP/streak/badges
+  conformes aux attentes.
+
+================================================================
+PARTIE 2 - VISION & PLAN D'AMELIORATION (avant demo DG lundi)
+================================================================
+
+LA VISION (telle que comprise) :
+La communaute ESFE doit fonctionner comme un "Stack Overflow" sante au
+Mali : etudiants ET enseignants experimentes echangent sur leurs themes /
+problemes quotidiens. La gamification (XP, niveaux, badges, classement)
+sert a faire emerger NATURELLEMENT les profils les plus actifs/utiles
+(notamment les enseignants qui repondent regulierement) et a les "mettre
+en avant" via le systeme de profil, le classement et les widgets de la
+page communaute. C'est un argument fort pour le DG : le site cree de la
+visibilite/reconnaissance pour les enseignants ET un outil d'entraide pour
+les etudiants, sans equivalent "sante" au Mali.
+
+----------------------------------------------------------------
+DECOUVERTES DE CETTE 2E PASSE (au-dela de la 1ere serie de fixes)
+----------------------------------------------------------------
+
+A. La sidebar de la page communaute (topic_list_sidebar.html, section
+   "Contributeurs / Profils actifs", TRES visible) affiche deja une liste
+   de top contributeurs... mais seulement leur ancien "profile.reputation"
+   (toujours a 0 dans la pratique). La vue (build_community_hub_context)
+   a DEJA prefetch le necessaire (select_related "gamification",
+   prefetch_related "user_badges", annotation badge_count) mais le
+   template n'exploite RIEN de tout ca.
+   -> C'est exactement l'endroit ideal pour "mettre en avant" les
+   enseignants/etudiants actifs (niveau, icone, titre, nb de badges) sans
+   toucher au backend : les donnees sont deja la, juste pas affichees.
+
+B. community/templates/community/partials/gamification/leaderboard.html
+   ("Top Contributeurs", non branche nulle part) contient un artefact de
+   copier-coller en debut de fichier :
+       Current Process
+       Files
+       HTML
+   -> texte brut qui s'afficherait tel quel si ce template etait un jour
+   inclus. A nettoyer (meme si non utilise actuellement, par souci de
+   proprete du code avant la demo / si quelqu'un le branche plus tard).
+
+C. Images d'avatar par defaut cassees :
+   - community/templates/community/leaderboard.html (page "Classement",
+     accessible via /community/classement/, podium top 3 + liste) utilise
+     {% static 'images/default-avatar.png' %} comme fallback quand
+     l'utilisateur n'a pas d'avatar.
+   - partials/gamification/leaderboard.html idem avec
+     /static/images/default-avatar.png.
+   - Ce fichier n'existe PAS dans static/ (verifie). Pour tout membre sans
+     avatar uploade (donc probablement la majorite des comptes de demo),
+     la page Classement affichera une icone d'image cassee -> tres visible
+     et "amateur" devant le DG.
+   - Le reste du site (members_list.html, topic_list_sidebar.html,
+     answer_item.html, public_profile.html...) utilise systematiquement le
+     fallback "initiale du nom dans un cercle degrade" -> a aligner ici
+     aussi pour la coherence visuelle ET corriger le bug.
+
+D. community/templates/community/members_list.html ("Contributeurs de la
+   communaute", /community/membres/) montre seulement le nb de
+   reponses/sujets + un badge "Staff" si is_staff. Aucune trace de
+   niveau/XP/titre gamification, alors que c'est la page-annuaire de la
+   communaute -> deuxieme endroit cle pour "mettre en avant" les profils.
+   La vue (members_list) ne fait pas select_related("gamification") ->
+   a ajouter pour eviter le N+1 si on affiche le niveau sur chaque carte.
+
+E. Le bloc "Ancien systeme" badges or/argent/bronze dans
+   public_profile.html (profile.badge_gold/silver/bronze) est un systeme
+   distinct (utilise aussi par accounts/views.py pour une autre page) qui
+   affiche presque toujours "0/0/0" car rien ne l'alimente cote
+   communaute. Cote visuel ca cree un doublon un peu confus juste sous la
+   vraie grille de badges. RISQUE FAIBLE / IMPACT FAIBLE -> laisse de cote
+   pour ne pas toucher a un systeme partage avec un autre dashboard a la
+   veille de la demo, mais signale ici pour memoire.
+
+----------------------------------------------------------------
+PLAN D'ACTION (priorise, pense pour etre fait avant demain)
+----------------------------------------------------------------
+1. [HAUTE PRIORITE / HAUT IMPACT] Enrichir la section "Profils actifs" de
+   topic_list_sidebar.html avec les donnees gamification deja disponibles
+   sur top_contributors : icone + titre de niveau, total XP, nb de badges.
+   -> Rendu visible immediatement sur la page d'accueil de la communaute.
+
+2. [HAUTE PRIORITE / BUG VISIBLE] Corriger le fallback avatar casse dans
+   leaderboard.html (page Classement) : remplacer
+   {% static 'images/default-avatar.png' %} par le pattern "initiale dans
+   cercle degrade" utilise partout ailleurs (podium + liste complete).
+
+3. [MOYENNE PRIORITE] Ajouter le niveau/titre gamification sur les cartes
+   de members_list.html (avec select_related("gamification") cote vue
+   pour eviter le N+1).
+
+4. [PETIT NETTOYAGE] Retirer le texte parasite "Current Process / Files /
+   HTML" en tete de partials/gamification/leaderboard.html.
+
+5. [VERIFICATION] Rendu de bout en bout (Django test client) des pages
+   cles : accueil communaute, sujet, classement, membres, profil public,
+   avec un utilisateur ayant XP/badges/streak pour confirmer l'absence
+   d'erreur de template et le bon affichage des widgets gamification.
+
+Hors-scope conserve (cf section E ci-dessus et Partie 1 de l'audit) :
+LeaderboardEntry mort, toast XP sur create_topic, formulaire "Repondre"
+casse (answer_form jamais passe au contexte), badges or/argent/bronze.
+
+----------------------------------------------------------------
+REALISE (points 1 a 5 du plan ci-dessus)
+----------------------------------------------------------------
+
+1. topic_list_sidebar.html, section "Profils actifs" : chaque contributeur
+   affiche maintenant son icone + titre de niveau + total XP (au lieu de
+   "0 points"), et un badge "nb de badges" si > 0. La carte est devenue un
+   lien direct vers le profil public. Aucun changement backend necessaire :
+   les donnees (gamification, badge_count) etaient deja prefetchees par
+   build_community_hub_context mais ignorees par le template.
+
+2. leaderboard.html (page /community/classement/) : remplacement des 5
+   <img src="{% static 'images/default-avatar.png' %}"> (fichier
+   inexistant -> icone cassee) par le pattern "initiale dans cercle
+   degrade" deja utilise partout ailleurs sur le site (podium 1/2/3 +
+   liste complete). Suppression du {% load static %} devenu inutile.
+
+3. members_list.html (page /community/membres/) : ajout de l'icone + titre
+   de niveau + XP sous le nom de chaque membre. members_list (views.py)
+   ajoute "gamification" au select_related pour eviter le N+1.
+
+4. partials/gamification/leaderboard.html (widget "Top Contributeurs", non
+   branche) : suppression du texte parasite "Current Process / Files /
+   HTML" en tete de fichier + meme correction d'avatar par defaut que le
+   point 2 (par coherence/proprete, meme si toujours non utilise).
+
+5. Verification de bout en bout (script temporaire, supprime apres) :
+   creation d'un "professeur" (12 reponses + 6 acceptees -> niveau 3,
+   435 XP) et d'un "etudiant" (1 sujet + 1 reponse -> niveau 1, 25 XP),
+   creation d'un sujet de sante publique avec reponse acceptee + sous-
+   reponse, puis rendu HTTP des 6 pages cles :
+     /community/                          -> 200
+     /community/sujet/test-paludisme/     -> 200
+     /community/classement/               -> 200
+     /community/membres/                  -> 200
+     /community/membre/gamif_teacher/     -> 200
+     /community/membre/gamif_student/     -> 200
+   Toutes rendues sans erreur, avec les widgets gamification (niveau,
+   XP, badge "Reponse validee", level_badge sur les reponses/sous-
+   reponses, sidebar "Profils actifs" enrichie, podium classement avec
+   avatars initiales) visibles avec des donnees realistes.
+
+python manage.py check --settings=config.settings_test_local -> OK (final).
+
+CONCLUSION : la partie communaute/gamification est maintenant coherente
+de bout en bout - du fil de discussion (badges de niveau sur chaque
+reponse) jusqu'a la page d'accueil (sidebar "Profils actifs" gamifiee), le
+classement (sans images cassees) et l'annuaire des membres (niveaux
+visibles). Le scenario de demo recommande pour le DG : ouvrir un sujet
+avec plusieurs reponses -> montrer les badges de niveau + reponse
+acceptee -> aller sur /community/classement/ -> aller sur le profil
+public d'un "professeur" actif (XP, niveau, badges, domaines
+d'expertise) -> revenir sur /community/ pour montrer la sidebar
+"Profils actifs" mise en avant.
+================================================================

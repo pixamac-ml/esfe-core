@@ -16,7 +16,7 @@ from students.models import Student, StudentAttendance, TeacherAttendance
 from inscriptions.models import Inscription
 from admissions.models import Candidature
 from formations.models import Programme, Cycle, Diploma, Filiere
-from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, ECChapter, ECContent, ECGrade, LessonLog, Semester, UE, WeeklyScheduleSlot
+from academics.models import AcademicClass, AcademicDebt, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, ECChapter, ECContent, ECGrade, LessonLog, Semester, UE, WeeklyScheduleSlot
 
 from accounts.access import (
 	can_access,
@@ -1680,6 +1680,50 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Gestion des notes")
 		self.assertContains(response, f"Semestre {semester.number}")
+
+	def test_it_notes_decisions_uses_official_annual_decision(self):
+		it_user = self._create_user("portal_it_notes_decisions", position="it_support")
+		student_user = self._create_user("portal_student_notes_decisions", role="student")
+		student = self._create_student_record(student_user, inscription_status=Inscription.STATUS_ACTIVE)
+		academic_year, academic_class, ec_one = self._create_academic_class_bundle("L2D")
+		semester_one = academic_class.semesters.get(number=1)
+		semester_two = Semester.objects.create(
+			academic_class=academic_class,
+			number=2,
+			total_required_credits=Decimal("6.00"),
+		)
+		ue_two = UE.objects.create(semester=semester_two, code="RES-L2D", title="Compensation")
+		ec_two = EC.objects.create(ue=ue_two, title="Matiere C", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+		ec_three = EC.objects.create(ue=ue_two, title="Matiere D", credit_required=Decimal("3.00"), coefficient=Decimal("3.00"))
+		AcademicEnrollment.objects.create(
+			inscription=student.inscription,
+			student=student_user,
+			programme=self.programme,
+			branch=self.branch,
+			academic_year=academic_year,
+			academic_class=academic_class,
+		)
+		enrollment = AcademicEnrollment.objects.get(student=student_user, academic_class=academic_class)
+		# Seuil LICENCE = 12, marge d'admissibilite = 2.
+		# S1 valide (moyenne 14 >= 12), S2 dans la marge d'admissibilite (moyenne 11 >= 12 - 2) -> ADMISSIBLE + dette.
+		ECGrade.objects.create(enrollment=enrollment, ec=ec_one, normal_score=Decimal("14.00"))
+		ECGrade.objects.create(enrollment=enrollment, ec=ec_two, normal_score=Decimal("11.00"))
+		ECGrade.objects.create(enrollment=enrollment, ec=ec_three, normal_score=Decimal("11.00"))
+		self.client.force_login(it_user)
+
+		response = self.client.get(
+			reverse("accounts_portal:it_notes_decisions"),
+			{"class_id": academic_class.id},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, student.full_name)
+		self.assertContains(response, "ADMISSIBLE")
+		self.assertEqual(
+			AcademicDebt.objects.filter(enrollment=enrollment, status="pending").count(),
+			2,
+		)
 
 	def test_it_notes_workflow_publishes_normal_session_then_unlocks_retake_modal(self):
 		it_user = self._create_user("portal_it_notes_publish_normal", position="it_support")

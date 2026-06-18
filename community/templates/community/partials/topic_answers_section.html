@@ -1,0 +1,142 @@
+<section id="answers-section" class="rounded-[28px] border border-primary-100 bg-white p-6 shadow-sm">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Réponses</p>
+      <h2 class="mt-1 text-xl font-bold text-slate-950">Échanges liés à ce sujet</h2>
+    </div>
+    <span class="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+      {{ answers|length }} réponse{{ answers|length|pluralize }}
+    </span>
+  </div>
+
+  <div class="mt-5 space-y-4">
+    {% for answer in answers %}
+      <article id="answer-{{ answer.id }}" x-data="{ replyOpen: false }" class="overflow-hidden rounded-3xl border border-primary-100 {% if topic.accepted_answer == answer %}bg-emerald-50/60{% else %}bg-slate-50{% endif %} p-5">
+        <div class="flex flex-col gap-4 sm:flex-row sm:gap-5">
+
+          <!-- ================= VOTES ================= -->
+          <div class="flex shrink-0 flex-row items-center gap-3 sm:flex-col sm:gap-2">
+            {% if user.is_authenticated %}
+              <button
+                hx-post="{% url 'community:vote_answer' answer.id %}"
+                hx-vals='{"value": "1"}'
+                hx-target="#answer-{{ answer.id }} .vote-count"
+                hx-swap="outerHTML"
+                hx-indicator="#vote-indicator-{{ answer.id }}"
+                class="flex h-9 w-9 items-center justify-center rounded-xl border border-primary-100 bg-white text-slate-400 shadow-sm transition hover:border-emerald-200 hover:text-emerald-600">
+                <i class="fa-solid fa-chevron-up text-sm"></i>
+              </button>
+            {% else %}
+              <a href="{% url 'login' %}?next={{ request.path }}"
+                 class="flex h-9 w-9 items-center justify-center rounded-xl border border-primary-100 bg-white text-slate-400 shadow-sm transition hover:border-emerald-200 hover:text-emerald-600">
+                <i class="fa-solid fa-chevron-up text-sm"></i>
+              </a>
+            {% endif %}
+
+            <div class="vote-count text-lg font-black {% if answer.score > 0 %}text-emerald-600{% elif answer.score < 0 %}text-red-500{% else %}text-slate-400{% endif %}">
+              {{ answer.score }}
+            </div>
+            <span id="vote-indicator-{{ answer.id }}" class="htmx-indicator text-[10px] font-bold uppercase text-primary-400">...</span>
+
+            {% if user.is_authenticated %}
+              <button
+                hx-post="{% url 'community:vote_answer' answer.id %}"
+                hx-vals='{"value": "-1"}'
+                hx-target="#answer-{{ answer.id }} .vote-count"
+                hx-swap="outerHTML"
+                hx-indicator="#vote-indicator-{{ answer.id }}"
+                class="flex h-9 w-9 items-center justify-center rounded-xl border border-primary-100 bg-white text-slate-400 shadow-sm transition hover:border-red-200 hover:text-red-500">
+                <i class="fa-solid fa-chevron-down text-sm"></i>
+              </button>
+            {% endif %}
+          </div>
+
+          <!-- ================= CONTENU ================= -->
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-600 text-xs font-bold text-white">
+                  {% if answer.author.profile.avatar %}
+                    <img src="{{ answer.author.profile.avatar.url }}" alt="{{ answer.author.get_full_name|default:answer.author.username }}" class="h-full w-full object-cover" />
+                  {% else %}
+                    {{ answer.author.get_full_name|default:answer.author.username|slice:":1"|upper }}
+                  {% endif %}
+                </div>
+                <div>
+                  <a href="{% url 'community:public_profile' answer.author.username %}" class="text-sm font-bold text-slate-950 transition hover:text-primary-600">{{ answer.author.get_full_name|default:answer.author.username }}</a>
+                  <p class="text-xs text-slate-400">{{ answer.created_at|date:"d M Y à H:i" }}</p>
+                </div>
+                {% include "community/partials/gamification/level_badge.html" with user=answer.author %}
+              </div>
+
+              <div id="accept-btn-{{ answer.id }}">
+                {% include "community/partials/accept_button.html" with answer=answer topic=topic %}
+              </div>
+            </div>
+
+            <div class="prose prose-slate prose-sm mt-4 max-w-none">
+              {{ answer.content|safe }}
+            </div>
+
+            {% if user.is_authenticated and not topic.is_locked %}
+              <div class="mt-4 flex items-center gap-3 border-t border-primary-100/70 pt-4">
+                <button @click="replyOpen = !replyOpen" class="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.1em] text-primary-600 transition hover:text-secondary">
+                  <i class="fa-solid fa-reply text-[10px]"></i> Répondre
+                </button>
+              </div>
+
+              <div id="reply-form-{{ answer.id }}" x-show="replyOpen" x-transition class="mt-4 border-t border-dashed border-primary-100 pt-4" style="display: none;">
+                <form
+                  hx-post="{% url 'community:add_answer' topic.slug %}"
+                  hx-target="#answer-{{ answer.id }} .replies"
+                  hx-swap="beforeend"
+                  hx-indicator="#reply-indicator-{{ answer.id }}"
+                  hx-on="htmx:afterRequest: this.reset()"
+                  @submit="replyOpen = false"
+                  class="space-y-3"
+                >
+                  {% csrf_token %}
+                  <input type="hidden" name="parent_id" value="{{ answer.id }}">
+                  <textarea
+                    name="content"
+                    rows="3"
+                    required
+                    minlength="10"
+                    placeholder="Votre réponse..."
+                    class="w-full rounded-2xl border border-primary-200 px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                  ></textarea>
+                  <div class="flex items-center gap-3">
+                    <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-secondary px-4 py-2 text-xs font-bold text-white transition hover:-translate-y-0.5">
+                      Envoyer
+                    </button>
+                    <button type="button" @click="replyOpen = false" class="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-200">
+                      Annuler
+                    </button>
+                    <span id="reply-indicator-{{ answer.id }}" class="htmx-indicator text-xs font-semibold text-primary-500">Envoi...</span>
+                  </div>
+                </form>
+              </div>
+            {% endif %}
+
+            {% if answer.replies.exists %}
+              <div class="replies mt-4 space-y-3 border-t border-dashed border-primary-100 pt-4">
+                <p class="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">
+                  {{ answer.replies.count }} sous-réponse{{ answer.replies.count|pluralize }}
+                </p>
+                {% for reply in answer.replies.all %}
+                  {% include "community/partials/reply_item.html" with answer=reply %}
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="replies mt-4"></div>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+    {% empty %}
+      <div class="rounded-3xl border border-dashed border-primary-200 p-8 text-center text-sm text-slate-500">
+        Aucun échange pour le moment.
+      </div>
+    {% endfor %}
+  </div>
+</section>

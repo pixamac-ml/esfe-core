@@ -1,3 +1,4 @@
+<p id="topics-count" hx-swap-oob="true" class="text-sm text-slate-500">{{ topics|length }} sujets affichés</p>
 <div class="overflow-hidden rounded-[28px] border border-primary-100 bg-white shadow-sm">
   <div class="divide-y divide-primary-100">
     {% for topic in topics %}
@@ -28,7 +29,10 @@
                   <i class="fa-solid fa-lock text-[10px]"></i> Verrouillé
                 </span>
               {% endif %}
-              <a href="{% url 'community:topic_by_category' topic.category.slug %}" class="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-primary-700">
+              <a href="{% url 'community:topic_by_category' topic.category.slug %}"
+                 class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
+                 style="background-color: {{ topic.category.color|default:'#1e4f6f' }}1a; color: {{ topic.category.color|default:'#1e4f6f' }};">
+                {% if topic.category.icon %}<i class="fa-solid fa-{{ topic.category.icon }} text-[10px]"></i>{% endif %}
                 {{ topic.category.name }}
               </a>
             </div>
@@ -106,6 +110,7 @@
           hx-target="#topic-list-container"
           hx-swap="innerHTML"
           hx-push-url="true"
+          hx-indicator="#list-loader"
           class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition"
         >
           Prec
@@ -118,6 +123,7 @@
           hx-target="#topic-list-container"
           hx-swap="innerHTML"
           hx-push-url="true"
+          hx-indicator="#list-loader"
           class="px-3 py-2 rounded-lg border border-primary-200 text-primary-700 hover:bg-primary-50 transition"
         >
           Suiv

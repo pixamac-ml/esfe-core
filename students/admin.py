@@ -1,7 +1,12 @@
 # students/admin.py
 
 from django.contrib import admin
-from .models import AttendanceAlert, AttendanceRollSheet, Student, StudentAttendance, TeacherAttendance, StudentCase, StudentCaseNote
+from django.utils import timezone
+from .models import (
+    AttendanceAlert, AttendanceRollSheet,
+    CarteEtudiant, Student, StudentAttendance,
+    StudentCase, StudentCaseNote, TeacherAttendance, VerificationLog,
+)
 
 
 @admin.register(Student)
@@ -119,6 +124,34 @@ class AttendanceAlertAdmin(admin.ModelAdmin):
         "student__inscription__candidature__last_name",
     )
     autocomplete_fields = ("student", "branch")
+
+
+@admin.register(CarteEtudiant)
+class CarteEtudiantAdmin(admin.ModelAdmin):
+    list_display = ("etudiant", "annee", "code_annexe", "statut", "date_expiration", "carte_valide")
+    list_filter = ("statut", "annee", "code_annexe")
+    search_fields = ("etudiant__matricule", "etudiant__inscription__candidature__last_name")
+    readonly_fields = ("date_emission", "created_at")
+    actions = ["revoquer_cartes", "marquer_perdues"]
+
+    @admin.display(boolean=True, description="Valide")
+    def carte_valide(self, obj):
+        return obj.is_valide
+
+    @admin.action(description="Révoquer les cartes sélectionnées")
+    def revoquer_cartes(self, request, queryset):
+        queryset.update(statut="revoquee")
+
+    @admin.action(description="Marquer comme perdue")
+    def marquer_perdues(self, request, queryset):
+        queryset.update(statut="perdue")
+
+
+@admin.register(VerificationLog)
+class VerificationLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "carte", "ip", "code_tente", "resultat")
+    list_filter = ("resultat", "created_at")
+    readonly_fields = ("created_at",)
 
 
 class StudentCaseNoteInline(admin.TabularInline):

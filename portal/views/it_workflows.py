@@ -244,13 +244,17 @@ def it_notes_decisions(request):
 
     from portal.selectors import get_it_academic_classes
     from academics.models import AcademicEnrollment, AcademicDebt
-    from academics.services.semester import compute_semester_result
+    from academics.services.year import (
+        DECISION_ADMISSIBLE,
+        DECISION_NON_ADMIS,
+        DECISION_VALIDE,
+        compute_annual_decision,
+    )
 
     branch = get_user_branch(request.user)
     classes_qs = get_it_academic_classes(branch=branch)
 
     class_id = (request.GET.get("class_id") or "").strip()
-    semester_id = (request.GET.get("semester_id") or "").strip()
 
     academic_class = get_object_or_404(classes_qs, pk=int(class_id)) if class_id.isdigit() else None
 
@@ -263,32 +267,25 @@ def it_notes_decisions(request):
         is_active=True,
     ).select_related("student__student_profile__inscription__candidature")
 
-    semesters = list(academic_class.semesters.all().order_by("number"))
-    s1 = semesters[0] if len(semesters) > 0 else None
-    s2 = semesters[1] if len(semesters) > 1 else None
+    decision_labels = {
+        DECISION_VALIDE: "VALIDÉ",
+        DECISION_ADMISSIBLE: "ADMISSIBLE",
+        DECISION_NON_ADMIS: "NON ADMIS",
+    }
 
     decisions = []
     for enrollment in enrollments:
-        s1_result = compute_semester_result(s1, enrollment) if s1 else None
-        s2_result = compute_semester_result(s2, enrollment) if s2 else None
+        result = compute_annual_decision(enrollment)
+        semester_validated = {
+            sr["semester"]: sr.get("is_validated")
+            for sr in result.get("semester_results", [])
+        }
 
-        s1_decision = "NON ADMIS"
-        s2_decision = "NON ADMIS"
-
-        if s1_result and s1_result.get("credit_obtained", 0) >= s1_result.get("credit_required", 1):
-            s1_decision = "VALIDÉ"
-
-        if s2_result and s2_result.get("credit_obtained", 0) >= s2_result.get("credit_required", 1):
-            s2_decision = "VALIDÉ"
-
-        s1_ok = s1_decision in ("VALIDÉ", "ADMISSIBLE")
-        s2_ok = s2_decision in ("VALIDÉ", "ADMISSIBLE")
-        if s1_decision == "VALIDÉ" and s2_decision == "VALIDÉ":
-            year_decision = "VALIDÉ"
-        elif s1_ok and s2_ok:
-            year_decision = "ADMISSIBLE"
-        else:
-            year_decision = "NON ADMIS"
+        def _semester_label(key):
+            validated = semester_validated.get(key)
+            if validated is None:
+                return "—"
+            return "VALIDÉ" if validated else "NON ADMIS"
 
         active_debts = AcademicDebt.objects.filter(
             enrollment=enrollment,
@@ -299,9 +296,9 @@ def it_notes_decisions(request):
 
         decisions.append({
             "student_name": enrollment.student.student_profile.full_name,
-            "s1": s1_decision,
-            "s2": s2_decision,
-            "year": year_decision,
+            "s1": _semester_label("S1"),
+            "s2": _semester_label("S2"),
+            "year": decision_labels.get(result["decision"], result["decision"]),
             "debts": debt_names,
         })
 
@@ -465,7 +462,7 @@ def it_support_flow_workspace(request):
     return render(
         request,
         "portal/informaticien/workflows/support_workspace.html",
-        build_support_context(branch=branch, status=status),
+        build_support_context(branch=branch, status=status, page=request.GET.get("page")),
     )
 
 
@@ -521,7 +518,7 @@ def it_audit_workspace(request):
     return render(
         request,
         "portal/informaticien/workflows/audit_workspace.html",
-        build_audit_context(branch=get_user_branch(request.user)),
+        build_audit_context(branch=get_user_branch(request.user), page=request.GET.get("page")),
     )
 
 
@@ -1087,7 +1084,7 @@ def it_supervision_workspace(request):
     return render(
         request,
         "portal/informaticien/workflows/supervision_workspace.html",
-        build_supervision_context(branch=get_user_branch(request.user)),
+        build_supervision_context(branch=get_user_branch(request.user), page=request.GET.get("page")),
     )
 
 
@@ -1398,11 +1395,8 @@ def it_student_card_pdf(request, student_id):
         student_qs = student_qs.filter(inscription__candidature__branch=branch)
     student = get_object_or_404(student_qs, pk=student_id)
 
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=landscape((86 * mm, 54 * mm)))
-    _draw_student_card(pdf, student=student)
-    pdf.save()
-    buffer.seek(0)
+    pdf_bytes = _render_student_card_pdf(request, student, branch)
+    buffer = BytesIO(pdf_bytes)
     log_support_action(
         actor=request.user,
         branch=branch,
@@ -1415,6 +1409,7 @@ def it_student_card_pdf(request, student_id):
         buffer,
         as_attachment=request.GET.get("preview") != "1",
         filename=f"carte-{student.matricule or student.id}.pdf",
+        content_type="application/pdf",
     )
 
 
@@ -1429,12 +1424,8 @@ def it_class_cards_pdf(request):
         return HttpResponseForbidden("Classe hors annexe refusee.")
 
     students = get_it_students_for_class(academic_class=academic_class)
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=landscape((86 * mm, 54 * mm)))
-    for student in students:
-        _draw_student_card(pdf, student=student, academic_class=academic_class)
-    pdf.save()
-    buffer.seek(0)
+    pdf_bytes = _render_class_cards_pdf(request, list(students), academic_class, branch)
+    buffer = BytesIO(pdf_bytes)
     log_support_action(
         actor=request.user,
         branch=branch,
@@ -1446,93 +1437,106 @@ def it_class_cards_pdf(request):
         buffer,
         as_attachment=request.GET.get("preview") != "1",
         filename=f"cartes-classe-{academic_class.id}.pdf",
+        content_type="application/pdf",
     )
 
 
-def _draw_student_card(pdf, *, student, academic_class=None):
-    page_size = landscape((86 * mm, 54 * mm))
-    width, height = page_size
-    candidature = student.inscription.candidature
+def _get_or_create_carte(student, branch):
+    from datetime import date
+    from students.models import CarteEtudiant
+
     enrollment = (
-        student.user.academic_enrollments.select_related("academic_class", "academic_year")
+        student.user.academic_enrollments.select_related("academic_class__academic_year")
         .filter(is_active=True)
         .order_by("-created_at")
         .first()
     )
-    academic_class = academic_class or (enrollment.academic_class if enrollment else None)
-    academic_year = academic_class.academic_year if academic_class else getattr(enrollment, "academic_year", None)
-    qr_value = f"ESFE:{student.matricule}:{student.id}"
+    academic_year = None
+    if enrollment and enrollment.academic_class:
+        academic_year = getattr(enrollment.academic_class, "academic_year", None)
+    if academic_year is None and enrollment:
+        academic_year = getattr(enrollment, "academic_year", None)
 
-    pdf.setPageSize(page_size)
-    pdf.setFillColor(colors.HexColor("#f8fafc"))
-    pdf.rect(0, 0, width, height, stroke=0, fill=1)
-    pdf.setFillColor(colors.HexColor("#082f49"))
-    pdf.rect(0, height - 15 * mm, width, 15 * mm, stroke=0, fill=1)
-    pdf.setFillColor(colors.white)
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(5 * mm, height - 8 * mm, "ESFE")
-    pdf.setFont("Helvetica", 7)
-    pdf.drawString(20 * mm, height - 7 * mm, "Ecole Superieure de Formation et d'Excellence")
-    pdf.drawString(20 * mm, height - 11 * mm, f"Annexe: {candidature.branch.name[:36]}")
+    today = date.today()
+    annee = str(academic_year)[:9] if academic_year else f"{today.year}-{today.year + 1}"
+    code_annexe = (getattr(branch, "code", None) or (branch.name[:20] if branch else "ESFE"))
+    date_expiration = date(today.year + 1, 9, 30)
 
-    pdf.setStrokeColor(colors.HexColor("#cbd5e1"))
-    pdf.setFillColor(colors.white)
-    pdf.roundRect(5 * mm, height - 39 * mm, 20 * mm, 22 * mm, 3 * mm, stroke=1, fill=1)
-    pdf.setFillColor(colors.HexColor("#64748b"))
-    pdf.setFont("Helvetica-Bold", 7)
-    pdf.drawCentredString(15 * mm, height - 29 * mm, "PHOTO")
+    carte, _ = CarteEtudiant.objects.get_or_create(
+        etudiant=student,
+        annee=annee,
+        defaults={
+            "code_annexe": code_annexe,
+            "date_expiration": date_expiration,
+            "statut": "active",
+        },
+    )
+    return carte
 
-    pdf.setFillColor(colors.HexColor("#0f172a"))
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(28 * mm, height - 21 * mm, student.full_name[:36])
-    pdf.setFont("Helvetica", 7.5)
-    pdf.drawString(28 * mm, height - 27 * mm, f"Matricule: {student.matricule or '-'}")
-    pdf.drawString(28 * mm, height - 32 * mm, f"Classe: {(academic_class.display_name if academic_class else '-')[:34]}")
-    pdf.drawString(28 * mm, height - 37 * mm, f"Formation: {candidature.programme.title[:32]}")
-    pdf.drawString(28 * mm, height - 42 * mm, f"Annee: {academic_year or '-'}")
 
-    try:
-        import qrcode
-        qr_image = qrcode.make(qr_value)
-        qr_buffer = BytesIO()
-        qr_image.save(qr_buffer, format="PNG")
-        qr_buffer.seek(0)
-        pdf.drawImage(ImageReader(qr_buffer), width - 20 * mm, 20 * mm, 14 * mm, 14 * mm)
-    except Exception:
-        pdf.setFont("Helvetica", 6)
-        pdf.drawRightString(width - 5 * mm, 25 * mm, qr_value[:22])
+def _render_student_card_pdf(request, student, branch=None):
+    from weasyprint import HTML
+    from django.template.loader import render_to_string
+    from students.services.card_security import signer_carte, generer_code_lisible, generer_qr_png, generer_qr_svg
+    from students.views_carte import _logo_data_uri, _get_classe
 
-    pdf.setFillColor(colors.HexColor("#e2e8f0"))
-    pdf.rect(0, 0, width, 7 * mm, stroke=0, fill=1)
-    pdf.setFillColor(colors.HexColor("#334155"))
-    pdf.setFont("Helvetica", 6.5)
-    pdf.drawString(5 * mm, 2.5 * mm, "Carte personnelle - emission automatique dashboard informaticien")
-    pdf.showPage()
+    if branch is None:
+        branch = get_user_branch(request.user)
 
-    pdf.setPageSize(page_size)
-    pdf.setFillColor(colors.white)
-    pdf.rect(0, 0, width, height, stroke=0, fill=1)
-    pdf.setFillColor(colors.HexColor("#082f49"))
-    pdf.rect(0, height - 10 * mm, width, 10 * mm, stroke=0, fill=1)
-    pdf.setFillColor(colors.white)
-    pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawString(5 * mm, height - 6.5 * mm, "Informations utiles")
-    pdf.setFillColor(colors.HexColor("#0f172a"))
-    pdf.setFont("Helvetica", 7)
-    lines = [
-        "Cette carte doit etre presentee a toute demande de l'administration.",
-        "En cas de perte, contacter immediatement le service scolarite.",
-        f"Contact annexe: {candidature.branch.phone or candidature.branch.email or '-'}",
-        f"Code unique: {qr_value}",
-    ]
-    y = height - 18 * mm
-    for line in lines:
-        pdf.drawString(6 * mm, y, line[:78])
-        y -= 5 * mm
-    pdf.line(width - 35 * mm, 13 * mm, width - 6 * mm, 13 * mm)
-    pdf.setFont("Helvetica-Bold", 7)
-    pdf.drawCentredString(width - 20 * mm, 8 * mm, "Signature / cachet")
-    pdf.showPage()
+    carte = _get_or_create_carte(student, branch)
+    token = signer_carte(carte.etudiant.matricule, carte.annee, carte.code_annexe)
+    verify_url = request.build_absolute_uri(f"/carte/v/{token}/")
+
+    ctx = {
+        "carte": carte,
+        "etudiant": student,
+        "classe": _get_classe(carte),
+        "qr_png": generer_qr_png(verify_url),
+        "qr_svg": generer_qr_svg(verify_url),
+        "code_verification": generer_code_lisible(token),
+        "logo_data_uri": _logo_data_uri(),
+    }
+    html_str = render_to_string("students/carte_etudiant.html", ctx, request=request)
+    return HTML(string=html_str, base_url=request.build_absolute_uri("/")).write_pdf()
+
+
+def _render_class_cards_pdf(request, students_list, academic_class, branch=None):
+    from weasyprint import HTML
+    from django.template.loader import render_to_string
+    from students.services.card_security import signer_carte, generer_code_lisible, generer_qr_png, generer_qr_svg
+    from students.views_carte import _logo_data_uri
+
+    if branch is None:
+        branch = get_user_branch(request.user)
+
+    logo = _logo_data_uri()
+    base_url = request.build_absolute_uri("/")
+    docs = []
+
+    for student in students_list:
+        carte = _get_or_create_carte(student, branch)
+        token = signer_carte(carte.etudiant.matricule, carte.annee, carte.code_annexe)
+        verify_url = request.build_absolute_uri(f"/carte/v/{token}/")
+        ctx = {
+            "carte": carte,
+            "etudiant": student,
+            "classe": str(academic_class) if academic_class else "",
+            "qr_png": generer_qr_png(verify_url),
+            "qr_svg": generer_qr_svg(verify_url),
+            "code_verification": generer_code_lisible(token),
+            "logo_data_uri": logo,
+        }
+        html_str = render_to_string("students/carte_etudiant.html", ctx, request=request)
+        docs.append(HTML(string=html_str, base_url=base_url).render())
+
+    if not docs:
+        return b""
+
+    all_pages = []
+    for doc in docs:
+        all_pages.extend(doc.pages)
+    docs[0].pages = all_pages
+    return docs[0].write_pdf()
 
 
 @login_required

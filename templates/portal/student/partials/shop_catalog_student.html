@@ -1,6 +1,9 @@
 {% load humanize %}
 <div class="space-y-3">
   <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]">Catalogue des articles disponibles</p>
+  {% if error %}
+  <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{{ error }}</div>
+  {% endif %}
   {% if products %}
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
       {% for product in products %}
@@ -30,15 +33,18 @@
             </div>
             <div class="mt-3 flex items-center justify-between gap-2">
               <span class="rounded-full px-2 py-0.5 text-[10px] font-bold
-                {% if product.is_low_stock %}bg-rose-100 text-rose-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
-                Stock {{ product.current_stock }}
+                {% if product.current_stock <= 0 %}bg-rose-100 text-rose-700
+                {% elif product.is_low_stock %}bg-amber-100 text-amber-700
+                {% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                {% if product.current_stock <= 0 %}Rupture de stock{% else %}Stock {{ product.current_stock }}{% endif %}
               </span>
               <div class="flex items-center gap-2">
                 {% if product.is_required %}
                 <span class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">Obligatoire</span>
                 {% endif %}
                 <button type="submit"
-                  class="rounded-lg bg-primary-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-primary-700">
+                  {% if product.current_stock <= 0 %}disabled{% endif %}
+                  class="rounded-lg bg-primary-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-slate-300">
                   Acheter
                 </button>
               </div>

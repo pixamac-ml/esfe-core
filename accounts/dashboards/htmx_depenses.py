@@ -22,6 +22,7 @@ from accounts.services.manager_intelligence import get_branch_cash_balance
 from accounts.dashboards.htmx_utils import (
     manager_closure_redirect_response,
     manager_required,
+    manager_section_notice_redirect_response,
     manager_section_redirect_response,
 )
 
@@ -125,6 +126,24 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
 
     period_month = closure_form.cleaned_data["period_month"]
     transfer_amount = closure_form.cleaned_data["bank_transfer_amount"] or 0
+
+    existing_closure = BranchMonthlyClosure.objects.filter(
+        branch=request.branch, period_month=period_month,
+    ).first()
+    if existing_closure and existing_closure.status != BranchMonthlyClosure.STATUS_DRAFT:
+        response = render(
+            request,
+            "accounts/dashboard/partials/monthly_closure_form.html",
+            {
+                "closure_form": closure_form,
+                "transfer_form": BranchBankTransferForm(request.POST, request.FILES),
+                "available_cash_balance": get_branch_cash_balance(request.branch),
+                "closure_error": "Cette periode est deja validee ou cloturee. Elle ne peut plus etre modifiee.",
+            },
+        )
+        response.status_code = 400
+        return response
+
     period_end = date(period_month.year, period_month.month, monthrange(period_month.year, period_month.month)[1])
     report_movements = BranchCashMovement.objects.filter(
         branch=request.branch,
@@ -194,11 +213,9 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
                 "expenses_paid": expenses_paid,
                 "result_amount": result_amount,
                 "bank_transfer_amount": transfer_amount,
-                "status": BranchMonthlyClosure.STATUS_CLOSED,
+                "status": BranchMonthlyClosure.STATUS_DRAFT,
                 "notes": closure_form.cleaned_data.get("notes", ""),
-                "validated_by": request.user,
-                "validated_at": timezone.now(),
-                "closed_at": timezone.now(),
+                "created_by": request.user,
             },
         )
         if transfer_amount > 0:
@@ -219,6 +236,35 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
                 transfer.save(update_fields=["proof", "updated_at"])
 
     return manager_closure_redirect_response(period_month)
+
+
+@manager_required
+@require_POST
+def monthly_closure_validate(request: HttpRequest, pk: int) -> HttpResponse:
+    closure = get_object_or_404(BranchMonthlyClosure, pk=pk, branch=request.branch)
+    if closure.status != BranchMonthlyClosure.STATUS_DRAFT:
+        return manager_section_notice_redirect_response("cloture", "cloture_non_brouillon")
+
+    closure.status = BranchMonthlyClosure.STATUS_VALIDATED
+    closure.validated_by = request.user
+    closure.validated_at = timezone.now()
+    closure.save(update_fields=["status", "validated_by", "validated_at", "updated_at"])
+
+    return manager_closure_redirect_response(closure.period_month)
+
+
+@manager_required
+@require_POST
+def monthly_closure_close(request: HttpRequest, pk: int) -> HttpResponse:
+    closure = get_object_or_404(BranchMonthlyClosure, pk=pk, branch=request.branch)
+    if closure.status != BranchMonthlyClosure.STATUS_VALIDATED:
+        return manager_section_notice_redirect_response("cloture", "cloture_non_validee")
+
+    closure.status = BranchMonthlyClosure.STATUS_CLOSED
+    closure.closed_at = timezone.now()
+    closure.save(update_fields=["status", "closed_at", "updated_at"])
+
+    return manager_closure_redirect_response(closure.period_month)
 
 
 @manager_required

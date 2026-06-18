@@ -203,7 +203,6 @@ class PayrollEntryForm(forms.ModelForm):
     class Meta:
         model = PayrollEntry
         fields = [
-            "period_month",
             "base_salary",
             "allowances",
             "deductions",
@@ -211,13 +210,12 @@ class PayrollEntryForm(forms.ModelForm):
             "notes",
         ]
         widgets = {
-            "period_month": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ["period_month", "base_salary", "allowances", "deductions", "advances"]:
+        for field_name in ["base_salary", "allowances", "deductions", "advances"]:
             self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["notes"].widget.attrs.update({
             "class": "dg-input",
@@ -229,7 +227,6 @@ class TeacherHonorariumEntryForm(forms.ModelForm):
     class Meta:
         model = TeacherHonorariumEntry
         fields = [
-            "period_month",
             "hourly_rate",
             "validated_hours",
             "adjustments",
@@ -238,13 +235,12 @@ class TeacherHonorariumEntryForm(forms.ModelForm):
             "notes",
         ]
         widgets = {
-            "period_month": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ["period_month", "hourly_rate", "validated_hours", "adjustments", "deductions", "advances"]:
+        for field_name in ["hourly_rate", "validated_hours", "adjustments", "deductions", "advances"]:
             self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["notes"].widget.attrs.update({
             "class": "dg-input",

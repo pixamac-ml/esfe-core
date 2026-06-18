@@ -251,6 +251,9 @@ class SecretaryTaskForm(SecretaryBaseForm):
             "related_student",
             "due_date",
         ]
+        widgets = {
+            "due_date": forms.DateInput(attrs={"type": "date"}),
+        }
         labels = {
             "title": "Titre de la tache",
             "description": "Description",

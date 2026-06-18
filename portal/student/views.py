@@ -5,7 +5,7 @@ from urllib.parse import quote as urlquote
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import update_session_auth_hash
 from django.db import connection
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
@@ -26,6 +26,8 @@ from .services import (
     is_semester_unlocked_for_enrollment,
 )
 from .profile_service import (
+    accept_internal_rules,
+    get_internal_rules_status,
     get_profile_data,
     handle_document_upload,
     update_account_center,
@@ -228,7 +230,25 @@ def _build_course_player_bundle(chapters):
 def dashboard(request):
     context = get_student_overview_data(request.user)
     context["shop_required"] = get_required_shop_context(request.user)
+    context["internal_rules"] = get_internal_rules_status(request.user)
     return render(request, "portal/student/dashboard.html", context)
+
+
+@login_required
+@role_required("student")
+def internal_rules_modal(request):
+    context = get_internal_rules_status(request.user)
+    if getattr(request, "htmx", None):
+        context["show_popup"] = True
+    return render(request, "portal/student/partials/internal_rules_modal.html", context)
+
+
+@login_required
+@role_required("student")
+@require_POST
+def accept_internal_rules_view(request):
+    accept_internal_rules(request.user)
+    return HttpResponse("")
 
 
 @login_required

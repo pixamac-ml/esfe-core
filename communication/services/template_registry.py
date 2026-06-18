@@ -11,6 +11,15 @@ EMAIL_TEMPLATE_REGISTRY = {
     "candidature_rejected": {
         "html_template": "emails/admissions/candidate_rejected.html",
     },
+    "candidature_under_review": {
+        "html_template": "emails/admissions/candidate_under_review.html",
+    },
+    "candidature_accepted_with_reserve": {
+        "html_template": "emails/admissions/candidate_accepted_with_reserve.html",
+    },
+    "candidature_to_complete": {
+        "html_template": "emails/admissions/candidate_to_complete.html",
+    },
     "document_missing": {
         "html_template": "emails/admissions/missing_documents.html",
     },

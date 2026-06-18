@@ -64,6 +64,7 @@ def build_branch_xlsx_report(
     honorarium_stats,
     expense_stats,
     cash_stats,
+    admissions_stats,
 ):
     wb = Workbook()
     ws = wb.active
@@ -125,6 +126,28 @@ def build_branch_xlsx_report(
         row += 1
     row += 1
 
+    # Admissions & inscriptions
+    ws.merge_cells(f"A{row}:F{row}")
+    ws.cell(row=row, column=1, value="Admissions et inscriptions de la periode").font = SUB_FONT
+    row += 1
+    admissions_headers = ["Indicateur", "Valeur"]
+    for col_i, h in enumerate(admissions_headers, 1):
+        _write_cell(ws, row, col_i, h, font=HEADER_FONT)
+    _style_header_row(ws, row, len(admissions_headers))
+    row += 1
+    admissions_rows = [
+        ("Candidatures recues", admissions_stats.get("candidatures_total", 0)),
+        ("Candidatures acceptees", admissions_stats.get("candidatures_accepted", 0)),
+        ("Candidatures refusees", admissions_stats.get("candidatures_rejected", 0)),
+        ("Nouvelles inscriptions", admissions_stats.get("inscriptions_total", 0)),
+        ("Inscriptions actives", admissions_stats.get("inscriptions_active", 0)),
+    ]
+    for label, val in admissions_rows:
+        _write_cell(ws, row, 1, label, font=BOLD_FONT)
+        _write_cell(ws, row, 2, val, font=BODY_FONT, fmt="#,##0")
+        row += 1
+    row += 1
+
     # Recent movements
     ws.merge_cells(f"A{row}:F{row}")
     ws.cell(row=row, column=1, value="Derniers mouvements de caisse").font = SUB_FONT
@@ -177,40 +200,44 @@ def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, b
     from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, TeacherHonorariumEntry
     from accounts.dashboards.manager_dashboard import _resolve_report_period
     from accounts.services.manager_intelligence import get_branch_cash_balance
+    from admissions.models import Candidature
+    from inscriptions.models import Inscription
 
     today = date.today()
     start_of_month = today.replace(day=1)
 
-    report_movements = BranchCashMovement.objects.filter(
+    report_movements_qs = BranchCashMovement.objects.filter(
         branch=branch,
         movement_date__gte=report_period["start"],
         movement_date__lte=report_period["end"],
-    ).order_by("-movement_date")[:200]
+    ).order_by("-movement_date")
 
-    report_total_entries = report_movements.filter(
+    report_total_entries = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_IN
     ).aggregate(total=Sum("amount"))["total"] or 0
-    report_total_exits = report_movements.filter(
+    report_total_exits = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_OUT
     ).aggregate(total=Sum("amount"))["total"] or 0
-    report_student_payments = report_movements.filter(
+    report_student_payments = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_IN, source=BranchCashMovement.SOURCE_STUDENT_PAYMENT
     ).aggregate(total=Sum("amount"))["total"] or 0
-    report_shop_sales = report_movements.filter(
+    report_shop_sales = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_IN, source=BranchCashMovement.SOURCE_SHOP
     ).aggregate(total=Sum("amount"))["total"] or 0
-    report_donations = report_movements.filter(
+    report_donations = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_IN, source=BranchCashMovement.SOURCE_DONATION
     ).aggregate(total=Sum("amount"))["total"] or 0
-    report_expenses = report_movements.filter(
+    report_expenses = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_OUT, source=BranchCashMovement.SOURCE_EXPENSE
     ).aggregate(total=Sum("amount"))["total"] or 0
-    report_salaries = report_movements.filter(
+    report_salaries = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_OUT, source=BranchCashMovement.SOURCE_PAYROLL
     ).aggregate(total=Sum("amount"))["total"] or 0
-    report_honorarium = report_movements.filter(
+    report_honorarium = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_OUT, source=BranchCashMovement.SOURCE_HONORARIUM
     ).aggregate(total=Sum("amount"))["total"] or 0
+
+    report_movements = report_movements_qs[:200]
 
     report_rows = [
         {"label": "Total entrees", "amount": report_total_entries},
@@ -278,6 +305,28 @@ def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, b
         "available_balance": get_branch_cash_balance(branch),
     }
 
+    period_candidatures = Candidature.objects.filter(
+        branch=branch,
+        is_deleted=False,
+        submitted_at__date__gte=report_period["start"],
+        submitted_at__date__lte=report_period["end"],
+    )
+    period_inscriptions = Inscription.objects.filter(
+        candidature__branch=branch,
+        candidature__is_deleted=False,
+        created_at__date__gte=report_period["start"],
+        created_at__date__lte=report_period["end"],
+    )
+    admissions_stats = {
+        "candidatures_total": period_candidatures.count(),
+        "candidatures_accepted": period_candidatures.filter(
+            status__in=["accepted", "accepted_with_reserve"]
+        ).count(),
+        "candidatures_rejected": period_candidatures.filter(status="rejected").count(),
+        "inscriptions_total": period_inscriptions.count(),
+        "inscriptions_active": period_inscriptions.filter(status=Inscription.STATUS_ACTIVE).count(),
+    }
+
     wb = build_branch_xlsx_report(
         branch=branch,
         report_period=report_period,
@@ -289,6 +338,7 @@ def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, b
         honorarium_stats=honorarium_stats,
         expense_stats=expense_stats,
         cash_stats=cash_stats,
+        admissions_stats=admissions_stats,
     )
     return wb
 

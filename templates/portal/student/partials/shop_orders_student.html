@@ -1,5 +1,5 @@
 {% load humanize %}
-<div class="space-y-3" x-data="{ shopTab: 'orders' }">
+<div class="space-y-3" x-data="{ shopTab: '{{ active_tab|default:"orders" }}' }">
   <div class="flex items-center justify-between gap-2 border-b border-[color:var(--line)] pb-3">
     <nav class="flex gap-4">
       <button type="button"
@@ -106,6 +106,13 @@
     </div>
   </div>
   <div x-show="shopTab === 'catalog'">
+    {% if catalog_preloaded %}
+    <div id="shop-catalog-target"
+      data-catalog-url="{% url 'portal_student:shop_catalog_partial' %}"
+      data-loaded="1">
+      {% include "portal/student/partials/shop_catalog_student.html" with products=products error=catalog_error %}
+    </div>
+    {% else %}
     <div id="shop-catalog-target"
       data-catalog-url="{% url 'portal_student:shop_catalog_partial' %}"
       data-loaded="0">
@@ -113,5 +120,6 @@
         <i data-lucide="loader-circle" class="mr-2 h-4 w-4 animate-spin"></i> Chargement du catalogue...
       </div>
     </div>
+    {% endif %}
   </div>
 </div>

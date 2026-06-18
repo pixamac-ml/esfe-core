@@ -1,5 +1,6 @@
 {# Toast notification XP - à afficher via HTMX/JS #}
-<div x-data="{ show: true }"
+<div hx-swap-oob="afterbegin:#xp-toast-container"
+     x-data="{ show: true }"
      x-show="show"
      x-init="setTimeout(() => show = false, 3000)"
      x-transition:enter="transition ease-out duration-300"
@@ -8,10 +9,12 @@
      x-transition:leave="transition ease-in duration-200"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     class="fixed bottom-4 right-4 z-50">
+     class="relative z-50">
 
     <div class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl shadow-lg">
-        <span class="text-2xl animate-bounce">⚡</span>
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg animate-bounce">
+            <i class="fa-solid fa-bolt"></i>
+        </span>
         <div>
             <div class="font-bold">+{{ points }} XP</div>
             <div class="text-sm text-green-100">{{ message }}</div>

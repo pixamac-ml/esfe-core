@@ -1,0 +1,267 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carte étudiant — École de Santé Félix Houphouët-Boigny</title>
+<style>
+  /* Polices locales (fallback système si absentes) */
+  @font-face{font-family:'Archivo';font-weight:500 800;src:url('{% static "fonts/Archivo-Bold.ttf" %}') format('truetype');}
+  @font-face{font-family:'Inter';font-weight:400;src:url('{% static "fonts/Inter-Regular.ttf" %}') format('truetype');}
+  @font-face{font-family:'Inter';font-weight:500;src:url('{% static "fonts/Inter-Medium.ttf" %}') format('truetype');}
+  @font-face{font-family:'Inter';font-weight:600;src:url('{% static "fonts/Inter-SemiBold.ttf" %}') format('truetype');}
+  @font-face{font-family:'Inter';font-weight:700;src:url('{% static "fonts/Inter-Bold.ttf" %}') format('truetype');}
+  @font-face{font-family:'JetBrains Mono';font-weight:500 600;src:url('{% static "fonts/JetBrainsMono-SemiBold.ttf" %}') format('truetype');}
+
+  :root{
+    --marine-900:#0A2138;
+    --marine-700:#143A5E;
+    --marine-500:#1F5288;
+    --gold:#C8A24A;
+    --blood:#B23A48;
+    --ink:#16242F;
+    --slate:#5C6B78;
+    --slate-light:#8A99A6;
+    --paper:#FFFFFF;
+    --mist:#F3F6FA;
+    --line:#E4EAF1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:#1c2531;
+    display:flex;flex-direction:column;align-items:center;gap:26px;
+    padding:48px 20px;color:var(--ink);
+  }
+  .stage-label{
+    color:#9fb0c0;font-size:12px;letter-spacing:.18em;
+    text-transform:uppercase;font-weight:600;
+  }
+
+  /* CR80 : 85.6 x 54 mm. Affichage a l'echelle, ratio conserve. */
+  .card{
+    width:396px;height:250px;
+    background:var(--paper);border-radius:15px;overflow:hidden;
+    position:relative;box-shadow:0 18px 44px rgba(0,0,0,.38);
+    font-feature-settings:"tnum" 1;
+  }
+  .guilloche{position:absolute;inset:0;opacity:.05;z-index:0;pointer-events:none;}
+
+  /* ===== RECTO ===== */
+  .header{
+    position:relative;z-index:2;
+    background:linear-gradient(135deg,var(--marine-900),var(--marine-700));
+    color:#fff;padding:11px 15px 10px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .emblem{
+    width:48px;height:48px;flex:none;border-radius:50%;
+    background:#fff;padding:3px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 3px rgba(0,0,0,.25);
+  }
+  .emblem img{width:100%;height:100%;object-fit:contain;border-radius:50%;}
+  .header-txt{line-height:1.22;min-width:0;}
+  .header-txt .school{
+    font-family:'Archivo';font-weight:700;font-size:12px;
+    text-transform:uppercase;letter-spacing:.02em;
+  }
+  .header-txt .sub{font-size:8.5px;color:#b9cbe0;font-weight:500;margin-top:2px;}
+  .header-txt .annexe{font-size:8.5px;color:var(--gold);font-weight:600;margin-top:1px;}
+
+  .body{position:relative;z-index:2;padding:13px 15px 0;display:flex;gap:13px;}
+  .photo{
+    width:74px;height:92px;flex:none;border-radius:7px;
+    border:1.5px solid var(--line);background:var(--mist);overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--slate-light);font-size:8px;font-weight:600;letter-spacing:.12em;
+  }
+  .photo img{width:100%;height:100%;object-fit:cover;}
+
+  .info{flex:1;min-width:0;}
+  .name{
+    font-family:'Archivo';font-weight:700;font-size:15.5px;
+    color:var(--marine-900);line-height:1.05;letter-spacing:-.01em;
+    text-transform:uppercase;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .name-rule{width:36px;height:2px;background:var(--gold);margin:5px 0 8px;border-radius:2px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;}
+  .field .k{
+    font-size:7px;color:var(--slate-light);text-transform:uppercase;
+    letter-spacing:.06em;font-weight:600;
+  }
+  .field .v{font-size:10px;color:var(--ink);font-weight:600;line-height:1.25;margin-top:1px;}
+  .field.full{grid-column:1 / -1;}
+  .blood{display:inline-flex;align-items:center;gap:4px;}
+  .blood .drop{width:7px;height:7px;border-radius:50%;background:var(--blood);flex:none;}
+
+  .footer{
+    position:absolute;bottom:0;left:0;right:0;z-index:2;
+    display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 15px 11px;gap:10px;
+  }
+  .role{font-family:'Archivo';font-weight:700;font-size:8px;text-transform:uppercase;
+    letter-spacing:.13em;color:var(--marine-500);}
+  .role::before{content:"";display:block;width:18px;height:2px;background:var(--gold);
+    margin-bottom:4px;border-radius:2px;}
+  .valid{font-size:8px;color:var(--slate);font-weight:500;}
+  .valid b{color:var(--ink);font-weight:700;}
+  .qr{width:54px;height:54px;flex:none;border-radius:6px;background:#fff;padding:2px;
+    border:1px solid var(--line);}
+  .qr svg,.qr img{width:100%;height:100%;display:block;}
+
+  /* ===== VERSO ===== */
+  .back-head{
+    position:relative;z-index:2;
+    background:linear-gradient(135deg,var(--marine-900),var(--marine-700));
+    color:#fff;padding:10px 15px;
+    font-family:'Archivo';font-weight:700;font-size:11px;
+    text-transform:uppercase;letter-spacing:.06em;
+  }
+  .back-body{position:relative;z-index:2;padding:12px 15px 0;}
+  .notice{display:flex;gap:7px;margin-bottom:6px;font-size:8.5px;color:var(--slate);line-height:1.4;}
+  .notice .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);flex:none;margin-top:4px;}
+  .contact{font-size:9px;color:var(--ink);font-weight:600;margin-top:8px;}
+  .contact span{color:var(--slate);font-weight:500;}
+  .verify{
+    margin-top:10px;padding:7px 10px;background:var(--mist);
+    border-radius:8px;border:1px solid var(--line);display:inline-block;
+  }
+  .verify .lbl{font-size:6.5px;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--slate-light);font-weight:600;margin-bottom:2px;}
+  .verify .code{font-family:'JetBrains Mono',monospace;font-weight:600;
+    font-size:11px;color:var(--marine-900);letter-spacing:.05em;}
+
+  .back-foot{
+    position:absolute;left:0;right:0;bottom:0;z-index:2;
+    display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 15px 11px;gap:14px;
+  }
+  .org{font-size:6.8px;line-height:1.5;color:var(--slate);max-width:200px;}
+  .org .org-name{font-weight:700;color:var(--marine-700);font-size:7.3px;
+    text-transform:uppercase;letter-spacing:.02em;margin-bottom:1px;}
+  .sign{text-align:center;flex:none;}
+  .sign .line{width:104px;height:1px;background:var(--ink);margin-bottom:3px;}
+  .sign .lbl{font-size:7.5px;color:var(--slate);font-weight:600;}
+
+  @media print{
+    /* WeasyPrint n'implémente pas zoom — on dimensionne la page sur les px de la carte.
+       396px × 250px @ 96dpi = 104.775mm × 66.146mm. Chaque carte tient sur sa propre page. */
+    @page{ size:104.775mm 66.146mm; margin:0; }
+    body{
+      background:#fff;padding:0;gap:0;display:block;
+      print-color-adjust:exact;-webkit-print-color-adjust:exact;
+    }
+    .stage-label{display:none;}
+    .card{
+      box-shadow:none;border-radius:0;overflow:hidden;page-break-after:always;
+    }
+    .card:last-child{page-break-after:auto;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="stage-label">Recto</div>
+
+  <!-- ============ RECTO ============ -->
+  <div class="card">
+    <svg class="guilloche" viewBox="0 0 396 250" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="g" width="44" height="44" patternUnits="userSpaceOnUse">
+          <path d="M0 22 Q11 0 22 22 T44 22" fill="none" stroke="#0A2138" stroke-width=".7"/>
+          <path d="M0 22 Q11 44 22 22 T44 22" fill="none" stroke="#0A2138" stroke-width=".7"/>
+        </pattern>
+      </defs>
+      <rect width="396" height="250" fill="url(#g)"/>
+    </svg>
+
+    <div class="header">
+      <div class="emblem"><img src="{{ logo_data_uri }}" alt="Logo École de Santé Félix Houphouët-Boigny"></div>
+      <div class="header-txt">
+        <div class="school">École de Santé Félix Houphouët-Boigny</div>
+        <div class="sub">Carte d'étudiant officielle</div>
+        <div class="annexe">Annexe : Bamako Moribabougou</div>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="photo">
+        {% if etudiant.photo %}
+          <img src="{{ etudiant.photo.url }}" alt="">
+        {% else %}
+          PHOTO
+        {% endif %}
+      </div>
+      <div class="info">
+        <div class="name">{{ etudiant.full_name }}</div>
+        <div class="name-rule"></div>
+        <div class="grid">
+          <div class="field"><div class="k">Matricule</div><div class="v">{{ etudiant.matricule }}</div></div>
+          <div class="field"><div class="k">Né(e) le</div><div class="v">{{ etudiant.inscription.candidature.birth_date|date:"d/m/Y" }}</div></div>
+          <div class="field"><div class="k">Formation</div><div class="v">{{ etudiant.programme_title }}</div></div>
+          <div class="field">
+            <div class="k">Groupe sanguin (déclaré)</div>
+            {% if etudiant.groupe_sanguin %}
+              <div class="v blood"><span class="drop"></span>{{ etudiant.groupe_sanguin }}</div>
+            {% else %}
+              <div class="v" style="color:var(--slate-light);">—</div>
+            {% endif %}
+          </div>
+          <div class="field full"><div class="k">Classe</div><div class="v">{{ classe|default:"—" }}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="role">Étudiant</div>
+      <div class="valid">Année <b>{{ carte.annee }}</b> · valable jusqu'au <b>{{ carte.date_expiration|date:"d/m/Y" }}</b></div>
+      <div class="qr">
+        {{ qr_svg|safe }}
+      </div>
+    </div>
+  </div>
+
+  <div class="stage-label">Verso</div>
+
+  <!-- ============ VERSO ============ -->
+  <div class="card">
+    <svg class="guilloche" viewBox="0 0 396 250" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="g2" width="44" height="44" patternUnits="userSpaceOnUse">
+          <path d="M0 22 Q11 0 22 22 T44 22" fill="none" stroke="#0A2138" stroke-width=".7"/>
+          <path d="M0 22 Q11 44 22 22 T44 22" fill="none" stroke="#0A2138" stroke-width=".7"/>
+        </pattern>
+      </defs>
+      <rect width="396" height="250" fill="url(#g2)"/>
+    </svg>
+
+    <div class="back-head">Informations utiles</div>
+
+    <div class="back-body">
+      <div class="notice"><span class="dot"></span><span>Cette carte doit être présentée à toute demande de l'administration.</span></div>
+      <div class="notice"><span class="dot"></span><span>En cas de perte, contacter immédiatement le service de scolarité.</span></div>
+      <div class="contact">Contact annexe : <span>77 04 44 81</span></div>
+
+      <div class="verify">
+        <div class="lbl">Code de vérification</div>
+        <div class="code">{{ code_verification }}</div>
+      </div>
+    </div>
+
+    <div class="back-foot">
+      <div class="org">
+        <div class="org-name">École de Santé Félix Houphouët-Boigny</div>
+        universite@univ-fhb-mali.org · BP 00223<br>
+        Rn27, face de la pharmacie Diamanatigui — Bamako Moribabougou
+      </div>
+      <div class="sign">
+        <div class="line"></div>
+        <div class="lbl">Signature / cachet</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

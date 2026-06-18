@@ -6,7 +6,8 @@
             hx-swap="innerHTML"
             hx-push-url="true"
             hx-trigger="submit, keyup changed delay:250ms from:input[name='q']"
-            class="w-full xl:max-w-2xl"
+            hx-indicator="#list-loader"
+            class="relative w-full xl:max-w-2xl"
         >
             <input type="hidden" name="sort" value="{{ current_sort }}">
             <input type="hidden" name="focus" value="{{ current_focus }}">
@@ -19,6 +20,9 @@
                 placeholder="Rechercher un sujet, tag ou auteur..."
                 class="w-full rounded-2xl border border-primary-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
             >
+            <span id="list-loader" class="htmx-indicator absolute right-4 top-1/2 -translate-y-1/2 text-primary-500">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+            </span>
         </form>
 
         {% if user.is_authenticated %}
@@ -32,18 +36,38 @@
 
     <div class="flex flex-wrap items-center gap-2">
         <a href="{{ request.path }}?sort={{ current_sort }}&q={{ query|urlencode }}"
+           hx-get="{{ request.path }}?sort={{ current_sort }}&q={{ query|urlencode }}"
+           hx-target="#topic-list-container"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-indicator="#list-loader"
            class="rounded-full border px-4 py-2 text-sm font-bold transition {% if not current_focus %}border-primary-300 bg-primary-50 text-primary-700{% else %}border-slate-200 bg-white text-slate-600 hover:bg-slate-50{% endif %}">
             Tout
         </a>
         <a href="{{ request.path }}?sort={{ current_sort }}&focus=pinned&q={{ query|urlencode }}"
+           hx-get="{{ request.path }}?sort={{ current_sort }}&focus=pinned&q={{ query|urlencode }}"
+           hx-target="#topic-list-container"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-indicator="#list-loader"
            class="rounded-full border px-4 py-2 text-sm font-bold transition {% if current_focus == 'pinned' %}border-amber-300 bg-amber-50 text-amber-700{% else %}border-slate-200 bg-white text-slate-600 hover:bg-slate-50{% endif %}">
             Épinglés
         </a>
         <a href="{{ request.path }}?sort={{ current_sort }}&focus=unanswered&q={{ query|urlencode }}"
+           hx-get="{{ request.path }}?sort={{ current_sort }}&focus=unanswered&q={{ query|urlencode }}"
+           hx-target="#topic-list-container"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-indicator="#list-loader"
            class="rounded-full border px-4 py-2 text-sm font-bold transition {% if current_focus == 'unanswered' %}border-rose-300 bg-rose-50 text-rose-700{% else %}border-slate-200 bg-white text-slate-600 hover:bg-slate-50{% endif %}">
             Sans réponse
         </a>
         <a href="{{ request.path }}?sort={{ current_sort }}&focus=answered&q={{ query|urlencode }}"
+           hx-get="{{ request.path }}?sort={{ current_sort }}&focus=answered&q={{ query|urlencode }}"
+           hx-target="#topic-list-container"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-indicator="#list-loader"
            class="rounded-full border px-4 py-2 text-sm font-bold transition {% if current_focus == 'answered' %}border-emerald-300 bg-emerald-50 text-emerald-700{% else %}border-slate-200 bg-white text-slate-600 hover:bg-slate-50{% endif %}">
             Résolus
         </a>

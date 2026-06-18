@@ -12,4 +12,19 @@
       <section class="workflow-empty">Aucun journal pour cette annexe.</section>
     {% endfor %}
   </div>
+  {% if logs_page and logs_page.paginator.num_pages > 1 %}
+  <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+    <p class="text-sm font-bold text-slate-500">
+      Page {{ logs_page.number }} / {{ logs_page.paginator.num_pages }} - {{ logs_page.paginator.count }} journaux
+    </p>
+    <div class="flex flex-wrap gap-2">
+      {% if logs_page.has_previous %}
+      <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_audit_workspace' %}?page={{ logs_page.previous_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Precedent</button>
+      {% endif %}
+      {% if logs_page.has_next %}
+      <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_audit_workspace' %}?page={{ logs_page.next_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>

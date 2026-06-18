@@ -1,0 +1,96 @@
+{% extends "emails/base_communication.html" %}
+{% block email_title %}Admission sous reserve - {{ institution_short_name|default:"ESFE" }}{% endblock %}
+{% block preheader %}Votre candidature est acceptee sous reserve de quelques conditions a finaliser.{% endblock %}
+{% block headline %}Votre admission est acceptee sous reserve{% endblock %}
+{% block content %}
+<p style="margin:0 0 6px;font-size:15px;line-height:1.8;color:#334155;">
+  Bonjour <strong style="color:#1e4f6f;">{% firstof first_name candidate_name recipient_name "Candidat" %}</strong>,
+</p>
+<p style="margin:0 0 22px;font-size:15px;line-height:1.8;color:#334155;">
+  Nous avons le plaisir de vous informer que votre candidature a ete
+  <strong style="color:#b45309;">acceptee sous reserve</strong>. Il vous reste a finaliser
+  les conditions indiquees ci-dessous pour valider definitivement votre admission.
+</p>
+<!-- STATUS BADGE -->
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px;">
+  <tr>
+    <td style="background:#fef3c7;border:1px solid #fcd34d;border-radius:20px;padding:6px 18px;">
+      <span style="color:#b45309;font-size:12px;font-weight:700;letter-spacing:.5px;">
+        &#9679; ADMISSION SOUS RESERVE
+      </span>
+    </td>
+  </tr>
+</table>
+<!-- INFO CARD -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+       style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:0 0 22px;">
+  <tr>
+    <td style="padding:18px 20px;font-size:14px;color:#334155;line-height:2.0;">
+      <strong>Reference dossier :</strong> {% firstof candidature_reference candidate_reference "-" %}<br>
+      <strong>Programme :</strong> {% firstof programme programme_name "-" %}<br>
+      {% if branch_name %}<strong>Annexe :</strong> {{ branch_name }}<br>{% endif %}
+      <strong>Annee academique :</strong> {% firstof academic_year "-" %}
+    </td>
+  </tr>
+</table>
+<!-- CONDITIONS CARD -->
+{% if comment or admin_comment or message %}
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+       style="background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #f59e0b;border-radius:8px;margin:0 0 24px;">
+  <tr>
+    <td style="padding:15px 18px;font-size:14px;color:#78350f;line-height:1.8;">
+      <strong>Conditions a remplir :</strong><br>
+      {% firstof comment admin_comment message %}
+    </td>
+  </tr>
+</table>
+{% endif %}
+<!-- NEXT STEPS -->
+<p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#1e4f6f;">Prochaines etapes :</p>
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+  <tr>
+    <td style="padding:5px 0;">
+      <table cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="width:28px;height:28px;min-width:28px;background:#f59e0b;border-radius:50%;text-align:center;vertical-align:middle;font-weight:700;color:#fff;font-size:13px;line-height:28px;">1</td>
+          <td style="padding-left:12px;font-size:14px;color:#334155;line-height:1.6;">Completer les conditions mentionnees ci-dessus</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:5px 0;">
+      <table cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="width:28px;height:28px;min-width:28px;background:#f59e0b;border-radius:50%;text-align:center;vertical-align:middle;font-weight:700;color:#fff;font-size:13px;line-height:28px;">2</td>
+          <td style="padding-left:12px;font-size:14px;color:#334155;line-height:1.6;">Confirmer ou completer les documents/informations demandes depuis votre espace candidat</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:5px 0;">
+      <table cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="width:28px;height:28px;min-width:28px;background:#cbd5e1;border-radius:50%;text-align:center;vertical-align:middle;font-weight:700;color:#fff;font-size:13px;line-height:28px;">3</td>
+          <td style="padding-left:12px;font-size:14px;color:#64748b;line-height:1.6;">Validation finale de votre admission, puis instructions de paiement et d'inscription</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{% endblock %}
+{% block cta_button %}
+{% if dashboard_url or login_url %}
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:28px auto 0;">
+  <tr>
+    <td align="center" style="background:#f59e0b;border-radius:8px;">
+      <a href="{% firstof dashboard_url login_url "#" %}"
+         style="display:inline-block;padding:13px 30px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:.3px;">
+        Voir les conditions
+      </a>
+    </td>
+  </tr>
+</table>
+{% endif %}
+{% endblock %}

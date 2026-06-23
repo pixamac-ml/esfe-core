@@ -508,11 +508,30 @@ def save_grade(request):
         updated_ec_id=ec.id,
     )
 
-    html = render_to_string(
-        "portal/admin/grades/partials/excel_row.html",
-        {"row": row, "active_session_type": session_type},
-        request=request,
-    )
+    if request.POST.get("live") == "1":
+        # Grille instantanee du dashboard informaticien (maquette.html) :
+        # le client a deja recalcule l'affichage a la frappe (hx-swap="none"
+        # cote input). On ne renvoie que la reconciliation serveur via des
+        # swaps hors-bande, sans jamais toucher aux <input>.
+        target_ec_row, target_ue_block = None, None
+        for ue_block in row["ue_blocks"]:
+            for ec_row in ue_block["rows"]:
+                if ec_row["ec"].id == ec.id:
+                    target_ec_row, target_ue_block = ec_row, ue_block
+                    break
+            if target_ec_row:
+                break
+        html = render_to_string(
+            "portal/admin/grades/partials/row_oob.html",
+            {"row": row, "ec_row": target_ec_row, "ue_block": target_ue_block},
+            request=request,
+        )
+    else:
+        html = render_to_string(
+            "portal/admin/grades/partials/excel_row.html",
+            {"row": row, "active_session_type": session_type},
+            request=request,
+        )
     response = HttpResponse(html)
     response["HX-Trigger"] = '{"kpi-update": "", "workflow-update": ""}'
     return response

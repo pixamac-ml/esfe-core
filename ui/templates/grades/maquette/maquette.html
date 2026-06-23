@@ -486,6 +486,7 @@
         {% for row in rows %}
           <div class="maq-row-student maq-row"
                data-row-id="{{ row.student_id }}"
+               data-row-index="{{ row.index }}"
                data-enrollment-id="{{ row.enrollment.id|default:'' }}">
 
             {# --- Métadonnées figées à gauche --- #}
@@ -502,37 +503,37 @@
             {# --- Pour chaque UE : ECs + Unité synthétique --- #}
             {% for ue_block in row.ue_blocks %}
               {% for ec_row in ue_block.rows %}
-                {# Cellule Note (éditable) — via composant existant #}
-                {% component "ec_note_cell" row=row ec_row=ec_row %}{% endcomponent %}
+                {# Cellule Note (éditable, instantanée) — via composant dédié informaticien #}
+                {% component "ec_note_cell_live" row=row ec_row=ec_row ue_id=ue_block.ue.id %}{% endcomponent %}
 
-                <div class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}">
+                <div class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}" id="notecoef-{{ row.index }}-{{ ec_row.ec.id }}">
                   {{ ec_row.note_coefficient_display|default:"0,00" }}
                 </div>
-                <div class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}">
+                <div class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}" id="credit-{{ row.index }}-{{ ec_row.ec.id }}">
                   {{ ec_row.credit_obtained_display|default:"0,00" }}
                 </div>
               {% endfor %}
 
               {# Colonne "Unité" synthétique (par UE) #}
-              <div class="maq-cell maq-cell--unit">
+              <div class="maq-cell maq-cell--unit" id="ueavg-{{ row.index }}-{{ ue_block.ue.id }}">
                 {{ ue_block.average_display|default:"0,00" }}
               </div>
-              <div class="maq-cell maq-cell--unit">
+              <div class="maq-cell maq-cell--unit" id="uenotecoef-{{ row.index }}-{{ ue_block.ue.id }}">
                 {{ ue_block.total_note_coefficients_display|default:"0,00" }}
               </div>
-              <div class="maq-cell maq-cell--unit {% if ue_block.credit_obtained == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">
+              <div class="maq-cell maq-cell--unit {% if ue_block.credit_obtained == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}" id="uecredit-{{ row.index }}-{{ ue_block.ue.id }}">
                 {{ ue_block.credit_obtained_display|default:"0,00" }}
               </div>
             {% endfor %}
 
             {# --- Résultats figés à droite (3 colonnes) --- #}
-            <div class="maq-cell maq-cell--res maq-cell--res-1">
+            <div class="maq-cell maq-cell--res maq-cell--res-1" id="semavg-{{ row.index }}">
               {{ row.semester_average_display|default:"0,00" }}
             </div>
-            <div class="maq-cell maq-cell--res maq-cell--res-2">
+            <div class="maq-cell maq-cell--res maq-cell--res-2" id="sempct-{{ row.index }}">
               {{ row.semester_percentage_display|default:"0,00" }}%
             </div>
-            <div class="maq-cell maq-cell--res maq-cell--res-3 {% if row.semester_credits == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">
+            <div class="maq-cell maq-cell--res maq-cell--res-3 {% if row.semester_credits == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}" id="semcredit-{{ row.index }}">
               {{ row.semester_credits_display|default:"0,00" }}
             </div>
           </div>
@@ -541,87 +542,8 @@
     </div>
   </div>
 
-  {# ============================================================ #}
-  {# JS : navigation clavier + validation 0-20 + color coding     #}
-  {# ============================================================ #}
-  <script>
-    (function() {
-      var root = document.currentScript.previousElementSibling;
-      while (root && !root.classList.contains('maq-root')) {
-        root = root.parentElement;
-      }
-      if (!root || root.dataset.bound === '1') return;
-      root.dataset.bound = '1';
-
-      // --- 1. Validation 0-20 + color coding par seuil de coefficient ---
-      root.addEventListener('input', function(ev) {
-        var input = ev.target.closest('.maq-cell--input');
-        if (!input) return;
-        var val = parseFloat(input.value);
-        var cell = input.closest('.maq-cell--note') || input.parentElement;
-
-        // Reset
-        input.classList.remove('is-validated', 'is-failed', 'is-invalid');
-        cell.classList.remove('maq-cell--ok', 'maq-cell--bad', 'maq-cell--warn');
-
-        if (isNaN(val)) return;
-
-        if (val < 0 || val > 20) {
-          input.classList.add('is-invalid');
-          return;
-        }
-
-        var seuil = parseFloat(input.dataset.seuil || '10');
-        if (val >= seuil) {
-          input.classList.add('is-validated');
-          cell.classList.add('maq-cell--ok');
-        } else {
-          input.classList.add('is-failed');
-          cell.classList.add('maq-cell--bad');
-        }
-      });
-
-      // --- 2. Navigation clavier (Tab / Enter / flèches) ---
-      root.addEventListener('keydown', function(ev) {
-        var input = ev.target.closest('.maq-cell--input');
-        if (!input) return;
-
-        var cell = input.closest('.maq-cell--note') || input.parentElement;
-        var row = cell.closest('.maq-row-student');
-        var grid = cell.closest('.maq-grid');
-
-        // Toutes les cellules Note éditables dans l'ordre du grid
-        var allNoteCells = Array.from(grid.querySelectorAll('.maq-cell--note .maq-cell--input'));
-        var idx = allNoteCells.indexOf(input);
-
-        if (ev.key === 'Enter') {
-          ev.preventDefault();
-          // Descendre d'une ligne, même colonne
-          var sameColumnNext = allNoteCells[idx + (grid.querySelectorAll('.maq-row-student').length)];
-          if (sameColumnNext) sameColumnNext.focus();
-        } else if (ev.key === 'ArrowDown') {
-          ev.preventDefault();
-          var next = allNoteCells[idx + (grid.querySelectorAll('.maq-row-student').length)];
-          if (next) next.focus();
-        } else if (ev.key === 'ArrowUp') {
-          ev.preventDefault();
-          var prev = allNoteCells[idx - (grid.querySelectorAll('.maq-row-student').length)];
-          if (prev) prev.focus();
-        } else if (ev.key === 'Escape') {
-          input.value = input.defaultValue;
-          input.blur();
-        }
-      });
-
-      // --- 3. Indicateur "saved" (déclenché par HTMX après requête OK) ---
-      root.addEventListener('htmx:afterRequest', function(ev) {
-        var input = ev.target.closest('.maq-cell--input');
-        if (!input) return;
-        if (ev.detail.xhr && ev.detail.xhr.status === 200) {
-          input.classList.add('is-saved');
-          setTimeout(function() { input.classList.remove('is-saved'); }, 1500);
-        }
-      });
-    })();
-  </script>
+  {# Navigation clavier, validation 0-20 et statut d'enregistrement sont    #}
+  {# geres par Alpine (notesGrid(), defini dans le shell du dashboard       #}
+  {# informaticien) via x-data sur .maq-root + @input/@keydown sur les      #}
+  {# inputs .score-input (composant ec_note_cell_live).                    #}
 </div>

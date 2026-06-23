@@ -1,0 +1,19 @@
+{% comment %}
+  Reconciliation serveur (source de verite) pour la grille de notes
+  instantanee du dashboard informaticien. Ne touche jamais aux <input> :
+  uniquement les cellules en lecture seule deja affichees par le calcul
+  client optimiste (ec_note_cell_live.html), via swaps hors-bande (OOB).
+{% endcomment %}
+<div id="notecoef-{{ row.index }}-{{ ec_row.ec.id }}" hx-swap-oob="true" class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}">{{ ec_row.note_coefficient_display|default:"0,00" }}</div>
+<div id="credit-{{ row.index }}-{{ ec_row.ec.id }}" hx-swap-oob="true" class="maq-cell maq-cell--{{ ec_row.display_status|default:'empty' }}">{{ ec_row.credit_obtained_display|default:"0,00" }}</div>
+<span id="scoreN-{{ row.index }}-{{ ec_row.ec.id }}" hx-swap-oob="true" class="score-token-value">{{ ec_row.normal_score_display|default:"0,00" }}</span>
+{% if row.active_session_type == "retake" %}
+<span id="scoreR-{{ row.index }}-{{ ec_row.ec.id }}" hx-swap-oob="true" class="score-token-value">{{ ec_row.retake_score_display|default:"0,00" }}</span>
+<span id="scoreF-{{ row.index }}-{{ ec_row.ec.id }}" hx-swap-oob="true" class="score-token-value">{{ ec_row.final_score_display|default:"0,00" }}</span>
+{% endif %}
+<div id="ueavg-{{ row.index }}-{{ ue_block.ue.id }}" hx-swap-oob="true" class="maq-cell maq-cell--unit">{{ ue_block.average_display|default:"0,00" }}</div>
+<div id="uenotecoef-{{ row.index }}-{{ ue_block.ue.id }}" hx-swap-oob="true" class="maq-cell maq-cell--unit">{{ ue_block.total_note_coefficients_display|default:"0,00" }}</div>
+<div id="uecredit-{{ row.index }}-{{ ue_block.ue.id }}" hx-swap-oob="true" class="maq-cell maq-cell--unit {% if ue_block.credit_obtained == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">{{ ue_block.credit_obtained_display|default:"0,00" }}</div>
+<div id="semavg-{{ row.index }}" hx-swap-oob="true" class="maq-cell maq-cell--res maq-cell--res-1">{{ row.semester_average_display|default:"0,00" }}</div>
+<div id="sempct-{{ row.index }}" hx-swap-oob="true" class="maq-cell maq-cell--res maq-cell--res-2">{{ row.semester_percentage_display|default:"0,00" }}%</div>
+<div id="semcredit-{{ row.index }}" hx-swap-oob="true" class="maq-cell maq-cell--res maq-cell--res-3 {% if row.semester_credits == 0 %}maq-cell--bad{% else %}maq-cell--ok{% endif %}">{{ row.semester_credits_display|default:"0,00" }}</div>

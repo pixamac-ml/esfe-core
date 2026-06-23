@@ -15,7 +15,7 @@
       hx-post="{% url 'accounts_portal:save_grade' %}"
       hx-trigger="input changed delay:600ms"
       hx-include="closest .score-cell"
-      hx-sync="closest .maq-row-student:replace"
+      hx-sync="this:replace"
       hx-swap="none"
       hx-indicator="#save-status-{{ row.index }}-{{ ec_row.ec.id }}"
       hx-vals='{"student_id": "{{ row.student_id }}", "live": "1"}'
@@ -24,10 +24,10 @@
       {% if row.active_session_type == "retake" and not ec_row.is_retake_editable %}disabled title="Matiere validee en session normale"{% endif %}
     >
     <div class="score-meta">
-      <span class="score-token normal"><span class="score-token-label">N</span><span class="score-token-value">{{ ec_row.normal_score_display|default:"0,00" }}</span></span>
+      <span class="score-token normal"><span class="score-token-label">N</span><span class="score-token-value" id="scoreN-{{ row.index }}-{{ ec_row.ec.id }}">{{ ec_row.normal_score_display|default:"0,00" }}</span></span>
       {% if row.active_session_type == "retake" %}
-        <span class="score-token retake"><span class="score-token-label">R</span><span class="score-token-value">{{ ec_row.retake_score_display|default:"0,00" }}</span></span>
-        <span class="score-token final"><span class="score-token-label">F</span><span class="score-token-value">{{ ec_row.final_score_display|default:"0,00" }}</span></span>
+        <span class="score-token retake"><span class="score-token-label">R</span><span class="score-token-value" id="scoreR-{{ row.index }}-{{ ec_row.ec.id }}">{{ ec_row.retake_score_display|default:"0,00" }}</span></span>
+        <span class="score-token final"><span class="score-token-label">F</span><span class="score-token-value" id="scoreF-{{ row.index }}-{{ ec_row.ec.id }}">{{ ec_row.final_score_display|default:"0,00" }}</span></span>
       {% endif %}
     </div>
     <span id="save-status-{{ row.index }}-{{ ec_row.ec.id }}" class="save-status htmx-indicator" aria-hidden="true">&hellip;</span>

@@ -1,149 +1,35 @@
+{% load component_tags %}
 {% comment %}
 Workspace HTMX principal du Surveillant Général (suivi terrain).
 Workflow strict :
-  1) (optionnel) Accueil sans classe
-  2) Toute autre section nécessite une classe sélectionnée
-Toutes les données sont filtrées côté vue par request.user.branch.
+  1) Accueil et Enseignants sont accessibles sans classe selectionnee.
+  2) Toute autre section necessite une classe selectionnee.
+Toutes les donnees sont filtrees cote vue par request.user.branch.
 {% endcomment %}
 
+{% include "portal/staff/supervisor/partials/_sidebar_nav_inner.html" %}
+{% include "portal/staff/supervisor/partials/_work_head_inner.html" %}
+
+<div class="panel">
 {% if branch is None %}
-  <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5">
-    <p class="text-sm font-extrabold text-rose-800">Aucune annexe n’est rattachée à ce compte.</p>
-    <p class="mt-1 text-sm text-rose-700">Veuillez contacter l’administrateur pour associer une annexe.</p>
-  </div>
+  {% component "empty_state" icon="alert-triangle" title="Aucune annexe rattachée" message="Veuillez contacter l'administrateur pour associer une annexe à ce compte." %}{% endcomponent %}
+{% elif section == 'home' %}
+  {% include "portal/staff/supervisor/partials/panel_home.html" %}
+{% elif section == 'teachers' %}
+  {% include "portal/staff/supervisor/partials/panel_teachers.html" %}
+{% elif not selected_class %}
+  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
+{% elif section == 'classes' %}
+  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
+{% elif section == 'attendance' %}
+  {% include "portal/staff/supervisor/partials/panel_attendance.html" %}
+{% elif section == 'schedule' %}
+  {% include "portal/staff/supervisor/partials/panel_schedule.html" %}
+{% elif section == 'courses' %}
+  {% include "portal/staff/supervisor/partials/panel_courses.html" %}
+{% elif section == 'students' %}
+  {% include "portal/staff/supervisor/partials/panel_students.html" %}
 {% else %}
-
-  {# Contexte actif (affiché dès qu'une classe est sélectionnée) #}
-  {% if selected_class %}
-    <div class="mb-4 rounded-2xl border border-slate-200 bg-white p-4" data-selected-class-id="{{ selected_class.id }}">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Contexte actif</p>
-          <p class="mt-1 text-lg font-extrabold text-slate-900">{{ selected_class.display_name }}</p>
-          <p class="mt-1 text-sm font-semibold text-slate-600">
-            {{ selected_class.student_count|default:0 }} étudiants · {{ today|date:"d/m/Y" }}
-          </p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button type="button"
-                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                  hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes"
-                  hx-target="#supervisor-workspace"
-                  hx-swap="innerHTML"
-          >Changer de classe</button>
-        </div>
-      </div>
-    </div>
-  {% endif %}
-
-  {# Blocage strict: si section != home et pas de classe -> seulement le choix de classe #}
-  {% if section == 'classes' and not selected_class %}
-    {% include "portal/staff/supervisor/partials/panel_classes.html" %}
-  {% elif section != 'home' and not selected_class %}
-    <div class="rounded-2xl border border-slate-200 bg-white p-5">
-      <p class="text-sm font-extrabold text-slate-900">Choisir une classe (obligatoire)</p>
-      <p class="mt-1 text-sm text-slate-600">Sélectionnez une classe pour débloquer Assiduité, Emploi du temps, Cours et Étudiants.</p>
-      <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {% for item in class_picker_items %}
-          <button type="button"
-                  class="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
-                  hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes&class_id={{ item.id }}"
-                  hx-target="#supervisor-workspace"
-                  hx-swap="innerHTML"
-          >
-            <p class="text-sm font-extrabold text-slate-900">{{ item.label }}</p>
-            <p class="mt-1 text-xs font-semibold text-slate-500">Effectif : {{ item.student_count }}</p>
-            <p class="mt-3 inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700">Sélectionner</p>
-          </button>
-        {% empty %}
-          <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
-            Aucune classe active disponible dans votre annexe.
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% else %}
-    {# Sections #}
-    {% if section == 'home' %}
-      {# Accueil: écran vide mais intelligent #}
-      <div class="space-y-4">
-        <div class="rounded-2xl border border-slate-200 bg-white p-5">
-          <p class="text-sm font-extrabold text-slate-900">Accueil</p>
-          <p class="mt-1 text-sm text-slate-600">Choisissez une classe pour commencer le suivi terrain.</p>
-          <div class="mt-4 flex flex-wrap gap-2">
-            <button type="button"
-                    class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
-                    hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes"
-                    hx-target="#supervisor-workspace"
-                    hx-swap="innerHTML"
-            >Choisir une classe</button>
-          </div>
-        </div>
-
-        <div class="rounded-2xl border border-slate-200 bg-white p-5">
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Classes (accès rapide)</p>
-          <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {% for item in class_picker_items %}
-              <button type="button"
-                      class="rounded-2xl border border-slate-200 bg-white p-4 text-left hover:bg-slate-50"
-                      hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=home&class_id={{ item.id }}"
-                      hx-target="#supervisor-workspace"
-                      hx-swap="innerHTML"
-              >
-                <p class="text-sm font-extrabold text-slate-900">{{ item.label }}</p>
-                <p class="mt-1 text-xs font-semibold text-slate-500">{{ item.student_count }} étudiants</p>
-              </button>
-            {% empty %}
-              <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
-                Aucune classe active disponible.
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-
-        {% if high_absence_classes %}
-          <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-            <p class="text-sm font-extrabold text-amber-900">Alertes utiles</p>
-            <p class="mt-1 text-sm text-amber-800">Absences élevées détectées aujourd’hui.</p>
-            <ul class="mt-3 space-y-1 text-sm font-semibold text-amber-900">
-              {% for row in high_absence_classes %}
-                <li>{{ row.class_name }} — {{ row.absent_count }} absents</li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
-      </div>
-
-      {% if selected_class %}
-        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <button type="button" class="rounded-2xl bg-slate-900 p-4 text-left text-white"
-                  hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class.id }}"
-                  hx-target="#supervisor-workspace" hx-swap="innerHTML">Faire l’appel</button>
-          <button type="button" class="rounded-2xl border border-slate-200 bg-white p-4 text-left"
-                  hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}"
-                  hx-target="#supervisor-workspace" hx-swap="innerHTML">Voir emploi du temps</button>
-          <button type="button" class="rounded-2xl border border-slate-200 bg-white p-4 text-left"
-                  hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=courses&class_id={{ selected_class.id }}"
-                  hx-target="#supervisor-workspace" hx-swap="innerHTML">Ajouter un cours</button>
-          <button type="button" class="rounded-2xl border border-slate-200 bg-white p-4 text-left"
-                  hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=students&class_id={{ selected_class.id }}"
-                  hx-target="#supervisor-workspace" hx-swap="innerHTML">Voir étudiants</button>
-        </div>
-      {% endif %}
-
-    {% elif section == 'classes' %}
-      {% include "portal/staff/supervisor/partials/panel_classes.html" %}
-    {% elif section == 'attendance' %}
-      {% include "portal/staff/supervisor/partials/panel_attendance_strict.html" %}
-    {% elif section == 'schedule' %}
-      {% include "portal/staff/supervisor/partials/panel_schedule_strict.html" %}
-    {% elif section == 'courses' %}
-      {% include "portal/staff/supervisor/partials/panel_courses_strict.html" %}
-    {% elif section == 'students' %}
-      {% include "portal/staff/supervisor/partials/panel_students_strict.html" %}
-    {% else %}
-      {% include "portal/staff/supervisor/partials/panel_classes.html" %}
-    {% endif %}
-  {% endif %}
+  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
 {% endif %}
-
+</div>

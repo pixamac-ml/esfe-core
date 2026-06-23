@@ -54,6 +54,7 @@ urlpatterns = [
     # Core (home + pages publiques)
     path("", include("core.urls")),
     path("academics/", include("academics.urls")),
+    path("memoires/", include(("memoires.urls", "memoires"), namespace="memoires")),
     path("community/", include("community.urls")),
     path("communication/", include(("communication.urls", "communication"), namespace="communication")),
     path("marketing/", include(("marketing.urls", "marketing"), namespace="marketing")),

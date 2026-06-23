@@ -1,0 +1,36 @@
+{% if toast %}
+<div class="banner {% if toast.level == 'success' %}ok{% else %}warn{% endif %}">{{ toast.message }}</div>
+{% endif %}
+
+{% if academic_class %}
+<div class="toolbar">
+  <span class="src-badge">⤿ Emploi du temps de {{ academic_class.display_name }}</span>
+  <button type="button" class="btn" style="margin-left:auto"
+          hx-get="{% url planner_hub_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+          hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+    ← Retour aux actions
+  </button>
+  <button type="button" class="btn primary"
+          hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=add_course"
+          hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+    + Ajouter un cours
+  </button>
+</div>
+
+<div class="grid cards-4" style="margin-bottom:16px">
+  <div class="stat"><div class="k">Semaine active</div><div class="v" style="font-size:17px">{{ schedule.week_start|date:"d/m/Y" }}</div></div>
+  <div class="stat"><div class="k">Cours programmés</div><div class="v">{{ scheduled_courses_count }}</div></div>
+  <div class="stat"><div class="k">Enseignants</div><div class="v">{{ teachers|length }}</div></div>
+  <div class="stat"><div class="k">EC</div><div class="v">{{ subject_rows|length }}</div></div>
+</div>
+
+<div class="card">
+  <div class="card-b" style="padding:12px;overflow:auto">
+    {% include "portal/staff/supervisor/partials/sg_schedule_week_grid.html" %}
+  </div>
+</div>
+{% else %}
+<div class="empty">
+  <p style="font-weight:800;font-size:14px">Aucune classe sélectionnée</p>
+</div>
+{% endif %}

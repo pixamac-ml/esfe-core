@@ -1,0 +1,42 @@
+{% load static %}
+<div id="memoire-visionneur"
+     class="memoire-visionneur bg-white/95 rounded-3xl border border-slate-200/80 shadow-soft overflow-hidden"
+     data-nb-pages="{{ memoire.nb_pages }}"
+     data-page-url-template="{% url 'memoires:page' slug=memoire.slug numero=999999 %}">
+
+  {% if memoire.nb_pages > 0 %}
+  <div class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+    <span class="text-sm font-medium text-slate-500">
+      Page <span id="page-courante" class="text-slate-900 font-semibold">1</span> / {{ memoire.nb_pages }}
+    </span>
+    <div class="flex items-center gap-2">
+      <button type="button" id="page-precedente" aria-label="Page précédente"
+              class="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:text-primary-600 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition">
+        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+      </button>
+      <button type="button" id="page-suivante" aria-label="Page suivante"
+              class="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:text-primary-600 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition">
+        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+
+  <div id="visionneur-page-conteneur" class="memoire-visionneur__page relative flex items-center justify-center bg-slate-100 min-h-[60vh] sm:min-h-[70vh]">
+    <div id="visionneur-chargement" class="inline-flex items-center gap-2 text-slate-400 text-sm">
+      <i data-lucide="loader-circle" class="w-4 h-4 animate-spin"></i>
+      Chargement…
+    </div>
+    <img id="visionneur-image" alt="Page du mémoire" class="hidden max-w-full shadow-lg select-none" draggable="false">
+  </div>
+
+  <p class="px-5 py-3.5 text-xs text-slate-400 text-center border-t border-slate-100 inline-flex items-center justify-center gap-1.5 w-full">
+    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+    Lecture en ligne uniquement. Copie, capture et téléchargement non autorisés.
+  </p>
+  {% else %}
+  <div class="p-12 text-center text-slate-400">
+    <i data-lucide="clock" class="w-8 h-8 mx-auto mb-3 text-slate-300"></i>
+    Les pages de ce mémoire sont en cours de préparation.
+  </div>
+  {% endif %}
+</div>

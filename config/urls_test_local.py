@@ -19,6 +19,7 @@ urlpatterns = [
     path("shop/", include(("shop.urls", "shop"), namespace="shop")),
     path("students/", include("students.urls")),
     path("academics/", include("academics.urls")),
+    path("memoires/", include(("memoires.urls", "memoires"), namespace="memoires")),
     path("actualites/", include("news.urls", namespace="news")),
     path("superadmin/", include("superadmin.urls")),
     path("communication/", include(("communication.urls", "communication"), namespace="communication")),

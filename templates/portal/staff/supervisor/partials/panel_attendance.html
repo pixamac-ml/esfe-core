@@ -1,204 +1,82 @@
 {% load component_tags %}
-<div id="supervisor-attendance-panel" class="space-y-4">
+<div id="sg-attendance">
   {% if toast %}
-  <div class="supervisor-toast {% if toast.level == 'success' %}is-success{% elif toast.level == 'error' %}is-error{% else %}is-info{% endif %}">
-    <p class="text-sm font-semibold">{{ toast.message }}</p>
-  </div>
+    <div class="banner {% if toast.level == 'success' %}ok{% else %}warn{% endif %}">
+      <span>{{ toast.message }}</span>
+    </div>
   {% endif %}
 
-  <div id="supervisor-attendance-workflow-wrap" class="dashboard-enter">
-  {% component "attendance_workflow" workflow=attendance_workflow class_picker_items=class_picker_items %}
-  {% endcomponent %}
-  </div>
-
-  <article class="portal-card portal-card-pad" x-data="{ showStudent: false, showTeacher: false }">
-    <div class="supervisor-panel-head">
+  <div class="toolbar">
+    <form style="display:flex;align-items:end;gap:10px"
+          hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}"
+          hx-target="#supervisor-workspace" hx-push-url="true">
+      <input type="hidden" name="section" value="attendance">
+      <input type="hidden" name="class_id" value="{{ selected_class.id }}">
       <div>
-        <p class="portal-section-kicker">Saisie groupée</p>
-        <h3 class="portal-section-title">Feuille par séance</h3>
+        <label class="f-l" style="margin-top:0">Date</label>
+        <input type="date" name="roll_date" value="{{ roll_date_iso }}" class="f-i">
       </div>
-      <span class="supervisor-badge bg-slate-100 text-slate-700">Feuille {{ roll_date|date:"d/m/Y" }}</span>
-    </div>
-
-    <div class="mt-4 rounded-2xl border border-dashed border-slate-200 p-4 dark:border-slate-700">
-      <p class="text-xs text-slate-500 dark:text-slate-400">Séances correspondant à la date sélectionnée dans le workflow ci-dessus.</p>
-      <div class="mt-3 flex flex-wrap items-end gap-3">
-        <label class="min-w-[240px] flex-1 text-xs font-bold text-slate-600 dark:text-slate-300">
-          Séance
-          <select id="supervisor-bulk-event-select" name="schedule_event_id" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-700 dark:bg-slate-900">
-            <option value="">Choisir un cours</option>
-            {% for item in roll_course_action_options %}
-            <option value="{{ item.id }}">{{ item.label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <button
-          type="button"
-          class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-          hx-get="{% url 'accounts_portal:supervisor_bulk_attendance_roster' %}"
-          hx-include="#supervisor-bulk-event-select"
-          hx-target="#supervisor-bulk-roster"
-          hx-swap="innerHTML"
-        >Charger la classe</button>
-      </div>
-      <div id="supervisor-bulk-roster" class="mt-4"></div>
-    </div>
-
-    <div class="mt-4 grid gap-3 lg:grid-cols-2">
-      <div class="supervisor-accordion">
-        <button type="button" @click="showStudent = !showStudent">
-          <span class="text-sm">Saisir une presence etudiant</span>
-          <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showStudent ? 'Fermer' : 'Ouvrir'"></span>
-        </button>
-        <div class="content" x-show="showStudent" x-transition.duration.180ms>
-          <form
-        method="post"
-        action="{% url 'accounts_portal:supervisor_mark_student_attendance' %}"
-        class="supervisor-form-card space-y-3"
-        hx-post="{% url 'accounts_portal:supervisor_mark_student_attendance' %}"
-        hx-target="#supervisor-attendance-panel"
-        hx-swap="outerHTML"
-        hx-indicator="#supervisor-attendance-indicator"
-      >
-        {% csrf_token %}
-        <div>
-          <p class="text-sm font-black text-slate-900">Presence etudiant</p>
-          <p class="mt-1 text-xs text-slate-500">Associer l'etudiant a son cours du jour.</p>
-        </div>
-        <select name="schedule_event_id" required>
-          <option value="">Choisir le cours</option>
-          {% for item in course_action_options %}
-          <option value="{{ item.id }}">{{ item.label }}</option>
-          {% endfor %}
-        </select>
-        <div class="space-y-2">
-          <input
-            type="search"
-            name="q"
-            placeholder="Rechercher un etudiant (nom, prenom, matricule)…"
-            class="supervisor-search-input"
-            hx-get="{% url 'accounts_portal:supervisor_student_options' %}"
-            hx-trigger="keyup changed delay:250ms"
-            hx-target="#supervisor-student-select"
-            hx-swap="innerHTML"
-          >
-          <select id="supervisor-student-select" name="student_id" required>
-            <option value="">Choisir l'etudiant</option>
-            {% for item in student_action_options %}
-            <option value="{{ item.id }}">{{ item.label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <select name="status" required>
-            <option value="present">Present</option>
-            <option value="absent">Absent</option>
-            <option value="late">En retard</option>
-          </select>
-          <input type="time" name="arrival_time">
-        </div>
-        <textarea name="justification" rows="2" placeholder="Justification ou observation"></textarea>
-        <div class="flex items-center justify-between gap-3">
-          <button type="submit" class="supervisor-submit bg-[var(--school-primary)]">Enregistrer</button>
-          <div id="supervisor-attendance-indicator" class="supervisor-indicator" aria-live="polite">
-            Mise a jour…
-          </div>
-        </div>
-      </form>
-        </div>
-      </div>
-
-      <div class="supervisor-accordion">
-        <button type="button" @click="showTeacher = !showTeacher">
-          <span class="text-sm">Saisir une presence enseignant</span>
-          <span class="supervisor-badge bg-slate-100 text-slate-700" x-text="showTeacher ? 'Fermer' : 'Ouvrir'"></span>
-        </button>
-        <div class="content" x-show="showTeacher" x-transition.duration.180ms>
-          <form
-        method="post"
-        action="{% url 'accounts_portal:supervisor_mark_teacher_attendance' %}"
-        class="supervisor-form-card space-y-3"
-        hx-post="{% url 'accounts_portal:supervisor_mark_teacher_attendance' %}"
-        hx-target="#supervisor-attendance-panel"
-        hx-swap="outerHTML"
-        hx-indicator="#supervisor-attendance-indicator-2"
-      >
-        {% csrf_token %}
-        <div>
-          <p class="text-sm font-black text-slate-900">Presence enseignant</p>
-          <p class="mt-1 text-xs text-slate-500">Marquer la situation du professeur par cours.</p>
-        </div>
-        <select name="schedule_event_id" required>
-          <option value="">Choisir le cours</option>
-          {% for item in teacher_action_options %}
-          <option value="{{ item.id }}">{{ item.label }}</option>
-          {% endfor %}
-        </select>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <select name="status" required>
-            <option value="present">Present</option>
-            <option value="absent">Absent</option>
-            <option value="late">En retard</option>
-          </select>
-          <input type="time" name="arrival_time">
-        </div>
-        <textarea name="justification" rows="2" placeholder="Motif ou observation"></textarea>
-        <div class="flex items-center justify-between gap-3">
-          <button type="submit" class="supervisor-submit bg-[var(--school-secondary)]">Enregistrer</button>
-          <div id="supervisor-attendance-indicator-2" class="supervisor-indicator" aria-live="polite">
-            Mise a jour…
-          </div>
-        </div>
-      </form>
-        </div>
-      </div>
-    </div>
-  </article>
-
-  <div class="supervisor-shell-grid">
-    <article class="portal-card portal-card-pad">
-      <div class="supervisor-panel-head">
-        <div>
-          <p class="portal-section-kicker">Etudiants</p>
-          <h3 class="portal-section-title">Dernieres presences enregistrees</h3>
-        </div>
-      </div>
-      <div class="mt-4 supervisor-mini-list">
-        {% for item in recent_student_attendances %}
-        <div class="supervisor-mini-item">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-sm font-semibold text-slate-900">{{ item.student_name }}</span>
-            <span class="supervisor-badge {% if item.status_code == 'absent' %}bg-rose-100 text-rose-700{% elif item.status_code == 'late' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.status }}</span>
-          </div>
-          <p class="mt-1 text-xs text-slate-500">{{ item.class_name }}{% if item.event_time %} · {{ item.event_time }}{% endif %}</p>
-        </div>
-        {% empty %}
-        <div class="supervisor-empty">Aucune saisie etudiant pour l'instant.</div>
-        {% endfor %}
-      </div>
-    </article>
-
-    <article class="portal-card portal-card-pad">
-      <div class="supervisor-panel-head">
-        <div>
-          <p class="portal-section-kicker">Enseignants</p>
-          <h3 class="portal-section-title">Dernieres presences enregistrees</h3>
-        </div>
-      </div>
-      <div class="mt-4 supervisor-mini-list">
-        {% for item in recent_teacher_attendances %}
-        <div class="supervisor-mini-item">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-sm font-semibold text-slate-900">{{ item.teacher_name }}</span>
-            <span class="supervisor-badge {% if item.status_code == 'absent' %}bg-rose-100 text-rose-700{% elif item.status_code == 'late' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ item.status }}</span>
-          </div>
-          <p class="mt-1 text-xs text-slate-500">{{ item.class_name }}{% if item.event_time %} · {{ item.event_time }}{% endif %}</p>
-        </div>
-        {% empty %}
-        <div class="supervisor-empty">Aucune saisie enseignant pour l'instant.</div>
-        {% endfor %}
-      </div>
-    </article>
+      <button type="submit" class="btn primary">Charger</button>
+    </form>
   </div>
-</div>
 
+  <div class="sess-strip">
+    {% for ev in attendance_events %}
+    <button type="button"
+            class="sess-chip {% if selected_event and ev.id == selected_event.id %}active{% endif %}"
+            hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class.id }}&roll_date={{ roll_date_iso }}&schedule_event_id={{ ev.id }}"
+            hx-target="#supervisor-workspace" hx-push-url="true">
+      <div class="t">{{ ev.start_datetime|date:"H:i" }} · {{ ev.ec.title }}</div>
+      <div class="s">{{ ev.teacher.get_full_name|default:ev.teacher.username }} · {{ ev.location|default:"—" }}</div>
+    </button>
+    {% empty %}
+    <span class="chip mute">Aucune séance ce jour</span>
+    {% endfor %}
+  </div>
+
+  {% if not selected_event %}
+    {% component "empty_state" icon="calendar-x" title="Aucune séance" message="Aucun cours n’est planifié pour cette classe à la date choisie." %}{% endcomponent %}
+  {% else %}
+    {% if roll_locked %}
+    <div class="banner ok">
+      <svg class="i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/></svg>
+      Cette feuille est validée. Rouvrez-la pour modifier.
+    </div>
+    {% else %}
+    <div class="banner warn">
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+      Complétez l'appel pour {{ selected_event.ec.title }}.
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-h">
+        <h3>{{ selected_event.ec.title }} — {{ selected_class.display_name }}</h3>
+        <form method="post"
+              hx-post="{% url 'accounts_portal:supervisor_workflow_roll_action' %}"
+              hx-target="#supervisor-workspace" hx-swap="innerHTML">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="attendance">
+          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+          <input type="hidden" name="roll_date" value="{{ roll_date_iso }}">
+          {% if attendance_workflow and attendance_workflow.sheet_id %}
+            <input type="hidden" name="action" value="validate">
+            <input type="hidden" name="sheet_id" value="{{ attendance_workflow.sheet_id }}">
+            <button type="submit" class="btn primary">Valider l'appel</button>
+          {% else %}
+            <input type="hidden" name="action" value="start">
+            <input type="hidden" name="schedule_event_id" value="{{ selected_event.id }}">
+            <button type="submit" class="btn primary">Démarrer la feuille</button>
+          {% endif %}
+        </form>
+      </div>
+      <div class="card-b">
+        {% for row in attendance_rows %}
+          {% include "portal/staff/supervisor/partials/attendance_student_row.html" %}
+        {% empty %}
+          {% component "empty_state" icon="users" title="Aucun étudiant" message="Aucun étudiant trouvé pour cette séance." compact=True %}{% endcomponent %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</div>

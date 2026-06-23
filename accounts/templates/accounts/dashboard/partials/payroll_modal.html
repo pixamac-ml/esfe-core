@@ -48,6 +48,71 @@
                         <p class="text-sm text-slate-500">Saisir ou corriger le salaire de base, les primes, retenues et avances, puis enregistrer.</p>
                     </div>
                 </div>
+
+                {% if otp_request_id %}
+                <div class="rounded-2xl border border-violet-200 bg-violet-50 p-5 space-y-4">
+                    <div>
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-violet-800">Validation DG / DGA requise</h3>
+                        <p class="mt-1 text-sm text-violet-800">
+                            Cette fiche a deja ete payee. Un code de validation a ete envoye au Directeur General et a la
+                            Directrice Generale Adjointe. Saisissez-le ci-dessous pour confirmer la modification
+                            (validite : {{ otp_validity_minutes|default:5 }} minutes).
+                        </p>
+                    </div>
+                    {% if otp_error %}
+                    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{{ otp_error }}</div>
+                    {% endif %}
+                    <form
+                        hx-post="{% url 'accounts:htmx_manager_salary_correct_confirm_otp' payroll_entry.id %}"
+                        hx-target="#modal-content"
+                        hx-swap="innerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        class="flex flex-col gap-4 sm:flex-row sm:items-end">
+                        <input type="hidden" name="otp_request_id" value="{{ otp_request_id }}">
+                        <div class="flex-1">
+                            <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Code de validation</label>
+                            <input type="text" name="otp_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456" class="w-full rounded-xl border border-violet-200 bg-white px-4 py-3 text-center text-lg font-bold tracking-widest text-slate-900" required>
+                        </div>
+                        <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700">
+                            <i class="fas fa-shield-halved"></i>
+                            Confirmer
+                        </button>
+                    </form>
+                </div>
+                {% elif payroll_entry and payroll_entry.paid_amount > 0 %}
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
+                    <div>
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-amber-800">Correction controlee</h3>
+                        <p class="mt-1 text-sm text-amber-800">Cette fiche a deja ete payee (en tout ou en partie). Toute modification sera tracee et necessite une validation DG/DGA par code.</p>
+                    </div>
+                    {% if correction_error %}
+                    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{{ correction_error }}</div>
+                    {% endif %}
+                    {% if correction_success %}
+                    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{{ correction_success }}</div>
+                    {% endif %}
+                    <form
+                        hx-post="{% url 'accounts:htmx_manager_salary_upsert' employee_profile.user_id %}"
+                        hx-target="#modal-content"
+                        hx-swap="innerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        class="space-y-4">
+                        {% include "accounts/dashboard/partials/dg_form_fields.html" with form=payroll_form %}
+                        <div>
+                            <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Motif de la correction</label>
+                            <textarea name="reason" rows="3" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" required>{{ correction_reason }}</textarea>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Confirmation</label>
+                            <input type="text" name="confirmation" placeholder="CORRIGER" class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900" required>
+                        </div>
+                        <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white hover:bg-amber-700 transition">
+                            <i class="fas fa-pen-to-square"></i>
+                            Demander la validation DG/DGA
+                        </button>
+                    </form>
+                </div>
+                {% else %}
                 <form
                     hx-post="{% url 'accounts:htmx_manager_salary_upsert' employee_profile.user_id %}"
                     hx-target="#modal-content"
@@ -70,6 +135,7 @@
                         <p><strong>Valider et rendre disponible</strong> : l'employe recoit une notification "Salaire disponible" et peut consulter / telecharger sa fiche de paie en PDF depuis son dashboard.</p>
                     </div>
                 </form>
+                {% endif %}
             </div>
 
             <!-- ETAPE 2 : PAIEMENT -->

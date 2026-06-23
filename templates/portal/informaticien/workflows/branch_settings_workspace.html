@@ -1,81 +1,115 @@
-{% load component_tags %}
-<section class="workflow-stack">
-  <div class="workflow-band workflow-band-validated">
+<div class="space-y-4">
+  <div class="band b-validated">
     <div>
-      <p class="workflow-kicker">Parametres</p>
+      <p class="kicker">Paramètres</p>
       <h3>{{ request.user.get_full_name|default:request.user.username }}</h3>
-      <p>Profil, securite et parametres d'annexe dans un seul panneau.</p>
+      <p>Profil, sécurité et paramètres d'annexe dans un seul panneau.</p>
     </div>
-    <span>{{ branch.name|default:"Annexe" }}</span>
+    <span class="badge">{{ branch.name|default:"Annexe" }}</span>
   </div>
 
-  <div class="workflow-actions">
-    <button type="button" class="workflow-btn workflow-btn-primary" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+  <div class="flex flex-wrap gap-2">
+    <button type="button" class="btn btn-primary" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+      <i data-lucide="user" class="h-4 w-4"></i>
       Modifier mon profil
     </button>
-    <a class="workflow-btn workflow-btn-secondary" href="{% url 'accounts:edit_preferences' %}">Preferences communes</a>
-    <a class="workflow-btn workflow-btn-secondary" href="{% url 'password_change' %}">Mot de passe</a>
+    <a class="btn btn-secondary" href="{% url 'accounts:edit_preferences' %}">
+      <i data-lucide="sliders" class="h-4 w-4"></i>
+      Préférences communes
+    </a>
+    <a class="btn btn-secondary" href="{% url 'password_change' %}">
+      <i data-lucide="key-round" class="h-4 w-4"></i>
+      Mot de passe
+    </a>
   </div>
 
-  <div class="workflow-table-shell">
+  <div class="panel">
     {% if toast %}
-      <section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
+    <div class="panel mb-4" style="border-left:5px solid {% if toast.level == 'success' %}#059669{% elif toast.level == 'error' %}#be123c{% else %}#d97706{% endif %}">
+      <p class="text-sm font-black">{{ toast.message }}</p>
+    </div>
     {% endif %}
     <form method="post" hx-post="{% url 'accounts_portal:it_my_account_save' %}" hx-target="#it-workspace" hx-swap="innerHTML">
       {% csrf_token %}
       <input type="hidden" name="return_settings" value="1">
-      <div class="workflow-context">
-        <label>Prenom <input name="first_name" value="{{ request.user.first_name }}"></label>
-        <label>Nom <input name="last_name" value="{{ request.user.last_name }}"></label>
-        <label>Email <input name="email" type="email" value="{{ request.user.email }}"></label>
+      <div class="wkc">
+        <label>Prénom <input name="first_name" value="{{ request.user.first_name }}" class="fi"></label>
+        <label>Nom <input name="last_name" value="{{ request.user.last_name }}" class="fi"></label>
+        <label style="grid-column:1/-1">Email <input name="email" type="email" value="{{ request.user.email }}" class="fi"></label>
       </div>
-      <button class="workflow-btn workflow-btn-primary" type="submit">Enregistrer profil</button>
+      <button class="btn btn-primary" type="submit">
+        <i data-lucide="save" class="h-4 w-4"></i>
+        Enregistrer profil
+      </button>
     </form>
   </div>
 
-  <div class="workflow-split">
-    <section class="workflow-table-shell">
-      <div class="workflow-table-head"><div><p class="workflow-kicker">Securite</p><h3>Compte</h3></div></div>
-      <div class="workflow-list">
-        <article><div><strong>Mot de passe</strong><span>Utiliser le changement de mot de passe standard du portail.</span></div><a class="workflow-btn workflow-btn-secondary" href="{% url 'password_change' %}">Modifier</a></article>
-        <article><div><strong>Compte actif</strong><span>{% if request.user.is_active %}Oui{% else %}Non{% endif %}</span></div></article>
+  <div class="grid lg:grid-cols-2 gap-4">
+    <div class="panel">
+      <div class="flex items-center justify-between">
+        <p class="kicker">Sécurité</p>
+        <h3 class="text-lg font-black">Compte</h3>
       </div>
-    </section>
-
-    <section class="workflow-table-shell">
-      <div class="workflow-table-head"><div><p class="workflow-kicker">Apparence</p><h3>Interface</h3></div></div>
-      <div class="workflow-list">
-        <article><div><strong>Theme</strong><span>Le bouton Theme du header conserve le choix localement.</span></div></article>
-        <article><div><strong>Sidebar</strong><span>L'etat retracte est conserve dans le navigateur.</span></div></article>
+      <div class="mt-3">
+        <div class="row">
+          <div class="flex-1">
+            <b class="block">Mot de passe</b>
+            <span class="text-xs font-semibold text-slate-400">Utiliser le changement de mot de passe standard du portail.</span>
+          </div>
+          <a class="btn btn-secondary" href="{% url 'password_change' %}">Modifier</a>
+        </div>
+        <div class="kv"><span>Compte actif</span><b>{% if request.user.is_active %}Oui{% else %}Non{% endif %}</b></div>
       </div>
-    </section>
-  </div>
-
-  <section class="workflow-table-shell">
-    <div class="workflow-table-head"><div><p class="workflow-kicker">Profil staff</p><h3>Resume utile</h3></div></div>
-    <div class="workflow-list">
-      <article><div><strong>Annexe</strong><span>{{ profile.branch.name|default:"Non rattache" }}</span></div></article>
-      <article><div><strong>Poste</strong><span>{{ profile.get_position_display|default:"Informaticien" }}</span></div></article>
-      <article><div><strong>Salaire</strong><span>{% if profile.salary_base %}{{ profile.salary_base }} FCFA{% else %}Non renseigne{% endif %}</span></div></article>
     </div>
-  </section>
 
-  <section class="workflow-table-shell">
-    <div class="workflow-table-head"><div><p class="workflow-kicker">Annexe</p><h3>Reglages techniques essentiels</h3></div></div>
-    <form method="post" hx-post="{% url 'accounts_portal:it_branch_settings_save' %}" hx-target="#it-workspace" hx-swap="innerHTML" class="workflow-context">
+    <div class="panel">
+      <div class="flex items-center justify-between">
+        <p class="kicker">Apparence</p>
+        <h3 class="text-lg font-black">Interface</h3>
+      </div>
+      <div class="mt-3">
+        <div class="kv"><span>Thème</span><b>Le bouton Thème du header conserve le choix localement.</b></div>
+        <div class="kv"><span>Sidebar</span><b>L'état rétracté est conservé dans le navigateur.</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="flex items-center justify-between">
+      <p class="kicker">Profil staff</p>
+      <h3 class="text-lg font-black">Résumé utile</h3>
+    </div>
+    <div class="mt-3">
+      <div class="kv"><span>Annexe</span><b>{{ profile.branch.name|default:"Non rattaché" }}</b></div>
+      <div class="kv"><span>Poste</span><b>{{ profile.get_position_display|default:"Informaticien" }}</b></div>
+      <div class="kv"><span>Salaire</span><b>{% if profile.salary_base %}{{ profile.salary_base }} FCFA{% else %}Non renseigné{% endif %}</b></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="flex items-center justify-between">
+      <p class="kicker">Annexe</p>
+      <h3 class="text-lg font-black">Réglages techniques essentiels</h3>
+    </div>
+    <form method="post" hx-post="{% url 'accounts_portal:it_branch_settings_save' %}" hx-target="#it-workspace" hx-swap="innerHTML" class="mt-3">
       {% csrf_token %}
-      <label>Seuil validation
-        <input name="validation_threshold" type="number" min="0" value="{{ settings.validation_threshold|default:'' }}">
-      </label>
-      <label>Annee academique active
-        <input name="active_academic_year" value="{{ settings.active_academic_year|default:'' }}">
-      </label>
-      <label style="grid-column: 1 / -1;">Configuration locale (JSON)
-        <input name="local_config" value="{{ settings.local_config|default:'' }}">
-      </label>
-      <div style="grid-column: 1 / -1; display:flex; justify-content:flex-end;">
-        <button class="workflow-btn workflow-btn-primary" type="submit">Enregistrer les parametres d'annexe</button>
+      <div class="wkc">
+        <label>Seuil validation
+          <input name="validation_threshold" type="number" min="0" value="{{ settings.validation_threshold|default:'' }}" class="fi">
+        </label>
+        <label>Année académique active
+          <input name="active_academic_year" value="{{ settings.active_academic_year|default:'' }}" class="fi">
+        </label>
+        <label style="grid-column: 1 / -1;">Configuration locale (JSON)
+          <input name="local_config" value="{{ settings.local_config|default:'' }}" class="fi">
+        </label>
+      </div>
+      <div class="flex justify-end">
+        <button class="btn btn-primary" type="submit">
+          <i data-lucide="save" class="h-4 w-4"></i>
+          Enregistrer les paramètres d'annexe
+        </button>
       </div>
     </form>
-  </section>
-</section>
+  </div>
+</div>

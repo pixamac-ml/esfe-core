@@ -1,83 +1,138 @@
-<section class="workflow-stack">
-  <div class="workflow-band workflow-band-in_progress">
+<div class="space-y-4">
+  <div class="band b-in_progress">
     <div>
-      <p class="workflow-kicker">Accueil</p>
+      <p class="kicker">Accueil</p>
       <h3>Que voulez-vous faire aujourd'hui ?</h3>
-      <p>{{ branch.name|default:"Annexe" }} - workflows operationnels du dashboard informaticien.</p>
+      <p>{{ branch.name|default:"Annexe" }} — workflows opérationnels du dashboard informaticien.</p>
     </div>
     {% if resume_target %}
-      <button class="workflow-btn workflow-btn-primary" hx-get="{{ resume_target.url }}" hx-target="#it-workspace" hx-swap="innerHTML">
-        Reprendre derniere classe
+      <button class="btn btn-primary" hx-get="{{ resume_target.url }}" hx-target="#it-workspace" hx-swap="innerHTML">
+        Reprendre dernière classe
       </button>
     {% endif %}
   </div>
 
-  <div class="workflow-actions">
-    <button class="workflow-btn workflow-btn-primary" hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">Saisir des notes</button>
-    <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_import_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">Importer Excel</button>
+  <div class="flex flex-wrap gap-3">
+    <button class="btn btn-primary" hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+      <i data-lucide="file-spreadsheet" class="h-4 w-4"></i>
+      Saisir des notes
+    </button>
+    <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_import_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+      <i data-lucide="upload-cloud" class="h-4 w-4"></i>
+      Importer Excel
+    </button>
     {% if calculable_classes %}
-      <button class="workflow-btn workflow-btn-secondary" hx-get="{{ calculable_classes.0.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Generer resultats</button>
+      <button class="btn btn-secondary" hx-get="{{ calculable_classes.0.url }}" hx-target="#it-workspace" hx-swap="innerHTML">
+        <i data-lucide="calculator" class="h-4 w-4"></i>
+        Générer résultats
+      </button>
     {% else %}
-      <span class="workflow-muted">Aucune classe prete a calculer pour l'instant.</span>
+      <span class="chip c-mute">Aucune classe prête à calculer</span>
     {% endif %}
-    <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_cards_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">Generer cartes</button>
-    <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">Mon compte</button>
+    <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_cards_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+      <i data-lucide="badge" class="h-4 w-4"></i>
+      Générer cartes
+    </button>
+    <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+      <i data-lucide="settings" class="h-4 w-4"></i>
+      Mon compte
+    </button>
   </div>
 
-  <div class="workflow-split">
-    <section class="workflow-table-shell">
-      <div class="workflow-table-head"><div><p class="workflow-kicker">Notes incompletes</p><h3>A traiter</h3></div></div>
-      <div class="workflow-list">
+  <div class="grid lg:grid-cols-2 gap-4">
+    <div class="panel">
+      <div class="flex items-center justify-between">
+        <p class="kicker">Notes incomplètes</p>
+        <span class="chip c-warn">{{ incomplete_classes|length }}</span>
+      </div>
+      <h3 class="mt-1 text-lg font-black">À traiter</h3>
+      <div class="mt-3">
         {% for item in incomplete_classes %}
-          <article>
-            <div><strong>{{ item.class.display_name }} - S{{ item.semester.number }}</strong><span>{{ item.state.missing_grades }} note(s) manquante(s)</span></div>
-            <button class="workflow-btn workflow-btn-secondary" hx-get="{{ item.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Ouvrir</button>
-          </article>
+          <div class="row">
+            <div class="avatar" style="background:#d97706">
+              <i data-lucide="edit-3" class="h-4 w-4"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <b class="block">{{ item.class.display_name }} — S{{ item.semester.number }}</b>
+              <span class="text-xs font-semibold text-slate-400">{{ item.state.missing_grades }} note(s) manquante(s)</span>
+            </div>
+            <button class="btn btn-secondary" hx-get="{{ item.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Ouvrir</button>
+          </div>
         {% empty %}
-          <p class="workflow-muted">Aucune classe avec saisie incomplete.</p>
+          <p class="py-4 text-center text-sm font-semibold text-slate-400">Aucune classe avec saisie incomplète.</p>
         {% endfor %}
       </div>
-    </section>
+    </div>
 
-    <section class="workflow-table-shell">
-      <div class="workflow-table-head"><div><p class="workflow-kicker">Resultats</p><h3>Prets a calculer</h3></div></div>
-      <div class="workflow-list">
+    <div class="panel">
+      <div class="flex items-center justify-between">
+        <p class="kicker">Résultats</p>
+        <span class="chip c-info">{{ calculable_classes|length }}</span>
+      </div>
+      <h3 class="mt-1 text-lg font-black">Prêts à calculer</h3>
+      <div class="mt-3">
         {% for item in calculable_classes %}
-          <article>
-            <div><strong>{{ item.class.display_name }} - S{{ item.semester.number }}</strong><span>{{ item.state.entered_grades }}/{{ item.state.expected_grades }} notes</span></div>
-            <button class="workflow-btn workflow-btn-primary" hx-get="{{ item.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Calculer</button>
-          </article>
+          <div class="row">
+            <div class="avatar" style="background:#059669">
+              <i data-lucide="calculator" class="h-4 w-4"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <b class="block">{{ item.class.display_name }} — S{{ item.semester.number }}</b>
+              <span class="text-xs font-semibold text-slate-400">{{ item.state.entered_grades }}/{{ item.state.expected_grades }} notes</span>
+            </div>
+            <button class="btn btn-primary" hx-get="{{ item.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Calculer</button>
+          </div>
         {% empty %}
-          <p class="workflow-muted">Aucun semestre complet non calcule.</p>
+          <p class="py-4 text-center text-sm font-semibold text-slate-400">Aucun semestre complet non calculé.</p>
         {% endfor %}
       </div>
-    </section>
-  </div>
+    </div>
 
-  <div class="workflow-split">
-    <section class="workflow-table-shell">
-      <div class="workflow-table-head"><div><p class="workflow-kicker">Import Excel</p><h3>Erreurs recentes</h3></div></div>
-      <div class="workflow-list">
+    <div class="panel">
+      <div class="flex items-center justify-between">
+        <p class="kicker">Import Excel</p>
+        <span class="chip c-bad">{{ import_errors|length }}</span>
+      </div>
+      <h3 class="mt-1 text-lg font-black">Erreurs récentes</h3>
+      <div class="mt-3">
         {% for log in import_errors %}
-          <article><div><strong>{{ log.target_label }}</strong><span>{{ log.details }}</span></div></article>
+          <div class="row">
+            <div class="avatar" style="background:#be123c">
+              <i data-lucide="alert-circle" class="h-4 w-4"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <b class="block">{{ log.target_label }}</b>
+              <span class="text-xs font-semibold text-slate-400">{{ log.details }}</span>
+            </div>
+          </div>
         {% empty %}
-          <p class="workflow-muted">Aucune erreur d'import recente.</p>
+          <p class="py-4 text-center text-sm font-semibold text-slate-400">Aucune erreur d'import récente.</p>
         {% endfor %}
       </div>
-    </section>
+    </div>
 
-    <section class="workflow-table-shell">
-      <div class="workflow-table-head"><div><p class="workflow-kicker">Comptes</p><h3>Comptes bloques</h3></div></div>
-      <div class="workflow-list">
+    <div class="panel">
+      <div class="flex items-center justify-between">
+        <p class="kicker">Comptes</p>
+        <span class="chip c-bad">{{ blocked_accounts|length }}</span>
+      </div>
+      <h3 class="mt-1 text-lg font-black">Comptes bloqués</h3>
+      <div class="mt-3">
         {% for state in blocked_accounts %}
-          <article>
-            <div><strong>{{ state.user.get_full_name|default:state.user.username }}</strong><span>{{ state.note|default:"Compte bloque" }}</span></div>
-            <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}?q={{ state.user.username }}" hx-target="#it-workspace" hx-swap="innerHTML">Gerer</button>
-          </article>
+          <div class="row">
+            <div class="avatar" style="background:#be123c">
+              <i data-lucide="shield-alert" class="h-4 w-4"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <b class="block">{{ state.user.get_full_name|default:state.user.username }}</b>
+              <span class="text-xs font-semibold text-slate-400">{{ state.note|default:"Compte bloqué" }}</span>
+            </div>
+            <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}?q={{ state.user.username }}" hx-target="#it-workspace" hx-swap="innerHTML">Gérer</button>
+          </div>
         {% empty %}
-          <p class="workflow-muted">Aucun compte bloque dans l'annexe.</p>
+          <p class="py-4 text-center text-sm font-semibold text-slate-400">Aucun compte bloqué dans l'annexe.</p>
         {% endfor %}
       </div>
-    </section>
+    </div>
   </div>
-</section>
+</div>

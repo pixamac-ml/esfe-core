@@ -1,0 +1,215 @@
+{% if toast %}
+<div class="banner {% if toast.level == 'success' %}ok{% else %}warn{% endif %}">{{ toast.message }}</div>
+{% endif %}
+
+{% if academic_class %}
+<div class="toolbar">
+  <span class="src-badge">⤿ {% if planner_intent == 'create' %}Création{% else %}Programmation{% endif %} — {{ academic_class.display_name }}</span>
+  <button type="button" class="btn"
+          hx-get="{% url planner_hub_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+          hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+    ← Retour aux actions
+  </button>
+  <a href="{% url class_print_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&period=week" target="_blank" class="btn">Imprimer classe</a>
+  <a href="{% url class_print_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&period=month" target="_blank" class="btn">Imprimer mois</a>
+  {% if prefill_teacher_id %}
+  <a href="{% url teacher_print_url prefill_teacher_id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&period=week" target="_blank" class="btn">Imprimer enseignant</a>
+  {% endif %}
+</div>
+
+<div class="grid cards-4" style="margin-bottom:16px">
+  <div class="stat"><div class="k">Cours programmés</div><div class="v">{{ scheduled_courses_count }}</div><div class="d">Cette semaine</div></div>
+  <div class="stat"><div class="k">EC disponibles</div><div class="v">{{ subject_rows|length }}</div><div class="d">Pour la classe active</div></div>
+  <div class="stat"><div class="k">Enseignants proposés</div><div class="v">{{ teachers|length }}</div><div class="d">Sélection rapide</div></div>
+  <div class="stat"><div class="k">Semaine active</div><div class="v" style="font-size:17px">{{ schedule.week_start|date:"d/m/Y" }}</div></div>
+</div>
+
+<div class="grid cards-2" style="grid-template-columns:1.35fr 1fr;align-items:start">
+  <div class="card">
+    <div class="card-h"><h3>Aperçu de l'emploi du temps</h3><span class="hint">{{ student_count }} étudiant(s)</span></div>
+    <div class="card-b" style="padding:12px;overflow:auto">
+      {% include "portal/staff/supervisor/partials/sg_schedule_week_grid.html" %}
+    </div>
+  </div>
+
+  <div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-h">
+        <h3>Navigation semaine</h3>
+        <span>
+          <button type="button" class="btn" style="padding:6px 9px"
+                  hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}"
+                  hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">‹</button>
+          <button type="button" class="btn" style="padding:6px 9px"
+                  hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}"
+                  hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">›</button>
+        </span>
+      </div>
+      <div class="card-b">
+        {% for day in schedule.days %}
+        <div class="row">
+          <div class="main"><b>{{ day.label }} {{ day.day_number }}</b><span>{{ day.date|date:"d/m/Y" }}</span></div>
+          {% if day.is_today %}<span class="tail"><span class="chip ok">Aujourd'hui</span></span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card" id="planner-create-course">
+      <div class="card-h">
+        <h3>{% if planner_intent == 'create' %}Création d'un nouvel emploi du temps{% else %}Formulaire de programmation{% endif %}</h3>
+        <span class="chip info">{% if planner_intent == 'create' %}Nouveau cadrage{% else %}Classe active{% endif %}</span>
+      </div>
+      <div class="card-b" style="padding:18px">
+        <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:14px">
+          {% if planner_intent == 'create' %}Le dashboard privilégie ici la création : cadrage de la semaine et programmation des premiers cours.{% else %}Ajoute ou programme un cours sur l'emploi du temps en cours pour la semaine sélectionnée.{% endif %}
+        </p>
+
+        {% if prefill_teacher_id or prefill_ec_id or prefill_room_label or prefill_planned_hours %}
+        <div class="banner ok" style="font-size:12.5px">
+          Formulaire pré-rempli depuis une affectation enseignant.
+          {% if prefill_planned_hours %} Volume cible : {{ prefill_planned_hours }} h.{% endif %}
+          {% if prefill_room_label %} Salle de référence : {{ prefill_room_label }}.{% endif %}
+        </div>
+        {% endif %}
+
+        <form
+          method="post"
+          action="{% url create_schedule_event_url academic_class.id %}"
+          hx-post="{% url create_schedule_event_url academic_class.id %}"
+          hx-target="{{ workspace_target_id }}"
+          hx-swap="innerHTML"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}">
+          <input type="hidden" name="planner_intent" value="{{ planner_intent|default:'create' }}">
+
+          <label class="f-l" style="margin-top:0">Choix rapide du jour</label>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px">
+            {% for day in schedule.days %}
+            <button type="button" class="btn {% if day.is_today %}primary{% endif %}" style="justify-content:flex-start;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px"
+                    onclick="const form=this.closest('form'); const input=form.querySelector('input[name=date]'); if(input){ input.value='{{ day.date|date:'Y-m-d' }}'; input.dispatchEvent(new Event('change', { bubbles: true })); input.focus(); }">
+              <span style="font-size:10px;text-transform:uppercase;opacity:.75">{{ day.label }}</span>
+              <span style="font-size:13px;font-weight:800">{{ day.date|date:"d/m" }}</span>
+            </button>
+            {% endfor %}
+          </div>
+
+          <div style="display:flex;gap:10px">
+            <div style="flex:1">
+              <label class="f-l">Date du cours</label>
+              <input name="date" type="date" required class="f-i" value="{% if prefill_date %}{{ prefill_date }}{% else %}{{ schedule.week_start|date:'Y-m-d' }}{% endif %}">
+            </div>
+            <div style="flex:1">
+              <label class="f-l">Salle</label>
+              <input name="location" type="text" class="f-i" placeholder="Ex : Amphi A" value="{% if prefill_location %}{{ prefill_location }}{% else %}{{ prefill_room_label }}{% endif %}">
+            </div>
+          </div>
+
+          <label class="f-l">Créneaux rapides</label>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:6px">
+            <button type="button" class="btn" onclick="const form=this.closest('form'); form.querySelector('input[name=start_time]').value='08:00'; form.querySelector('input[name=end_time]').value='10:00';">08:00 – 10:00</button>
+            <button type="button" class="btn" onclick="const form=this.closest('form'); form.querySelector('input[name=start_time]').value='10:15'; form.querySelector('input[name=end_time]').value='12:15';">10:15 – 12:15</button>
+            <button type="button" class="btn" onclick="const form=this.closest('form'); form.querySelector('input[name=start_time]').value='13:30'; form.querySelector('input[name=end_time]').value='15:30';">13:30 – 15:30</button>
+            <button type="button" class="btn" onclick="const form=this.closest('form'); form.querySelector('input[name=start_time]').value='15:45'; form.querySelector('input[name=end_time]').value='17:45';">15:45 – 17:45</button>
+          </div>
+
+          <div style="display:flex;gap:10px">
+            <div style="flex:1">
+              <label class="f-l">Heure de début</label>
+              <input name="start_time" type="time" required class="f-i" value="{{ prefill_start_time }}">
+            </div>
+            <div style="flex:1">
+              <label class="f-l">Heure de fin</label>
+              <input name="end_time" type="time" required class="f-i" value="{{ prefill_end_time }}">
+            </div>
+          </div>
+
+          <label class="f-l">Matière / EC</label>
+          <select name="ec_id" required class="f-i">
+            <option value="">Choisir un EC</option>
+            {% for ec in ecs %}
+            <option value="{{ ec.id }}"{% if prefill_ec_id == ec.id %} selected{% endif %}>{{ ec.ue.code }} · {{ ec.title }}</option>
+            {% endfor %}
+          </select>
+
+          <label class="f-l">Enseignant</label>
+          <select name="teacher_id" required class="f-i">
+            <option value="">Choisir un enseignant</option>
+            {% for teacher in teachers %}
+            <option value="{{ teacher.id }}"{% if prefill_teacher_id == teacher.id %} selected{% endif %}>{{ teacher.get_full_name|default:teacher.username }}</option>
+            {% endfor %}
+          </select>
+
+          <label style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px;font-weight:600;color:var(--ink-2)">
+            <input type="checkbox" name="is_online" value="1">
+            Cours en ligne
+          </label>
+
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+            <button type="reset" class="btn">Vider</button>
+            <button type="submit" class="btn primary">{% if planner_intent == 'create' %}Créer et programmer{% else %}Programmer le cours{% endif %}</button>
+          </div>
+        </form>
+
+        {% if prefill_teacher_id or prefill_ec_id %}
+        <script>
+          (function () {
+            const root = document.getElementById('planner-create-course');
+            if (!root) { return; }
+            const ecSelect = root.querySelector('select[name="ec_id"]');
+            const teacherSelect = root.querySelector('select[name="teacher_id"]');
+            const prefillEcId = "{{ prefill_ec_id|default:'' }}";
+            const prefillTeacherId = "{{ prefill_teacher_id|default:'' }}";
+            if (ecSelect && prefillEcId) { ecSelect.value = prefillEcId; }
+            if (teacherSelect && prefillTeacherId) { teacherSelect.value = prefillTeacherId; }
+          }());
+        </script>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid cards-2" style="margin-top:16px;grid-template-columns:1.05fr .95fr">
+  <div class="card">
+    <div class="card-h"><h3>Gestion des matières</h3><span class="chip info">{{ subject_rows|length }} EC</span></div>
+    <div class="card-b">
+      {% for subject in subject_rows %}
+      <div class="row">
+        <div class="main"><b>{{ subject.title }}</b><span>{{ subject.ue_code }} · {{ subject.teacher_name }}{% if subject.room %} · {{ subject.room }}{% endif %}</span></div>
+        <span class="tail"><span class="chip mute">{{ subject.event_count }} cours</span></span>
+      </div>
+      {% empty %}
+      <div class="empty"><p>Aucune matière disponible.</p></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>Actions rapides</h3><span class="chip mute">{{ student_count }} étudiants</span></div>
+    <div class="card-b" style="padding:14px 18px">
+      <button type="button" class="btn" style="width:100%;justify-content:flex-start;margin-bottom:8px" onclick="document.getElementById('planner-create-course')?.scrollIntoView({behavior: 'smooth', block: 'center'})">Ajouter un cours</button>
+      <button type="button" class="btn" style="width:100%;justify-content:flex-start;margin-bottom:8px" onclick="window.location.hash='attendance'">Ouvrir les présences</button>
+      <button type="button" class="btn" style="width:100%;justify-content:flex-start;margin-bottom:8px" onclick="window.location.hash='courses'">Ouvrir les cours</button>
+      <button type="button" class="btn" style="width:100%;justify-content:flex-start" onclick="window.location.hash='alerts'">Voir les alertes</button>
+
+      <div class="sec-title">Étudiants rattachés</div>
+      <div style="max-height:280px;overflow:auto">
+        {% for student in students %}
+        <div class="row" style="padding:8px 0">
+          <div class="main"><b style="font-size:13px">{{ student.full_name }}</b><span>{{ student.matricule|default:"—" }}</span></div>
+          <span class="tail"><span class="chip ok">OK</span></span>
+        </div>
+        {% empty %}
+        <p style="font-size:12px;color:var(--ink-3)">Aucun étudiant rattaché.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="empty">
+  <p style="font-weight:800;font-size:14px">Aucune classe sélectionnée</p>
+</div>
+{% endif %}

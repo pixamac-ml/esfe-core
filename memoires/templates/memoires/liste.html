@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Mémoires – ESFE{% endblock %}
+
+{% block content %}
+
+<!-- ================= HERO ================= -->
+<section class="relative overflow-hidden bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 text-white">
+
+  <div class="relative max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-12 md:py-16 lg:py-20">
+    <div class="max-w-3xl space-y-5 lg:space-y-6">
+      <div class="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm px-4 md:px-6 py-2 md:py-3 rounded-full text-xs uppercase tracking-wider font-medium">
+        <span class="w-2 h-2 bg-secondary rounded-full animate-pulse"></span>
+        Bibliothèque académique
+      </div>
+
+      <h1 class="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight">Mémoires</h1>
+
+      <p class="text-sm md:text-base lg:text-lg text-white/85 max-w-2xl leading-relaxed">
+        Consultez en ligne les mémoires soutenus par les étudiants de l'ESFé. Lecture protégée, aucun téléchargement.
+      </p>
+
+      <form method="get" class="pt-2 max-w-md"
+            hx-get="{% url 'memoires:liste' %}" hx-target="#memoires-resultats" hx-swap="innerHTML"
+            hx-push-url="true" hx-trigger="submit, keyup changed delay:400ms from:input[name='q']">
+        <div class="relative group">
+          <input type="text" name="q" value="{{ q }}" placeholder="Rechercher un mémoire, un auteur, un mot-clé…"
+                 class="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent focus:bg-white/15 transition-all duration-300">
+          <svg class="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/60 group-focus-within:text-secondary transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m2.1-5.4a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z"/>
+          </svg>
+          <button type="submit" class="sr-only">Rechercher</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="absolute top-0 right-0 w-72 h-72 bg-secondary/10 blur-3xl rounded-full pointer-events-none"></div>
+  <div class="absolute bottom-0 left-0 w-56 h-56 bg-white/5 blur-2xl rounded-full pointer-events-none"></div>
+</section>
+
+<!-- ================= FILTRES ================= -->
+<section class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 -mt-6 relative z-10">
+  <form method="get"
+        class="bg-white/95 backdrop-blur-sm rounded-2xl border border-slate-200/80 shadow-soft p-4 md:p-5 flex flex-wrap items-center gap-3"
+        hx-get="{% url 'memoires:liste' %}" hx-target="#memoires-resultats" hx-swap="innerHTML"
+        hx-push-url="true" hx-trigger="change, submit">
+    <input type="hidden" name="q" value="{{ q }}">
+
+    <div class="flex items-center gap-2 text-slate-400 text-sm pr-1">
+      <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+      Filtrer
+    </div>
+
+    <select name="filiere"
+            class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-300">
+      <option value="">Toutes les filières</option>
+      {% for filiere in filieres %}
+      <option value="{{ filiere.id }}" {% if filiere.id|stringformat:"s" == filiere_active %}selected{% endif %}>{{ filiere.name }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="niveau"
+            class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-300">
+      <option value="">Tous les niveaux</option>
+      {% for valeur, libelle in niveaux %}
+      <option value="{{ valeur }}" {% if valeur == niveau_actif %}selected{% endif %}>{{ libelle }}</option>
+      {% endfor %}
+    </select>
+
+    <input type="number" name="annee" value="{{ annee_active }}" placeholder="Année"
+           class="w-28 rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-300">
+
+    {% if q or filiere_active or niveau_actif or annee_active %}
+    <a href="{% url 'memoires:liste' %}" class="text-sm text-slate-500 hover:text-secondary transition ml-auto">Réinitialiser</a>
+    {% endif %}
+  </form>
+</section>
+
+<!-- ================= PLUS CONSULTÉS DU MOIS ================= -->
+{% if plus_consultes_mois %}
+<section class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 pt-14">
+  <h2 class="text-lg md:text-xl font-bold text-slate-900 mb-5 flex items-center gap-2.5">
+    <span class="flex items-center justify-center w-8 h-8 rounded-xl bg-secondary/10 text-secondary">
+      <i data-lucide="trending-up" class="w-4 h-4"></i>
+    </span>
+    Les plus consultés ce mois
+  </h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 md:gap-6">
+    {% for memoire in plus_consultes_mois %}
+    {% include "memoires/partials/carte_memoire.html" %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<!-- ================= MIS EN AVANT ================= -->
+{% if mis_en_avant %}
+<section class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 pt-14">
+  <h2 class="text-lg md:text-xl font-bold text-slate-900 mb-5 flex items-center gap-2.5">
+    <span class="flex items-center justify-center w-8 h-8 rounded-xl bg-secondary/10 text-secondary">
+      <i data-lucide="star" class="w-4 h-4"></i>
+    </span>
+    Mis en avant
+  </h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+    {% for memoire in mis_en_avant %}
+    {% include "memoires/partials/carte_memoire.html" %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<!-- ================= LISTE ================= -->
+<section class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-14 md:py-16">
+  <h2 class="text-lg md:text-xl font-bold text-slate-900 mb-5 flex items-center gap-2.5">
+    <span class="flex items-center justify-center w-8 h-8 rounded-xl bg-primary-50 text-primary-600">
+      <i data-lucide="library" class="w-4 h-4"></i>
+    </span>
+    Tous les mémoires
+  </h2>
+  <div id="memoires-resultats">
+    {% include "memoires/partials/_resultats.html" %}
+  </div>
+</section>
+
+{% endblock %}

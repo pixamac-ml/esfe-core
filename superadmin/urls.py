@@ -204,6 +204,17 @@ urlpatterns = [
     path('branches/<int:pk>/toggle/', views.toggle_branch, name='toggle_branch'),
 
     # ============================================================================
+    # MEMOIRES
+    # ============================================================================
+    path('memoires/', views.memoire_list, name='memoire_list'),
+    path('memoires/create/', views.memoire_create, name='memoire_create'),
+    path('memoires/<int:pk>/edit/', views.memoire_edit, name='memoire_edit'),
+    path('memoires/<int:pk>/delete/', views.memoire_delete, name='memoire_delete'),
+    path('memoires/<int:pk>/toggle-publication/', views.toggle_memoire_publication, name='toggle_memoire_publication'),
+    path('memoires/<int:pk>/toggle-avant/', views.toggle_memoire_avant, name='toggle_memoire_avant'),
+    path('memoires/<int:pk>/regenerer-pages/', views.memoire_regenerate_pages, name='memoire_regenerate_pages'),
+
+    # ============================================================================
     # MESSAGES (Contact)
     # ============================================================================
     path('messages/', views.message_list, name='message_list'),

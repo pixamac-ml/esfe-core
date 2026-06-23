@@ -1,0 +1,152 @@
+{% load component_tags %}
+{% if toast %}
+<div class="banner {% if toast.level == 'success' %}ok{% else %}warn{% endif %}">{{ toast.message }}</div>
+{% endif %}
+
+{% if academic_class %}
+
+{% if drawer %}
+  {# ── Mode DRAWER : menu compact d'actions ── #}
+  <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:16px">{{ academic_class.display_name }} · Semaine du {{ schedule.week_start|date:"d/m/Y" }}</p>
+
+  <div class="card">
+    <div class="card-b">
+      <div class="row clickable"
+           hx-get="{% url planner_view_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML"
+           @click="$dispatch('supervisor-drawer-close')">
+        <div class="pic" style="background:#334155">👁</div>
+        <div class="main"><b>Voir l'emploi du temps</b><span>Affichage lecture seule avec navigation de semaine</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="row clickable"
+           hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=create"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML"
+           @click="$dispatch('supervisor-drawer-close')">
+        <div class="pic" style="background:var(--accent)">＋</div>
+        <div class="main"><b>Créer un nouvel emploi du temps</b><span>Formulaire de cadrage et aperçu côte à côte</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="row clickable"
+           hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=add_course"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML"
+           @click="$dispatch('supervisor-drawer-close')">
+        <div class="pic" style="background:#0d9f6e">+C</div>
+        <div class="main"><b>Ajouter un cours</b><span>Programme un cours sur l'emploi du temps existant</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="row clickable"
+           hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=program"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML"
+           @click="$dispatch('supervisor-drawer-close')">
+        <div class="pic" style="background:#c2790b">⏱</div>
+        <div class="main"><b>Programmer un cours</b><span>Formulaire rapide avec focus sur la saisie</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="row clickable"
+           hx-get="{% url weekly_slots_workspace_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML"
+           @click="$dispatch('supervisor-drawer-close')">
+        <div class="pic" style="background:#6b21d6">▦</div>
+        <div class="main"><b>Grille hebdomadaire (modèle)</b><span>CRUD des créneaux récurrents par jour/matière/enseignant/salle</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-title">Génération des cours</div>
+  <div style="display:flex;gap:10px">
+    <button type="button" class="btn primary" style="flex:1;justify-content:center"
+            @click="$dispatch('supervisor-drawer-close')" onclick="document.getElementById('modal-generate-week')?.classList.remove('hide')">
+      Générer la semaine
+    </button>
+    <button type="button" class="btn primary" style="flex:1;justify-content:center;background:#6b21d6;border-color:#6b21d6"
+            @click="$dispatch('supervisor-drawer-close')" onclick="document.getElementById('modal-generate-month')?.classList.remove('hide')">
+      Générer le mois
+    </button>
+  </div>
+
+{% else %}
+  {# ── Mode PLEIN ÉCRAN : affichage complet du hub ── #}
+  {% component "timetable_view" timetable_view=timetable_view %}
+  {% endcomponent %}
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-h">
+      <div>
+        <span class="src-badge">⤿ Étape 2</span>
+        <h3 style="margin-top:6px">Actions pour {{ academic_class.display_name }}</h3>
+      </div>
+    </div>
+    <div class="card-b" style="padding:16px 18px">
+      <p style="font-size:13px;color:var(--ink-2);margin-bottom:16px">Choisissez l'action à effectuer sur l'emploi du temps de cette classe.</p>
+      <div class="grid cards-4">
+        <div class="stat"><div class="k">Étudiants</div><div class="v">{{ student_count }}</div></div>
+        <div class="stat"><div class="k">Cours</div><div class="v">{{ scheduled_courses_count }}</div></div>
+        <div class="stat"><div class="k">EC</div><div class="v">{{ subject_rows|length }}</div></div>
+        <div class="stat"><div class="k">Semaine</div><div class="v" style="font-size:15px">{{ schedule.week_start|date:"d/m/Y" }}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-h"><h3>Actions</h3></div>
+    <div class="card-b">
+      <div class="row clickable"
+           hx-get="{% url planner_view_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+        <div class="pic" style="background:#334155">👁</div>
+        <div class="main"><b>Voir l'emploi du temps</b><span>Affichage lecture seule, navigation de semaine et aperçu propre de la grille.</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="row clickable"
+           hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=create"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+        <div class="pic" style="background:var(--accent)">＋</div>
+        <div class="main"><b>Créer un nouvel emploi du temps</b><span>Formulaire de cadrage et aperçu côte à côte.</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="row clickable"
+           hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=add_course"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+        <div class="pic" style="background:#0d9f6e">+C</div>
+        <div class="main"><b>Ajouter un cours</b><span>Ajoute un cours sur l'emploi du temps existant sans changer le cadre hebdomadaire.</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="row clickable"
+           hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=program"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+        <div class="pic" style="background:#c2790b">⏱</div>
+        <div class="main"><b>Programmer un cours</b><span>Passe directement au formulaire de programmation, focus sur la saisie.</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="row clickable"
+           hx-get="{% url weekly_slots_workspace_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}"
+           hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+        <div class="pic" style="background:#6b21d6">▦</div>
+        <div class="main"><b>Grille hebdomadaire (modèle)</b><span>CRUD des créneaux récurrents par jour / matière / enseignant / salle. Les cours datés se gèrent via « Programmer un cours ».</span></div>
+        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-h">
+      <h3>Aperçu rapide de la semaine</h3>
+      <button type="button" class="btn"
+              hx-get="{% url planner_view_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+              hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+        Voir la grille complète
+      </button>
+    </div>
+    <div class="card-b" style="padding:12px;overflow:auto">
+      {% include "portal/staff/supervisor/partials/sg_schedule_week_grid.html" %}
+    </div>
+  </div>
+{% endif %}
+
+{% else %}
+<div class="empty">
+  <p style="font-weight:800;font-size:14px">Aucune classe sélectionnée</p>
+</div>
+{% endif %}

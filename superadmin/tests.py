@@ -1,5 +1,6 @@
 from io import BytesIO
 
+import fitz
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -10,6 +11,8 @@ from news.models import Event, EventType, MediaItem, ResultSession
 from core.models import ContactMessage, LegalPage
 from branches.models import Branch
 from payments.models import PaymentAgent
+from formations.models import Filiere
+from memoires.models import Memoire, PageMemoire
 
 
 User = get_user_model()
@@ -500,5 +503,155 @@ class LegalPagesSuperadminTests(TestCase):
 
         public_response = self.client.get(reverse('core:legal_notice'))
         self.assertEqual(public_response.status_code, 200)
+
+
+def _pdf_bytes(nb_pages=2):
+    document = fitz.open()
+    for _ in range(nb_pages):
+        document.new_page(width=200, height=200)
+    data = document.tobytes()
+    document.close()
+    return data
+
+
+class MemoireSuperadminModuleTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username='admin_memoires',
+            email='admin_memoires@example.com',
+            password='pass1234',
+        )
+        self.filiere = Filiere.objects.create(name='Soins infirmiers')
+
+    def _donnees_formulaire(self, **extra):
+        defaults = dict(
+            titre='Prise en charge des urgences',
+            slug='prise-en-charge-des-urgences',
+            auteurs='Mariam Diallo',
+            filiere=self.filiere.pk,
+            niveau=Memoire.Niveau.LICENCE,
+            annee=2026,
+            resume='Resume du memoire',
+            mots_cles='urgences, soins',
+            statut=Memoire.Statut.BROUILLON,
+        )
+        defaults.update(extra)
+        return defaults
+
+    def test_acces_refuse_aux_non_superadmins(self):
+        simple_user = User.objects.create_user(
+            username='secretaire', email='secretaire@example.com', password='pass1234'
+        )
+        self.client.force_login(simple_user)
+
+        response = self.client.get(reverse('superadmin:memoire_list'))
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_liste_accessible_au_superadmin(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('superadmin:memoire_list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_creation_declenche_la_generation_des_pages(self):
+        self.client.force_login(self.admin)
+        fichier = SimpleUploadedFile('memoire.pdf', _pdf_bytes(2), content_type='application/pdf')
+
+        response = self.client.post(
+            reverse('superadmin:memoire_create'),
+            self._donnees_formulaire(fichier_source=fichier),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        memoire = Memoire.objects.get(slug='prise-en-charge-des-urgences')
+        self.assertEqual(memoire.cree_par, self.admin)
+        self.assertEqual(memoire.nb_pages, 2)
+        self.assertEqual(PageMemoire.objects.filter(memoire=memoire).count(), 2)
+
+    def test_remplacement_fichier_regenere_les_pages(self):
+        self.client.force_login(self.admin)
+        memoire = Memoire.objects.create(
+            **{k: v for k, v in self._donnees_formulaire().items() if k != 'filiere'},
+            filiere=self.filiere,
+            fichier_source=SimpleUploadedFile(
+                'initial.pdf', _pdf_bytes(2), content_type='application/pdf'
+            ),
+        )
+        from memoires.services.rendering import render_memoire_pages
+        render_memoire_pages(memoire)
+        self.assertEqual(memoire.nb_pages, 2)
+
+        nouveau_fichier = SimpleUploadedFile(
+            'remplace.pdf', _pdf_bytes(3), content_type='application/pdf'
+        )
+        response = self.client.post(
+            reverse('superadmin:memoire_edit', args=[memoire.pk]),
+            self._donnees_formulaire(fichier_source=nouveau_fichier),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        memoire.refresh_from_db()
+        self.assertEqual(memoire.nb_pages, 3)
+        self.assertEqual(PageMemoire.objects.filter(memoire=memoire).count(), 3)
+
+    def test_suppression_nettoie_le_stockage(self):
+        self.client.force_login(self.admin)
+        memoire = Memoire.objects.create(
+            **{k: v for k, v in self._donnees_formulaire().items() if k != 'filiere'},
+            filiere=self.filiere,
+            fichier_source=SimpleUploadedFile(
+                'a_supprimer.pdf', _pdf_bytes(2), content_type='application/pdf'
+            ),
+        )
+        from memoires.services.rendering import render_memoire_pages
+        render_memoire_pages(memoire)
+
+        fichier_source_storage = memoire.fichier_source.storage
+        fichier_source_name = memoire.fichier_source.name
+        pages_storage_et_noms = [
+            (page.image.storage, page.image.name) for page in memoire.pages.all()
+        ]
+        self.assertTrue(fichier_source_storage.exists(fichier_source_name))
+
+        response = self.client.post(reverse('superadmin:memoire_delete', args=[memoire.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Memoire.objects.filter(pk=memoire.pk).exists())
+        self.assertFalse(fichier_source_storage.exists(fichier_source_name))
+        for storage, name in pages_storage_et_noms:
+            self.assertFalse(storage.exists(name))
+
+    def test_toggle_publication_renseigne_date_publication(self):
+        self.client.force_login(self.admin)
+        memoire = Memoire.objects.create(
+            **{k: v for k, v in self._donnees_formulaire().items() if k != 'filiere'},
+            filiere=self.filiere,
+            fichier_source=SimpleUploadedFile(
+                'toggle.pdf', _pdf_bytes(1), content_type='application/pdf'
+            ),
+        )
+
+        response = self.client.get(reverse('superadmin:toggle_memoire_publication', args=[memoire.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        memoire.refresh_from_db()
+        self.assertEqual(memoire.statut, Memoire.Statut.PUBLIE)
+        self.assertIsNotNone(memoire.date_publication)
+
+    def test_toggle_mise_en_avant(self):
+        self.client.force_login(self.admin)
+        memoire = Memoire.objects.create(
+            **{k: v for k, v in self._donnees_formulaire().items() if k != 'filiere'},
+            filiere=self.filiere,
+            fichier_source=SimpleUploadedFile(
+                'avant.pdf', _pdf_bytes(1), content_type='application/pdf'
+            ),
+        )
+
+        response = self.client.get(reverse('superadmin:toggle_memoire_avant', args=[memoire.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        memoire.refresh_from_db()
+        self.assertTrue(memoire.est_mis_en_avant)
 
 

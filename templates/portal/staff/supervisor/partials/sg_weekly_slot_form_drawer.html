@@ -1,0 +1,78 @@
+{% if academic_class %}
+<p style="font-size:12.5px;color:var(--ink-3);margin-bottom:4px;font-weight:700">
+  {% if editing_slot %}Modifier le créneau{% else %}Nouveau créneau{% endif %} — {{ academic_class.display_name }}
+</p>
+<p style="font-size:12px;color:var(--ink-3);margin-bottom:16px">Modèle hebdomadaire · récurrence par jour de semaine.</p>
+
+<form
+  method="post"
+  action="{% url weekly_slot_save_url academic_class.id %}"
+  hx-post="{% url weekly_slot_save_url academic_class.id %}"
+  hx-target="#supervisor-workspace"
+  hx-swap="innerHTML"
+  hx-on::after-request="if(event.detail.successful){ window.dispatchEvent(new Event('supervisor-drawer-close')); }"
+>
+  {% csrf_token %}
+  <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+  <input type="hidden" name="action" value="{% if editing_slot %}update{% else %}create{% endif %}" />
+  {% if editing_slot %}<input type="hidden" name="slot_id" value="{{ editing_slot.id }}" />{% endif %}
+  <input type="hidden" name="from_drawer" value="1" />
+
+  <label class="f-l" style="margin-top:0">Jour</label>
+  <select name="weekday" required class="f-i">
+    {% for val, label in weekday_choices %}
+    <option value="{{ val }}" {% if editing_slot and editing_slot.weekday == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+
+  <div style="display:flex;gap:10px">
+    <div style="flex:1">
+      <label class="f-l">Début</label>
+      <input name="start_time" type="time" required class="f-i"
+             {% if editing_slot %}value="{{ editing_slot.start_time }}"{% endif %}>
+    </div>
+    <div style="flex:1">
+      <label class="f-l">Fin</label>
+      <input name="end_time" type="time" required class="f-i"
+             {% if editing_slot %}value="{{ editing_slot.end_time }}"{% endif %}>
+    </div>
+  </div>
+
+  <label class="f-l">Matière (EC)</label>
+  <select name="ec_id" required class="f-i">
+    <option value="">Choisir…</option>
+    {% for ec in ecs %}
+    <option value="{{ ec.id }}" {% if editing_slot and editing_slot.ec_id == ec.id %}selected{% endif %}>{{ ec.ue.code }} — {{ ec.title }}</option>
+    {% endfor %}
+  </select>
+
+  <label class="f-l">Enseignant</label>
+  <select name="teacher_id" required class="f-i">
+    <option value="">Choisir…</option>
+    {% for t in teachers %}
+    <option value="{{ t.id }}" {% if editing_slot and editing_slot.teacher_id == t.id %}selected{% endif %}>{{ t.get_full_name|default:t.username }}</option>
+    {% endfor %}
+  </select>
+
+  <label class="f-l">Salle</label>
+  <input name="room" type="text" class="f-i" placeholder="Ex : Amphi A"
+         value="{% if editing_slot %}{{ editing_slot.room }}{% endif %}">
+
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap">
+    {% if editing_slot %}
+    <button type="button" class="btn" style="color:var(--bad);border-color:#f6c8d2;margin-right:auto"
+            hx-post="{% url weekly_slot_save_url academic_class.id %}"
+            hx-vals='{"action":"delete","slot_id":"{{ editing_slot.id }}","week_start":"{{ schedule.week_start|date:"Y-m-d" }}"}'
+            hx-target="#supervisor-workspace" hx-swap="innerHTML"
+            hx-confirm="Supprimer ce créneau ?"
+            hx-on::after-request="if(event.detail.successful){ window.dispatchEvent(new Event('supervisor-drawer-close')); }">
+      Supprimer
+    </button>
+    {% endif %}
+    <button type="button" class="btn" @click="$dispatch('supervisor-drawer-close')">Annuler</button>
+    <button type="submit" class="btn primary">{% if editing_slot %}Enregistrer{% else %}Créer le créneau{% endif %}</button>
+  </div>
+</form>
+{% else %}
+<p style="font-size:13px;color:var(--ink-3)">Aucune classe sélectionnée.</p>
+{% endif %}

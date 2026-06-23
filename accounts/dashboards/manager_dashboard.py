@@ -860,9 +860,11 @@ def _manager_context(request, active_section="overview"):
         "cash_sources": BranchCashMovement.SOURCE_CHOICES,
         "closure_form": BranchMonthlyClosureForm(initial={
             "period_month": payroll_month,
-            "bank_transfer_amount": 0,
+            "bank_transfer_amount": max(get_branch_cash_balance(branch) - branch.cash_reserve_target, 0),
         }),
         "available_cash_balance": get_branch_cash_balance(branch),
+        "cash_reserve_target": branch.cash_reserve_target,
+        "suggested_transfer_amount": max(get_branch_cash_balance(branch) - branch.cash_reserve_target, 0),
         "transfer_form": BranchBankTransferForm(initial={
             "transfer_date": today,
             "amount": 0,

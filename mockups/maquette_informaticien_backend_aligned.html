@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="fr" class="">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Informaticien · ESFé Core (maquette)</title>
+<!-- MAQUETTE fidèle au back-end réel ESFé Core (espace Informaticien d'annexe).
+     Reproduit : les 13 modules it_* (Accueil, Notes & Résultats, Paramétrage académique, Import/export,
+     Archives, Cartes, Utilisateurs, Support, Supervision, Journal d'audit, Catalogue, Notifications, Compte),
+     la machine à états des notes (empty→in_progress→ready_to_publish_normal→normal_published→
+     retake_in_progress→ready_to_publish_final→final_published), le scoping annexe, les actions comptes
+     (reset MDP, bloquer/débloquer, désactiver/réactiver, modifier email).
+     Données FICTIVES, cohérentes avec le modèle (Branch, AcademicClass→UE→EC, Semester, seuil de validation).
+     Nécessite une connexion (Tailwind + lucide en CDN, comme le dashboard réel). -->
+<script>window.tailwind=window.tailwind||{};window.tailwind.config={darkMode:'class'};</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  [x-cloak]{display:none!important}
+  body{background:#f8fafc;color:#0f172a}
+  .dark body{background:#020617;color:#e2e8f0}
+  .it-sidebar{background:#082f49;color:#fff}
+  .it-nav-btn{display:flex;width:100%;align-items:center;gap:.85rem;border-radius:14px;padding:.7rem 1rem;text-align:left;font-size:.88rem;font-weight:800;color:rgb(226 232 240 / .86);transition:.16s ease;border:none;background:none;cursor:pointer}
+  .it-nav-btn:hover{background:rgb(255 255 255 / .10)}
+  .it-nav-btn.active{background:#2563eb;color:#fff}
+  .nav-sub{font-size:.66rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:rgb(186 210 236 / .5);padding:.9rem 1rem .3rem}
+  .wkc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-bottom:1rem}
+  .wkc label{display:grid;gap:.4rem;font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#64748b}
+  .wkc select{height:46px;border-radius:12px;border:1px solid #cbd5e1;background:#fff;padding:0 .9rem;color:#0f172a;font-size:.92rem;font-weight:700;outline:none}
+  .dark .wkc select{border-color:#334155;background:#0f172a;color:#e2e8f0}
+  .panel{border:1px solid #e2e8f0;border-radius:18px;background:#fff;padding:1.2rem;box-shadow:0 10px 28px rgb(15 23 42 / .06)}
+  .dark .panel{border-color:#334155;background:#0f172a}
+  .band{border:1px solid #e2e8f0;border-radius:18px;background:#fff;padding:1.2rem;box-shadow:0 10px 28px rgb(15 23 42 / .06);display:flex;align-items:center;justify-content:space-between;gap:1rem;border-left-width:6px}
+  .dark .band{border-color:#334155;background:#0f172a}
+  .band h3{margin-top:.25rem;font-size:1.25rem;font-weight:950}
+  .band p{margin-top:.35rem;color:#64748b;font-size:.9rem;font-weight:600}
+  .band>div>span.badge{border-radius:999px;background:#eff6ff;padding:.5rem .75rem;color:#1d4ed8;font-size:.78rem;font-weight:900;white-space:nowrap}
+  .b-empty{border-left-color:#64748b}.b-in_progress{border-left-color:#2563eb}
+  .b-ready_to_publish_normal,.b-ready_to_publish_final{border-left-color:#d97706}
+  .b-normal_published,.b-final_published{border-left-color:#059669}
+  .b-retake_in_progress{border-left-color:#4f46e5}
+  .kicker{margin:0;color:#2563eb;font-size:.72rem;font-weight:950;text-transform:uppercase;letter-spacing:.16em}
+  .progress-track{margin-top:.7rem;height:10px;overflow:hidden;border-radius:999px;background:#e2e8f0}
+  .dark .progress-track{background:#1e293b}
+  .progress-track div{height:100%;border-radius:inherit;background:#2563eb;transition:width .3s ease}
+  .btn{display:inline-flex;min-height:42px;align-items:center;justify-content:center;gap:.5rem;border-radius:12px;padding:.55rem 1rem;font-size:.85rem;font-weight:900;transition:.16s ease;border:none;cursor:pointer}
+  .btn-primary{background:#2563eb;color:#fff}.btn-primary:hover{background:#1d4ed8}
+  .btn-secondary{border:1px solid #cbd5e1;background:#fff;color:#334155}.btn-secondary:hover{background:#f1f5f9}
+  .dark .btn-secondary{border-color:#475569;background:#020617;color:#e2e8f0}
+  .btn-amber{background:#d97706;color:#fff}.btn-amber:hover{background:#b45309}
+  .btn-green{background:#059669;color:#fff}.btn-green:hover{background:#047857}
+  .btn-danger{border:1px solid #fecdd3;background:#fff1f2;color:#be123c}.btn-danger:hover{background:#ffe4e6}
+  .chip{display:inline-flex;align-items:center;gap:.3rem;border-radius:999px;padding:.25rem .65rem;font-size:.72rem;font-weight:900;white-space:nowrap}
+  .c-ok{background:#dcfce7;color:#166534}.c-bad{background:#ffe4e6;color:#be123c}.c-warn{background:#fef3c7;color:#92400e}.c-info{background:#dbeafe;color:#1d4ed8}.c-mute{background:#f1f5f9;color:#475569}
+  .dark .c-mute{background:#1e293b;color:#94a3b8}
+  table.grid{width:100%;border-collapse:collapse;font-size:.85rem}
+  table.grid th{position:sticky;top:0;background:#f1f5f9;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:#475569;font-weight:900;padding:.6rem .7rem;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+  .dark table.grid th{background:#0b1220;color:#94a3b8;border-color:#334155}
+  table.grid td{padding:.5rem .7rem;border-bottom:1px solid #eef2f7;font-weight:700}
+  .dark table.grid td{border-color:#1e293b}
+  .gcell{width:64px;border:1px solid #cbd5e1;border-radius:8px;padding:.35rem;font-size:.85rem;font-weight:800;text-align:center;outline:none;background:#fff;color:#0f172a}
+  .gcell:focus{border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
+  .gcell:disabled{background:#f1f5f9;color:#94a3b8}
+  .row{display:flex;align-items:center;gap:.9rem;padding:.75rem 0;border-bottom:1px solid #eef2f7}
+  .dark .row{border-color:#1e293b}.row:last-child{border-bottom:none}
+  .avatar{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:900;font-size:.8rem;color:#fff;flex:0 0 38px}
+  .kv{display:flex;justify-content:space-between;gap:1rem;padding:.7rem 0;border-bottom:1px dashed #e2e8f0;font-size:.88rem}
+  .dark .kv{border-color:#334155}.kv span{color:#64748b;font-weight:700}.kv b{font-weight:900}
+  .fl{display:block;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;font-weight:900;color:#64748b;margin:1rem 0 .4rem}
+  .fi{width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:.65rem .8rem;font-size:.9rem;font-weight:700;color:#0f172a;background:#fff;outline:none}
+  .fi:focus{border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
+  .seg{display:flex;gap:.4rem;background:#f1f5f9;border-radius:12px;padding:.3rem;flex-wrap:wrap}
+  .dark .seg{background:#0b1220}
+  .seg-b{flex:1;border-radius:9px;padding:.5rem;font-size:.78rem;font-weight:900;color:#475569;border:none;background:none;cursor:pointer;min-width:80px}
+  .seg-b.active{background:#2563eb;color:#fff}
+  .it-drawer-backdrop{position:fixed;inset:0;z-index:85;background:rgba(15,23,42,.48);opacity:0;visibility:hidden;transition:.22s ease}
+  .it-drawer-backdrop.show{opacity:1;visibility:visible}
+  .it-drawer{position:fixed;top:0;bottom:0;right:0;z-index:90;width:480px;max-width:94vw;background:#fff;color:#0f172a;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .24s ease;box-shadow:-24px 0 60px -24px rgba(15,23,42,.4)}
+  .it-drawer.show{transform:translateX(0)}
+  .codebox{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:#082f49;color:#7dd3fc;border-radius:12px;padding:.8rem 1rem;font-family:ui-monospace,Menlo,monospace;font-size:1rem;font-weight:800;letter-spacing:.06em}
+  .codebox button{color:#cbd5e1;font-size:.72rem;font-weight:800;border:1px solid #1e3a5f;border-radius:8px;padding:.35rem .6rem;background:none;cursor:pointer}
+  #toasts{position:fixed;right:1.4rem;bottom:1.4rem;display:flex;flex-direction:column;gap:.6rem;z-index:300}
+  .toast{padding:.8rem 1rem;border-radius:12px;font-size:.85rem;font-weight:800;box-shadow:0 18px 40px -16px rgba(0,0,0,.5);animation:tin .25s ease both;background:#0f172a;color:#fff;display:flex;align-items:center;gap:.6rem}
+  @keyframes tin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .mockflag{position:fixed;left:50%;bottom:.8rem;transform:translateX(-50%);background:#082f49;color:#9fb0d0;font-size:.7rem;font-weight:800;padding:.35rem .8rem;border-radius:999px;z-index:80;border:1px solid #1e3a5f}
+  .lds{width:18px;height:18px}
+  /* ----- ajouts créatifs (badgés « Idée ») ----- */
+  .idea{display:inline-flex;align-items:center;border-radius:999px;background:#fef3c7;color:#92400e;font-size:.58rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:.12rem .45rem;margin-left:.35rem}
+  .crumb-bar{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.78rem;font-weight:800}
+  .crumb-link{color:#2563eb;background:none;border:none;cursor:pointer;padding:0}
+  .crumb-cur{color:#475569;background:none;border:none;padding:0}.dark .crumb-cur{color:#cbd5e1}
+  .pcol{flex:0 0 196px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:.6rem}
+  .dark .pcol{background:#0b1220;border-color:#1e293b}
+  .pcol-h{display:flex;align-items:center;justify-content:space-between;font-size:.68rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid;padding-bottom:.4rem;margin-bottom:.5rem}
+  .pcard{display:block;width:100%;text-align:left;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.5rem .6rem;margin-bottom:.4rem;cursor:pointer;transition:.14s}
+  .pcard:hover{border-color:#2563eb;box-shadow:0 4px 10px -6px rgba(37,99,235,.6)}
+  .dark .pcard{background:#0f172a;border-color:#334155}
+  .pcard b{display:block;font-size:.76rem;font-weight:800}.pcard span{font-size:.68rem;color:#94a3b8}
+  .pempty{text-align:center;color:#cbd5e1;font-size:.8rem;padding:.4rem}
+  .palette-wrap{position:fixed;inset:0;z-index:120;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;padding-top:12vh}
+  .palette-wrap.show{display:flex}
+  .palette{width:560px;max-width:92vw;background:#fff;border-radius:16px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5);overflow:hidden}
+  .dark .palette{background:#0f172a;color:#e2e8f0}
+  .palette input{width:100%;border:none;border-bottom:1px solid #e2e8f0;padding:1rem 1.1rem;font-size:1rem;font-weight:700;outline:none;background:transparent;color:inherit}
+  .dark .palette input{border-color:#334155}
+  .pal-item{display:flex;align-items:center;gap:.7rem;width:100%;text-align:left;padding:.65rem 1.1rem;font-size:.86rem;font-weight:700;border:none;background:none;cursor:pointer;color:inherit}
+  .pal-item.pal-active{background:#eff6ff}.dark .pal-item.pal-active{background:#1e293b}
+  .modal-wrap{position:fixed;inset:0;z-index:115;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;padding:1rem}
+  .modal-wrap.show{display:flex}
+  .modal{width:520px;max-width:94vw;background:#fff;border-radius:18px;padding:1.4rem;box-shadow:0 30px 80px -20px rgba(0,0,0,.5)}
+  .dark .modal{background:#0f172a;color:#e2e8f0}
+  .kbd-hint{display:inline-flex;align-items:center;gap:.3rem;border-radius:8px;border:1px solid #cbd5e1;padding:.15rem .45rem;font-size:.7rem;font-weight:800;color:#64748b}
+  /* ===== Grille de notes fidèle (namespacée ng-) ===== */
+  .ng-shell{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden}
+  .dark .ng-shell{border-color:#334155;background:#0f172a}
+  .ng-head{padding:1rem 1.2rem;border-bottom:1px solid #eef2f7;text-align:center}
+  .ng-head .h1{font-weight:900;font-size:.98rem}.ng-head .h2{margin-top:.15rem;font-size:.8rem;font-weight:700;color:#64748b}.ng-head .h3{margin-top:.4rem;font-size:.9rem;font-weight:900;color:#082f49}
+  .dark .ng-head .h3{color:#7dd3fc}
+  .ng-scroll{overflow:auto;max-height:70vh}
+  .ng-grid{display:grid;min-width:max-content;background:#fff}
+  .dark .ng-grid{background:#0f172a}
+  .ng-c{border-right:1px solid #d9e2ef;border-bottom:1px solid #d9e2ef;padding:6px;font-size:12px;text-align:center;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;background:#fff;overflow:hidden}
+  .dark .ng-c{background:#0f172a;border-color:#334155;color:#e2e8f0}
+  .ng-h{font-weight:800;background:#eef3ff;line-height:1.1}
+  .dark .ng-h{background:#0b1220}
+  .ng-ue{background:#dbeafe;color:#17306b;font-size:11.5px;white-space:normal}
+  .ng-unit{background:#ede9fe;color:#4c1d95;font-size:10.5px}
+  .ng-res{background:#eef2f7}.dark .ng-res{background:#0b1220}
+  .ng-sub{background:#f8fafc;font-size:10.5px;color:#475569;font-weight:800}.dark .ng-sub{background:#0b1220}
+  .ng-cr{background:#f1f7ff;color:#1d4ed8;font-weight:800;font-size:11px}
+  .ng-co{background:#f6f3ff;color:#5b21b6;font-weight:800;font-size:11px}
+  .ng-r1{position:sticky;top:0;height:42px}.ng-r2{position:sticky;top:42px;height:30px}.ng-r3{position:sticky;top:72px;height:24px}.ng-r4{position:sticky;top:96px;height:24px}.ng-r5{position:sticky;top:120px;height:30px}
+  .ng-h.ng-r1,.ng-h.ng-r2,.ng-h.ng-r3,.ng-h.ng-r4,.ng-h.ng-r5{z-index:5}
+  .ng-m1{position:sticky;left:0;z-index:8;width:44px;background:#fff}.dark .ng-m1{background:#0f172a}
+  .ng-m2{position:sticky;left:44px;z-index:8;background:#fff}.dark .ng-m2{background:#0f172a}
+  .ng-m3{position:sticky;left:188px;z-index:8;background:#fff;border-right:2px solid #b9c8de}.dark .ng-m3{background:#0f172a}
+  .ng-mlbl{position:sticky;left:0;z-index:14;background:#eef3ff;border-right:2px solid #b9c8de;justify-content:flex-start;text-align:left;font-weight:800;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#334155;padding-left:9px}
+  .dark .ng-mlbl{background:#0b1220;color:#cbd5e1}
+  .ng-res1{position:sticky;right:282px;z-index:8;background:#eef2f7;font-weight:900;border-left:2px solid #b9c8de}
+  .ng-res2{position:sticky;right:218px;z-index:8;background:#eef2f7;font-weight:900}
+  .ng-res3{position:sticky;right:140px;z-index:8;background:#eef2f7;font-weight:900}
+  .ng-res4{position:sticky;right:0;z-index:8;background:#fff;font-weight:900}
+  .dark .ng-res1,.dark .ng-res2,.dark .ng-res3{background:#0b1220}.dark .ng-res4{background:#0f172a}
+  .ng-h.ng-res1,.ng-h.ng-res2,.ng-h.ng-res3,.ng-h.ng-res4{z-index:14}
+  .ng-stu{justify-content:flex-start;text-align:left;font-weight:800}
+  .ng-in{width:100%;max-width:52px;text-align:center;border:1px solid #b9c8de;border-radius:7px;padding:5px 2px;font-size:12.5px;font-weight:800;outline:none;background:#fff;color:#0f172a;font-variant-numeric:tabular-nums}
+  .ng-in:focus{border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(29,78,216,.14)}
+  .ng-in.below{border-color:#f1a8b4;background:#fff5f6;color:#be123c}
+  .ng-ok{color:#15803d;font-weight:900}.ng-no{color:#94a3b8;font-weight:800}
+  .ng-unitc{background:#faf8ff;color:#4c1d95;font-weight:900}.dark .ng-unitc{background:#1a1530}
+  .ng-zebra{background:#fbfdff}.dark .ng-zebra{background:#0c1424}
+  .ng-dl{border:1px solid #b9c8de;background:#fff;border-radius:6px;padding:1px 6px;font-size:11px;cursor:pointer;margin-left:5px}
+</style>
+</head>
+<body class="min-h-screen">
+<div class="flex">
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="it-sidebar fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-200" style="width:280px">
+    <div class="flex h-20 items-center gap-3 px-4">
+      <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15"><i data-lucide="workflow" class="lds"></i></div>
+      <div id="brandWrap" class="min-w-0">
+        <p class="truncate text-base font-black" id="brandName">Annexe Hamdallaye</p>
+        <p class="truncate text-xs font-bold uppercase tracking-widest text-sky-100/70">Informaticien d'annexe</p>
+      </div>
+    </div>
+    <button onclick="toggleSidebar()" class="absolute right-[-18px] top-6 grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 shadow-lg ring-4 ring-slate-50" title="Réduire"><i data-lucide="panel-left-close" class="lds" id="collapseIcon"></i></button>
+    <nav class="mt-2 flex-1 space-y-1 overflow-y-auto px-3 pb-4" id="navRoot"></nav>
+    <div class="p-3"><button class="it-nav-btn justify-center border border-white/10 bg-white/10" onclick="toast('Déconnexion (simulée)')"><i data-lucide="log-out" class="lds"></i><span class="navlabel">Déconnexion</span></button></div>
+  </aside>
+
+  <!-- MAIN -->
+  <main id="main" class="min-h-screen flex-1 transition-all duration-200" style="margin-left:280px">
+    <div class="mx-auto max-w-7xl px-5 py-6">
+      <header class="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="kicker" id="hdKicker"></p>
+          <h1 class="mt-1 text-3xl font-black tracking-tight" id="hdLabel"></h1>
+          <p class="mt-2 text-sm font-semibold text-slate-500">Support technique, accès et santé du portail · scope : annexe Hamdallaye</p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <span class="chip c-info">Gestion des notes</span>
+            <span class="chip c-warn">Inscriptions sans affectation</span>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button class="btn btn-secondary" onclick="openPalette()"><i data-lucide="command" class="lds"></i> Rechercher / agir <span class="kbd-hint ml-1">⌘K</span></button>
+          <button class="btn btn-primary" onclick="openModule('settings')"><i data-lucide="settings" class="lds"></i> Compte</button>
+          <button class="btn btn-secondary" onclick="toggleDark()"><i data-lucide="moon" class="lds"></i> Thème</button>
+          <button class="btn btn-secondary" onclick="openModule('notifications')"><i data-lucide="bell" class="lds"></i><span id="notifDot" class="ml-1 inline-grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-black text-white">3</span></button>
+        </div>
+      </header>
+      <div id="crumbBar"></div>
+      <div id="ctxBar"></div>
+      <div id="it-workspace"></div>
+    </div>
+  </main>
+</div>
+
+<div class="it-drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer()"></div>
+<aside class="it-drawer" id="drawer">
+  <div class="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
+    <div><p class="kicker" id="drawerKicker">Détail</p><h3 class="mt-1 text-lg font-black" id="drawerTitle"></h3></div>
+    <button class="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 text-slate-500" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="flex-1 overflow-y-auto p-5" id="drawerBody"></div>
+</aside>
+<button onclick="openPalette()" class="btn btn-primary" style="position:fixed;bottom:3.2rem;right:1.4rem;z-index:30;border-radius:999px"><i data-lucide="command" class="lds"></i> Tout faire · ⌘K</button>
+<div class="palette-wrap" id="paletteWrap" onclick="if(event.target===this)closePalette()"><div class="palette"><input id="paletteInput" placeholder="Rechercher une section, une classe, un compte, une action…" oninput="renderPalette(this.value)" onkeydown="paletteKey(event)"><div id="paletteList" style="max-height:340px;overflow:auto"></div><div class="px-4 py-2 text-xs font-semibold text-slate-400" style="border-top:1px solid #eef2f7">↑↓ naviguer · ⏎ exécuter · Échap fermer</div></div></div>
+<div class="modal-wrap" id="modalWrap" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-black" id="modalTitle"></h3><button onclick="closeModal()" class="text-slate-400">✕</button></div><div id="modalBody"></div></div></div>
+<div id="toasts"></div>
+<div class="mockflag">Prototype — données fictives, cohérentes avec le back-end</div>
+
+<script>
+/* ============ MODULES (identiques au dashboard réel) ============ */
+const MODULES=[
+  {key:'home',label:'Accueil',icon:'home',kicker:'Actions rapides et priorités'},
+  {key:'notes',label:'Notes & Résultats',icon:'file-spreadsheet',kicker:'Classe → Semestre → État → Action'},
+  {key:'structure',label:'Paramétrage académique',icon:'blocks',kicker:'Classes → UE → EC → Affectations'},
+  {key:'import',label:'Import / export',icon:'upload-cloud',kicker:'Excel notes et export classe'},
+  {key:'archives',label:'Archives',icon:'folder-archive',kicker:'Années, classes et dossiers consultables'},
+  {key:'cards',label:'Cartes étudiants',icon:'badge-check',kicker:'Classe → Étudiant → PDF'},
+  {key:'accounts',label:'Utilisateurs',icon:'shield-check',kicker:'Utilisateur → État compte → Action'},
+  {key:'support',label:'Support',icon:'life-buoy',kicker:"Tickets de l'annexe"},
+  {key:'supervision',label:'Supervision',icon:'alert-triangle',kicker:'Anomalies, alertes et points bloquants'},
+  {key:'audit',label:"Journal d'audit",icon:'history',kicker:"Historique des actions de l'annexe"},
+  {key:'catalog',label:'Catalogue',icon:'library',kicker:'Langues et professions de référence'},
+  {key:'notifications',label:'Notifications',icon:'bell',kicker:'Alertes, messages et communications'},
+  {key:'settings',label:'Compte',icon:'settings',kicker:'Profil, sécurité, préférences et annexe'},
+];
+const CTX_MODULES=['notes','cards']; // modules avec barre Classe/Semestre
+
+/* ============ DONNÉES FICTIVES (modèle réel) ============ */
+const THRESHOLD=10; // validation_threshold (paramètre annexe)
+const YEAR='2025-2026';
+const FN=["Aminata","Ousmane","Fatoumata","Modibo","Mariam","Adama","Kadiatou","Ibrahim","Rokia","Seydou","Awa","Bakary","Salif","Nana"];
+const LN=["Traoré","Diarra","Keïta","Coulibaly","Sidibé","Touré","Cissé","Maïga","Diallo","Konaté"];
+const AVC=["#0e7490","#0369a1","#4338ca","#7c3aed","#b45309","#047857","#be185d"];
+// Semester.status -> on dérive l'état du workflow comme get_notes_state()
+const CLASSES={
+  l1si:{name:"L1 Soins Infirmiers",
+    ues:[{code:"UE1",title:"Sciences fondamentales",ecs:[{code:"ANAT",title:"Anatomie-Physiologie",cr:4,teacher:"Dr. Coulibaly"},{code:"BIOS",title:"Biostatistique",cr:2,teacher:null}]},
+         {code:"UE2",title:"Soins infirmiers",ecs:[{code:"SOIN",title:"Soins fondamentaux",cr:3,teacher:"Mme Diallo"}]}],
+    semesters:[{id:"l1si-s1",number:1,status:"NORMAL_ENTRY"},{id:"l1si-s2",number:2,status:"EMPTY"}]},
+  l2si:{name:"L2 Soins Infirmiers",
+    ues:[{code:"UE3",title:"Pharmacologie",ecs:[{code:"PHAR",title:"Pharmacologie",cr:3,teacher:"Dr. Touré"}]},
+         {code:"UE4",title:"Soins spécialisés",ecs:[{code:"SOIN2",title:"Soins spécialisés",cr:4,teacher:"Mme Diallo"}]}],
+    semesters:[{id:"l2si-s1",number:1,status:"NORMAL_LOCKED"},{id:"l2si-s2",number:2,status:"RETAKE_ENTRY"}]},
+  l1sf:{name:"L1 Sage-femme",
+    ues:[{code:"UE5",title:"Obstétrique",ecs:[{code:"OBST",title:"Obstétrique I",cr:4,teacher:"Mme Sangaré"},{code:"ANAT2",title:"Anatomie",cr:3,teacher:"Dr. Coulibaly"}]}],
+    semesters:[{id:"l1sf-s1",number:1,status:"FINALIZED"}]},
+};
+// statut sémestre -> état workflow (miroir de get_notes_state)
+function deriveState(sem,key){
+  const g=gradesFor(key);const ecs=ecsOf(curClass(key));
+  const total=g.length*ecs.length;let entered=0;g.forEach(r=>ecs.forEach(e=>{if(r.n[e.code]!=null)entered++;}));
+  if(sem.status==="PUBLISHED")return "final_published";
+  if(sem.status==="FINALIZED")return "ready_to_publish_final";
+  if(sem.status==="RETAKE_ENTRY")return "retake_in_progress";
+  if(sem.status==="NORMAL_LOCKED")return "normal_published";
+  if(entered===0)return "empty";
+  if(entered<total)return "in_progress";
+  return "ready_to_publish_normal";
+}
+const STATE_LABEL={empty:"Non commencé",in_progress:"Saisie en cours",ready_to_publish_normal:"Session normale prête à publier",normal_published:"Session normale publiée",retake_in_progress:"Rattrapage actif",ready_to_publish_final:"Résultats finaux prêts",final_published:"Résultats finaux publiés"};
+const STATE_DESC={
+  empty:"Aucune note exploitable. Démarrez la saisie pour cette classe et ce semestre.",
+  in_progress:"Des notes existent déjà. Complétez les cellules manquantes avant calcul.",
+  ready_to_publish_normal:"Toutes les notes normales sont renseignées. La session normale peut être publiée.",
+  normal_published:"La session normale est publiée. Le rattrapage peut maintenant être préparé.",
+  retake_in_progress:"Le rattrapage est actif. Les notes normales restent visibles ; seules les notes de rattrapage sont ajustables.",
+  ready_to_publish_final:"Le semestre est finalisé et prêt pour la publication finale.",
+  final_published:"Les relevés et exports finaux sont déblocables selon les règles du semestre.",
+};
+const STATE_ORDER=["empty","in_progress","ready_to_publish_normal","normal_published","retake_in_progress","ready_to_publish_final","final_published"];
+
+/* grilles de notes par classe+semestre (seed déterministe) */
+let GRADES={};
+function gradesFor(key){
+  if(!GRADES[key]){
+    const cl=curClass(key),ecs=ecsOf(cl);let s=key.length*97;const rnd=()=>{s=(s*9301+49297)%233280;return s/233280;};
+    const n=12;const arr=[];
+    const sem=curSem(key);const filled=sem.status==="EMPTY"?0:1;
+    for(let i=0;i<n;i++){const fn=FN[Math.floor(rnd()*FN.length)],ln=LN[Math.floor(rnd()*LN.length)];
+      const nObj={},rObj={};ecs.forEach(e=>{
+        if(filled&&rnd()>.12)nObj[e.code]=Math.round((5+rnd()*14)*4)/4; else nObj[e.code]=(filled?null:null);
+        rObj[e.code]=null;
+      });
+      arr.push({id:key+"-"+i,name:fn+" "+ln,mat:"E"+(2400+Math.floor(rnd()*600)),color:AVC[i%AVC.length],n:nObj,r:rObj});}
+    GRADES[key]=arr;
+  }
+  return GRADES[key];
+}
+function curClass(key){return CLASSES[key.split('-')[0]];}
+function ecsOf(cl){return cl.ues.flatMap(u=>u.ecs.map(e=>({...e,ue:u.code})));}
+function curSem(key){const cl=curClass(key);return cl.semesters.find(s=>s.id===key)||cl.semesters[0];}
+
+/* comptes utilisateurs (AccountSupportState) */
+let USERS=[
+  {id:1,name:"Aminata Traoré",login:"E2401",role:"Étudiant",info:"L1 Soins Inf.",blocked:false,active:true,last:"Aujourd'hui 08:12"},
+  {id:2,name:"Dr. Coulibaly",login:"ens.coulibaly",role:"Enseignant",info:"Anatomie-Physiologie",blocked:false,active:true,last:"Hier 16:40"},
+  {id:3,name:"S. Konaté",login:"surv.konate",role:"Surveillant",info:"Surveillant académique",blocked:false,active:true,last:"Aujourd'hui 07:55"},
+  {id:4,name:"Modibo Diarra",login:"E2418",role:"Étudiant",info:"L2 Soins Inf.",blocked:true,active:true,last:"il y a 3 j"},
+  {id:5,name:"Fatoumata Keïta",login:"E2455",role:"Étudiant",info:"L1 Sage-femme",blocked:false,active:false,last:"il y a 2 sem."},
+  {id:6,name:"Mme Diallo",login:"ens.diallo",role:"Enseignant",info:"Soins fondamentaux",blocked:false,active:true,last:"il y a 2 j"},
+  {id:7,name:"Ibrahim Cissé",login:"E2473",role:"Étudiant",info:"L1 Soins Inf.",blocked:false,active:true,last:"Aujourd'hui 09:30"},
+];
+function uState(u){return !u.active?{c:"c-mute",l:"Désactivé"}:u.blocked?{c:"c-bad",l:"Bloqué"}:{c:"c-ok",l:"Actif"};}
+
+/* tickets support */
+let TICKETS=[
+  {id:142,title:"Connexion impossible — étudiant E2462",status:"open",who:"Ousmane Maïga",t:"il y a 1 h"},
+  {id:141,title:"Photo de carte refusée à l'import",status:"in_progress",who:"Secrétariat",t:"il y a 5 h"},
+  {id:139,title:"Export Excel notes L2 — colonnes décalées",status:"resolved",who:"Dr. Touré",t:"hier"},
+];
+const TK_STATUS={open:{c:"c-warn",l:"Ouvert"},in_progress:{c:"c-info",l:"En cours"},resolved:{c:"c-ok",l:"Résolu"}};
+
+/* journal d'audit */
+let AUDIT=[
+  {t:"Aujourd'hui 09:14",action:"Réinitialisation du mot de passe",target:"E2401 — Aminata Traoré",type:"warn"},
+  {t:"Aujourd'hui 08:40",action:"Compte bloqué",target:"E2418 — Modibo Diarra",type:"bad"},
+  {t:"Hier 17:02",action:"Session normale publiée",target:"L2 Soins Inf. — Semestre 1",type:"ok"},
+  {t:"Hier 15:30",action:"Import notes (Excel)",target:"L1 Soins Inf. — 38 lignes",type:"info"},
+  {t:"il y a 2 j",action:"Paramètre annexe modifié",target:"Seuil de validation = 10/20",type:"info"},
+];
+function addAudit(action,target,type){AUDIT.unshift({t:"À l'instant",action,target,type:type||"info"});}
+
+/* catalogue */
+let LANGS=["Français","Anglais","Bambara","Arabe"];
+let PROFS=["Infirmier(ère) d'État","Sage-femme","Technicien de laboratoire","Aide-soignant(e)"];
+
+/* ============ ÉTAT GLOBAL ============ */
+let active="home";
+let notesKey="l1si-s1";
+let cardClass="l1si";
+
+/* ============ NAVIGATION ============ */
+function renderNav(){
+  const groups=[["Pilotage",["home"]],["Académique",["notes","structure","import","archives","cards"]],["Utilisateurs",["accounts"]],["Exploitation",["support","supervision","audit","catalog","notifications"]],["Compte",["settings"]]];
+  let html="";
+  groups.forEach(([g,keys])=>{html+=`<div class="nav-sub navlabel">${g}</div>`;
+    keys.forEach(k=>{const m=MODULES.find(x=>x.key===k);html+=`<button class="it-nav-btn ${k===active?'active':''}" onclick="openModule('${k}')"><i data-lucide="${m.icon}" class="lds shrink-0"></i><span class="navlabel">${m.label}</span></button>`;});});
+  document.getElementById('navRoot').innerHTML=html;icons();
+}
+function openModule(k){
+  active=k;const m=MODULES.find(x=>x.key===k);
+  document.getElementById('hdKicker').textContent=m.kicker;
+  document.getElementById('hdLabel').textContent=m.label;
+  document.title="Informaticien — "+m.label+" · ESFé Core";
+  renderNav();renderCtx();renderCrumb();
+  document.getElementById('it-workspace').innerHTML=`<div style="opacity:0;animation:tin .2s ease forwards">${render(k)}</div>`;
+  icons();
+  if(k==='notes'&&window.ngRender)ngRender();
+}
+function render(k){const f={home:wsHome,notes:wsNotes,structure:wsStructure,import:wsImport,archives:wsArchives,cards:wsCards,accounts:wsAccounts,support:wsSupport,supervision:wsSupervision,audit:wsAudit,catalog:wsCatalog,notifications:wsNotifications,settings:wsSettings}[k];return f?f():'';}
+function renderCtx(){
+  const bar=document.getElementById('ctxBar');
+  if(active==='notes'){
+    const cl=curClass(notesKey);
+    bar.innerHTML=`<div class="wkc">
+      <label>Classe<select onchange="pickNotesClass(this.value)">${Object.entries(CLASSES).map(([id,c])=>`<option value="${id}" ${id===notesKey.split('-')[0]?'selected':''}>${c.name}</option>`).join("")}</select></label>
+      <label>Semestre<select onchange="notesKey=this.value;openModule('notes')">${cl.semesters.map(s=>`<option value="${s.id}" ${s.id===notesKey?'selected':''}>Semestre ${s.number}</option>`).join("")}</select></label></div>`;
+  } else if(active==='cards'){
+    bar.innerHTML=`<div class="wkc"><label>Classe<select onchange="cardClass=this.value;openModule('cards')">${Object.entries(CLASSES).map(([id,c])=>`<option value="${id}" ${id===cardClass?'selected':''}>${c.name}</option>`).join("")}</select></label><label>&nbsp;<input class="fi" style="height:46px" placeholder="Rechercher un étudiant…"></label></div>`;
+  } else bar.innerHTML="";
+}
+function pickNotesClass(id){notesKey=CLASSES[id].semesters[0].id;openModule('notes');}
+
+/* ============ ACCUEIL ============ */
+function wsHome(){
+  // priorités dérivées comme build_home_context
+  let incomplete=[],calculable=[],resume=null;
+  Object.keys(CLASSES).forEach(cid=>CLASSES[cid].semesters.forEach(sem=>{
+    const key=sem.id,st=deriveState(sem,key);
+    if(st==='in_progress'){incomplete.push({key,cid,sem});if(!resume)resume={key,cid,sem,st};}
+    if(st==='ready_to_publish_normal'||st==='ready_to_publish_final')calculable.push({key,cid,sem,st});
+  }));
+  const blocked=USERS.filter(u=>u.blocked||!u.active);
+  const kpi=(ic,col,k,v,d)=>`<div class="panel"><div class="flex items-center gap-2 text-xs font-black text-slate-500"><i data-lucide="${ic}" class="h-4 w-4" style="color:${col}"></i>${k}</div><div class="mt-2 text-3xl font-black">${v}</div><div class="mt-1 text-xs font-semibold text-slate-400">${d}</div></div>`;
+  const item=(o,cta,fn)=>`<div class="row"><div class="avatar" style="background:#0e7490">${CLASSES[o.cid].name.split(' ')[0]}</div><div class="flex-1 min-w-0"><b class="block">${CLASSES[o.cid].name} · Semestre ${o.sem.number}</b><span class="text-xs font-semibold text-slate-400">${STATE_LABEL[deriveState(o.sem,o.key)]}</span></div><button class="btn btn-secondary" style="padding:.4rem .8rem" onclick="${fn}">${cta}</button></div>`;
+  return `${actionCenter()}${pipelineBoard()}<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+    ${kpi('play-circle','#2563eb','Reprendre','1',resume?CLASSES[resume.cid].name:'—')}
+    ${kpi('list-todo','#d97706','À compléter',incomplete.length,'classes en saisie')}
+    ${kpi('calculator','#059669','Prêtes à publier',calculable.length,'sessions calculables')}
+    ${kpi('shield-alert','#be123c','Comptes à surveiller',blocked.length,'bloqués/désactivés')}
+  </div>
+  <div class="grid lg:grid-cols-2 gap-4">
+    <div class="panel"><div class="flex items-center justify-between"><h3 class="text-base font-black">Sessions prêtes à publier</h3><span class="chip c-warn">${calculable.length}</span></div><div class="mt-2">${calculable.length?calculable.map(o=>item(o,'Ouvrir',`notesKey='${o.key}';openModule('notes')`)).join(""):'<p class="py-6 text-center text-sm font-semibold text-slate-400">Rien à publier pour le moment.</p>'}</div></div>
+    <div class="panel"><div class="flex items-center justify-between"><h3 class="text-base font-black">Comptes bloqués / désactivés</h3><span class="chip c-bad">${blocked.length}</span></div><div class="mt-2">${blocked.map(u=>`<div class="row"><div class="avatar" style="background:#be185d">${u.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</div><div class="flex-1"><b class="block">${u.name}</b><span class="text-xs font-semibold text-slate-400">${u.login} · ${u.role}</span></div><span class="chip ${uState(u).c}">${uState(u).l}</span></div>`).join("")}</div></div>
+  </div>`;
+}
+
+/* ============ NOTES & RÉSULTATS (machine à états) ============ */
+function wsNotes(){
+  const sem=curSem(notesKey),cl=curClass(notesKey),ecs=ecsOf(cl),g=gradesFor(notesKey);
+  const st=deriveState(sem,notesKey);
+  const idx=Math.max(0,STATE_ORDER.indexOf(st));const pct=Math.round((idx/(STATE_ORDER.length-1))*100);
+  const retake=st==='retake_in_progress';const locked=['normal_published','ready_to_publish_final','final_published'].includes(st);
+  // grille
+  const rows=g.map(r=>{
+    const cells=ecs.map(e=>{const v=r.n[e.code];const fail=v!=null&&v<THRESHOLD;
+      const norm=`<input class="gcell" type="number" min="0" max="20" step="0.25" value="${v==null?'':v}" ${locked||retake?'disabled':''} oninput="setGrade('${r.id}','${e.code}','n',this.value)">`;
+      const ret=retake&&fail?`<input class="gcell" style="border-color:#a5b4fc;background:#eef2ff" type="number" min="0" max="20" step="0.25" value="${r.r[e.code]==null?'':r.r[e.code]}" placeholder="ratt." oninput="setGrade('${r.id}','${e.code}','r',this.value)">`:'';
+      return `<td>${norm}${ret}</td>`;}).join("");
+    const m=moy(r,ecs);const dec=m==null?'<span class="chip c-mute">—</span>':m>=THRESHOLD?'<span class="chip c-ok">Validé</span>':'<span class="chip c-bad">Ajourné</span>';
+    return `<tr><td style="position:sticky;left:0;background:#fff"><div class="flex items-center gap-2"><span class="avatar" style="width:28px;height:28px;font-size:.65rem;background:${r.color}">${r.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</span><div><b class="block text-[.8rem]">${r.name}</b><span class="text-[.7rem] text-slate-400">${r.mat}</span></div></div></td>${cells}<td class="font-black">${m==null?'—':m.toFixed(2)}</td><td>${dec}</td></tr>`;}).join("");
+  const head=`<th style="position:sticky;left:0">Étudiant</th>${ecs.map(e=>`<th title="${e.ue} · ${e.cr} cr">${e.code}<div class="font-medium normal-case text-[.6rem] text-slate-400">${e.cr} cr</div></th>`).join("")}<th>Moy.</th><th>Décision</th>`;
+  // actions selon état
+  let actions='';
+  if(st==='empty'||st==='in_progress')actions=`<button class="btn btn-primary" onclick="advance('fill')"><i data-lucide="check" class="lds"></i> Valider la saisie (calcul)</button>`;
+  else if(st==='ready_to_publish_normal')actions=`<button class="btn btn-amber" onclick="confirmPublish('normal')"><i data-lucide="send" class="lds"></i> Publier la session normale</button> <span class="kbd-hint">aperçu d'impact <span class="idea">Idée</span></span>`;
+  else if(st==='normal_published')actions=`<button class="btn btn-primary" onclick="advance('open_retake')"><i data-lucide="rotate-ccw" class="lds"></i> Préparer le rattrapage</button> <button class="btn btn-secondary" onclick="openModule('import')"><i data-lucide="download" class="lds"></i> Exporter relevés</button>`;
+  else if(st==='retake_in_progress')actions=`<button class="btn btn-primary" onclick="advance('finalize')"><i data-lucide="lock" class="lds"></i> Finaliser le semestre</button>`;
+  else if(st==='ready_to_publish_final')actions=`<button class="btn btn-amber" onclick="confirmPublish('final')"><i data-lucide="send" class="lds"></i> Publier les résultats finaux</button> <span class="kbd-hint">aperçu d'impact <span class="idea">Idée</span></span>`;
+  else if(st==='final_published')actions=`<button class="btn btn-green" onclick="advance('transmit')"><i data-lucide="share-2" class="lds"></i> Transmettre au Directeur des études</button> <button class="btn btn-secondary" onclick="openModule('cards')"><i data-lucide="badge-check" class="lds"></i> Cartes</button>`;
+  // candidats rattrapage
+  const cand=g.filter(r=>ecs.some(e=>r.n[e.code]!=null&&r.n[e.code]<THRESHOLD)).length;
+  const candNote=(st==='normal_published'||retake)&&cand?`<div class="panel mt-4" style="border-left:6px solid #4f46e5"><div class="flex items-center gap-2 text-sm font-black"><i data-lucide="users" class="h-4 w-4"></i> ${cand} étudiant(s) éligible(s) au rattrapage</div><p class="mt-1 text-sm font-semibold text-slate-500">Les notes normales restent visibles ; seules les matières échouées sont rejouables en rattrapage.</p></div>`:'';
+  return `<div class="band b-${st}"><div><p class="kicker">${STATE_LABEL[st]}</p><h3>${cl.name} · Semestre ${sem.number}</h3><p>${STATE_DESC[st]}</p></div><div><span class="badge">${YEAR}</span></div></div>
+    <div class="panel mt-3"><div class="flex items-center justify-between text-sm font-black"><span>Avancement du workflow</span><span>${pct}%</span></div><div class="progress-track"><div style="width:${pct}%"></div></div>
+      <div class="mt-3 flex flex-wrap gap-2">${summary(g,ecs)}</div></div>
+    <div class="panel mt-3 flex flex-wrap items-center gap-3">${actions}</div>
+    ${candNote}
+    <div id="ngHost" class="mt-3"></div>`;
+}
+function moy(r,ecs){let sum=0,cr=0,any=false;ecs.forEach(e=>{let v=r.n[e.code];if(r.r[e.code]!=null)v=Math.max(v??0,r.r[e.code]);if(v!=null){sum+=v*e.cr;cr+=e.cr;any=true;}});return any&&cr?Math.round(sum/cr*100)/100:null;}
+function summary(g,ecs){let val=0,aj=0,man=0;g.forEach(r=>{const m=moy(r,ecs);if(m==null)man++;else if(m>=THRESHOLD)val++;else aj++;});return `<span class="chip c-ok">${val} validés</span><span class="chip c-bad">${aj} ajournés</span><span class="chip c-mute">${man} à saisir</span>`;}
+function setGrade(rid,ec,kind,val){const r=gradesFor(notesKey).find(x=>x.id===rid);r[kind][ec]=val===''?null:Number(val);
+  // maj résumé + bande sans tout reconstruire (léger)
+  const sem=curSem(notesKey);if(deriveState(sem,notesKey)!==active)openModule('notes');else openModule('notes');}
+function advance(act){const sem=curSem(notesKey);
+  if(act==='fill'){// compléter toutes les cases vides avec une note plausible
+    const ecs=ecsOf(curClass(notesKey));gradesFor(notesKey).forEach(r=>ecs.forEach(e=>{if(r.n[e.code]==null)r.n[e.code]=Math.round((8+Math.random()*10)*4)/4;}));toast("Notes calculées ✓");}
+  else if(act==='publish_normal'){sem.status="NORMAL_LOCKED";addAudit("Session normale publiée",curClass(notesKey).name+" — Semestre "+sem.number,"ok");toast("Session normale publiée ✓");}
+  else if(act==='open_retake'){sem.status="RETAKE_ENTRY";addAudit("Rattrapage ouvert",curClass(notesKey).name+" — Semestre "+sem.number,"info");toast("Rattrapage ouvert");}
+  else if(act==='finalize'){sem.status="FINALIZED";addAudit("Semestre finalisé",curClass(notesKey).name+" — Semestre "+sem.number,"info");toast("Semestre finalisé ✓");}
+  else if(act==='publish_final'){sem.status="PUBLISHED";addAudit("Résultats finaux publiés",curClass(notesKey).name+" — Semestre "+sem.number,"ok");toast("Résultats finaux publiés ✓");}
+  else if(act==='transmit'){addAudit("Résultats transmis au Directeur",curClass(notesKey).name+" — Semestre "+sem.number,"info");toast("Transmis au Directeur des études ✓");}
+  openModule('notes');
+}
+
+/* ============ PARAMÉTRAGE ACADÉMIQUE ============ */
+function wsStructure(){
+  const noNotes=[],noTeacher=[];
+  Object.entries(CLASSES).forEach(([cid,c])=>{const st=deriveState(c.semesters[0],c.semesters[0].id);if(st==='empty')noNotes.push(c.name);
+    ecsOf(c).forEach(e=>{if(!e.teacher)noTeacher.push(`${e.title} — ${c.name}`);});});
+  const tree=Object.entries(CLASSES).map(([cid,c])=>`<div class="panel mb-3"><div class="flex items-center justify-between"><h3 class="font-black flex items-center gap-2"><i data-lucide="graduation-cap" class="h-4 w-4 text-blue-600"></i>${c.name}</h3><span class="text-xs font-semibold text-slate-400">${YEAR} · ${ecsOf(c).reduce((a,e)=>a+e.cr,0)} crédits</span></div>
+    ${c.ues.map(u=>`<div class="mt-3"><div class="text-xs font-black uppercase tracking-wider text-slate-500">${u.code} · ${u.title}</div>
+      ${u.ecs.map(e=>`<div class="row"><div class="avatar" style="width:30px;height:30px;font-size:.65rem;background:#0369a1">${e.code.slice(0,2)}</div><div class="flex-1"><b class="block text-sm">${e.title}</b><span class="text-xs text-slate-400">${e.cr} crédits</span></div>${e.teacher?`<span class="chip c-info"><i data-lucide="user" class="h-3 w-3"></i> ${e.teacher}</span>`:`<span class="chip c-warn">Sans enseignant</span>`}<button class="btn btn-secondary" style="padding:.35rem .7rem" onclick="toast('Affectation (simulée)')">Affecter</button></div>`).join("")}</div>`).join("")}</div>`).join("");
+  return `<div class="grid lg:grid-cols-3 gap-4 mb-4">
+    <div class="panel"><div class="text-xs font-black text-slate-500">Classes</div><div class="mt-1 text-3xl font-black">${Object.keys(CLASSES).length}</div></div>
+    <div class="panel" style="border-left:5px solid #d97706"><div class="text-xs font-black text-slate-500">Classes sans notes</div><div class="mt-1 text-3xl font-black">${noNotes.length}</div></div>
+    <div class="panel" style="border-left:5px solid #d97706"><div class="text-xs font-black text-slate-500">EC sans enseignant</div><div class="mt-1 text-3xl font-black">${noTeacher.length}</div></div>
+  </div>${tree}`;
+}
+
+/* ============ IMPORT / EXPORT ============ */
+function wsImport(){
+  return `<div class="grid lg:grid-cols-2 gap-4">
+    <div class="panel"><h3 class="font-black flex items-center gap-2"><i data-lucide="upload-cloud" class="h-5 w-5 text-blue-600"></i> Import des notes (Excel)</h3>
+      <label class="fl">Classe</label><select class="fi">${Object.values(CLASSES).map(c=>`<option>${c.name}</option>`).join("")}</select>
+      <label class="fl">Semestre</label><select class="fi"><option>Semestre 1</option><option>Semestre 2</option></select>
+      <div class="mt-4 rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center text-slate-400"><i data-lucide="file-spreadsheet" class="mx-auto mb-2 h-8 w-8"></i><p class="font-bold">Glissez un fichier .xlsx ici</p><p class="text-xs">Colonnes attendues : Matricule, puis une colonne par EC</p></div>
+      <button class="btn btn-primary mt-4 w-full" onclick="toast('Aperçu de l\\'import (simulé)')">Analyser le fichier</button></div>
+    <div class="panel"><h3 class="font-black flex items-center gap-2"><i data-lucide="download" class="h-5 w-5 text-emerald-600"></i> Export</h3>
+      <p class="mt-1 text-sm font-semibold text-slate-500">Modèles et relevés générés depuis le back-end (Excel / PDF).</p>
+      <div class="mt-4 space-y-2">
+        <button class="btn btn-secondary w-full justify-start" onclick="toast('Modèle Excel téléchargé')"><i data-lucide="file-down" class="lds"></i> Modèle de saisie (classe vierge)</button>
+        <button class="btn btn-secondary w-full justify-start" onclick="toast('Export généré')"><i data-lucide="table" class="lds"></i> Export notes de la classe (Excel)</button>
+        <button class="btn btn-secondary w-full justify-start" onclick="toast('Relevés générés')"><i data-lucide="file-text" class="lds"></i> Relevés de notes (PDF)</button>
+      </div>
+      <div class="panel mt-4" style="border-left:5px solid #be123c;box-shadow:none"><div class="flex items-center gap-2 text-sm font-black text-rose-700"><i data-lucide="alert-circle" class="h-4 w-4"></i> 1 erreur d'import récente</div><p class="mt-1 text-sm font-semibold text-slate-500">Ligne 12 : matricule E9999 invalide (introuvable dans la classe).</p></div></div>
+  </div>`;
+}
+
+/* ============ ARCHIVES ============ */
+function wsArchives(){
+  const years=["2025-2026","2024-2025","2023-2024"];
+  return `<div class="panel"><div class="flex items-center justify-between"><h3 class="font-black">Dossiers archivés</h3><span class="text-xs font-semibold text-slate-400">consultation seule</span></div>
+    ${years.map((y,i)=>`<div class="row"><div class="avatar" style="background:${AVC[i]}"><i data-lucide="folder-archive" class="h-4 w-4"></i></div><div class="flex-1"><b class="block">Année ${y}</b><span class="text-xs text-slate-400">${3-i} classes · relevés clôturés</span></div><button class="btn btn-secondary" style="padding:.4rem .8rem" onclick="toast('Ouverture dossier ${y} (simulé)')">Ouvrir</button></div>`).join("")}</div>`;
+}
+
+/* ============ CARTES ÉTUDIANTS ============ */
+let cardStore={};
+function getCards(){if(!cardStore[cardClass]){const c=curClass(cardClass.includes('-')?cardClass:cardClass+'-s1');const arr=[];let s=cardClass.length*53;const rnd=()=>{s=(s*9301+49297)%233280;return s/233280;};for(let i=0;i<12;i++){const fn=FN[Math.floor(rnd()*FN.length)],ln=LN[Math.floor(rnd()*LN.length)],r=rnd();arr.push({id:cardClass+"c"+i,name:fn+" "+ln,mat:"E"+(2400+Math.floor(rnd()*600)),photo:rnd()>.18,status:r>.66?"imprimée":r>.36?"générée":"à générer"});}cardStore[cardClass]=arr;}return cardStore[cardClass];}
+function wsCards(){
+  const data=getCards();const cm={"à générer":"c-warn","générée":"c-info","imprimée":"c-ok"};const todo=data.filter(c=>c.status==="à générer"&&c.photo).length;
+  return `<div class="panel mb-4 flex items-center justify-between"><div><h3 class="font-black">${CLASSES[cardClass].name}</h3><p class="text-xs font-semibold text-slate-400">${data.length} étudiants · ${data.filter(c=>!c.photo).length} sans photo</p></div><button class="btn btn-primary" onclick="genBatch()" ${todo?'':'disabled'}><i data-lucide="layers" class="lds"></i> Générer le lot (${todo})</button></div>
+  <div class="panel" style="padding:.5rem 1.2rem">${data.map(c=>`<div class="row"><div class="avatar" style="background:${c.photo?'#0e7490':'#cbd5e1'}">${c.photo?c.name.split(' ').map(x=>x[0]).join('').slice(0,2):'?'}</div><div class="flex-1"><b class="block">${c.name}</b><span class="text-xs text-slate-400">${c.mat} · ${c.photo?'photo OK':'photo manquante'}</span></div><span class="chip ${cm[c.status]}">${c.status}</span>${c.status==="à générer"?`<button class="btn btn-primary" style="padding:.4rem .8rem" onclick="genCard('${c.id}')" ${c.photo?'':'disabled'}>PDF</button>`:`<button class="btn btn-secondary" style="padding:.4rem .8rem" onclick="previewCard('${c.id}')">Aperçu</button>`}</div>`).join("")}</div>`;
+}
+function genCard(id){const c=getCards().find(x=>x.id===id);if(!c.photo){toast("Photo manquante",'bad');return;}c.status="générée";addAudit("Carte générée",c.name+" — "+c.mat,"info");openModule('cards');toast("Carte générée (PDF) ✓");}
+function genBatch(){let n=0;getCards().forEach(c=>{if(c.status==="à générer"&&c.photo){c.status="générée";n++;}});addAudit("Cartes générées (lot)",CLASSES[cardClass].name+" — "+n,"info");openModule('cards');toast(n+" carte(s) générée(s) ✓");}
+function previewCard(id){const c=getCards().find(x=>x.id===id);drawer("Carte étudiant",c.name,`
+  <div class="rounded-2xl p-5 text-white" style="background:linear-gradient(135deg,#082f49,#1e3a5f)"><div class="flex justify-between"><div><div class="text-[10px] uppercase tracking-widest text-sky-200/70">${document.getElementById('brandName').textContent}</div><div class="mt-3 text-lg font-black">${c.name}</div><div class="text-xs text-sky-100/80">${c.mat} · ${CLASSES[cardClass].name}</div><div class="text-xs text-sky-100/80">Année ${YEAR}</div></div><div class="grid h-16 w-14 place-items-center rounded-lg bg-white/10 text-[10px] text-sky-200/70">${c.photo?'<i data-lucide=user class="h-6 w-6"></i>':'pas de<br>photo'}</div></div><div class="mt-3 grid h-12 w-12 place-items-center rounded-lg bg-white"><i data-lucide="qr-code" class="h-8 w-8 text-slate-900"></i></div></div>
+  <div class="kv mt-4"><span>Statut</span><b><span class="chip ${c.status==='imprimée'?'c-ok':'c-info'}">${c.status}</span></b></div>
+  <div class="kv"><span>QR signé</span><b>matricule + année (vérifiable)</b></div>
+  <div class="mt-4 flex justify-end gap-2"><button class="btn btn-secondary" onclick="closeDrawer()">Fermer</button><button class="btn btn-primary" onclick="toast('PDF régénéré');closeDrawer()">Régénérer le PDF</button></div>`);}
+
+/* ============ UTILISATEURS ============ */
+let uFilter="tous";
+function wsAccounts(){
+  const filters=[["tous","Tous"],["Étudiant","Étudiants"],["Enseignant","Enseignants"],["Surveillant","Surveillants"],["pb","Bloqués/désactivés"]];
+  const list=USERS.filter(u=>uFilter==="tous"?true:uFilter==="pb"?(u.blocked||!u.active):u.role===uFilter);
+  return `<div class="seg mb-4">${filters.map(f=>`<button class="seg-b ${uFilter===f[0]?'active':''}" onclick="uFilter='${f[0]}';openModule('accounts')">${f[1]}</button>`).join("")}</div>
+  <div class="panel" style="padding:.5rem 1.2rem">${list.map(u=>{const s=uState(u);return `<div class="row"><div class="avatar" style="background:#4338ca">${u.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</div><div class="flex-1 min-w-0"><b class="block">${u.name}</b><span class="text-xs text-slate-400">${u.login} · ${u.role} · ${u.info}</span></div><span class="chip ${s.c}">${s.l}</span><span class="hidden md:inline text-xs font-semibold text-slate-400">${u.last}</span><button class="btn btn-secondary" style="padding:.4rem .8rem" onclick="openUser(${u.id})">Gérer</button></div>`;}).join("")}</div>`;
+}
+function openUser(id){const u=USERS.find(x=>x.id===id);const s=uState(u);
+  drawer("Compte · "+u.role,u.name,`
+    <div class="kv"><span>Identifiant</span><b>${u.login}</b></div>
+    <div class="kv"><span>Rattachement</span><b>${u.info}</b></div>
+    <div class="kv"><span>État</span><b><span class="chip ${s.c}">${s.l}</span></b></div>
+    <div class="kv"><span>Dernière connexion</span><b>${u.last}</b></div>
+    <div class="fl">Mot de passe</div>
+    <button class="btn btn-secondary w-full justify-center" onclick="askReset(${u.id})"><i data-lucide="key-round" class="lds"></i> Réinitialiser le mot de passe</button>
+    <p class="mt-2 text-xs font-semibold text-slate-500"><i data-lucide="lock" class="inline h-3 w-3"></i> Jamais affiché : envoi d'un lien (30 min) ou code temporaire à usage unique.</p>
+    <div class="fl">État du compte</div>
+    <div class="flex gap-2">
+      ${u.blocked?`<button class="btn btn-primary flex-1" onclick="setAcc(${u.id},'unblock')">Débloquer</button>`:`<button class="btn btn-danger flex-1" onclick="setAcc(${u.id},'block')">Bloquer</button>`}
+      ${!u.active?`<button class="btn btn-primary flex-1" onclick="setAcc(${u.id},'reactivate')">Réactiver</button>`:`<button class="btn btn-secondary flex-1" onclick="setAcc(${u.id},'suspend')">Désactiver</button>`}
+    </div>
+    <p class="mt-2 text-xs font-semibold text-slate-500"><b>Bloquer</b> = verrouillage temporaire (sécurité). <b>Désactiver</b> = compte hors service (offboarding).</p>
+    <div class="fl">Email</div><div class="flex gap-2"><input class="fi" value="${u.login}@esfe.ml"><button class="btn btn-secondary" onclick="toast('Email mis à jour ✓');addAudit('Email modifié','${u.login}')">OK</button></div>`);
+}
+function askReset(id){const u=USERS.find(x=>x.id===id);
+  drawer("Réinitialisation",u.name,`<p class="text-sm font-semibold text-slate-600">Méthode pour <b>${u.login}</b> :</p>
+    <div class="seg mt-3"><button class="seg-b active" id="rmL" onclick="segOnly(this)">Lien (email)</button><button class="seg-b" id="rmT" onclick="segOnly(this)">Code temporaire</button></div>
+    <p class="text-xs font-semibold text-slate-500">Le lien expire en 30 min. Le code force le changement à la 1re connexion.</p>
+    <div class="mt-4 flex justify-end gap-2"><button class="btn btn-secondary" onclick="openUser(${id})">Retour</button><button class="btn btn-primary" onclick="doReset(${id})">Confirmer</button></div>`);}
+function doReset(id){const u=USERS.find(x=>x.id===id);const temp=document.getElementById('rmT').classList.contains('active');addAudit("Réinitialisation du mot de passe",u.login+" — "+u.name,"warn");
+  if(temp){const code=Math.random().toString(36).slice(2,8).toUpperCase();document.getElementById('drawerBody').innerHTML=`<div class="panel" style="border-left:5px solid #059669;box-shadow:none"><b class="text-emerald-700">Code temporaire généré</b></div><p class="mt-3 text-sm font-semibold text-slate-500">À transmettre à l'utilisateur. Affiché une seule fois.</p><div class="codebox mt-2"><span>${code}</span><button onclick="navigator.clipboard&&navigator.clipboard.writeText('${code}');toast('Copié ✓')">Copier</button></div><div class="mt-4 flex justify-end"><button class="btn btn-primary" onclick="closeDrawer();openModule('accounts')">Terminé</button></div>`;}
+  else{document.getElementById('drawerBody').innerHTML=`<div class="panel" style="border-left:5px solid #059669;box-shadow:none"><b class="text-emerald-700">Lien envoyé à ${u.login}</b></div><p class="mt-3 text-sm font-semibold text-slate-500">Valable 30 minutes pour définir un nouveau mot de passe.</p><div class="mt-4 flex justify-end"><button class="btn btn-primary" onclick="closeDrawer();openModule('accounts')">Terminé</button></div>`;}
+  toast("Réinitialisation tracée ✓");}
+function setAcc(id,act){const u=USERS.find(x=>x.id===id);const map={block:['blocked',true,'Compte bloqué','bad'],unblock:['blocked',false,'Compte débloqué','ok'],suspend:['active',false,'Compte désactivé','warn'],reactivate:['active',true,'Compte réactivé','ok']};const[f,v,l,t]=map[act];u[f]=v;addAudit(l,u.login+" — "+u.name,t);closeDrawer();openModule('accounts');toast(l+" ✓");}
+
+/* ============ SUPPORT (tickets) ============ */
+function wsSupport(){
+  return `<div class="panel mb-4 flex items-center justify-between"><h3 class="font-black">Tickets de l'annexe</h3><button class="btn btn-primary" onclick="toast('Nouveau ticket (simulé)')"><i data-lucide="plus" class="lds"></i> Nouveau</button></div>
+  <div class="panel" style="padding:.5rem 1.2rem">${TICKETS.map(t=>{const s=TK_STATUS[t.status];return `<div class="row"><div class="avatar" style="background:${t.status==='resolved'?'#047857':t.status==='in_progress'?'#0369a1':'#b45309'}"><i data-lucide="life-buoy" class="h-4 w-4"></i></div><div class="flex-1"><b class="block">#${t.id} · ${t.title}</b><span class="text-xs text-slate-400">${t.who} · ${t.t}</span></div><span class="chip ${s.c}">${s.l}</span>${t.status!=='resolved'?`<button class="btn btn-secondary" style="padding:.4rem .8rem" onclick="resolveTk(${t.id})">${t.status==='open'?'Prendre':'Résoudre'}</button>`:''}</div>`;}).join("")}</div>`;
+}
+function resolveTk(id){const t=TICKETS.find(x=>x.id===id);if(t.status==='open'){t.status='in_progress';addAudit("Ticket pris en charge","#"+id,"info");}else{t.status='resolved';addAudit("Ticket résolu","#"+id,"ok");}openModule('support');toast("Ticket mis à jour ✓");}
+
+/* ============ SUPERVISION (anomalies) ============ */
+function wsSupervision(){
+  const alerts=[];
+  Object.entries(CLASSES).forEach(([cid,c])=>{const st=deriveState(c.semesters[0],c.semesters[0].id);
+    if(st==='empty')alerts.push(['warning','Classe sans notes',c.name,'notes']);
+    ecsOf(c).forEach(e=>{if(!e.teacher)alerts.push(['warning','EC sans enseignant planifié',`${e.title} — ${c.name}`,'structure']);});
+    if(st==='ready_to_publish_final'||c.semesters.some(s=>s.status==='FINALIZED'))alerts.push(['info','Résultats calculés non envoyés',c.name,'notes']);});
+  TICKETS.filter(t=>t.status!=='resolved').forEach(t=>alerts.push(['warning','Ticket ouvert',`#${t.id} — ${t.title}`,'support']));
+  return `<div class="panel" style="padding:.5rem 1.2rem">${alerts.map(a=>`<div class="row"><div class="avatar" style="background:${a[0]==='warning'?'#b45309':'#0369a1'}"><i data-lucide="${a[0]==='warning'?'alert-triangle':'info'}" class="h-4 w-4"></i></div><div class="flex-1"><b class="block">${a[1]}</b><span class="text-xs text-slate-400">${a[2]}</span></div><span class="chip ${a[0]==='warning'?'c-warn':'c-info'}">${a[0]==='warning'?'À traiter':'Info'}</span><button class="btn btn-secondary" style="padding:.4rem .8rem" onclick="openModule('${a[3]}')">Ouvrir</button></div>`).join("")||'<p class="py-6 text-center text-sm font-semibold text-slate-400">Aucune anomalie.</p>'}</div>`;
+}
+
+/* ============ JOURNAL D'AUDIT ============ */
+function wsAudit(){
+  const ic={ok:['check-circle','#059669'],warn:['alert-triangle','#d97706'],bad:['x-circle','#be123c'],info:['info','#2563eb']};
+  return `<div class="panel mb-4 flex items-center justify-between"><div><h3 class="font-black">Historique des actions de l'annexe</h3><p class="text-xs font-semibold text-slate-400">journal horodaté et attribué — ${AUDIT.length} entrées</p></div><button class="btn btn-secondary" onclick="toast('Export (simulé)')"><i data-lucide="download" class="lds"></i> Exporter</button></div>
+  <div class="panel" style="padding:.5rem 1.2rem">${AUDIT.map(a=>{const i=ic[a.type]||ic.info;return `<div class="row"><div class="avatar" style="background:${i[1]}"><i data-lucide="${i[0]}" class="h-4 w-4"></i></div><div class="flex-1"><b class="block">${a.action}</b><span class="text-xs text-slate-400">${a.target}</span></div><span class="chip c-mute">${a.t}</span></div>`;}).join("")}</div>`;
+}
+
+/* ============ CATALOGUE ============ */
+function wsCatalog(){
+  const col=(title,items,kind)=>`<div class="panel"><div class="flex items-center justify-between"><h3 class="font-black">${title}</h3><button class="btn btn-secondary" style="padding:.35rem .7rem" onclick="addCat('${kind}')"><i data-lucide="plus" class="lds"></i></button></div><div class="mt-2 flex flex-wrap gap-2">${items.map(x=>`<span class="chip c-mute">${x}</span>`).join("")}</div></div>`;
+  return `<div class="grid lg:grid-cols-2 gap-4">${col('Langues','LANGS'==='LANGS'?LANGS:[],'lang')}${col('Professions',PROFS,'prof')}</div>`;
+}
+function addCat(kind){const v=prompt(kind==='lang'?"Nouvelle langue :":"Nouvelle profession :");if(v){(kind==='lang'?LANGS:PROFS).push(v);addAudit("Catalogue enrichi",v);openModule('catalog');toast("Ajouté ✓");}}
+
+/* ============ NOTIFICATIONS ============ */
+function wsNotifications(){
+  const N=[["bell","Demande de réinitialisation","Ousmane Maïga (E2462) · il y a 1 h","c-warn"],["file-spreadsheet","L2 Soins Inf. — rattrapage à finaliser","Semestre 2 · il y a 3 h","c-info"],["shield-alert","Compte bloqué automatiquement","E2418 · 5 échecs de connexion · hier","c-bad"]];
+  return `<div class="panel" style="padding:.5rem 1.2rem">${N.map(n=>`<div class="row"><div class="avatar" style="background:#0369a1"><i data-lucide="${n[0]}" class="h-4 w-4"></i></div><div class="flex-1"><b class="block">${n[1]}</b><span class="text-xs text-slate-400">${n[2]}</span></div><span class="chip ${n[3]}">Nouveau</span></div>`).join("")}</div>`;
+}
+
+/* ============ COMPTE / PARAMÈTRES ============ */
+let cfgTab='profil';
+function wsSettings(){
+  const tabs=[['profil','Profil'],['secu','Sécurité'],['annexe','Paramètres annexe']];
+  let body='';
+  if(cfgTab==='profil'){body=`<div class="panel"><label class="fl">Nom</label><input class="fi" value="M. Touré"><label class="fl">Identifiant</label><input class="fi" value="info.toure" disabled><label class="fl">Email</label><input class="fi" value="info.hamdallaye@esfe.ml"><label class="fl">Rôle</label><input class="fi" value="Informaticien · Annexe Hamdallaye" disabled><div class="mt-4 flex justify-end"><button class="btn btn-primary" onclick="toast('Profil enregistré ✓')">Enregistrer</button></div></div>`;}
+  else if(cfgTab==='secu'){body=`<div class="panel"><button class="btn btn-secondary w-full justify-center" onclick="toast('Changement MDP (simulé)')"><i data-lucide="key-round" class="lds"></i> Changer mon mot de passe</button><div class="panel mt-3" style="border-left:5px solid #059669;box-shadow:none"><div class="flex items-center gap-2 text-sm font-black"><i data-lucide="shield-check" class="h-4 w-4 text-emerald-600"></i> Authentification à deux facteurs : activée</div><p class="mt-1 text-sm font-semibold text-slate-500">Recommandée pour ce compte à privilèges (gestion des comptes et des notes).</p></div></div>`;}
+  else{body=`<div class="panel"><label class="fl">Seuil de validation (/20)</label><input class="fi" type="number" value="${THRESHOLD}"><label class="fl">Année académique active</label><input class="fi" value="${YEAR}"><label class="fl">Configuration locale (JSON)</label><textarea class="fi" rows="3">{ "rattrapage_plafonne": true }</textarea><div class="panel mt-3" style="border-left:5px solid #be123c;box-shadow:none"><div class="flex items-center gap-2 text-sm font-black text-rose-700"><i data-lucide="alert-triangle" class="h-4 w-4"></i> En production</div><p class="mt-1 text-sm font-semibold text-slate-500">Ce réglage pilote le calcul des notes (seuil) ; il doit être appliqué côté serveur et chaque modification tracée à l'audit.</p></div><div class="mt-4 flex justify-end"><button class="btn btn-primary" onclick="addAudit('Paramètre annexe modifié','Seuil/année');toast('Paramètres annexe enregistrés ✓')">Enregistrer</button></div></div>`;}
+  return `<div class="seg mb-4" style="max-width:520px">${tabs.map(t=>`<button class="seg-b ${cfgTab===t[0]?'active':''}" onclick="cfgTab='${t[0]}';openModule('settings')">${t[1]}</button>`).join("")}</div>${body}`;
+}
+
+/* ============ DRAWER / UTILS ============ */
+function drawer(kicker,title,html){document.getElementById('drawerKicker').textContent=kicker;document.getElementById('drawerTitle').textContent=title;document.getElementById('drawerBody').innerHTML=html;document.getElementById('drawer').classList.add('show');document.getElementById('drawerBackdrop').classList.add('show');icons();}
+function closeDrawer(){document.getElementById('drawer').classList.remove('show');document.getElementById('drawerBackdrop').classList.remove('show');}
+function segOnly(b){b.parentNode.querySelectorAll('.seg-b').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
+function toast(msg,type){const el=document.createElement('div');el.className="toast";const col=type==='bad'?'#be123c':type==='warn'?'#d97706':'#059669';el.innerHTML=`<span style="width:9px;height:9px;border-radius:999px;background:${col}"></span>${msg}`;document.getElementById('toasts').appendChild(el);setTimeout(()=>{el.style.opacity=0;setTimeout(()=>el.remove(),300)},2600);}
+let collapsed=false;
+function toggleSidebar(){collapsed=!collapsed;document.getElementById('sidebar').style.width=collapsed?'82px':'280px';document.getElementById('main').style.marginLeft=collapsed?'82px':'280px';document.querySelectorAll('.navlabel').forEach(e=>e.style.display=collapsed?'none':'');document.getElementById('brandWrap').style.display=collapsed?'none':'';document.getElementById('collapseIcon').style.transform=collapsed?'rotate(180deg)':'';}
+function toggleDark(){document.documentElement.classList.toggle('dark');}
+function icons(){if(window.lucide&&lucide.createIcons)lucide.createIcons();}
+
+/* ===================== AJOUTS CRÉATIFS (badgés « Idée ») ===================== */
+function ideaPill(){return '<span class="idea">Idée</span>';}
+
+/* Fil d'Ariane contextuel cliquable */
+function renderCrumb(){
+  const m=MODULES.find(x=>x.key===active);
+  let trail=[['Annexe Hamdallaye',null],[m.label,null]];
+  if(active==='notes'){const cl=curClass(notesKey),sem=curSem(notesKey);trail=[['Annexe Hamdallaye',null],['Notes',"openModule('notes')"],[cl.name,null],['Semestre '+sem.number,null],[STATE_LABEL[deriveState(sem,notesKey)],null]];}
+  else if(active==='cards')trail=[['Annexe Hamdallaye',null],['Cartes',"openModule('cards')"],[CLASSES[cardClass].name,null]];
+  document.getElementById('crumbBar').innerHTML='<nav class="crumb-bar">'+trail.map((t,i)=>`${i?'<i data-lucide="chevron-right" class="h-3 w-3 text-slate-300"></i>':''}<button ${t[1]?`onclick="${t[1]}"`:''} class="${t[1]?'crumb-link':'crumb-cur'}">${t[0]}</button>`).join('')+'</nav>';icons();
+}
+
+/* Centre d'actions : prochaines actions recommandées toutes sections confondues */
+function buildActions(){
+  const a=[];
+  Object.keys(CLASSES).forEach(cid=>CLASSES[cid].semesters.forEach(sem=>{const key=sem.id,st=deriveState(sem,key);
+    if(st==='ready_to_publish_normal')a.push({icon:'send',col:'#d97706',title:'Publier la session normale',sub:CLASSES[cid].name+' · S'+sem.number,cta:'Publier',fn:`notesKey='${key}';openModule('notes');confirmPublish('normal')`});
+    else if(st==='ready_to_publish_final')a.push({icon:'send',col:'#d97706',title:'Publier les résultats finaux',sub:CLASSES[cid].name+' · S'+sem.number,cta:'Publier',fn:`notesKey='${key}';openModule('notes');confirmPublish('final')`});
+    else if(st==='in_progress')a.push({icon:'edit-3',col:'#2563eb',title:'Terminer la saisie des notes',sub:CLASSES[cid].name+' · S'+sem.number,cta:'Reprendre',fn:`notesKey='${key}';openModule('notes')`});
+    else if(st==='retake_in_progress')a.push({icon:'rotate-ccw',col:'#4f46e5',title:'Finaliser le rattrapage',sub:CLASSES[cid].name+' · S'+sem.number,cta:'Ouvrir',fn:`notesKey='${key}';openModule('notes')`});
+  }));
+  USERS.filter(u=>u.blocked).forEach(u=>a.push({icon:'unlock',col:'#be123c',title:'Compte bloqué à examiner',sub:u.name+' · '+u.login,cta:'Ouvrir',fn:`openModule('accounts');setTimeout(()=>openUser(${u.id}),60)`}));
+  TICKETS.filter(t=>t.status==='open').forEach(t=>a.push({icon:'life-buoy',col:'#0369a1',title:'Ticket à prendre en charge',sub:'#'+t.id+' · '+t.title,cta:'Traiter',fn:`openModule('support')`}));
+  return a;
+}
+function actionCenter(){
+  const a=buildActions();
+  return `<div class="panel mb-4" style="border-left:6px solid #2563eb"><div class="flex items-center justify-between"><h3 class="text-base font-black flex items-center"><i data-lucide="zap" class="h-4 w-4 mr-2 text-blue-600"></i> Centre d'actions ${ideaPill()}</h3><span class="chip c-info">${a.length} à traiter</span></div>
+    <p class="mt-1 text-sm font-semibold text-slate-500">Prochaines actions recommandées, toutes sections confondues — un clic pour agir.</p>
+    <div class="mt-2">${a.slice(0,6).map(x=>`<div class="row"><div class="avatar" style="background:${x.col}"><i data-lucide="${x.icon}" class="h-4 w-4"></i></div><div class="flex-1 min-w-0"><b class="block">${x.title}</b><span class="text-xs text-slate-400">${x.sub}</span></div><button class="btn btn-primary" style="padding:.4rem .8rem" onclick="${x.fn}">${x.cta}</button></div>`).join('')||'<p class="py-4 text-center text-sm font-semibold text-slate-400">Tout est à jour ✓</p>'}</div></div>`;
+}
+
+/* Pipeline académique : kanban des (classe, semestre) par état du workflow */
+function pipelineBoard(){
+  const cols=[['empty','Non commencé','#64748b'],['in_progress','Saisie','#2563eb'],['ready_to_publish_normal','À publier','#d97706'],['normal_published','Publié','#059669'],['retake_in_progress','Rattrapage','#4f46e5'],['ready_to_publish_final','Finaux prêts','#d97706'],['final_published','Finalisé','#059669']];
+  const byState={};Object.keys(CLASSES).forEach(cid=>CLASSES[cid].semesters.forEach(sem=>{const st=deriveState(sem,sem.id);(byState[st]=byState[st]||[]).push({cid,sem});}));
+  return `<div class="panel mb-4"><div class="flex items-center justify-between"><h3 class="text-base font-black flex items-center"><i data-lucide="kanban" class="h-4 w-4 mr-2 text-blue-600"></i> Pipeline académique de l'annexe ${ideaPill()}</h3><span class="text-xs font-semibold text-slate-400">cliquez une carte pour ouvrir la classe</span></div>
+    <div class="mt-3 flex gap-3 overflow-x-auto pb-2">${cols.map(c=>`<div class="pcol"><div class="pcol-h" style="border-color:${c[2]}"><span style="color:${c[2]}">${c[1]}</span><span class="chip c-mute">${(byState[c[0]]||[]).length}</span></div>${(byState[c[0]]||[]).map(o=>`<button class="pcard" onclick="notesKey='${o.sem.id}';openModule('notes')"><b>${CLASSES[o.cid].name}</b><span>Semestre ${o.sem.number}</span></button>`).join('')||'<div class="pempty">—</div>'}</div>`).join('')}</div></div>`;
+}
+
+/* Aperçu d'impact avant publication (dry-run) */
+function confirmPublish(kind){
+  const g=gradesFor(notesKey),ecs=ecsOf(curClass(notesKey));let val=0,aj=0,man=0;
+  g.forEach(r=>{const m=moy(r,ecs);if(m==null)man++;else if(m>=THRESHOLD)val++;else aj++;});
+  const cand=g.filter(r=>ecs.some(e=>r.n[e.code]!=null&&r.n[e.code]<THRESHOLD)).length;
+  modal("Aperçu avant publication",`<p class="text-sm font-semibold text-slate-600">${curClass(notesKey).name} · Semestre ${curSem(notesKey).number}. Vérifiez l'impact avant de publier ${kind==='final'?'les résultats finaux':'la session normale'}.</p>
+    <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+      <div class="panel" style="box-shadow:none"><div class="text-2xl font-black" style="color:#059669">${val}</div><div class="text-xs font-bold text-slate-400">validés</div></div>
+      <div class="panel" style="box-shadow:none"><div class="text-2xl font-black" style="color:#be123c">${aj}</div><div class="text-xs font-bold text-slate-400">ajournés</div></div>
+      <div class="panel" style="box-shadow:none"><div class="text-2xl font-black" style="color:#d97706">${man}</div><div class="text-xs font-bold text-slate-400">à saisir</div></div>
+    </div>
+    ${man?`<div class="panel mt-3" style="border-left:5px solid #d97706;box-shadow:none"><p class="text-sm font-semibold" style="color:#92400e">⚠ ${man} étudiant(s) sans note seront marqués « à saisir ».</p></div>`:''}
+    ${kind==='normal'&&cand?`<p class="mt-2 text-sm font-semibold text-slate-500">${cand} étudiant(s) deviendront éligibles au rattrapage.</p>`:''}
+    <div class="mt-4 flex justify-end gap-2"><button class="btn btn-secondary" onclick="closeModal()">Annuler</button><button class="btn btn-amber" onclick="closeModal();advance('publish_${kind}')">Confirmer la publication</button></div>`);
+}
+
+/* Palette de commandes (⌘K) : naviguer ET agir au clavier */
+let CMD=[];
+function buildCommands(){
+  const c=[];
+  MODULES.forEach(m=>c.push({t:'Aller à · '+m.label,ic:m.icon,fn:`openModule('${m.key}')`}));
+  Object.entries(CLASSES).forEach(([cid,cl])=>cl.semesters.forEach(sem=>c.push({t:'Notes · '+cl.name+' — S'+sem.number,ic:'file-spreadsheet',fn:`notesKey='${sem.id}';openModule('notes')`})));
+  Object.entries(CLASSES).forEach(([cid,cl])=>c.push({t:'Cartes · '+cl.name,ic:'badge-check',fn:`cardClass='${cid}';openModule('cards')`}));
+  USERS.forEach(u=>c.push({t:'Compte · '+u.name+' ('+u.login+')',ic:'shield-check',fn:`openModule('accounts');setTimeout(()=>openUser(${u.id}),60)`}));
+  c.push({t:'Action · Nouveau ticket de support',ic:'plus',fn:`openModule('support')`});
+  return c;
+}
+function openPalette(){CMD=buildCommands();document.getElementById('paletteWrap').classList.add('show');const i=document.getElementById('paletteInput');i.value='';renderPalette('');setTimeout(()=>i.focus(),30);}
+function closePalette(){document.getElementById('paletteWrap').classList.remove('show');}
+function renderPalette(q){q=(q||'').toLowerCase();const r=CMD.filter(x=>x.t.toLowerCase().includes(q)).slice(0,8);
+  document.getElementById('paletteList').innerHTML=r.map((x,i)=>`<button class="pal-item ${i===0?'pal-active':''}" data-fn="${x.fn.replace(/"/g,'&quot;')}" onmouseover="palHover(${i})" onclick="palRun(this)"><i data-lucide="${x.ic}" class="h-4 w-4 text-slate-400"></i><span>${x.t}</span></button>`).join('')||'<div class="px-4 py-4 text-sm font-semibold text-slate-400">Aucun résultat</div>';icons();}
+function palHover(i){document.querySelectorAll('.pal-item').forEach((e,j)=>e.classList.toggle('pal-active',i===j));}
+function palRun(el){const fn=el.getAttribute('data-fn');closePalette();new Function(fn)();}
+function paletteKey(e){const items=[...document.querySelectorAll('.pal-item')];let i=items.findIndex(x=>x.classList.contains('pal-active'));
+  if(e.key==='ArrowDown'){e.preventDefault();i=Math.min(items.length-1,i+1);palHover(i);}
+  else if(e.key==='ArrowUp'){e.preventDefault();i=Math.max(0,i-1);palHover(i);}
+  else if(e.key==='Enter'){e.preventDefault();if(items[i])palRun(items[i]);}
+  else if(e.key==='Escape')closePalette();}
+function modal(title,html){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=html;document.getElementById('modalWrap').classList.add('show');icons();}
+function closeModal(){document.getElementById('modalWrap').classList.remove('show');}
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}});
+
+/* ============ GRILLE DE NOTES FIDÈLE (IDE-SF, 5 UE = 30 crédits) ============ */
+const NG_TH=10;
+const NG_UES=[
+ {code:"SIO111",title:"Connaissances de base liées aux fonctions infirmières",ecs:[["Anglais",1,1],["Pharmacologie générale",2,1],["Microbiologie",1,1],["Secourisme",1,1],["Profession infirmière et sage-femme",1,1]]},
+ {code:"SIO112",title:"Connaissances de base du corps et de l'alimentation",ecs:[["Système national de santé",1,2],["Étude du milieu",1,2],["Prévention des infections",2,3],["Hématologie",1,1],["Théories et concepts des soins infirmiers",1,1]]},
+ {code:"SIO113",title:"Notions de base sur les situations cliniques (pathologies)",ecs:[["Puériculture",1,1],["Soins de base infirmiers en médecine",1,1],["Législation",1,1],["Statistique",1,2],["Sémiologie médicale",1,2],["Nutrition-Diététique",1,1]]},
+ {code:"SIO114",title:"Santé communautaire",ecs:[["Anatomie-physiologie générale",2,1],["Psycho-socio-anthropologie",2,1],["Déontologie",2,1]]},
+ {code:"SIO115",title:"Simulation des méthodes et techniques de base en soins",ecs:[["Relation d'aide",0.5,1],["IST/VIH",0.5,1],["Anatomie-physiologie obstétricale",1,2],["TP Anatomie",1,3],["TP Chirurgie",1,2],["TP Médecine",0.5,3],["Conduite",0.5,1],["Soins infirmiers de base en chirurgie",1,1]]},
+];
+NG_UES.forEach((u,ui)=>u.ecs=u.ecs.map((e,ei)=>({n:e[0],cr:e[1],co:e[2],key:"u"+ui+"e"+ei})));
+const NG_SEM=NG_UES.reduce((a,u)=>a+u.ecs.reduce((b,e)=>b+e.cr,0),0); // = 30
+const NG_FN=["Aminata","Ousmane","Fatoumata","Modibo","Mariam","Adama","Kadiatou","Ibrahim","Rokia","Seydou","Awa","Bakary","Djénéba","Alassane"];
+const NG_LN=["Traoré","Diarra","Keïta","Coulibaly","Sidibé","Touré","Cissé","Maïga","Diallo","Konaté","Sangaré"];
+let NG_STU=[];(function(){let s=909;const r=()=>{s=(s*9301+49297)%233280;return s/233280;};
+ for(let i=0;i<14;i++){const o={id:i,no:i+1,nom:NG_LN[Math.floor(r()*NG_LN.length)].toUpperCase(),prenom:NG_FN[Math.floor(r()*NG_FN.length)],notes:{}};
+  NG_UES.forEach(u=>u.ecs.forEach(e=>{const x=r();o.notes[e.key]=x<.08?null:Math.round((4+r()*15)*4)/4;}));NG_STU.push(o);}})();
+const NGW={no:44,nom:144,prenom:110,note:58,coef:50,cred:44,umoy:58,ucoef:50,ucred:44,res1:92,res2:64,res3:78,res4:140};
+function ngTpl(){let t=[NGW.no,NGW.nom,NGW.prenom];NG_UES.forEach(u=>{u.ecs.forEach(()=>t.push(NGW.note,NGW.coef,NGW.cred));t.push(NGW.umoy,NGW.ucoef,NGW.ucred);});t.push(NGW.res1,NGW.res2,NGW.res3,NGW.res4);return t.map(x=>x+"px").join(" ");}
+function ngAgg(o,ui){const u=NG_UES[ui];let pts=0,co=0;u.ecs.forEach(e=>{const v=o.notes[e.key];if(v!=null){pts+=v*e.co;co+=e.co;}});const moy=co?pts/co:null,req=u.ecs.reduce((a,e)=>a+e.cr,0);let cr=0;if(moy!=null&&moy>=NG_TH)cr=req;else u.ecs.forEach(e=>{const v=o.notes[e.key];if(v!=null&&v>=NG_TH)cr+=e.cr;});return {moy,pts:Math.round(pts*100)/100,req,cr};}
+function ngOverall(o){let pts=0,co=0,cr=0;NG_UES.forEach((u,ui)=>cr+=ngAgg(o,ui).cr);NG_UES.forEach(u=>u.ecs.forEach(e=>{const v=o.notes[e.key];if(v!=null){pts+=v*e.co;co+=e.co;}}));const moy=co?Math.round(pts/co*100)/100:null;const all=NG_UES.every((u,ui)=>{const a=ngAgg(o,ui);return a.moy!=null&&a.moy>=NG_TH;});const dec=moy==null?{l:"—",c:"c-mute"}:(all||moy>=NG_TH)?{l:"Admis",c:"c-ok"}:{l:"Non admis",c:"c-bad"};return {moy,cr,dec,pct:moy==null?null:Math.round(moy/20*100)};}
+function ngC(cls,html,span,extra){return `<div class="ng-c ${cls||''}" ${span?`style="grid-column:span ${span};${extra||''}"`:extra?`style="${extra}"`:''}>${html==null?'':html}</div>`;}
+function ngRender(){
+ const host=document.getElementById('ngHost');if(!host)return;
+ let h=`<div class="ng-shell"><div class="ng-head"><div class="h1">École de Santé Félix Houphouët-Boigny (ESFé) — Moribabougou</div><div class="h2">Résultat du Semestre I · 2025–2026 · seuil ${NG_TH}/20 · semestre = ${NG_SEM} crédits</div><div class="h3">1ère Année Technicien Supérieur de Santé (TSS) · IDE-SF</div></div><div class="ng-scroll"><div class="ng-grid" id="ngGrid" style="grid-template-columns:${ngTpl()}">`;
+ // R1 UNITÉS
+ h+=ngC("ng-h ng-mlbl ng-r1","UNITÉS / COMPÉTENCES",3);
+ NG_UES.forEach(u=>h+=ngC("ng-h ng-ue ng-r1",`${u.code} — ${u.title}`,u.ecs.length*3+3));
+ h+=ngC("ng-h ng-res ng-res4 ng-r1","RÉSULTATS",4,"right:0;left:auto");
+ // R2 MATIÈRES
+ h+=ngC("ng-h ng-mlbl ng-r2","MATIÈRES",3);
+ NG_UES.forEach(u=>{u.ecs.forEach(e=>h+=ngC("ng-h ng-r2",e.n,3));h+=ngC("ng-h ng-unit ng-r2","Unité",3);});
+ h+=ngC("ng-h ng-res ng-res1 ng-r2","",1)+ngC("ng-h ng-res ng-res2 ng-r2","",1)+ngC("ng-h ng-res ng-res3 ng-r2","",1)+ngC("ng-h ng-res ng-res4 ng-r2","",1);
+ // R3 crédits
+ h+=ngC("ng-h ng-mlbl ng-r3","Crédits requis",3);
+ NG_UES.forEach((u,ui)=>{u.ecs.forEach(e=>h+=ngC("ng-h ng-cr ng-r3",e.cr,3));h+=ngC("ng-h ng-cr ng-r3",ngAgg(NG_STU[0],ui).req,3);});
+ h+=ngC("ng-h ng-res ng-res1 ng-r3","",1)+ngC("ng-h ng-res ng-res2 ng-r3","",1)+ngC("ng-h ng-res ng-res3 ng-r3","",1)+ngC("ng-h ng-res ng-res4 ng-r3","",1);
+ // R4 coeff
+ h+=ngC("ng-h ng-mlbl ng-r4","Coefficients",3);
+ NG_UES.forEach(u=>{u.ecs.forEach(e=>h+=ngC("ng-h ng-co ng-r4",e.co,3));h+=ngC("ng-h ng-co ng-r4",u.ecs.reduce((a,e)=>a+e.co,0),3);});
+ h+=ngC("ng-h ng-res ng-res1 ng-r4","",1)+ngC("ng-h ng-res ng-res2 ng-r4","",1)+ngC("ng-h ng-res ng-res3 ng-r4","",1)+ngC("ng-h ng-res ng-res4 ng-r4","",1);
+ // R5 sous-libellés
+ h+=ngC("ng-h ng-m1 ng-r5","N°")+ngC("ng-h ng-m2 ng-r5 ng-sub","NOM",null,"justify-content:flex-start")+ngC("ng-h ng-m3 ng-r5 ng-sub","PRÉNOMS",null,"justify-content:flex-start");
+ NG_UES.forEach(u=>{u.ecs.forEach(()=>{h+=ngC("ng-h ng-sub ng-r5","Note")+ngC("ng-h ng-sub ng-r5","N.coef")+ngC("ng-h ng-sub ng-r5","Créd");});h+=ngC("ng-h ng-sub ng-unit ng-r5","Moy")+ngC("ng-h ng-sub ng-unit ng-r5","N.coef")+ngC("ng-h ng-sub ng-unit ng-r5","Créd");});
+ h+=ngC("ng-h ng-res ng-res1 ng-r5","Moyenne",1)+ngC("ng-h ng-res ng-res2 ng-r5","%",1)+ngC("ng-h ng-res ng-res3 ng-r5","Crédits",1)+ngC("ng-h ng-res ng-res4 ng-r5","Observation",1);
+ // corps
+ NG_STU.forEach((o,ri)=>{const zb=ri%2?'ng-zebra':'';
+  h+=ngC("ng-m1 "+zb,o.no)+ngC("ng-m2 ng-stu "+zb,o.nom,null,"justify-content:flex-start")+ngC("ng-m3 ng-stu "+zb,o.prenom,null,"justify-content:flex-start");
+  NG_UES.forEach((u,ui)=>{u.ecs.forEach(e=>{const v=o.notes[e.key];const below=v!=null&&v<NG_TH;
+    h+=`<div class="ng-c ${zb}" style="padding:4px"><input id="ng-${o.id}-${e.key}" class="ng-in ${below?'below':''}" type="number" min="0" max="20" step="0.25" value="${v==null?'':v}" oninput="ngSetNote(${o.id},'${e.key}',this.value,'ng-${o.id}-${e.key}')"></div>`;
+    h+=ngC(zb,v==null?'—':(Math.round(v*e.co*100)/100));
+    h+=ngC(zb,v==null?'<span class="ng-no">—</span>':(v>=NG_TH?`<span class="ng-ok">${e.cr}</span>`:'<span class="ng-no">0</span>'));});
+   const a=ngAgg(o,ui);h+=ngC("ng-unitc "+zb,a.moy==null?'—':a.moy.toFixed(2))+ngC("ng-unitc "+zb,a.pts||'—')+ngC("ng-unitc "+zb,`${a.cr}/${a.req}`);});
+  const ov=ngOverall(o);
+  h+=ngC("ng-res1 "+zb,ov.moy==null?'—':ov.moy.toFixed(2),1,(ov.moy!=null&&ov.moy<NG_TH?'color:#be123c':''))+ngC("ng-res2 "+zb,ov.pct==null?'—':ov.pct+'%',1)+ngC("ng-res3 "+zb,ov.moy==null?'—':`${ov.cr}/${NG_SEM}`,1)+ngC("ng-res4 "+zb,`<span class="chip ${ov.dec.c}" style="font-size:.64rem">${ov.dec.l}</span><button class="ng-dl" title="Télécharger le relevé (PDF)" onclick="toast('Relevé ${o.nom} ${o.prenom} — PDF (simulé)')">⬇</button>`,1);
+ });
+ h+="</div></div></div>";host.innerHTML=h;
+}
+function ngSetNote(id,key,val,inputId){NG_STU.find(o=>o.id===id).notes[key]=val===''?null:Number(val);ngRender();const el=document.getElementById(inputId);if(el){el.focus();const v=el.value;el.value='';el.value=v;}}
+
+/* boot */
+renderNav();openModule('home');
+</script>
+</body>
+</html>

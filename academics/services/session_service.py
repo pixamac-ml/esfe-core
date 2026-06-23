@@ -150,6 +150,19 @@ def close_session(*, event: AcademicScheduleEvent, supervisor: User, notes: str 
     return complete_schedule_event(event, supervisor, notes=notes or "")
 
 
+def assign_session_replacement(*, event: AcademicScheduleEvent, replacement_teacher: User, supervisor: User, note: str = ""):
+    """
+    Affecte un enseignant remplaçant à une séance datée précise (instance, pas le modèle
+    récurrent). L'enseignant d'origine reste visible via TeacherAttendance (marqué absent
+    séparément par le surveillant) ; cette fonction ne fait que réassigner qui dispense la
+    séance concernée.
+    """
+    event.teacher = replacement_teacher
+    event.updated_by = supervisor
+    event.save(update_fields=["teacher", "updated_by"])
+    return event
+
+
 def mark_teacher_presence(
     *,
     event: AcademicScheduleEvent,

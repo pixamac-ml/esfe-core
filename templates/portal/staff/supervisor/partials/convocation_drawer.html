@@ -1,0 +1,52 @@
+{% load component_tags %}
+{% if target_type == "teacher" and not teacher %}
+  {% component "empty_state" icon="user-x" title="Enseignant introuvable" message="La sélection ne correspond pas à votre annexe." %}{% endcomponent %}
+{% elif target_type == "student" and not student %}
+  {% component "empty_state" icon="user-x" title="Étudiant introuvable" message="La sélection ne correspond pas à votre annexe." %}{% endcomponent %}
+{% else %}
+  <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:16px">
+    {% if target_type == "teacher" %}{{ teacher.get_full_name|default:teacher.username }}{% else %}{{ student.full_name }} — {{ student.programme_title }}{% endif %}
+  </p>
+  <form hx-post="{% url 'accounts_portal:supervisor_convocation_create' %}" hx-target="#supervisor-drawer-content">
+    {% csrf_token %}
+    <input type="hidden" name="target_type" value="{{ target_type }}">
+    <input type="hidden" name="target_id" value="{{ target_id }}">
+    <input type="hidden" name="case_id" value="{{ case_id }}">
+
+    {% if target_type == "student" %}
+    <label class="f-l" style="margin-top:0">Destinataire</label>
+    <div class="seg">
+      {% for val, label in dest_choices %}
+      <button type="button" class="seg-b {% if forloop.first %}active{% endif %}" onclick="document.querySelectorAll('#conv-dest-seg .seg-b').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('conv-dest-input').value='{{ val }}'" id="conv-dest-seg">{{ label }}</button>
+      {% endfor %}
+    </div>
+    <input type="hidden" id="conv-dest-input" name="destinataire" value="{{ dest_choices.0.0 }}">
+    {% endif %}
+
+    <label class="f-l">Motif</label>
+    <select name="motif" required class="f-i">
+      {% for m in motif_choices %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+    </select>
+
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label class="f-l">Date</label><input type="date" name="scheduled_date" required class="f-i"></div>
+      <div style="flex:1"><label class="f-l">Heure</label><input type="time" name="scheduled_time" required class="f-i"></div>
+    </div>
+
+    <label class="f-l">Canal</label>
+    <select name="channel" required class="f-i">
+      {% for val, label in channel_choices %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+    </select>
+    {% if channel_choices|length %}
+    <p style="font-size:11px;color:var(--ink-3);margin-top:4px">Seul le canal E-mail envoie réellement la convocation ; les autres canaux sont enregistrés pour traitement manuel.</p>
+    {% endif %}
+
+    <label class="f-l">Message</label>
+    <textarea name="message" rows="3" class="f-i" placeholder="Précisez l'objet de la convocation…"></textarea>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button type="button" class="btn" @click="$dispatch('supervisor-drawer-close')">Annuler</button>
+      <button type="submit" class="btn primary">Envoyer la convocation</button>
+    </div>
+  </form>
+{% endif %}

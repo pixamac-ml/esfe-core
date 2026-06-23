@@ -1,0 +1,127 @@
+{% if toast %}
+<div class="banner {% if toast.level == 'success' %}ok{% else %}warn{% endif %}" style="margin-bottom:14px">{{ toast.message }}</div>
+{% endif %}
+
+{% if academic_class %}
+<div class="toolbar">
+  <span class="src-badge">⤿ Grille hebdomadaire — {{ academic_class.display_name }}</span>
+  <button type="button" class="btn"
+          hx-get="{% url planner_hub_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}"
+          hx-target="{{ workspace_target_id }}" hx-swap="innerHTML">
+    ← Retour aux actions
+  </button>
+  <button type="button" class="btn" style="margin-left:auto" onclick="document.getElementById('modal-generate-week').classList.remove('hide')">Générer la semaine</button>
+  <button type="button" class="btn primary" onclick="document.getElementById('modal-generate-month').classList.remove('hide')">Générer le mois</button>
+  <button type="button" class="btn primary"
+          hx-get="{% url weekly_slots_workspace_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&drawer_form=1"
+          hx-target="#supervisor-drawer-content">
+    + Nouveau créneau
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-h"><h3>Créneaux récurrents</h3><span class="hint">{{ weekly_slot_rows|length }} ligne(s) · modèle hebdomadaire, indépendant des cours datés</span></div>
+  <div class="card-b">
+    {% for row in weekly_slot_rows %}
+    <div class="row">
+      <div class="pic" style="background:#334155">{{ row.weekday_label|slice:":2"|upper }}</div>
+      <div class="main">
+        <b>{{ row.ec_title }}</b>
+        <span>{{ row.weekday_label }} · {{ row.start_time }}–{{ row.end_time }} · {{ row.teacher_name }}{% if row.room %} · {{ row.room }}{% endif %}</span>
+      </div>
+      <span class="tail">
+        <button type="button" class="btn"
+                hx-get="{% url weekly_slots_workspace_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&edit={{ row.id }}&drawer_form=1"
+                hx-target="#supervisor-drawer-content">Modifier</button>
+        <button type="button" class="btn" style="color:var(--bad);border-color:#f6c8d2"
+                onclick="document.getElementById('modal-delete-slot-{{ row.id }}').classList.remove('hide')">Retirer</button>
+      </span>
+    </div>
+
+    <div id="modal-delete-slot-{{ row.id }}" class="hide" style="position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.5);padding:16px">
+      <div style="width:100%;max-width:420px;background:var(--card);border-radius:20px;padding:24px;box-shadow:0 24px 60px -16px rgba(15,23,42,.4)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px">
+          <div>
+            <p style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--bad)">Confirmation</p>
+            <h3 style="margin-top:4px;font-size:17px;font-weight:800">Retirer le créneau</h3>
+          </div>
+          <button type="button" onclick="document.getElementById('modal-delete-slot-{{ row.id }}').classList.add('hide')" class="drawer-h x" style="border-radius:10px">✕</button>
+        </div>
+        <p style="font-size:13px;color:var(--ink-2);margin-bottom:18px">{{ row.weekday_label }} {{ row.start_time }}–{{ row.end_time }} · {{ row.ec_title }} · {{ row.teacher_name }}</p>
+        <form method="post" action="{% url weekly_slot_save_url academic_class.id %}"
+              hx-post="{% url weekly_slot_save_url academic_class.id %}"
+              hx-target="{{ workspace_target_id }}" hx-swap="innerHTML"
+              hx-on::after-request="document.getElementById('modal-delete-slot-{{ row.id }}')?.classList.add('hide')"
+              style="display:flex;justify-content:flex-end;gap:10px">
+          {% csrf_token %}
+          <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+          <input type="hidden" name="action" value="delete" />
+          <input type="hidden" name="slot_id" value="{{ row.id }}" />
+          <button type="button" onclick="document.getElementById('modal-delete-slot-{{ row.id }}').classList.add('hide')" class="btn">Annuler</button>
+          <button type="submit" class="btn primary" style="background:var(--bad);border-color:var(--bad)">Confirmer le retrait</button>
+        </form>
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty">
+      <p style="font-weight:800;font-size:14px">Aucun créneau hebdomadaire défini</p>
+      <p style="margin-top:4px">Utilisez « + Nouveau créneau » pour construire le modèle de la semaine.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="banner warn" style="margin-top:16px">
+  Les créneaux définissent le modèle hebdomadaire récurrent. Utilisez « Générer la semaine/mois » pour créer les cours datés à partir de ce modèle, ou « Programmer un cours » pour un ajout ponctuel.
+</div>
+
+{# ── Modale : Générer la semaine ── #}
+<div id="modal-generate-week" class="hide" style="position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.5);padding:16px">
+  <div style="width:100%;max-width:420px;background:var(--card);border-radius:20px;padding:24px;box-shadow:0 24px 60px -16px rgba(15,23,42,.4)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px">
+      <div>
+        <p style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ok)">Génération</p>
+        <h3 style="margin-top:4px;font-size:17px;font-weight:800">Générer la semaine</h3>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-generate-week').classList.add('hide')" class="drawer-h x" style="border-radius:10px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:18px">Créer les cours datés de la semaine à partir des créneaux hebdomadaires existants.</p>
+    <form method="post" action="{% url week_materialize_url academic_class.id %}"
+          hx-post="{% url week_materialize_url academic_class.id %}"
+          hx-target="{{ workspace_target_id }}" hx-swap="innerHTML"
+          hx-on::after-request="document.getElementById('modal-generate-week')?.classList.add('hide')"
+          style="display:flex;justify-content:flex-end;gap:10px">
+      {% csrf_token %}
+      <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+      <button type="button" onclick="document.getElementById('modal-generate-week').classList.add('hide')" class="btn">Annuler</button>
+      <button type="submit" class="btn primary">Générer</button>
+    </form>
+  </div>
+</div>
+
+{# ── Modale : Générer le mois ── #}
+<div id="modal-generate-month" class="hide" style="position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.5);padding:16px">
+  <div style="width:100%;max-width:420px;background:var(--card);border-radius:20px;padding:24px;box-shadow:0 24px 60px -16px rgba(15,23,42,.4)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px">
+      <div>
+        <p style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#6b21d6">Génération</p>
+        <h3 style="margin-top:4px;font-size:17px;font-weight:800">Générer le mois</h3>
+      </div>
+      <button type="button" onclick="document.getElementById('modal-generate-month').classList.add('hide')" class="drawer-h x" style="border-radius:10px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:18px">Créer quatre semaines de cours à partir des créneaux hebdomadaires.</p>
+    <form method="post" action="{% url month_materialize_url academic_class.id %}"
+          hx-post="{% url month_materialize_url academic_class.id %}"
+          hx-target="{{ workspace_target_id }}" hx-swap="innerHTML"
+          hx-on::after-request="document.getElementById('modal-generate-month')?.classList.add('hide')"
+          style="display:flex;justify-content:flex-end;gap:10px">
+      {% csrf_token %}
+      <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+      <button type="button" onclick="document.getElementById('modal-generate-month').classList.add('hide')" class="btn">Annuler</button>
+      <button type="submit" class="btn primary">Générer le mois</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<p style="font-size:13px;color:var(--ink-3)">Aucune classe sélectionnée.</p>
+{% endif %}

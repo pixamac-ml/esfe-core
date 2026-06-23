@@ -1,4 +1,4 @@
-{% load component_tags %}
+{% load component_tags l10n %}
 {% comment %}
   Maquette de saisie des notes — refonte CSS Grid.
 
@@ -17,6 +17,7 @@
 {% endcomment %}
 
 <div class="maq-root"
+     x-data="notesGrid()"
      data-grid-key="{{ academic_class.id }}-{{ semester.id }}"
      data-session="{{ active_session_type }}"
      data-total-ecs="{{ total_ecs }}"
@@ -317,7 +318,31 @@
       .score-input { display: none; }
       .score-stack { min-height: auto; }
     }
+
+    /* === Statut d'enregistrement discret (saisie instantanee) === */
+    .save-status {
+      display: none;
+      margin-top: 2px;
+      font-size: 9px;
+      font-weight: 800;
+      text-align: center;
+      color: #1d4ed8;
+    }
+    .save-status.htmx-request { display: block; }
+    .save-status.is-flash { display: block; color: #16a34a; }
+    .save-status.is-flash.is-error { color: #b91c1c; }
   </style>
+
+  {# === Structure UE/EC (coefficients, credits) pour le recalcul instantane cote client === #}
+  {# Purement cosmetique : le serveur reste seul a valider/persister les notes. #}
+  {% localize off %}
+  <script type="application/json" data-maq-structure>[
+    {% for ue in ues %}{"id": {{ ue.id }}, "coefficient": {{ ue.coefficient }}, "creditRequired": {{ ue.credit_required }}, "ecs": [
+      {% for ec in ue.ecs.all %}{"id": {{ ec.id }}, "coefficient": {{ ec.coefficient }}, "creditRequired": {{ ec.credit_required }}}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ]}{% if not forloop.last %},{% endif %}{% endfor %}
+  ]</script>
+  {% endlocalize %}
 
   {# === Variables CSS dynamiques injectées par le contexte === #}
   <script>
@@ -346,9 +371,10 @@
         {# ============================================================ #}
 
         {# --- Ligne 1 : Noms des UEs --- #}
-        <div class="maq-cell maq-cell--h meta-num maq-cell--h-row1">Etudiants</div>
-        <div class="maq-cell maq-cell--h meta-name maq-cell--h-row1"></div>
-        <div class="maq-cell maq-cell--h meta-prenom maq-cell--h-row1"></div>
+        <div class="maq-cell maq-cell--h maq-cell--h-label meta-num maq-cell--h-row1"
+             style="grid-column: span 3;text-align:center;font-weight:900;color:#1e293b;">
+          UNITÉ D'ENSEIGNEMENT
+        </div>
 
         {% for ue in ues %}
           {# Chaque UE span = (nb_ecs * 3) colonnes + 3 colonnes Unité #}
@@ -366,9 +392,10 @@
         </div>
 
         {# --- Ligne 2 : Noms des ECs + Unité --- #}
-        <div class="maq-cell maq-cell--h meta-num maq-cell--h-row2">Matières</div>
-        <div class="maq-cell maq-cell--h meta-name maq-cell--h-row2"></div>
-        <div class="maq-cell maq-cell--h meta-prenom maq-cell--h-row2"></div>
+        <div class="maq-cell maq-cell--h maq-cell--h-label meta-num maq-cell--h-row2"
+             style="grid-column: span 3;text-align:center;font-weight:900;color:#1e293b;">
+          MATIÈRES
+        </div>
 
         {% for ue in ues %}
           {% for ec in ue.ecs.all %}
@@ -384,9 +411,10 @@
         <div class="maq-cell maq-cell--h maq-cell--h-res maq-cell--h-row2" style="grid-column: span 3;"></div>
 
         {# --- Ligne 3 : Crédits requis --- #}
-        <div class="maq-cell maq-cell--h maq-cell--h-label meta-num maq-cell--h-row3">Crédits requis</div>
-        <div class="maq-cell maq-cell--h maq-cell--h-label meta-name maq-cell--h-row3"></div>
-        <div class="maq-cell maq-cell--h maq-cell--h-label meta-prenom maq-cell--h-row3"></div>
+        <div class="maq-cell maq-cell--h maq-cell--h-label meta-num maq-cell--h-row3"
+             style="grid-column: span 3;text-align:center;font-weight:900;color:#1e293b;">
+          CRÉDITS REQUIS
+        </div>
 
         {% for ue in ues %}
           {% for ec in ue.ecs.all %}
@@ -408,9 +436,10 @@
         {% endfor %}
 
         {# --- Ligne 4 : Coefficients --- #}
-        <div class="maq-cell maq-cell--h maq-cell--h-label meta-num maq-cell--h-row4">Coefficients</div>
-        <div class="maq-cell maq-cell--h maq-cell--h-label meta-name maq-cell--h-row4"></div>
-        <div class="maq-cell maq-cell--h maq-cell--h-label meta-prenom maq-cell--h-row4"></div>
+        <div class="maq-cell maq-cell--h maq-cell--h-label meta-num maq-cell--h-row4"
+             style="grid-column: span 3;text-align:center;font-weight:900;color:#1e293b;">
+          COEFFICIENTS
+        </div>
 
         {% for ue in ues %}
           {% for ec in ue.ecs.all %}

@@ -110,6 +110,8 @@ def expense_pay(request: HttpRequest, pk: int) -> HttpResponse:
 @require_POST
 def monthly_closure_create(request: HttpRequest) -> HttpResponse:
     closure_form = BranchMonthlyClosureForm(request.POST)
+    available_cash_balance = get_branch_cash_balance(request.branch)
+    suggested_transfer_amount = max(available_cash_balance - request.branch.cash_reserve_target, 0)
     if not closure_form.is_valid():
         response = render(
             request,
@@ -117,7 +119,9 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
             {
                 "closure_form": closure_form,
                 "transfer_form": BranchBankTransferForm(request.POST, request.FILES),
-                "available_cash_balance": get_branch_cash_balance(request.branch),
+                "available_cash_balance": available_cash_balance,
+                "cash_reserve_target": request.branch.cash_reserve_target,
+                "suggested_transfer_amount": suggested_transfer_amount,
                 "closure_error": "Verifiez les champs du formulaire de cloture.",
             },
         )
@@ -192,7 +196,9 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
             {
                 "closure_form": closure_form,
                 "transfer_form": transfer_form,
-                "available_cash_balance": get_branch_cash_balance(request.branch),
+                "available_cash_balance": available_cash_balance,
+                "cash_reserve_target": request.branch.cash_reserve_target,
+                "suggested_transfer_amount": suggested_transfer_amount,
                 "closure_error": "Verifiez les champs du versement bancaire.",
             },
         )

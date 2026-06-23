@@ -81,6 +81,26 @@ def _require_it_support(request):
     return True
 
 
+def _render_it_section(request, module_key, template_name, context):
+    """
+    Rend le fragment d'une section du dashboard informaticien.
+
+    Si la requete vient de HTMX (navigation interne), seul le fragment est
+    renvoye. Sinon (navigation directe, F5, retour/avance navigateur), la
+    coquille complete du dashboard est reconstruite avec ce meme fragment
+    deja insere dans #it-workspace, pour eviter une page cassee.
+    """
+    if getattr(request, "htmx", False):
+        return render(request, template_name, context)
+    fragment = render(request, template_name, context)
+    from portal.views.views import _render_it_dashboard
+    return _render_it_dashboard(
+        request,
+        initial_module=module_key,
+        initial_workspace_html=fragment.content.decode(fragment.charset or "utf-8"),
+    )
+
+
 def _same_branch_or_forbidden(*, request, target_user):
     request_branch = get_user_branch(request.user)
     target_branch = getattr(getattr(target_user, "profile", None), "branch", None)
@@ -141,7 +161,6 @@ def it_notes_kpi(request):
         return HttpResponseForbidden("Acces refuse.")
 
     from academics.models import AcademicEnrollment, ECGrade, AcademicDebt
-    from django.db.models import Count
 
     from portal.services.notes_workflow import get_notes_state
 
@@ -167,24 +186,17 @@ def it_notes_kpi(request):
     ec_count = semester.ues.aggregate(total=Count("ecs", distinct=True))["total"] or 0
     expected_grades = enrollment_count * ec_count
 
-    entered_grades = ECGrade.objects.filter(
+    grade_stats = ECGrade.objects.filter(
         enrollment__in=enrollments,
         ec__ue__semester=semester,
-        normal_score__isnull=False,
-    ).count()
-
-    validated_grades = ECGrade.objects.filter(
-        enrollment__in=enrollments,
-        ec__ue__semester=semester,
-        is_validated=True,
-    ).count()
-
-    failed_grades = ECGrade.objects.filter(
-        enrollment__in=enrollments,
-        ec__ue__semester=semester,
-        final_score__isnull=False,
-        is_validated=False,
-    ).count()
+    ).aggregate(
+        entered_grades=Count("id", filter=Q(normal_score__isnull=False)),
+        validated_grades=Count("id", filter=Q(is_validated=True)),
+        failed_grades=Count("id", filter=Q(final_score__isnull=False, is_validated=False)),
+    )
+    entered_grades = grade_stats["entered_grades"]
+    validated_grades = grade_stats["validated_grades"]
+    failed_grades = grade_stats["failed_grades"]
 
     pending_debts = AcademicDebt.objects.filter(
         academic_class=academic_class,
@@ -324,8 +336,9 @@ def it_notes_flow_workspace(request):
             "portal/informaticien/drawers/notes_drawer.html",
             context,
         )
-    return render(
+    return _render_it_section(
         request,
+        "notes",
         "portal/informaticien/workflows/notes_workspace.html",
         context,
     )
@@ -335,8 +348,9 @@ def it_notes_flow_workspace(request):
 def it_home_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
-    return render(
+    return _render_it_section(
         request,
+        "home",
         "portal/informaticien/workflows/home_workspace.html",
         build_home_context(branch=get_user_branch(request.user)),
     )
@@ -450,7 +464,7 @@ def it_cards_workspace(request):
     if selection["selected_class"]:
         students = list(get_it_students_for_class(academic_class=selection["selected_class"])[:80])
     selection.update({"students": students, "workflow_module": "cards"})
-    return render(request, "portal/informaticien/workflows/cards_workspace.html", selection)
+    return _render_it_section(request, "cards", "portal/informaticien/workflows/cards_workspace.html", selection)
 
 
 @login_required
@@ -459,8 +473,9 @@ def it_support_flow_workspace(request):
         return HttpResponseForbidden("Acces refuse.")
     branch = get_user_branch(request.user)
     status = (request.GET.get("status") or "").strip()
-    return render(
+    return _render_it_section(
         request,
+        "support",
         "portal/informaticien/workflows/support_workspace.html",
         build_support_context(branch=branch, status=status, page=request.GET.get("page")),
     )
@@ -515,8 +530,9 @@ def it_support_flow_action(request):
 def it_audit_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
-    return render(
+    return _render_it_section(
         request,
+        "audit",
         "portal/informaticien/workflows/audit_workspace.html",
         build_audit_context(branch=get_user_branch(request.user), page=request.GET.get("page")),
     )
@@ -634,8 +650,9 @@ def it_import_workspace(request):
         return HttpResponseForbidden("Acces refuse.")
     branch = get_user_branch(request.user)
     classes, selected_class, selected_semester = _resolve_import_selection(request)
-    return render(
+    return _render_it_section(
         request,
+        "import",
         "portal/informaticien/workflows/import_workspace.html",
         build_import_context(
             branch=branch,
@@ -784,8 +801,9 @@ def it_structure_workspace(request):
     selected_class_id = (request.GET.get("class_id") or request.GET.get("classe") or "").strip()
     student_query = (request.GET.get("student_q") or "").strip()
     section = (request.GET.get("section") or "classes").strip()
-    return render(
+    return _render_it_section(
         request,
+        "structure",
         "portal/informaticien/workflows/structure_workspace.html",
         build_academic_structure_context(
             branch=get_user_branch(request.user),
@@ -994,8 +1012,9 @@ def it_archives_workspace(request):
             academic_year_id=academic_year_id or None,
             class_id=class_id or None,
         )
-    return render(
+    return _render_it_section(
         request,
+        "archives",
         "portal/informaticien/workflows/archive_workspace.html",
         {
             "branch": branch,
@@ -1081,8 +1100,9 @@ def it_archive_detail(request, batch_id):
 def it_supervision_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
-    return render(
+    return _render_it_section(
         request,
+        "supervision",
         "portal/informaticien/workflows/supervision_workspace.html",
         build_supervision_context(branch=get_user_branch(request.user), page=request.GET.get("page")),
     )
@@ -1092,7 +1112,7 @@ def it_supervision_workspace(request):
 def it_catalog_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
-    return render(request, "portal/informaticien/workflows/catalog_workspace.html", build_catalog_context())
+    return _render_it_section(request, "catalog", "portal/informaticien/workflows/catalog_workspace.html", build_catalog_context())
 
 
 @login_required
@@ -1151,8 +1171,9 @@ def _build_accounts_flow_context(request, *, toast=None):
 def it_accounts_flow_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
-    return render(
+    return _render_it_section(
         request,
+        "accounts",
         "portal/informaticien/workflows/accounts_workspace.html",
         _build_accounts_flow_context(request),
     )
@@ -1280,8 +1301,9 @@ def it_branch_settings_workspace(request):
         return HttpResponseForbidden("Acces refuse.")
     branch = get_user_branch(request.user)
     settings = get_branch_settings(branch=branch)
-    return render(
+    return _render_it_section(
         request,
+        "settings",
         "portal/informaticien/workflows/branch_settings_workspace.html",
         {
             "branch": branch,
@@ -1340,8 +1362,9 @@ def it_my_account_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
     profile = getattr(request.user, "profile", None)
-    return render(
+    return _render_it_section(
         request,
+        "settings",
         "portal/informaticien/workflows/my_account_workspace.html",
         {
             "profile": profile,
@@ -1634,7 +1657,7 @@ def it_notifications_workspace(request):
         "source": source,
     }
 
-    return render(request, "portal/informaticien/workflows/notifications_workspace.html", {
+    return _render_it_section(request, "notifications", "portal/informaticien/workflows/notifications_workspace.html", {
         "notifications": notifications,
         "page_obj": page_obj,
         "stats": stats,

@@ -14,255 +14,118 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   [x-cloak] { display: none !important; }
-  .it-shell { min-height: 100vh; background: #f8fafc; color: #0f172a; }
-  .dark .it-shell { background: #020617; color: #e2e8f0; }
-  .it-sidebar { background: #082f49; color: white; }
-  .it-nav-btn { display: flex; width: 100%; align-items: center; gap: .85rem; border-radius: 14px; padding: .85rem 1rem; text-align: left; font-size: .9rem; font-weight: 800; color: rgb(226 232 240 / .86); transition: .16s ease; }
+  body { background: #f8fafc; color: #0f172a; }
+  .dark body { background: #020617; color: #e2e8f0; }
+  .it-sidebar { background: #082f49; color: #fff; }
+  .it-nav-btn { display: flex; width: 100%; align-items: center; gap: .85rem; border-radius: 14px; padding: .7rem 1rem; text-align: left; font-size: .88rem; font-weight: 800; color: rgb(226 232 240 / .86); transition: .16s ease; border: none; background: none; cursor: pointer; }
   .it-nav-btn:hover { background: rgb(255 255 255 / .10); }
-  .it-nav-btn.active { background: #2563eb; color: white; }
-  .workflow-context { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
-  .workflow-context label { display: grid; gap: .45rem; font-size: .78rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: #64748b; }
-  .workflow-context select, .workflow-context input { height: 46px; border-radius: 12px; border: 1px solid #cbd5e1; background: white; padding: 0 .9rem; color: #0f172a; font-size: .92rem; font-weight: 700; outline: none; }
-  .dark .workflow-context select, .dark .workflow-context input { border-color: #334155; background: #0f172a; color: #e2e8f0; }
-  .workflow-stack { display: grid; gap: 1rem; }
-  .workflow-band, .workflow-progress, .workflow-actions, .workflow-table-shell, .workflow-empty, .workflow-toast {
-    border: 1px solid #e2e8f0; border-radius: 18px; background: white; padding: 1.2rem; box-shadow: 0 10px 28px rgb(15 23 42 / .06);
-  }
-  .workflow-table-shell { min-width: 0; overflow: hidden; }
-  .dark .workflow-band, .dark .workflow-progress, .dark .workflow-actions, .dark .workflow-table-shell, .dark .workflow-empty, .dark .workflow-toast {
-    border-color: #334155; background: #0f172a;
-  }
-  .workflow-band { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-left-width: 6px; }
-  .workflow-band h3, .workflow-table-head h3 { margin-top: .25rem; font-size: 1.25rem; font-weight: 950; }
-  .workflow-band p, .workflow-progress p, .workflow-muted { margin-top: .35rem; color: #64748b; font-size: .9rem; font-weight: 600; }
-  .dark .workflow-band p, .dark .workflow-progress p, .dark .workflow-muted { color: #94a3b8; }
-  .workflow-band span { border-radius: 999px; background: #eff6ff; padding: .5rem .75rem; color: #1d4ed8; font-size: .78rem; font-weight: 900; white-space: nowrap; }
-  .workflow-band-empty { border-left-color: #64748b; }
-  .workflow-band-in_progress { border-left-color: #2563eb; }
-  .workflow-band-ready_to_publish_normal { border-left-color: #d97706; }
-  .workflow-band-normal_published { border-left-color: #059669; }
-  .workflow-band-retake_in_progress { border-left-color: #4f46e5; }
-  .workflow-band-ready_to_publish_final { border-left-color: #d97706; }
-  .workflow-band-final_published { border-left-color: #059669; }
-  .workflow-band-ready_to_validate { border-left-color: #d97706; }
-  .workflow-band-validated { border-left-color: #059669; }
-  .workflow-band-transmitted { border-left-color: #4f46e5; }
-  .workflow-kicker { margin: 0; color: #2563eb !important; font-size: .72rem !important; font-weight: 950 !important; text-transform: uppercase; letter-spacing: .16em; }
-  .workflow-split { display: grid; grid-template-columns: .9fr 1.1fr; gap: 1rem; align-items: stretch; }
-  .workflow-progress-head, .workflow-table-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-  .workflow-progress-head span { font-size: .86rem; font-weight: 900; color: #334155; }
-  .dark .workflow-progress-head span { color: #cbd5e1; }
-  .workflow-progress-track { margin-top: .85rem; height: 10px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
-  .workflow-progress-track div { height: 100%; border-radius: inherit; background: #2563eb; }
-  .workflow-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
-  .workflow-btn { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; border-radius: 12px; padding: .65rem 1rem; font-size: .86rem; font-weight: 900; transition: .16s ease; }
-  .workflow-btn-primary { background: #2563eb; color: white; }
-  .workflow-btn-primary:hover { background: #1d4ed8; }
-  .workflow-btn-secondary { border: 1px solid #cbd5e1; background: white; color: #334155; }
-  .dark .workflow-btn-secondary { border-color: #475569; background: #020617; color: #e2e8f0; }
-  .workflow-grid-placeholder { margin-top: 1rem; overflow: auto; border-radius: 14px; border: 1px dashed #cbd5e1; padding: 1rem; color: #64748b; font-weight: 700; }
-  .notes-grid-shell { min-width: 0; max-width: 100%; overflow: hidden; }
-  .notes-grid-scroll { max-width: 100%; max-height: 70vh; overflow-x: auto; overflow-y: auto; }
-  .workflow-list { margin-top: 1rem; display: grid; gap: .7rem; }
-  .workflow-list article { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-radius: 14px; border: 1px solid #e2e8f0; padding: .9rem; }
-  .workflow-list strong, .workflow-list span { display: block; }
-  .workflow-list span { margin-top: .2rem; color: #64748b; font-size: .82rem; font-weight: 700; }
-  .workflow-toast-success { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
-  .workflow-toast-error { border-color: #fecdd3; background: #fff1f2; color: #be123c; }
-  .it-drawer-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 85;
-    background: rgba(15, 23, 42, 0.48);
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition: opacity .22s ease, visibility .22s ease;
-  }
-  .it-drawer-backdrop.is-visible {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-  }
-  .it-drawer {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    left: auto;
-    z-index: 90;
-    width: 100%;
-    max-width: 100vw;
-    height: 100%;
-    max-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: #ffffff;
-    color: #0f172a;
-    transform: translateX(100%);
-    transition: transform .22s ease;
-  }
-  .it-drawer.is-open {
-    transform: translateX(0);
-  }
-  .dark .it-drawer {
-    background: #ffffff;
-    color: #0f172a;
-  }
-  .it-drawer-content {
-    min-height: 0;
-    flex: 1 1 auto;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    background: #f6f8fc;
-    color: #0f172a;
-    font-size: 0.95rem;
-    line-height: 1.55;
-  }
-  .dark .it-drawer-content {
-    background: #f6f8fc;
-    color: #0f172a;
-  }
-  .it-drawer-page {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    background: #f6f8fc;
-    color: #0f172a;
-  }
-  .dark .it-drawer-page {
-    background: #f6f8fc;
-    color: #0f172a;
-  }
-  .it-drawer-head {
-    flex: 0 0 auto;
-    background: #ffffff;
-    color: #0f172a;
-  }
-  .dark .it-drawer-head {
-    background: #ffffff;
-    color: #0f172a;
-  }
-  .it-drawer-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-  }
-  .it-drawer-side,
-  .it-drawer-main {
-    min-height: 0;
-  }
-  .it-drawer-content,
-  .it-drawer-content div,
-  .it-drawer-content p,
-  .it-drawer-content span,
-  .it-drawer-content h1,
-  .it-drawer-content h2,
-  .it-drawer-content h3,
-  .it-drawer-content h4,
-  .it-drawer-content h5,
-  .it-drawer-content h6,
-  .it-drawer-content td,
-  .it-drawer-content th,
-  .dark .it-drawer-content,
-  .dark .it-drawer-content div,
-  .dark .it-drawer-content p,
-  .dark .it-drawer-content span,
-  .dark .it-drawer-content h1,
-  .dark .it-drawer-content h2,
-  .dark .it-drawer-content h3,
-  .dark .it-drawer-content h4,
-  .dark .it-drawer-content h5,
-  .dark .it-drawer-content h6,
-  .dark .it-drawer-content td,
-  .dark .it-drawer-content th {
-    color: #0f172a !important;
-  }
-  .it-drawer-content .text-slate-900,
-  .it-drawer-content .text-slate-800,
-  .it-drawer-content .text-slate-700,
-  .dark .it-drawer-content .text-slate-600,
-  .dark .it-drawer-content .text-slate-500,
-  .dark .it-drawer-content .text-slate-400,
-  .dark .it-drawer-content .text-slate-300,
-  .dark .it-drawer-content .text-slate-200,
-  .dark .it-drawer-content .text-slate-100,
-  .dark .it-drawer-content .text-slate-900,
-  .dark .it-drawer-content .text-slate-800,
-  .dark .it-drawer-content .text-slate-700 {
-    color: #0f172a !important;
-  }
-  .it-drawer-content .text-slate-600,
-  .it-drawer-content .text-slate-500,
-  .it-drawer-content .text-slate-400 {
-    color: #334155 !important;
-  }
-  .it-drawer-content .workflow-kicker,
-  .it-drawer-content .text-blue-600,
-  .dark .it-drawer-content .workflow-kicker,
-  .dark .it-drawer-content .text-blue-600 {
-    color: #1d4ed8 !important;
-  }
-  .it-drawer-content .text-emerald-700,
-  .dark .it-drawer-content .text-emerald-700 {
-    color: #047857 !important;
-  }
-  .it-drawer-content .text-amber-700,
-  .dark .it-drawer-content .text-amber-700 {
-    color: #b45309 !important;
-  }
-  .it-drawer-content .text-rose-700,
-  .dark .it-drawer-content .text-rose-700 {
-    color: #be123c !important;
-  }
-  .it-drawer-content .bg-white,
-  .dark .it-drawer-content .bg-white {
-    background-color: #ffffff !important;
-  }
-  .it-drawer-content .bg-slate-50,
-  .it-drawer-content .bg-slate-900\/60,
-  .it-drawer-content .bg-slate-950,
-  .dark .it-drawer-content .bg-slate-50 {
-    background-color: #f8fafc !important;
-  }
-  .it-drawer-content .border-slate-200,
-  .it-drawer-content .border-slate-100,
-  .dark .it-drawer-content .border-slate-200,
-  .dark .it-drawer-content .border-slate-100 {
-    border-color: #dbe3ef !important;
-  }
-  .it-drawer-content table {
-    color: #0f172a !important;
-  }
-  .it-drawer-content .workflow-btn-primary,
-  .it-drawer-content .workflow-btn-primary *,
-  .dark .it-drawer-content .workflow-btn-primary,
-  .dark .it-drawer-content .workflow-btn-primary * {
-    color: #ffffff !important;
-  }
-  .it-drawer-content .workflow-btn-secondary,
-  .it-drawer-content .workflow-btn-secondary *,
-  .dark .it-drawer-content .workflow-btn-secondary,
-  .dark .it-drawer-content .workflow-btn-secondary * {
-    color: #1f2937 !important;
-    background: #ffffff !important;
-  }
-  .it-drawer-empty {
-    flex: 1 1 auto;
-    display: grid;
-    place-items: center;
-    padding: 1.5rem;
-    color: #64748b;
-    font-size: .9rem;
-    font-weight: 700;
-    text-align: center;
-  }
+  .it-nav-btn.active { background: #2563eb; color: #fff; }
+  .wkc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+  .wkc label { display: grid; gap: .4rem; font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: #64748b; }
+  .wkc select, .wkc input { height: 46px; border-radius: 12px; border: 1px solid #cbd5e1; background: #fff; padding: 0 .9rem; color: #0f172a; font-size: .92rem; font-weight: 700; outline: none; }
+  .dark .wkc select, .dark .wkc input { border-color: #334155; background: #0f172a; color: #e2e8f0; }
+  .panel { border: 1px solid #e2e8f0; border-radius: 18px; background: #fff; padding: 1.2rem; box-shadow: 0 10px 28px rgb(15 23 42 / .06); }
+  .dark .panel { border-color: #334155; background: #0f172a; }
+  .band { border: 1px solid #e2e8f0; border-radius: 18px; background: #fff; padding: 1.2rem; box-shadow: 0 10px 28px rgb(15 23 42 / .06); display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-left-width: 6px; }
+  .dark .band { border-color: #334155; background: #0f172a; }
+  .band h3 { margin-top: .25rem; font-size: 1.25rem; font-weight: 950; }
+  .band p { margin-top: .35rem; color: #64748b; font-size: .9rem; font-weight: 600; }
+  .band > div > span.badge { border-radius: 999px; background: #eff6ff; padding: .5rem .75rem; color: #1d4ed8; font-size: .78rem; font-weight: 900; white-space: nowrap; }
+  .b-empty { border-left-color: #64748b; }
+  .b-in_progress { border-left-color: #2563eb; }
+  .b-ready_to_publish_normal, .b-ready_to_publish_final, .b-ready_to_validate { border-left-color: #d97706; }
+  .b-normal_published, .b-final_published, .b-validated, .b-transmitted { border-left-color: #059669; }
+  .b-retake_in_progress { border-left-color: #4f46e5; }
+  .kicker { margin: 0; color: #2563eb; font-size: .72rem; font-weight: 950; text-transform: uppercase; letter-spacing: .16em; }
+  .btn { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: .5rem; border-radius: 12px; padding: .55rem 1rem; font-size: .85rem; font-weight: 900; transition: .16s ease; border: none; cursor: pointer; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-secondary { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+  .btn-secondary:hover { background: #f1f5f9; }
+  .dark .btn-secondary { border-color: #475569; background: #020617; color: #e2e8f0; }
+  .btn-amber { background: #d97706; color: #fff; }
+  .btn-amber:hover { background: #b45309; }
+  .btn-green { background: #059669; color: #fff; }
+  .btn-green:hover { background: #047857; }
+  .btn-danger { border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; }
+  .btn-danger:hover { background: #ffe4e6; }
+  .chip { display: inline-flex; align-items: center; gap: .3rem; border-radius: 999px; padding: .25rem .65rem; font-size: .72rem; font-weight: 900; white-space: nowrap; }
+  .c-ok { background: #dcfce7; color: #166534; }
+  .c-bad { background: #ffe4e6; color: #be123c; }
+  .c-warn { background: #fef3c7; color: #92400e; }
+  .c-info { background: #dbeafe; color: #1d4ed8; }
+  .c-mute { background: #f1f5f9; color: #475569; }
+  .dark .c-mute { background: #1e293b; color: #94a3b8; }
+  .row { display: flex; align-items: center; gap: .9rem; padding: .75rem 0; border-bottom: 1px solid #eef2f7; }
+  .dark .row { border-color: #1e293b; }
+  .row:last-child { border-bottom: none; }
+  .avatar { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-weight: 900; font-size: .8rem; color: #fff; flex: 0 0 38px; }
+  .it-drawer-backdrop { position: fixed; inset: 0; z-index: 85; background: rgba(15,23,42,.48); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .22s ease, visibility .22s ease; }
+  .it-drawer-backdrop.is-visible { opacity: 1; visibility: visible; pointer-events: auto; }
+  .it-drawer { position: fixed; top: 0; bottom: 0; right: 0; z-index: 90; width: 100%; max-width: 100vw; height: 100%; max-height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: #fff; color: #0f172a; transform: translateX(100%); transition: transform .22s ease; }
+  .it-drawer.is-open { transform: translateX(0); }
+  .dark .it-drawer { background: #fff; color: #0f172a; }
+  .it-drawer-content { min-height: 0; flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; background: #f6f8fc; color: #0f172a; font-size: .95rem; line-height: 1.55; }
+  .dark .it-drawer-content { background: #f6f8fc; color: #0f172a; }
+  .it-drawer-page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: #f6f8fc; color: #0f172a; }
+  .dark .it-drawer-page { background: #f6f8fc; color: #0f172a; }
+  .it-drawer-head { flex: 0 0 auto; background: #fff; color: #0f172a; }
+  .dark .it-drawer-head { background: #fff; color: #0f172a; }
+  .it-drawer-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .it-drawer-side, .it-drawer-main { min-height: 0; }
+  .it-drawer-empty { flex: 1 1 auto; display: grid; place-items: center; padding: 1.5rem; color: #64748b; font-size: .9rem; font-weight: 700; text-align: center; }
+  .it-drawer-content .kicker { color: #1d4ed8 !important; }
+  .it-drawer-content .btn-primary { color: #fff !important; }
+  .it-drawer-content .btn-secondary { color: #1f2937 !important; background: #fff !important; }
+  .seg { display: flex; gap: .4rem; background: #f1f5f9; border-radius: 12px; padding: .3rem; flex-wrap: wrap; }
+  .dark .seg { background: #0b1220; }
+  .seg-b { flex: 1; border-radius: 9px; padding: .5rem; font-size: .78rem; font-weight: 900; color: #475569; border: none; background: none; cursor: pointer; min-width: 80px; }
+  .seg-b.active { background: #2563eb; color: #fff; }
+  .fl { display: block; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 900; color: #64748b; margin: 1rem 0 .4rem; }
+  .fi { width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: .65rem .8rem; font-size: .9rem; font-weight: 700; color: #0f172a; background: #fff; outline: none; }
+  .fi:focus { border-color: #2563eb; box-shadow: 0 0 0 3px #dbeafe; }
+  .kv { display: flex; justify-content: space-between; gap: 1rem; padding: .7rem 0; border-bottom: 1px dashed #e2e8f0; font-size: .88rem; }
+  .dark .kv { border-color: #334155; }
+  .kv span { color: #64748b; font-weight: 700; }
+  .kv b { font-weight: 900; }
+  .kbd-hint { display: inline-flex; align-items: center; gap: .3rem; border-radius: 8px; border: 1px solid #cbd5e1; padding: .15rem .45rem; font-size: .7rem; font-weight: 800; color: #64748b; }
+  table.grid { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  table.grid th { position: sticky; top: 0; background: #f1f5f9; text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: #475569; font-weight: 900; padding: .6rem .7rem; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+  .dark table.grid th { background: #0b1220; color: #94a3b8; border-color: #334155; }
+  table.grid td { padding: .5rem .7rem; border-bottom: 1px solid #eef2f7; font-weight: 700; }
+  .dark table.grid td { border-color: #1e293b; }
+  .gcell { width: 64px; border: 1px solid #cbd5e1; border-radius: 8px; padding: .35rem; font-size: .85rem; font-weight: 800; text-align: center; outline: none; background: #fff; color: #0f172a; }
+  .gcell:focus { border-color: #2563eb; box-shadow: 0 0 0 3px #dbeafe; }
+  .gcell:disabled { background: #f1f5f9; color: #94a3b8; }
+  .progress-track { margin-top: .7rem; height: 10px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+  .dark .progress-track { background: #1e293b; }
+  .progress-track div { height: 100%; border-radius: inherit; background: #2563eb; transition: width .3s ease; }
+  /* Backward compat aliases for shared component templates */
+  .workflow-btn { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: .5rem; border-radius: 12px; padding: .55rem 1rem; font-size: .85rem; font-weight: 900; transition: .16s ease; border: none; cursor: pointer; }
+  .workflow-btn.btn-primary { background: #2563eb; color: #fff; }
+  .workflow-btn.btn-primary:hover { background: #1d4ed8; }
+  .workflow-btn.btn-secondary { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+  .dark .workflow-btn.btn-secondary { border-color: #475569; background: #020617; color: #e2e8f0; }
+  .workflow-band { border: 1px solid #e2e8f0; border-radius: 18px; background: #fff; padding: 1.2rem; box-shadow: 0 10px 28px rgb(15 23 42 / .06); display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-left-width: 6px; }
+  .dark .workflow-band { border-color: #334155; background: #0f172a; }
+  .workflow-kicker { margin: 0; color: #2563eb; font-size: .72rem; font-weight: 950; text-transform: uppercase; letter-spacing: .16em; }
+  .workflow-context { color: #64748b; font-size: .9rem; font-weight: 600; }
+  .workflow-table-shell { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; overflow: hidden; }
+  .dark .workflow-table-shell { border-color: #334155; background: #0f172a; }
+  .workflow-stack { display: grid; gap: .75rem; }
+  .workflow-muted { color: #64748b; font-size: .78rem; font-weight: 600; }
+  .workflow-empty { padding: 2rem; text-align: center; color: #94a3b8; font-weight: 700; font-size: .9rem; }
+  .workflow-progress { margin-top: .7rem; height: 10px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+  .dark .workflow-progress { background: #1e293b; }
+  .workflow-progress div { height: 100%; border-radius: inherit; background: #2563eb; transition: width .3s ease; }
+  .workflow-toast { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: .8rem 1rem; }
+  .dark .workflow-toast { border-color: #334155; background: #0f172a; }
+  .workflow-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   @media (max-width: 900px) {
-    .workflow-context, .workflow-split { grid-template-columns: 1fr; }
+    .wkc { grid-template-columns: 1fr; }
+    .it-drawer { width: 100%; max-width: 100vw; }
   }
+  #it-topbar-loader { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: #2563eb; z-index: 200; transition: width .18s ease, opacity .3s ease; opacity: 0; }
 </style>
 {% endblock %}
 
@@ -273,8 +136,8 @@
   @keydown.escape.window="closeModal(); closeDrawer()"
   x-cloak
   :class="{ 'dark': darkMode }"
-  class="it-shell"
 >
+  <div id="it-topbar-loader"></div>
   <div class="flex min-h-screen">
     <aside class="it-sidebar fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-200" :class="collapsed ? 'w-[82px]' : 'w-[280px]'">
       <div class="flex h-20 items-center gap-3 px-4">
@@ -286,7 +149,6 @@
           <p class="truncate text-xs font-bold uppercase tracking-widest text-sky-100/70">Informaticien d'annexe</p>
         </div>
       </div>
-
       <button
         type="button"
         class="absolute right-[-18px] top-6 grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 shadow-lg ring-4 ring-slate-50 dark:ring-slate-950"
@@ -295,27 +157,29 @@
       >
         <i data-lucide="panel-left-close" class="h-5 w-5" :class="collapsed ? 'rotate-180' : ''"></i>
       </button>
-
-      <nav class="mt-4 flex-1 space-y-2 px-3">
+      <nav class="mt-2 flex-1 space-y-1 overflow-y-auto px-3 pb-4">
         <template x-for="module in modules" :key="module.key">
           <button
             type="button"
             class="it-nav-btn"
             :class="activeModule === module.key ? 'active' : ''"
+            :hx-get="module.url"
+            hx-target="#it-workspace"
+            hx-swap="innerHTML"
+            hx-push-url="true"
             @click="openModule(module.key)"
           >
             <i :data-lucide="module.icon" class="h-5 w-5 shrink-0"></i>
-            <span x-show="!collapsed" x-transition x-text="module.label"></span>
+            <span x-show="!collapsed" x-transition x-text="module.label" class="navlabel"></span>
           </button>
         </template>
       </nav>
-
       <div class="p-3">
         <form method="post" action="{% url 'accounts:logout' %}">
           {% csrf_token %}
           <button type="submit" class="it-nav-btn justify-center border border-white/10 bg-white/10">
             <i data-lucide="log-out" class="h-5 w-5"></i>
-            <span x-show="!collapsed" x-transition>Deconnexion</span>
+            <span x-show="!collapsed" x-transition class="navlabel">Déconnexion</span>
           </button>
         </form>
       </div>
@@ -325,27 +189,35 @@
       <div class="mx-auto max-w-7xl px-5 py-6">
         <header class="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p class="workflow-kicker" x-text="activeKicker()"></p>
+            <p class="kicker" x-text="activeKicker()"></p>
             <h1 class="mt-1 text-3xl font-black tracking-tight" x-text="activeLabel()"></h1>
-            <p class="mt-2 text-sm font-semibold text-slate-500">Support technique, acces, et sante du portail</p>
+            <p class="mt-2 text-sm font-semibold text-slate-500">Support technique, accès et santé du portail · scope : <span x-text="branchName()"></span></p>
             <div class="mt-3 flex flex-wrap gap-2">
-              <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-200">Gestion des notes</span>
-              <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">Inscriptions sans affectation</span>
+              <span class="chip c-info">Gestion des notes</span>
+              <span class="chip c-warn">Inscriptions sans affectation</span>
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button type="button" class="workflow-btn workflow-btn-primary" @click="openModule('settings')">
+            <button
+              type="button"
+              class="btn btn-primary"
+              hx-get="{% url 'accounts_portal:it_my_account_workspace' %}"
+              hx-target="#it-workspace"
+              hx-swap="innerHTML"
+              hx-push-url="true"
+              @click="openModule('settings')"
+            >
               <i data-lucide="settings" class="mr-2 h-4 w-4"></i>
               Compte
             </button>
-            <button type="button" class="workflow-btn workflow-btn-secondary" @click="toggleDarkMode()">
+            <button type="button" class="btn btn-secondary" @click="toggleDarkMode()">
               <i data-lucide="moon" class="mr-2 h-4 w-4"></i>
-              Theme
+              Thème
             </button>
             <div class="relative" @click.outside="notificationDropdownOpen = false">
               <button
                 type="button"
-                class="workflow-btn workflow-btn-secondary relative"
+                class="btn btn-secondary relative"
                 @click="toggleNotificationDropdown()"
                 title="Notifications"
               >
@@ -374,6 +246,10 @@
                   <button
                     type="button"
                     class="flex w-full items-center justify-center gap-1 text-xs font-black text-blue-600 hover:text-blue-800"
+                    hx-get="{% url 'accounts_portal:it_notifications_workspace' %}"
+                    hx-target="#it-workspace"
+                    hx-swap="innerHTML"
+                    hx-push-url="true"
                     @click="notificationDropdownOpen = false; openModule('notifications')"
                   >
                     Voir toutes les notifications
@@ -383,42 +259,62 @@
               </div>
             </div>
             <div class="relative" @click.outside="profileOpen = false">
-              <button type="button" class="workflow-btn workflow-btn-secondary" @click="profileOpen = !profileOpen">
+              <button type="button" class="btn btn-secondary" @click="profileOpen = !profileOpen">
                 <span class="grid h-7 w-7 place-items-center rounded-full bg-blue-600 text-xs font-black text-white">
                   {{ request.user.first_name|first|default:request.user.username|first|upper }}
                 </span>
                 <span>{{ request.user.get_full_name|default:request.user.username }}</span>
               </button>
               <div x-show="profileOpen" x-transition class="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
-                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" @click="activeModule='settings'; profileOpen=false">Mon profil</button>
-                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_branch_settings_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" @click="activeModule='settings'; profileOpen=false">Parametres annexe</button>
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" hx-push-url="true" @click="activeModule='settings'; profileOpen=false">Mon profil</button>
+                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_branch_settings_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" hx-push-url="true" @click="activeModule='settings'; profileOpen=false">Paramètres annexe</button>
                 <a href="{% url 'password_change' %}" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900">Mot de passe</a>
                 <form method="post" action="{% url 'accounts:logout' %}">
                   {% csrf_token %}
-                  <button type="submit" class="block w-full px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50">Deconnexion</button>
+                  <button type="submit" class="block w-full px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50">Déconnexion</button>
                 </form>
               </div>
             </div>
           </div>
         </header>
 
+        <div id="crumbBar" class="flex items-center gap-2 mb-4 text-sm font-bold" x-show="activeModule !== 'home'">
+          <button
+            class="text-blue-600 hover:underline"
+            hx-get="{% url 'accounts_portal:it_home_workspace' %}"
+            hx-target="#it-workspace"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            @click="openModule('home')"
+          >Accueil</button>
+          <template x-for="(crumb, i) in crumbs" :key="i">
+            <span class="flex items-center gap-2">
+              <i data-lucide="chevron-right" class="h-3 w-3 text-slate-300"></i>
+              <span class="text-slate-500" x-text="crumb"></span>
+            </span>
+          </template>
+        </div>
+
         <section
           id="it-workspace"
+          {% if not initial_workspace_html %}
           hx-get="{% if selected_class and selected_semester %}{% url 'accounts_portal:it_notes_workspace' %}?class_id={{ selected_class.id }}&amp;semester_id={{ selected_semester.id }}{% else %}{% url 'accounts_portal:it_home_workspace' %}{% endif %}"
           hx-trigger="load"
           hx-target="#it-workspace"
           hx-swap="innerHTML"
+          {% endif %}
         >
-          <div class="workflow-empty">{% if selected_class and selected_semester %}Workspace Notes{% else %}Chargement du workflow...{% endif %}</div>
+          {% if initial_workspace_html %}{{ initial_workspace_html }}{% else %}<div class="panel">{% if selected_class and selected_semester %}Workspace Notes{% else %}Chargement du workflow...{% endif %}</div>{% endif %}
         </section>
+
         <div id="it-modal-root"></div>
         <div id="it-drawer-backdrop" class="it-drawer-backdrop" role="button" aria-label="Fermer le drawer" onclick="window.itCloseDrawer && window.itCloseDrawer()"></div>
-        <aside id="it-drawer-shell" class="it-drawer" role="complementary" aria-label="Drawer detaille" aria-hidden="true">
+        <aside id="it-drawer-shell" class="it-drawer" role="complementary" aria-label="Drawer détaillé" aria-hidden="true">
           <div id="it-drawer-content" class="it-drawer-content">
             <div class="it-drawer-empty">
               <div>
-                <div class="text-lg font-black text-slate-900 dark:text-slate-100">Selectionnez une classe</div>
-                <div class="mt-2">Le drawer detaille affiche la classe, les UE et les EC sur toute la hauteur disponible.</div>
+                <div class="text-lg font-black text-slate-900">Sélectionnez une classe</div>
+                <div class="mt-2">Le drawer détaillé affiche la classe, les UE et les EC sur toute la hauteur disponible.</div>
               </div>
             </div>
           </div>
@@ -436,33 +332,42 @@
       profileOpen: false,
       notificationDropdownOpen: false,
       unreadCount: 0,
-      activeModule: 'home',
+      activeModule: '{{ initial_module|default:"home" }}',
+      crumbs: [],
       modules: [
-        { key: 'home', label: 'Accueil', icon: 'home', kicker: 'Actions rapides et priorites' },
-        { key: 'notes', label: 'Notes & Resultats', icon: 'file-spreadsheet', kicker: 'Classe -> Semestre -> Etat -> Action' },
-        { key: 'structure', label: 'Parametrage academique', icon: 'blocks', kicker: 'Classes -> UE -> EC -> Affectations' },
-        { key: 'import', label: 'Import / export', icon: 'upload-cloud', kicker: 'Excel notes et export classe' },
-        { key: 'archives', label: 'Archives', icon: 'folder-archive', kicker: 'Annees, classes et dossiers consultables' },
-        { key: 'cards', label: 'Cartes etudiants', icon: 'badge', kicker: 'Classe -> Etudiant -> PDF' },
-        { key: 'accounts', label: 'Utilisateurs', icon: 'shield-check', kicker: 'Utilisateur -> Etat compte -> Action' },
-        { key: 'support', label: 'Support', icon: 'life-buoy', kicker: 'Tickets de l annexe' },
-        { key: 'supervision', label: 'Supervision', icon: 'alert-triangle', kicker: 'Anomalies, alertes et points bloquants' },
-        { key: 'audit', label: 'Journal d audit', icon: 'history', kicker: 'Historique des actions de l annexe' },
-        { key: 'catalog', label: 'Catalogue', icon: 'library', kicker: 'Langues et professions de reference' },
-        { key: 'notifications', label: 'Notifications', icon: 'bell', kicker: 'Alertes, messages et communications' },
-        { key: 'settings', label: 'Compte', icon: 'settings', kicker: 'Profil, securite, preferences et annexe' },
+        { key: 'home', label: 'Accueil', icon: 'home', kicker: 'Actions rapides et priorités', url: "{% url 'accounts_portal:it_home_workspace' %}" },
+        { key: 'notes', label: 'Notes & Résultats', icon: 'file-spreadsheet', kicker: 'Classe → Semestre → État → Action', url: "{% url 'accounts_portal:it_notes_flow_workspace' %}" },
+        { key: 'structure', label: 'Paramétrage académique', icon: 'blocks', kicker: 'Classes → UE → EC → Affectations', url: "{% url 'accounts_portal:it_structure_workspace' %}" },
+        { key: 'import', label: 'Import / export', icon: 'upload-cloud', kicker: 'Excel notes et export classe', url: "{% url 'accounts_portal:it_import_workspace' %}" },
+        { key: 'archives', label: 'Archives', icon: 'folder-archive', kicker: 'Années, classes et dossiers consultables', url: "{% url 'accounts_portal:it_archives_workspace' %}" },
+        { key: 'cards', label: 'Cartes étudiants', icon: 'badge', kicker: 'Classe → Étudiant → PDF', url: "{% url 'accounts_portal:it_cards_workspace' %}" },
+        { key: 'accounts', label: 'Utilisateurs', icon: 'shield-check', kicker: 'Utilisateur → État compte → Action', url: "{% url 'accounts_portal:it_accounts_flow_workspace' %}" },
+        { key: 'support', label: 'Support', icon: 'life-buoy', kicker: 'Tickets de l\'annexe', url: "{% url 'accounts_portal:it_support_flow_workspace' %}" },
+        { key: 'supervision', label: 'Supervision', icon: 'alert-triangle', kicker: 'Anomalies, alertes et points bloquants', url: "{% url 'accounts_portal:it_supervision_workspace' %}" },
+        { key: 'audit', label: 'Journal d\'audit', icon: 'history', kicker: 'Historique des actions de l\'annexe', url: "{% url 'accounts_portal:it_audit_workspace' %}" },
+        { key: 'catalog', label: 'Catalogue', icon: 'library', kicker: 'Langues et professions de référence', url: "{% url 'accounts_portal:it_catalog_workspace' %}" },
+        { key: 'notifications', label: 'Notifications', icon: 'bell', kicker: 'Alertes, messages et communications', url: "{% url 'accounts_portal:it_notifications_workspace' %}" },
+        { key: 'settings', label: 'Compte', icon: 'settings', kicker: 'Profil, sécurité, préférences et annexe', url: "{% url 'accounts_portal:it_my_account_workspace' %}" },
       ],
       init() {
         this.collapsed = window.localStorage.getItem('it_flow_sidebar') === '1';
         this.darkMode = window.localStorage.getItem('it_flow_dark') === '1';
         this.applyTheme();
+        if (this.activeModule !== 'home') {
+          const current = this.currentModule();
+          this.crumbs = current ? [current.label] : [];
+        }
         this.$nextTick(() => this.renderIcons());
         this.loadUnreadCount();
+        this.initTopbarLoader();
         document.body.addEventListener('htmx:afterSwap', (event) => {
           this.renderIcons();
           if (event.detail && event.detail.target && event.detail.target.id === 'it-drawer-content') {
             this.openDrawer();
           }
+        });
+        document.body.addEventListener('htmx:afterSettle', (event) => {
+          this.renderIcons();
         });
         document.body.addEventListener('notif-update', () => this.loadUnreadCount());
         document.body.addEventListener('it-modal-close', () => this.closeModal());
@@ -475,6 +380,45 @@
         document.body.addEventListener('it-drawer-close', () => this.closeDrawer());
         window.itOpenDrawer = () => this.openDrawer();
         window.itCloseDrawer = () => this.closeDrawer();
+      },
+      initTopbarLoader() {
+        const bar = document.getElementById('it-topbar-loader');
+        if (!bar) return;
+        let pendingTimer = null;
+        let visible = false;
+        const isWorkspaceRequest = (event) => {
+          const target = event && event.detail && event.detail.target;
+          return !!target && target.id === 'it-workspace';
+        };
+        const show = () => {
+          visible = true;
+          bar.style.transition = 'none';
+          bar.style.width = '0';
+          bar.style.opacity = '1';
+          requestAnimationFrame(() => {
+            bar.style.transition = 'width .18s ease, opacity .3s ease';
+            bar.style.width = '35%';
+          });
+        };
+        const hide = () => {
+          if (!visible) return;
+          visible = false;
+          bar.style.width = '100%';
+          setTimeout(() => { bar.style.opacity = '0'; bar.style.width = '0'; }, 220);
+        };
+        document.body.addEventListener('htmx:beforeRequest', (event) => {
+          if (!isWorkspaceRequest(event)) return;
+          clearTimeout(pendingTimer);
+          pendingTimer = setTimeout(show, 300);
+        });
+        document.body.addEventListener('htmx:afterRequest', (event) => {
+          if (!isWorkspaceRequest(event)) return;
+          clearTimeout(pendingTimer);
+          hide();
+        });
+      },
+      branchName() {
+        return '{{ branch.name|default:"Annexe courante"|escapejs }}';
       },
       loadUnreadCount() {
         fetch('{% url "accounts_portal:it_notifications_workspace" %}?count_only=1')
@@ -507,26 +451,12 @@
         return this.currentModule().kicker;
       },
       openModule(moduleKey) {
+        // Etat cosmetique uniquement : la navigation reseau est portee par les
+        // attributs hx-get/hx-push-url declares sur le bouton cliqueur lui-meme.
         this.activeModule = moduleKey;
         this.closeModal();
-        const urls = {
-          home: "{% url 'accounts_portal:it_home_workspace' %}",
-          notes: "{% url 'accounts_portal:it_notes_flow_workspace' %}",
-          structure: "{% url 'accounts_portal:it_structure_workspace' %}",
-          import: "{% url 'accounts_portal:it_import_workspace' %}",
-          archives: "{% url 'accounts_portal:it_archives_workspace' %}",
-          accounts: "{% url 'accounts_portal:it_accounts_flow_workspace' %}",
-          cards: "{% url 'accounts_portal:it_cards_workspace' %}",
-          support: "{% url 'accounts_portal:it_support_flow_workspace' %}",
-          supervision: "{% url 'accounts_portal:it_supervision_workspace' %}",
-          audit: "{% url 'accounts_portal:it_audit_workspace' %}",
-          catalog: "{% url 'accounts_portal:it_catalog_workspace' %}",
-          notifications: "{% url 'accounts_portal:it_notifications_workspace' %}",
-          settings: "{% url 'accounts_portal:it_my_account_workspace' %}",
-        };
-        if (window.htmx) {
-          window.htmx.ajax('GET', urls[moduleKey], '#it-workspace');
-        }
+        const module = this.modules.find(m => m.key === moduleKey);
+        this.crumbs = module ? [module.label] : [];
         this.$nextTick(() => this.renderIcons());
       },
       toggleSidebar() {
@@ -573,10 +503,202 @@
           drawer.setAttribute('aria-hidden', 'true');
         }
         if (content) {
-          content.innerHTML = '<div class="it-drawer-empty"><div><div class="text-lg font-black text-slate-900 dark:text-slate-100">Selectionnez une classe</div><div class="mt-2">Le drawer detaille affiche la classe, les UE et les EC sur toute la hauteur disponible.</div></div></div>';
+          content.innerHTML = '<div class="it-drawer-empty"><div><div class="text-lg font-black text-slate-900">Sélectionnez une classe</div><div class="mt-2">Le drawer détaillé affiche la classe, les UE et les EC sur toute la hauteur disponible.</div></div></div>';
         }
         document.body.classList.remove('it-overlay-open');
         document.body.style.overflow = '';
+      },
+    };
+  }
+
+  // Calcul instantane (cosmetique) de la grille de notes informaticien.
+  // Le serveur reste seul a valider/persister ; ce code ne fait que
+  // reproduire l'affichage pour eviter tout aller-retour reseau visible
+  // a la frappe. Defini ici (shell persistant) pour etre disponible avant
+  // que la grille ne soit inseree par un swap HTMX.
+  function notesGrid() {
+    return {
+      structure: [],
+      ecsPerRow: 0,
+      init() {
+        const raw = this.$root.querySelector('[data-maq-structure]');
+        try {
+          this.structure = raw ? JSON.parse(raw.textContent) : [];
+        } catch (e) {
+          this.structure = [];
+        }
+        this.ecsPerRow = this.structure.reduce((sum, ue) => sum + ue.ecs.length, 0);
+        this.$root.addEventListener('htmx:afterRequest', (event) => this.onSaveSettled(event));
+      },
+      onSaveSettled(event) {
+        const elt = event.detail && event.detail.elt;
+        if (!elt || !elt.classList || !elt.classList.contains('score-input')) return;
+        const rowEl = elt.closest('.maq-row-student');
+        const rowIndex = rowEl ? rowEl.dataset.rowIndex : null;
+        const ecId = elt.dataset.ecId;
+        if (!rowIndex || !ecId) return;
+        const statusEl = document.getElementById(`save-status-${rowIndex}-${ecId}`);
+        if (!statusEl) return;
+        const ok = !!(event.detail.successful);
+        statusEl.textContent = ok ? 'Enregistre ✓' : 'Erreur';
+        statusEl.classList.add('is-flash');
+        statusEl.classList.toggle('is-error', !ok);
+        clearTimeout(statusEl._flashTimer);
+        statusEl._flashTimer = setTimeout(() => {
+          statusEl.classList.remove('is-flash', 'is-error');
+          statusEl.textContent = '…';
+        }, 1400);
+      },
+      resolveEcThreshold(coefficient) {
+        if (coefficient <= 1) return 8;
+        if (coefficient <= 2) return 10;
+        return 12;
+      },
+      round2(value) {
+        return Math.round((value + Number.EPSILON) * 100) / 100;
+      },
+      fmt(value) {
+        if (value === null || value === undefined || isNaN(value)) return '0,00';
+        return value.toFixed(2).replace('.', ',');
+      },
+      parseNum(text) {
+        if (!text) return 0;
+        const n = parseFloat(String(text).trim().replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+      },
+      getText(id) {
+        const el = document.getElementById(id);
+        return el ? el.textContent : '';
+      },
+      setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      },
+      toggleCreditStatus(id, isZero) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('maq-cell--bad', isZero);
+        el.classList.toggle('maq-cell--ok', !isZero);
+      },
+      applyNoteStatus(input, status) {
+        input.classList.remove('is-validated', 'is-failed', 'is-invalid');
+        const cell = input.closest('.maq-cell--note');
+        if (cell) cell.classList.remove('maq-cell--ok', 'maq-cell--bad', 'maq-cell--empty');
+        if (status === 'invalid') {
+          input.classList.add('is-invalid');
+          if (cell) cell.classList.add('maq-cell--empty');
+        } else if (status === 'empty') {
+          if (cell) cell.classList.add('maq-cell--empty');
+        } else if (status === 'ok') {
+          input.classList.add('is-validated');
+          if (cell) cell.classList.add('maq-cell--ok');
+        } else if (status === 'bad') {
+          input.classList.add('is-failed');
+          if (cell) cell.classList.add('maq-cell--bad');
+        }
+      },
+      computeEc(rowIndex, ec) {
+        const input = document.getElementById(`note-${rowIndex}-${ec.id}`);
+        if (!input) {
+          return { note: null, noteCoefficient: 0, creditObtained: 0, status: null };
+        }
+        if (input.disabled) {
+          // Matiere verrouillee (deja validee en session normale) : la valeur
+          // affichee n'est pas forcement celle du champ (logique final_score
+          // cote serveur). On garde l'affichage serveur tel quel.
+          return {
+            note: 'locked',
+            noteCoefficient: this.parseNum(this.getText(`notecoef-${rowIndex}-${ec.id}`)),
+            creditObtained: this.parseNum(this.getText(`credit-${rowIndex}-${ec.id}`)),
+            status: null,
+          };
+        }
+        const raw = input.value.trim().replace(',', '.');
+        if (raw === '') {
+          return { note: null, noteCoefficient: 0, creditObtained: 0, status: 'empty' };
+        }
+        const parsed = parseFloat(raw);
+        if (isNaN(parsed) || parsed < 0 || parsed > 20) {
+          return { note: null, noteCoefficient: 0, creditObtained: 0, status: 'invalid' };
+        }
+        const threshold = this.resolveEcThreshold(ec.coefficient);
+        const noteCoefficient = this.round2(parsed * ec.coefficient);
+        const isValidated = parsed >= threshold;
+        const creditObtained = isValidated ? ec.creditRequired : 0;
+        return { note: parsed, noteCoefficient, creditObtained, status: isValidated ? 'ok' : 'bad' };
+      },
+      recomputeRow(rowEl) {
+        if (!this.structure || !this.structure.length) return;
+        const rowIndex = rowEl.dataset.rowIndex;
+        if (!rowIndex) return;
+        let totalUeCoef = 0;
+        let totalUeNoteCoef = 0;
+        let totalCreditReq = 0;
+        let totalCreditObt = 0;
+        let rowMissing = false;
+
+        this.structure.forEach((ue) => {
+          let ueCoefSum = 0;
+          let ueNoteCoefSum = 0;
+          let ueCreditSum = 0;
+          let ueMissing = false;
+
+          ue.ecs.forEach((ec) => {
+            const result = this.computeEc(rowIndex, ec);
+            ueCoefSum += ec.coefficient;
+            ueNoteCoefSum += result.noteCoefficient;
+            ueCreditSum += result.creditObtained;
+            if (result.note === null) ueMissing = true;
+            this.setText(`notecoef-${rowIndex}-${ec.id}`, this.fmt(result.noteCoefficient));
+            this.setText(`credit-${rowIndex}-${ec.id}`, this.fmt(result.creditObtained));
+            if (result.status) {
+              const input = document.getElementById(`note-${rowIndex}-${ec.id}`);
+              if (input) this.applyNoteStatus(input, result.status);
+            }
+          });
+
+          const ueAverage = (!ueMissing && ueCoefSum > 0) ? (ueNoteCoefSum / ueCoefSum) : null;
+          if (ueAverage === null) rowMissing = true;
+          this.setText(`ueavg-${rowIndex}-${ue.id}`, ueAverage === null ? '0,00' : this.fmt(ueAverage));
+          this.setText(`uenotecoef-${rowIndex}-${ue.id}`, this.fmt(ueNoteCoefSum));
+          this.setText(`uecredit-${rowIndex}-${ue.id}`, this.fmt(ueCreditSum));
+          this.toggleCreditStatus(`uecredit-${rowIndex}-${ue.id}`, ueCreditSum === 0);
+
+          totalUeCoef += ue.coefficient;
+          if (ueAverage !== null) totalUeNoteCoef += ueAverage * ue.coefficient;
+          totalCreditReq += ue.creditRequired;
+          totalCreditObt += ueCreditSum;
+        });
+
+        const semesterAverage = (!rowMissing && totalUeCoef > 0) ? (totalUeNoteCoef / totalUeCoef) : null;
+        const percentage = totalCreditReq > 0 ? (totalCreditObt / totalCreditReq) * 100 : 0;
+        this.setText(`semavg-${rowIndex}`, semesterAverage === null ? '0,00' : this.fmt(semesterAverage));
+        this.setText(`sempct-${rowIndex}`, this.fmt(percentage) + '%');
+        this.setText(`semcredit-${rowIndex}`, this.fmt(totalCreditObt));
+        this.toggleCreditStatus(`semcredit-${rowIndex}`, totalCreditObt === 0);
+      },
+      onInput(event) {
+        const input = event.target;
+        if (!input.classList || !input.classList.contains('score-input')) return;
+        const rowEl = input.closest('.maq-row-student');
+        if (rowEl) this.recomputeRow(rowEl);
+      },
+      onKeydown(event) {
+        const input = event.target;
+        if (!input.classList || !input.classList.contains('score-input')) return;
+        if (event.key === 'Escape') {
+          input.value = input.defaultValue;
+          input.blur();
+          return;
+        }
+        if (event.key !== 'Enter' && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        const allInputs = Array.from(this.$root.querySelectorAll('.score-input'));
+        const idx = allInputs.indexOf(input);
+        const offset = this.ecsPerRow || 1;
+        const targetIdx = (event.key === 'ArrowUp') ? idx - offset : idx + offset;
+        const target = allInputs[targetIdx];
+        if (target) target.focus();
       },
     };
   }

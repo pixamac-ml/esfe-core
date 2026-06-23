@@ -1,70 +1,80 @@
 {% if toast %}
-<section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
+<div class="panel mb-4" style="border-left:5px solid {% if toast.level == 'success' %}#059669{% elif toast.level == 'error' %}#be123c{% else %}#d97706{% endif %}">
+  <p class="text-sm font-black">{{ toast.message }}</p>
+</div>
 {% endif %}
 
-<form
-  class="workflow-context"
-  hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}"
-  hx-target="#it-workspace"
-  hx-swap="innerHTML"
->
-  <label>
-    <span>Recherche utilisateur</span>
-    <input name="q" value="{{ query }}" placeholder="Username ou email" hx-trigger="keyup changed delay:350ms" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-workspace" hx-include="[name='q']">
-  </label>
-</form>
+<div class="space-y-4">
+  <form
+    class="wkc"
+    hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}"
+    hx-target="#it-workspace"
+    hx-swap="innerHTML"
+  >
+    <label>
+      <span>Recherche utilisateur</span>
+      <input name="q" value="{{ query }}" placeholder="Username ou email" hx-trigger="keyup changed delay:350ms" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-workspace" hx-include="[name='q']">
+    </label>
+  </form>
 
-<section class="workflow-stack">
-  <div class="workflow-band workflow-band-in_progress">
+  <div class="band b-in_progress">
     <div>
-      <p class="workflow-kicker">Gestion des comptes</p>
-      <h3>Utilisateur -> Etat -> Action</h3>
-      <p>La liste est limitee a l'annexe courante. Chaque ligne expose uniquement les actions possibles sur le compte.</p>
+      <p class="kicker">Gestion des comptes</p>
+      <h3>Utilisateur → État → Action</h3>
+      <p>La liste est limitée à l'annexe courante. Chaque ligne expose uniquement les actions possibles sur le compte.</p>
     </div>
-    <span>{{ branch.name|default:"Global" }}</span>
+    <span class="badge">{{ branch.name|default:"Global" }}</span>
   </div>
 
-  <div class="workflow-table-shell">
-    <div class="workflow-table-head">
+  <div class="panel">
+    <div class="flex items-center justify-between mb-3">
       <div>
-        <p class="workflow-kicker">Comptes utilisateurs</p>
-        <h3>File de traitement</h3>
+        <p class="kicker">Comptes utilisateurs</p>
+        <h3 class="text-lg font-black">File de traitement</h3>
       </div>
     </div>
-    <div class="workflow-list">
+    <div>
       {% for row in rows %}
-      <article>
-        <div>
-          <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
-          <span>{{ row.user.username }} - {{ row.account_state|title }}</span>
+      <div class="row">
+        <div class="avatar" style="background:#4338ca">
+          {{ row.user.get_full_name|default:row.user.username|first|upper }}
+        </div>
+        <div class="flex-1 min-w-0">
+          <b class="block">{{ row.user.get_full_name|default:row.user.username }}</b>
+          <span class="text-xs font-semibold text-slate-400">{{ row.user.username }} — {{ row.account_state|title }}</span>
         </div>
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="workflow-btn workflow-btn-secondary"
+            class="btn btn-secondary"
             hx-get="{% url 'accounts_portal:it_user_modal' row.user.id %}"
             hx-target="#it-modal-root"
             hx-swap="innerHTML"
           >
             Voir / Modifier
           </button>
-          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML" x-on:submit="$dispatch('notify', {message: '{% if row.user.is_active %}Désactivation en cours...{% else %}Activation en cours...{% endif %}', type: 'info'})">
+          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
             {% csrf_token %}
             <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
             <input type="hidden" name="action" value="toggle_active">
-            <button class="workflow-btn workflow-btn-secondary" type="submit">{% if row.user.is_active %}Desactiver{% else %}Activer{% endif %}</button>
+            <button class="btn btn-secondary" type="submit">
+              {% if row.user.is_active %}Désactiver{% else %}Activer{% endif %}
+            </button>
           </form>
-          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML" x-on:submit="$dispatch('notify', {message: 'Réinitialisation du mot de passe en cours...', type: 'info'})">
+          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
             {% csrf_token %}
             <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
             <input type="hidden" name="action" value="reset_password">
-            <button class="workflow-btn workflow-btn-primary" type="submit">Reset password</button>
+            <button class="btn btn-primary" type="submit">
+              <i data-lucide="key-round" class="h-4 w-4"></i>
+              Reset password
+            </button>
           </form>
         </div>
-      </article>
+      </div>
       {% empty %}
-      <p class="workflow-muted">Aucun compte ne correspond a cette recherche.</p>
+      <p class="py-6 text-center text-sm font-semibold text-slate-400">Aucun compte ne correspond à cette recherche.</p>
       {% endfor %}
     </div>
   </div>
-</section>
+</div>

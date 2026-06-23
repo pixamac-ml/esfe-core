@@ -1,0 +1,33 @@
+{% load component_tags %}
+{% if toast %}
+  <div class="banner {% if toast.level == 'success' %}ok{% else %}warn{% endif %}"><span>{{ toast.message }}</span></div>
+{% endif %}
+<div class="grid cards-3" style="margin-bottom:16px">
+  <div class="stat"><div class="k"><span class="dot" style="background:var(--ok)"></span>Présents</div><div class="v">{{ teachers_present_count }}/{{ teachers_total_count }}</div></div>
+  <div class="stat"><div class="k"><span class="dot" style="background:var(--warn)"></span>Appels à faire</div><div class="v">{{ teachers_pending_appel_count }}</div></div>
+  <div class="stat"><div class="k"><span class="dot" style="background:var(--bad)"></span>Absents</div><div class="v">{{ teachers_absent_count }}</div></div>
+</div>
+<div class="card">
+  <div class="card-h"><h3>Enseignants — aujourd'hui</h3><span class="src-badge">⤿ Académique</span></div>
+  <div class="card-b">
+    {% for t in teachers %}
+    <div class="row clickable"
+         hx-get="{% url 'accounts_portal:supervisor_teacher_drawer' %}?teacher_id={{ t.id }}"
+         hx-target="#supervisor-drawer-content">
+      <div class="pic" style="background:#334155">{{ t.name|slice:":2"|upper }}</div>
+      <div class="main"><b>{{ t.name }}</b><span>{{ t.subject }}</span></div>
+      <span class="tail">
+        {% if t.present %}
+          {% if t.punctual %}<span class="chip ok">Présent</span>{% else %}<span class="chip warn">Présent (en retard)</span>{% endif %}
+        {% else %}
+          <span class="chip bad">Absent</span>
+        {% endif %}
+        {% if t.appel == "done" %}<span class="chip ok">Appel fait</span>{% elif t.appel == "pending" %}<span class="chip warn">Appel à faire</span>{% else %}<span class="chip mute">—</span>{% endif %}
+        <svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </span>
+    </div>
+    {% empty %}
+    {% component "empty_state" icon="users" title="Aucun cours aujourd'hui" message="Aucune séance programmée aujourd'hui pour suivre les enseignants." %}{% endcomponent %}
+    {% endfor %}
+  </div>
+</div>

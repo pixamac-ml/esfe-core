@@ -1,93 +1,52 @@
-<div class="flex flex-col gap-6">
-  {% if not selected_class %}
-    <section class="rounded-2xl border border-slate-200 bg-white p-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Suivi des classes</p>
-          <h2 class="mt-1 text-lg font-extrabold text-slate-900">Choisir une classe</h2>
-          <p class="mt-1 text-sm font-semibold text-slate-600">Sélectionnez une classe pour ouvrir son workflow terrain.</p>
-        </div>
-        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{{ total_classes }} classe(s)</span>
-      </div>
-    </section>
-
-    <div class="overflow-auto max-h-[70vh] pr-1">
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {% for item in class_picker_items %}
-          <div class="rounded-xl bg-white p-4 shadow border border-slate-100">
-            <p class="text-sm font-black text-slate-900">{{ item.label }}</p>
-            <p class="mt-1 text-xs font-semibold text-slate-500">{{ item.programme_title }}</p>
-            <div class="mt-4 flex items-center justify-between gap-3">
-              <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{{ item.student_count }} étudiant(s)</span>
-              <button
-                type="button"
-                class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
-                hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes&class_id={{ item.id }}"
-                hx-target="#supervisor-workspace"
-                hx-swap="innerHTML"
-              >
-                Ouvrir
-              </button>
-            </div>
-          </div>
-        {% empty %}
-          <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
-            Aucune classe active disponible dans votre annexe.
-          </div>
-        {% endfor %}
-      </div>
+{% load component_tags %}
+{% if not selected_class %}
+<div class="card">
+  <div class="card-h"><h3>Classes — {{ branch.name|default:"Annexe" }}</h3><span class="hint">{{ class_picker_items|length }} classe{{ class_picker_items|length|pluralize }}</span></div>
+  <div class="card-b">
+    {% for item in class_picker_items %}
+    <div class="row clickable"
+         hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes&class_id={{ item.id }}"
+         hx-target="#supervisor-workspace" hx-push-url="true">
+      <div class="pic" style="background:{% cycle '#3d4f63' '#4a5d57' '#6b5e3c' '#574b63' '#6a4a52' '#3f5560' %}">{{ item.label|slice:":2"|upper }}</div>
+      <div class="main"><b>{{ item.label }}</b><span>{{ item.student_count }} étudiant{{ item.student_count|pluralize }}</span></div>
+      <span class="tail">
+        <svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </span>
     </div>
-  {% else %}
-    <section class="rounded-2xl border border-slate-200 bg-white p-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Classe sélectionnée</p>
-          <h2 class="mt-1 text-xl font-black text-slate-900">{{ selected_class.display_name }}</h2>
-          <p class="mt-1 text-sm font-semibold text-slate-600">{{ selected_class.student_count|default:0 }} étudiant(s) · {{ today|date:"d/m/Y" }}</p>
-        </div>
-        <button
-          type="button"
-          class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-          hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes"
-          hx-target="#supervisor-workspace"
-          hx-swap="innerHTML"
-        >
-          Changer classe
-        </button>
-      </div>
-    </section>
-
-    <section class="grid grid-cols-1 gap-4 md:grid-cols-3">
-      <button
-        type="button"
-        class="rounded-2xl bg-slate-900 p-5 text-left text-white shadow"
-        hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class.id }}"
-        hx-target="#supervisor-workspace"
-        hx-swap="innerHTML"
-      >
-        <span class="block text-xs font-bold uppercase tracking-wider text-slate-300">Action</span>
-        <span class="mt-2 block text-lg font-black">Faire l’appel</span>
-      </button>
-      <button
-        type="button"
-        class="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow hover:bg-slate-50"
-        hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}"
-        hx-target="#supervisor-workspace"
-        hx-swap="innerHTML"
-      >
-        <span class="block text-xs font-bold uppercase tracking-wider text-slate-500">Action</span>
-        <span class="mt-2 block text-lg font-black text-slate-900">Voir emploi du temps</span>
-      </button>
-      <button
-        type="button"
-        class="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow hover:bg-slate-50"
-        hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=courses&class_id={{ selected_class.id }}"
-        hx-target="#supervisor-workspace"
-        hx-swap="innerHTML"
-      >
-        <span class="block text-xs font-bold uppercase tracking-wider text-slate-500">Action</span>
-        <span class="mt-2 block text-lg font-black text-slate-900">Ajouter cours</span>
-      </button>
-    </section>
-  {% endif %}
+    {% empty %}
+    {% component "empty_state" icon="layout-grid" title="Aucune classe active" message="Aucune classe active disponible dans votre annexe." %}{% endcomponent %}
+    {% endfor %}
+  </div>
 </div>
+{% else %}
+<div class="card">
+  <div class="card-h">
+    <div><h3>{{ selected_class.display_name }}</h3><span class="hint">{{ selected_class.student_count|default:0 }} étudiant(s)</span></div>
+    <button type="button" class="btn"
+            hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes"
+            hx-target="#supervisor-workspace" hx-push-url="true">Changer de classe</button>
+  </div>
+  <div class="card-b" style="padding:18px">
+    <div class="grid cards-3">
+      <button type="button" class="card" style="background:var(--rail);color:#fff;text-align:left;padding:18px;border:none;cursor:pointer"
+              hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class_id }}"
+              hx-target="#supervisor-workspace" hx-push-url="true">
+        <span style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:#94a3b8">Action</span>
+        <span style="display:block;margin-top:8px;font-size:16px;font-weight:800">Faire l'appel</span>
+      </button>
+      <button type="button" class="card" style="text-align:left;padding:18px;border:1px solid var(--line);background:#fff;cursor:pointer"
+              hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class_id }}"
+              hx-target="#supervisor-workspace" hx-push-url="true">
+        <span style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--ink-3)">Action</span>
+        <span style="display:block;margin-top:8px;font-size:16px;font-weight:800">Voir emploi du temps</span>
+      </button>
+      <button type="button" class="card" style="text-align:left;padding:18px;border:1px solid var(--line);background:#fff;cursor:pointer"
+              hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=courses&class_id={{ selected_class_id }}"
+              hx-target="#supervisor-workspace" hx-push-url="true">
+        <span style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--ink-3)">Action</span>
+        <span style="display:block;margin-top:8px;font-size:16px;font-weight:800">Ajouter cours</span>
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}

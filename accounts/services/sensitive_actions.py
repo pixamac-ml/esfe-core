@@ -134,45 +134,50 @@ def confirm_sensitive_action(*, request_id, code, approver, apply_callback):
     apply_callback(request_obj) -> dict (new_state) : fonction qui applique
     reellement la modification metier et retourne le nouvel etat pour l'audit.
     """
+    error_message = None
+
     with transaction.atomic():
         request_obj = (
             SensitiveActionRequest.objects.select_for_update().get(pk=request_id)
         )
 
         if request_obj.status != SensitiveActionRequest.STATUS_PENDING:
-            raise SensitiveActionError("Cette demande n'est plus en attente de validation.")
-
-        if timezone.now() > request_obj.expires_at:
+            error_message = "Cette demande n'est plus en attente de validation."
+        elif timezone.now() > request_obj.expires_at:
             request_obj.status = SensitiveActionRequest.STATUS_EXPIRED
             request_obj.resolved_at = timezone.now()
             request_obj.save(update_fields=["status", "resolved_at"])
-            raise SensitiveActionError(
-                "Le code n'a pas ete entre a temps. Veuillez recommencer la demande."
-            )
+            error_message = "Le code n'a pas ete entre a temps. Veuillez recommencer la demande."
+        else:
+            request_obj.attempts += 1
+            if _hash_code(code) != request_obj.otp_code_hash:
+                request_obj.save(update_fields=["attempts"])
+                error_message = "Code de validation incorrect."
+            else:
+                new_state = apply_callback(request_obj)
 
-        request_obj.attempts += 1
-        if _hash_code(code) != request_obj.otp_code_hash:
-            request_obj.save(update_fields=["attempts"])
-            raise SensitiveActionError("Code de validation incorrect.")
+                request_obj.status = SensitiveActionRequest.STATUS_APPROVED
+                request_obj.approved_by = approver
+                request_obj.resolved_at = timezone.now()
+                request_obj.save(update_fields=["status", "approved_by", "resolved_at", "attempts"])
 
-        new_state = apply_callback(request_obj)
+                FinancialAuditLog.objects.create(
+                    branch=request_obj.branch,
+                    action_type=request_obj.action_type,
+                    target_model=request_obj.target_model,
+                    target_id=request_obj.target_id,
+                    previous_state=request_obj.previous_state,
+                    new_state=new_state or request_obj.requested_state,
+                    performed_by=request_obj.requested_by,
+                    approved_by=approver,
+                    sensitive_action_request=request_obj,
+                )
 
-        request_obj.status = SensitiveActionRequest.STATUS_APPROVED
-        request_obj.approved_by = approver
-        request_obj.resolved_at = timezone.now()
-        request_obj.save(update_fields=["status", "approved_by", "resolved_at", "attempts"])
-
-        FinancialAuditLog.objects.create(
-            branch=request_obj.branch,
-            action_type=request_obj.action_type,
-            target_model=request_obj.target_model,
-            target_id=request_obj.target_id,
-            previous_state=request_obj.previous_state,
-            new_state=new_state or request_obj.requested_state,
-            performed_by=request_obj.requested_by,
-            approved_by=approver,
-            sensitive_action_request=request_obj,
-        )
+    # Note : l'exception est levee APRES la sortie du bloc atomic, pour que les
+    # mises a jour deja faites (compteur d'essais, expiration) restent commitees
+    # meme quand la demande est finalement rejetee.
+    if error_message:
+        raise SensitiveActionError(error_message)
 
     return request_obj
 

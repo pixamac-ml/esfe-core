@@ -1,0 +1,79 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}Mémoires{% endblock %}
+{% block page_subtitle %}Dépôt, publication et mise en avant des mémoires soutenus{% endblock %}
+
+{% block content_main %}
+<div class="space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Total mémoires</p>
+            <p class="text-2xl font-bold text-slate-900 mb-0">{{ memoires_total }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+            <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Publiés</p>
+            <p class="text-2xl font-bold text-emerald-700 mb-0">{{ memoires_publies }}</p>
+        </article>
+        <article class="card p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between gap-3">
+            <div>
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Actions</p>
+                <p class="text-sm text-slate-600 mb-0">Déposer un nouveau mémoire</p>
+            </div>
+            <a href="{% url 'superadmin:memoire_create' %}" class="btn btn-primary">
+                Déposer
+            </a>
+        </article>
+    </section>
+
+    <section class="card p-4 rounded-xl border border-slate-100 shadow-sm">
+        <form id="memoire-filter-form"
+              method="get"
+              class="grid grid-cols-1 md:grid-cols-6 gap-3"
+              hx-get="{% url 'superadmin:memoire_list' %}"
+              hx-target="#memoire-table-container"
+              hx-swap="innerHTML"
+              hx-trigger="keyup changed delay:350ms, change, submit">
+            <div class="md:col-span-2">
+                <input type="text"
+                       name="search"
+                       value="{{ filters.search|default:'' }}"
+                       placeholder="Rechercher titre, auteur, mot-clé..."
+                       class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            </div>
+            <div>
+                <select name="statut" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous statuts</option>
+                    {% for valeur, libelle in statuts %}
+                    <option value="{{ valeur }}" {% if filters.statut == valeur %}selected{% endif %}>{{ libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="niveau" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Tous niveaux</option>
+                    {% for valeur, libelle in niveaux %}
+                    <option value="{{ valeur }}" {% if filters.niveau == valeur %}selected{% endif %}>{{ libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="filiere" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Toutes filières</option>
+                    {% for filiere in filieres %}
+                    <option value="{{ filiere.id }}" {% if filters.filiere == filiere.id|stringformat:"s" %}selected{% endif %}>{{ filiere.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'superadmin:memoire_list' %}" class="btn btn-outline">Réinitialiser</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="card overflow-hidden rounded-xl border border-slate-100 shadow-sm">
+        <div id="memoire-table-container">
+            {% include "superadmin/memoires/_list_table.html" %}
+        </div>
+    </section>
+</div>
+{% endblock %}

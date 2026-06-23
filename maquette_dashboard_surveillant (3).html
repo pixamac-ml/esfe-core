@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Surveillant Général · ESFé Core</title>
+<!-- MAQUETTE interactive — Dashboard Surveillant Général (ESFé Core). 100% autonome, données simulées.
+     Rien n'est bloqué : toutes les sections sont ouvertes. En prod : Tailwind compilé + HTMX + Alpine + Cotton. -->
+<style>
+  :root{
+    --rail:#0b1220;--rail-2:#111a2e;--rail-line:#1e2a44;
+    --ink:#0f172a;--ink-2:#475569;--ink-3:#94a3b8;
+    --bg:#eef2f7;--card:#fff;--line:#e2e8f0;--line-2:#eef2f7;
+    --accent:#2f56ff;--accent-soft:#e8edff;
+    --ok:#0d9f6e;--ok-soft:#e3f6ee;--warn:#c2790b;--warn-soft:#fdf2dd;
+    --bad:#e11d48;--bad-soft:#fde7ec;--info:#2563eb;--info-soft:#e6efff;
+    --radius:16px;--rail-w:268px;--font:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px}
+  #topbar-loader{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:200;transition:width .18s ease,opacity .3s ease;opacity:0}
+  .shell{display:flex;height:100vh;overflow:hidden}
+  .rail{width:var(--rail-w);flex:0 0 var(--rail-w);background:var(--rail);color:#cdd7ea;display:flex;flex-direction:column;border-right:1px solid var(--rail-line)}
+  .rail-brand{padding:20px 20px 16px;border-bottom:1px solid var(--rail-line)}
+  .rail-brand .eyebrow{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#5d6f93;font-weight:800}
+  .rail-brand .name{margin-top:6px;font-size:17px;font-weight:800;color:#fff}
+  .rail-brand .sub{margin-top:2px;font-size:12px;color:#7d8db0}
+  .rail-class{padding:16px 20px;border-bottom:1px solid var(--rail-line)}
+  .rail-class label{display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#5d6f93;font-weight:800;margin-bottom:8px}
+  .rail-class select{width:100%;background:var(--rail-2);color:#e7edf8;border:1px solid var(--rail-line);border-radius:11px;padding:10px 11px;font-size:13.5px;font-weight:600;outline:none}
+  .rail-class select:focus{border-color:var(--accent)}
+  .rail-nav{flex:1;padding:14px 12px;overflow:auto}
+  .nav-group{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#4d5d80;font-weight:800;padding:14px 10px 6px}
+  .nav-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:10px 11px;border-radius:11px;color:#aebbd6;font-size:13.5px;font-weight:650;transition:background .14s,color .14s}
+  .nav-item .ic{width:18px;height:18px;flex:0 0 18px;opacity:.85}
+  .nav-item:hover{background:#16223c;color:#eaf0fb}
+  .nav-item.active{background:var(--accent);color:#fff;box-shadow:0 6px 16px -6px rgba(47,86,255,.7)}
+  .nav-item.active .ic{opacity:1}
+  .nav-item .count{margin-left:auto;color:#fff;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 7px;min-width:20px;text-align:center}
+  .badge-bad{background:var(--bad)}.badge-warn{background:var(--warn)}
+  .nav-item.active .count{background:rgba(255,255,255,.25)!important}
+  .rail-foot{padding:12px;border-top:1px solid var(--rail-line)}
+  .who{display:flex;align-items:center;gap:10px;padding:8px 10px 12px}
+  .avatar{width:34px;height:34px;border-radius:10px;background:#1e293b;color:#e2e8f0;font-weight:800;font-size:13px;display:grid;place-items:center}
+  .who .meta b{display:block;color:#e7edf8;font-size:13px}.who .meta span{color:#7d8db0;font-size:11.5px}
+  .logout{display:flex;align-items:center;gap:9px;width:100%;padding:10px 11px;border-radius:11px;background:#1b1320;color:#ff9aae;font-weight:700;font-size:13px;border:1px solid #3a1b27}
+  .logout:hover{background:#26161f}
+  .work{flex:1;display:flex;flex-direction:column;min-width:0}
+  .work-head{background:var(--card);border-bottom:1px solid var(--line);padding:16px 26px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+  .work-head .crumb{font-size:11px;letter-spacing:.05em;color:var(--ink-3);font-weight:700;text-transform:uppercase}
+  .work-head h1{font-size:21px;font-weight:800;letter-spacing:-.02em;margin-top:3px}
+  .work-head .lede{font-size:13px;color:var(--ink-2);margin-top:2px}
+  .work-head .date{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:9px 13px;font-size:13px;font-weight:700;color:var(--ink-2);white-space:nowrap}
+  .work-body{flex:1;overflow:auto;padding:24px 26px 60px}
+  .panel{animation:rise .18s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .grid{display:grid;gap:16px}.cards-4{grid-template-columns:repeat(4,1fr)}.cards-3{grid-template-columns:repeat(3,1fr)}.cards-2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:1100px){.cards-4{grid-template-columns:repeat(2,1fr)}.cards-3{grid-template-columns:1fr}.cards-2{grid-template-columns:1fr}}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .stat .k{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-2)}
+  .stat .v{font-size:30px;font-weight:850;letter-spacing:-.02em;margin-top:10px}.stat .d{font-size:12px;color:var(--ink-3);margin-top:4px}
+  .dot{width:9px;height:9px;border-radius:99px;display:inline-block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line-2)}
+  .card-h h3{font-size:14.5px;font-weight:800}.card-h .hint{font-size:11.5px;color:var(--ink-3);font-weight:600}
+  .card-b{padding:6px 0}
+  .src-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--info);background:var(--info-soft);border-radius:99px;padding:4px 10px}
+  .row{display:flex;align-items:center;gap:13px;padding:12px 18px;border-bottom:1px solid var(--line-2);transition:background .12s}
+  .row:last-child{border-bottom:none}.row.clickable{cursor:pointer}.row.clickable:hover{background:var(--line-2)}
+  .pic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;flex:0 0 38px}
+  .row .main b{font-size:13.5px;font-weight:700;display:block}.row .main span{font-size:12px;color:var(--ink-3)}
+  .row .tail{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .chip{font-size:11.5px;font-weight:800;border-radius:99px;padding:4px 10px;white-space:nowrap}
+  .chip.ok{background:var(--ok-soft);color:var(--ok)}.chip.warn{background:var(--warn-soft);color:var(--warn)}
+  .chip.bad{background:var(--bad-soft);color:var(--bad)}.chip.info{background:var(--info-soft);color:var(--info)}.chip.mute{background:var(--bg);color:var(--ink-2)}
+  .att-state{font-size:12px;font-weight:800;border-radius:10px;padding:7px 12px;border:1px solid transparent;min-width:96px;text-align:center;transition:transform .08s}
+  .att-state:active{transform:scale(.96)}
+  .att-present{background:var(--ok-soft);color:var(--ok);border-color:#bfe8d6}.att-retard{background:var(--warn-soft);color:var(--warn);border-color:#f3e0b4}
+  .att-absent{background:var(--bad-soft);color:var(--bad);border-color:#f6c8d2}.att-justifie{background:var(--info-soft);color:var(--info);border-color:#c8dcff}
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .btn{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;border-radius:11px;padding:10px 15px;border:1px solid var(--line);background:var(--card);color:var(--ink);transition:background .14s,border-color .14s}
+  .btn:hover{background:var(--line-2)}.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn.primary:hover{background:#2546d8}.btn.ghost{background:transparent}
+  .search{flex:1;min-width:200px;display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 14px}
+  .search input{border:none;outline:none;width:100%;font-size:13.5px;color:var(--ink);background:transparent}
+  .counts{display:flex;gap:8px;flex-wrap:wrap}
+  .sess-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .sess-chip{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 14px;min-width:185px;transition:border-color .14s,box-shadow .14s}
+  .sess-chip:hover{border-color:var(--accent)}
+  .sess-chip.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .sess-chip .t{font-size:12.5px;font-weight:800}.sess-chip .s{font-size:11.5px;color:var(--ink-3);margin:2px 0 7px}
+  .banner{display:flex;align-items:center;gap:11px;border-radius:13px;padding:13px 16px;margin-bottom:14px;font-size:13px;font-weight:650}
+  .banner.warn{background:var(--warn-soft);color:#8a5606}.banner.ok{background:var(--ok-soft);color:#0a6e4c}
+  .sched{width:100%;border-collapse:collapse;font-size:12.5px}
+  .sched th,.sched td{border:1px solid var(--line);padding:0}
+  .sched thead th{background:var(--bg);font-weight:800;color:var(--ink-2);padding:10px;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+  .sched td{height:64px;vertical-align:top;padding:6px;width:18%}.sched .time{background:var(--bg);font-weight:800;color:var(--ink-2);text-align:center;width:10%}
+  .slot{border-radius:9px;padding:7px 9px;height:100%;font-weight:700;cursor:pointer}.slot small{display:block;font-weight:600;opacity:.8;margin-top:2px}
+  .s-blue{background:var(--info-soft);color:#1746b3}.s-green{background:var(--ok-soft);color:#0a7a54}.s-purple{background:#efe6ff;color:#6b21d6}.s-amber{background:var(--warn-soft);color:#9a5d05}
+  .cell-add{width:100%;height:100%;min-height:52px;border:1.5px dashed var(--line);border-radius:9px;color:var(--ink-3);font-size:20px;font-weight:700;background:transparent;transition:all .14s}
+  .cell-add:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .flow{display:flex;align-items:center;margin:4px 0 2px}
+  .flow .step{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;color:var(--ink-3)}
+  .flow .step .b{width:22px;height:22px;border-radius:99px;border:2px solid var(--line);display:grid;place-items:center;font-size:11px;color:var(--ink-3);background:#fff}
+  .flow .step.done .b{background:var(--ok);border-color:var(--ok);color:#fff}.flow .step.current .b{background:var(--accent);border-color:var(--accent);color:#fff}.flow .step.current{color:var(--accent)}
+  .flow .line{flex:1;height:2px;background:var(--line);margin:0 8px;min-width:16px}.flow .line.done{background:var(--ok)}
+  .empty{text-align:center;padding:48px 24px;color:var(--ink-3)}
+  .empty .ico{width:54px;height:54px;border-radius:16px;background:var(--bg);display:grid;place-items:center;margin:0 auto 16px}
+  .empty h4{color:var(--ink);font-size:15px;font-weight:800;margin-bottom:6px}.empty p{font-size:13px;max-width:340px;margin:0 auto 16px}
+  .scrim{position:fixed;inset:0;background:rgba(15,23,42,.34);opacity:0;visibility:hidden;transition:opacity .2s;z-index:90}.scrim.open{opacity:1;visibility:visible}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:440px;max-width:92vw;background:var(--card);box-shadow:-24px 0 60px -24px rgba(15,23,42,.4);transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:100;display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px;border-bottom:1px solid var(--line)}
+  .drawer-h .x{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);display:grid;place-items:center;color:var(--ink-2);font-size:18px}.drawer-h .x:hover{background:var(--line-2)}
+  .drawer-b{padding:20px;overflow:auto;flex:1}
+  .kv{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px dashed var(--line);font-size:13px}.kv span{color:var(--ink-3);font-weight:600}.kv b{font-weight:700}
+  .sec-title{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:800;margin:20px 0 10px}
+  .f-l{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;color:var(--ink-2);margin:14px 0 7px}
+  .f-i{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-size:13.5px;font-weight:600;color:var(--ink);background:var(--card);outline:none;font-family:inherit}
+  .f-i:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}textarea.f-i{resize:vertical}
+  .seg{display:flex;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:4px}
+  .seg-b{flex:1;border-radius:9px;padding:9px;font-size:12.5px;font-weight:700;color:var(--ink-2);transition:all .14s}
+  .seg-b.active{background:var(--accent);color:#fff;box-shadow:0 4px 10px -4px rgba(47,86,255,.6)}
+  #toasts{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column;gap:10px;z-index:300}
+  .toast{background:var(--ink);color:#fff;padding:13px 16px;border-radius:12px;font-size:13px;font-weight:650;box-shadow:0 18px 40px -16px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px;animation:toastin .25s ease both}
+  .toast .tdot{width:9px;height:9px;border-radius:99px;background:var(--ok)}
+  @keyframes toastin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .mock-flag{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:#0b1220;color:#9fb0d0;font-size:11px;font-weight:700;padding:6px 13px;border-radius:99px;z-index:80;border:1px solid #22304d}
+  .hide{display:none!important}
+  svg.i{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+<div id="topbar-loader"></div>
+<div class="shell">
+  <aside class="rail">
+    <div class="rail-brand"><div class="eyebrow">Surveillant Général</div><div class="name">ESFé Core</div><div class="sub">Annexe Hamdallaye · Bamako</div></div>
+    <div class="rail-class">
+      <label for="classSel">Classe active</label>
+      <select id="classSel" onchange="onClassChange(this.value)">
+        <option value="l1si">L1 Soins Infirmiers (42)</option>
+        <option value="l2si">L2 Soins Infirmiers (38)</option>
+        <option value="l1sf">L1 Sage-femme (29)</option>
+        <option value="l3lab">L3 Laboratoire (24)</option>
+        <option value="m1sp">M1 Santé Publique (18)</option>
+      </select>
+    </div>
+    <nav class="rail-nav">
+      <div class="nav-group">Pilotage</div>
+      <button class="nav-item active" data-sec="home" onclick="go('home')"><svg class="i ic" viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg> Accueil</button>
+      <button class="nav-item" data-sec="classes" onclick="go('classes')"><svg class="i ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/></svg> Suivi des classes</button>
+      <button class="nav-item" data-sec="cases" onclick="go('cases')"><svg class="i ic" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg> Cas à traiter <span class="count badge-bad" id="casesCount">3</span></button>
+      <div class="nav-group">Classe active</div>
+      <button class="nav-item" data-sec="attendance" onclick="go('attendance')"><svg class="i ic" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Assiduité <span class="count badge-warn" id="pendingCount">2</span></button>
+      <button class="nav-item" data-sec="schedule" onclick="go('schedule')"><svg class="i ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Emploi du temps</button>
+      <button class="nav-item" data-sec="courses" onclick="go('courses')"><svg class="i ic" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Cours</button>
+      <button class="nav-item" data-sec="students" onclick="go('students')"><svg class="i ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> Étudiants</button>
+      <button class="nav-item" data-sec="teachers" onclick="go('teachers')"><svg class="i ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5"/></svg> Enseignants</button>
+    </nav>
+    <div class="rail-foot">
+      <div class="who"><div class="avatar">SK</div><div class="meta"><b>S. Konaté</b><span>Surveillant Général</span></div></div>
+      <button class="logout" onclick="toast('Déconnexion (simulée)')"><svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg> Déconnexion</button>
+    </div>
+  </aside>
+  <div class="work">
+    <header class="work-head">
+      <div><div class="crumb" id="crumb">Pilotage · Accueil</div><h1 id="ptitle">Vue d'ensemble</h1><div class="lede" id="plede">Pilotage des classes, du temps, des enseignants et de la discipline.</div></div>
+      <div class="date">Lundi 16 juin 2026</div>
+    </header>
+    <div class="work-body"><div id="workspace"></div></div>
+  </div>
+</div>
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-h"><div><div class="crumb" id="drawerKicker" style="color:var(--ink-3)">Détail</div><h3 id="drawerTitle" style="font-size:17px;font-weight:800;margin-top:3px"></h3></div><button class="x" onclick="closeDrawer()" aria-label="Fermer">×</button></div>
+  <div class="drawer-b" id="drawerBody"></div>
+</aside>
+<div id="toasts"></div>
+<div class="mock-flag">Prototype interactif — données de démonstration</div>
+
+<script>
+/* ===================== DONNÉES SIMULÉES ===================== */
+const CLASSES={l1si:{label:"L1 Soins Infirmiers",n:42,pres:94},l2si:{label:"L2 Soins Infirmiers",n:38,pres:86},l1sf:{label:"L1 Sage-femme",n:29,pres:97},l3lab:{label:"L3 Laboratoire",n:24,pres:91},m1sp:{label:"M1 Santé Publique",n:18,pres:100}};
+const COLORS=["#3d4f63","#4a5d57","#6b5e3c","#574b63","#6a4a52","#3f5560"];
+const FN=["Aminata","Ousmane","Fatoumata","Modibo","Mariam","Adama","Kadiatou","Ibrahim","Rokia","Seydou","Awa","Bakary","Hawa","Drissa","Salimata","Yacouba"];
+const LN=["Traoré","Diarra","Keïta","Coulibaly","Sidibé","Touré","Cissé","Maïga","Diallo","Konaté","Sangaré","Dembélé","Fofana","Koné","Camara","Sissoko"];
+const ATT=["present","retard","absent","justifie"],ATT_LABEL={present:"Présent",retard:"Retard",absent:"Absent",justifie:"Justifié"};
+const ECS=[{id:"anat",code:"ANAT01",title:"Anatomie-Physiologie",color:"s-blue"},{id:"soin",code:"SOIN01",title:"Soins fondamentaux",color:"s-green"},{id:"phar",code:"PHAR01",title:"Pharmacologie",color:"s-amber"},{id:"micr",code:"MICR01",title:"Microbiologie",color:"s-purple"},{id:"sant",code:"SANT01",title:"Santé publique",color:"s-blue"},{id:"labo",code:"LABO01",title:"TP Laboratoire",color:"s-purple"}];
+const TEACHERS=[
+  {id:"t1",name:"Dr. Coulibaly",subject:"Anatomie-Physiologie",present:true,appel:"done",punctual:true},
+  {id:"t2",name:"Mme Diallo",subject:"Soins fondamentaux",present:true,appel:"pending",punctual:false},
+  {id:"t3",name:"Dr. Sissoko",subject:"Pharmacologie",present:false,appel:"na",punctual:false},
+  {id:"t4",name:"Dr. Touré",subject:"Microbiologie / TP",present:true,appel:"done",punctual:true},
+  {id:"t5",name:"M. Dembélé",subject:"Santé publique",present:true,appel:"pending",punctual:true},
+];
+const DAYS=["Lundi","Mardi","Mercredi","Jeudi","Vendredi"],ROWS=["08:00","10:00","14:00","16:00"],TODAY=0;
+let SCHED={},slotSeq=100,APPEL={};
+function getSched(){if(!SCHED[state.classId])SCHED[state.classId]=seedSched();return SCHED[state.classId];}
+function seedSched(){return[
+  {id:++slotSeq,day:0,start:"08:00",end:"10:00",ec:"anat",teacher:"t1",room:"Amphi A"},
+  {id:++slotSeq,day:0,start:"10:00",end:"12:00",ec:"soin",teacher:"t2",room:"Salle B2"},
+  {id:++slotSeq,day:0,start:"14:00",end:"16:00",ec:"phar",teacher:"t3",room:"Amphi C"},
+  {id:++slotSeq,day:1,start:"08:00",end:"10:00",ec:"micr",teacher:"t4",room:"Labo 1"},
+  {id:++slotSeq,day:2,start:"10:00",end:"12:00",ec:"sant",teacher:"t5",room:"Amphi A"},
+  {id:++slotSeq,day:3,start:"14:00",end:"16:00",ec:"labo",teacher:"t4",room:"Labo 2"},
+];}
+function rowIndex(s){const h=parseInt(s,10);return h<10?0:h<14?1:h<16?2:3;}
+function ecById(id){return ECS.find(e=>e.id===id)||{};}
+function teacherById(id){return(TEACHERS.find(t=>t.id===id)||{}).name||"—";}
+function todaySessions(){const r=getSched().filter(s=>s.day===TODAY).sort((a,b)=>a.start.localeCompare(b.start));r.forEach((s,i)=>{const k=state.classId+'_'+s.id;if(!(k in APPEL))APPEL[k]=i===0?'done':'pending';});return r;}
+function appelOf(s){return APPEL[state.classId+'_'+s.id];}
+function pendingCount(){return todaySessions().filter(s=>appelOf(s)==='pending').length;}
+
+let CASES=[
+  {id:1,type:"student",title:"Absences répétées non justifiées",who:"Ousmane Diarra",cls:"L2 Soins Infirmiers",sev:"bad",status:2,note:"4 absences sur 3 semaines. Parent injoignable au 1er appel."},
+  {id:2,type:"student",title:"Retards récurrents",who:"Rokia Diallo",cls:"L1 Soins Infirmiers",sev:"warn",status:1,note:"3 retards consécutifs en cours d'anatomie."},
+  {id:3,type:"teacher",title:"Retard répété à la prise de service",who:"Dr. Sissoko",cls:"Pharmacologie",sev:"warn",status:3,note:"Arrivées tardives signalées sur 2 semaines. Convocation prévue."},
+  {id:4,type:"student",title:"Altercation entre étudiants",who:"Modibo Coulibaly",cls:"L2 Soins Infirmiers",sev:"mute",status:4,note:"Résolu après médiation. Avertissement écrit classé."},
+];
+const CASE_STEPS=["Nouveau","En instruction","Convoqué","Résolu"];
+
+let state={section:"home",classId:"l1si",sessionId:null};
+let rosterCache={};
+
+/* ===================== NAVIGATION (instantanée) ===================== */
+const META={
+  home:{c:"Pilotage · Accueil",t:"Vue d'ensemble",l:"Pilotage des classes, du temps, des enseignants et de la discipline."},
+  classes:{c:"Pilotage · Classes",t:"Suivi des classes",l:"État d'assiduité et alertes par classe."},
+  cases:{c:"Pilotage · Discipline",t:"Cas à traiter",l:"Dossiers disciplinaires — étudiants et enseignants."},
+  attendance:{c:"Classe active · Assiduité",t:"Faire l'appel",l:"Si l'enseignant n'a pas fait l'appel, le surveillant le complète."},
+  schedule:{c:"Classe active · Emploi du temps",t:"Planifier la semaine",l:"Le surveillant construit l'emploi du temps hebdomadaire."},
+  courses:{c:"Classe active · Cours",t:"Cours & séances",l:"Séances programmées pour la classe."},
+  students:{c:"Classe active · Étudiants",t:"Étudiants de la classe",l:"Annuaire de la classe et historique individuel."},
+  teachers:{c:"Pilotage · Enseignants",t:"Suivi des enseignants",l:"Présence, ponctualité, appels faits et incidents."},
+};
+function loader(){const l=document.getElementById('topbar-loader');l.style.opacity=1;l.style.width='35%';setTimeout(()=>l.style.width='80%',60);setTimeout(()=>{l.style.width='100%';setTimeout(()=>{l.style.opacity=0;l.style.width='0'},220)},150);}
+function go(sec){
+  state.section=sec;
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.sec===sec));
+  const m=META[sec];
+  document.getElementById('crumb').textContent=m.c;document.getElementById('ptitle').textContent=m.t;document.getElementById('plede').textContent=m.l;
+  document.title="Surveillant Général — "+m.t+" · ESFé Core";
+  loader();
+  setTimeout(()=>{document.getElementById('workspace').innerHTML='<div class="panel">'+render(sec)+'</div>';},120);
+}
+function onClassChange(v){state.classId=v;state.sessionId=null;document.getElementById('pendingCount').textContent=pendingCount();toast("Classe active : "+CLASSES[v].label);go(state.section);}
+function render(sec){
+  switch(sec){
+    case"home":return panelHome();case"classes":return panelClasses();case"cases":return panelCases();
+    case"attendance":return panelAttendance();case"schedule":return panelSchedule();case"courses":return panelCourses();
+    case"students":return panelStudents();case"teachers":return panelTeachers();
+  }
+}
+
+/* ===================== ROSTER (filtré par classe active) ===================== */
+function seedStudents(classId,count){const arr=[];let s=count*7;const rnd=()=>{s=(s*9301+49297)%233280;return s/233280;};
+  for(let i=0;i<count;i++){const fn=FN[Math.floor(rnd()*FN.length)],ln=LN[Math.floor(rnd()*LN.length)];const r=rnd();let st=r>.86?"absent":r>.78?"retard":r>.72?"justifie":"present";
+    arr.push({id:classId+"-"+i,name:fn+" "+ln,mat:"E"+(2400+Math.floor(rnd()*600)),color:COLORS[i%COLORS.length],att:st,absences:Math.floor(rnd()*6),retards:Math.floor(rnd()*4)});}
+  return arr;}
+function getRoster(){if(!rosterCache[state.classId])rosterCache[state.classId]=seedStudents(state.classId,CLASSES[state.classId].n);return rosterCache[state.classId];}
+function initials(n){return n.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();}
+
+/* ===================== ACCUEIL ===================== */
+function panelHome(){
+  const pend=pendingCount();
+  const stats=[
+    {k:"Présence aujourd'hui",v:"91%",d:"+3 pts vs hier",c:"var(--ok)"},
+    {k:"Appels en attente",v:pend,d:CLASSES[state.classId].label,c:"var(--warn)"},
+    {k:"Enseignants absents",v:TEACHERS.filter(t=>!t.present).length,d:"aujourd'hui",c:"var(--bad)"},
+    {k:"Cas ouverts",v:openCases(),d:"étudiants + enseignants",c:"var(--info)"},
+  ];
+  const cards=stats.map(s=>`<div class="stat"><div class="k"><span class="dot" style="background:${s.c}"></span>${s.k}</div><div class="v">${s.v}</div><div class="d">${s.d}</div></div>`).join("");
+  const alerts=[
+    {t:"Appel non fait par Mme Diallo — Soins fondamentaux (10h)",c:"warn",f:()=>go('attendance')},
+    {t:"Dr. Sissoko absent — Pharmacologie (14h)",c:"bad",f:()=>go('teachers')},
+    {t:"7 absences non justifiées en L2 Soins Infirmiers",c:"bad",f:()=>{document.getElementById('classSel').value='l2si';onClassChange('l2si');}},
+  ];
+  window.ALERTS=alerts.map(a=>a.f);
+  const arows=alerts.map((a,i)=>`<div class="row clickable" onclick="ALERTS[${i}]()"><span class="dot" style="background:var(--${a.c})"></span><div class="main"><b>${a.t}</b></div><span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span></div>`).join("");
+  const sess=todaySessions().map(s=>{const ec=ecById(s.ec),done=appelOf(s)==='done';
+    return `<div class="row clickable" onclick="go('attendance')"><div class="pic" style="background:var(--bg);color:var(--ink-2)">${s.start}</div><div class="main"><b>${ec.title}</b><span>${teacherById(s.teacher)} · ${s.room}</span></div><span class="tail"><span class="chip ${done?'ok':'warn'}">${done?'Appel fait':'À faire'}</span></span></div>`;}).join("");
+  return `<div class="grid cards-4" style="margin-bottom:16px">${cards}</div>
+    <div class="grid cards-2">
+      <div class="card"><div class="card-h"><h3>Alertes du jour</h3><span class="hint">cliquez pour traiter</span></div><div class="card-b">${arows}</div></div>
+      <div class="card"><div class="card-h"><h3>Séances du jour — ${CLASSES[state.classId].label}</h3><span class="src-badge">⤿ Académique</span></div><div class="card-b">${sess}</div></div>
+    </div>`;
+}
+
+/* ===================== CLASSES ===================== */
+function panelClasses(){
+  const rows=Object.entries(CLASSES).map(([id,c],idx)=>{const cls=c.pres>=95?"ok":c.pres>=88?"warn":"bad";
+    return `<div class="row clickable" onclick="openClass('${id}')"><div class="pic" style="background:${COLORS[idx%COLORS.length]}">${c.label.split(' ')[0]}</div><div class="main"><b>${c.label}</b><span>${c.n} étudiants</span></div><span class="tail"><span class="chip ${cls}">${c.pres}% présence</span><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span></div>`;}).join("");
+  return `<div class="card"><div class="card-h"><h3>Classes — Annexe Hamdallaye</h3><span class="hint">${Object.keys(CLASSES).length} classes</span></div><div class="card-b">${rows}</div></div>`;
+}
+
+/* ===================== ASSIDUITÉ (par séance + statut appel) ===================== */
+function panelAttendance(){
+  const sess=todaySessions();
+  if(!state.sessionId||!sess.find(s=>s.id===state.sessionId))state.sessionId=sess.length?sess[0].id:null;
+  const strip=sess.map(s=>{const ec=ecById(s.ec),done=appelOf(s)==='done',act=s.id===state.sessionId;
+    return `<button class="sess-chip ${act?'active':''}" onclick="pickSession(${s.id})"><div class="t">${s.start} · ${ec.title}</div><div class="s">${teacherById(s.teacher)} · ${s.room}</div><span class="chip ${done?'ok':'warn'}">${done?'Appel fait':'À faire'}</span></button>`;}).join("");
+  const cur=sess.find(s=>s.id===state.sessionId);
+  let banner="",roster="";
+  if(cur){const done=appelOf(cur)==='done';
+    banner=done
+      ?`<div class="banner ok"><svg class="i" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/></svg> Appel déjà fait par ${teacherById(cur.teacher)}. Vous pouvez le corriger si besoin.</div>`
+      :`<div class="banner warn"><svg class="i" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg> ${teacherById(cur.teacher)} n'a pas encore fait l'appel — vous pouvez le faire à sa place.</div>`;
+    const r=getRoster();
+    const rows=r.map(st=>`<div class="row"><div class="pic" style="background:${st.color}">${initials(st.name)}</div><div class="main"><b>${st.name}</b><span>${st.mat}</span></div><span class="tail"><button class="att-state att-${st.att}" id="btn-${st.id}" onclick="cycleAtt('${st.id}')">${ATT_LABEL[st.att]}</button></span></div>`).join("");
+    roster=`<div class="toolbar"><div class="counts" id="attCounts">${attCounts(r)}</div><button class="btn ghost" onclick="markAll('present')">Tout présent</button><button class="btn primary" style="margin-left:auto" onclick="validateAppel(${cur.id})">Valider l'appel</button></div>
+      <div class="card"><div class="card-h"><h3>${ecById(cur.ec).title} — ${CLASSES[state.classId].label}</h3><span class="hint">cliquez l'état pour le changer</span></div><div class="card-b">${rows}</div></div>`;
+  } else { roster=`<div class="card"><div class="empty"><div class="ico"><svg class="i" style="width:24px;height:24px;color:var(--ink-3)" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div><h4>Aucune séance aujourd'hui</h4><p>Cette classe n'a pas de cours programmé aujourd'hui. Planifiez via l'emploi du temps.</p><button class="btn primary" onclick="go('schedule')">Aller à l'emploi du temps</button></div></div>`; }
+  return `<div class="sess-strip">${strip||'<span class="chip mute">Aucune séance ce jour</span>'}</div>${banner}${roster}`;
+}
+function pickSession(id){state.sessionId=id;go('attendance');}
+function attCounts(r){const c={present:0,retard:0,absent:0,justifie:0};r.forEach(s=>c[s.att]++);return `<span class="chip ok">${c.present} présents</span><span class="chip warn">${c.retard} retards</span><span class="chip bad">${c.absent} absents</span><span class="chip info">${c.justifie} justifiés</span>`;}
+function cycleAtt(id){const r=getRoster(),st=r.find(x=>x.id===id);st.att=ATT[(ATT.indexOf(st.att)+1)%ATT.length];const b=document.getElementById('btn-'+id);b.className="att-state att-"+st.att;b.textContent=ATT_LABEL[st.att];document.getElementById('attCounts').innerHTML=attCounts(r);}
+function markAll(s){getRoster().forEach(x=>x.att=s);go('attendance');toast("Tous marqués : "+ATT_LABEL[s]);}
+function validateAppel(id){APPEL[state.classId+'_'+id]='done';document.getElementById('pendingCount').textContent=pendingCount();go('attendance');toast("Appel validé ✓ (par le surveillant)");}
+
+/* ===================== EMPLOI DU TEMPS (planifié) ===================== */
+function panelSchedule(){
+  const slots=getSched(),cells={};slots.forEach(s=>cells[s.day+'_'+rowIndex(s.start)]=s);
+  let body="";
+  ROWS.forEach((t,ri)=>{body+=`<tr><td class="time">${t}</td>`;
+    for(let d=0;d<5;d++){const s=cells[d+'_'+ri];
+      body+= s?`<td><div class="slot ${ecById(s.ec).color}" onclick="openSlotForm(${s.id})">${ecById(s.ec).title}<small>${s.start}–${s.end} · ${s.room||'—'}</small><small>${teacherById(s.teacher)}</small></div></td>`
+              :`<td><button class="cell-add" onclick="openSlotForm(null,${d},${ri})" title="Planifier">+</button></td>`;}
+    body+="</tr>";});
+  return `<div class="toolbar"><span class="src-badge">⤿ Matières &amp; enseignants : Académique</span><button class="btn primary" style="margin-left:auto" onclick="openSlotForm()">+ Planifier un créneau</button></div>
+    <div class="card"><div class="card-h"><h3>Emploi du temps — ${CLASSES[state.classId].label}</h3><span class="hint">cliquez un créneau pour le modifier · « + » pour planifier</span></div>
+    <div style="padding:14px"><table class="sched"><thead><tr><th>Horaire</th>${DAYS.map(d=>`<th>${d}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div></div>`;
+}
+function openSlotForm(id,pd,pr){
+  const ed=id!=null&&id!==undefined;
+  const s=ed?getSched().find(x=>x.id===id):{day:(pd??0),start:(pr!=null?ROWS[pr]:"08:00"),end:"10:00",ec:"",teacher:"",room:""};
+  document.getElementById('drawerKicker').textContent=ed?"Modifier le créneau":"Nouveau créneau";
+  document.getElementById('drawerTitle').textContent=CLASSES[state.classId].label;
+  document.getElementById('drawerBody').innerHTML=`
+    <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:16px">Modèle hebdomadaire · récurrence par jour.</p>
+    <label class="f-l">Jour</label><select id="f_day" class="f-i">${DAYS.map((d,i)=>`<option value="${i}" ${s.day==i?'selected':''}>${d}</option>`).join("")}</select>
+    <div style="display:flex;gap:10px"><div style="flex:1"><label class="f-l">Début</label><input id="f_start" type="time" class="f-i" value="${s.start}"></div><div style="flex:1"><label class="f-l">Fin</label><input id="f_end" type="time" class="f-i" value="${s.end}"></div></div>
+    <label class="f-l">Matière (EC)</label><select id="f_ec" class="f-i"><option value="">Choisir…</option>${ECS.map(e=>`<option value="${e.id}" ${s.ec===e.id?'selected':''}>${e.code} — ${e.title}</option>`).join("")}</select>
+    <label class="f-l">Enseignant</label><select id="f_teacher" class="f-i"><option value="">Choisir…</option>${TEACHERS.map(t=>`<option value="${t.id}" ${s.teacher===t.id?'selected':''}>${t.name}</option>`).join("")}</select>
+    <label class="f-l">Salle</label><input id="f_room" type="text" class="f-i" placeholder="Ex : Amphi A" value="${s.room||''}">
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap">${ed?`<button class="btn" style="color:var(--bad);border-color:#f6c8d2;margin-right:auto" onclick="deleteSlot(${id})">Supprimer</button>`:''}<button class="btn" onclick="closeDrawer()">Annuler</button><button class="btn primary" onclick="saveSlot(${ed?id:null})">${ed?'Enregistrer':'Créer le créneau'}</button></div>`;
+  openDrawer();
+}
+function saveSlot(id){const ec=document.getElementById('f_ec').value,teacher=document.getElementById('f_teacher').value;if(!ec||!teacher){toast("Choisissez la matière et l'enseignant",'warn');return;}
+  const data={day:+document.getElementById('f_day').value,start:document.getElementById('f_start').value,end:document.getElementById('f_end').value,ec,teacher,room:document.getElementById('f_room').value};
+  const arr=getSched();if(id!=null){Object.assign(arr.find(x=>x.id===id),data);toast("Créneau modifié ✓");}else{arr.push(Object.assign({id:++slotSeq},data));toast("Créneau planifié ✓");}
+  closeDrawer();go('schedule');}
+function deleteSlot(id){const arr=getSched(),i=arr.findIndex(x=>x.id===id);if(i>-1)arr.splice(i,1);closeDrawer();go('schedule');toast("Créneau supprimé");}
+
+/* ===================== COURS ===================== */
+function panelCourses(){
+  const rows=ECS.slice(0,5).map(e=>`<div class="row"><div class="pic ${e.color}" style="color:#1746b3">${e.code.slice(0,2)}</div><div class="main"><b>${e.title}</b><span>${e.code}</span></div><span class="tail"><span class="chip mute">${20+Math.floor(Math.random()*30)} h</span></span></div>`).join("");
+  return `<div class="card"><div class="card-h"><h3>Cours — ${CLASSES[state.classId].label}</h3><span class="src-badge">⤿ Académique</span></div><div class="card-b">${rows}</div></div>`;
+}
+
+/* ===================== ÉTUDIANTS (de la classe active) ===================== */
+function panelStudents(){
+  const r=getRoster();
+  const rows=r.map(st=>`<div class="row clickable" data-name="${st.name.toLowerCase()}" onclick="openStudent('${st.id}')"><div class="pic" style="background:${st.color}">${initials(st.name)}</div><div class="main"><b>${st.name}</b><span>${st.mat}</span></div><span class="tail">${st.absences>=3?`<span class="chip bad">${st.absences} abs.</span>`:st.absences>0?`<span class="chip warn">${st.absences} abs.</span>`:`<span class="chip ok">assidu</span>`}<svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span></div>`).join("");
+  return `<div class="toolbar"><div class="search"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Rechercher dans la classe…" oninput="filterStudents(this.value)"></div></div>
+    <div class="card"><div class="card-h"><h3>${CLASSES[state.classId].label}</h3><span class="hint">${r.length} étudiants</span></div><div class="card-b" id="studentList">${rows}</div></div>`;
+}
+function filterStudents(q){q=q.toLowerCase();document.querySelectorAll('#studentList .row').forEach(r=>r.classList.toggle('hide',!r.dataset.name.includes(q)));}
+
+/* ===================== ENSEIGNANTS ===================== */
+function panelTeachers(){
+  const rows=TEACHERS.map(t=>{const pres=t.present?(t.punctual?'<span class="chip ok">Présent</span>':'<span class="chip warn">Présent (en retard)</span>'):'<span class="chip bad">Absent</span>';
+    const ap=t.appel==='done'?'<span class="chip ok">Appel fait</span>':t.appel==='pending'?'<span class="chip warn">Appel à faire</span>':'<span class="chip mute">—</span>';
+    return `<div class="row clickable" onclick="openTeacher('${t.id}')"><div class="pic" style="background:#334155">${t.name.split(' ').slice(-1)[0].slice(0,2).toUpperCase()}</div><div class="main"><b>${t.name}</b><span>${t.subject}</span></div><span class="tail">${pres}${ap}<svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span></div>`;}).join("");
+  return `<div class="grid cards-3" style="margin-bottom:16px">
+      <div class="stat"><div class="k"><span class="dot" style="background:var(--ok)"></span>Présents</div><div class="v">${TEACHERS.filter(t=>t.present).length}/${TEACHERS.length}</div></div>
+      <div class="stat"><div class="k"><span class="dot" style="background:var(--warn)"></span>Appels à faire</div><div class="v">${TEACHERS.filter(t=>t.appel==='pending').length}</div></div>
+      <div class="stat"><div class="k"><span class="dot" style="background:var(--bad)"></span>Absents</div><div class="v">${TEACHERS.filter(t=>!t.present).length}</div></div>
+    </div>
+    <div class="card"><div class="card-h"><h3>Enseignants — aujourd'hui</h3><span class="src-badge">⤿ Académique</span></div><div class="card-b">${rows}</div></div>`;
+}
+function openTeacher(id){
+  const t=TEACHERS.find(x=>x.id===id);
+  document.getElementById('drawerKicker').textContent="Enseignant";
+  document.getElementById('drawerTitle').textContent=t.name;
+  document.getElementById('drawerBody').innerHTML=`
+    <div class="kv"><span>Matière</span><b>${t.subject}</b></div>
+    <div class="kv"><span>Présence</span><b><span class="chip ${t.present?'ok':'bad'}">${t.present?'Présent':'Absent'}</span></b></div>
+    <div class="kv"><span>Ponctualité</span><b>${t.punctual?'À l’heure':'En retard'}</b></div>
+    <div class="kv"><span>Appel de sa séance</span><b><span class="chip ${t.appel==='done'?'ok':t.appel==='pending'?'warn':'mute'}">${t.appel==='done'?'Fait':t.appel==='pending'?'À faire':'—'}</span></b></div>
+    <div class="sec-title">Actions du surveillant</div>
+    <button class="btn ${t.present?'':''}" style="width:100%;justify-content:center;margin-bottom:10px" onclick="toggleTeacherPresence('${t.id}')">${t.present?'Marquer absent':'Marquer présent'}</button>
+    ${!t.present?`<button class="btn primary" style="width:100%;justify-content:center;margin-bottom:10px" onclick="openReplacement('${t.id}')">Affecter un remplaçant</button>`:''}
+    ${t.appel==='pending'?`<button class="btn" style="width:100%;justify-content:center;margin-bottom:10px" onclick="toast('Relance envoyée à '+'${t.name}')">Relancer pour l'appel</button>`:''}
+    <button class="btn" style="width:100%;justify-content:center;margin-bottom:10px" onclick="signalTeacher('${t.id}')">Signaler un incident</button>
+    <button class="btn" style="width:100%;justify-content:center" onclick="openConvocation('${t.name}','${t.subject}','teacher')">Convoquer l'enseignant</button>`;
+  openDrawer();
+}
+function toggleTeacherPresence(id){const t=TEACHERS.find(x=>x.id===id);t.present=!t.present;if(!t.present)t.appel='na';openTeacher(id);if(state.section==='teachers')go('teachers');toast(t.name+(t.present?' marqué présent':' marqué absent'));}
+function signalTeacher(id){const t=TEACHERS.find(x=>x.id===id);CASES.unshift({id:Date.now(),type:"teacher",title:"Incident signalé",who:t.name,cls:t.subject,sev:"warn",status:1,note:"Signalement créé depuis le suivi des enseignants."});document.getElementById('casesCount').textContent=openCases();toast("Incident enregistré ✓");closeDrawer();}
+
+/* ===================== CAS (étudiants + enseignants) ===================== */
+function openCases(){return CASES.filter(c=>c.status<4).length;}
+function panelCases(){
+  const rows=CASES.map(c=>`<div class="row clickable" onclick="openCase(${c.id})"><span class="dot" style="background:var(--${c.sev==='bad'?'bad':c.sev==='warn'?'warn':'ink-3'})"></span><div class="main"><b>${c.title}</b><span>${c.who} · ${c.cls}</span></div><span class="tail"><span class="chip ${c.type==='teacher'?'info':'mute'}">${c.type==='teacher'?'Enseignant':'Étudiant'}</span><span class="chip ${c.status===4?'ok':c.status>=3?'info':c.status>=2?'warn':'mute'}">${CASE_STEPS[c.status-1]}</span><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span></div>`).join("");
+  return `<div class="toolbar"><span class="chip mute">${CASES.filter(c=>c.type==='student').length} étudiants</span><span class="chip info">${CASES.filter(c=>c.type==='teacher').length} enseignants</span><span class="chip warn" style="margin-left:auto">${openCases()} ouverts</span></div>
+    <div class="card"><div class="card-h"><h3>Dossiers disciplinaires</h3><span class="hint">${CASES.length} au total</span></div><div class="card-b">${rows}</div></div>`;
+}
+function openCase(id){
+  const c=CASES.find(x=>x.id===id);
+  document.getElementById('drawerKicker').textContent=(c.type==='teacher'?'Dossier enseignant':'Dossier étudiant');
+  document.getElementById('drawerTitle').textContent=c.title;
+  document.getElementById('drawerBody').innerHTML=`
+    <div class="flow">${CASE_STEPS.map((s,i)=>{const idx=i+1,cls=idx<c.status?'done':idx===c.status?'current':'';return `${i>0?`<div class="line ${idx<=c.status?'done':''}"></div>`:''}<div class="step ${cls}"><div class="b">${idx<c.status?'✓':idx}</div></div>`;}).join("")}</div>
+    <div style="display:flex;gap:8px;margin:14px 0 4px"><span class="chip ${c.type==='teacher'?'info':'mute'}">${c.type==='teacher'?'Enseignant':'Étudiant'}</span><span class="chip ${c.sev==='bad'?'bad':c.sev==='warn'?'warn':'mute'}">${c.sev==='bad'?'Grave':c.sev==='warn'?'Modéré':'Clos'}</span><span class="chip mute">${CASE_STEPS[c.status-1]}</span></div>
+    <div class="kv"><span>Concerné</span><b>${c.who}</b></div><div class="kv"><span>${c.type==='teacher'?'Matière':'Classe'}</span><b>${c.cls}</b></div>
+    <div class="sec-title">Note</div><p style="font-size:13px;color:var(--ink-2);line-height:1.55">${c.note}</p>
+    <div class="sec-title">Faire avancer</div>
+    ${c.status<4?`<button class="btn primary" style="width:100%;justify-content:center;margin-bottom:10px" onclick="advanceCase(${c.id})">Passer à : ${CASE_STEPS[c.status]}</button>${c.type==='teacher'?`<button class="btn" style="width:100%;justify-content:center" onclick="openConvocation('${c.who}','${c.cls}','teacher')">Convoquer l'enseignant</button>`:`<button class="btn" style="width:100%;justify-content:center" onclick="openConvocation('${c.who}','${c.cls}')">Convoquer (étudiant / parents)</button>`}`:`<p style="color:var(--ok);font-weight:700;font-size:13px">✓ Dossier résolu et classé.</p>`}`;
+  openDrawer();
+}
+function advanceCase(id){const c=CASES.find(x=>x.id===id);if(c.status<4)c.status++;document.getElementById('casesCount').textContent=openCases();openCase(id);if(state.section==='cases')go('cases');toast("Dossier : "+CASE_STEPS[c.status-1]);}
+
+/* ===================== DRAWERS communs ===================== */
+function openDrawer(){document.getElementById('drawer').classList.add('open');document.getElementById('scrim').classList.add('open');document.getElementById('drawer').setAttribute('aria-hidden','false');}
+function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('scrim').classList.remove('open');document.getElementById('drawer').setAttribute('aria-hidden','true');}
+function openClass(id){const c=CLASSES[id];
+  document.getElementById('drawerKicker').textContent="Classe";document.getElementById('drawerTitle').textContent=c.label;
+  document.getElementById('drawerBody').innerHTML=`
+    <div class="kv"><span>Effectif</span><b>${c.n} étudiants</b></div><div class="kv"><span>Présence (7 j.)</span><b>${c.pres}%</b></div>
+    <div class="kv"><span>Absences à justifier</span><b>${Math.round(c.n*(100-c.pres)/100)}</b></div>
+    <div class="sec-title">Actions</div>
+    <button class="btn primary" style="width:100%;justify-content:center;margin-bottom:10px" onclick="document.getElementById('classSel').value='${id}';onClassChange('${id}');closeDrawer();go('attendance')">Faire l'appel de cette classe</button>
+    <button class="btn" style="width:100%;justify-content:center" onclick="document.getElementById('classSel').value='${id}';onClassChange('${id}');closeDrawer();go('students')">Voir les étudiants</button>`;
+  openDrawer();}
+function openStudent(id){const st=getRoster().find(x=>x.id===id),rel=CASES.filter(c=>c.who===st.name);
+  document.getElementById('drawerKicker').textContent="Étudiant";document.getElementById('drawerTitle').textContent=st.name;
+  document.getElementById('drawerBody').innerHTML=`
+    <div style="display:flex;align-items:center;gap:13px;margin-bottom:8px"><div class="pic" style="width:50px;height:50px;font-size:16px;background:${st.color}">${initials(st.name)}</div><div><b style="font-size:15px">${st.name}</b><div style="color:var(--ink-3);font-size:12.5px">${st.mat} · ${CLASSES[state.classId].label}</div></div></div>
+    <div class="kv"><span>État du jour</span><b><span class="chip ${st.att==='present'?'ok':st.att==='absent'?'bad':st.att==='retard'?'warn':'info'}">${ATT_LABEL[st.att]}</span></b></div>
+    <div class="kv"><span>Absences cumulées</span><b>${st.absences}</b></div><div class="kv"><span>Retards cumulés</span><b>${st.retards}</b></div>
+    <div class="sec-title">Dossiers liés</div>
+    ${rel.length?rel.map(c=>`<div class="row" style="padding:10px 0;border-bottom:1px dashed var(--line)"><div class="main"><b style="font-size:13px">${c.title}</b><span>${CASE_STEPS[c.status-1]}</span></div></div>`).join(""):`<p style="color:var(--ink-3);font-size:13px">Aucun dossier disciplinaire.</p>`}
+    <div class="sec-title">Actions</div>
+    <button class="btn primary" style="width:100%;justify-content:center;margin-bottom:10px" onclick="openConvocation('${st.name}','${CLASSES[state.classId].label}')">Convoquer (étudiant / parents)</button>
+    <button class="btn" style="width:100%;justify-content:center" onclick="toast('Dossier ouvert (simulé)');closeDrawer()">Ouvrir un dossier disciplinaire</button>`;
+  openDrawer();}
+function openConvocation(name,ctx,kind){
+  const isTeacher=kind==='teacher';
+  document.getElementById('drawerKicker').textContent="Convocation";document.getElementById('drawerTitle').textContent=name;
+  const dest=isTeacher?'':`<label class="f-l">Destinataire</label><div class="seg"><button class="seg-b active" onclick="segPick(this)">L'étudiant</button><button class="seg-b" onclick="segPick(this)">Les parents</button><button class="seg-b" onclick="segPick(this)">Les deux</button></div>`;
+  const motifs=isTeacher?['Retards à la prise de service','Absences','Manquement pédagogique','Entretien','Autre']:['Absences répétées','Retards récurrents','Comportement','Tenue / stage non conforme','Autre'];
+  document.getElementById('drawerBody').innerHTML=`
+    <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:16px">${ctx}</p>
+    ${dest}
+    <label class="f-l">Motif</label><select class="f-i">${motifs.map(m=>`<option>${m}</option>`).join('')}</select>
+    <div style="display:flex;gap:10px"><div style="flex:1"><label class="f-l">Date</label><input type="date" class="f-i" value="2026-06-23"></div><div style="flex:1"><label class="f-l">Heure</label><input type="time" class="f-i" value="10:00"></div></div>
+    <label class="f-l">Canal</label><select class="f-i"><option>SMS</option><option>Appel téléphonique</option><option>E-mail</option><option>Courrier remis</option></select>
+    <label class="f-l">Message</label><textarea class="f-i" rows="3" placeholder="Précisez l'objet de la convocation…"></textarea>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px"><button class="btn" onclick="closeDrawer()">Annuler</button><button class="btn primary" onclick="closeDrawer();toast('Convocation envoyée ✓')">Envoyer la convocation</button></div>`;
+  openDrawer();}
+function openReplacement(id){
+  const t=TEACHERS.find(x=>x.id===id),others=TEACHERS.filter(x=>x.id!==id&&x.present);
+  document.getElementById('drawerKicker').textContent="Remplacement";document.getElementById('drawerTitle').textContent="Absence — "+t.name;
+  document.getElementById('drawerBody').innerHTML=`
+    <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:16px">${t.subject}</p>
+    <div class="banner warn"><svg class="i" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg> Enseignant absent : la séance doit être couverte. La rémunération de la séance sera réaffectée au remplaçant.</div>
+    <label class="f-l">Enseignant remplaçant</label><select class="f-i"><option value="">Choisir…</option>${others.map(o=>`<option>${o.name} — ${o.subject}</option>`).join('')}</select>
+    <label class="f-l">Séance concernée</label><input class="f-i" type="text" value="${t.subject}">
+    <label class="f-l">Note</label><textarea class="f-i" rows="2" placeholder="Précisions sur le remplacement…"></textarea>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px"><button class="btn" onclick="closeDrawer()">Annuler</button><button class="btn primary" onclick="closeDrawer();toast('Remplaçant affecté ✓')">Affecter le remplaçant</button></div>`;
+  openDrawer();}
+function segPick(b){b.parentNode.querySelectorAll('.seg-b').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
+
+/* ===================== UTILS ===================== */
+function toast(msg,type){const el=document.createElement('div');el.className="toast";el.innerHTML=`<span class="tdot" style="background:${type==='warn'?'var(--warn)':'var(--ok)'}"></span>${msg}`;document.getElementById('toasts').appendChild(el);setTimeout(()=>{el.style.opacity=0;el.style.transform='translateY(8px)';setTimeout(()=>el.remove(),300)},2600);}
+
+/* boot */
+document.getElementById('pendingCount').textContent=pendingCount();
+go('home');
+</script>
+</body>
+</html>

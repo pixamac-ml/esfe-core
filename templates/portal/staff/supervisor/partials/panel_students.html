@@ -1,0 +1,53 @@
+{% load component_tags %}
+<div id="sg-students">
+  <div class="toolbar">
+    <div class="search">
+      <svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <form hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}"
+            hx-target="#supervisor-workspace" hx-push-url="true"
+            hx-trigger="submit, keyup changed delay:250ms from:input[name='q']" style="flex:1">
+        <input type="hidden" name="section" value="students">
+        <input type="hidden" name="class_id" value="{{ selected_class.id }}">
+        <input type="search" name="q" value="{{ student_query }}" placeholder="Rechercher dans la classe…">
+      </form>
+    </div>
+  </div>
+
+  <div class="grid cards-4" style="margin-bottom:16px">
+    <div class="stat">
+      <div class="k">Effectif</div>
+      <div class="v">{% if students_total_count is not None %}{{ students_total_count }}{% else %}{{ students_list|length }}{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="k"><span class="dot" style="background:var(--ok)"></span>Présents aujourd'hui</div>
+      <div class="v" style="color:var(--ok)">{{ students_present_today|default:0 }}</div>
+    </div>
+    <div class="stat">
+      <div class="k"><span class="dot" style="background:var(--bad)"></span>Absents</div>
+      <div class="v" style="color:var(--bad)">{{ students_absent_today|default:0 }}</div>
+    </div>
+    <div class="stat">
+      <div class="k"><span class="dot" style="background:var(--warn)"></span>Retards</div>
+      <div class="v" style="color:var(--warn)">{{ students_late_today|default:0 }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>{{ selected_class.display_name }}</h3><span class="hint">{{ students_list|length }} étudiant(s)</span></div>
+    <div class="card-b">
+      {% for student in students_list %}
+        <div class="row clickable"
+             hx-get="{% url 'accounts_portal:supervisor_student_drawer' %}?student_id={{ student.id }}&class_id={{ selected_class.id }}"
+             hx-target="#supervisor-drawer-content">
+          <div class="pic" style="background:#3d4f63">{{ student.full_name|slice:":2"|upper }}</div>
+          <div class="main"><b>{{ student.full_name }}</b><span>{{ student.matricule }}</span></div>
+          <span class="tail">
+            <svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </span>
+        </div>
+      {% empty %}
+        {% component "empty_state" icon="users" title="Aucun étudiant" message="Aucun étudiant trouvé." %}{% endcomponent %}
+      {% endfor %}
+    </div>
+  </div>
+</div>

@@ -1,10 +1,5 @@
-{% extends "base.html" %}
+{% extends "base_app.html" %}
 {% load humanize %}
-
-{% block public_navbar %}{% endblock %}
-{% block public_footer %}{% endblock %}
-{% block public_floating_widget %}{% endblock %}
-{% block public_cookie_consent %}{% endblock %}
 
 {% block title %}Dashboard Gestionnaire{% endblock %}
 
@@ -202,7 +197,7 @@
       </div>
     </div>
 
-    <div class="dg-sidebar-scroll">
+    <div class="dg-sidebar-scroll" hx-boost="true">
       <div class="dg-cluster-label">Pilotage</div>
       <a href="?section=overview" class="dg-link {% if active_section == 'overview' %}active{% endif %}">
         <i class="fa-solid fa-home w-4 text-center"></i><span>Vue globale</span>
@@ -245,7 +240,7 @@
       <a href="?section=cloture" class="dg-link {% if active_section == 'cloture' %}active{% endif %}">
         <i class="fa-solid fa-lock w-4 text-center"></i><span>Cloture</span>
       </a>
-      <a href="{% url 'accounts_portal:reenrollment_workspace' %}" class="dg-link">
+      <a href="{% url 'accounts_portal:reenrollment_workspace' %}" class="dg-link" hx-boost="false">
         <i class="fa-solid fa-arrows-rotate w-4 text-center"></i><span>Passages & reinscriptions</span>
       </a>
     </div>
@@ -261,7 +256,7 @@
   </aside>
 
   <main class="dg-main">
-    <header class="dg-topbar">
+    <header class="dg-topbar" hx-boost="true">
       <div class="dg-topbar-left">
         <button type="button" class="dg-btn-icon" onclick="managerToggleSidebar()"><i class="fa-solid fa-bars-staggered"></i></button>
         <div style="min-width:0;">
@@ -301,7 +296,7 @@
     </header>
 
     <div class="dg-scroll-area">
-      <div class="dg-content-wrap">
+      <div class="dg-content-wrap" id="dg-app-main" hx-boost="true">
         {% include "accounts/dashboard/partials/widget_scope_bar.html" %}
 
         <div class="dg-nav-tabs">
@@ -362,6 +357,7 @@
                   <div class="text-slate-500">{{ item.inscription.candidature.full_name }} - {{ item.amount|intcomma }} FCFA</div>
                   <a href="{% url 'inscriptions:public_detail' item.inscription.public_token %}"
                      target="_blank"
+                     hx-boost="false"
                      rel="noopener noreferrer"
                      class="inline-flex items-center gap-1 text-xs font-mono text-blue-600 hover:text-blue-700 hover:underline">
                     {{ item.inscription.public_token }}
@@ -529,7 +525,7 @@
           <div class="dg-row-2">
             <div class="dg-panel">
               <div class="dg-panel-title">Filtre</div>
-              <form method="get" class="dg-action-grid" style="grid-template-columns:1fr 1fr 1fr;">
+              <form method="get" class="dg-action-grid" style="grid-template-columns:1fr 1fr 1fr;" hx-target="#candidatures-results" hx-select="#candidatures-results" hx-swap="outerHTML">
                 <input type="hidden" name="section" value="candidatures">
                 <select class="dg-filter" name="cand_status" style="width:100%;">
                   <option value="">Tous les statuts</option>
@@ -564,6 +560,7 @@
             </div>
           </div>
 
+          <div id="candidatures-results">
           <div class="dg-table-wrap" style="margin-top:16px;">
             <table class="dg-table">
               <thead>
@@ -610,9 +607,10 @@
             </table>
           </div>
           <div class="dg-pagination">
-            <div>{% if candidatures.has_previous %}<a href="?section=candidatures&cand_page={{ candidatures.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">← Précédent</a>{% endif %}</div>
+            <div>{% if candidatures.has_previous %}<a href="?section=candidatures&cand_page={{ candidatures.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#candidatures-results" hx-select="#candidatures-results" hx-swap="outerHTML">← Précédent</a>{% endif %}</div>
             <div class="dg-pagination-info">Page {{ candidatures.number }}/{{ candidatures.paginator.num_pages }} · {{ candidatures.paginator.count }} candidatures</div>
-            <div>{% if candidatures.has_next %}<a href="?section=candidatures&cand_page={{ candidatures.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">Suivant →</a>{% endif %}</div>
+            <div>{% if candidatures.has_next %}<a href="?section=candidatures&cand_page={{ candidatures.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#candidatures-results" hx-select="#candidatures-results" hx-swap="outerHTML">Suivant →</a>{% endif %}</div>
+          </div>
           </div>
         </section>
         {% endif %}
@@ -639,7 +637,7 @@
             <div class="dg-kpi-card" style="min-height:auto; border-top:3px solid #2563eb;"><div class="dg-kpi-label" style="color:#2563eb;">Creees</div><div class="dg-kpi-value">{{ inscription_stats.created }}</div><div class="dg-kpi-detail">A finaliser</div></div>
           </div>
 
-          <form method="get" class="dg-filter-bar">
+          <form method="get" class="dg-filter-bar" hx-target="#inscriptions-results" hx-select="#inscriptions-results" hx-swap="outerHTML">
             <input type="hidden" name="section" value="inscriptions">
             <select name="ins_status" class="dg-filter-input">
               <option value="">Tous les statuts</option>
@@ -652,6 +650,7 @@
             <button class="dg-btn dg-btn-primary" type="submit" style="height:36px;">Filtrer</button>
           </form>
 
+          <div id="inscriptions-results">
           <div class="dg-table-wrap">
             <table class="dg-table">
               <thead><tr><th>Etudiant</th><th>Token</th><th>Statut</th><th>Solde</th><th>Actions</th></tr></thead>
@@ -662,6 +661,7 @@
                   <td>
                     <a href="{% url 'inscriptions:public_detail' item.public_token %}"
                        target="_blank"
+                       hx-boost="false"
                        rel="noopener noreferrer"
                        style="font-family:monospace; color:#2563eb; text-decoration:none;">
                       {{ item.public_token }}
@@ -682,9 +682,10 @@
             </table>
           </div>
           <div class="dg-pagination">
-            <div>{% if inscriptions.has_previous %}<a href="?section=inscriptions&ins_page={{ inscriptions.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">← Précédent</a>{% endif %}</div>
+            <div>{% if inscriptions.has_previous %}<a href="?section=inscriptions&ins_page={{ inscriptions.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#inscriptions-results" hx-select="#inscriptions-results" hx-swap="outerHTML">← Précédent</a>{% endif %}</div>
             <div class="dg-pagination-info">Page {{ inscriptions.number }}/{{ inscriptions.paginator.num_pages }} · {{ inscriptions.paginator.count }} inscriptions</div>
-            <div>{% if inscriptions.has_next %}<a href="?section=inscriptions&ins_page={{ inscriptions.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">Suivant →</a>{% endif %}</div>
+            <div>{% if inscriptions.has_next %}<a href="?section=inscriptions&ins_page={{ inscriptions.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#inscriptions-results" hx-select="#inscriptions-results" hx-swap="outerHTML">Suivant →</a>{% endif %}</div>
+          </div>
           </div>
         </section>
         {% endif %}
@@ -751,7 +752,7 @@
             </div>
           </div>
 
-          <form method="get" class="dg-filter-bar">
+          <form method="get" class="dg-filter-bar" hx-target="#paiements-results" hx-select="#paiements-results" hx-swap="outerHTML">
             <input type="hidden" name="section" value="paiements">
             <select name="pay_status" class="dg-filter-input">
               <option value="">Tous les statuts</option>
@@ -764,6 +765,7 @@
             <button class="dg-btn dg-btn-primary" type="submit" style="height:36px;">Filtrer</button>
           </form>
 
+          <div id="paiements-results">
           <div class="dg-table-wrap" style="margin-top:16px;">
             <table class="dg-table">
               <thead><tr><th>Reference</th><th>Etudiant</th><th>Montant</th><th>Statut</th><th>Date</th><th>Actions</th></tr></thead>
@@ -776,6 +778,7 @@
                       <div style="font-weight:700;">{{ item.inscription.candidature.full_name }}</div>
                       <a href="{% url 'inscriptions:public_detail' item.inscription.public_token %}"
                          target="_blank"
+                         hx-boost="false"
                          rel="noopener noreferrer"
                          style="font-size:.68rem; font-family:monospace; color:#2563eb; text-decoration:none;">
                         {{ item.inscription.public_token }}
@@ -805,9 +808,10 @@
             </table>
           </div>
           <div class="dg-pagination">
-            <div>{% if payments.has_previous %}<a href="?section=paiements&pay_page={{ payments.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">← Précédent</a>{% endif %}</div>
+            <div>{% if payments.has_previous %}<a href="?section=paiements&pay_page={{ payments.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#paiements-results" hx-select="#paiements-results" hx-swap="outerHTML">← Précédent</a>{% endif %}</div>
             <div class="dg-pagination-info">Page {{ payments.number }}/{{ payments.paginator.num_pages }} · {{ payments.paginator.count }} paiements</div>
-            <div>{% if payments.has_next %}<a href="?section=paiements&pay_page={{ payments.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">Suivant →</a>{% endif %}</div>
+            <div>{% if payments.has_next %}<a href="?section=paiements&pay_page={{ payments.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#paiements-results" hx-select="#paiements-results" hx-swap="outerHTML">Suivant →</a>{% endif %}</div>
+          </div>
           </div>
         </section>
         {% endif %}
@@ -838,7 +842,7 @@
             <button type="button" class="dg-btn dg-btn-success" hx-post="{% url 'accounts:htmx_manager_salary_pay_ready_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend"><i class="fa-solid fa-bell"></i>Notifier les fiches disponibles</button>
           </div>
 
-          <form method="get" class="dg-filter-bar">
+          <form method="get" class="dg-filter-bar" hx-target="#salaires-results" hx-select="#salaires-results" hx-swap="outerHTML">
             <input type="hidden" name="section" value="salaires">
             <select name="salary_status" class="dg-filter-input">
               <option value="">Tous les statuts</option>
@@ -852,6 +856,7 @@
             <button class="dg-btn dg-btn-primary" type="submit" style="height:36px;">Filtrer</button>
           </form>
 
+          <div id="salaires-results">
           <div class="dg-table-wrap">
             <table class="dg-table">
               <thead><tr><th>Employe</th><th>Salaire officiel</th><th>Net</th><th>Paye</th><th>Statut</th><th>Actions</th></tr></thead>
@@ -886,9 +891,10 @@
             </table>
           </div>
           <div class="dg-pagination">
-            <div>{% if payroll_entries.has_previous %}<a href="?section=salaires&salary_page={{ payroll_entries.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">← Précédent</a>{% endif %}</div>
+            <div>{% if payroll_entries.has_previous %}<a href="?section=salaires&salary_page={{ payroll_entries.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#salaires-results" hx-select="#salaires-results" hx-swap="outerHTML">← Précédent</a>{% endif %}</div>
             <div class="dg-pagination-info">Page {{ payroll_entries.number }}/{{ payroll_entries.paginator.num_pages }} · {{ payroll_entries.paginator.count }} employes</div>
-            <div>{% if payroll_entries.has_next %}<a href="?section=salaires&salary_page={{ payroll_entries.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">Suivant →</a>{% endif %}</div>
+            <div>{% if payroll_entries.has_next %}<a href="?section=salaires&salary_page={{ payroll_entries.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#salaires-results" hx-select="#salaires-results" hx-swap="outerHTML">Suivant →</a>{% endif %}</div>
+          </div>
           </div>
         </section>
         {% endif %}
@@ -910,7 +916,7 @@
           <div class="dg-row-2">
             <div class="dg-panel" style="box-shadow:none; background:#f8fafc; border-radius:12px;" id="manager-expense-form">
               <div class="dg-panel-title">Nouvelle depense</div>
-              <form method="post" action="{% url 'accounts:htmx_manager_expense_create' %}" enctype="multipart/form-data" class="space-y-3">
+              <form method="post" action="{% url 'accounts:htmx_manager_expense_create' %}" enctype="multipart/form-data" class="space-y-3" hx-boost="false">
                 {% csrf_token %}
                 {% include "accounts/dashboard/partials/dg_form_fields.html" with form=expense_form %}
                 <div class="dg-form-footer">
@@ -929,7 +935,7 @@
             </div>
           </div>
 
-          <form method="get" class="dg-filter-bar">
+          <form method="get" class="dg-filter-bar" hx-target="#depenses-results" hx-select="#depenses-results" hx-swap="outerHTML">
             <input type="hidden" name="section" value="depenses">
             <select name="expense_status" class="dg-filter-input">
               <option value="">Tous les statuts</option>
@@ -948,6 +954,7 @@
             <button class="dg-btn dg-btn-primary" type="submit" style="height:36px;">Filtrer</button>
           </form>
 
+          <div id="depenses-results">
           <div class="dg-table-wrap" id="manager-expenses-table" style="margin-top:16px;">
             <table class="dg-table">
               <thead><tr><th>Titre</th><th>Categorie</th><th>Montant</th><th>Statut</th><th>Date</th><th>Actions</th></tr></thead>
@@ -974,9 +981,10 @@
             </table>
           </div>
           <div class="dg-pagination">
-            <div>{% if expenses.has_previous %}<a href="?section=depenses&expense_page={{ expenses.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">← Précédent</a>{% endif %}</div>
+            <div>{% if expenses.has_previous %}<a href="?section=depenses&expense_page={{ expenses.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#depenses-results" hx-select="#depenses-results" hx-swap="outerHTML">← Précédent</a>{% endif %}</div>
             <div class="dg-pagination-info">Page {{ expenses.number }}/{{ expenses.paginator.num_pages }} · {{ expenses.paginator.count }} depenses</div>
-            <div>{% if expenses.has_next %}<a href="?section=depenses&expense_page={{ expenses.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">Suivant →</a>{% endif %}</div>
+            <div>{% if expenses.has_next %}<a href="?section=depenses&expense_page={{ expenses.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#depenses-results" hx-select="#depenses-results" hx-swap="outerHTML">Suivant →</a>{% endif %}</div>
+          </div>
           </div>
         </section>
         {% endif %}
@@ -1005,7 +1013,7 @@
           <div class="dg-row-2">
             <div class="dg-panel" style="box-shadow:none; background:#f8fafc; border-radius:12px;" id="manager-cash-movement-form">
               <div class="dg-panel-title">Mouvement manuel</div>
-              <form method="post" action="{% url 'accounts:htmx_manager_cash_movement_create' %}" class="space-y-3">
+              <form method="post" action="{% url 'accounts:htmx_manager_cash_movement_create' %}" class="space-y-3" hx-boost="false">
                 {% csrf_token %}
                 {% include "accounts/dashboard/partials/dg_form_fields.html" with form=cash_form %}
                 <div class="dg-form-footer">
@@ -1043,7 +1051,7 @@
             </div>
           </div>
 
-          <form method="get" class="dg-filter-bar">
+          <form method="get" class="dg-filter-bar" hx-target="#caisse-results" hx-select="#caisse-results" hx-swap="outerHTML">
             <input type="hidden" name="section" value="caisse">
             <select name="cash_type" class="dg-filter-input">
               <option value="">Tous les types</option>
@@ -1060,6 +1068,7 @@
             <button class="dg-btn dg-btn-primary" type="submit" style="height:36px;">Filtrer</button>
           </form>
 
+          <div id="caisse-results">
           <div class="dg-table-wrap" style="margin-top:16px;">
             <table class="dg-table">
               <thead><tr><th>Date</th><th>Type</th><th>Source</th><th>Montant</th><th>Libelle</th><th>Actions</th></tr></thead>
@@ -1072,7 +1081,7 @@
                   <td style="font-weight:800; {% if item.movement_type == 'in' %}color:#16a34a;{% else %}color:#ef4444;{% endif %}">{% if item.movement_type == 'in' %}+{% else %}-{% endif %}{{ item.amount|intcomma }} FCFA</td>
                   <td>{{ item.label }}</td>
                   <td>
-                    <a class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" href="{% url 'accounts:htmx_manager_cash_movement_receipt' item.id %}" target="_blank"><i class="fa-regular fa-file-pdf"></i></a>
+                    <a class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" href="{% url 'accounts:htmx_manager_cash_movement_receipt' item.id %}" target="_blank" hx-boost="false"><i class="fa-regular fa-file-pdf"></i></a>
                   </td>
                 </tr>
                 {% empty %}
@@ -1082,9 +1091,10 @@
             </table>
           </div>
           <div class="dg-pagination">
-            <div>{% if cash_movements.has_previous %}<a href="?section=caisse&cash_page={{ cash_movements.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">← Précédent</a>{% endif %}</div>
+            <div>{% if cash_movements.has_previous %}<a href="?section=caisse&cash_page={{ cash_movements.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#caisse-results" hx-select="#caisse-results" hx-swap="outerHTML">← Précédent</a>{% endif %}</div>
             <div class="dg-pagination-info">Page {{ cash_movements.number }}/{{ cash_movements.paginator.num_pages }} · {{ cash_movements.paginator.count }} mouvements</div>
-            <div>{% if cash_movements.has_next %}<a href="?section=caisse&cash_page={{ cash_movements.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">Suivant →</a>{% endif %}</div>
+            <div>{% if cash_movements.has_next %}<a href="?section=caisse&cash_page={{ cash_movements.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#caisse-results" hx-select="#caisse-results" hx-swap="outerHTML">Suivant →</a>{% endif %}</div>
+          </div>
           </div>
         </section>
         {% endif %}
@@ -1109,7 +1119,7 @@
             <input type="date" name="report_start" value="{{ report_period.start|date:'Y-m-d' }}" class="dg-filter" style="width:100%;">
             <input type="date" name="report_end" value="{{ report_period.end|date:'Y-m-d' }}" class="dg-filter" style="width:100%;">
             <button class="dg-btn dg-btn-primary" type="submit">Generer</button>
-            <a href="{% url 'accounts:manager_export_report_xlsx' %}?section=rapport&report_period={{ report_period.preset }}&report_start={{ report_period.start|date:'Y-m-d' }}&report_end={{ report_period.end|date:'Y-m-d' }}" class="dg-btn dg-btn-success" style="text-decoration:none;"><i class="fa-solid fa-file-excel"></i>Excel</a>
+            <a href="{% url 'accounts:manager_export_report_xlsx' %}?section=rapport&report_period={{ report_period.preset }}&report_start={{ report_period.start|date:'Y-m-d' }}&report_end={{ report_period.end|date:'Y-m-d' }}" class="dg-btn dg-btn-success" style="text-decoration:none;" hx-boost="false"><i class="fa-solid fa-file-excel"></i>Excel</a>
           </form>
 
           <div class="dg-table-wrap">
@@ -1198,7 +1208,7 @@
             </div>
           </div>
 
-          <form method="get" class="dg-filter-bar">
+          <form method="get" class="dg-filter-bar" hx-target="#cloture-honorarium-results" hx-select="#cloture-honorarium-results" hx-swap="outerHTML">
             <input type="hidden" name="section" value="cloture">
             <select name="honorarium_status" class="dg-filter-input">
               <option value="">Tous les statuts</option>
@@ -1212,6 +1222,7 @@
             <button class="dg-btn dg-btn-primary" type="submit" style="height:36px;">Filtrer</button>
           </form>
 
+          <div id="cloture-honorarium-results">
           <div class="dg-table-wrap" style="margin-top:16px;">
             <table class="dg-table">
               <thead><tr><th>Enseignant</th><th>Taux</th><th>Heures</th><th>Net</th><th>Paye</th><th>Statut</th><th>Actions</th></tr></thead>
@@ -1244,9 +1255,10 @@
             </table>
           </div>
           <div class="dg-pagination">
-            <div>{% if honorarium_entries.has_previous %}<a href="?section=cloture&honorarium_page={{ honorarium_entries.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">← Précédent</a>{% endif %}</div>
+            <div>{% if honorarium_entries.has_previous %}<a href="?section=cloture&honorarium_page={{ honorarium_entries.previous_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#cloture-honorarium-results" hx-select="#cloture-honorarium-results" hx-swap="outerHTML">← Précédent</a>{% endif %}</div>
             <div class="dg-pagination-info">Page {{ honorarium_entries.number }}/{{ honorarium_entries.paginator.num_pages }} · {{ honorarium_entries.paginator.count }} enseignants</div>
-            <div>{% if honorarium_entries.has_next %}<a href="?section=cloture&honorarium_page={{ honorarium_entries.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn">Suivant →</a>{% endif %}</div>
+            <div>{% if honorarium_entries.has_next %}<a href="?section=cloture&honorarium_page={{ honorarium_entries.next_page_number }}" class="dg-btn dg-btn-outline dg-pagination-btn" hx-target="#cloture-honorarium-results" hx-select="#cloture-honorarium-results" hx-swap="outerHTML">Suivant →</a>{% endif %}</div>
+          </div>
           </div>
 
           <div class="dg-table-wrap" style="margin-top:16px;">
@@ -1319,7 +1331,7 @@
           <div class="dg-row-2" id="manager-donation-section">
             <div class="dg-panel" style="box-shadow:none; background:#fde8ec; border-radius:12px;">
               <div class="dg-panel-title">Nouveau don</div>
-              <form method="post" action="{% url 'accounts:htmx_manager_donation_create' %}" class="space-y-3">
+              <form method="post" action="{% url 'accounts:htmx_manager_donation_create' %}" class="space-y-3" hx-boost="false">
                 {% csrf_token %}
                 {% include "accounts/dashboard/partials/donation_form.html" %}
                 <button class="dg-btn dg-btn-danger" type="submit">Enregistrer le don</button>

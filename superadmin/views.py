@@ -51,6 +51,9 @@ from inscriptions.models import Inscription, StatusHistory
 from payments.models import Payment, PaymentAgent, CashPaymentSession
 from students.models import Student
 from branches.models import Branch
+from memoires.models import Memoire
+from memoires.forms import MemoireForm
+from memoires.services.rendering import render_memoire_pages
 from accounts.models import Profile
 from academics.models import AcademicClass
 from academics.services.academic_years import (
@@ -4425,6 +4428,168 @@ def toggle_branch(request, pk):
     branch.save(update_fields=['is_active'])
     messages.success(request, 'Statut campus mis a jour.')
     return redirect('superadmin:branch_list')
+
+
+# ============================================
+# MEMOIRES
+# ============================================
+
+def _generer_pages_memoire(request, memoire):
+    try:
+        nb_pages = render_memoire_pages(memoire)
+    except Exception as exc:  # noqa: BLE001 - message clair en l'absence de file de taches
+        messages.error(request, f"Echec de la generation des pages pour « {memoire.titre} » : {exc}")
+    else:
+        messages.success(request, f"{nb_pages} page(s) generee(s) pour « {memoire.titre} ».")
+
+
+def _memoire_list_context(request):
+    qs = Memoire.objects.select_related('filiere').order_by('-date_depot')
+
+    search = request.GET.get('search', '').strip()
+    statut = request.GET.get('statut', '').strip()
+    niveau = request.GET.get('niveau', '').strip()
+    filiere = request.GET.get('filiere', '').strip()
+    annee = request.GET.get('annee', '').strip()
+
+    if search:
+        qs = qs.filter(
+            Q(titre__icontains=search)
+            | Q(auteurs__icontains=search)
+            | Q(mots_cles__icontains=search)
+        )
+    if statut:
+        qs = qs.filter(statut=statut)
+    if niveau:
+        qs = qs.filter(niveau=niveau)
+    if filiere:
+        qs = qs.filter(filiere_id=filiere)
+    if annee:
+        qs = qs.filter(annee=annee)
+
+    memoires = Paginator(qs, 20).get_page(request.GET.get('page', 1))
+
+    return {
+        'page_title': 'Memoires',
+        'active_menu': 'memoires',
+        'memoires': memoires,
+        'memoires_total': Memoire.objects.count(),
+        'memoires_publies': Memoire.objects.filter(statut=Memoire.Statut.PUBLIE).count(),
+        'filieres': Filiere.objects.filter(is_active=True).order_by('name'),
+        'niveaux': Memoire.Niveau.choices,
+        'statuts': Memoire.Statut.choices,
+        'filters': {'search': search, 'statut': statut, 'niveau': niveau, 'filiere': filiere, 'annee': annee},
+    }
+
+
+def _memoire_list_or_table(request):
+    """Re-rend la liste (table seule si requete HTMX) en conservant les filtres actifs."""
+    context = _memoire_list_context(request)
+    if request.headers.get('HX-Request'):
+        return render(request, 'superadmin/memoires/_list_table.html', context)
+    return render(request, 'superadmin/memoires/list.html', context)
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def memoire_list(request):
+    return _memoire_list_or_table(request)
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def memoire_create(request):
+    form = MemoireForm(request.POST or None, request.FILES or None)
+
+    if request.method == 'POST':
+        if form.is_valid():
+            memoire = form.save(commit=False)
+            memoire.cree_par = request.user
+            memoire.save()
+            _generer_pages_memoire(request, memoire)
+            return redirect('superadmin:memoire_list')
+
+        messages.error(request, "Veuillez corriger les champs du formulaire memoire.")
+
+    return render(request, 'superadmin/memoires/form.html', {
+        'page_title': 'Deposer un memoire',
+        'active_menu': 'memoires',
+        'form': form,
+        'memoire': None,
+    })
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def memoire_edit(request, pk):
+    memoire = get_object_or_404(Memoire, pk=pk)
+    form = MemoireForm(request.POST or None, request.FILES or None, instance=memoire)
+
+    if request.method == 'POST':
+        if form.is_valid():
+            fichier_remplace = 'fichier_source' in form.changed_data
+            memoire = form.save()
+            if fichier_remplace:
+                _generer_pages_memoire(request, memoire)
+            else:
+                messages.success(request, f"Memoire '{memoire.titre}' mis a jour.")
+            return redirect('superadmin:memoire_list')
+
+        messages.error(request, "Veuillez corriger les champs du formulaire memoire.")
+
+    return render(request, 'superadmin/memoires/form.html', {
+        'page_title': f'Modifier : {memoire.titre}',
+        'active_menu': 'memoires',
+        'memoire': memoire,
+        'form': form,
+    })
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def memoire_delete(request, pk):
+    if request.method == 'POST':
+        memoire = get_object_or_404(Memoire, pk=pk)
+        response = _safe_delete(
+            request,
+            memoire,
+            success_message='Memoire supprime (fichiers nettoyes du stockage).',
+            protected_message='Suppression impossible : memoire lie a des donnees.',
+            hx_redirect='/superadmin/memoires/',
+        )
+        if response:
+            return response
+    return redirect('superadmin:memoire_list')
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def toggle_memoire_publication(request, pk):
+    memoire = get_object_or_404(Memoire, pk=pk)
+    if memoire.statut == Memoire.Statut.PUBLIE:
+        memoire.statut = Memoire.Statut.BROUILLON
+    else:
+        memoire.statut = Memoire.Statut.PUBLIE
+    memoire.save()
+    messages.success(request, 'Statut de publication mis a jour.')
+    if request.headers.get('HX-Request'):
+        return _memoire_list_or_table(request)
+    return redirect('superadmin:memoire_list')
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def toggle_memoire_avant(request, pk):
+    memoire = get_object_or_404(Memoire, pk=pk)
+    memoire.est_mis_en_avant = not memoire.est_mis_en_avant
+    memoire.save(update_fields=['est_mis_en_avant'])
+    messages.success(request, 'Mise en avant mise a jour.')
+    if request.headers.get('HX-Request'):
+        return _memoire_list_or_table(request)
+    return redirect('superadmin:memoire_list')
+
+
+@user_passes_test(superuser_required, login_url='/accounts/login/')
+def memoire_regenerate_pages(request, pk):
+    memoire = get_object_or_404(Memoire, pk=pk)
+    _generer_pages_memoire(request, memoire)
+    if request.headers.get('HX-Request'):
+        return _memoire_list_or_table(request)
+    return redirect('superadmin:memoire_list')
 
 
 def _programme_filter(qs, programme_id):

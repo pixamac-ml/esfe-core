@@ -322,6 +322,24 @@ Issu d'une session d'analyse 360° (backend + frontend) du dashboard gestionnair
 
 **Prochaine priorité :** Phase 2 (caisse claire + contrôle budgétaire salaires + clôture ajustable).
 
+### Session du 18/06/2026 — Phase 2 (premier incrément) : versement bancaire suggéré avec fonds de roulement
+
+**Objectif :** point (g) du plan — pré-remplir intelligemment le montant du versement bancaire à la clôture mensuelle, tout en laissant la gestionnaire ajuster, et en réservant un fonds de roulement pour le mois suivant.
+
+**Fait :**
+1. ✅ `branches/models.py` : nouveau champ `Branch.cash_reserve_target` (fonds de roulement cible, configurable par annexe). Migration `branches/migrations/0003_branch_cash_reserve_target.py` générée et testée.
+2. ✅ `branches/admin.py` : champ visible/éditable dans l'admin Django (`list_display`).
+3. ✅ `accounts/dashboards/manager_dashboard.py` : calcule `suggested_transfer_amount = max(caisse disponible - fonds de roulement, 0)` et pré-remplit `closure_form` avec cette valeur (au lieu de 0 en dur).
+4. ✅ `accounts/dashboards/htmx_depenses.py` (`monthly_closure_create`) : les deux chemins d'erreur (formulaire clôture invalide, formulaire versement invalide) renvoient désormais aussi `cash_reserve_target`/`suggested_transfer_amount`, pour ne pas perdre l'information en cas de correction.
+5. ✅ `monthly_closure_form.html` : bloc explicatif affichant le fonds de roulement et le montant suggéré ; corrigé un bug pré-existant où le champ caché `amount` (utilisé pour créer le `BranchBankTransfer`) ne se synchronisait pas avec une modification manuelle du montant par la gestionnaire — ajout d'un petit script qui synchronise les deux champs en direct.
+6. ✅ Vérifié : `python manage.py check` (0 erreur), `migrate` (OK) sur les deux apps modifiées.
+
+**Limitations connues / à faire en suite de Phase 2 :**
+- Le `cash_reserve_target` est pour l'instant configurable uniquement via l'admin Django (pas encore d'écran dédié pour la gestionnaire ou la DG).
+- Reste à faire pour clore Phase 2 : refonte de l'affichage caisse (solde palpable + entrées/sorties + justificatifs + relevé style "compte bancaire"), et contrôle budgétaire formel avant paiement de salaires (le blocage existe déjà partiellement dans `pay_ready_payroll_entries`/`pay_ready_teacher_honorarium_entries` côté `manager_intelligence.py`, mais sans message explicite ni vue de simulation avant paiement).
+
+**Prochaine priorité :** poursuite Phase 2 — refonte de l'affichage caisse et message de contrôle budgétaire explicite avant paiement de la paie.
+
 ### Session du 31/05/2026 (suite 2) — Dons dans rapport Excel + Workflow boutique étudiant
 
 **Fait :**

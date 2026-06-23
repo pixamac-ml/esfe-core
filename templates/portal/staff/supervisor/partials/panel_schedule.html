@@ -1,0 +1,143 @@
+{% load component_tags %}
+<div id="sg-schedule">
+  <div class="card-h" style="background:var(--card);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px">
+    <div>
+      <h3>Emploi du temps</h3>
+      <span class="hint">Semaine du {{ schedule.week_start|date:"d/m/Y"|default:"..." }}</span>
+    </div>
+    {% if schedule and schedule.week_start %}
+    <div style="display:flex;align-items:center;gap:8px">
+      <button type="button" class="btn primary"
+              hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ selected_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&drawer=1"
+              hx-target="#supervisor-drawer-content">
+        <svg class="i" style="width:14px;height:14px" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+        Planifier
+      </button>
+      <button type="button" class="btn"
+              hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}"
+              hx-target="#supervisor-workspace" hx-swap="innerHTML" title="Semaine précédente">
+        <svg class="i" style="width:14px;height:14px" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <span class="chip mute">{{ schedule.week_start|date:"d/m/Y" }}</span>
+      <button type="button" class="btn"
+              hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}"
+              hx-target="#supervisor-workspace" hx-swap="innerHTML" title="Semaine suivante">
+        <svg class="i" style="width:14px;height:14px" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if schedule %}
+    <div class="toolbar">
+      <span class="chip mute">{{ schedule_week_total }} cours</span>
+      <span class="chip info">{{ schedule_week_planned }} planifiés</span>
+      <span class="chip ok">{{ schedule_week_completed }} terminés</span>
+      <span class="chip warn">{{ schedule_empty_days_count }} jours vides</span>
+      {% if timetable_view.schedule_alerts %}
+      <button type="button" class="chip warn" style="margin-left:auto;border:none;cursor:pointer"
+              onclick="document.getElementById('sg-schedule-alerts')?.classList.toggle('hide')">
+        {{ timetable_view.schedule_alerts|length }} alerte(s)
+      </button>
+      {% endif %}
+    </div>
+
+    <div id="sg-schedule-alerts" class="hide" style="margin-bottom:14px">
+      <div class="grid cards-2">
+        {% for alert in timetable_view.schedule_alerts %}
+          <div class="banner warn">{{ alert.message }}</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-b" style="padding:12px;overflow:auto">
+        {% include "portal/staff/supervisor/partials/sg_schedule_week_grid.html" %}
+      </div>
+    </div>
+  {% else %}
+    {% component "empty_state" icon="calendar-off" title="Emploi du temps indisponible" message="Aucune donnée de planning pour cette classe / semaine." %}{% endcomponent %}
+  {% endif %}
+</div>
+
+{% if schedule and schedule.week_start %}
+{# ── Modale : Générer la semaine ── #}
+<div id="modal-generate-week"
+     class="sg-modal hide" style="position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.5);padding:16px"
+     role="dialog" aria-modal="true">
+  <div style="width:100%;max-width:420px;background:var(--card);border-radius:20px;padding:24px;box-shadow:0 24px 60px -16px rgba(15,23,42,.4)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px">
+      <div>
+        <p style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ok)">Génération</p>
+        <h3 style="margin-top:4px;font-size:17px;font-weight:800">Générer la semaine</h3>
+      </div>
+      <button type="button" data-modal-close="modal-generate-week" class="drawer-h x" style="border-radius:10px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:18px">
+      Créer les cours datés de la semaine à partir des créneaux hebdomadaires existants.
+    </p>
+    <form method="post"
+          action="{% url 'accounts_portal:supervisor_week_materialize' selected_class.id %}"
+          hx-post="{% url 'accounts_portal:supervisor_week_materialize' selected_class.id %}"
+          hx-target="#supervisor-workspace"
+          hx-swap="innerHTML"
+          hx-on::after-request="document.getElementById('modal-generate-week')?.classList.add('hide')"
+          style="display:flex;justify-content:flex-end;gap:10px">
+      {% csrf_token %}
+      <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+      <button type="button" data-modal-close="modal-generate-week" class="btn">Annuler</button>
+      <button type="submit" class="btn primary">Générer</button>
+    </form>
+  </div>
+</div>
+
+{# ── Modale : Générer le mois ── #}
+<div id="modal-generate-month"
+     class="sg-modal hide" style="position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.5);padding:16px"
+     role="dialog" aria-modal="true">
+  <div style="width:100%;max-width:420px;background:var(--card);border-radius:20px;padding:24px;box-shadow:0 24px 60px -16px rgba(15,23,42,.4)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px">
+      <div>
+        <p style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#6b21d6">Génération</p>
+        <h3 style="margin-top:4px;font-size:17px;font-weight:800">Générer le mois</h3>
+      </div>
+      <button type="button" data-modal-close="modal-generate-month" class="drawer-h x" style="border-radius:10px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:18px">
+      Créer quatre semaines de cours à partir des créneaux hebdomadaires.
+    </p>
+    <form method="post"
+          action="{% url 'accounts_portal:supervisor_month_materialize' selected_class.id %}"
+          hx-post="{% url 'accounts_portal:supervisor_month_materialize' selected_class.id %}"
+          hx-target="#supervisor-workspace"
+          hx-swap="innerHTML"
+          hx-on::after-request="document.getElementById('modal-generate-month')?.classList.add('hide')"
+          style="display:flex;justify-content:flex-end;gap:10px">
+      {% csrf_token %}
+      <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+      <button type="button" data-modal-close="modal-generate-month" class="btn">Annuler</button>
+      <button type="submit" class="btn primary">Générer le mois</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function() {
+    document.addEventListener('click', function(e) {
+      if (e.target.matches('[data-modal-close]')) {
+        const modalId = e.target.getAttribute('data-modal-close');
+        const modal = document.getElementById(modalId);
+        if (modal) modal.classList.add('hide');
+      }
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.sg-modal:not(.hide)').forEach(function(m) {
+          m.classList.add('hide');
+        });
+      }
+    });
+  })();
+</script>
+{% endif %}
+

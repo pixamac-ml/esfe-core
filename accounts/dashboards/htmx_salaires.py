@@ -1,5 +1,6 @@
 import json
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -7,7 +8,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.forms import PayrollEntryForm
-from accounts.models import BranchCashMovement, PayrollEntry
+from accounts.models import BranchCashMovement, PayrollEntry, SensitiveActionRequest
 from accounts.services.accounting_documents import create_cash_movement
 from accounts.services.manager_intelligence import (
     get_branch_cash_balance,
@@ -15,6 +16,11 @@ from accounts.services.manager_intelligence import (
     notify_salary_available,
     payroll_cash_reference,
     prepare_missing_payroll_entries,
+)
+from accounts.services.sensitive_actions import (
+    SensitiveActionError,
+    confirm_sensitive_action,
+    request_sensitive_action,
 )
 
 from accounts.dashboards.htmx_utils import (
@@ -24,6 +30,9 @@ from accounts.dashboards.htmx_utils import (
     manager_salary_redirect_response,
     manager_section_notice_redirect_response,
 )
+
+
+PAYROLL_EDITABLE_FIELDS = ["base_salary", "allowances", "deductions", "advances", "notes"]
 
 
 @manager_required
@@ -89,6 +98,9 @@ def salary_upsert(request: HttpRequest, pk: int) -> HttpResponse:
         response.status_code = 400
         return response
 
+    if payroll_entry and payroll_entry.paid_amount > 0:
+        return _salary_request_correction_otp(request, profile, payroll_entry, form, payroll_month)
+
     entry = form.save(commit=False)
     entry.branch = request.branch
     entry.employee = profile.user
@@ -112,6 +124,142 @@ def salary_upsert(request: HttpRequest, pk: int) -> HttpResponse:
 
     entry.refresh_from_db()
     return manager_salary_redirect_response(entry.period_month)
+
+
+def _payroll_modal_context(profile, payroll_entry, form, payroll_month, **extra):
+    context = {
+        "employee_profile": profile,
+        "payroll_entry": payroll_entry,
+        "payroll_form": form,
+        "payroll_month": payroll_month,
+        "available_cash_balance": get_branch_cash_balance(profile.branch),
+    }
+    context.update(extra)
+    return context
+
+
+def _salary_request_correction_otp(request, profile, payroll_entry, form, payroll_month):
+    reason = (request.POST.get("reason") or "").strip()
+    confirmation = (request.POST.get("confirmation") or "").strip().upper()
+
+    if confirmation != "CORRIGER":
+        response = render(
+            request,
+            "accounts/dashboard/partials/payroll_modal.html",
+            _payroll_modal_context(
+                profile, payroll_entry, form, payroll_month,
+                correction_error="Tapez CORRIGER pour confirmer la modification de cette fiche deja payee.",
+                correction_reason=reason,
+            ),
+        )
+        response.status_code = 400
+        return response
+
+    previous_state = {field: getattr(payroll_entry, field) for field in PAYROLL_EDITABLE_FIELDS}
+    requested_state = {field: form.cleaned_data[field] for field in PAYROLL_EDITABLE_FIELDS}
+
+    try:
+        otp_request = request_sensitive_action(
+            branch=request.branch,
+            action_type=SensitiveActionRequest.ACTION_PAYROLL_EDIT,
+            target_model="PayrollEntry",
+            target_id=payroll_entry.pk,
+            previous_state=previous_state,
+            requested_state=requested_state,
+            requested_by=request.user,
+            reason=reason,
+        )
+    except SensitiveActionError as exc:
+        response = render(
+            request,
+            "accounts/dashboard/partials/payroll_modal.html",
+            _payroll_modal_context(
+                profile, payroll_entry, form, payroll_month,
+                correction_error=str(exc),
+                correction_reason=reason,
+            ),
+        )
+        response.status_code = 400
+        return response
+
+    response = render(
+        request,
+        "accounts/dashboard/partials/payroll_modal.html",
+        _payroll_modal_context(
+            profile, payroll_entry, form, payroll_month,
+            otp_request_id=otp_request.pk,
+            otp_validity_minutes=SensitiveActionRequest.OTP_VALIDITY_MINUTES,
+        ),
+    )
+    response["HX-Trigger"] = json.dumps({
+        "showToast": {
+            "message": "Code de validation envoye au DG et a la DGA. Saisissez-le pour confirmer.",
+            "type": "info",
+        },
+    })
+    return response
+
+
+@manager_required
+@require_POST
+def salary_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
+    payroll_entry = get_object_or_404(
+        PayrollEntry.objects.select_related("employee", "employee__profile", "branch"),
+        pk=pk,
+        branch=request.branch,
+    )
+    profile = get_branch_staff_profile(request.branch, payroll_entry.employee_id)
+    payroll_month = payroll_entry.period_month
+    otp_request_id = request.POST.get("otp_request_id")
+    otp_code = (request.POST.get("otp_code") or "").strip()
+
+    def _apply(otp_request):
+        for field, value in otp_request.requested_state.items():
+            setattr(payroll_entry, field, value)
+        payroll_entry.updated_by = otp_request.requested_by
+        payroll_entry.save()
+        if profile.salary_base != payroll_entry.base_salary:
+            profile.salary_base = payroll_entry.base_salary
+            profile.save(update_fields=["salary_base"])
+        payroll_entry.refresh_from_db()
+        return {field: getattr(payroll_entry, field) for field in PAYROLL_EDITABLE_FIELDS}
+
+    try:
+        confirm_sensitive_action(
+            request_id=otp_request_id,
+            code=otp_code,
+            approver=request.user,
+            apply_callback=_apply,
+        )
+    except (SensitiveActionError, ValidationError, SensitiveActionRequest.DoesNotExist) as exc:
+        message = " ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+        payroll_entry.refresh_from_db()
+        response = render(
+            request,
+            "accounts/dashboard/partials/payroll_modal.html",
+            _payroll_modal_context(
+                profile, payroll_entry, PayrollEntryForm(instance=payroll_entry), payroll_month,
+                otp_request_id=otp_request_id,
+                otp_error=message,
+            ),
+        )
+        response.status_code = 400
+        return response
+
+    payroll_entry.refresh_from_db()
+    response = render(
+        request,
+        "accounts/dashboard/partials/payroll_modal.html",
+        _payroll_modal_context(
+            profile, payroll_entry, PayrollEntryForm(instance=payroll_entry), payroll_month,
+            correction_success="Modification validee par le DG/DGA et tracee dans l'audit financier.",
+        ),
+    )
+    response["HX-Trigger"] = json.dumps({
+        "dashboardStatsUpdated": True,
+        "showToast": {"message": "Fiche de paie corrigee avec tracabilite.", "type": "success"},
+    })
+    return response
 
 
 @manager_required

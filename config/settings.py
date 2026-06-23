@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     "accounts.apps.AccountsConfig",
     "portal.apps.PortalConfig",
     "secretary",
+    "memoires.apps.MemoiresConfig",
 ]
 
 if ENABLE_BROWSER_RELOAD and importlib.util.find_spec("django_browser_reload"):
@@ -308,6 +309,25 @@ WHITENOISE_MAX_AGE = int(os.getenv("WHITENOISE_MAX_AGE", "31536000" if not DEBUG
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# ==================================================
+# STOCKAGE PRIVÉ — APP MEMOIRES
+# ==================================================
+# Bucket S3 privé pour les mémoires (sources PDF + pages rendues). Si les
+# variables S3_* ne sont pas renseignées, memoires.storage retombe sur un
+# répertoire local non exposé par config.urls (dev/test sans fournisseur S3).
+
+MEMOIRES_S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", "").strip()
+MEMOIRES_S3_BUCKET = os.getenv("S3_BUCKET", "").strip()
+MEMOIRES_S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "").strip()
+MEMOIRES_S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "").strip()
+MEMOIRES_S3_CONFIGURED = bool(
+    MEMOIRES_S3_BUCKET and MEMOIRES_S3_ACCESS_KEY and MEMOIRES_S3_SECRET_KEY
+)
+MEMOIRES_PRIVATE_ROOT = BASE_DIR / "private_media" / "memoires"
+
+MEMOIRE_UPLOAD_MAX_MB = int(os.getenv("MEMOIRE_UPLOAD_MAX_MB", "50"))
+MEMOIRE_RENDER_DPI = int(os.getenv("MEMOIRE_RENDER_DPI", "130"))
 
 # ==================================================
 # DEFAULT PK

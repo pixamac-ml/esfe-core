@@ -1,0 +1,107 @@
+{% extends "superadmin/base.html" %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}Métadonnées du mémoire et dépôt du PDF source{% endblock %}
+
+{% block content_main %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <section class="card rounded-xl border border-slate-100 shadow-sm">
+        <div class="card-header">
+            <h2 class="text-base font-semibold text-slate-900 mb-0">Informations du mémoire</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% csrf_token %}
+                {{ form.media }}
+
+                {% if form.non_field_errors %}
+                <div class="md:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Titre *</label>
+                    {{ form.titre }}
+                    {% if form.titre.errors %}<p class="text-xs text-red-600 mt-1">{{ form.titre.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Slug</label>
+                    {{ form.slug }}
+                    {% if form.slug.errors %}<p class="text-xs text-red-600 mt-1">{{ form.slug.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Auteur(s) *</label>
+                    {{ form.auteurs }}
+                    {% if form.auteurs.errors %}<p class="text-xs text-red-600 mt-1">{{ form.auteurs.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Encadreur</label>
+                    {{ form.encadreur }}
+                    {% if form.encadreur.errors %}<p class="text-xs text-red-600 mt-1">{{ form.encadreur.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Filière *</label>
+                    {{ form.filiere }}
+                    {% if form.filiere.errors %}<p class="text-xs text-red-600 mt-1">{{ form.filiere.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Niveau *</label>
+                    {{ form.niveau }}
+                    {% if form.niveau.errors %}<p class="text-xs text-red-600 mt-1">{{ form.niveau.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Année *</label>
+                    {{ form.annee }}
+                    {% if form.annee.errors %}<p class="text-xs text-red-600 mt-1">{{ form.annee.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Statut</label>
+                    {{ form.statut }}
+                    {% if form.statut.errors %}<p class="text-xs text-red-600 mt-1">{{ form.statut.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Résumé (HTML autorisé) *</label>
+                    {{ form.resume }}
+                    {% if form.resume.errors %}<p class="text-xs text-red-600 mt-1">{{ form.resume.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Mots-clés</label>
+                    {{ form.mots_cles }}
+                    {% if form.mots_cles.errors %}<p class="text-xs text-red-600 mt-1">{{ form.mots_cles.errors|join:', ' }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Fichier PDF source {% if not memoire %}*{% endif %}</label>
+                    {{ form.fichier_source }}
+                    {% if form.fichier_source.errors %}<p class="text-xs text-red-600 mt-1">{{ form.fichier_source.errors|join:', ' }}</p>{% endif %}
+                    {% if memoire and memoire.fichier_source %}
+                    <p class="text-xs text-slate-500 mt-1">
+                        Fichier actuel conservé si aucun nouveau PDF n'est sélectionné ({{ memoire.nb_pages }} page{{ memoire.nb_pages|pluralize }} générée{{ memoire.nb_pages|pluralize }}).
+                    </p>
+                    {% endif %}
+                </div>
+
+                <div class="md:col-span-2 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    {{ form.est_mis_en_avant }}
+                    <label class="text-sm text-slate-700 mb-0">Mettre en avant sur la page publique</label>
+                </div>
+
+                <div class="md:col-span-2 flex items-center justify-end gap-2 pt-2">
+                    <a href="{% url 'superadmin:memoire_list' %}" class="btn btn-outline">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock %}

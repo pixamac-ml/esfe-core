@@ -52,6 +52,18 @@ class Branch(models.Model):
 
     accepts_online_registration = models.BooleanField(default=True)
 
+    cash_reserve_target = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        verbose_name="Fonds de roulement cible",
+        help_text=(
+            "Montant a conserver en caisse a chaque cloture mensuelle pour couvrir "
+            "les depenses imprevues du mois suivant. Le versement bancaire suggere "
+            "est calcule en consequence."
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

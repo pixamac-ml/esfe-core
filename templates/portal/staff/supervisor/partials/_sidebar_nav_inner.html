@@ -1,0 +1,121 @@
+{% load component_tags %}
+<div id="sg-sidebar-nav" hx-swap-oob="true">
+  <div class="rail-class">
+    <label for="sg-class-selector">Classe active</label>
+    {% url 'accounts_portal:supervisor_workflow_workspace' as workflow_url %}
+    {% component "class_picker"
+      id="sg-class-selector"
+      name="class_id"
+      items=class_picker_items
+      selected_id=selected_class_id|default:""
+      hx_get=workflow_url|add:"?section="|add:section
+      hx_target="#supervisor-workspace"
+    %}{% endcomponent %}
+  </div>
+
+  <nav class="rail-nav">
+    <div class="nav-group">Pilotage</div>
+
+    <a href="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=home"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=home"
+       hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true"
+       hx-indicator="#topbar-loader" preload
+       class="nav-item {% if section == 'home' %}active{% endif %}">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+      Accueil
+    </a>
+
+    <a href="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes"
+       hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true"
+       hx-indicator="#topbar-loader" preload
+       class="nav-item {% if section == 'classes' %}active{% endif %}">
+      <svg class="i ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/></svg>
+      Suivi des classes
+    </a>
+
+    <a href="{% url 'accounts_portal:supervisor_cases_workspace' %}"
+       hx-get="{% url 'accounts_portal:supervisor_cases_workspace' %}"
+       hx-target="#supervisor-workspace" hx-push-url="true" hx-indicator="#topbar-loader" preload
+       class="nav-item {% if section == 'cases' %}active{% endif %}">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      Cas à traiter
+      {% if open_cases_count %}<span class="count badge-bad">{{ open_cases_count }}</span>{% endif %}
+    </a>
+
+    <a href="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=teachers"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=teachers"
+       hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true"
+       hx-indicator="#topbar-loader" preload
+       class="nav-item {% if section == 'teachers' %}active{% endif %}">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5"/></svg>
+      Enseignants
+    </a>
+
+    <div class="nav-group">Classe active</div>
+
+    {% if selected_class_id %}
+    <a href="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class_id }}"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance"
+       hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true"
+       hx-indicator="#topbar-loader" preload
+       class="nav-item {% if section == 'attendance' %}active{% endif %}">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Assiduité
+    </a>
+    {% else %}
+    <span class="nav-item-disabled">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Assiduité
+    </span>
+    {% endif %}
+
+    {% if selected_class_id %}
+    <a href="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class_id }}"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule"
+       hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true"
+       hx-indicator="#topbar-loader" preload
+       class="nav-item {% if section == 'schedule' %}active{% endif %}">
+      <svg class="i ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Emploi du temps
+    </a>
+    {% else %}
+    <span class="nav-item-disabled">
+      <svg class="i ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Emploi du temps
+    </span>
+    {% endif %}
+
+    {% if selected_class_id %}
+    <a href="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=courses&class_id={{ selected_class_id }}"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=courses"
+       hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true"
+       hx-indicator="#topbar-loader" preload
+       class="nav-item {% if section == 'courses' %}active{% endif %}">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Cours
+    </a>
+    {% else %}
+    <span class="nav-item-disabled">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Cours
+    </span>
+    {% endif %}
+
+    {% if selected_class_id %}
+    <a href="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=students&class_id={{ selected_class_id }}"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=students"
+       hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true"
+       hx-indicator="#topbar-loader" preload
+       class="nav-item {% if section == 'students' %}active{% endif %}">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Étudiants
+    </a>
+    {% else %}
+    <span class="nav-item-disabled">
+      <svg class="i ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Étudiants
+    </span>
+    {% endif %}
+  </nav>
+</div>

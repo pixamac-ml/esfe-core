@@ -1,0 +1,64 @@
+{% load component_tags %}
+{% if not teacher %}
+  {% component "empty_state" icon="user-x" title="Enseignant introuvable" message="La sélection ne correspond pas à votre annexe." %}{% endcomponent %}
+{% else %}
+  <div style="display:flex;align-items:center;gap:13px;margin-bottom:8px">
+    <div class="pic" style="width:50px;height:50px;font-size:16px;background:#3d4f63">{{ teacher.get_full_name|default:teacher.username|slice:":2"|upper }}</div>
+    <div><b style="font-size:15px">{{ teacher.get_full_name|default:teacher.username }}</b><div style="color:var(--ink-3);font-size:12.5px">Enseignant</div></div>
+  </div>
+  <div class="kv"><span>Matière(s)</span><b>{{ entry.subject|default:"—" }}</b></div>
+  <div class="kv"><span>Présence</span><b><span class="chip {% if entry.present %}ok{% else %}bad{% endif %}">{% if entry.present %}Présent{% else %}Absent{% endif %}</span></b></div>
+  <div class="kv"><span>Ponctualité</span><b>{% if entry.punctual %}À l'heure{% else %}En retard{% endif %}</b></div>
+  <div class="kv"><span>Appel de sa séance</span><b><span class="chip {% if entry.appel == 'done' %}ok{% elif entry.appel == 'pending' %}warn{% else %}mute{% endif %}">{% if entry.appel == 'done' %}Fait{% elif entry.appel == 'pending' %}À faire{% else %}—{% endif %}</span></b></div>
+
+  {% if open_cases %}
+  <div class="sec-title">Cas ouverts</div>
+  {% for case in open_cases %}
+  <div class="row clickable" style="padding:8px 0"
+       hx-get="{% url 'accounts_portal:supervisor_case_detail' 'teacher' case.id %}" hx-target="#supervisor-drawer-content">
+    <div class="main"><b style="font-size:13px">{{ case.title }}</b><span>{{ case.get_status_display }}</span></div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <div class="sec-title">Actions du surveillant</div>
+  {% if entry %}
+  <form hx-post="{% url 'accounts_portal:supervisor_toggle_teacher_presence' %}" hx-target="#supervisor-drawer-content">
+    {% csrf_token %}
+    <input type="hidden" name="teacher_id" value="{{ teacher.id }}">
+    <input type="hidden" name="schedule_event_id" value="{{ entry.current_event_id }}">
+    <button type="submit" class="btn" style="width:100%;justify-content:center;margin-bottom:10px">
+      {% if entry.present %}Marquer absent{% else %}Marquer présent{% endif %}
+    </button>
+  </form>
+  {% if not entry.present %}
+  <details style="margin-bottom:10px">
+    <summary class="btn primary" style="justify-content:center;list-style:none;cursor:pointer">Affecter un remplaçant</summary>
+    <form hx-post="{% url 'accounts_portal:supervisor_assign_replacement' %}" hx-target="#supervisor-workspace" style="margin-top:10px">
+      {% csrf_token %}
+      <input type="hidden" name="schedule_event_id" value="{{ entry.current_event_id }}">
+      <label class="f-l" style="margin-top:0">Enseignant remplaçant</label>
+      <select name="replacement_teacher_id" required class="f-i">
+        <option value="">Choisir…</option>
+        {% for other in other_teachers %}
+        <option value="{{ other.id }}">{{ other.get_full_name|default:other.username }}</option>
+        {% endfor %}
+      </select>
+      <label class="f-l">Note</label>
+      <textarea name="note" rows="2" class="f-i" placeholder="Précisions sur le remplacement…"></textarea>
+      <button type="submit" class="btn primary" style="width:100%;justify-content:center;margin-top:10px">Affecter le remplaçant</button>
+    </form>
+  </details>
+  {% endif %}
+  {% endif %}
+  <button type="button" class="btn" style="width:100%;justify-content:center;margin-bottom:10px"
+          hx-post="{% url 'accounts_portal:supervisor_signal_teacher_incident' %}" hx-target="#supervisor-workspace"
+          hx-vals='{"teacher_id":"{{ teacher.id }}"}'>
+    Signaler un incident
+  </button>
+  <button type="button" class="btn" style="width:100%;justify-content:center"
+          hx-get="{% url 'accounts_portal:supervisor_convocation_drawer' %}?target_type=teacher&target_id={{ teacher.id }}"
+          hx-target="#supervisor-drawer-content">
+    Convoquer l'enseignant
+  </button>
+{% endif %}

@@ -23,7 +23,16 @@
         </div>
     </div>
 
-    <form method="post" action="{% url 'accounts:htmx_manager_monthly_closure_create' %}" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+    <div class="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-800">
+        <p>
+            <span class="font-semibold">Fonds de roulement a conserver : {{ cash_reserve_target|default:0|intcomma }} FCFA.</span>
+            Versement bancaire suggere (caisse disponible - fonds de roulement) :
+            <span class="font-bold">{{ suggested_transfer_amount|default:0|intcomma }} FCFA</span>.
+            Ce montant est pre-rempli ci-dessous, vous pouvez l'ajuster avant de cloturer.
+        </p>
+    </div>
+
+    <form method="post" action="{% url 'accounts:htmx_manager_monthly_closure_create' %}" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6" hx-boost="false">
         {% csrf_token %}
         <div class="space-y-4">
             {% include "accounts/dashboard/partials/dg_form_fields.html" with form=closure_form %}
@@ -60,7 +69,7 @@
                     <label for="{{ transfer_form.transfer_date.id_for_label }}"><i class="fa-solid {{ "transfer_date"|field_icon }}"></i>{{ transfer_form.transfer_date.label }}</label>
                     <div class="dg-input-wrap"><i class="fa-solid {{ "transfer_date"|field_icon }} dg-input-icon"></i>{{ transfer_form.transfer_date }}</div>
                 </div>
-                <input type="hidden" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
+                <input type="hidden" id="transfer-amount-sync" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
                 <div class="dg-field">
                     <label for="{{ transfer_form.proof.id_for_label }}"><i class="fa-solid {{ "proof"|field_icon }}"></i>{{ transfer_form.proof.label }}</label>
                     {{ transfer_form.proof }}
@@ -79,3 +88,15 @@
         </div>
     </form>
 </div>
+<script>
+(function () {
+    const bankTransferInput = document.getElementById("id_bank_transfer_amount");
+    const syncInput = document.getElementById("transfer-amount-sync");
+    if (!bankTransferInput || !syncInput) {
+        return;
+    }
+    bankTransferInput.addEventListener("input", function () {
+        syncInput.value = bankTransferInput.value || 0;
+    });
+})();
+</script>

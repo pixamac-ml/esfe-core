@@ -1,0 +1,96 @@
+{% load humanize %}
+<div class="overflow-x-auto">
+    <table class="data-table min-w-full">
+        <thead>
+            <tr>
+                <th>Titre</th>
+                <th>Auteurs</th>
+                <th>Filière</th>
+                <th>Niveau</th>
+                <th>Année</th>
+                <th>Vues</th>
+                <th>Mis en avant</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for memoire in memoires %}
+            <tr>
+                <td>
+                    <p class="font-semibold text-slate-900 mb-0">{{ memoire.titre }}</p>
+                    <p class="text-xs text-slate-500 mb-0">{{ memoire.nb_pages }} page{{ memoire.nb_pages|pluralize }}</p>
+                </td>
+                <td>{{ memoire.auteurs }}</td>
+                <td>{{ memoire.filiere.name }}</td>
+                <td>{{ memoire.get_niveau_display }}</td>
+                <td>{{ memoire.annee }}</td>
+                <td>{{ memoire.nombre_vues|intcomma }}</td>
+                <td>
+                    {% if memoire.est_mis_en_avant %}
+                        <span class="badge-status badge-success">Oui</span>
+                    {% else %}
+                        <span class="badge-status badge-draft">Non</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if memoire.statut == "publie" %}
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">Publié</span>
+                    {% else %}
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700">Brouillon</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="flex items-center gap-2">
+                        <a href="{% url 'superadmin:memoire_edit' memoire.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                        <a href="{% url 'superadmin:toggle_memoire_publication' memoire.pk %}?{{ request.GET.urlencode }}"
+                           hx-get="{% url 'superadmin:toggle_memoire_publication' memoire.pk %}?{{ request.GET.urlencode }}"
+                           hx-target="#memoire-table-container" hx-swap="innerHTML"
+                           class="btn btn-outline btn-sm">
+                            {% if memoire.statut == "publie" %}Dépublier{% else %}Publier{% endif %}
+                        </a>
+                        <a href="{% url 'superadmin:toggle_memoire_avant' memoire.pk %}?{{ request.GET.urlencode }}"
+                           hx-get="{% url 'superadmin:toggle_memoire_avant' memoire.pk %}?{{ request.GET.urlencode }}"
+                           hx-target="#memoire-table-container" hx-swap="innerHTML"
+                           class="btn btn-outline btn-sm">
+                            {% if memoire.est_mis_en_avant %}Retirer de l'avant{% else %}Mettre en avant{% endif %}
+                        </a>
+                        <a href="{% url 'superadmin:memoire_regenerate_pages' memoire.pk %}?{{ request.GET.urlencode }}"
+                           hx-get="{% url 'superadmin:memoire_regenerate_pages' memoire.pk %}?{{ request.GET.urlencode }}"
+                           hx-target="#memoire-table-container" hx-swap="innerHTML"
+                           class="btn btn-outline btn-sm">Régénérer pages</a>
+                        <form method="post" action="{% url 'superadmin:memoire_delete' memoire.pk %}" class="inline" onsubmit="return confirm('Supprimer ce mémoire ? Les fichiers seront supprimés du stockage.')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="text-center text-slate-500 py-8">Aucun mémoire trouvé.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if memoires.paginator.num_pages > 1 %}
+<div class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+    <p class="text-xs text-slate-500 mb-0">Page {{ memoires.number }} / {{ memoires.paginator.num_pages }}</p>
+    <div class="flex items-center gap-2">
+        {% if memoires.has_previous %}
+            <a class="btn btn-outline btn-sm"
+               href="?page={{ memoires.previous_page_number }}&search={{ filters.search|default:'' }}&statut={{ filters.statut|default:'' }}&niveau={{ filters.niveau|default:'' }}&filiere={{ filters.filiere|default:'' }}"
+               hx-get="?page={{ memoires.previous_page_number }}&search={{ filters.search|default:'' }}&statut={{ filters.statut|default:'' }}&niveau={{ filters.niveau|default:'' }}&filiere={{ filters.filiere|default:'' }}"
+               hx-target="#memoire-table-container" hx-swap="innerHTML">Précédent</a>
+        {% endif %}
+        {% if memoires.has_next %}
+            <a class="btn btn-outline btn-sm"
+               href="?page={{ memoires.next_page_number }}&search={{ filters.search|default:'' }}&statut={{ filters.statut|default:'' }}&niveau={{ filters.niveau|default:'' }}&filiere={{ filters.filiere|default:'' }}"
+               hx-get="?page={{ memoires.next_page_number }}&search={{ filters.search|default:'' }}&statut={{ filters.statut|default:'' }}&niveau={{ filters.niveau|default:'' }}&filiere={{ filters.filiere|default:'' }}"
+               hx-target="#memoire-table-container" hx-swap="innerHTML">Suivant</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

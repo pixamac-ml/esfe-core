@@ -766,6 +766,7 @@ class StudentCase(models.Model):
     STATUS_EN_COURS = "en_cours"
     STATUS_ATTENTE_PARENT = "attente_parent"
     STATUS_EN_OBSERVATION = "en_observation"
+    STATUS_CONVOQUE = "convoque"
     STATUS_RESOLU = "resolu"
     STATUS_ESCALADE = "escalade"
 
@@ -774,9 +775,15 @@ class StudentCase(models.Model):
         (STATUS_EN_COURS, "En cours"),
         (STATUS_ATTENTE_PARENT, "En attente parent"),
         (STATUS_EN_OBSERVATION, "En observation"),
+        (STATUS_CONVOQUE, "Convoqué"),
         (STATUS_RESOLU, "Résolu"),
         (STATUS_ESCALADE, "Escaladé direction"),
     ]
+
+    # Flux simplifié à 4 étapes utilisé par le dashboard Surveillant Général
+    # (nouveau -> en_cours -> convoque -> resolu) ; les autres statuts restent
+    # accessibles via leurs mécanismes propres (attente parent, escalade direction).
+    SIMPLE_FLOW_STATUSES = [STATUS_NOUVEAU, STATUS_EN_COURS, STATUS_CONVOQUE, STATUS_RESOLU]
 
     PRIORITY_FAIBLE = "faible"
     PRIORITY_NORMALE = "normale"
@@ -877,6 +884,239 @@ class StudentCaseNote(models.Model):
 
     def __str__(self):
         return f"Note #{self.pk} — Cas #{self.case_id}"
+
+
+class TeacherCase(models.Model):
+    """Cas de suivi surveillant général pour un enseignant (miroir de StudentCase)."""
+
+    TYPE_RETARD_REPETE = "retard_repete"
+    TYPE_ABSENCE_NON_JUSTIFIEE = "absence_non_justifiee"
+    TYPE_APPEL_NON_FAIT = "appel_non_fait"
+    TYPE_MANQUEMENT_PEDAGOGIQUE = "manquement_pedagogique"
+    TYPE_INCIDENT = "incident"
+    TYPE_AUTRE = "autre"
+
+    TYPE_CHOICES = [
+        (TYPE_RETARD_REPETE, "Retards répétés"),
+        (TYPE_ABSENCE_NON_JUSTIFIEE, "Absence non justifiée"),
+        (TYPE_APPEL_NON_FAIT, "Appel non fait de façon récurrente"),
+        (TYPE_MANQUEMENT_PEDAGOGIQUE, "Manquement pédagogique"),
+        (TYPE_INCIDENT, "Incident signalé"),
+        (TYPE_AUTRE, "Autre"),
+    ]
+
+    STATUS_NOUVEAU = StudentCase.STATUS_NOUVEAU
+    STATUS_EN_COURS = StudentCase.STATUS_EN_COURS
+    STATUS_CONVOQUE = StudentCase.STATUS_CONVOQUE
+    STATUS_RESOLU = StudentCase.STATUS_RESOLU
+
+    STATUS_CHOICES = [
+        (STATUS_NOUVEAU, "Nouveau"),
+        (STATUS_EN_COURS, "En cours"),
+        (STATUS_CONVOQUE, "Convoqué"),
+        (STATUS_RESOLU, "Résolu"),
+    ]
+
+    PRIORITY_FAIBLE = StudentCase.PRIORITY_FAIBLE
+    PRIORITY_NORMALE = StudentCase.PRIORITY_NORMALE
+    PRIORITY_URGENTE = StudentCase.PRIORITY_URGENTE
+    PRIORITY_CRITIQUE = StudentCase.PRIORITY_CRITIQUE
+    PRIORITY_CHOICES = StudentCase.PRIORITY_CHOICES
+
+    teacher = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="teacher_cases",
+    )
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="teacher_cases",
+        db_index=True,
+    )
+    case_type = models.CharField(max_length=40, choices=TYPE_CHOICES, db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_NOUVEAU,
+        db_index=True,
+    )
+    priority = models.CharField(
+        max_length=10,
+        choices=PRIORITY_CHOICES,
+        default=PRIORITY_NORMALE,
+        db_index=True,
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    opened_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="opened_teacher_cases",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Cas enseignant"
+        verbose_name_plural = "Cas enseignants"
+        indexes = [
+            models.Index(fields=["branch", "status"]),
+            models.Index(fields=["teacher", "status"]),
+            models.Index(fields=["priority", "status"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.get_priority_display()}] {self.title} — {self.teacher}"
+
+    @property
+    def is_open(self):
+        return self.status != self.STATUS_RESOLU
+
+    def resolve(self, user):
+        self.status = self.STATUS_RESOLU
+        self.resolved_at = timezone.now()
+        self.save(update_fields=["status", "resolved_at", "updated_at"])
+        TeacherCaseNote.objects.create(
+            case=self,
+            author=user,
+            content="Cas marqué comme résolu.",
+        )
+
+
+class TeacherCaseNote(models.Model):
+    """Note interne sur un cas enseignant."""
+
+    case = models.ForeignKey(
+        TeacherCase,
+        on_delete=models.CASCADE,
+        related_name="notes",
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="teacher_case_notes",
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Note de cas enseignant"
+        verbose_name_plural = "Notes de cas enseignant"
+
+    def __str__(self):
+        return f"Note #{self.pk} — Cas enseignant #{self.case_id}"
+
+
+class Convocation(models.Model):
+    """Convocation disciplinaire envoyée par le surveillant général (étudiant/parents ou enseignant)."""
+
+    TARGET_STUDENT = "student"
+    TARGET_TEACHER = "teacher"
+    TARGET_CHOICES = [
+        (TARGET_STUDENT, "Étudiant"),
+        (TARGET_TEACHER, "Enseignant"),
+    ]
+
+    DEST_STUDENT = "etudiant"
+    DEST_PARENTS = "parents"
+    DEST_BOTH = "les_deux"
+    DEST_CHOICES = [
+        (DEST_STUDENT, "L'étudiant"),
+        (DEST_PARENTS, "Les parents"),
+        (DEST_BOTH, "Les deux"),
+    ]
+
+    CHANNEL_SMS = "sms"
+    CHANNEL_CALL = "call"
+    CHANNEL_EMAIL = "email"
+    CHANNEL_LETTER = "letter"
+    CHANNEL_CHOICES = [
+        (CHANNEL_SMS, "SMS"),
+        (CHANNEL_CALL, "Appel téléphonique"),
+        (CHANNEL_EMAIL, "E-mail"),
+        (CHANNEL_LETTER, "Courrier remis"),
+    ]
+
+    STATUS_PLANNED = "planned"
+    STATUS_SENT = "sent"
+    STATUS_MANUAL = "manual_pending"
+    STATUS_CHOICES = [
+        (STATUS_PLANNED, "Planifiée"),
+        (STATUS_SENT, "Envoyée"),
+        (STATUS_MANUAL, "À traiter manuellement"),
+    ]
+
+    target_type = models.CharField(max_length=10, choices=TARGET_CHOICES, db_index=True)
+    student = models.ForeignKey(
+        "students.Student",
+        on_delete=models.CASCADE,
+        related_name="convocations",
+        null=True,
+        blank=True,
+    )
+    teacher = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="convocations",
+        null=True,
+        blank=True,
+    )
+    student_case = models.ForeignKey(
+        StudentCase,
+        on_delete=models.SET_NULL,
+        related_name="convocations",
+        null=True,
+        blank=True,
+    )
+    teacher_case = models.ForeignKey(
+        TeacherCase,
+        on_delete=models.SET_NULL,
+        related_name="convocations",
+        null=True,
+        blank=True,
+    )
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="convocations",
+        db_index=True,
+    )
+    destinataire = models.CharField(max_length=10, choices=DEST_CHOICES, blank=True)
+    motif = models.CharField(max_length=200)
+    channel = models.CharField(max_length=10, choices=CHANNEL_CHOICES)
+    scheduled_date = models.DateField()
+    scheduled_time = models.TimeField()
+    message = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PLANNED)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_convocations",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Convocation"
+        verbose_name_plural = "Convocations"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(target_type="student", student__isnull=False, teacher__isnull=True)
+                    | models.Q(target_type="teacher", teacher__isnull=False, student__isnull=True)
+                ),
+                name="convocation_target_matches_fk",
+            ),
+        ]
+
+    def __str__(self):
+        target = self.student if self.target_type == self.TARGET_STUDENT else self.teacher
+        return f"Convocation {self.get_channel_display()} — {target} ({self.scheduled_date})"
 
 
 # =============================================================

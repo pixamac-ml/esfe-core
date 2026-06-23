@@ -1,0 +1,30 @@
+{% load component_tags %}
+<div
+  class="scrim"
+  x-data="{ open: false }"
+  :class="open ? 'open' : ''"
+  @{{ open_event }}.window="open = true"
+  @{{ close_event }}.window="open = false"
+  @click="$dispatch('{{ close_event }}')"
+></div>
+<aside
+  id="{{ id }}"
+  class="drawer"
+  x-data="{ open: false }"
+  :class="open ? 'open' : ''"
+  @{{ open_event }}.window="open = true"
+  @{{ close_event }}.window="open = false"
+  @keydown.escape.window="$dispatch('{{ close_event }}')"
+  :aria-hidden="!open"
+>
+  <div class="drawer-h">
+    <div>
+      <div class="crumb" style="color:var(--ink-3);font-size:11px;letter-spacing:.05em;font-weight:700;text-transform:uppercase">{{ kicker }}</div>
+      <h3 style="font-size:17px;font-weight:800;margin-top:3px">{{ title }}</h3>
+    </div>
+    <button class="x" type="button" @click="$dispatch('{{ close_event }}')" aria-label="Fermer">×</button>
+  </div>
+  <div class="drawer-b" id="{{ content_id }}">
+    <p>{{ placeholder }}</p>
+  </div>
+</aside>

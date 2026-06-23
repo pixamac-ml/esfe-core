@@ -1,54 +1,81 @@
-<div class="workflow-stack">
+<div class="space-y-4">
   {% if toast %}
-  <section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
+  <div class="panel mb-4" style="border-left:5px solid {% if toast.level == 'success' %}#059669{% elif toast.level == 'error' %}#be123c{% else %}#d97706{% endif %}">
+    <p class="text-sm font-black">{{ toast.message }}</p>
+  </div>
   {% endif %}
 
-  <section class="workflow-table-shell">
-    <div class="workflow-table-head">
+  <div class="band b-in_progress">
+    <div>
+      <p class="kicker">Archivage</p>
+      <h3>Clôture d'année et classes</h3>
+      <p class="text-sm font-semibold text-slate-500">Les données sont conservées, journalisées et restaurables.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="flex items-center justify-between mb-4">
       <div>
-        <p class="workflow-kicker">Archivage</p>
-        <h3>Cloture d'annee et classes</h3>
-        <p class="workflow-muted">Les donnees sont conservees, journalisees et restaurables.</p>
+        <p class="kicker">Sélection</p>
+        <h3 class="text-lg font-black">Choisir une année ou une classe</h3>
       </div>
     </div>
 
     <form
-      class="workflow-context mt-4"
+      class="wkc"
       method="get"
       hx-get="{% url 'accounts_portal:it_archives_workspace' %}"
       hx-trigger="change from:select"
       hx-target="#it-workspace"
       hx-swap="innerHTML"
     >
-      <label>Annee academique
+      <label>Année académique
         <select name="academic_year_id">
-          <option value="">Selectionner une annee</option>
+          <option value="">Sélectionner une année</option>
           {% for year in academic_years %}
           <option value="{{ year.id }}" {% if selected_academic_year_id == year.id|stringformat:"s" %}selected{% endif %}>{{ year.name }}</option>
           {% endfor %}
         </select>
       </label>
-      <label>Classe precise
+      <label>Classe précise
         <select name="class_id">
-          <option value="">Toute l'annee selectionnee</option>
+          <option value="">Toute l'année sélectionnée</option>
           {% for class in classes %}
-          <option value="{{ class.id }}" {% if selected_class_id == class.id|stringformat:"s" %}selected{% endif %}>{{ class.display_name }} - {{ class.academic_year.name }}</option>
+          <option value="{{ class.id }}" {% if selected_class_id == class.id|stringformat:"s" %}selected{% endif %}>{{ class.display_name }} — {{ class.academic_year.name }}</option>
           {% endfor %}
         </select>
       </label>
     </form>
 
     {% if preview %}
-    <div class="grid gap-3 md:grid-cols-6">
-      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Classes</p><h3>{{ preview.classes_count }}</h3></article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Etudiants</p><h3>{{ preview.students_count }}</h3></article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Inscriptions</p><h3>{{ preview.inscriptions_count }}</h3></article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Affectations</p><h3>{{ preview.enrollments_count }}</h3></article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Notes</p><h3>{{ preview.grades_count }}</h3></article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4"><p class="workflow-kicker">Paiements</p><h3>{{ preview.payments_count }}</h3></article>
+    <div class="grid grid-cols-3 lg:grid-cols-6 gap-4 mt-4">
+      <div class="panel" style="text-align:center">
+        <p class="kicker">Classes</p>
+        <p class="text-2xl font-black">{{ preview.classes_count }}</p>
+      </div>
+      <div class="panel" style="text-align:center">
+        <p class="kicker">Étudiants</p>
+        <p class="text-2xl font-black">{{ preview.students_count }}</p>
+      </div>
+      <div class="panel" style="text-align:center">
+        <p class="kicker">Inscriptions</p>
+        <p class="text-2xl font-black">{{ preview.inscriptions_count }}</p>
+      </div>
+      <div class="panel" style="text-align:center">
+        <p class="kicker">Affectations</p>
+        <p class="text-2xl font-black">{{ preview.enrollments_count }}</p>
+      </div>
+      <div class="panel" style="text-align:center">
+        <p class="kicker">Notes</p>
+        <p class="text-2xl font-black">{{ preview.grades_count }}</p>
+      </div>
+      <div class="panel" style="text-align:center">
+        <p class="kicker">Paiements</p>
+        <p class="text-2xl font-black">{{ preview.payments_count }}</p>
+      </div>
     </div>
     <form
-      class="mt-4 grid gap-3"
+      class="mt-4"
       method="post"
       hx-post="{% url 'accounts_portal:it_archives_action' %}"
       hx-target="#it-workspace"
@@ -62,67 +89,70 @@
       <input type="hidden" name="action" value="archive_year">
       <input type="hidden" name="academic_year_id" value="{{ selected_academic_year_id }}">
       {% endif %}
-      <label class="grid gap-2 text-sm font-black text-slate-700">Raison obligatoire
-        <input name="reason" required placeholder="Ex: cloture officielle de l'annee academique" class="h-12 rounded-xl border border-slate-200 px-4">
-      </label>
+      <label class="fl">Raison obligatoire</label>
+      <input name="reason" required placeholder="Ex: clôture officielle de l'année académique" class="fi mb-4">
       <div class="flex justify-end">
-        <button class="workflow-btn workflow-btn-primary" type="submit">Archiver maintenant</button>
+        <button class="btn btn-primary" type="submit">Archiver maintenant</button>
       </div>
     </form>
     {% else %}
-    <div class="workflow-empty mt-4">Selectionne une annee ou une classe pour afficher le resume avant archivage.</div>
+    <div class="panel mt-4" style="text-align:center;padding:2rem;border:1px dashed #cbd5e1">
+      <p class="text-sm font-semibold text-slate-400">Sélectionne une année ou une classe pour afficher le résumé avant archivage.</p>
+    </div>
     {% endif %}
-  </section>
+  </div>
 
-  <section class="workflow-table-shell">
-    <div class="workflow-table-head">
+  <div class="panel">
+    <div class="flex items-center justify-between mb-4">
       <div>
-        <p class="workflow-kicker">Archives existantes</p>
-        <h3>Lots d'archivage</h3>
+        <p class="kicker">Archives existantes</p>
+        <h3 class="text-lg font-black">Lots d'archivage</h3>
       </div>
     </div>
-    <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
-      <table class="min-w-full text-sm">
-        <thead class="bg-slate-900 text-white">
+    <div class="overflow-x-auto">
+      <table class="grid">
+        <thead>
           <tr>
-            <th class="px-3 py-3 text-left">Archive</th>
-            <th class="px-3 py-3 text-left">Statut</th>
-            <th class="px-3 py-3 text-left">Contenu</th>
-            <th class="px-3 py-3 text-left">Acteur</th>
-            <th class="px-3 py-3 text-right">Actions</th>
+            <th>Archive</th>
+            <th>Statut</th>
+            <th>Contenu</th>
+            <th>Acteur</th>
+            <th style="text-align:right">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for batch in archive_batches %}
-          <tr class="border-b border-slate-100 last:border-b-0">
-            <td class="px-3 py-3">
-              <strong class="text-slate-900">{{ batch }}</strong>
+          <tr>
+            <td>
+              <b>{{ batch }}</b>
               <span class="block text-xs font-bold text-slate-500">{{ batch.created_at|date:"d/m/Y H:i" }}</span>
             </td>
-            <td class="px-3 py-3 font-black {% if batch.status == 'archived' %}text-amber-700{% else %}text-emerald-700{% endif %}">{{ batch.get_status_display }}</td>
-            <td class="px-3 py-3 text-slate-700">
-              {{ batch.classes_count }} classe(s), {{ batch.students_count }} etudiant(s), {{ batch.grades_count }} note(s), {{ batch.payments_count }} paiement(s)
+            <td>
+              <span class="chip {% if batch.status == 'archived' %}c-warn{% else %}c-ok{% endif %}">{{ batch.get_status_display }}</span>
             </td>
-            <td class="px-3 py-3 text-slate-700">{{ batch.created_by.get_full_name|default:batch.created_by.username }}</td>
-            <td class="px-3 py-3">
+            <td class="text-slate-700">
+              {{ batch.classes_count }} classe(s), {{ batch.students_count }} étudiant(s), {{ batch.grades_count }} note(s), {{ batch.payments_count }} paiement(s)
+            </td>
+            <td class="text-slate-700">{{ batch.created_by.get_full_name|default:batch.created_by.username }}</td>
+            <td style="text-align:right">
               <div class="flex justify-end gap-2">
-                <button class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_archive_detail' batch.id %}" hx-target="#it-workspace" hx-swap="innerHTML" type="button">Voir</button>
+                <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_archive_detail' batch.id %}" hx-target="#it-workspace" hx-swap="innerHTML" type="button">Voir</button>
                 {% if batch.status == 'archived' %}
                 <form method="post" hx-post="{% url 'accounts_portal:it_archives_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="restore">
                   <input type="hidden" name="batch_id" value="{{ batch.id }}">
-                  <button class="workflow-btn workflow-btn-secondary" type="submit">Restaurer</button>
+                  <button class="btn btn-secondary" type="submit">Restaurer</button>
                 </form>
                 {% endif %}
               </div>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="px-3 py-8 text-center font-bold text-slate-500">Aucune archive pour le moment.</td></tr>
+          <tr><td colspan="5" class="text-center text-slate-500 py-8">Aucune archive pour le moment.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-  </section>
+  </div>
 </div>

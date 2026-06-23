@@ -17,6 +17,8 @@ from .dashboard.info_field import InfoField
 from .dashboard.metric_card import MetricCard
 from .dashboard.progress_bar import ProgressBar
 from .dashboard.status_badge import StatusBadge
+from .dashboard.class_picker import ClassPicker
+from .dashboard.drawer import Drawer
 
 # Card components
 from .cards.base_card.base_card import BaseCard
@@ -37,6 +39,7 @@ from .notes.notes_workflow import NotesWorkflow
 from .notes.notes_header import NotesHeader
 from .notes.student_identity_column import StudentIdentityColumn
 from .notes.ec_note_cell import ECNoteCell
+from .notes.ec_note_cell_live import ECNoteCellLive
 from .notes.semester_summary import SemesterSummary
 from .notes.notes_validation_panel import NotesValidationPanel
 from .notes.notes_anomaly_panel import NotesAnomalyPanel

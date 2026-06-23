@@ -1,0 +1,53 @@
+<table class="sched">
+  <thead>
+    <tr>
+      <th>Horaire</th>
+      {% for day in schedule.days %}
+      <th {% if day.is_today %}style="color:var(--accent)"{% endif %}>{{ day.label }} <span style="font-weight:600;opacity:.7">{{ day.date|date:"d/m" }}</span></th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for slot in schedule.slots %}
+    <tr>
+      <td class="time">{{ slot.label }}</td>
+      {% for cell in slot.cells %}
+      <td>
+        {% for event in cell.events %}
+        <div class="slot {% cycle 's-blue' 's-green' 's-purple' 's-amber' %}" style="margin-bottom:4px">
+          {{ event.title }}
+          <small>{{ event.time_range }} · {{ event.location|default:"Salle a definir" }}</small>
+          <small>{{ event.teacher_name }}</small>
+        </div>
+        {% empty %}
+        {% if planner_workspace_url and workspace_target_id and academic_class and slot.end_label %}
+        <button type="button" class="cell-add"
+                style="font-size:13px"
+                hx-get="{% url planner_workspace_url %}?class_id={{ academic_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&intent=program&date={{ cell.day_date|date:'Y-m-d' }}&start_time={{ slot.label }}&end_time={{ slot.end_label }}"
+                hx-target="{{ workspace_target_id }}"
+                hx-swap="innerHTML"
+                title="Programmer ce créneau libre">+</button>
+        {% endif %}
+        {% endfor %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    {% for slot in schedule.extra_slots %}
+    <tr>
+      <td class="time">{{ slot.label }}</td>
+      {% for cell in slot.cells %}
+      <td>
+        {% for event in cell.events %}
+        <div class="slot {% cycle 's-blue' 's-green' 's-purple' 's-amber' %}" style="margin-bottom:4px">
+          {{ event.title }}
+          <small>{{ event.time_range }} · {{ event.location|default:"Salle a definir" }}</small>
+          <small>{{ event.teacher_name }}</small>
+        </div>
+        {% endfor %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

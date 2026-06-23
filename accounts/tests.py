@@ -26,7 +26,20 @@ from accounts.access import (
 	get_user_role,
 	get_user_scope,
 )
-from accounts.models import BranchCashMovement, PayrollEntry, UserPreference
+from accounts.models import (
+	BranchCashMovement,
+	FinancialAuditLog,
+	PayrollEntry,
+	SensitiveActionRequest,
+	TeacherHonorariumEntry,
+	UserPreference,
+)
+from accounts.services.sensitive_actions import (
+	SensitiveActionError,
+	confirm_sensitive_action,
+	request_sensitive_action,
+)
+from unittest.mock import patch
 from communication.models import CommunicationNotification
 from portal.permissions import get_user_role as get_portal_user_role
 from portal.permissions import get_post_login_portal_url
@@ -1211,7 +1224,7 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Dashboard Surveillant General")
-		self.assertContains(response, "Pilotage des classes, du temps et de la discipline")
+		self.assertContains(response, "Pilotage des classes, du temps, des enseignants et de la discipline")
 
 	def test_portal_dashboard_renders_director_dashboard_from_single_entry(self):
 		director = self._create_user("portal_director", role="executive", position="director_of_studies")
@@ -2513,4 +2526,420 @@ class ProfileCenterTests(TestCase):
 		candidature.refresh_from_db()
 		self.assertEqual(candidature.phone, "+22376123456")
 		self.assertEqual(self.user.profile.phone, "+22376123456")
+
+
+class SensitiveActionServiceTests(TestCase):
+	"""Workflow OTP anti-fraude : demande -> expiration -> confirmation -> audit log."""
+
+	def setUp(self):
+		self.branch = Branch.objects.create(
+			name="Annexe Audit",
+			code="AAU",
+			slug="annexe-audit",
+		)
+		self.manager = USER_MANAGER.create_user(
+			username="otp_manager",
+			email="otp_manager@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		self.manager.profile.branch = self.branch
+		self.manager.profile.save(update_fields=["branch", "updated_at"])
+		self.dg = USER_MANAGER.create_user(
+			username="otp_dg",
+			email="otp_dg@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		self.dg.profile.position = "executive_director"
+		self.dg.profile.save(update_fields=["position", "updated_at"])
+
+	def test_request_sensitive_action_requires_an_active_dg_approver(self):
+		self.dg.is_active = False
+		self.dg.save(update_fields=["is_active"])
+
+		with self.assertRaises(SensitiveActionError):
+			request_sensitive_action(
+				branch=self.branch,
+				action_type=SensitiveActionRequest.ACTION_PAYROLL_EDIT,
+				target_model="PayrollEntry",
+				target_id=1,
+				previous_state={"base_salary": 50000},
+				requested_state={"base_salary": 60000},
+				requested_by=self.manager,
+			)
+		self.assertFalse(SensitiveActionRequest.objects.exists())
+
+	def test_request_sensitive_action_notifies_dg_with_otp_code(self):
+		with patch("accounts.services.sensitive_actions._generate_code", return_value="654321"):
+			otp_request = request_sensitive_action(
+				branch=self.branch,
+				action_type=SensitiveActionRequest.ACTION_PAYROLL_EDIT,
+				target_model="PayrollEntry",
+				target_id=1,
+				previous_state={"base_salary": 50000},
+				requested_state={"base_salary": 60000},
+				requested_by=self.manager,
+				reason="Erreur de saisie",
+			)
+
+		self.assertEqual(otp_request.status, SensitiveActionRequest.STATUS_PENDING)
+		self.assertTrue(
+			CommunicationNotification.objects.filter(
+				recipient=self.dg,
+				event_type="sensitive_action_otp",
+				legacy_object_id=str(otp_request.pk),
+			).exists()
+		)
+
+	def test_confirm_sensitive_action_with_correct_code_applies_callback_and_logs_audit(self):
+		with patch("accounts.services.sensitive_actions._generate_code", return_value="111222"):
+			otp_request = request_sensitive_action(
+				branch=self.branch,
+				action_type=SensitiveActionRequest.ACTION_PAYROLL_EDIT,
+				target_model="PayrollEntry",
+				target_id=42,
+				previous_state={"base_salary": 50000},
+				requested_state={"base_salary": 60000},
+				requested_by=self.manager,
+			)
+
+		applied_states = []
+
+		def _apply(request_obj):
+			applied_states.append(request_obj.requested_state)
+			return request_obj.requested_state
+
+		confirm_sensitive_action(
+			request_id=otp_request.pk,
+			code="111222",
+			approver=self.dg,
+			apply_callback=_apply,
+		)
+
+		otp_request.refresh_from_db()
+		self.assertEqual(otp_request.status, SensitiveActionRequest.STATUS_APPROVED)
+		self.assertEqual(otp_request.approved_by, self.dg)
+		self.assertEqual(applied_states, [{"base_salary": 60000}])
+		self.assertTrue(
+			FinancialAuditLog.objects.filter(
+				sensitive_action_request=otp_request,
+				performed_by=self.manager,
+				approved_by=self.dg,
+				new_state={"base_salary": 60000},
+			).exists()
+		)
+
+	def test_confirm_sensitive_action_with_wrong_code_increments_attempts_and_does_not_apply(self):
+		with patch("accounts.services.sensitive_actions._generate_code", return_value="333444"):
+			otp_request = request_sensitive_action(
+				branch=self.branch,
+				action_type=SensitiveActionRequest.ACTION_PAYROLL_EDIT,
+				target_model="PayrollEntry",
+				target_id=42,
+				previous_state={"base_salary": 50000},
+				requested_state={"base_salary": 60000},
+				requested_by=self.manager,
+			)
+
+		applied = []
+		with self.assertRaises(SensitiveActionError):
+			confirm_sensitive_action(
+				request_id=otp_request.pk,
+				code="000000",
+				approver=self.dg,
+				apply_callback=lambda request_obj: applied.append(True),
+			)
+
+		otp_request.refresh_from_db()
+		self.assertEqual(otp_request.attempts, 1)
+		self.assertEqual(otp_request.status, SensitiveActionRequest.STATUS_PENDING)
+		self.assertEqual(applied, [])
+		self.assertFalse(FinancialAuditLog.objects.exists())
+
+	def test_confirm_sensitive_action_after_expiry_marks_expired_and_raises(self):
+		with patch("accounts.services.sensitive_actions._generate_code", return_value="555666"):
+			otp_request = request_sensitive_action(
+				branch=self.branch,
+				action_type=SensitiveActionRequest.ACTION_PAYROLL_EDIT,
+				target_model="PayrollEntry",
+				target_id=42,
+				previous_state={"base_salary": 50000},
+				requested_state={"base_salary": 60000},
+				requested_by=self.manager,
+			)
+		otp_request.expires_at = timezone.now() - timezone.timedelta(minutes=1)
+		otp_request.save(update_fields=["expires_at"])
+
+		with self.assertRaises(SensitiveActionError):
+			confirm_sensitive_action(
+				request_id=otp_request.pk,
+				code="555666",
+				approver=self.dg,
+				apply_callback=lambda request_obj: request_obj.requested_state,
+			)
+
+		otp_request.refresh_from_db()
+		self.assertEqual(otp_request.status, SensitiveActionRequest.STATUS_EXPIRED)
+
+
+class SalaryCorrectionOtpWorkflowTests(TestCase):
+	"""Extension du workflow OTP aux fiches de paie deja payees (Phase 1, point 3.2)."""
+
+	def setUp(self):
+		self.branch = Branch.objects.create(
+			name="Annexe Correction Paie",
+			code="ACP",
+			slug="annexe-correction-paie",
+		)
+		self.manager = USER_MANAGER.create_user(
+			username="salary_otp_manager",
+			email="salary_otp_manager@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		group, _ = Group.objects.get_or_create(name="gestionnaire")
+		self.manager.groups.add(group)
+		self.manager.profile.branch = self.branch
+		self.manager.profile.save(update_fields=["branch", "updated_at"])
+
+		self.dg = USER_MANAGER.create_user(
+			username="salary_otp_dg",
+			email="salary_otp_dg@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		self.dg.profile.position = "executive_director"
+		self.dg.profile.save(update_fields=["position", "updated_at"])
+
+		self.employee = USER_MANAGER.create_user(
+			username="salary_otp_employee",
+			email="salary_otp_employee@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		employee_profile = self.employee.profile
+		employee_profile.branch = self.branch
+		employee_profile.salary_base = 80000
+		employee_profile.position = "secretary"
+		employee_profile.user_type = "staff"
+		employee_profile.save(update_fields=["branch", "salary_base", "position", "user_type", "updated_at"])
+
+		self.entry = PayrollEntry.objects.create(
+			branch=self.branch,
+			employee=self.employee,
+			period_month="2026-05-01",
+			base_salary=80000,
+			paid_amount=80000,
+			status=PayrollEntry.STATUS_PAID,
+			created_by=self.manager,
+			updated_by=self.manager,
+		)
+
+		self.client.force_login(self.manager)
+
+	def _post_correction(self, base_salary="90000", confirmation="CORRIGER"):
+		return self.client.post(
+			reverse("accounts:htmx_manager_salary_upsert", args=[self.employee.id]),
+			{
+				"period_month": "2026-05-01",
+				"base_salary": base_salary,
+				"allowances": "0",
+				"deductions": "0",
+				"advances": "0",
+				"notes": "",
+				"reason": "Correction test",
+				"confirmation": confirmation,
+			},
+		)
+
+	def test_correcting_a_paid_entry_without_confirmation_keyword_is_rejected(self):
+		response = self._post_correction(confirmation="")
+
+		self.assertEqual(response.status_code, 400)
+		self.entry.refresh_from_db()
+		self.assertEqual(self.entry.base_salary, 80000)
+		self.assertFalse(SensitiveActionRequest.objects.exists())
+
+	def test_correcting_a_paid_entry_sends_otp_without_applying_change(self):
+		response = self._post_correction()
+
+		self.assertEqual(response.status_code, 200)
+		self.entry.refresh_from_db()
+		self.assertEqual(self.entry.base_salary, 80000)
+		otp_request = SensitiveActionRequest.objects.get()
+		self.assertEqual(otp_request.action_type, SensitiveActionRequest.ACTION_PAYROLL_EDIT)
+		self.assertEqual(otp_request.target_model, "PayrollEntry")
+		self.assertEqual(otp_request.target_id, self.entry.pk)
+		self.assertEqual(otp_request.requested_state["base_salary"], 90000)
+		self.assertTrue(
+			CommunicationNotification.objects.filter(recipient=self.dg, event_type="sensitive_action_otp").exists()
+		)
+
+	def test_confirming_correction_with_correct_code_applies_change_and_logs_audit(self):
+		with patch("accounts.services.sensitive_actions._generate_code", return_value="123456"):
+			self._post_correction()
+		otp_request = SensitiveActionRequest.objects.get()
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_salary_correct_confirm_otp", args=[self.entry.id]),
+			{"otp_request_id": otp_request.pk, "otp_code": "123456"},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.entry.refresh_from_db()
+		self.assertEqual(self.entry.base_salary, 90000)
+		otp_request.refresh_from_db()
+		self.assertEqual(otp_request.status, SensitiveActionRequest.STATUS_APPROVED)
+		self.assertTrue(
+			FinancialAuditLog.objects.filter(
+				sensitive_action_request=otp_request,
+				target_model="PayrollEntry",
+				target_id=self.entry.pk,
+			).exists()
+		)
+
+	def test_confirming_correction_with_wrong_code_does_not_apply_change(self):
+		with patch("accounts.services.sensitive_actions._generate_code", return_value="123456"):
+			self._post_correction()
+		otp_request = SensitiveActionRequest.objects.get()
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_salary_correct_confirm_otp", args=[self.entry.id]),
+			{"otp_request_id": otp_request.pk, "otp_code": "000000"},
+		)
+
+		self.assertEqual(response.status_code, 400)
+		self.entry.refresh_from_db()
+		self.assertEqual(self.entry.base_salary, 80000)
+
+
+class HonorariumCorrectionOtpWorkflowTests(TestCase):
+	"""Extension du workflow OTP aux honoraires enseignants deja payes (Phase 1, point 3.2)."""
+
+	def setUp(self):
+		self.branch = Branch.objects.create(
+			name="Annexe Correction Honoraires",
+			code="ACH",
+			slug="annexe-correction-honoraires",
+		)
+		self.manager = USER_MANAGER.create_user(
+			username="honorarium_otp_manager",
+			email="honorarium_otp_manager@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		group, _ = Group.objects.get_or_create(name="gestionnaire")
+		self.manager.groups.add(group)
+		self.manager.profile.branch = self.branch
+		self.manager.profile.save(update_fields=["branch", "updated_at"])
+
+		self.dg = USER_MANAGER.create_user(
+			username="honorarium_otp_dg",
+			email="honorarium_otp_dg@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		self.dg.profile.position = "executive_director"
+		self.dg.profile.save(update_fields=["position", "updated_at"])
+
+		self.teacher = USER_MANAGER.create_user(
+			username="honorarium_otp_teacher",
+			email="honorarium_otp_teacher@example.com",
+			password="pass1234",
+			is_staff=True,
+		)
+		teacher_profile = self.teacher.profile
+		teacher_profile.branch = self.branch
+		teacher_profile.teacher_hourly_rate = 2000
+		teacher_profile.position = "teacher"
+		teacher_profile.user_type = "staff"
+		teacher_profile.save(update_fields=["branch", "teacher_hourly_rate", "position", "user_type", "updated_at"])
+
+		self.entry = TeacherHonorariumEntry.objects.create(
+			branch=self.branch,
+			teacher=self.teacher,
+			period_month="2026-05-01",
+			hourly_rate=2000,
+			validated_hours=Decimal("10"),
+			paid_amount=20000,
+			status=TeacherHonorariumEntry.STATUS_PAID,
+			created_by=self.manager,
+			updated_by=self.manager,
+		)
+
+		self.client.force_login(self.manager)
+
+	def _post_correction(self, hourly_rate="2500", confirmation="CORRIGER"):
+		return self.client.post(
+			reverse("accounts:htmx_manager_teacher_honorarium_upsert", args=[self.teacher.id]),
+			{
+				"period_month": "2026-05-01",
+				"hourly_rate": hourly_rate,
+				"validated_hours": "10",
+				"adjustments": "0",
+				"deductions": "0",
+				"advances": "0",
+				"notes": "",
+				"reason": "Correction test",
+				"confirmation": confirmation,
+			},
+		)
+
+	def test_correcting_a_paid_entry_without_confirmation_keyword_is_rejected(self):
+		response = self._post_correction(confirmation="")
+
+		self.assertEqual(response.status_code, 400)
+		self.entry.refresh_from_db()
+		self.assertEqual(self.entry.hourly_rate, 2000)
+		self.assertFalse(SensitiveActionRequest.objects.exists())
+
+	def test_correcting_a_paid_entry_sends_otp_without_applying_change(self):
+		response = self._post_correction()
+
+		self.assertEqual(response.status_code, 200)
+		self.entry.refresh_from_db()
+		self.assertEqual(self.entry.hourly_rate, 2000)
+		otp_request = SensitiveActionRequest.objects.get()
+		self.assertEqual(otp_request.action_type, SensitiveActionRequest.ACTION_HONORARIUM_EDIT)
+		self.assertEqual(otp_request.target_model, "TeacherHonorariumEntry")
+		self.assertEqual(otp_request.target_id, self.entry.pk)
+		self.assertEqual(otp_request.requested_state["hourly_rate"], 2500)
+
+	def test_confirming_correction_with_correct_code_applies_change_and_logs_audit(self):
+		with patch("accounts.services.sensitive_actions._generate_code", return_value="789012"):
+			self._post_correction()
+		otp_request = SensitiveActionRequest.objects.get()
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_teacher_honorarium_correct_confirm_otp", args=[self.entry.id]),
+			{"otp_request_id": otp_request.pk, "otp_code": "789012"},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.entry.refresh_from_db()
+		self.assertEqual(self.entry.hourly_rate, 2500)
+		otp_request.refresh_from_db()
+		self.assertEqual(otp_request.status, SensitiveActionRequest.STATUS_APPROVED)
+		self.assertTrue(
+			FinancialAuditLog.objects.filter(
+				sensitive_action_request=otp_request,
+				target_model="TeacherHonorariumEntry",
+				target_id=self.entry.pk,
+			).exists()
+		)
+
+	def test_confirming_correction_with_wrong_code_does_not_apply_change(self):
+		with patch("accounts.services.sensitive_actions._generate_code", return_value="789012"):
+			self._post_correction()
+		otp_request = SensitiveActionRequest.objects.get()
+
+		response = self.client.post(
+			reverse("accounts:htmx_manager_teacher_honorarium_correct_confirm_otp", args=[self.entry.id]),
+			{"otp_request_id": otp_request.pk, "otp_code": "000000"},
+		)
+
+		self.assertEqual(response.status_code, 400)
+		self.entry.refresh_from_db()
+		self.assertEqual(self.entry.hourly_rate, 2000)
 

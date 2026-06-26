@@ -20,7 +20,7 @@
     <label>Titre <input name="title" required placeholder="Incident ou demande"></label>
     <label>Description <input name="description" placeholder="Contexte utile"></label>
   </div>
-  <button class="workflow-btn workflow-btn-primary" type="submit">Creer ticket</button>
+  <button class="workflow-btn workflow-btn-primary" type="submit"><i data-lucide="plus" class="h-4 w-4"></i> Creer ticket</button>
 </form>
 
 <div class="workflow-list">
@@ -35,13 +35,13 @@
         {% if ticket.status == "open" %}
           <form method="post" hx-post="{% url 'accounts_portal:it_support_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
             {% csrf_token %}<input type="hidden" name="action" value="take"><input type="hidden" name="ticket_id" value="{{ ticket.id }}">
-            <button class="workflow-btn workflow-btn-secondary" type="submit">Prendre</button>
+            <button class="workflow-btn workflow-btn-secondary" type="submit"><i data-lucide="hand" class="h-4 w-4"></i> Prendre</button>
           </form>
         {% endif %}
         {% if ticket.status != "resolved" %}
           <form method="post" hx-post="{% url 'accounts_portal:it_support_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
             {% csrf_token %}<input type="hidden" name="action" value="resolve"><input type="hidden" name="ticket_id" value="{{ ticket.id }}">
-            <button class="workflow-btn workflow-btn-primary" type="submit">Resoudre</button>
+            <button class="workflow-btn workflow-btn-primary" type="submit"><i data-lucide="check-circle" class="h-4 w-4"></i> Resoudre</button>
           </form>
         {% endif %}
       </div>
@@ -57,10 +57,10 @@
   </p>
   <div class="flex flex-wrap gap-2">
     {% if tickets_page.has_previous %}
-    <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_support_flow_workspace' %}?status={{ status }}&page={{ tickets_page.previous_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Precedent</button>
+    <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_support_flow_workspace' %}?status={{ status }}&page={{ tickets_page.previous_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML"><i data-lucide="chevron-left" class="h-4 w-4"></i> Precedent</button>
     {% endif %}
     {% if tickets_page.has_next %}
-    <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_support_flow_workspace' %}?status={{ status }}&page={{ tickets_page.next_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
+    <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_support_flow_workspace' %}?status={{ status }}&page={{ tickets_page.next_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant <i data-lucide="chevron-right" class="h-4 w-4"></i></button>
     {% endif %}
   </div>
 </div>

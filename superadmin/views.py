@@ -20,6 +20,7 @@ from io import BytesIO
 import secrets
 import logging
 import re
+import json
 from urllib.parse import urlencode
 
 from reportlab.lib import colors
@@ -32,6 +33,7 @@ from formations.models import Programme, Cycle, Diploma, Fee, Filiere, Programme
 from admissions.models import Candidature, CandidatureDocument
 from blog.models import Article, Comment, Category as BlogCategory
 from blog.forms import ArticleForm
+from superadmin.forms import ProgrammeForm
 from news.models import News, Event, EventType, MediaItem, ResultSession, Category as NewsCategory
 from news.services import create_event_media_batch
 from communication.models import CommunicationNotification
@@ -678,6 +680,54 @@ def _multiline_text_to_items(raw_value):
             items.append(cleaned)
     return items
 
+
+def _save_programme_years_and_fees(programme, post):
+    """Synchronise les années (ProgrammeYear) et leurs frais (Fee) à partir
+    des champs dynamiques `year_number_{i}` / `fee_label_{i}_{j}` /
+    `fee_amount_{i}_{j}` / `fee_due_month_{i}_{j}` soumis par le formulaire."""
+    year_indexes = [i for i in post.get('year_indexes', '').split(',') if i.strip()]
+
+    seen_year_numbers = set()
+    for idx in year_indexes:
+        raw_year_number = (post.get(f'year_number_{idx}') or '').strip()
+        if not raw_year_number:
+            continue
+        try:
+            year_number = int(raw_year_number)
+        except ValueError:
+            continue
+
+        programme_year, _ = ProgrammeYear.objects.update_or_create(
+            programme=programme,
+            year_number=year_number,
+        )
+        seen_year_numbers.add(year_number)
+
+        fee_indexes = [j for j in post.get(f'fee_indexes_{idx}', '').split(',') if j.strip()]
+        seen_labels = set()
+        for fee_idx in fee_indexes:
+            label = (post.get(f'fee_label_{idx}_{fee_idx}') or '').strip()
+            raw_amount = (post.get(f'fee_amount_{idx}_{fee_idx}') or '').strip()
+            due_month = (post.get(f'fee_due_month_{idx}_{fee_idx}') or '').strip()
+            if not label or not raw_amount:
+                continue
+            try:
+                amount = int(raw_amount)
+            except ValueError:
+                continue
+
+            Fee.objects.update_or_create(
+                programme_year=programme_year,
+                label=label,
+                defaults={'amount': amount, 'due_month': due_month},
+            )
+            seen_labels.add(label)
+
+        programme_year.fees.exclude(label__in=seen_labels).delete()
+
+    programme.years.exclude(year_number__in=seen_year_numbers).delete()
+
+
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def formation_list(request):
     formations = Programme.objects.select_related('cycle', 'filiere').all().order_by('-created_at')
@@ -712,36 +762,22 @@ def formation_list(request):
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def formation_create(request):
-    if request.method == 'POST':
-        title = request.POST.get('title')
-        if not title:
-            messages.error(request, "Le titre est obligatoire.")
-            return redirect('superadmin:formation_create')
+    form = ProgrammeForm(request.POST or None, request.FILES or None)
 
-        Programme.objects.create(
-            title=title,
-            short_description=request.POST.get('short_description', ''),
-            description=request.POST.get('description', ''),
-            cycle_id=request.POST.get('cycle') or None,
-            filiere_id=request.POST.get('filiere') or None,
-            diploma_awarded_id=request.POST.get('diploma_awarded') or None,
-            duration_years=request.POST.get('duration_years', 3),
-            learning_outcomes=request.POST.get('learning_outcomes', ''),
-            career_opportunities=request.POST.get('career_opportunities', ''),
-            program_structure=request.POST.get('program_structure', ''),
-            is_active=request.POST.get('is_active') == 'on',
-            is_featured=request.POST.get('is_featured') == 'on',
-            illustration=request.FILES.get('illustration'),
-        )
-        messages.success(request, f"Formation '{title}' créée!")
-        return redirect('superadmin:formation_list')
+    if request.method == 'POST':
+        if form.is_valid():
+            programme = form.save()
+            _save_programme_years_and_fees(programme, request.POST)
+            messages.success(request, f"Formation '{programme.title}' créée!")
+            return redirect('superadmin:formation_list')
+
+        messages.error(request, "Veuillez corriger les champs du formulaire.")
 
     context = {
         'page_title': 'Nouvelle Formation',
+        'form': form,
         'programme': Programme(),
-        'cycles': Cycle.objects.all(),
-        'filieres': Filiere.objects.all(),
-        'diplomas': Diploma.objects.all(),
+        'initial_years_json': json.dumps([]),
     }
     return render(request, 'superadmin/formations/form.html', context)
 
@@ -761,35 +797,32 @@ def formation_detail(request, pk):
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def formation_edit(request, pk):
     formation = get_object_or_404(Programme, pk=pk)
+    form = ProgrammeForm(request.POST or None, request.FILES or None, instance=formation)
 
     if request.method == 'POST':
-        formation.title = request.POST.get('title', formation.title)
-        formation.short_description = request.POST.get('short_description', formation.short_description)
-        formation.description = request.POST.get('description', formation.description)
-        formation.cycle_id = request.POST.get('cycle') or None
-        formation.filiere_id = request.POST.get('filiere') or None
-        formation.diploma_awarded_id = request.POST.get('diploma_awarded') or None
-        formation.duration_years = request.POST.get('duration_years', formation.duration_years)
-        formation.learning_outcomes = request.POST.get('learning_outcomes', formation.learning_outcomes)
-        formation.career_opportunities = request.POST.get('career_opportunities', formation.career_opportunities)
-        formation.program_structure = request.POST.get('program_structure', formation.program_structure)
-        formation.is_active = request.POST.get('is_active') == 'on'
-        formation.is_featured = request.POST.get('is_featured') == 'on'
-        
-        # Handle file upload
-        if request.FILES.get('illustration'):
-            formation.illustration = request.FILES['illustration']
-        
-        formation.save()
-        messages.success(request, f"Formation '{formation.title}' mise à jour!")
-        return redirect('superadmin:formation_list')
+        if form.is_valid():
+            formation = form.save()
+            _save_programme_years_and_fees(formation, request.POST)
+            messages.success(request, f"Formation '{formation.title}' mise à jour!")
+            return redirect('superadmin:formation_list')
 
+        messages.error(request, "Veuillez corriger les champs du formulaire.")
+
+    existing_years = formation.years.order_by('year_number').prefetch_related('fees')
     context = {
         'page_title': f'Modifier: {formation.title}',
+        'form': form,
         'programme': formation,
-        'cycles': Cycle.objects.all(),
-        'filieres': Filiere.objects.all(),
-        'diplomas': Diploma.objects.all(),
+        'initial_years_json': json.dumps([
+            {
+                'year_number': year.year_number,
+                'fees': [
+                    {'label': fee.label, 'amount': fee.amount, 'due_month': fee.due_month}
+                    for fee in year.fees.all()
+                ],
+            }
+            for year in existing_years
+        ]),
     }
     return render(request, 'superadmin/formations/form.html', context)
 

@@ -655,3 +655,62 @@ class TransferRequest(models.Model):
 
     def __str__(self):
         return f"{self.get_transfer_type_display()} - {self.enrollment}"
+
+
+class AdministrativeDocument(models.Model):
+    TYPE_NOTE_SERVICE = "note_service"
+    TYPE_AVIS = "avis"
+    TYPE_LETTRE = "lettre"
+    TYPE_CONVOCATION = "convocation"
+    TYPE_FICHE_TRANSFERT = "fiche_transfert"
+    TYPE_FICHE_FREQUENTATION = "fiche_frequentation"
+
+    TYPE_CHOICES = [
+        (TYPE_NOTE_SERVICE, "Note de service"),
+        (TYPE_AVIS, "Avis"),
+        (TYPE_LETTRE, "Lettre"),
+        (TYPE_CONVOCATION, "Convocation"),
+        (TYPE_FICHE_TRANSFERT, "Fiche de transfert"),
+        (TYPE_FICHE_FREQUENTATION, "Fiche de frequentation"),
+    ]
+
+    STATUS_DRAFT = "draft"
+    STATUS_PUBLISHED = "published"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_PUBLISHED, "Publie"),
+    ]
+
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="admin_documents",
+        db_index=True,
+    )
+    doc_type = models.CharField(max_length=30, choices=TYPE_CHOICES, db_index=True)
+    title = models.CharField(max_length=200)
+    reference = models.CharField(max_length=100, blank=True)
+    body = models.TextField()
+    recipients = models.TextField(blank=True, help_text="Destinataires (libre)")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="admin_documents_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Document administratif"
+        verbose_name_plural = "Documents administratifs"
+        indexes = [
+            models.Index(fields=["branch", "doc_type"]),
+            models.Index(fields=["branch", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_doc_type_display()} - {self.title}"

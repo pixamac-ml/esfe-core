@@ -10,6 +10,7 @@ from portal.views import (
     load_student_results,
     publish_semester_view,
     save_grade,
+    save_grade_confirm_otp,
 )
 from portal.views.admin_grades import excel_grade_view
 from portal.views.it_grades_import import it_grades_import_view
@@ -100,6 +101,10 @@ from portal.views.supervisor import (
 )
 from portal.views.views import (
     admissions_portal,
+    director_correspondance_create,
+    director_correspondance_pdf,
+    director_correspondance_publish,
+    director_programme_action,
     dg_action,
     dg_assign_manager_modal,
     dg_closure_detail,
@@ -121,9 +126,11 @@ from portal.views.views import (
     director_teacher_documents_modal,
     director_teacher_document_upload,
     director_teacher_document_review,
+    director_export_report_xlsx,
     director_planner_hub,
     director_planner_view_workspace,
     director_planner_workspace,
+    director_results_confirm_otp,
     director_weekly_slots_workspace,
     director_weekly_slot_save,
     director_week_materialize,
@@ -132,6 +139,7 @@ from portal.views.views import (
     director_transfer_create,
     director_transfer_review,
     director_results_action,
+    director_results_confirm_otp,
     director_bulletin_action,
     director_workspace,
     finance_portal,
@@ -189,10 +197,16 @@ urlpatterns = [
     path("director/teachers/documents/modal/", director_teacher_documents_modal, name="director_teacher_documents_modal"),
     path("director/teachers/documents/upload/", director_teacher_document_upload, name="director_teacher_document_upload"),
     path("director/teachers/documents/review/", director_teacher_document_review, name="director_teacher_document_review"),
+    path("director/programme/action/", director_programme_action, name="director_programme_action"),
+    path("director/correspondances/create/", director_correspondance_create, name="director_correspondance_create"),
+    path("director/correspondances/<int:doc_id>/pdf/", director_correspondance_pdf, name="director_correspondance_pdf"),
+    path("director/correspondances/<int:doc_id>/publish/", director_correspondance_publish, name="director_correspondance_publish"),
     path("director/transfers/create/", director_transfer_create, name="director_transfer_create"),
     path("director/transfers/review/", director_transfer_review, name="director_transfer_review"),
     path("director/results/action/", director_results_action, name="director_results_action"),
+    path("director/results/confirm-otp/", director_results_confirm_otp, name="director_results_confirm_otp"),
     path("director/bulletins/action/", director_bulletin_action, name="director_bulletin_action"),
+    path("director/export/report/xlsx/", director_export_report_xlsx, name="director_export_report_xlsx"),
     path("director/planner/hub/", director_planner_hub, name="director_planner_hub"),
     path("director/planner/view/", director_planner_view_workspace, name="director_planner_view_workspace"),
     path("director/planner/workspace/", director_planner_workspace, name="director_planner_workspace"),
@@ -453,6 +467,7 @@ urlpatterns = [
     path("admin/grades/<int:enrollment_id>/", load_student_results, name="load_student_results"),
     path("admin/grades/<int:enrollment_id>/<int:semester_id>/", load_grades_table, name="load_grades_table"),
     path("admin/grades/save/", save_grade, name="save_grade"),
+    path("admin/grades/save/confirm-otp/", save_grade_confirm_otp, name="save_grade_confirm_otp"),
     path(
         "admin/grades/<int:enrollment_id>/<int:semester_id>/publish/",
         publish_semester_view,

@@ -16,3 +16,4 @@ from .teacher_management_service import (
     generate_teacher_contract,
     generate_teacher_contract_pdf,
 )
+from .tasks_center import build_director_tasks_center

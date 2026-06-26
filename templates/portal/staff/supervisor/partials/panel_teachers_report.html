@@ -1,0 +1,132 @@
+{% load humanize %}
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    .shell, .rail, .work-head, #topbar-loader { display: none !important; }
+    body { background: #fff !important; }
+    .print-page { padding: 24px; }
+    .report-table { font-size: 11px; }
+  }
+</style>
+
+<div class="print-page">
+
+  <!-- Navigation semaine -->
+  <div class="toolbar no-print">
+    <a class="btn"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=teachers_report&week_start={{ report_prev_week|date:'Y-m-d' }}"
+       hx-target="#supervisor-workspace" hx-push-url="true" hx-indicator="#topbar-loader">
+      <svg class="i" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      Semaine précédente
+    </a>
+    <span class="btn ghost" style="cursor:default;color:var(--ink-2)">
+      {{ report_week_start|date:"d M" }} — {{ report_week_end|date:"d M Y" }}
+    </span>
+    <a class="btn"
+       hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=teachers_report&week_start={{ report_next_week|date:'Y-m-d' }}"
+       hx-target="#supervisor-workspace" hx-push-url="true" hx-indicator="#topbar-loader">
+      Semaine suivante
+      <svg class="i" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+    </a>
+    <div style="flex:1"></div>
+    <button class="btn primary" onclick="window.print()">
+      <svg class="i" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Imprimer
+    </button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="grid cards-3" style="margin-bottom:16px">
+    <div class="stat">
+      <div class="k"><span class="dot" style="background:var(--ink-2)"></span>Séances programmées</div>
+      <div class="v">{{ report_total_events }}</div>
+      <div class="d">sur la semaine sélectionnée</div>
+    </div>
+    <div class="stat">
+      <div class="k"><span class="dot" style="background:var(--bad)"></span>Absences enseignants</div>
+      <div class="v">{{ report_absent_count }}</div>
+      <div class="d">séances sans enseignant</div>
+    </div>
+    <div class="stat">
+      <div class="k"><span class="dot" style="background:var(--warn)"></span>Retards enregistrés</div>
+      <div class="v">{{ report_late_count }}</div>
+      <div class="d">prises de service tardives</div>
+    </div>
+  </div>
+
+  <!-- Tableau rapport -->
+  <div class="card">
+    <div class="card-h">
+      <h3>Régularité par enseignant — {{ report_week_start|date:"d M" }} au {{ report_week_end|date:"d M Y" }}</h3>
+      <span class="src-badge no-print">⤿ Académique</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="report-table" style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);text-align:left">
+            <th style="padding:11px 16px;font-size:11px;font-weight:800;color:var(--ink-2);border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em">Enseignant</th>
+            <th style="padding:11px 12px;font-size:11px;font-weight:800;color:var(--ink-2);border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em;text-align:center">Programmés</th>
+            <th style="padding:11px 12px;font-size:11px;font-weight:800;color:var(--ok);border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em;text-align:center">Tenus</th>
+            <th style="padding:11px 12px;font-size:11px;font-weight:800;color:var(--bad);border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em;text-align:center">Absences</th>
+            <th style="padding:11px 12px;font-size:11px;font-weight:800;color:var(--warn);border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em;text-align:center">Retards</th>
+            <th style="padding:11px 16px;font-size:11px;font-weight:800;color:var(--ink-2);border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em;text-align:center">Taux régularité</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in report_teachers %}
+          <tr style="border-bottom:1px solid var(--line-2)">
+            <td style="padding:13px 16px">
+              <b style="display:block;font-weight:700;font-size:13.5px">{{ t.name }}</b>
+              <span style="font-size:11.5px;color:var(--ink-3)">{{ t.subjects|join:", " }}</span>
+            </td>
+            <td style="padding:13px 12px;text-align:center;font-weight:700;color:var(--ink-2)">{{ t.planned }}</td>
+            <td style="padding:13px 12px;text-align:center">
+              <span style="font-weight:800;color:var(--ok)">{{ t.held }}</span>
+            </td>
+            <td style="padding:13px 12px;text-align:center">
+              {% if t.absent %}
+                <span class="chip bad">{{ t.absent }}</span>
+              {% else %}
+                <span style="color:var(--ink-3)">—</span>
+              {% endif %}
+            </td>
+            <td style="padding:13px 12px;text-align:center">
+              {% if t.late %}
+                <span class="chip warn">{{ t.late }}</span>
+              {% else %}
+                <span style="color:var(--ink-3)">—</span>
+              {% endif %}
+            </td>
+            <td style="padding:13px 16px;text-align:center">
+              {% if t.regularity_rate is not None %}
+                {% if t.regularity_rate >= 80 %}
+                  <span class="chip ok">{{ t.regularity_rate }}%</span>
+                {% elif t.regularity_rate >= 50 %}
+                  <span class="chip warn">{{ t.regularity_rate }}%</span>
+                {% else %}
+                  <span class="chip bad">{{ t.regularity_rate }}%</span>
+                {% endif %}
+              {% else %}
+                <span class="chip mute">N/A</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" style="padding:48px 24px;text-align:center;color:var(--ink-3)">
+              <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:6px">Aucune séance cette semaine</div>
+              <div style="font-size:13px">Aucun cours programmé pour la période du {{ report_week_start|date:"d M" }} au {{ report_week_end|date:"d M Y" }}.</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pied de page impression -->
+  <div style="margin-top:24px;font-size:11px;color:var(--ink-3);text-align:right">
+    Rapport généré le {{ today|date:"d F Y" }} — Surveillant Général
+  </div>
+
+</div>

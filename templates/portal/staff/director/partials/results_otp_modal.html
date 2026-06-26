@@ -1,0 +1,39 @@
+<div class="grid gap-5">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <p class="portal-section-kicker">Publication</p>
+      <h3 class="mt-1 text-2xl font-black text-slate-900">Validation DG/DGA requise</h3>
+      {% if class_label %}
+      <p class="mt-1 text-sm font-semibold text-slate-500">{{ class_label }} - Semestre {{ semester_number }}</p>
+      {% endif %}
+    </div>
+    <button type="button" class="director-btn director-btn-secondary" onclick="window.deCloseModal && window.deCloseModal()">Fermer</button>
+  </div>
+
+  {% if otp_error %}
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{{ otp_error }}</div>
+  {% elif otp_request_id %}
+    <p class="text-sm font-semibold text-slate-500">
+      Un code de validation a ete envoye au DG/DGA de l'annexe pour confirmer la publication
+      definitive des resultats. Saisissez le code recu ci-dessous (validite : {{ otp_validity_minutes|default:5 }} minutes).
+    </p>
+    <form class="grid gap-4" method="post" hx-post="{% url 'accounts_portal:director_results_confirm_otp' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="otp_request_id" value="{{ otp_request_id }}">
+      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+        Code de validation
+        <input
+          type="text"
+          name="otp_code"
+          inputmode="numeric"
+          maxlength="6"
+          autocomplete="one-time-code"
+          placeholder="123456"
+          class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-center text-lg font-black tracking-widest text-slate-900 outline-none"
+          required
+        >
+      </label>
+      <button type="submit" class="director-btn director-btn-primary">Confirmer la publication</button>
+    </form>
+  {% endif %}
+</div>

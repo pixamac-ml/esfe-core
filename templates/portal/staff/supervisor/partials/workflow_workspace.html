@@ -1,35 +1,49 @@
 {% load component_tags %}
-{% comment %}
-Workspace HTMX principal du Surveillant Général (suivi terrain).
-Workflow strict :
-  1) Accueil et Enseignants sont accessibles sans classe selectionnee.
-  2) Toute autre section necessite une classe selectionnee.
-Toutes les donnees sont filtrees cote vue par request.user.branch.
-{% endcomment %}
-
 {% include "portal/staff/supervisor/partials/_sidebar_nav_inner.html" %}
 {% include "portal/staff/supervisor/partials/_work_head_inner.html" %}
 
 <div class="panel">
 {% if branch is None %}
   {% component "empty_state" icon="alert-triangle" title="Aucune annexe rattachée" message="Veuillez contacter l'administrateur pour associer une annexe à ce compte." %}{% endcomponent %}
+
 {% elif section == 'home' %}
   {% include "portal/staff/supervisor/partials/panel_home.html" %}
+
+{% elif section == 'attendance' %}
+  {% if selected_class %}
+    {% include "portal/staff/supervisor/partials/panel_attendance.html" %}
+  {% else %}
+    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
+  {% endif %}
+
+{% elif section == 'attendance_report' %}
+  {% if selected_class %}
+    {% include "portal/staff/supervisor/partials/panel_attendance_report.html" %}
+  {% else %}
+    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
+  {% endif %}
+
 {% elif section == 'teachers' %}
   {% include "portal/staff/supervisor/partials/panel_teachers.html" %}
-{% elif not selected_class %}
-  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
-{% elif section == 'classes' %}
-  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
-{% elif section == 'attendance' %}
-  {% include "portal/staff/supervisor/partials/panel_attendance.html" %}
-{% elif section == 'schedule' %}
-  {% include "portal/staff/supervisor/partials/panel_schedule.html" %}
-{% elif section == 'courses' %}
-  {% include "portal/staff/supervisor/partials/panel_courses.html" %}
+
+{% elif section == 'teachers_report' %}
+  {% include "portal/staff/supervisor/partials/panel_teachers_report.html" %}
+
+{% elif section == 'courses' or section == 'schedule' %}
+  {% if selected_class %}
+    {% include "portal/staff/supervisor/partials/panel_courses.html" %}
+  {% else %}
+    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
+  {% endif %}
+
 {% elif section == 'students' %}
-  {% include "portal/staff/supervisor/partials/panel_students.html" %}
+  {% if selected_class %}
+    {% include "portal/staff/supervisor/partials/panel_students.html" %}
+  {% else %}
+    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
+  {% endif %}
+
 {% else %}
-  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
+  {% include "portal/staff/supervisor/partials/panel_home.html" %}
 {% endif %}
 </div>

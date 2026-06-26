@@ -9,6 +9,12 @@ from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 
+from academic_cycle.models import GradeModificationRequest
+from academic_cycle.services.grade_modifications import (
+    GradeModificationError,
+    confirm_grade_modification,
+    request_grade_modification,
+)
 from academics.models import AcademicEnrollment, EC, ECGrade, Semester
 from academics.services.grading import apply_ec_grade, compute_ec_status, resolve_ec_threshold, resolve_threshold
 from academics.services.semester import compute_semester_result
@@ -392,6 +398,22 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
     }
 
 
+# Statuts de semestre pour lesquels une session est consideree "cloturee"
+# (donc eligible a une correction via OTP, plutot qu'a un blocage sec). Le
+# statut "jamais ouvert" (DRAFT pour le normal, DRAFT/NORMAL_ENTRY pour le
+# rattrapage) reste bloque sans OTP : il n'y a rien a "corriger".
+NORMAL_CLOSED_STATUSES = {
+    Semester.STATUS_NORMAL_LOCKED,
+    Semester.STATUS_RETAKE_ENTRY,
+    Semester.STATUS_FINALIZED,
+    Semester.STATUS_PUBLISHED,
+}
+RETAKE_CLOSED_STATUSES = {
+    Semester.STATUS_FINALIZED,
+    Semester.STATUS_PUBLISHED,
+}
+
+
 @login_required
 def save_grade(request):
     if request.method != "POST":
@@ -433,9 +455,13 @@ def save_grade(request):
     permissions = get_semester_permissions(semester)
     if session_type == "retake":
         if not permissions["can_enter_retake"]:
+            if request.POST.get("live") == "1" and semester.status in RETAKE_CLOSED_STATUSES:
+                return _request_grade_otp(request, enrollment=enrollment, ec=ec, session_type=session_type, raw_note=raw_note)
             return HttpResponse("Le rattrapage n'est pas autorise pour ce semestre.", status=403)
     else:
         if not permissions["can_enter_normal"]:
+            if request.POST.get("live") == "1" and semester.status in NORMAL_CLOSED_STATUSES:
+                return _request_grade_otp(request, enrollment=enrollment, ec=ec, session_type=session_type, raw_note=raw_note)
             return HttpResponse("La saisie normale n'est pas autorisee pour ce semestre.", status=403)
 
     if raw_note:
@@ -534,6 +560,120 @@ def save_grade(request):
         )
     response = HttpResponse(html)
     response["HX-Trigger"] = '{"kpi-update": "", "workflow-update": ""}'
+    return response
+
+
+def _request_grade_otp(request, *, enrollment, ec, session_type, raw_note):
+    """
+    Correction d'une note deja saisie dans une session deja cloturee
+    (dashboard informaticien uniquement, cf. CAHIER_DES_CHARGES_OTP_NOTES.md).
+
+    Ne s'applique qu'a une CORRECTION d'une note existante : si aucune note
+    n'a jamais ete saisie pour ce couple enrollment/EC/session, le blocage
+    normal (403) reste en vigueur, OTP ou pas.
+    """
+    if not raw_note:
+        return HttpResponse("La correction d'une session cloturee necessite une note.", status=400)
+    try:
+        note = Decimal(raw_note)
+    except (InvalidOperation, TypeError):
+        return HttpResponse("Note invalide", status=400)
+    if note < Decimal("0") or note > Decimal("20"):
+        return HttpResponse("La note doit etre comprise entre 0 et 20.", status=400)
+
+    grade = ECGrade.objects.filter(enrollment=enrollment, ec=ec).first()
+    existing_score = (grade.retake_score if session_type == "retake" else grade.normal_score) if grade else None
+    if existing_score is None:
+        message = (
+            "Le rattrapage n'est pas autorise pour ce semestre."
+            if session_type == "retake"
+            else "La saisie normale n'est pas autorisee pour ce semestre."
+        )
+        return HttpResponse(message, status=403)
+
+    branch = get_user_branch(request.user) or enrollment.branch
+    try:
+        otp_request = request_grade_modification(
+            branch=branch,
+            ec_grade=grade,
+            session_type=session_type,
+            requested_score=note,
+            requested_by=request.user,
+            reason=(request.POST.get("reason") or "").strip(),
+        )
+    except GradeModificationError as exc:
+        html = render_to_string(
+            "portal/admin/grades/partials/grade_otp_modal.html",
+            {"otp_error": str(exc)},
+            request=request,
+        )
+        return HttpResponse(f'<div id="it-modal-root" hx-swap-oob="true">{html}</div>')
+
+    html = render_to_string(
+        "portal/admin/grades/partials/grade_otp_modal.html",
+        {
+            "otp_request_id": otp_request.pk,
+            "otp_validity_minutes": GradeModificationRequest.OTP_VALIDITY_MINUTES,
+            "student_name": enrollment.student.get_full_name() or enrollment.student.username,
+            "ec_title": ec.title,
+        },
+        request=request,
+    )
+    return HttpResponse(f'<div id="it-modal-root" hx-swap-oob="true">{html}</div>')
+
+
+@login_required
+def save_grade_confirm_otp(request):
+    if request.method != "POST":
+        return HttpResponse("Methode non autorisee", status=405)
+
+    is_it_support = get_user_position(request.user) == "it_support"
+    if not can_access(request.user, "view_portal", "dashboard") and not is_it_support:
+        return HttpResponseForbidden("Acces refuse.")
+
+    otp_request_id = request.POST.get("otp_request_id")
+    otp_code = (request.POST.get("otp_code") or "").strip()
+
+    def _apply(otp_request):
+        grade = otp_request.ec_grade
+        if otp_request.session_type == GradeModificationRequest.SESSION_RETAKE:
+            grade.retake_score = otp_request.requested_score
+        else:
+            grade.normal_score = otp_request.requested_score
+        apply_ec_grade(grade)
+        grade.save()
+        grade.refresh_from_db()
+        compute_ue_result(grade.ec.ue, grade.enrollment)
+        compute_semester_result(grade.ec.ue.semester, grade.enrollment)
+        return {"score": str(otp_request.requested_score), "final_score": str(grade.final_score)}
+
+    try:
+        confirm_grade_modification(
+            request_id=otp_request_id,
+            code=otp_code,
+            approver=request.user,
+            apply_callback=_apply,
+        )
+    except (GradeModificationError, GradeModificationRequest.DoesNotExist) as exc:
+        message = str(exc) if isinstance(exc, GradeModificationError) else "Demande introuvable."
+        response = render(
+            request,
+            "portal/admin/grades/partials/grade_otp_modal.html",
+            {
+                "otp_request_id": otp_request_id,
+                "otp_error": message,
+                "otp_validity_minutes": GradeModificationRequest.OTP_VALIDITY_MINUTES,
+            },
+        )
+        response.status_code = 400
+        return response
+
+    response = render(
+        request,
+        "portal/admin/grades/partials/grade_otp_modal.html",
+        {"otp_success": True},
+    )
+    response["HX-Trigger"] = '{"kpi-update": "", "workflow-update": "", "it-modal-close": ""}'
     return response
 
 

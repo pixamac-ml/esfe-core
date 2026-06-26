@@ -112,13 +112,16 @@ def ensure_manager_branch(user: AbstractBaseUser) -> Branch | None:
 # PAGINATION STANDARD
 # ==========================================================
 
-def paginate_queryset(request: HttpRequest, queryset: QuerySet, per_page: int = 25) -> Any:
+def paginate_queryset(request: HttpRequest, queryset: QuerySet, per_page: int = 25, page_param: str = "page") -> Any:
     """
     Pagination securisee pour dashboards.
+
+    page_param permet d'avoir plusieurs listes paginees independamment sur le
+    meme ecran (ex: classes, etudiants et anomalies sur la meme section).
     """
     paginator = Paginator(queryset, per_page)
 
-    page_number = request.GET.get("page")
+    page_number = request.GET.get(page_param)
 
     try:
         page_obj = paginator.page(page_number)

@@ -2,6 +2,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
 from unidecode import unidecode
+from django_ckeditor_5.fields import CKEditor5Field
 
 
 # ==================================================
@@ -101,7 +102,7 @@ class Programme(models.Model):
     duration_years = models.PositiveSmallIntegerField()
 
     short_description = models.CharField(max_length=300)
-    description = models.TextField()
+    description = CKEditor5Field("Description", config_name="default")
 
     # ==================================================
     # CONTENU LANDING PAGE
@@ -129,6 +130,29 @@ class Programme(models.Model):
     )
 
     # ==================================================
+    # SEO / RESEAUX SOCIAUX (CAMPAGNES FACEBOOK)
+    # ==================================================
+
+    meta_title = models.CharField(
+        max_length=70,
+        blank=True,
+        help_text="Titre SEO/reseaux sociaux. Laisser vide pour utiliser le titre du programme."
+    )
+
+    meta_description = models.CharField(
+        max_length=160,
+        blank=True,
+        help_text="Description SEO/reseaux sociaux. Laisser vide pour utiliser la description courte."
+    )
+
+    og_image = models.ImageField(
+        upload_to="programmes/og_images/",
+        blank=True,
+        null=True,
+        help_text="Image dediee au partage social (recommande 1200x630px). Laisser vide pour utiliser l'illustration du programme."
+    )
+
+    # ==================================================
 
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
@@ -148,6 +172,18 @@ class Programme(models.Model):
 
     def get_absolute_url(self):
         return reverse("formations:detail", args=[self.slug])
+
+    @property
+    def effective_meta_title(self):
+        return self.meta_title or self.title
+
+    @property
+    def effective_meta_description(self):
+        return self.meta_description or self.short_description
+
+    @property
+    def effective_og_image(self):
+        return self.og_image or self.illustration
 
     def save(self, *args, **kwargs):
         if not self.slug:

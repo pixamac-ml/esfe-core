@@ -260,12 +260,14 @@ class SensitiveActionRequest(models.Model):
     ACTION_PAYMENT_CANCEL = "payment_cancel"
     ACTION_PAYROLL_EDIT = "payroll_edit"
     ACTION_HONORARIUM_EDIT = "honorarium_edit"
+    ACTION_SEMESTER_PUBLISH = "semester_publish"
 
     ACTION_CHOICES = [
         (ACTION_PAYMENT_EDIT, "Modification d'un paiement valide"),
         (ACTION_PAYMENT_CANCEL, "Annulation d'un paiement valide"),
         (ACTION_PAYROLL_EDIT, "Modification d'une fiche de paie deja payee"),
         (ACTION_HONORARIUM_EDIT, "Modification d'un honoraire deja paye"),
+        (ACTION_SEMESTER_PUBLISH, "Publication des resultats d'un semestre"),
     ]
 
     STATUS_PENDING = "pending"

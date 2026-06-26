@@ -183,8 +183,17 @@ def formation_detail(request, slug):
 
     main_branch = Branch.objects.filter(is_active=True).order_by("name").first()
 
+    effective_og_image = programme.effective_og_image
+    og_image_url = request.build_absolute_uri(effective_og_image.url) if effective_og_image else None
+
     context = {
         "programme": programme,
+        "page_title": f"{programme.title} - ESFE",
+        "meta_description": programme.effective_meta_description,
+        "meta_og_title": programme.effective_meta_title,
+        "meta_og_description": programme.effective_meta_description,
+        "og_image_url": og_image_url,
+        "og_type": "article",
         "programme_years": programme_years,
         "years_with_totals": years_with_totals,
         "required_documents": required_documents,

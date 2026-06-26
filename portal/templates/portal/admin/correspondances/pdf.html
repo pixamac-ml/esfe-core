@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { margin: 2.5cm 3cm; size: A4 portrait; }
+  body { font-family: "Times New Roman", Times, serif; font-size: 12pt; color: #000; line-height: 1.6; }
+  .header { text-align: center; margin-bottom: 2rem; }
+  .header h1 { font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; margin: 0; }
+  .header p { font-size: 10pt; margin: .2rem 0; color: #444; }
+  .separator { border: none; border-top: 2px solid #000; margin: 1.5rem 0; }
+  .doc-type { text-align: center; margin: 1.5rem 0; }
+  .doc-type span { font-size: 14pt; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: .3rem; letter-spacing: .1em; }
+  .meta-table { width: 100%; margin: 1.5rem 0; border-collapse: collapse; }
+  .meta-table td { padding: .3rem .5rem; font-size: 11pt; vertical-align: top; }
+  .meta-table td:first-child { font-weight: bold; width: 40%; }
+  .body-section { margin: 2rem 0; text-align: justify; }
+  .footer { margin-top: 3rem; text-align: right; }
+  .footer p { margin: .2rem 0; font-size: 11pt; }
+  .signature-block { margin-top: 1.5rem; }
+  .signature-block p { margin: .2rem 0; font-size: 11pt; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ESFE Mali</h1>
+  <p>Ecole de Sante Felix Houphouet-Boigny</p>
+  {% if branch %}
+  <p>Annexe : {{ branch.name }}</p>
+  {% endif %}
+</div>
+
+<hr class="separator">
+
+<div class="doc-type">
+  <span>{{ doc.get_doc_type_display }}</span>
+</div>
+
+<table class="meta-table">
+  {% if doc.reference %}
+  <tr>
+    <td>Reference :</td>
+    <td>{{ doc.reference }}</td>
+  </tr>
+  {% endif %}
+  <tr>
+    <td>Objet :</td>
+    <td>{{ doc.title }}</td>
+  </tr>
+  {% if doc.recipients %}
+  <tr>
+    <td>Destinataires :</td>
+    <td>{{ doc.recipients }}</td>
+  </tr>
+  {% endif %}
+  <tr>
+    <td>Date :</td>
+    <td>{{ today|date:"d/m/Y" }}</td>
+  </tr>
+</table>
+
+<hr class="separator">
+
+<div class="body-section">
+  {{ doc.body|linebreaksbr }}
+</div>
+
+<div class="footer">
+  <p>Fait le {{ today|date:"d/m/Y" }}</p>
+  <div class="signature-block">
+    <p>Le Directeur des Etudes</p>
+    <br><br>
+    <p>____________________________</p>
+    {% if doc.created_by %}
+    <p>{{ doc.created_by.get_full_name }}</p>
+    {% endif %}
+  </div>
+</div>
+
+</body>
+</html>

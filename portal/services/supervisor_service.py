@@ -212,6 +212,177 @@ def build_courses_section_context(*, request, branch, academic_class):
     }
 
 
+def build_attendance_monthly_report_context(*, branch, academic_class, month):
+    """Rapport mensuel de présence par étudiant pour une classe donnée."""
+    import calendar
+    from datetime import timedelta as _td
+
+    last_day = calendar.monthrange(month.year, month.month)[1]
+    month_end = month.replace(day=last_day)
+    prev_month = (month - _td(days=1)).replace(day=1)
+    next_month = month_end + _td(days=1)
+
+    attendances = list(
+        StudentAttendance.objects.select_related("student", "student__inscription__candidature")
+        .filter(
+            branch=branch,
+            academic_class=academic_class,
+            date__gte=month,
+            date__lte=month_end,
+        )
+        .order_by("student__inscription__candidature__last_name", "date")
+    )
+
+    by_student = {}
+    for att in attendances:
+        student = att.student
+        entry = by_student.setdefault(
+            student.id,
+            {
+                "student": student,
+                "present": 0,
+                "absent": 0,
+                "late": 0,
+                "justified": 0,
+                "total": 0,
+            },
+        )
+        entry["total"] += 1
+        if att.status == StudentAttendance.STATUS_PRESENT:
+            entry["present"] += 1
+        elif att.status == StudentAttendance.STATUS_ABSENT:
+            if att.justification:
+                entry["justified"] += 1
+            else:
+                entry["absent"] += 1
+        elif att.status == StudentAttendance.STATUS_LATE:
+            entry["late"] += 1
+
+    rows = []
+    for entry in by_student.values():
+        total = entry["total"]
+        rate = round((entry["present"] / total) * 100) if total else None
+        rows.append({**entry, "rate": rate})
+    rows.sort(key=lambda r: (
+        r["student"].inscription.candidature.last_name if hasattr(r["student"], "inscription") else "",
+        r["student"].matricule,
+    ))
+
+    return {
+        "attendance_report_month": month,
+        "attendance_report_month_end": month_end,
+        "attendance_report_prev_month": prev_month,
+        "attendance_report_next_month": next_month,
+        "attendance_report_rows": rows,
+        "attendance_report_class": academic_class,
+        "attendance_report_total_students": len(rows),
+    }
+
+
+def build_teachers_weekly_report_context(*, branch, week_start):
+    """Rapport hebdomadaire de régularité pour chaque enseignant de l'annexe."""
+    from datetime import timedelta as _td
+
+    week_end = week_start + _td(days=7)
+
+    events = list(
+        AcademicScheduleEvent.objects.select_related("teacher", "ec", "academic_class")
+        .filter(
+            branch=branch,
+            start_datetime__date__gte=week_start,
+            start_datetime__date__lt=week_end,
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            is_active=True,
+        )
+        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .order_by("teacher__first_name", "teacher__last_name", "start_datetime")
+    )
+    event_ids = [e.id for e in events]
+
+    attendance_map = {
+        row.schedule_event_id: row
+        for row in TeacherAttendance.objects.filter(
+            branch=branch,
+            date__gte=week_start,
+            date__lt=week_end,
+            schedule_event_id__in=event_ids,
+        )
+    }
+    lesson_map = {
+        row.schedule_event_id: row
+        for row in LessonLog.objects.filter(
+            branch=branch,
+            date__gte=week_start,
+            date__lt=week_end,
+            schedule_event_id__in=event_ids,
+        )
+    }
+
+    by_teacher = {}
+    for event in events:
+        teacher = event.teacher
+        entry = by_teacher.setdefault(
+            teacher.id,
+            {
+                "id": teacher.id,
+                "name": teacher.get_full_name() or teacher.username,
+                "subjects": set(),
+                "planned": 0,
+                "held": 0,
+                "absent": 0,
+                "late": 0,
+                "cancelled": 0,
+            },
+        )
+        entry["planned"] += 1
+        entry["subjects"].add(event.ec.title)
+
+        lesson = lesson_map.get(event.id)
+        attendance = attendance_map.get(event.id)
+
+        if lesson:
+            if lesson.status == LessonLog.STATUS_DONE:
+                entry["held"] += 1
+            elif lesson.status == LessonLog.STATUS_ABSENT_TEACHER:
+                entry["absent"] += 1
+            elif lesson.status == LessonLog.STATUS_CANCELLED:
+                entry["cancelled"] += 1
+
+        if attendance and attendance.status == TeacherAttendance.STATUS_LATE:
+            entry["late"] += 1
+
+    teachers = []
+    for entry in by_teacher.values():
+        planned = entry["planned"]
+        held = entry["held"]
+        rate = round((held / planned) * 100) if planned else None
+        teachers.append(
+            {
+                "id": entry["id"],
+                "name": entry["name"],
+                "subjects": sorted(entry["subjects"]),
+                "planned": planned,
+                "held": held,
+                "absent": entry["absent"],
+                "late": entry["late"],
+                "cancelled": entry["cancelled"],
+                "regularity_rate": rate,
+            }
+        )
+    teachers.sort(key=lambda t: t["name"])
+
+    return {
+        "report_week_start": week_start,
+        "report_week_end": week_end - _td(days=1),
+        "report_prev_week": week_start - _td(days=7),
+        "report_next_week": week_start + _td(days=7),
+        "report_teachers": teachers,
+        "report_total_events": len(events),
+        "report_absent_count": sum(t["absent"] for t in teachers),
+        "report_late_count": sum(t["late"] for t in teachers),
+    }
+
+
 _ATTENDANCE_CYCLE = {
     StudentAttendance.STATUS_PRESENT: StudentAttendance.STATUS_LATE,
     StudentAttendance.STATUS_LATE: StudentAttendance.STATUS_ABSENT,

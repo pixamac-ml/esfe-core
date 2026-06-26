@@ -685,3 +685,83 @@ class AcademicAuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} {self.object_type}#{self.object_id}"
+
+
+class GradeModificationRequest(TimeStampedModel):
+    """Demande de correction d'une note EC apres cloture de sa session.
+
+    Meme principe que `accounts.models.SensitiveActionRequest` (paiements) :
+    la saisie normale n'est jamais bloquee par ce workflow. Il s'active
+    uniquement quand un informaticien/gestionnaire tente de CORRIGER une
+    note deja saisie dans une session (normale ou rattrapage) deja cloturee.
+    Un code OTP est alors envoye au Directeur des Etudes (ou a defaut a la
+    direction executive) et la correction n'est appliquee qu'apres saisie du
+    bon code, dans le delai imparti.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_EXPIRED = "expired"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "En attente"),
+        (STATUS_APPROVED, "Approuvee"),
+        (STATUS_EXPIRED, "Expiree"),
+        (STATUS_CANCELLED, "Annulee"),
+    ]
+
+    SESSION_NORMAL = "normal"
+    SESSION_RETAKE = "retake"
+    SESSION_CHOICES = [
+        (SESSION_NORMAL, "Normale"),
+        (SESSION_RETAKE, "Rattrapage"),
+    ]
+
+    OTP_VALIDITY_MINUTES = 5
+
+    branch = models.ForeignKey("branches.Branch", on_delete=models.CASCADE, related_name="grade_modification_requests")
+    ec_grade = models.ForeignKey(
+        "academics.ECGrade",
+        on_delete=models.CASCADE,
+        related_name="modification_requests",
+    )
+    session_type = models.CharField(max_length=10, choices=SESSION_CHOICES)
+
+    previous_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    requested_score = models.DecimalField(max_digits=5, decimal_places=2)
+    reason = models.TextField(blank=True)
+
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="grade_modification_requests",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_grade_modifications",
+    )
+
+    otp_code_hash = models.CharField(max_length=128)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    expires_at = models.DateTimeField()
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Demande de correction de note"
+        verbose_name_plural = "Demandes de correction de note"
+        indexes = [
+            models.Index(fields=["branch", "status"]),
+            models.Index(fields=["ec_grade", "status"]),
+        ]
+
+    def __str__(self):
+        return f"Correction note #{self.ec_grade_id} ({self.get_status_display()})"
+
+    @property
+    def is_expired(self):
+        return self.status == self.STATUS_PENDING and timezone.now() > self.expires_at

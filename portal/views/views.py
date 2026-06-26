@@ -2,6 +2,7 @@ from collections import defaultdict
 import csv
 from datetime import datetime, timedelta
 from decimal import Decimal
+from urllib.parse import quote
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -30,14 +31,17 @@ from academics.models import (
     Semester,
     WeeklyScheduleSlot,
 )
-from academics.permissions import can_manage_bulletins, can_manage_diplomas
+from academics.permissions import BULLETIN_MANAGEMENT_POSITIONS, can_manage_bulletins, can_manage_diplomas
+from academic_cycle.services.academic_excel_reports import build_academic_report_xlsx, xlsx_response
 from academics.services.documents import (
     generate_annual_bulletins_for_class,
     generate_semester_bulletins_for_class,
     prepare_diploma_awards_for_class,
 )
 from admissions.models import Candidature
-from accounts.models import BranchExpense, Profile
+from academic_cycle.services.audit_service import log_action
+from accounts.models import BranchExpense, Profile, SensitiveActionRequest
+from accounts.services.sensitive_actions import SensitiveActionError, confirm_sensitive_action, request_sensitive_action
 from academics.services.lesson_log_service import create_lesson_log, update_lesson_log
 from academics.services.schedule_service import (
     create_weekly_schedule_slot,
@@ -53,7 +57,7 @@ from academics.services.semester import compute_semester_result
 from academics.services.grading import resolve_threshold
 from academics.services.workflow import can_publish_semester
 from accounts.access import can_access, get_user_position, get_user_scope
-from accounts.dashboards.helpers import get_user_branch
+from accounts.dashboards.helpers import get_user_branch, paginate_queryset
 from branches.models import Branch
 from inscriptions.models import Inscription
 from payments.models import Payment
@@ -78,6 +82,7 @@ from portal.services.director import (
     build_director_classroom_ops_context,
     build_director_document_context,
     build_director_planning_assignment_context,
+    build_director_tasks_center,
     build_director_teacher_assignment_context,
     build_director_transfer_context,
     create_transfer_request,
@@ -88,6 +93,11 @@ from portal.services.director import (
     upload_teacher_document,
 )
 from portal.services.supervisor_service import build_class_detail_context
+from portal.services.academic_structure_service import (
+    delete_ec,
+    save_ec,
+    save_ue,
+)
 from portal.services.it_support_service import (
     add_support_ticket_comment,
     assign_support_ticket,
@@ -105,7 +115,7 @@ from portal.services.it_support_service import (
     update_account_email,
     update_support_ticket_status,
 )
-from portal.models import DirectorTeacherAssignment, SupportAuditLog, SupportTicket
+from portal.models import AdministrativeDocument, DirectorTeacherAssignment, SupportAuditLog, SupportTicket
 from portal.views.it_grades_import import build_it_grade_selection_context
 from portal.dg.services import (
     build_dg_dashboard_context,
@@ -309,28 +319,34 @@ def _render_director_dashboard(request):
 def _parse_director_section(request, default="home"):
     section = (request.GET.get("section") or request.POST.get("section") or default).strip().lower()
     aliases = {
-        "classes": "operations",
-        "planning": "assignments",
-        "edt": "assignments",
-        "schedule": "assignments",
-        "transfers": "documents",
-        "notifications": "stats",
-        "logs": "stats",
-        "anomalies": "assignments",
+        # anciens noms → nouveaux noms
+        "operations": "planification",
+        "assignments": "planification",
+        "edt": "planification",
+        "schedule": "planification",
+        "planning": "planification",
+        "academic": "programme",
+        "classes": "programme",
+        "teachers": "enseignants",
+        "documents": "enseignants",
+        "transfers": "enseignants",
+        "results": "evaluations",
+        "publications": "evaluations",
+        "settings": "enseignants",
+        "stats": "evaluations",
+        "notifications": "evaluations",
+        "logs": "evaluations",
+        "students": "programme",
+        "anomalies": "evaluations",
     }
     section = aliases.get(section, section)
     allowed = {
         "home",
-        "operations",
-        "academic",
-        "teachers",
-        "assignments",
-        "results",
-        "publications",
-        "documents",
-        "stats",
-        "students",
-        "settings",
+        "planification",
+        "programme",
+        "correspondances",
+        "enseignants",
+        "evaluations",
     }
     return section if section in allowed else default
 
@@ -561,6 +577,10 @@ def _build_director_workspace_context(request, *, toast=None):
         teacher_q=teacher_q,
     )
     teacher_rows = teacher_context["teacher_rows"]
+    teacher_rows_page = paginate_queryset(request, teacher_rows, per_page=20, page_param="teachers_page")
+    class_cards_page = paginate_queryset(request, class_cards, per_page=15, page_param="classes_page")
+    teachers_query_suffix = f"section=teachers&teacher_q={quote(teacher_q)}"
+    classes_query_suffix = "section=results"
 
     class_load_items = sorted(
         (class_load_map or {}).items(),
@@ -591,6 +611,11 @@ def _build_director_workspace_context(request, *, toast=None):
         "in_progress": [item for item in class_cards if item["workflow_bucket"] == "in_progress"],
         "rejected": [item for item in class_cards if item["workflow_bucket"] == "rejected"],
     }
+    results_query_suffix = (
+        f"section=results&class_id={selected_class.id}&semester_id={selected_semester.id}"
+        if selected_class is not None and selected_semester is not None
+        else "section=results"
+    )
     result_table_rows = []
     result_anomalies = []
     result_summary = None
@@ -610,6 +635,9 @@ def _build_director_workspace_context(request, *, toast=None):
         )
         ec_ids = list(selected_semester.ues.values_list("ecs__id", flat=True).distinct())
         ec_ids = [ec_id for ec_id in ec_ids if ec_id is not None]
+        grades_by_enrollment = defaultdict(dict)
+        for grade in ECGrade.objects.filter(enrollment__in=semester_enrollments, ec_id__in=ec_ids).select_related("ec"):
+            grades_by_enrollment[grade.enrollment_id][grade.ec_id] = grade
         ranking_rows = []
         total_average = Decimal("0.00")
         average_count = 0
@@ -618,13 +646,7 @@ def _build_director_workspace_context(request, *, toast=None):
             threshold = resolve_threshold(enrollment)
             student_profile = getattr(enrollment.student, "student_profile", None)
             student_name = getattr(student_profile, "full_name", "") or enrollment.student.get_full_name() or enrollment.student.username
-            grade_map = {
-                grade.ec_id: grade
-                for grade in ECGrade.objects.filter(
-                    enrollment=enrollment,
-                    ec_id__in=ec_ids,
-                ).select_related("ec")
-            }
+            grade_map = grades_by_enrollment.get(enrollment.id, {})
             missing_count = sum(1 for ec_id in ec_ids if grade_map.get(ec_id) is None or grade_map[ec_id].final_score is None)
             semester_result = compute_semester_result(selected_semester, enrollment)
             average = semester_result["average"]
@@ -682,7 +704,9 @@ def _build_director_workspace_context(request, *, toast=None):
             "class_average": _format_director_decimal(total_average / average_count) if average_count else "-",
             "anomalies_count": len(result_anomalies),
         }
-        result_anomalies = result_anomalies[:12]
+
+    result_anomalies_page = paginate_queryset(request, result_anomalies, per_page=12, page_param="anomalies_page")
+    result_table_rows_page = paginate_queryset(request, result_table_rows, per_page=25, page_param="results_page")
 
     ready_to_publish = [row for row in semester_rows if row["can_publish"]]
     ready_to_validate = [row for row in semester_rows if row["can_validate"]]
@@ -772,6 +796,21 @@ def _build_director_workspace_context(request, *, toast=None):
     )
     bulletin_scope_class = selected_class or (class_rows[0] if class_rows else None)
 
+    # UE / EC pour la section Programme
+    programme_ue_rows = []
+    if selected_class is not None:
+        semesters_qs = list(selected_class.semesters.prefetch_related("ues__ecs").order_by("number"))
+        for sem in semesters_qs:
+            programme_ue_rows.append({
+                "semester": sem,
+                "ues": list(sem.ues.prefetch_related("ecs").order_by("code", "id")),
+            })
+
+    admin_documents = list(
+        AdministrativeDocument.objects.filter(branch=branch).order_by("-created_at")[:50]
+    ) if branch else []
+    admin_doc_type_choices = AdministrativeDocument.TYPE_CHOICES
+
     context = {
         "branch": branch,
         "section": section,
@@ -789,6 +828,8 @@ def _build_director_workspace_context(request, *, toast=None):
         "today": timezone.localdate(),
         "classes": class_rows,
         "class_cards": class_cards,
+        "class_cards_page": class_cards_page,
+        "classes_query_suffix": classes_query_suffix,
         "total_classes": len(class_rows),
         "total_semesters": len(semester_rows),
         "semester_rows": semester_rows,
@@ -812,6 +853,8 @@ def _build_director_workspace_context(request, *, toast=None):
         "transfer_target_classes": transfer_context["transfer_target_classes"],
         "transfer_type_choices": transfer_context["transfer_type_choices"],
         "teachers": teacher_rows,
+        "teacher_rows_page": teacher_rows_page,
+        "teachers_query_suffix": teachers_query_suffix,
         "teachers_total": teacher_context["teachers_total"],
         "teacher_unassigned_count": teacher_context["teacher_unassigned_count"],
         "teacher_assigned_count": teacher_context["teachers_total"] - teacher_context["teacher_unassigned_count"],
@@ -860,13 +903,27 @@ def _build_director_workspace_context(request, *, toast=None):
         "semester_rows_by_class": semester_rows_by_class,
         "results_class_queues": results_class_queues,
         "result_table_rows": result_table_rows,
+        "result_table_rows_page": result_table_rows_page,
         "result_anomalies": result_anomalies,
+        "result_anomalies_page": result_anomalies_page,
         "result_summary": result_summary,
+        "results_query_suffix": results_query_suffix,
+        "tasks_center": build_director_tasks_center(
+            branch=branch,
+            semester_rows=semester_rows,
+            teacher_unassigned_count=teacher_context["teacher_unassigned_count"],
+            result_anomalies=result_anomalies,
+        ),
         "student_panel_subtitle": (
             f"{selected_student_entry['matricule']} · {selected_student_entry['email']}"
             if selected_student_entry is not None
             else "Fiche etudiant"
         ),
+        "programme_ue_rows": programme_ue_rows,
+        "admin_documents": admin_documents,
+        "admin_doc_type_choices": admin_doc_type_choices,
+        "admin_doc_draft_count": sum(1 for d in admin_documents if d.status == AdministrativeDocument.STATUS_DRAFT),
+        "admin_doc_published_count": sum(1 for d in admin_documents if d.status == AdministrativeDocument.STATUS_PUBLISHED),
     }
     if toast:
         context["toast"] = toast
@@ -917,11 +974,138 @@ def director_drawer(request):
 
 
 @_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+def director_programme_action(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_academic_branch(request)
+    if not branch:
+        return HttpResponseBadRequest("Aucune annexe.")
+    action = (request.POST.get("action") or "").strip()
+    class_id = (request.POST.get("class_id") or "").strip()
+    toast = None
+    try:
+        if action == "save_ue":
+            ue = save_ue(
+                branch=branch,
+                ue_id=(request.POST.get("ue_id") or "").strip() or None,
+                semester_id=request.POST.get("semester_id"),
+                code=request.POST.get("code"),
+                title=request.POST.get("title"),
+            )
+            class_id = str(ue.semester.academic_class_id)
+            toast = {"level": "success", "message": "Unite d'enseignement enregistree."}
+        elif action == "save_ec":
+            ec = save_ec(
+                branch=branch,
+                ec_id=(request.POST.get("ec_id") or "").strip() or None,
+                ue_id=request.POST.get("ue_id"),
+                title=request.POST.get("title"),
+                coefficient=request.POST.get("coefficient"),
+                credit_required=request.POST.get("credit_required"),
+            )
+            class_id = str(ec.ue.semester.academic_class_id)
+            toast = {"level": "success", "message": "Element constitutif enregistre."}
+        elif action == "delete_ec":
+            delete_ec(branch=branch, ec_id=request.POST.get("ec_id"))
+            toast = {"level": "success", "message": "EC supprime."}
+        else:
+            toast = {"level": "error", "message": "Action inconnue."}
+    except ValidationError as exc:
+        toast = {"level": "error", "message": " ".join(exc.messages)}
+
+    params = request.GET.copy()
+    params["section"] = "programme"
+    if class_id:
+        params["class_id"] = class_id
+    request.GET = params
+    context = _build_director_workspace_context(request, toast=toast)
+    return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+def director_correspondance_create(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_academic_branch(request)
+    if not branch:
+        return HttpResponseBadRequest("Aucune annexe.")
+    doc_type = request.POST.get("doc_type", "").strip()
+    title = request.POST.get("title", "").strip()
+    body = request.POST.get("body", "").strip()
+    reference = request.POST.get("reference", "").strip()
+    recipients = request.POST.get("recipients", "").strip()
+    action = request.POST.get("action", "draft")
+    if not title or not body:
+        return _build_workspace_response(request, toast={"level": "error", "message": "Titre et corps du document sont obligatoires."})
+    status = AdministrativeDocument.STATUS_PUBLISHED if action == "publish" else AdministrativeDocument.STATUS_DRAFT
+    AdministrativeDocument.objects.create(
+        branch=branch,
+        doc_type=doc_type,
+        title=title,
+        body=body,
+        reference=reference,
+        recipients=recipients,
+        status=status,
+        created_by=request.user,
+    )
+    msg = "Document publie avec succes." if status == AdministrativeDocument.STATUS_PUBLISHED else "Brouillon enregistre."
+    return _build_workspace_response(request, section_override="correspondances", toast={"level": "success", "message": msg})
+
+
+def _build_workspace_response(request, section_override=None, toast=None):
+    if section_override:
+        params = request.GET.copy()
+        params["section"] = section_override
+        request.GET = params
+    context = _build_director_workspace_context(request, toast=toast)
+    return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+def director_correspondance_publish(request, doc_id):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_academic_branch(request)
+    doc = AdministrativeDocument.objects.filter(id=doc_id, branch=branch).first()
+    if not doc:
+        return HttpResponseBadRequest("Document introuvable.")
+    doc.status = AdministrativeDocument.STATUS_PUBLISHED
+    doc.save(update_fields=["status", "updated_at"])
+    return _build_workspace_response(request, section_override="correspondances", toast={"level": "success", "message": "Document publie."})
+
+
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+def director_correspondance_pdf(request, doc_id):
+    branch = _resolve_academic_branch(request)
+    doc = AdministrativeDocument.objects.filter(id=doc_id, branch=branch).first()
+    if not doc:
+        return HttpResponseBadRequest("Document introuvable.")
+    html_content = render(request, "portal/admin/correspondances/pdf.html", {
+        "doc": doc,
+        "branch": branch,
+        "today": timezone.localdate(),
+    })
+    try:
+        from weasyprint import HTML as WeasyprintHTML
+        pdf_bytes = WeasyprintHTML(string=html_content.content, base_url=request.build_absolute_uri("/")).write_pdf()
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        safe_title = doc.title[:40].replace(" ", "_")
+        response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'
+        return response
+    except Exception:
+        return html_content
+
+
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_results_action(request):
     if request.method != "POST":
         return _deny_portal_access(request)
     branch = _resolve_academic_branch(request)
     action = (request.POST.get("action") or "").strip()
+
+    if action == "publish":
+        return _director_request_publish_otp(request, branch=branch)
+
     toast = {"level": "error", "message": "Action impossible."}
     rejected_semester_ids = {
         int(semester_id)
@@ -929,10 +1113,11 @@ def director_results_action(request):
         if str(semester_id).isdigit()
     }
     try:
-        semester = Semester.objects.select_related("academic_class", "academic_class__branch").get(pk=request.POST.get("semester_id"))
+        semester = Semester.objects.select_related("academic_class", "academic_class__branch", "academic_class__academic_year").get(pk=request.POST.get("semester_id"))
         if branch and semester.academic_class.branch_id != branch.id:
             raise ValidationError("Action hors annexe refusee.")
         enrollments = list(AcademicEnrollment.objects.filter(academic_class=semester.academic_class, academic_year=semester.academic_class.academic_year, is_active=True))
+        previous_status = semester.status
         if action == "validate":
             if not can_publish_semester(semester, enrollments):
                 raise ValidationError("Toutes les notes doivent etre renseignees avant validation.")
@@ -940,13 +1125,16 @@ def director_results_action(request):
             semester.save(update_fields=["status"])
             rejected_semester_ids.discard(semester.id)
             toast = {"level": "success", "message": "Resultats valides. Publication possible."}
-        elif action == "publish":
-            if semester.status != Semester.STATUS_FINALIZED:
-                raise ValidationError("Le semestre doit etre valide avant publication.")
-            semester.status = Semester.STATUS_PUBLISHED
-            semester.save(update_fields=["status"])
-            rejected_semester_ids.discard(semester.id)
-            toast = {"level": "success", "message": "Resultats publies."}
+            log_action(
+                request.user,
+                "semester.validated",
+                semester,
+                old_values={"status": previous_status},
+                new_values={"status": semester.status},
+                branch=semester.academic_class.branch,
+                academic_year=semester.academic_class.academic_year,
+                request=request,
+            )
         elif action == "reject":
             if semester.status == Semester.STATUS_PUBLISHED:
                 raise ValidationError("Un semestre publie ne peut pas etre rejete ici.")
@@ -954,6 +1142,16 @@ def director_results_action(request):
             semester.save(update_fields=["status"])
             rejected_semester_ids.add(semester.id)
             toast = {"level": "success", "message": "Resultats renvoyes en correction."}
+            log_action(
+                request.user,
+                "semester.rejected",
+                semester,
+                old_values={"status": previous_status},
+                new_values={"status": semester.status},
+                branch=semester.academic_class.branch,
+                academic_year=semester.academic_class.academic_year,
+                request=request,
+            )
         else:
             raise ValidationError("Action inconnue.")
     except (Semester.DoesNotExist, ValidationError) as exc:
@@ -963,6 +1161,105 @@ def director_results_action(request):
     context = _build_director_workspace_context(request, toast=toast)
     context["section"] = "results"
     return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+def _director_request_publish_otp(request, *, branch):
+    """Publication = action irreversible : declenche une demande OTP au DG/DGA
+    de l'annexe au lieu de changer le statut directement (cf.
+    CAHIER_DES_CHARGES_DIRECTEUR_ETUDES.md, 2.1)."""
+    try:
+        semester = Semester.objects.select_related(
+            "academic_class", "academic_class__branch", "academic_class__academic_year"
+        ).get(pk=request.POST.get("semester_id"))
+        if branch and semester.academic_class.branch_id != branch.id:
+            raise ValidationError("Action hors annexe refusee.")
+        if semester.status != Semester.STATUS_FINALIZED:
+            raise ValidationError("Le semestre doit etre valide avant publication.")
+        otp_request = request_sensitive_action(
+            branch=semester.academic_class.branch,
+            action_type=SensitiveActionRequest.ACTION_SEMESTER_PUBLISH,
+            target_model="Semester",
+            target_id=semester.pk,
+            previous_state={"status": semester.status},
+            requested_state={"status": Semester.STATUS_PUBLISHED},
+            requested_by=request.user,
+        )
+    except (Semester.DoesNotExist, ValidationError, SensitiveActionError) as exc:
+        message = " ".join(getattr(exc, "messages", [])) if hasattr(exc, "messages") else str(exc)
+        return render(
+            request,
+            "portal/staff/director/partials/results_otp_modal.html",
+            {"otp_error": message or "Publication impossible."},
+        )
+
+    return render(
+        request,
+        "portal/staff/director/partials/results_otp_modal.html",
+        {
+            "otp_request_id": otp_request.pk,
+            "otp_validity_minutes": SensitiveActionRequest.OTP_VALIDITY_MINUTES,
+            "class_label": semester.academic_class.display_name,
+            "semester_number": semester.number,
+        },
+    )
+
+
+@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+def director_results_confirm_otp(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    otp_request_id = request.POST.get("otp_request_id")
+    otp_code = (request.POST.get("otp_code") or "").strip()
+
+    def _apply(otp_request):
+        semester = Semester.objects.select_related(
+            "academic_class", "academic_class__branch", "academic_class__academic_year"
+        ).get(pk=otp_request.target_id)
+        previous_status = semester.status
+        semester.status = Semester.STATUS_PUBLISHED
+        semester.save(update_fields=["status"])
+
+        rejected_semester_ids = {
+            int(semester_id)
+            for semester_id in (request.session.get("director_rejected_semester_ids") or [])
+            if str(semester_id).isdigit()
+        }
+        rejected_semester_ids.discard(semester.id)
+        request.session["director_rejected_semester_ids"] = sorted(rejected_semester_ids)
+
+        log_action(
+            otp_request.requested_by,
+            "semester.published",
+            semester,
+            old_values={"status": previous_status},
+            new_values={"status": semester.status},
+            branch=semester.academic_class.branch,
+            academic_year=semester.academic_class.academic_year,
+            reason=otp_request.reason,
+            request=request,
+        )
+        return {"status": semester.status}
+
+    toast = None
+    try:
+        confirm_sensitive_action(
+            request_id=otp_request_id,
+            code=otp_code,
+            approver=request.user,
+            apply_callback=_apply,
+            skip_financial_audit=True,
+        )
+        toast = {"level": "success", "message": "Resultats publies."}
+    except (SensitiveActionError, SensitiveActionRequest.DoesNotExist) as exc:
+        message = str(exc) if isinstance(exc, SensitiveActionError) else "Demande introuvable."
+        toast = {"level": "error", "message": message}
+
+    context = _build_director_workspace_context(request, toast=toast)
+    context["section"] = "results"
+    response = render(request, "portal/staff/director/partials/workspace.html", context)
+    if toast["level"] == "success":
+        response["HX-Trigger"] = "director-modal-close"
+    return response
 
 
 @_position_required({"director_of_studies", "super_admin"})
@@ -1007,6 +1304,14 @@ def director_bulletin_action(request):
     context = _build_director_workspace_context(request, toast=toast)
     context["section"] = "publications"
     return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required(BULLETIN_MANAGEMENT_POSITIONS)
+def director_export_report_xlsx(request):
+    branch = _resolve_academic_branch(request)
+    wb = build_academic_report_xlsx(branch=branch)
+    filename = f"rapport_pedagogique_{branch.slug if branch else 'annexe'}.xlsx"
+    return xlsx_response(wb, filename)
 
 
 @_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})

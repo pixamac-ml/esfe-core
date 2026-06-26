@@ -48,6 +48,7 @@ from students.services.case_service import advance_teacher_case, count_open_case
 from students.services.convocation_service import create_convocation
 from portal.services.supervisor_dashboard_service import get_supervisor_class_picker_bundle
 from portal.services.supervisor_service import (
+    build_attendance_monthly_report_context,
     build_attendance_section_context,
     build_class_detail_context,
     build_courses_section_context,
@@ -55,6 +56,7 @@ from portal.services.supervisor_service import (
     build_schedule_section_context,
     build_students_section_context,
     build_teachers_section_context,
+    build_teachers_weekly_report_context,
     next_attendance_status,
 )
 from portal.views.views import (
@@ -85,6 +87,8 @@ _SECTION_META = {
     "courses": ("Classe active · Cours", "Cours & séances", "Séances programmées pour la classe."),
     "students": ("Classe active · Étudiants", "Étudiants de la classe", "Annuaire de la classe et historique individuel."),
     "teachers": ("Pilotage · Enseignants", "Suivi des enseignants", "Présence, ponctualité, appels faits et incidents."),
+    "teachers_report": ("Suivi enseignants · Rapport", "Rapport hebdomadaire enseignants", "Régularité et présence de chaque enseignant sur la semaine sélectionnée."),
+    "attendance_report": ("Présences · Rapport mensuel", "Rapport mensuel des présences", "Taux de présence par étudiant sur le mois sélectionné."),
 }
 
 
@@ -136,7 +140,7 @@ def _render_supervisor_dashboard(request, *, section=None):
 
 def _parse_supervisor_section(request, default="home"):
     section = (request.GET.get("section") or request.POST.get("section") or default).strip().lower()
-    allowed = {"home", "classes", "attendance", "schedule", "courses", "students", "teachers"}
+    allowed = {"home", "classes", "attendance", "attendance_report", "schedule", "courses", "students", "teachers", "teachers_report"}
     return section if section in allowed else default
 
 
@@ -234,6 +238,29 @@ def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
     if resolved_section == "teachers":
         # Section transverse a l'annexe, independante de la classe selectionnee.
         context.update(build_teachers_section_context(branch=branch))
+        return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
+
+    if resolved_section == "teachers_report":
+        week_start_raw = (request.GET.get("week_start") or "").strip()
+        week_start = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
+        if week_start_raw:
+            try:
+                week_start = datetime.strptime(week_start_raw, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        context.update(build_teachers_weekly_report_context(branch=branch, week_start=week_start))
+        return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
+
+    if resolved_section == "attendance_report":
+        if selected_class is None:
+            return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
+        month_raw = (request.GET.get("month") or "").strip()
+        today = timezone.localdate()
+        try:
+            report_month = datetime.strptime(month_raw, "%Y-%m").date().replace(day=1) if month_raw else today.replace(day=1)
+        except ValueError:
+            report_month = today.replace(day=1)
+        context.update(build_attendance_monthly_report_context(branch=branch, academic_class=selected_class, month=report_month))
         return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
 
     if resolved_section == "home":

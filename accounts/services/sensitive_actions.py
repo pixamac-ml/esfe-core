@@ -128,11 +128,16 @@ def request_sensitive_action(
     return request_obj
 
 
-def confirm_sensitive_action(*, request_id, code, approver, apply_callback):
+def confirm_sensitive_action(*, request_id, code, approver, apply_callback, skip_financial_audit=False):
     """Verifie le code OTP et applique la modification via apply_callback si valide.
 
     apply_callback(request_obj) -> dict (new_state) : fonction qui applique
     reellement la modification metier et retourne le nouvel etat pour l'audit.
+
+    skip_financial_audit : a utiliser quand l'action n'est pas financiere
+    (ex: publication de semestre) et que l'appelant ecrit deja son propre
+    journal d'audit (ex: AcademicAuditLog) dans apply_callback - on evite
+    alors de creer un FinancialAuditLog hors-sujet.
     """
     error_message = None
 
@@ -161,17 +166,18 @@ def confirm_sensitive_action(*, request_id, code, approver, apply_callback):
                 request_obj.resolved_at = timezone.now()
                 request_obj.save(update_fields=["status", "approved_by", "resolved_at", "attempts"])
 
-                FinancialAuditLog.objects.create(
-                    branch=request_obj.branch,
-                    action_type=request_obj.action_type,
-                    target_model=request_obj.target_model,
-                    target_id=request_obj.target_id,
-                    previous_state=request_obj.previous_state,
-                    new_state=new_state or request_obj.requested_state,
-                    performed_by=request_obj.requested_by,
-                    approved_by=approver,
-                    sensitive_action_request=request_obj,
-                )
+                if not skip_financial_audit:
+                    FinancialAuditLog.objects.create(
+                        branch=request_obj.branch,
+                        action_type=request_obj.action_type,
+                        target_model=request_obj.target_model,
+                        target_id=request_obj.target_id,
+                        previous_state=request_obj.previous_state,
+                        new_state=new_state or request_obj.requested_state,
+                        performed_by=request_obj.requested_by,
+                        approved_by=approver,
+                        sensitive_action_request=request_obj,
+                    )
 
     # Note : l'exception est levee APRES la sortie du bloc atomic, pour que les
     # mises a jour deja faites (compteur d'essais, expiration) restent commitees

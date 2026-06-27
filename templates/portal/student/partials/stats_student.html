@@ -1,10 +1,10 @@
 {% load component_tags %}
 
 {% component "dashboard_card" %}
-  <div class="student-inline-head">
+  <div class="mb-3 flex items-center justify-between">
     <div>
-      <p class="student-section-kicker">Performance</p>
-      <h3 class="student-section-title">Progression academique</h3>
+      <p class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Performance</p>
+      <h3 class="text-sm font-black text-[color:var(--text)]">Progression academique</h3>
     </div>
     {% if academic_status == "assigned" %}
       {% component "status_badge" label="Affecte" tone="success" icon="check-circle-2" %}{% endcomponent %}
@@ -26,13 +26,11 @@
     </div>
   </div>
 
-  <div class="student-stat-grid mb-3">
-    {% for stat in stats.mini_stats %}
-      {% component "metric_card" label=stat.label value=stat.value icon=stat.icon %}{% endcomponent %}
-    {% endfor %}
-  </div>
+  {% if stats.mini_stats %}
+    {% component "kpi_row" cards=stats.mini_stats columns=4 %}{% endcomponent %}
+  {% endif %}
 
-  <div class="student-progress-list">
+  <div class="mt-3 space-y-2">
     {% for bar in stats.progress_bars %}
       {% component "progress_bar" label=bar.label value=bar.value %}{% endcomponent %}
     {% empty %}

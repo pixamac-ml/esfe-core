@@ -231,6 +231,15 @@ def dashboard(request):
     context = get_student_overview_data(request.user)
     context["shop_required"] = get_required_shop_context(request.user)
     context["internal_rules"] = get_internal_rules_status(request.user)
+    context["sections"] = [
+        {"id": "courses", "url_name": "portal_student:courses_partial", "loading": "Chargement des cours..."},
+        {"id": "schedule", "url_name": "portal_student:timetable_partial", "loading": "Chargement du calendrier..."},
+        {"id": "messages", "url_name": "portal_student:messages_partial", "loading": "Chargement des messages..."},
+        {"id": "academics", "url_name": "portal_student:academics_partial", "loading": "Chargement des données académiques..."},
+        {"id": "diplomas", "url_name": "portal_student:diplomas_partial", "loading": "Chargement des diplomes..."},
+        {"id": "shop", "url_name": "portal_student:shop_orders_partial", "loading": "Chargement de la boutique..."},
+        {"id": "settings", "url_name": "portal_student:settings_partial", "loading": "Chargement des parametres..."},
+    ]
     return render(request, "portal/student/dashboard.html", context)
 
 

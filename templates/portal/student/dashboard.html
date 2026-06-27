@@ -100,91 +100,23 @@
               <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]" x-text="activeMeta.badge"></span>
             </header>
 
-            <section x-show="activeSection === 'overview'" x-cloak class="student-workspace-panel">
-              <section id="overview" class="student-section">
+            <section x-show="activeSection === 'overview'" x-cloak>
+              <section id="overview" class="space-y-3">
                 {% include "portal/student/partials/hero_student.html" %}
-                <div class="mt-3">
-                  {% include "portal/student/partials/overview_schedule_quick.html" %}
-                </div>
-                <div class="mt-3">
-                  {% include "portal/student/partials/stats_student.html" %}
-                </div>
+                {% include "portal/student/partials/overview_schedule_quick.html" %}
+                {% include "portal/student/partials/stats_student.html" %}
               </section>
             </section>
 
-            <section x-show="activeSection === 'courses'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-              <section
-                id="courses"
-                data-section-url="{% url 'portal_student:courses_partial' %}"
-                data-section-loaded="0"
-              >
-                {% component "empty_state" title="Chargement" message="Chargement des cours..." icon="loader-circle" %}{% endcomponent %}
-              </section>
-            </section>
-
-            <section x-show="activeSection === 'schedule'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-              <section
-                id="schedule"
-                data-section-url="{% url 'portal_student:timetable_partial' %}"
-                data-section-loaded="0"
-              >
-                {% component "empty_state" title="Chargement" message="Chargement du calendrier..." icon="loader-circle" %}{% endcomponent %}
-              </section>
-            </section>
-
-            <section x-show="activeSection === 'messages'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-                <section
-                  id="messages"
-                  data-section-url="{% url 'portal_student:messages_partial' %}"
-                  data-section-loaded="0"
-                >
-                  {% component "empty_state" title="Chargement" message="Chargement des messages..." icon="loader-circle" %}{% endcomponent %}
+            {% for sec in sections %}
+            <section x-show="activeSection === '{{ sec.id }}'" x-cloak>
+              {% component "dashboard_card" %}
+                <section id="{{ sec.id }}" data-section-url="{% url sec.url_name %}" data-section-loaded="0">
+                  {% component "empty_state" title="Chargement" message="{{ sec.loading }}" icon="loader-circle" %}{% endcomponent %}
                 </section>
+              {% endcomponent %}
             </section>
-
-            <section x-show="activeSection === 'academics'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-                <section
-                  id="academics"
-                  data-section-url="{% url 'portal_student:academics_partial' %}"
-                  data-section-loaded="0"
-                >
-                  {% include "portal/student/partials/academics.html" with status=academic_widget.status status_tone=academic_widget.status_tone formation=academic_widget.formation level=academic_widget.level academic_year=academic_widget.academic_year classroom=academic_widget.classroom active_semester=academic_widget.active_semester semester=academic_widget.semester credits=academic_widget.credits average=academic_widget.average validated_count=academic_widget.validated_count failed_count=academic_widget.failed_count pending_count=academic_widget.pending_count validation_rate=academic_widget.validation_rate semester_rows=academic_widget.semester_rows grade_rows=academic_widget.grade_rows progress=academic_widget.progress status_message=academic_widget.status_message only %}
-                </section>
-            </section>
-
-            <section x-show="activeSection === 'teachers'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-                {% include "portal/student/partials/teachers_student.html" %}
-            </section>
-
-            <section x-show="activeSection === 'diplomas'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-                <section
-                  id="diplomas"
-                  data-section-url="{% url 'portal_student:diplomas_partial' %}"
-                  data-section-loaded="0"
-                >
-                  {% component "empty_state" title="Chargement" message="Chargement des diplomes..." icon="loader-circle" %}{% endcomponent %}
-                </section>
-            </section>
-
-            <section x-show="activeSection === 'shop'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-                <section
-                  id="shop"
-                  data-section-url="{% url 'portal_student:shop_orders_partial' %}"
-                  data-section-loaded="0"
-                >
-                  {% component "empty_state" title="Chargement" message="Chargement de la boutique..." icon="loader-circle" %}{% endcomponent %}
-                </section>
-            </section>
-
-            <section x-show="activeSection === 'settings'" x-cloak class="student-section student-card student-card-pad student-solo-panel student-panel-frame">
-                <section
-                  id="settings"
-                  data-section-url="{% url 'portal_student:settings_partial' %}"
-                  data-section-loaded="0"
-                >
-                  {% component "empty_state" title="Chargement" message="Chargement des parametres..." icon="loader-circle" %}{% endcomponent %}
-                </section>
-            </section>
+            {% endfor %}
           </div>
         </div>
       </section>

@@ -1,0 +1,45 @@
+<div id="{{ id }}">
+  {% if rows %}
+    <div class="overflow-x-auto rounded-xl border border-[color:var(--line)]">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-[color:var(--surface-2)]">
+            {% for header in headers %}
+              <th class="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)] {% if header.sortable %}cursor-pointer hover:text-[color:var(--text)]{% endif %}">
+                {% if header.sortable %}
+                  <a href="{{ header.sort_url }}" class="flex items-center gap-1">
+                    {{ header.label }}
+                    {% if header.sorted %}
+                      <i data-lucide="arrow-up" style="width:14px;height:14px;"></i>
+                    {% endif %}
+                  </a>
+                {% else %}
+                  {{ header.label }}
+                {% endif %}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[color:var(--line)] bg-[color:var(--card)]">
+          {% for row in rows %}
+            <tr class="transition hover:bg-[color:var(--card-soft)]">
+              {% for cell in row.cells %}
+                <td class="px-4 py-3 text-[color:var(--text)] {% if cell.class %}{{ cell.class }}{% endif %}">
+                  {% if cell.component %}
+                    {% component cell.component %}{% endcomponent %}
+                  {% elif cell.html %}
+                    {{ cell.html|safe }}
+                  {% else %}
+                    {{ cell.value|default:"—" }}
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {% component "empty_state" title=empty_title message=empty_message icon=empty_icon %}{% endcomponent %}
+  {% endif %}
+</div>

@@ -1,5 +1,6 @@
 from django_components import component
 
+
 @component.register("section_header")
 class SectionHeader(component.Component):
     template_name = "sections/section_header/section_header.html"
@@ -8,10 +9,14 @@ class SectionHeader(component.Component):
         self,
         title="",
         subtitle="",
-        align="left"
+        align="left",
+        icon="",
+        **kwargs,
     ):
         return {
             "title": title,
             "subtitle": subtitle,
             "align": align,
+            "icon": icon,
+            **kwargs,
         }

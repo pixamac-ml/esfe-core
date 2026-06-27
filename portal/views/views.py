@@ -1895,6 +1895,12 @@ def teacher_portal(request):
         base_context_builder=_build_portal_context,
     )
     context["active_section"] = section if section in ("overview", "classes", "supports", "schedule", "logs", "salary", "notifications", "settings") else "overview"
+    context["kpi_cards"] = [
+        {"label": "Mes classes", "value": len(context.get("class_focus_rows") or []), "icon": "graduation-cap"},
+        {"label": "Cours aujourd'hui", "value": context.get("teacher_kpis", {}).get("today_courses", 0), "icon": "calendar-check-2"},
+        {"label": "Cahiers en attente", "value": context.get("pending_lesson_logs_count", 0), "icon": "book-open"},
+        {"label": "Cahiers du mois", "value": context.get("teacher_kpis", {}).get("month_done_logs", 0), "icon": "clipboard-check"},
+    ]
     return render(request, "portal/teacher/sg_dashboard.html", context)
 
 

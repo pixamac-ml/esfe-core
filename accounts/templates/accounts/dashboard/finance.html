@@ -1,4 +1,5 @@
 {% extends "accounts/dashboard/base_dashboard.html" %}
+{% load component_tags %}
 {% load humanize %}
 {% load custom_filters %}
 
@@ -66,15 +67,15 @@
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="{% url 'accounts:edit_profile' %}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1e4f6f] text-white font-medium rounded-xl hover:bg-[#163b53] transition-colors">
-                <i class="fas fa-user-cog"></i>
+                {% component "icon" name="user-cog" %}{% endcomponent %}
                 <span>Profil</span>
             </a>
             <a href="{% url 'accounts:edit_preferences' %}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors">
-                <i class="fas fa-sliders-h"></i>
+                {% component "icon" name="sliders-horizontal" %}{% endcomponent %}
                 <span>Preferences</span>
             </a>
             <a href="{% url 'password_change' %}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors">
-                <i class="fas fa-key"></i>
+                {% component "icon" name="key" %}{% endcomponent %}
                 <span>Mot de passe</span>
             </a>
         </div>
@@ -87,7 +88,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
-                <i class="fas fa-user-tie text-lg"></i>
+                {% component "icon" name="user-tie" class_str="text-lg" %}{% endcomponent %}
             </div>
             <div>
                 <p class="text-xs uppercase tracking-wide text-primary-100">Agent de paiement</p>
@@ -102,7 +103,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
-                <i class="fas fa-globe text-lg"></i>
+                {% component "icon" name="globe" class_str="text-lg" %}{% endcomponent %}
             </div>
             <div>
                 <p class="text-xs uppercase tracking-wide text-white/80">Mode direction</p>
@@ -122,14 +123,14 @@
         <!-- Search + Export Row -->
         <div class="flex flex-col sm:flex-row gap-3">
             <div class="relative flex-1">
-                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                {% component "icon" name="search" class_str="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" %}{% endcomponent %}
                 <input type="text" name="q" value="{{ request.GET.q }}"
                        placeholder="Rechercher par nom, référence ou token..."
                        class="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#1e4f6f] focus:border-transparent">
             </div>
             <a href="{% url 'accounts:export_payments_csv' %}?{{ request.GET.urlencode }}"
                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1db5b0] text-white font-medium rounded-xl hover:bg-[#19a09b] transition-colors">
-                <i class="fas fa-download"></i>
+                {% component "icon" name="download" %}{% endcomponent %}
                 <span class="hidden sm:inline">Export CSV</span>
             </a>
         </div>
@@ -137,7 +138,7 @@
         <!-- Filters Row -->
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2 text-slate-600">
-                <i class="fas fa-filter text-[#1db5b0]"></i>
+                {% component "icon" name="filter" class_str="text-[#1db5b0]" %}{% endcomponent %}
                 <span class="text-sm font-semibold hidden sm:inline">Filtres:</span>
             </div>
 
@@ -163,12 +164,12 @@
 
             <div class="flex gap-2 w-full sm:w-auto">
                 <button type="submit" class="flex-1 sm:flex-none px-5 py-2.5 bg-[#1e4f6f] text-white font-medium rounded-xl hover:bg-[#163b53] flex items-center justify-center gap-2 transition-colors">
-                    <i class="fas fa-search"></i>
+                    {% component "icon" name="search" %}{% endcomponent %}
                     <span>Filtrer</span>
                 </button>
                 {% if request.GET %}
                 <a href="{% url 'accounts:finance_dashboard' %}" class="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl text-sm flex items-center gap-2 transition-colors">
-                    <i class="fas fa-times"></i>
+                    {% component "icon" name="x" %}{% endcomponent %}
                 </a>
                 {% endif %}
             </div>
@@ -186,7 +187,7 @@
     <div class="stat-card fin-kpi-card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(29, 181, 176, 0.1);">
-                <i class="fas fa-receipt text-lg sm:text-xl" style="color: #1db5b0;"></i>
+                {% component "icon" name="receipt" class_str="text-lg sm:text-xl" %}{% endcomponent %}
             </div>
         </div>
         <p class="text-2xl sm:text-3xl font-bold" style="color: #1db5b0;">{{ stats_today.count|default:0 }}</p>
@@ -197,7 +198,7 @@
     <div class="stat-card fin-kpi-card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(34, 197, 94, 0.1);">
-                <i class="fas fa-money-bill-wave text-lg sm:text-xl" style="color: #22c55e;"></i>
+                {% component "icon" name="banknote" class_str="text-lg sm:text-xl" %}{% endcomponent %}
             </div>
         </div>
         <p class="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600 truncate">{{ stats_today.total|default:0|intcomma }} F</p>
@@ -208,7 +209,7 @@
     <div class="stat-card fin-kpi-card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(243, 156, 18, 0.1);">
-                <i class="fas fa-hourglass-half text-lg sm:text-xl" style="color: #f39c12;"></i>
+                {% component "icon" name="hourglass-half" class_str="text-lg sm:text-xl" %}{% endcomponent %}
             </div>
         </div>
         <p class="text-2xl sm:text-3xl font-bold" style="color: #f39c12;">{{ pending_payments|length }}</p>
@@ -219,7 +220,7 @@
     <div class="stat-card fin-kpi-card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(59, 130, 246, 0.1);">
-                <i class="fas fa-calendar-week text-lg sm:text-xl" style="color: #3b82f6;"></i>
+                {% component "icon" name="calendar-range" class_str="text-lg sm:text-xl" %}{% endcomponent %}
             </div>
         </div>
         <p class="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600 truncate">{{ stats_week.total|default:0|intcomma }} F</p>
@@ -230,7 +231,7 @@
     <div class="stat-card fin-kpi-card p-4 sm:p-5 col-span-2 sm:col-span-1">
         <div class="flex items-center justify-between mb-2 sm:mb-3">
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center" style="background-color: rgba(139, 92, 246, 0.1);">
-                <i class="fas fa-chart-line text-lg sm:text-xl" style="color: #8b5cf6;"></i>
+                {% component "icon" name="chart-no-axes-combined" class_str="text-lg sm:text-xl" %}{% endcomponent %}
             </div>
         </div>
         <p class="text-xl sm:text-2xl lg:text-3xl font-bold" style="color: #8b5cf6;">{{ stats_global.total|default:0|intcomma }} F</p>
@@ -242,7 +243,7 @@
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div class="flex items-center gap-3">
             <div class="w-12 h-12 rounded-xl flex items-center justify-center fin-chip-primary">
-                <i class="fas fa-repeat"></i>
+                {% component "icon" name="refresh-cw" %}{% endcomponent %}
             </div>
             <div>
                 <p class="text-xs uppercase tracking-widest text-slate-400">Reinscriptions</p>
@@ -259,7 +260,7 @@
             </span>
             <a href="{% url 'accounts_portal:reenrollment_workspace' %}"
                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1e4f6f] text-white font-medium rounded-xl hover:bg-[#163b53] transition-colors">
-                <i class="fas fa-arrow-right"></i>
+                {% component "icon" name="arrow-right" %}{% endcomponent %}
                 <span>Ouvrir</span>
             </a>
         </div>
@@ -273,7 +274,7 @@
     <div class="fin-workbench-card overflow-hidden" id="pending-payments-section">
         <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between fin-soft-header">
             <h2 class="font-bold text-base sm:text-lg text-primary-700">
-                <i class="fas fa-clock mr-2 text-accent"></i>
+                {% component "icon" name="clock" class_str="mr-2 text-accent" %}{% endcomponent %}
                 <span class="hidden sm:inline">Paiements en attente</span>
                 <span class="sm:hidden">En attente</span>
             </h2>
@@ -317,7 +318,7 @@
                             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                             class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 hover:shadow-md transition-all"
                             style="background-color: rgba(29, 181, 176, 0.1); color: #1db5b0;">
-                            <i class="fas fa-check"></i>
+                            {% component "icon" name="check" %}{% endcomponent %}
                             <span class="hidden sm:inline">Valider</span>
                         </button>
                         <button
@@ -328,7 +329,7 @@
                             hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                             class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 hover:shadow-md transition-all"
                             style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
-                            <i class="fas fa-times"></i>
+                            {% component "icon" name="x" %}{% endcomponent %}
                             <span class="hidden sm:inline">Rejeter</span>
                         </button>
                     </div>
@@ -338,7 +339,7 @@
             {% else %}
             <div class="text-center py-12" id="pending-payments-empty">
                 <div class="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full flex items-center justify-center" style="background-color: rgba(29, 181, 176, 0.1);">
-                    <i class="fas fa-check-circle text-2xl sm:text-3xl" style="color: #1db5b0;"></i>
+                    {% component "icon" name="circle-check" class_str="text-2xl sm:text-3xl" %}{% endcomponent %}
                 </div>
                 <p class="font-semibold text-slate-600">Aucun paiement en attente</p>
                 <p class="text-sm text-slate-400 mt-1">Tous les paiements ont été traités</p>
@@ -351,7 +352,7 @@
     <div class="fin-workbench-card overflow-hidden">
         <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between fin-soft-header">
             <h2 class="font-bold text-base sm:text-lg text-primary-700">
-                <i class="fas fa-user-plus mr-2 text-blue-500"></i>
+                {% component "icon" name="user-plus" class_str="mr-2 text-blue-500" %}{% endcomponent %}
                 <span class="hidden sm:inline">Inscriptions en attente</span>
                 <span class="sm:hidden">Inscriptions</span>
             </h2>
@@ -399,7 +400,7 @@
             {% else %}
             <div class="text-center py-12">
                 <div class="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full flex items-center justify-center" style="background-color: rgba(29, 181, 176, 0.1);">
-                    <i class="fas fa-check-double text-2xl sm:text-3xl" style="color: #1db5b0;"></i>
+                    {% component "icon" name="check-check" class_str="text-2xl sm:text-3xl" %}{% endcomponent %}
                 </div>
                 <p class="font-semibold text-slate-600">Aucune inscription en attente</p>
                 <p class="text-sm text-slate-400 mt-1">Toutes les inscriptions sont à jour</p>
@@ -413,14 +414,14 @@
 <div class="fin-workbench-card mb-6" id="cash-sessions-section">
     <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style="background-color: #f4fbfb;">
         <h2 class="font-bold text-base sm:text-lg" style="color: #1e4f6f;">
-            <i class="fas fa-money-bill-alt mr-2" style="color: #8b5cf6;"></i>
+            {% component "icon" name="money-bill-alt" class_str="mr-2" %}{% endcomponent %}
             Sessions de paiement espèces
         </h2>
         <button
             onclick="document.getElementById('create-session-form').classList.toggle('hidden')"
             class="px-4 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center justify-center gap-2 hover:shadow-md transition-all w-full sm:w-auto"
             style="background-color: #8b5cf6; color: white;">
-            <i class="fas fa-plus"></i>
+            {% component "icon" name="plus" %}{% endcomponent %}
             Nouvelle session
         </button>
     </div>
@@ -459,7 +460,7 @@
                 <button type="submit"
                         class="px-5 sm:px-6 py-3 font-medium rounded-xl flex items-center justify-center gap-2 hover:shadow-md transition-all"
                         style="background-color: #8b5cf6; color: white;">
-                    <i class="fas fa-check"></i>
+                    {% component "icon" name="check" %}{% endcomponent %}
                     <span>Créer la session</span>
                 </button>
             </div>
@@ -502,7 +503,7 @@
                                     hx-swap="innerHTML"
                                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                     class="px-3 py-1.5 text-xs rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
-                                    <i class="fas fa-sync-alt mr-1"></i>Régénérer
+                                    {% component "icon" name="sync-alt" class_str="mr-1" %}{% endcomponent %}Régénérer
                                 </button>
                                 <button
                                     hx-post="{% url 'accounts:mark_session_used_htmx' session.id %}"
@@ -510,7 +511,7 @@
                                     hx-swap="outerHTML"
                                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                     class="px-3 py-1.5 text-xs rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors">
-                                    <i class="fas fa-check mr-1"></i>Encaissé
+                                    {% component "icon" name="check" class_str="mr-1" %}{% endcomponent %}Encaissé
                                 </button>
                                 <button
                                     hx-post="{% url 'accounts:cancel_session_htmx' session.id %}"
@@ -519,7 +520,7 @@
                                     hx-confirm="Annuler cette session ?"
                                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                     class="px-3 py-1.5 text-xs rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors">
-                                    <i class="fas fa-times"></i>
+                                    {% component "icon" name="x" %}{% endcomponent %}
                                 </button>
                             </div>
                         </div>
@@ -531,7 +532,7 @@
         {% else %}
         <div class="text-center py-8" id="active-sessions-list">
             <div class="w-14 h-14 mx-auto mb-3 rounded-full flex items-center justify-center" style="background-color: rgba(139, 92, 246, 0.1);">
-                <i class="fas fa-money-bill-alt text-xl" style="color: #8b5cf6;"></i>
+                {% component "icon" name="money-bill-alt" class_str="text-xl" %}{% endcomponent %}
             </div>
             <p class="font-semibold text-slate-600">Aucune session active</p>
             <p class="text-sm text-slate-400 mt-1">Créez une session pour encaisser un paiement en espèces</p>
@@ -544,7 +545,7 @@
 <div class="fin-workbench-card overflow-hidden" id="payments-table-section">
     <div class="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between fin-soft-header">
         <h2 class="font-bold text-base sm:text-lg text-primary-700">
-            <i class="fas fa-list-alt mr-2 text-secondary"></i>
+            {% component "icon" name="list-alt" class_str="mr-2 text-secondary" %}{% endcomponent %}
             Historique des paiements
         </h2>
         <span class="px-3 py-1 rounded-full text-xs font-semibold fin-chip-secondary">
@@ -626,7 +627,7 @@
                                 {% if payment.status == 'validated' %}bg-green-100 text-green-700
                                 {% elif payment.status == 'pending' %}bg-yellow-100 text-yellow-700
                                 {% else %}bg-red-100 text-red-700{% endif %}">
-                                {% if payment.status == 'validated' %}<i class="fas fa-check-circle mr-1"></i>{% endif %}
+                                {% if payment.status == 'validated' %}{% component "icon" name="circle-check" class_str="mr-1" %}{% endcomponent %}{% endif %}
                                 {{ payment.get_status_display }}
                             </span>
                         </td>
@@ -635,7 +636,7 @@
                                 hx-get="{% url 'accounts:payment_detail_htmx' payment.id %}"
                                 hx-target="#modal-container"
                                 class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
-                                <i class="fas fa-eye mr-1"></i>Détail
+                                {% component "icon" name="eye" class_str="mr-1" %}{% endcomponent %}Détail
                             </button>
                         </td>
                     </tr>
@@ -655,7 +656,7 @@
                 {% if payments.has_previous %}
                 <a href="?page={{ payments.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.method %}&method={{ request.GET.method }}{% endif %}{% if request.GET.order %}&order={{ request.GET.order }}{% endif %}"
                    class="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
-                    <i class="fas fa-chevron-left mr-1"></i> Précédent
+                    {% component "icon" name="chevron-left" class_str="mr-1" %}{% endcomponent %} Précédent
                 </a>
                 {% endif %}
 
@@ -679,7 +680,7 @@
                 {% if payments.has_next %}
                 <a href="?page={{ payments.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.method %}&method={{ request.GET.method }}{% endif %}{% if request.GET.order %}&order={{ request.GET.order }}{% endif %}"
                    class="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
-                    Suivant <i class="fas fa-chevron-right ml-1"></i>
+                    Suivant {% component "icon" name="chevron-right" class_str="ml-1" %}{% endcomponent %}
                 </a>
                 {% endif %}
             </div>
@@ -689,7 +690,7 @@
         {% else %}
         <div class="text-center py-12 rounded-xl border border-dashed border-slate-200 bg-slate-50/60">
             <div class="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full flex items-center justify-center bg-primary-50">
-                <i class="fas fa-receipt text-2xl sm:text-3xl text-primary-600"></i>
+                {% component "icon" name="receipt" class_str="text-2xl sm:text-3xl text-primary-600" %}{% endcomponent %}
             </div>
             <p class="font-semibold text-slate-600">Aucun paiement trouvé</p>
             <p class="text-sm text-slate-400 mt-1">

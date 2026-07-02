@@ -1,3 +1,4 @@
+{% load component_tags %}
 {% load humanize %}
 <!-- Table paiements paginée (pour HTMX) -->
 
@@ -76,9 +77,9 @@
                         {% if payment.status == 'validated' %}bg-green-100 text-green-700
                         {% elif payment.status == 'pending' %}bg-yellow-100 text-yellow-700
                         {% else %}bg-red-100 text-red-700{% endif %}">
-                        {% if payment.status == 'validated' %}<i class="fas fa-check-circle mr-1"></i>{% endif %}
-                        {% if payment.status == 'pending' %}<i class="fas fa-hourglass-half mr-1"></i>{% endif %}
-                        {% if payment.status == 'cancelled' %}<i class="fas fa-times-circle mr-1"></i>{% endif %}
+                        {% if payment.status == 'validated' %}{% component "icon" name="circle-check" class_str="mr-1" %}{% endcomponent %}{% endif %}
+                        {% if payment.status == 'pending' %}{% component "icon" name="hourglass-half" class_str="mr-1" %}{% endcomponent %}{% endif %}
+                        {% if payment.status == 'cancelled' %}{% component "icon" name="times-circle" class_str="mr-1" %}{% endcomponent %}{% endif %}
                         {{ payment.get_status_display }}
                     </span>
                 </td>
@@ -88,7 +89,7 @@
                         hx-target="#modal-container"
                                 aria-label="Voir le detail"
                                 class="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors">
-                        <i class="fas fa-eye mr-1"></i>Détail
+                        {% component "icon" name="eye" class_str="mr-1" %}{% endcomponent %}Détail
                     </button>
                 </td>
             </tr>
@@ -105,7 +106,7 @@
             hx-target="#payments-table-section .p-3"
             hx-swap="innerHTML"
             class="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
-        <i class="fas fa-chevron-left"></i>
+        {% component "icon" name="chevron-left" %}{% endcomponent %}
     </button>
     {% endif %}
 
@@ -118,7 +119,7 @@
             hx-target="#payments-table-section .p-3"
             hx-swap="innerHTML"
             class="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
-        <i class="fas fa-chevron-right"></i>
+        {% component "icon" name="chevron-right" %}{% endcomponent %}
     </button>
     {% endif %}
 </div>
@@ -127,7 +128,7 @@
 {% else %}
 <div class="text-center py-12">
     <div class="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center bg-primary-50">
-        <i class="fas fa-receipt text-2xl text-primary-600"></i>
+        {% component "icon" name="receipt" class_str="text-2xl text-primary-600" %}{% endcomponent %}
     </div>
     <p class="font-semibold text-slate-600">Aucun paiement trouve</p>
     <p class="text-sm text-slate-400 mt-1">Ajustez les filtres pour afficher des resultats.</p>

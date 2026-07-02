@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% load component_tags %}
 {% load humanize %}
 
 {% block title %}Dashboard Gestionnaire{% endblock %}
@@ -190,7 +191,7 @@
 <div class="dg-shell" x-data>
   <aside class="dg-sidebar custom-scrollbar" id="managerSidebar">
     <div class="dg-logo">
-      <div class="dg-logo-mark"><i class="fa-solid fa-briefcase text-white"></i></div>
+      <div class="dg-logo-mark">{% component "icon" name="briefcase-business" class_str="text-white" %}{% endcomponent %}</div>
       <div style="margin-left:.75rem; min-width:0;">
         <div class="dg-logo-text">Gestionnaire</div>
         <div class="dg-logo-sub">{{ branch.name }}</div>
@@ -200,48 +201,48 @@
     <div class="dg-sidebar-scroll" hx-boost="true">
       <div class="dg-cluster-label">Pilotage</div>
       <a href="?section=overview" class="dg-link {% if active_section == 'overview' %}active{% endif %}">
-        <i class="fa-solid fa-home w-4 text-center"></i><span>Vue globale</span>
+        {% component "icon" name="house" class_str="w-4 text-center" %}{% endcomponent %}<span>Vue globale</span>
       </a>
       <a href="?section=candidatures" class="dg-link {% if active_section == 'candidatures' %}active{% endif %}">
-        <i class="fa-solid fa-file-circle-check w-4 text-center"></i><span>Candidatures</span>
+        {% component "icon" name="file-circle-check" class_str="w-4 text-center" %}{% endcomponent %}<span>Candidatures</span>
         <span class="js-badge-candidatures" data-badge="candidatures" hx-get="{% url 'accounts:widget_sidebar_badges' %}" hx-trigger="candidatureUpdated from:body" hx-target="closest .js-badge-candidatures" hx-swap="outerHTML">{% if candidatures_pending %}<span class="dg-badge">{{ candidatures_pending }}</span>{% endif %}</span>
       </a>
       <a href="?section=inscriptions" class="dg-link {% if active_section == 'inscriptions' %}active{% endif %}">
-        <i class="fa-solid fa-id-card w-4 text-center"></i><span>Inscriptions</span>
+        {% component "icon" name="id-card" class_str="w-4 text-center" %}{% endcomponent %}<span>Inscriptions</span>
       </a>
       <a href="?section=paiements" class="dg-link {% if active_section == 'paiements' %}active{% endif %}">
-        <i class="fa-solid fa-credit-card w-4 text-center"></i><span>Paiements</span>
+        {% component "icon" name="credit-card" class_str="w-4 text-center" %}{% endcomponent %}<span>Paiements</span>
         <span class="js-badge-payments" data-badge="payments" hx-get="{% url 'accounts:widget_sidebar_badges' %}" hx-trigger="paymentUpdated from:body" hx-target="closest .js-badge-payments" hx-swap="outerHTML">{% if pending_payments %}<span class="dg-badge">{{ pending_payments }}</span>{% endif %}</span>
       </a>
 
       <div class="dg-sidebar-divider"></div>
       <div class="dg-cluster-label">Exploitation</div>
       <a href="?section=salaires" class="dg-link {% if active_section == 'salaires' %}active{% endif %}">
-        <i class="fa-solid fa-users-gear w-4 text-center"></i><span>Salaires</span>
+        {% component "icon" name="users-gear" class_str="w-4 text-center" %}{% endcomponent %}<span>Salaires</span>
       </a>
       <a href="?section=depenses" class="dg-link {% if active_section == 'depenses' %}active{% endif %}">
-        <i class="fa-solid fa-receipt w-4 text-center"></i><span>Depenses</span>
+        {% component "icon" name="receipt" class_str="w-4 text-center" %}{% endcomponent %}<span>Depenses</span>
       </a>
       <a href="?section=boutique" class="dg-link {% if active_section == 'boutique' %}active{% endif %}">
-        <i class="fa-solid fa-store w-4 text-center"></i><span>Boutique</span>
+        {% component "icon" name="store" class_str="w-4 text-center" %}{% endcomponent %}<span>Boutique</span>
       </a>
       <a href="?section=dons" class="dg-link {% if active_section == 'dons' %}active{% endif %}">
-        <i class="fa-solid fa-hand-holding-heart w-4 text-center"></i><span>Dons</span>
+        {% component "icon" name="hand-holding-heart" class_str="w-4 text-center" %}{% endcomponent %}<span>Dons</span>
       </a>
 
       <div class="dg-sidebar-divider"></div>
       <div class="dg-cluster-label">Tresorerie</div>
       <a href="?section=caisse" class="dg-link {% if active_section == 'caisse' %}active{% endif %}">
-        <i class="fa-solid fa-vault w-4 text-center"></i><span>Caisse</span>
+        {% component "icon" name="vault" class_str="w-4 text-center" %}{% endcomponent %}<span>Caisse</span>
       </a>
       <a href="?section=rapport" class="dg-link {% if active_section == 'rapport' %}active{% endif %}">
-        <i class="fa-solid fa-chart-line w-4 text-center"></i><span>Rapport</span>
+        {% component "icon" name="chart-no-axes-combined" class_str="w-4 text-center" %}{% endcomponent %}<span>Rapport</span>
       </a>
       <a href="?section=cloture" class="dg-link {% if active_section == 'cloture' %}active{% endif %}">
-        <i class="fa-solid fa-lock w-4 text-center"></i><span>Cloture</span>
+        {% component "icon" name="lock" class_str="w-4 text-center" %}{% endcomponent %}<span>Cloture</span>
       </a>
       <a href="{% url 'accounts_portal:reenrollment_workspace' %}" class="dg-link" hx-boost="false">
-        <i class="fa-solid fa-arrows-rotate w-4 text-center"></i><span>Passages & reinscriptions</span>
+        {% component "icon" name="arrows-rotate" class_str="w-4 text-center" %}{% endcomponent %}<span>Passages & reinscriptions</span>
       </a>
     </div>
 
@@ -249,7 +250,7 @@
       <form action="{% url 'accounts:logout' %}" method="post" style="margin:0;">
         {% csrf_token %}
         <button type="submit" class="dg-logout-btn">
-          <i class="fa-solid fa-arrow-right-from-bracket w-4 text-center"></i><span>Deconnexion</span>
+          {% component "icon" name="log-out" class_str="w-4 text-center" %}{% endcomponent %}<span>Deconnexion</span>
         </button>
       </form>
     </div>
@@ -258,7 +259,7 @@
   <main class="dg-main">
     <header class="dg-topbar" hx-boost="true">
       <div class="dg-topbar-left">
-        <button type="button" class="dg-btn-icon" onclick="managerToggleSidebar()"><i class="fa-solid fa-bars-staggered"></i></button>
+        <button type="button" class="dg-btn-icon" onclick="managerToggleSidebar()">{% component "icon" name="bars-staggered" %}{% endcomponent %}</button>
         <div style="min-width:0;">
           <div style="font-size:1.05rem; font-weight:900; color:#0f172a; line-height:1.2;">Dashboard Gestionnaire</div>
           <div style="font-size:.72rem; font-weight:600; color:#94a3b8; line-height:1.2;">{{ branch.name }} - {{ report_period.label|default:'Periode courante' }}</div>
@@ -268,7 +269,7 @@
       <div class="dg-topbar-right">
         <form method="get" class="dg-search">
           <input type="hidden" name="section" value="{{ active_section }}">
-          <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
+          {% component "icon" name="magnifying-glass" %}{% endcomponent %}
           <input type="search" name="q" value="{{ manager_search }}" placeholder="Rechercher..." />
         </form>
         <div class="dg-filter">
@@ -278,7 +279,7 @@
           </select>
         </div>
         {% include "notification_center/partials/widget.html" %}
-        <button type="button" class="dg-btn-icon" onclick="location.reload()" title="Actualiser"><i class="fa-solid fa-rotate-right"></i></button>
+        <button type="button" class="dg-btn-icon" onclick="location.reload()" title="Actualiser">{% component "icon" name="rotate-right" %}{% endcomponent %}</button>
         <div class="dg-avatar">
           <div style="min-width:0;">
             <div style="font-size:.82rem; font-weight:900; color:#0f172a; line-height:1.2;">{{ user.get_full_name|default:user.username }}</div>
@@ -376,25 +377,25 @@
           <div class="dg-panel">
             <div class="dg-section-hero">
               <div>
-                <div class="dg-section-hero-title"><i class="fa-solid fa-briefcase" style="color:#2563eb; margin-right:8px;"></i>Pilotage global de l'annexe</div>
+                <div class="dg-section-hero-title">{% component "icon" name="briefcase-business" %}{% endcomponent %}Pilotage global de l'annexe</div>
                 <div class="dg-section-hero-sub">Suivre le dossier et l'encaissement, arbitrer entre recettes, charges et engagements.</div>
               </div>
               <div class="dg-section-actions">
-                <a href="?section=candidatures" class="dg-btn dg-btn-outline"><i class="fa-solid fa-file-circle-check"></i>Candidatures</a>
-                <a href="?section=caisse" class="dg-btn dg-btn-primary"><i class="fa-solid fa-vault"></i>Caisse</a>
+                <a href="?section=candidatures" class="dg-btn dg-btn-outline">{% component "icon" name="file-circle-check" %}{% endcomponent %}Candidatures</a>
+                <a href="?section=caisse" class="dg-btn dg-btn-primary">{% component "icon" name="vault" %}{% endcomponent %}Caisse</a>
               </div>
             </div>
 
             <div class="dg-kpi-grid" id="live-kpi-grid">
               <div class="dg-kpi-card" style="border-top:3px solid #2563eb; cursor:default;">
-                <div class="dg-kpi-icon-wrap bg-blue-50 text-blue-600"><i class="fa-solid fa-users"></i></div>
+                <div class="dg-kpi-icon-wrap bg-blue-50 text-blue-600">{% component "icon" name="users" %}{% endcomponent %}</div>
                 <div class="dg-kpi-label" style="color:#2563eb;">Etudiants</div>
                 <div class="dg-kpi-value">{{ total_students|intcomma }}</div>
                 <div class="dg-kpi-detail">Inscrits actifs</div>
               </div>
               {% include "accounts/dashboard/partials/widget_today_payments.html" %}
               <div class="dg-kpi-card" style="border-top:3px solid #f43f5e; cursor:default;" id="alerts-kpi-card">
-                <div class="dg-kpi-icon-wrap bg-rose-50 text-rose-600"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="dg-kpi-icon-wrap bg-rose-50 text-rose-600">{% component "icon" name="triangle-exclamation" %}{% endcomponent %}</div>
                 <div class="dg-kpi-label" style="color:#f43f5e;">Alertes</div>
                 <div class="dg-kpi-value">{{ manager_intelligence.alerts|length|default:0 }}</div>
                 <div class="dg-kpi-detail">Elements critiques a traiter</div>
@@ -418,7 +419,7 @@
               </div>
               {% empty %}
               <div class="dg-empty">
-                <div class="dg-empty-icon"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="dg-empty-icon">{% component "icon" name="circle-check" %}{% endcomponent %}</div>
                 <div class="dg-empty-text">Aucune priorite immediate</div>
               </div>
               {% endfor %}
@@ -491,7 +492,7 @@
               </div>
               {% empty %}
               <div class="dg-empty">
-                <div class="dg-empty-icon"><i class="fa-solid fa-shield-check"></i></div>
+                <div class="dg-empty-icon">{% component "icon" name="shield-check" %}{% endcomponent %}</div>
                 <div class="dg-empty-text">Aucune alerte active</div>
               </div>
               {% endfor %}
@@ -504,7 +505,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-file-circle-check" style="color:#2563eb; margin-right:8px;"></i>Candidatures</div>
+              <div class="dg-section-hero-title">{% component "icon" name="file-circle-check" %}{% endcomponent %}Candidatures</div>
               <div class="dg-section-hero-sub">Traiter les dossiers entrants, demander des complements ou accepter pour ouvrir l'inscription.</div>
             </div>
             <div class="dg-section-actions">
@@ -547,14 +548,14 @@
                     <div class="dg-action-label" style="color:#16a34a;">Passer aux inscriptions</div>
                     <div class="dg-action-sub">Suite du workflow</div>
                   </div>
-                  <i class="fa-solid fa-chevron-right" style="color:#94a3b8;"></i>
+                  {% component "icon" name="chevron-right" %}{% endcomponent %}
                 </a>
                 <a href="?section=paiements" class="dg-action-card">
                   <div>
                     <div class="dg-action-label" style="color:#2563eb;">Suivre les paiements</div>
                     <div class="dg-action-sub">Encaissement et caisse</div>
                   </div>
-                  <i class="fa-solid fa-chevron-right" style="color:#94a3b8;"></i>
+                  {% component "icon" name="chevron-right" %}{% endcomponent %}
                 </a>
               </div>
             </div>
@@ -585,23 +586,23 @@
                   <td>{{ item.submitted_at|date:"d/m/Y" }}</td>
                   <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_candidature_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-regular fa-eye"></i></button>
+                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_candidature_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()">{% component "icon" name="eye" %}{% endcomponent %}</button>
                       {% if item.status == 'submitted' or item.status == 'under_review' %}
                       {% if item.status == 'submitted' %}
-                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_under_review' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Passer cette candidature en analyse ?"><i class="fa-solid fa-magnifying-glass"></i></button>
+                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_under_review' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Passer cette candidature en analyse ?">{% component "icon" name="magnifying-glass" %}{% endcomponent %}</button>
                       {% endif %}
-                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_accept' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Accepter cette candidature ?"><i class="fa-solid fa-check"></i></button>
-                      <button type="button" class="dg-btn dg-btn-warning" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_to_complete' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Marquer cette candidature comme a completer ?"><i class="fa-solid fa-pen"></i></button>
-                      <button type="button" class="dg-btn dg-btn-danger" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_reject' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Refuser cette candidature ?"><i class="fa-solid fa-xmark"></i></button>
+                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_accept' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Accepter cette candidature ?">{% component "icon" name="check" %}{% endcomponent %}</button>
+                      <button type="button" class="dg-btn dg-btn-warning" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_to_complete' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Marquer cette candidature comme a completer ?">{% component "icon" name="pen" %}{% endcomponent %}</button>
+                      <button type="button" class="dg-btn dg-btn-danger" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_candidature_reject' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Refuser cette candidature ?">{% component "icon" name="xmark" %}{% endcomponent %}</button>
                       {% endif %}
                       {% if item.status == 'rejected' %}
-                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem; border-color:#fecaca; color:#ef4444;" hx-post="{% url 'accounts:htmx_candidature_delete' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Supprimer definitivement cette candidature rejetee ?"><i class="fa-regular fa-trash-can"></i></button>
+                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem; border-color:#fecaca; color:#ef4444;" hx-post="{% url 'accounts:htmx_candidature_delete' item.id %}" hx-target="#candidature-{{ item.id }}" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Supprimer definitivement cette candidature rejetee ?">{% component "icon" name="trash-can" %}{% endcomponent %}</button>
                       {% endif %}
                     </div>
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-inbox"></i></div><div class="dg-empty-text">Aucune candidature</div></td></tr>
+                <tr><td colspan="5" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="inbox" %}{% endcomponent %}</div><div class="dg-empty-text">Aucune candidature</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -619,7 +620,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-id-card" style="color:#16a34a; margin-right:8px;"></i>Inscriptions</div>
+              <div class="dg-section-hero-title">{% component "icon" name="id-card" %}{% endcomponent %}Inscriptions</div>
               <div class="dg-section-hero-sub">Transformer les candidatures acceptes en inscriptions payables et suivre l'etat financier de chaque dossier.</div>
             </div>
             <div class="dg-section-actions">
@@ -671,12 +672,12 @@
                   <td>{{ item.balance|intcomma }} FCFA</td>
                   <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_inscription_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-regular fa-eye"></i></button>
+                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_inscription_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()">{% component "icon" name="eye" %}{% endcomponent %}</button>
                     </div>
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-folder-open"></i></div><div class="dg-empty-text">Aucune inscription</div></td></tr>
+                <tr><td colspan="5" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="folder-open" %}{% endcomponent %}</div><div class="dg-empty-text">Aucune inscription</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -694,7 +695,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-credit-card" style="color:#7c3aed; margin-right:8px;"></i>Paiements</div>
+              <div class="dg-section-hero-title">{% component "icon" name="credit-card" %}{% endcomponent %}Paiements</div>
               <div class="dg-section-hero-sub">Valider, annuler, corriger et synchroniser les paiements pour garder la caisse fiable.</div>
             </div>
             <div class="dg-section-actions">
@@ -734,7 +735,7 @@
                 </div>
                 {% empty %}
                 <div id="manager-cash-session-empty" class="dg-empty">
-                  <div class="dg-empty-icon"><i class="fa-solid fa-money-check"></i></div>
+                  <div class="dg-empty-icon">{% component "icon" name="money-check" %}{% endcomponent %}</div>
                   <div class="dg-empty-text">Aucune session cash active</div>
                 </div>
                 {% endfor %}
@@ -790,19 +791,19 @@
                   <td>{{ item.created_at|date:"d/m/Y" }}</td>
                   <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_payment_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-regular fa-eye"></i></button>
+                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_payment_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()">{% component "icon" name="eye" %}{% endcomponent %}</button>
                       {% if item.status == 'pending' %}
-                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_payment_validate' item.id %}" hx-target="#manager-payment-row-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Valider ce paiement ?"><i class="fa-solid fa-check"></i></button>
-                      <button type="button" class="dg-btn dg-btn-danger" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_payment_cancel' item.id %}" hx-target="#manager-payment-row-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Annuler ce paiement ?"><i class="fa-solid fa-xmark"></i></button>
+                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_payment_validate' item.id %}" hx-target="#manager-payment-row-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Valider ce paiement ?">{% component "icon" name="check" %}{% endcomponent %}</button>
+                      <button type="button" class="dg-btn dg-btn-danger" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_payment_cancel' item.id %}" hx-target="#manager-payment-row-{{ item.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Annuler ce paiement ?">{% component "icon" name="xmark" %}{% endcomponent %}</button>
                       {% endif %}
                       {% if item.status == 'validated' %}
-                      <button type="button" class="dg-btn dg-btn-warning" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_payment_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-solid fa-pen"></i></button>
+                      <button type="button" class="dg-btn dg-btn-warning" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_payment_detail' item.id %}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()">{% component "icon" name="pen" %}{% endcomponent %}</button>
                       {% endif %}
                     </div>
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-receipt"></i></div><div class="dg-empty-text">Aucun paiement</div></td></tr>
+                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="receipt" %}{% endcomponent %}</div><div class="dg-empty-text">Aucun paiement</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -820,7 +821,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-users-gear" style="color:#7c3aed; margin-right:8px;"></i>Salaires</div>
+              <div class="dg-section-hero-title">{% component "icon" name="users-gear" %}{% endcomponent %}Salaires</div>
               <div class="dg-section-hero-sub">Preparer les fiches, notifier la disponibilite puis regler les salaires selon la caisse.</div>
             </div>
             <div class="dg-section-actions">
@@ -838,8 +839,8 @@
           </div>
 
           <div class="dg-section-actions" style="margin-bottom:12px;">
-            <button type="button" class="dg-btn dg-btn-primary" hx-post="{% url 'accounts:htmx_manager_salary_prepare_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend"><i class="fa-solid fa-calculator"></i>Pre-calculer les fiches</button>
-            <button type="button" class="dg-btn dg-btn-success" hx-post="{% url 'accounts:htmx_manager_salary_pay_ready_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend"><i class="fa-solid fa-bell"></i>Notifier les fiches disponibles</button>
+            <button type="button" class="dg-btn dg-btn-primary" hx-post="{% url 'accounts:htmx_manager_salary_prepare_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend">{% component "icon" name="calculator" %}{% endcomponent %}Pre-calculer les fiches</button>
+            <button type="button" class="dg-btn dg-btn-success" hx-post="{% url 'accounts:htmx_manager_salary_pay_ready_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend">{% component "icon" name="bell" %}{% endcomponent %}Notifier les fiches disponibles</button>
           </div>
 
           <form method="get" class="dg-filter-bar" hx-target="#salaires-results" hx-select="#salaires-results" hx-swap="outerHTML">
@@ -876,16 +877,16 @@
                   </td>
                   <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-regular fa-eye"></i></button>
-                      <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-solid fa-pen"></i></button>
+                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()">{% component "icon" name="eye" %}{% endcomponent %}</button>
+                      <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()">{% component "icon" name="pen" %}{% endcomponent %}</button>
                       {% if item.current_payroll and item.current_payroll.remaining_salary > 0 %}
-                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()" title="Payer le salaire"><i class="fa-solid fa-money-bill-wave"></i> Payer</button>
+                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_salary_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()" title="Payer le salaire">{% component "icon" name="banknote" %}{% endcomponent %} Payer</button>
                       {% endif %}
                     </div>
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-users-slash"></i></div><div class="dg-empty-text">Aucun employe disponible</div></td></tr>
+                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="users-slash" %}{% endcomponent %}</div><div class="dg-empty-text">Aucun employe disponible</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -903,7 +904,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-receipt" style="color:#7c3aed; margin-right:8px;"></i>Depenses</div>
+              <div class="dg-section-hero-title">{% component "icon" name="receipt" %}{% endcomponent %}Depenses</div>
               <div class="dg-section-hero-sub">Soumettre, approuver, payer et tracer les sorties de l'annexe.</div>
             </div>
             <div class="dg-section-actions">
@@ -920,7 +921,7 @@
                 {% csrf_token %}
                 {% include "accounts/dashboard/partials/dg_form_fields.html" with form=expense_form %}
                 <div class="dg-form-footer">
-                  <button class="dg-btn dg-btn-primary" type="submit"><i class="fa-solid fa-plus"></i>Creer la depense</button>
+                  <button class="dg-btn dg-btn-primary" type="submit">{% component "icon" name="plus" %}{% endcomponent %}Creer la depense</button>
                 </div>
               </form>
             </div>
@@ -968,14 +969,14 @@
                   <td>{{ item.expense_date|date:"d/m/Y" }}</td>
                   <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_manager_expense_approve' item.id %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Approuver cette depense de {{ item.amount|intcomma }} FCFA ?"><i class="fa-solid fa-check"></i></button>
-                      <button type="button" class="dg-btn dg-btn-warning" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_manager_expense_reject' item.id %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Rejeter cette depense ?"><i class="fa-solid fa-xmark"></i></button>
-                      <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_manager_expense_pay' item.id %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Payer {{ item.amount|intcomma }} FCFA pour cette depense ?"><i class="fa-solid fa-money-bill"></i></button>
+                      <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_manager_expense_approve' item.id %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Approuver cette depense de {{ item.amount|intcomma }} FCFA ?">{% component "icon" name="check" %}{% endcomponent %}</button>
+                      <button type="button" class="dg-btn dg-btn-warning" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_manager_expense_reject' item.id %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Rejeter cette depense ?">{% component "icon" name="xmark" %}{% endcomponent %}</button>
+                      <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-post="{% url 'accounts:htmx_manager_expense_pay' item.id %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Payer {{ item.amount|intcomma }} FCFA pour cette depense ?">{% component "icon" name="money-bill" %}{% endcomponent %}</button>
                     </div>
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-receipt"></i></div><div class="dg-empty-text">Aucune depense</div></td></tr>
+                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="receipt" %}{% endcomponent %}</div><div class="dg-empty-text">Aucune depense</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -993,7 +994,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-vault" style="color:#16a34a; margin-right:8px;"></i>Caisse</div>
+              <div class="dg-section-hero-title">{% component "icon" name="vault" %}{% endcomponent %}Caisse</div>
               <div class="dg-section-hero-sub">Lire toutes les entrees et sorties, synchroniser les encaissements et produire les pieces de caisse.</div>
             </div>
             <div class="dg-section-actions">
@@ -1017,11 +1018,11 @@
                 {% csrf_token %}
                 {% include "accounts/dashboard/partials/dg_form_fields.html" with form=cash_form %}
                 <div class="dg-form-footer">
-                  <button class="dg-btn dg-btn-primary" type="submit"><i class="fa-solid fa-plus"></i>Creer mouvement</button>
+                  <button class="dg-btn dg-btn-primary" type="submit">{% component "icon" name="plus" %}{% endcomponent %}Creer mouvement</button>
                 </div>
               </form>
               <div class="mt-4 flex flex-wrap gap-2">
-                <button class="dg-btn dg-btn-success" type="button" hx-post="{% url 'accounts:htmx_manager_cash_sync' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend"><i class="fa-solid fa-arrows-rotate"></i>Synchroniser encaissements</button>
+                <button class="dg-btn dg-btn-success" type="button" hx-post="{% url 'accounts:htmx_manager_cash_sync' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend">{% component "icon" name="arrows-rotate" %}{% endcomponent %}Synchroniser encaissements</button>
               </div>
             </div>
 
@@ -1081,11 +1082,11 @@
                   <td style="font-weight:800; {% if item.movement_type == 'in' %}color:#16a34a;{% else %}color:#ef4444;{% endif %}">{% if item.movement_type == 'in' %}+{% else %}-{% endif %}{{ item.amount|intcomma }} FCFA</td>
                   <td>{{ item.label }}</td>
                   <td>
-                    <a class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" href="{% url 'accounts:htmx_manager_cash_movement_receipt' item.id %}" target="_blank" hx-boost="false"><i class="fa-regular fa-file-pdf"></i></a>
+                    <a class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" href="{% url 'accounts:htmx_manager_cash_movement_receipt' item.id %}" target="_blank" hx-boost="false">{% component "icon" name="file-text" %}{% endcomponent %}</a>
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-vault"></i></div><div class="dg-empty-text">Aucun mouvement de caisse</div></td></tr>
+                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="vault" %}{% endcomponent %}</div><div class="dg-empty-text">Aucun mouvement de caisse</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -1103,7 +1104,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-chart-line" style="color:#2563eb; margin-right:8px;"></i>Rapport financier</div>
+              <div class="dg-section-hero-title">{% component "icon" name="chart-no-axes-combined" %}{% endcomponent %}Rapport financier</div>
               <div class="dg-section-hero-sub">Lecture financiere par periode et comparaison annuelle des recettes.</div>
             </div>
             <div class="dg-section-actions">
@@ -1119,7 +1120,7 @@
             <input type="date" name="report_start" value="{{ report_period.start|date:'Y-m-d' }}" class="dg-filter" style="width:100%;">
             <input type="date" name="report_end" value="{{ report_period.end|date:'Y-m-d' }}" class="dg-filter" style="width:100%;">
             <button class="dg-btn dg-btn-primary" type="submit">Generer</button>
-            <a href="{% url 'accounts:manager_export_report_xlsx' %}?section=rapport&report_period={{ report_period.preset }}&report_start={{ report_period.start|date:'Y-m-d' }}&report_end={{ report_period.end|date:'Y-m-d' }}" class="dg-btn dg-btn-success" style="text-decoration:none;" hx-boost="false"><i class="fa-solid fa-file-excel"></i>Excel</a>
+            <a href="{% url 'accounts:manager_export_report_xlsx' %}?section=rapport&report_period={{ report_period.preset }}&report_start={{ report_period.start|date:'Y-m-d' }}&report_end={{ report_period.end|date:'Y-m-d' }}" class="dg-btn dg-btn-success" style="text-decoration:none;" hx-boost="false">{% component "icon" name="sheet" %}{% endcomponent %}Excel</a>
           </form>
 
           <div class="dg-table-wrap">
@@ -1158,7 +1159,7 @@
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="4" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-chart-line"></i></div><div class="dg-empty-text">Aucune recette annuelle</div></td></tr>
+                <tr><td colspan="4" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="chart-no-axes-combined" %}{% endcomponent %}</div><div class="dg-empty-text">Aucune recette annuelle</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -1170,7 +1171,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-lock" style="color:#0f9d8a; margin-right:8px;"></i>Honoraires & cloture</div>
+              <div class="dg-section-hero-title">{% component "icon" name="lock" %}{% endcomponent %}Honoraires & cloture</div>
               <div class="dg-section-hero-sub">Preparer les honoraires enseignants, archiver la periode et enregistrer le versement bancaire.</div>
             </div>
             <div class="dg-section-actions">
@@ -1188,8 +1189,8 @@
           </div>
 
           <div class="dg-section-actions" style="margin-bottom:12px;">
-            <button type="button" class="dg-btn dg-btn-primary" hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_prepare_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend"><i class="fa-solid fa-calculator"></i>Pre-calculer les honoraires</button>
-            <button type="button" class="dg-btn dg-btn-success" hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_pay_ready_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend"><i class="fa-solid fa-bell"></i>Notifier les honoraires disponibles</button>
+            <button type="button" class="dg-btn dg-btn-primary" hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_prepare_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend">{% component "icon" name="calculator" %}{% endcomponent %}Pre-calculer les honoraires</button>
+            <button type="button" class="dg-btn dg-btn-success" hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_pay_ready_all' %}" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend">{% component "icon" name="bell" %}{% endcomponent %}Notifier les honoraires disponibles</button>
           </div>
 
           <div class="dg-row-2">
@@ -1243,13 +1244,13 @@
                   </td>
                   <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_teacher_honorarium_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-regular fa-eye"></i></button>
-                      <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_teacher_honorarium_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()"><i class="fa-solid fa-pen"></i></button>
+                      <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_teacher_honorarium_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()">{% component "icon" name="eye" %}{% endcomponent %}</button>
+                      <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .5rem;" hx-get="{% url 'accounts:htmx_manager_teacher_honorarium_detail' item.user_id %}?salary_month={{ salary_month_value }}" hx-target="#modal-content" hx-swap="innerHTML" onclick="openDashboardModal()">{% component "icon" name="pen" %}{% endcomponent %}</button>
                     </div>
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-chalkboard-user"></i></div><div class="dg-empty-text">Aucun enseignant disponible</div></td></tr>
+                <tr><td colspan="7" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="chalkboard-user" %}{% endcomponent %}</div><div class="dg-empty-text">Aucun enseignant disponible</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -1274,16 +1275,16 @@
                   <td>{% if closure.bank_transfer %}{{ closure.bank_transfer.reference }}{% else %}<span class="text-slate-400">Aucun</span>{% endif %}</td>
                   <td>
                     {% if closure.status == 'draft' %}
-                    <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .6rem;" hx-post="{% url 'accounts:htmx_manager_monthly_closure_validate' closure.id %}" hx-target="body" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Valider la cloture de {{ closure.period_month|date:"m/Y" }} ? Les montants ne pourront plus etre recalcules."><i class="fa-solid fa-check"></i> Valider</button>
+                    <button type="button" class="dg-btn dg-btn-primary" style="font-size:.65rem; height:28px; padding:0 .6rem;" hx-post="{% url 'accounts:htmx_manager_monthly_closure_validate' closure.id %}" hx-target="body" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Valider la cloture de {{ closure.period_month|date:"m/Y" }} ? Les montants ne pourront plus etre recalcules.">{% component "icon" name="check" %}{% endcomponent %} Valider</button>
                     {% elif closure.status == 'validated' %}
-                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .6rem;" hx-post="{% url 'accounts:htmx_manager_monthly_closure_close' closure.id %}" hx-target="body" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Cloturer definitivement {{ closure.period_month|date:"m/Y" }} ? Cette etape est irreversible."><i class="fa-solid fa-lock"></i> Cloturer</button>
+                    <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .6rem;" hx-post="{% url 'accounts:htmx_manager_monthly_closure_close' closure.id %}" hx-target="body" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Cloturer definitivement {{ closure.period_month|date:"m/Y" }} ? Cette etape est irreversible.">{% component "icon" name="lock" %}{% endcomponent %} Cloturer</button>
                     {% else %}
                     <span class="text-slate-400">-</span>
                     {% endif %}
                   </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-lock"></i></div><div class="dg-empty-text">Aucune cloture enregistree</div></td></tr>
+                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="lock" %}{% endcomponent %}</div><div class="dg-empty-text">Aucune cloture enregistree</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -1302,7 +1303,7 @@
                   <td>{{ transfer.comment|default:"-" }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-building-columns"></i></div><div class="dg-empty-text">Aucun versement bancaire</div></td></tr>
+                <tr><td colspan="5" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="building-columns" %}{% endcomponent %}</div><div class="dg-empty-text">Aucun versement bancaire</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -1318,7 +1319,7 @@
         <section class="dg-panel">
           <div class="dg-section-hero">
             <div>
-              <div class="dg-section-hero-title"><i class="fa-solid fa-hand-holding-heart" style="color:#e11d48; margin-right:8px;"></i>Dons & donations</div>
+              <div class="dg-section-hero-title">{% component "icon" name="hand-holding-heart" %}{% endcomponent %}Dons & donations</div>
               <div class="dg-section-hero-sub">Enregistrer et suivre les dons, dons en nature et appuis financiers.</div>
             </div>
             <div class="dg-section-actions">
@@ -1354,7 +1355,7 @@
                 {% for donation in donations %}
                 {% include "accounts/dashboard/partials/donation_row.html" %}
                 {% empty %}
-                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon"><i class="fa-solid fa-gift"></i></div><div class="dg-empty-text">Aucun don enregistre</div></td></tr>
+                <tr><td colspan="6" class="dg-empty"><div class="dg-empty-icon">{% component "icon" name="gift" %}{% endcomponent %}</div><div class="dg-empty-text">Aucun don enregistre</div></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -1503,10 +1504,10 @@
     const container = document.getElementById('toast-container');
     if (!container) return;
     const colors = { success: '#16a34a', error: '#ef4444', warning: '#d97706', info: '#2563eb' };
-    const icons = { success: 'fa-check-circle', error: 'fa-times-circle', warning: 'fa-exclamation-circle', info: 'fa-info-circle' };
+    const icons = { success: 'circle-check', error: 'circle-x', warning: 'circle-alert', info: 'circle-info' };
     const toast = document.createElement('div');
     toast.style.cssText = 'background:' + (colors[type] || colors.info) + '; color:#fff; padding:12px 20px; border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,.18); display:flex; align-items:center; gap:12px; font-size:.85rem; font-weight:700; transform:translateX(120%); opacity:0; transition:all .35s cubic-bezier(.22,1,.36,1); pointer-events:auto; max-width:420px;';
-    toast.innerHTML = '<i class="fas ' + (icons[type] || icons.info) + '" style="font-size:1.1rem;"></i><span style="flex:1;">' + message + '</span><button onclick="this.parentElement.remove()" style="background:none; border:none; color:rgba(255,255,255,.7); cursor:pointer; padding:2px;"><i class="fas fa-times"></i></button>';
+    toast.innerHTML = '{% component "icon" name="award" class_str="' + (icons[type] || icons.info) + '" %}{% endcomponent %}<span style="flex:1;">' + message + '</span><button onclick="this.parentElement.remove()" style="background:none; border:none; color:rgba(255,255,255,.7); cursor:pointer; padding:2px;">{% component "icon" name="x" %}{% endcomponent %}</button>';
     container.appendChild(toast);
     requestAnimationFrame(function() {
       toast.style.transform = 'translateX(0)';

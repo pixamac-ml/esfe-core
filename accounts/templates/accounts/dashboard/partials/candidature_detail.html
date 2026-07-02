@@ -1,3 +1,4 @@
+{% load component_tags %}
 {# templates/accounts/dashboard/partials/candidature_detail.html #}
 
 <div class="modal-content">
@@ -5,7 +6,7 @@
     <div class="modal-header bg-gradient-primary text-white">
         <div class="d-flex align-items-center">
             <div class="avatar-circle bg-white text-primary me-3">
-                <i class="fas fa-user-graduate fa-lg"></i>
+                {% component "icon" name="graduation-cap" %}{% endcomponent %}
             </div>
             <div>
                 <h5 class="modal-title mb-0">{{ candidature.full_name }}</h5>
@@ -36,19 +37,12 @@
                         {% elif candidature.status == 'accepted_with_reserve' %}bg-info
                         {% elif candidature.status == 'rejected' %}bg-danger
                         {% endif %}">
-                        <i class="fas
-                            {% if candidature.status == 'submitted' %}fa-clock
-                            {% elif candidature.status == 'under_review' %}fa-search
-                            {% elif candidature.status == 'to_complete' %}fa-exclamation-triangle
-                            {% elif candidature.status == 'accepted' %}fa-check-circle
-                            {% elif candidature.status == 'accepted_with_reserve' %}fa-check
-                            {% elif candidature.status == 'rejected' %}fa-times-circle
-                            {% endif %} me-1"></i>
+                        {% component "icon" name="award" class_str="{% if candidature.status == 'submitted' %}clock {% elif candidature.status == 'under_review' %}search {% elif candidature.status == 'to_complete' %}triangle-alert {% elif candidature.status == 'accepted' %}circle-check {% elif candidature.status == 'accepted_with_reserve' %}check {% elif candidature.status == 'rejected' %}circle-x {% endif %} me-1" %}{% endcomponent %}
                         {{ candidature.get_status_display }}
                     </span>
                 </div>
                 <div class="text-muted small">
-                    <i class="fas fa-calendar-alt me-1"></i>
+                    {% component "icon" name="calendar" class_str="me-1" %}{% endcomponent %}
                     Soumise le {{ candidature.submitted_at|date:"d/m/Y à H:i" }}
                 </div>
             </div>
@@ -58,7 +52,7 @@
         <div class="p-3 border-bottom">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <span class="fw-semibold">
-                    <i class="fas fa-tasks me-2 text-primary"></i>
+                    {% component "icon" name="list-checks" class_str="me-2 text-primary" %}{% endcomponent %}
                     Complétion du dossier
                 </span>
                 <span class="badge {% if completion_percentage == 100 %}bg-success{% else %}bg-warning{% endif %}">
@@ -79,7 +73,7 @@
                 <span>{{ validated_docs }}/{{ required_docs_count }} documents validés</span>
                 {% if pending_docs > 0 %}
                 <span class="text-warning">
-                    <i class="fas fa-exclamation-circle"></i> {{ pending_docs }} en attente
+                    {% component "icon" name="circle-alert" %}{% endcomponent %} {{ pending_docs }} en attente
                 </span>
                 {% endif %}
             </div>
@@ -89,7 +83,7 @@
             {# ===== INFORMATIONS PERSONNELLES ===== #}
             <div class="card mb-3 border-0 shadow-sm">
                 <div class="card-header bg-primary bg-gradient text-white py-2">
-                    <i class="fas fa-id-card me-2"></i>Informations personnelles
+                    {% component "icon" name="id-card" class_str="me-2" %}{% endcomponent %}Informations personnelles
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -103,7 +97,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Genre</label>
                                 <p class="mb-0">
-                                    <i class="fas fa-{% if candidature.gender == 'male' %}mars text-primary{% else %}venus text-danger{% endif %} me-1"></i>
+                                    {% component "icon" name="{%" class_str="if candidature.gender == 'male' %}mars text-primary{% else %}venus text-danger{% endif %} me-1" %}{% endcomponent %}
                                     {{ candidature.get_gender_display }}
                                 </p>
                             </div>
@@ -112,7 +106,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Date de naissance</label>
                                 <p class="mb-0">
-                                    <i class="fas fa-birthday-cake text-warning me-1"></i>
+                                    {% component "icon" name="birthday-cake" class_str="text-warning me-1" %}{% endcomponent %}
                                     {{ candidature.birth_date|date:"d/m/Y" }}
                                 </p>
                             </div>
@@ -121,7 +115,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Lieu de naissance</label>
                                 <p class="mb-0">
-                                    <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                                    {% component "icon" name="map-pin" class_str="text-danger me-1" %}{% endcomponent %}
                                     {{ candidature.birth_place }}
                                 </p>
                             </div>
@@ -133,7 +127,7 @@
             {# ===== COORDONNÉES ===== #}
             <div class="card mb-3 border-0 shadow-sm">
                 <div class="card-header bg-info bg-gradient text-white py-2">
-                    <i class="fas fa-address-book me-2"></i>Coordonnées
+                    {% component "icon" name="address-book" class_str="me-2" %}{% endcomponent %}Coordonnées
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -142,7 +136,7 @@
                                 <label class="text-muted small mb-0">Email</label>
                                 <p class="mb-0">
                                     <a href="mailto:{{ candidature.email }}" class="text-decoration-none">
-                                        <i class="fas fa-envelope text-primary me-1"></i>
+                                        {% component "icon" name="mail" class_str="text-primary me-1" %}{% endcomponent %}
                                         {{ candidature.email }}
                                     </a>
                                 </p>
@@ -153,7 +147,7 @@
                                 <label class="text-muted small mb-0">Téléphone</label>
                                 <p class="mb-0">
                                     <a href="tel:{{ candidature.phone }}" class="text-decoration-none">
-                                        <i class="fas fa-phone text-success me-1"></i>
+                                        {% component "icon" name="phone" class_str="text-success me-1" %}{% endcomponent %}
                                         {{ candidature.phone }}
                                     </a>
                                 </p>
@@ -163,7 +157,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Adresse</label>
                                 <p class="mb-0">
-                                    <i class="fas fa-home text-secondary me-1"></i>
+                                    {% component "icon" name="house" class_str="text-secondary me-1" %}{% endcomponent %}
                                     {{ candidature.address|default:"Non renseignée" }}
                                 </p>
                             </div>
@@ -178,7 +172,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Pays</label>
                                 <p class="mb-0">
-                                    <i class="fas fa-globe text-info me-1"></i>
+                                    {% component "icon" name="globe" class_str="text-info me-1" %}{% endcomponent %}
                                     {{ candidature.country }}
                                 </p>
                             </div>
@@ -190,7 +184,7 @@
             {# ===== PROGRAMME ===== #}
             <div class="card mb-3 border-0 shadow-sm">
                 <div class="card-header bg-success bg-gradient text-white py-2">
-                    <i class="fas fa-graduation-cap me-2"></i>Programme académique
+                    {% component "icon" name="graduation-cap" class_str="me-2" %}{% endcomponent %}Programme académique
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -198,7 +192,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Programme</label>
                                 <p class="mb-0 fw-semibold">
-                                    <i class="fas fa-book text-success me-1"></i>
+                                    {% component "icon" name="book-open" class_str="text-success me-1" %}{% endcomponent %}
                                     {{ candidature.programme.title }}
                                 </p>
                             </div>
@@ -235,7 +229,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Annexe</label>
                                 <p class="mb-0">
-                                    <i class="fas fa-building text-primary me-1"></i>
+                                    {% component "icon" name="building-2" class_str="text-primary me-1" %}{% endcomponent %}
                                     {{ candidature.branch.name|default:"Non assignée" }}
                                 </p>
                             </div>
@@ -248,7 +242,7 @@
             <div class="card mb-3 border-0 shadow-sm">
                 <div class="card-header bg-warning bg-gradient text-dark py-2 d-flex justify-content-between align-items-center">
                     <span>
-                        <i class="fas fa-folder-open me-2"></i>
+                        {% component "icon" name="folder-open" class_str="me-2" %}{% endcomponent %}
                         Documents du dossier
                     </span>
                     <span class="badge bg-dark">{{ total_docs }} fichier{{ total_docs|pluralize }}</span>
@@ -277,7 +271,7 @@
                                             <div class="doc-icon me-2
                                                 {% if doc.is_valid or doc.is_validated %}text-success
                                                 {% else %}text-warning{% endif %}">
-                                                <i class="fas fa-file-{% if 'pdf' in doc.file.name %}pdf{% elif 'image' in doc.document_type.name|lower or 'photo' in doc.document_type.name|lower %}image{% else %}alt{% endif %} fa-lg"></i>
+                                                {% component "icon" name="file-{%" class_str="if 'pdf' in doc.file.name %}pdf{% elif 'image' in doc.document_type.name|lower or 'photo' in doc.document_type.name|lower %}image{% else %}alt{% endif %}" %}{% endcomponent %}
                                             </div>
                                             <div>
                                                 <p class="mb-0 fw-medium">{{ doc.document_type.name }}</p>
@@ -288,11 +282,11 @@
                                     <td class="text-center">
                                         {% if doc.is_valid or doc.is_validated %}
                                         <span class="badge bg-success">
-                                            <i class="fas fa-check-circle me-1"></i>Validé
+                                            {% component "icon" name="circle-check" class_str="me-1" %}{% endcomponent %}Validé
                                         </span>
                                         {% else %}
                                         <span class="badge bg-warning text-dark">
-                                            <i class="fas fa-clock me-1"></i>En attente
+                                            {% component "icon" name="clock" class_str="me-1" %}{% endcomponent %}En attente
                                         </span>
                                         {% endif %}
                                     </td>
@@ -308,13 +302,13 @@
                                                target="_blank"
                                                class="btn btn-outline-primary"
                                                title="Voir le document">
-                                                <i class="fas fa-eye"></i>
+                                                {% component "icon" name="eye" %}{% endcomponent %}
                                             </a>
                                             <a href="{{ doc.file.url }}"
                                                download
                                                class="btn btn-outline-secondary"
                                                title="Télécharger">
-                                                <i class="fas fa-download"></i>
+                                                {% component "icon" name="download" %}{% endcomponent %}
                                             </a>
                                             {% if not doc.is_valid and not doc.is_validated %}
                                             <button type="button"
@@ -324,7 +318,7 @@
                                                     hx-swap="outerHTML"
                                                     hx-confirm="Valider ce document ?"
                                                     title="Valider le document">
-                                                <i class="fas fa-check"></i>
+                                                {% component "icon" name="check" %}{% endcomponent %}
                                             </button>
                                             {% endif %}
                                         </div>
@@ -336,7 +330,7 @@
                     </div>
                     {% else %}
                     <div class="text-center py-4">
-                        <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                        {% component "icon" name="folder-open" class_str="text-muted mb-3" %}{% endcomponent %}
                         <p class="text-muted mb-0">Aucun document soumis par le candidat.</p>
                     </div>
                     {% endif %}
@@ -347,7 +341,7 @@
             {% if candidature.reviewed_at %}
             <div class="card mb-3 border-0 shadow-sm">
                 <div class="card-header bg-secondary bg-gradient text-white py-2">
-                    <i class="fas fa-user-check me-2"></i>Informations de révision
+                    {% component "icon" name="user-check" class_str="me-2" %}{% endcomponent %}Informations de révision
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -355,7 +349,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Révisé le</label>
                                 <p class="mb-0">
-                                    <i class="fas fa-calendar-check text-success me-1"></i>
+                                    {% component "icon" name="calendar-check" class_str="text-success me-1" %}{% endcomponent %}
                                     {{ candidature.reviewed_at|date:"d/m/Y à H:i"|default:"-" }}
                                 </p>
                             </div>
@@ -382,7 +376,7 @@
             {% if has_inscription %}
             <div class="card mb-3 border-success border-2 shadow-sm">
                 <div class="card-header bg-success bg-gradient text-white py-2">
-                    <i class="fas fa-file-signature me-2"></i>Inscription créée
+                    {% component "icon" name="file-signature" class_str="me-2" %}{% endcomponent %}Inscription créée
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -390,7 +384,7 @@
                             <div class="info-item">
                                 <label class="text-muted small mb-0">Référence</label>
                                 <p class="mb-0 fw-semibold">
-                                    <i class="fas fa-hashtag text-success me-1"></i>
+                                    {% component "icon" name="hashtag" class_str="text-success me-1" %}{% endcomponent %}
                                     {{ inscription.reference|default:"N/A" }}
                                 </p>
                             </div>
@@ -419,7 +413,7 @@
     {# ===== FOOTER AVEC ACTIONS ===== #}
     <div class="modal-footer bg-light">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-            <i class="fas fa-times me-1"></i>Fermer
+            {% component "icon" name="x" class_str="me-1" %}{% endcomponent %}Fermer
         </button>
 
         {% if can_set_under_review %}
@@ -429,7 +423,7 @@
                 hx-target="#candidature-row-{{ candidature.id }}"
                 hx-swap="outerHTML"
                 hx-confirm="Mettre cette candidature en cours d'analyse ?">
-            <i class="fas fa-search me-1"></i>En révision
+            {% component "icon" name="search" class_str="me-1" %}{% endcomponent %}En révision
         </button>
         {% endif %}
 
@@ -440,7 +434,7 @@
                 hx-target="#candidature-row-{{ candidature.id }}"
                 hx-swap="outerHTML"
                 hx-prompt="Message à envoyer au candidat :">
-            <i class="fas fa-exclamation-circle me-1"></i>À compléter
+            {% component "icon" name="circle-alert" class_str="me-1" %}{% endcomponent %}À compléter
         </button>
         {% endif %}
 
@@ -451,7 +445,7 @@
                 hx-target="#candidature-row-{{ candidature.id }}"
                 hx-swap="outerHTML"
                 hx-confirm="Accepter cette candidature ? L'inscription sera creee ensuite apres le positionnement academique.">
-            <i class="fas fa-check-circle me-1"></i>Accepter
+            {% component "icon" name="circle-check" class_str="me-1" %}{% endcomponent %}Accepter
         </button>
         {% endif %}
 
@@ -463,7 +457,7 @@
                 hx-swap="outerHTML"
                 hx-prompt="Motif du refus :"
                 hx-confirm="Rejeter cette candidature ?">
-            <i class="fas fa-times-circle me-1"></i>Rejeter
+            {% component "icon" name="times-circle" class_str="me-1" %}{% endcomponent %}Rejeter
         </button>
         {% endif %}
 
@@ -474,7 +468,7 @@
                 hx-target="#modal-container"
                 hx-swap="innerHTML"
                 onclick="openDashboardModal()">
-            <i class="fas fa-file-signature me-1"></i>Créer inscription
+            {% component "icon" name="file-signature" class_str="me-1" %}{% endcomponent %}Créer inscription
         </button>
         {% endif %}
     </div>

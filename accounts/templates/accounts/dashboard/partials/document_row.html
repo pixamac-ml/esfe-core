@@ -1,7 +1,8 @@
+{% load component_tags %}
 <div id="doc-row-{{ doc.id }}" class="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-xl bg-slate-50 hover:bg-slate-100 gap-3 transition-colors">
     <div class="flex items-center gap-3 sm:gap-4 min-w-0">
         <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
-            <i class="fas fa-file-alt"></i>
+            {% component "icon" name="file-text" %}{% endcomponent %}
         </div>
         <div class="min-w-0">
             <p class="font-semibold text-slate-800 truncate">{{ doc.document_type.name|default:"Document" }}</p>
@@ -17,7 +18,7 @@
     <div class="flex items-center gap-2 justify-end sm:justify-start flex-shrink-0">
         <a href="{{ doc.file.url }}" target="_blank" rel="noopener"
            class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
-            <i class="fas fa-eye mr-1"></i>Voir
+            {% component "icon" name="eye" class_str="mr-1" %}{% endcomponent %}Voir
         </a>
         {% if not doc.is_validated or not doc.is_valid %}
         <button hx-post="{% url 'accounts:validate_document_htmx' doc.id %}"
@@ -25,11 +26,11 @@
                 hx-swap="outerHTML"
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 class="px-3 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors">
-            <i class="fas fa-check mr-1"></i>Valider
+            {% component "icon" name="check" class_str="mr-1" %}{% endcomponent %}Valider
         </button>
         {% else %}
         <span class="px-3 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-700">
-            <i class="fas fa-check-circle mr-1"></i>Valide
+            {% component "icon" name="circle-check" class_str="mr-1" %}{% endcomponent %}Valide
         </span>
         {% endif %}
     </div>

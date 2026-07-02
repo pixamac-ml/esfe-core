@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load component_tags %}
 {% load static %}
 {% load humanize %}
 {% load custom_filters %}
@@ -897,7 +898,7 @@
         <div class="sidebar-header">
             <a href="{% url 'core:home' %}" class="flex items-center gap-3 text-white no-underline">
                 <div class="sidebar-logo">
-                    <i class="fas fa-graduation-cap"></i>
+                    {% component "icon" name="graduation-cap" %}{% endcomponent %}
                 </div>
                 <span class="sidebar-brand">ESFE Dashboard</span>
             </a>
@@ -931,7 +932,7 @@
                 <a href="{% url 'accounts:admissions_dashboard' %}"
                    class="sidebar-link {% if dashboard_type == 'admissions' %}active{% endif %}">
                     <div class="sidebar-link-icon">
-                        <i class="fas fa-file-alt"></i>
+                        {% component "icon" name="file-text" %}{% endcomponent %}
                     </div>
                     <span class="sidebar-link-text">Candidatures</span>
                     {% if pending_candidatures_count %}
@@ -944,7 +945,7 @@
                 <a href="{% url 'accounts:finance_dashboard' %}"
                    class="sidebar-link {% if dashboard_type == 'finance' %}active{% endif %}">
                     <div class="sidebar-link-icon">
-                        <i class="fas fa-money-bill-wave"></i>
+                        {% component "icon" name="banknote" %}{% endcomponent %}
                     </div>
                     <span class="sidebar-link-text">Paiements</span>
                     {% if pending_payments_count %}
@@ -957,7 +958,7 @@
                 <a href="{% url 'accounts_portal:reenrollment_workspace' %}"
                    class="sidebar-link {% if dashboard_type == 'reenrollment' %}active{% endif %}">
                     <div class="sidebar-link-icon">
-                        <i class="fas fa-repeat"></i>
+                        {% component "icon" name="refresh-cw" %}{% endcomponent %}
                     </div>
                     <span class="sidebar-link-text">Passages</span>
                     {% if reenrollment_finance_pending_count %}
@@ -970,7 +971,7 @@
                 <a href="{% url 'accounts:manager_dashboard' %}"
                    class="sidebar-link {% if dashboard_type == 'manager' %}active{% endif %}">
                     <div class="sidebar-link-icon">
-                        <i class="fas fa-briefcase"></i>
+                        {% component "icon" name="briefcase-business" %}{% endcomponent %}
                     </div>
                     <span class="sidebar-link-text">Gestionnaire</span>
                     {% if pending_candidatures_count or pending_payments_count %}
@@ -983,7 +984,7 @@
                 <a href="{% url 'accounts:executive_dashboard' %}"
                    class="sidebar-link {% if dashboard_type == 'executive' %}active{% endif %}">
                     <div class="sidebar-link-icon">
-                        <i class="fas fa-chart-line"></i>
+                        {% component "icon" name="chart-no-axes-combined" %}{% endcomponent %}
                     </div>
                     <span class="sidebar-link-text">Vue Globale</span>
                 </a>
@@ -997,7 +998,7 @@
 
                 <a href="{% url 'admin:index' %}" class="sidebar-link" target="_blank">
                     <div class="sidebar-link-icon">
-                        <i class="fas fa-cog"></i>
+                        {% component "icon" name="settings" %}{% endcomponent %}
                     </div>
                     <span class="sidebar-link-text">Admin Django</span>
                 </a>
@@ -1009,7 +1010,7 @@
         <div class="sidebar-footer">
             <a href="{% url 'core:home' %}" class="sidebar-link">
                 <div class="sidebar-link-icon">
-                    <i class="fas fa-home"></i>
+                    {% component "icon" name="house" %}{% endcomponent %}
                 </div>
                 <span class="sidebar-link-text">Retour au site</span>
             </a>
@@ -1018,7 +1019,7 @@
                 {% csrf_token %}
                 <button type="submit" class="sidebar-link" style="width: 100%; border: none; background: none; cursor: pointer; text-align: left;">
                     <div class="sidebar-link-icon">
-                        <i class="fas fa-sign-out-alt"></i>
+                        {% component "icon" name="log-out" %}{% endcomponent %}
                     </div>
                     <span class="sidebar-link-text">Déconnexion</span>
                 </button>
@@ -1034,7 +1035,7 @@
         <header class="dashboard-header">
             <div class="header-left">
                 <button class="menu-toggle" onclick="toggleSidebar()">
-                    <i class="fas fa-bars"></i>
+                    {% component "icon" name="menu" %}{% endcomponent %}
                 </button>
                 <div class="header-title">
                     <h1>{% block dashboard_title %}Dashboard{% endblock %}</h1>
@@ -1044,7 +1045,7 @@
 
             <div class="header-right">
                 <div class="header-date">
-                    <i class="fas fa-calendar-alt"></i>
+                    {% component "icon" name="calendar" %}{% endcomponent %}
                     <span>{{ now|date:"d M Y" }}</span>
                 </div>
 
@@ -1053,12 +1054,12 @@
 
                 <!-- Export -->
                 <button class="header-btn" id="exportBtn" title="Exporter">
-                    <i class="fas fa-download"></i>
+                    {% component "icon" name="download" %}{% endcomponent %}
                 </button>
 
                 <!-- Refresh -->
                 <button class="header-btn" onclick="location.reload()" title="Actualiser">
-                    <i class="fas fa-sync-alt"></i>
+                    {% component "icon" name="sync-alt" %}{% endcomponent %}
                 </button>
 
                 <!-- Avatar -->
@@ -1086,11 +1087,7 @@
                     {% elif message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
                     {% elif message.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200
                     {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
-                    <i class="fas
-                        {% if message.tags == 'success' %}fa-check-circle
-                        {% elif message.tags == 'error' %}fa-times-circle
-                        {% elif message.tags == 'warning' %}fa-exclamation-triangle
-                        {% else %}fa-info-circle{% endif %}"></i>
+                    {% component "icon" name="award" class_str="{% if message.tags == 'success' %}circle-check {% elif message.tags == 'error' %}circle-x {% elif message.tags == 'warning' %}triangle-alert {% else %}circle-info{% endif %}" %}{% endcomponent %}
                     <span>{{ message }}</span>
                 </div>
                 {% endfor %}
@@ -1123,19 +1120,19 @@ function legacyDashboardToastUnused(message, type = 'info') {
         info: 'bg-cyan-500'
     };
     const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-times-circle',
-        warning: 'fa-exclamation-circle',
-        info: 'fa-info-circle'
+        success: 'circle-check',
+        error: 'circle-x',
+        warning: 'circle-alert',
+        info: 'circle-info'
     };
 
     const toast = document.createElement('div');
     toast.className = `${colors[type]} text-white px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 transform transition-all duration-300 translate-x-full opacity-0`;
     toast.innerHTML = `
-        <i class="fas ${icons[type]} text-lg"></i>
+        {% component "icon" name="award" class_str="${icons[type]} text-lg" %}{% endcomponent %}
         <span class="font-medium">${message}</span>
         <button onclick="this.parentElement.remove()" class="ml-auto hover:opacity-75">
-            <i class="fas fa-times"></i>
+            {% component "icon" name="x" %}{% endcomponent %}
         </button>
     `;
 

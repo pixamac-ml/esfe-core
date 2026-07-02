@@ -14,12 +14,17 @@
 {#  OVERVIEW                                              #}
 {# ═══════════════════════════════════════════════════════ #}
 <div class="space-y-4" data-sg-panel="overview" {% if active_section != 'overview' %}hidden{% endif %}>
-  {% component "page_header" title="Vue d'ensemble" subtitle="" %}
-    {% fill "actions" %}
-      {% url 'secretary:secretary_dashboard' as dash_url %}
-      {% component "button" label="Registre" href=dash_url|add:"?section=registry" icon_left="book-open" variant="outline" size="sm" %}{% endcomponent %}
-    {% endfill %}
-  {% endcomponent %}
+  {% url 'secretary:secretary_dashboard' as dash_url %}
+  <section class="secretary-command-hero">
+    <div class="secretary-command-content">
+      <div>
+        <span class="secretary-command-kicker">{% component "icon" name="sparkles" size=14 %}{% endcomponent %} Accueil administratif · {{ branch_name }}</span>
+        <h1 class="secretary-command-title">Bonjour {{ user_display_name|default:"Secrétaire" }}</h1>
+        <p class="secretary-command-subtitle">Registre, visiteurs, rendez-vous et dépôts documentaires sont réunis dans votre espace de travail.</p>
+      </div>
+      <a class="secretary-command-action" href="{{ dash_url }}?section=registry">{% component "icon" name="book-plus" size=16 %}{% endcomponent %} Nouvelle entrée</a>
+    </div>
+  </section>
 
   <div class="grid gap-4 sm:grid-cols-4">
     {% component "widget_card" label="Registre" value=pending_registry_count|default:"0" icon="book-open" tone="primary" size="lg" hint="Entrées en attente" %}{% endcomponent %}

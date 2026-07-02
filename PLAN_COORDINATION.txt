@@ -1,0 +1,262 @@
+================================================================================
+ PLAN DE COORDINATION — CLAUDE + CODEX
+ Branche : refonte/dashboards-ui
+ Date    : 2026-07-02
+================================================================================
+
+PRINCIPE DE SÉPARATION
+──────────────────────
+Chaque tâche touche un périmètre de fichiers DISTINCT.
+Jamais deux agents sur le même fichier en même temps.
+Chaque tâche se termine par : manage.py check → 0 issues + commit.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ TÂCHES CLAUDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CLAUDE-1 — Suppression définitive de communication/ + core.Notification
+────────────────────────────────────────────────────────────────────────
+Pourquoi Claude : travail backend pur, migrations Django, vérification
+d'imports dans 15+ apps, aucun template impliqué.
+
+Fichiers touchés :
+  communication/         → suppression du dossier entier
+  core/models.py         → suppression du modèle Notification
+  core/admin.py          → suppression de NotificationAdmin
+  core/migrations/       → migration de suppression
+  config/settings.py     → retirer communication de INSTALLED_APPS
+  admissions/            → vérifier qu'aucune référence legacy ne reste
+
+Critère de fin :
+  - python manage.py check → 0 issues
+  - python manage.py test --settings=config.settings_test_local → passe
+  - grep "from communication" . → 0 résultat hors communication/
+  - grep "core.models.Notification" . → 0 résultat
+
+
+CLAUDE-2 — Dashboard Gestionnaire (backend + sécurité)
+───────────────────────────────────────────────────────
+Pourquoi Claude : AGENTS.md contient les règles métier complexes du
+gestionnaire (salaires, honoraires, caisse, clôtures). Travail critique
+qui demande de connaître ces règles.
+
+Fichiers touchés :
+  accounts/dashboards/manager_dashboard.py
+  accounts/dashboards/htmx_manager.py
+  accounts/dashboards/htmx_salaires.py
+  accounts/dashboards/htmx_honoraires.py
+  accounts/dashboards/htmx_caisse.py
+  accounts/dashboards/htmx_paiements.py
+  accounts/dashboards/htmx_candidatures.py
+  accounts/dashboards/htmx_inscriptions.py
+  accounts/dashboards/htmx_depenses.py
+  accounts/dashboards/permissions.py
+  accounts/dashboards/helpers.py
+
+Critère de fin :
+  - Filtrage par annexe vérifié sur tous les endpoints
+  - Tests anti-fuite ajoutés (gestionnaire annexe A ne voit pas annexe B)
+  - manage.py check → 0 issues
+
+
+CLAUDE-3 — Dashboard Enseignant : Lot 2 (découpage sections)
+─────────────────────────────────────────────────────────────
+Pourquoi Claude : continuation directe du travail commencé (HTMX workspace,
+sécurité par annexe). Je connais déjà l'architecture v2 en place.
+
+Fichiers touchés :
+  templates/portal/teacher/v2/dashboard.html
+  templates/portal/teacher/v2/sections/overview.html
+  templates/portal/teacher/v2/sections/classes.html
+  templates/portal/teacher/v2/sections/supports.html
+  templates/portal/teacher/v2/sections/schedule.html
+  templates/portal/teacher/v2/sections/logs.html
+  templates/portal/teacher/v2/sections/salary.html
+  templates/portal/teacher/v2/sections/notifications.html
+  templates/portal/teacher/v2/sections/settings.html
+  portal/services/teacher_dashboard_service.py
+  portal/views/views.py (endpoints sections)
+
+Critère de fin :
+  - 8 sections chargées en HTMX depuis #teacher-workspace
+  - Aucune section dans le DOM au démarrage (sauf la première)
+  - Skeleton visible pendant le chargement
+  - Tests sections HTTP 200 passent
+
+
+CLAUDE-4 — Tests globaux de non-régression
+───────────────────────────────────────────
+Pourquoi Claude : travail transversal qui touche les fichiers tests.py
+de chaque app. À faire APRÈS que Codex a terminé ses tâches.
+
+Fichiers touchés :
+  accounts/tests.py
+  admissions/tests.py
+  portal/test_supervisor_planner.py
+  secretary/tests.py
+  ui/tests.py
+  notifier/tests.py
+  notification_center/tests/
+
+Critère de fin :
+  - python manage.py test --settings=config.settings_test_local → tout passe
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ TÂCHES CODEX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CODEX-1 — Dashboard Gestionnaire (templates + fa-* → Lucide)
+─────────────────────────────────────────────────────────────
+Pourquoi Codex : travail purement visuel/template. 481 icônes fa-* à
+convertir, classes CSS propriétaires à remplacer. Zéro logique métier.
+
+Fichiers touchés :
+  accounts/templates/accounts/dashboard/manager_dashboard.html  (1534 lignes)
+  accounts/templates/accounts/dashboard/base_dashboard.html     (1190 lignes)
+  accounts/templates/accounts/dashboard/admissions.html
+  accounts/templates/accounts/dashboard/finance.html
+  accounts/templates/accounts/dashboard/executive.html
+  accounts/templates/accounts/dashboard/partials/ (52 fichiers)
+
+Travail à faire :
+  - Remplacer tous les <i class="fa-*"> par le composant {% component "icon" %}
+  - Remplacer les classes dg-* / sg-* par tokens CSS ou composants ui
+  - Utiliser metric_card pour les KPIs
+  - Utiliser status_badge pour les badges de statut
+  - Retirer les CDN FontAwesome une fois le dernier fa-* remplacé
+
+Critère de fin :
+  - grep "fa-" accounts/templates/ → 0 résultat
+  - Aucune classe dg-* ni sg-* dans ces templates
+  - Rendu visuel identique ou amélioré
+
+
+CODEX-2 — Dashboard Secrétaire (templates + composants)
+────────────────────────────────────────────────────────
+Pourquoi Codex : refonte visuelle pure. La structure htmx/ est déjà
+créée, il faut assembler les composants ui dans les templates.
+
+Fichiers touchés :
+  secretary/templates/secretary/dashboard.html       (615 lignes)
+  secretary/templates/secretary/base.html
+  secretary/templates/secretary/htmx/               (24 fichiers partiels)
+  secretary/templates/secretary/registry_kanban.html
+  secretary/templates/secretary/registry_form.html
+  secretary/templates/secretary/task_form.html
+  secretary/templates/secretary/visitor_form.html
+  secretary/templates/secretary/appointment_form.html
+
+Travail à faire :
+  - Assembler le dashboard avec les composants : kpi_row, data_table,
+    search_bar, tabs, form_field, status_badge, pill
+  - Utiliser le composant drawer pour les drawers
+  - Utiliser le composant tabs pour la navigation des sections
+  - Respecter la structure HTMX déjà en place (htmx/)
+
+Critère de fin :
+  - Dashboard secrétaire fonctionnel (KPIs, liste, drawers, formulaires)
+  - Aucune classe propriétaire codée en dur
+  - Composants ui utilisés partout où c'est possible
+
+
+CODEX-3 — Dashboard Directeur + DG (templates)
+────────────────────────────────────────────────
+Pourquoi Codex : travail visuel. Ces deux dashboards ont des templates
+longs mais peu de logique métier côté templates.
+
+Fichiers touchés :
+  templates/portal/staff/director_dashboard.html     (468 lignes)
+  templates/portal/dg/dashboard.html                 (1764 lignes)
+  templates/portal/staff/director/partials/          (dossier)
+
+Travail à faire :
+  - Convertir KPIs → kpi_row + metric_card
+  - Convertir badges de statut → status_badge
+  - Convertir tableaux simples → data_table
+  - Remplacer classes codées en dur par tokens CSS
+  - Supprimer FontAwesome si utilisé, remplacer par Lucide
+
+Critère de fin :
+  - manage.py check → 0 issues
+  - Aucun fa-* dans ces templates
+  - Composants ui utilisés
+
+
+CODEX-4 — Unification des bases/layouts
+────────────────────────────────────────
+Pourquoi Codex : travail purement structurel sur les templates de base.
+Aucune logique backend impliquée.
+
+Situation actuelle : ~23 fichiers "base" différents dans le projet.
+  templates/base.html
+  templates/base_app.html
+  secretary/templates/secretary/base.html
+  accounts/templates/accounts/dashboard/base_dashboard.html
+  marketing/templates/marketing/base.html
+  formations/base.html
+  superadmin/templates/superadmin/base.html
+  ... etc.
+
+Travail à faire :
+  - Identifier les blocs communs à tous les layouts
+  - Créer une hiérarchie claire : base.html > base_app.html > base_dashboard.html
+  - Retirer les CDN FontAwesome de tous les layouts
+  - S'assurer que tous chargent main.css + esfe_theme.css
+  - Retirer les doublons (Tailwind CDN, Alpine CDN si déjà dans base)
+
+Critère de fin :
+  - Tous les layouts héritent d'une base commune
+  - Aucun CDN FontAwesome dans aucun layout
+  - Aucun CDN Tailwind en double
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ORDRE D'EXÉCUTION RECOMMANDÉ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ROUND 1 (en parallèle, aucun conflit de fichiers) :
+  Claude  → CLAUDE-1 (suppression communication/ + core.Notification)
+  Codex   → CODEX-4  (unification des bases/layouts)
+
+  → Ces deux tâches sont totalement indépendantes.
+
+ROUND 2 (après round 1 commité) :
+  Claude  → CLAUDE-2 (gestionnaire backend)
+  Codex   → CODEX-1  (gestionnaire templates + fa-*)
+
+  → Claude touche les vues/services, Codex touche les templates.
+  → Aucun conflit possible.
+
+ROUND 3 (après round 2 commité) :
+  Claude  → CLAUDE-3 (enseignant sections HTMX)
+  Codex   → CODEX-2  (secrétaire templates)
+
+  → Fichiers entièrement séparés.
+
+ROUND 4 (après round 3 commité) :
+  Claude  → CLAUDE-4 (tests globaux)
+  Codex   → CODEX-3  (directeur + DG templates)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ RÈGLES DE COORDINATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Chaque tâche se termine IMPÉRATIVEMENT par :
+     python manage.py check → 0 issues
+     git commit avec message clair (ex: "CLAUDE-1: suppression communication/")
+
+2. Jamais deux agents sur le même fichier en même temps.
+
+3. Si un agent a besoin d'un fichier déjà pris par l'autre,
+   il attend le commit de l'autre avant de commencer.
+
+4. Les fichiers de config partagés (config/settings.py, config/urls.py)
+   ne sont modifiés que par Claude (tâches backend).
+
+5. Ce fichier PLAN_COORDINATION.txt sert de référence commune.
+   Chaque agent note [FAIT] devant sa tâche quand elle est terminée.
+
+================================================================================

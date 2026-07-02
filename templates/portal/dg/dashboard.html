@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load static humanize component_tags %}
 
 {% block public_navbar %}{% endblock %}
 {% block public_footer %}{% endblock %}
@@ -9,10 +9,7 @@
 
 {% block extra_head %}
 {{ block.super }}
-<script
-  src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"
-  crossorigin="anonymous"
-></script>
+<script defer src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
 <style>
   :root {
     --dg-navy: #07162d;
@@ -507,7 +504,7 @@
     <div class="dg-logo">
       <div class="flex items-center gap-3">
         <div class="grid h-10 w-10 place-items-center rounded-xl bg-sky-500 shadow-lg">
-          <i class="fa-solid fa-user-doctor text-xl"></i>
+          {% component "icon" name="stethoscope" class_str="text-xl" %}{% endcomponent %}
         </div>
         <div class="dg-hide-compact">
           <div class="text-xl font-black tracking-wide leading-tight">FELIX SANTE</div>
@@ -518,33 +515,33 @@
 <div class="flex h-[calc(100vh-78px)] flex-col overflow-y-auto px-3 py-5 dg-scroll">
       <div class="dg-hide-compact mb-1 px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Pilotage</div>
       <nav class="space-y-.5">
-        <button type="button" :class="activeSection === 'overview' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('overview')"><i class="fa-solid fa-home w-5 text-center"></i><span>Vue globale</span></button>
-        <button type="button" :class="activeSection === 'analytics' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('analytics')"><i class="fa-solid fa-chart-line w-5 text-center"></i><span>Analytics</span></button>
-        <button type="button" :class="activeSection === 'realtime' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('realtime')"><i class="fa-solid fa-wave-square w-5 text-center"></i><span>Temps reel</span><span class="dg-badge bg-blue-600 text-white ml-auto">LIVE</span></button>
+        <button type="button" :class="activeSection === 'overview' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('overview')">{% component "icon" name="house" class_str="w-5 text-center" %}{% endcomponent %}<span>Vue globale</span></button>
+        <button type="button" :class="activeSection === 'analytics' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('analytics')">{% component "icon" name="chart-no-axes-combined" class_str="w-5 text-center" %}{% endcomponent %}<span>Analytics</span></button>
+        <button type="button" :class="activeSection === 'realtime' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('realtime')">{% component "icon" name="activity" class_str="w-5 text-center" %}{% endcomponent %}<span>Temps reel</span><span class="dg-badge bg-blue-600 text-white ml-auto">LIVE</span></button>
       </nav>
       <div class="dg-hide-compact mt-2 mb-1 h-px bg-white/10"></div>
       <div class="dg-hide-compact px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Operations</div>
       <nav class="space-y-.5">
-        <button type="button" :class="activeSection === 'alerts' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('alerts')"><i class="fa-solid fa-triangle-exclamation w-5 text-center"></i><span>Alertes & Risques</span><span class="dg-badge bg-rose-500 text-white ml-auto">{{ open_alerts }}</span></button>
-        <button type="button" :class="activeSection === 'workflows' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('workflows')"><i class="fa-solid fa-arrows-rotate w-5 text-center"></i><span>Passages & Reins.</span><span class="dg-badge bg-amber-500 text-white ml-auto">{{ workflow.blocked_count }}</span></button>
-        <button type="button" :class="activeSection === 'schedule' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('schedule')"><i class="fa-regular fa-calendar-days w-5 text-center"></i><span>Emploi du temps</span></button>
+        <button type="button" :class="activeSection === 'alerts' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('alerts')">{% component "icon" name="triangle-alert" class_str="w-5 text-center" %}{% endcomponent %}<span>Alertes & Risques</span><span class="dg-badge bg-rose-500 text-white ml-auto">{{ open_alerts }}</span></button>
+        <button type="button" :class="activeSection === 'workflows' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('workflows')">{% component "icon" name="refresh-cw" class_str="w-5 text-center" %}{% endcomponent %}<span>Passages & Reins.</span><span class="dg-badge bg-amber-500 text-white ml-auto">{{ workflow.blocked_count }}</span></button>
+        <button type="button" :class="activeSection === 'schedule' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('schedule')">{% component "icon" name="calendar-days" class_str="w-5 text-center" %}{% endcomponent %}<span>Emploi du temps</span></button>
       </nav>
       <div class="dg-hide-compact mt-2 mb-1 h-px bg-white/10"></div>
       <div class="dg-hide-compact px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Ressources</div>
       <nav class="space-y-.5">
-        <button type="button" :class="activeSection === 'annexes' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('annexes')"><i class="fa-regular fa-building w-5 text-center"></i><span>Annexes</span></button>
-        <button type="button" :class="activeSection === 'rh' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('rh')"><i class="fa-solid fa-user-group w-5 text-center"></i><span>RH / Staff</span></button>
+        <button type="button" :class="activeSection === 'annexes' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('annexes')">{% component "icon" name="building-2" class_str="w-5 text-center" %}{% endcomponent %}<span>Annexes</span></button>
+        <button type="button" :class="activeSection === 'rh' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('rh')">{% component "icon" name="users" class_str="w-5 text-center" %}{% endcomponent %}<span>RH / Staff</span></button>
       </nav>
       <div class="dg-hide-compact mt-2 mb-1 h-px bg-white/10"></div>
       <div class="dg-hide-compact px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Finance</div>
       <nav class="space-y-.5">
-        <button type="button" :class="activeSection === 'finance' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('finance')"><i class="fa-solid fa-sack-dollar w-5 text-center"></i><span>Finance</span></button>
+        <button type="button" :class="activeSection === 'finance' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('finance')">{% component "icon" name="hand-coins" class_str="w-5 text-center" %}{% endcomponent %}<span>Finance</span></button>
       </nav>
       <div class="mt-auto"></div>
       <form method="post" action="{% url 'accounts:logout' %}" class="mt-3">
         {% csrf_token %}
         <button type="submit" class="dg-link w-full border border-rose-400/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20">
-          <i class="fa-solid fa-arrow-right-from-bracket w-5 text-center"></i>
+          {% component "icon" name="log-out" class_str="w-5 text-center" %}{% endcomponent %}
           <span>Deconnexion</span>
         </button>
       </form>
@@ -555,7 +552,7 @@
     <header class="dg-topbar">
       <div class="flex min-w-0 items-center gap-4">
         <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-800 hover:bg-slate-50" onclick="dgToggleSidebar()">
-          <i class="fa-solid fa-bars-staggered"></i>
+          {% component "icon" name="menu" %}{% endcomponent %}
         </button>
         <div class="min-w-0">
           <h1 class="truncate text-xl font-black text-slate-950">{{ executive_display_name }}</h1>
@@ -564,7 +561,7 @@
       </div>
         <div class="dg-filter-row flex items-center gap-3">
           <label class="dg-search" title="Recherche">
-            <i class="fa-solid fa-magnifying-glass"></i>
+            {% component "icon" name="search" %}{% endcomponent %}
           <input id="dg-search-input" type="search" placeholder="Rechercher DG / DGA" autocomplete="off" oninput="dgSearchCurrentSection(this.value)" onkeydown="dgHandleSearchKey(event)">
           <div id="dg-search-panel" class="dg-search-panel dg-scroll"></div>
           </label>
@@ -587,11 +584,11 @@
           </div>
         {% include "notification_center/partials/widget.html" %}
         <button type="button" class="dg-notif" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')" title="Alertes DG">
-          <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+          {% component "icon" name="triangle-alert" class_str="text-lg" %}{% endcomponent %}
           <span>{{ open_alerts }}</span>
         </button>
         <div class="dg-clock" title="Heure locale">
-          <i class="fa-regular fa-clock"></i>
+          {% component "icon" name="clock" %}{% endcomponent %}
           <span>
             <span class="dg-clock-date" data-dg-live-date>{{ generated_at|date:"d/m/Y" }}</span>
             <span class="dg-clock-time" data-dg-live-clock>{{ generated_at|date:"H:i:s" }}</span>
@@ -616,10 +613,10 @@
             <div class="dg-context-hint">Les sections suivent le filtre annexe et periode. L'emploi du temps ajoute le filtre classe.</div>
           </div>
           <div class="dg-context-main">
-            <span class="dg-scope-chip"><i class="fa-solid fa-globe" style="margin-right:4px;"></i>{{ dashboard_scope_label }}</span>
-            <span class="dg-scope-chip"><i class="fa-solid fa-building" style="margin-right:4px;"></i>{{ total_branches|intcomma }} annexe{% if total_branches > 1 %}s{% endif %}</span>
-            <span class="dg-scope-chip"><i class="fa-solid fa-users" style="margin-right:4px;"></i>{{ total_students|intcomma }} etudiants</span>
-            <span class="dg-scope-chip"><i class="fa-solid fa-calendar" style="margin-right:4px;"></i>{{ schedule.total_events|intcomma }} cours / semaine</span>
+            <span class="dg-scope-chip">{% component "icon" name="globe-2" %}{% endcomponent %}{{ dashboard_scope_label }}</span>
+            <span class="dg-scope-chip">{% component "icon" name="building-2" %}{% endcomponent %}{{ total_branches|intcomma }} annexe{% if total_branches > 1 %}s{% endif %}</span>
+            <span class="dg-scope-chip">{% component "icon" name="users" %}{% endcomponent %}{{ total_students|intcomma }} etudiants</span>
+            <span class="dg-scope-chip">{% component "icon" name="calendar" %}{% endcomponent %}{{ schedule.total_events|intcomma }} cours / semaine</span>
           </div>
         </div>
 
@@ -653,7 +650,7 @@
                 <p class="mt-2 text-xs font-bold text-slate-500">{{ card.detail }}</p>
               </div>
               <div class="grid h-10 w-10 place-items-center rounded-xl bg-white text-slate-700 shadow-sm">
-                <i class="fa-solid {{ card.icon }}"></i>
+                {% component "icon" name=card.icon|slice:'3:' %}{% endcomponent %}
               </div>
             </div>
           </div>
@@ -675,7 +672,7 @@
               <div>
                 <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Apercu des annexes</h3>
               </div>
-              <button type="button" class="dg-action" onclick="dgShowSection('annexes')" title="Annexes"><i class="fa-solid fa-arrow-right"></i></button>
+              <button type="button" class="dg-action" onclick="dgShowSection('annexes')" title="Annexes">{% component "icon" name="arrow-right" %}{% endcomponent %}</button>
             </div>
             <div class="overflow-x-auto">
               <table class="dg-table">
@@ -772,7 +769,7 @@
           <div class="rounded-2xl border border-slate-200 bg-white p-4">
             <div class="mb-4 flex items-center justify-between">
               <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Annexes a risque</h3>
-              <button type="button" class="dg-action" onclick="dgShowSection('alerts')" title="Alertes"><i class="fa-solid fa-arrow-right"></i></button>
+              <button type="button" class="dg-action" onclick="dgShowSection('alerts')" title="Alertes">{% component "icon" name="arrow-right" %}{% endcomponent %}</button>
             </div>
             <div class="overflow-x-auto">
               <table class="dg-table">
@@ -796,7 +793,7 @@
           <div class="rounded-2xl border border-slate-200 bg-white p-4">
             <div class="mb-4 flex items-center justify-between">
               <h3 class="text-sm font-black uppercase tracking-[.18em] text-slate-500">Solde par annexe</h3>
-              <button type="button" class="dg-action" onclick="dgShowSection('finance')" title="Finance"><i class="fa-solid fa-arrow-right"></i></button>
+              <button type="button" class="dg-action" onclick="dgShowSection('finance')" title="Finance">{% component "icon" name="arrow-right" %}{% endcomponent %}</button>
             </div>
             <div class="space-y-3">
               {% for item in executive_summary.top_balance_branches %}
@@ -863,15 +860,15 @@
           {% for action in executive_summary.action_center %}
           <button type="button" class="dg-quick-action" onclick="{% if action.drawer_url %}dgOpenDrawer('{{ action.drawer_url }}'){% else %}dgShowSection('{{ action.section }}'){% endif %}">
             <span>
-              <i class="fa-solid {{ action.icon }} mr-2"></i>{{ action.label }}
+              {% component "icon" name=action.icon|slice:'3:' class_str="mr-2" %}{% endcomponent %}{{ action.label }}
               <span class="mt-1 block text-xs font-bold text-slate-500">{{ action.detail }}</span>
             </span>
             <span class="dg-badge {% if action.tone == 'rose' %}bg-rose-100 text-rose-700{% elif action.tone == 'amber' %}bg-amber-100 text-amber-700{% elif action.tone == 'emerald' %}bg-emerald-100 text-emerald-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ action.count|intcomma }}</span>
           </button>
           {% endfor %}
           <button type="button" class="dg-quick-action" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
-            <span><i class="fa-solid fa-user-plus mr-2"></i>Recruter un staff</span>
-            <i class="fa-solid fa-chevron-right"></i>
+            <span>{% component "icon" name="user-plus" class_str="mr-2" %}{% endcomponent %}Recruter un staff</span>
+            {% component "icon" name="chevron-right" %}{% endcomponent %}
           </button>
         </div>
       </section>
@@ -889,7 +886,7 @@
       <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-5">
         <div class="flex min-w-0 items-center gap-3">
           <button id="dg-drawer-back" type="button" class="hidden grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50" onclick="dgDrawerBack()" title="Retour">
-            <i class="fa-solid fa-arrow-left"></i>
+            {% component "icon" name="arrow-left" %}{% endcomponent %}
           </button>
           <div class="min-w-0">
             <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Detail executif</p>
@@ -897,7 +894,7 @@
           </div>
         </div>
         <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50" onclick="dgCloseDrawer()">
-          <i class="fa-solid fa-xmark"></i>
+          {% component "icon" name="x" %}{% endcomponent %}
         </button>
       </div>
       <div id="dg-drawer-content" class="p-6">
@@ -1181,7 +1178,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'dg-search-result active';
-        button.innerHTML = '<span><span class="dg-search-result-title"></span><span class="dg-search-result-meta"></span></span><i class="fa-solid fa-arrow-right"></i>';
+        button.innerHTML = '<span><span class="dg-search-result-title"></span><span class="dg-search-result-meta"></span></span>{% component "icon" name="arrow-right" %}{% endcomponent %}';
         button.querySelector('.dg-search-result-title').textContent = 'Ouvrir la section correspondante';
         button.querySelector('.dg-search-result-meta').textContent = mapped;
         button.addEventListener('click', function() {
@@ -1202,7 +1199,7 @@
       button.type = 'button';
       button.className = 'dg-search-result' + (index === 0 ? ' active' : '');
       button.dataset.index = String(index);
-      button.innerHTML = '<span><span class="dg-search-result-title"></span><span class="dg-search-result-meta"></span></span><i class="fa-solid fa-arrow-right"></i>';
+      button.innerHTML = '<span><span class="dg-search-result-title"></span><span class="dg-search-result-meta"></span></span>{% component "icon" name="arrow-right" %}{% endcomponent %}';
       button.querySelector('.dg-search-result-title').textContent = result.title;
       button.querySelector('.dg-search-result-meta').textContent = result.sectionLabel;
       button.addEventListener('click', function() {
@@ -1419,7 +1416,7 @@ function dgRefreshSection(section) {
     if (submit) {
       submit.disabled = true;
       submit.classList.add('opacity-60', 'cursor-wait');
-      submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+      submit.innerHTML = '{% component "icon" name="loader-circle" class_str="animate-spin" %}{% endcomponent %}';
     }
     fetch(actionUrl, {
       method: 'POST',
@@ -1437,7 +1434,7 @@ function dgRefreshSection(section) {
         if (submit) {
           submit.classList.remove('cursor-wait');
           submit.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
-          submit.innerHTML = '<i class="fa-solid fa-check"></i>';
+          submit.innerHTML = '{% component "icon" name="check" %}{% endcomponent %}';
         }
         const currentSection = (window.location.hash || '#overview').replace('#', '') || 'overview';
         dgRefreshSection(currentSection);

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static component_tags %}
 
 {% block public_navbar %}{% endblock %}
 {% block public_footer %}{% endblock %}
@@ -7,7 +8,7 @@
 {% block title %}Dashboard Direction des Etudes{% endblock %}
 
 {% block extra_head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script defer src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
 <style>
   [x-cloak] { display: none !important; }
   body { font-family: Inter, system-ui, sans-serif; }
@@ -196,36 +197,12 @@
 
           <!-- KPIs -->
           <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
-            <div class="de-kpi">
-              <p class="de-section-label">Classes</p>
-              <p class="mt-2 text-3xl font-black text-slate-900">{{ total_classes|default:0 }}</p>
-              <p class="mt-1 text-xs font-semibold text-blue-600">Actives</p>
-            </div>
-            <div class="de-kpi">
-              <p class="de-section-label">Enseignants</p>
-              <p class="mt-2 text-3xl font-black text-slate-900">{{ teachers_total|default:0 }}</p>
-              <p class="mt-1 text-xs font-semibold text-slate-500">Affectes</p>
-            </div>
-            <div class="de-kpi">
-              <p class="de-section-label">Semestres</p>
-              <p class="mt-2 text-3xl font-black text-slate-900">{{ total_semesters|default:0 }}</p>
-              <p class="mt-1 text-xs font-semibold text-slate-500">Suivis</p>
-            </div>
-            <div class="de-kpi">
-              <p class="de-section-label">A publier</p>
-              <p class="mt-2 text-3xl font-black text-blue-600">{{ ready_to_publish|length|default:0 }}</p>
-              <p class="mt-1 text-xs font-semibold text-blue-600">Resultats prets</p>
-            </div>
-            <div class="de-kpi">
-              <p class="de-section-label">Anomalies</p>
-              <p class="mt-2 text-3xl font-black text-red-600">{{ assignments_alerts_count|default:0 }}</p>
-              <p class="mt-1 text-xs font-semibold text-red-600">A corriger</p>
-            </div>
-            <div class="de-kpi">
-              <p class="de-section-label">Documents</p>
-              <p class="mt-2 text-3xl font-black text-slate-900">{{ admin_doc_published_count|default:0 }}</p>
-              <p class="mt-1 text-xs font-semibold text-emerald-600">Publies</p>
-            </div>
+            {% component "metric_card" label="Classes" value=total_classes|default:0 icon="school" hint="Actives" %}{% endcomponent %}
+            {% component "metric_card" label="Enseignants" value=teachers_total|default:0 icon="users" hint="Affectés" %}{% endcomponent %}
+            {% component "metric_card" label="Semestres" value=total_semesters|default:0 icon="calendar-range" hint="Suivis" %}{% endcomponent %}
+            {% component "metric_card" label="À publier" value=ready_to_publish|length|default:0 icon="send" hint="Résultats prêts" %}{% endcomponent %}
+            {% component "metric_card" label="Anomalies" value=assignments_alerts_count|default:0 icon="triangle-alert" hint="À corriger" %}{% endcomponent %}
+            {% component "metric_card" label="Documents" value=admin_doc_published_count|default:0 icon="file-check" hint="Publiés" %}{% endcomponent %}
           </div>
 
           <!-- Actions rapides -->

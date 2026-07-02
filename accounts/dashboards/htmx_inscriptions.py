@@ -84,7 +84,7 @@ def inscription_create(request: HttpRequest, pk: int) -> HttpResponse:
     academic_class_id = request.POST.get("academic_class", "").strip()
     academic_class = (
         AcademicClass.objects.select_related("programme", "branch", "academic_year")
-        .filter(pk=academic_class_id)
+        .filter(pk=academic_class_id, branch=request.branch)
         .first()
     )
 

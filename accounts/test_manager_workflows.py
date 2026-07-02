@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from branches.models import Branch
 from admissions.models import Candidature
+from academics.models import AcademicClass, AcademicYear
 from inscriptions.models import Inscription
 from formations.models import Programme, Cycle, Diploma, Filiere
 from accounts.models import (
@@ -67,6 +68,14 @@ def _create_programme():
         short_description="Formation en informatique",
         description="Formation en informatique de niveau licence",
     )
+
+
+def _create_academic_class(programme, branch, level="L1"):
+    year, _ = AcademicYear.objects.get_or_create(
+        name="2025-2026",
+        defaults={"start_date": date(2025, 10, 1), "end_date": date(2026, 7, 31), "is_active": True},
+    )
+    return AcademicClass.objects.create(programme=programme, branch=branch, academic_year=year, level=level)
 
 
 def _create_candidature(programme, branch, **kw):
@@ -304,6 +313,31 @@ class ManagerAccessControlTests(TestCase):
         url = reverse("accounts:htmx_candidature_under_review", args=[self.cand_a.id])
         response = self.client.post(url, HTTP_HX_REQUEST="true")
         self.assertEqual(response.status_code, 403)
+
+    def test_manager_a_cannot_inscribe_candidature_into_branch_b_class(self):
+        """Un gestionnaire de l'annexe A ne peut pas inscrire un candidat dans une classe de l'annexe B."""
+        self.cand_a.status = "accepted"
+        self.cand_a.save(update_fields=["status"])
+        class_b = _create_academic_class(self.programme, self.branch_b)
+        _login(self.client, self.manager_a)
+        url = reverse("accounts:htmx_inscription_create", args=[self.cand_a.id])
+        response = self.client.post(
+            url,
+            {"academic_level": "L1", "academic_class": str(class_b.pk)},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertFalse(
+            Inscription.objects.filter(candidature=self.cand_a).exists(),
+            "Une inscription ne doit pas être créée avec une classe d'une autre annexe.",
+        )
+        self.assertNotEqual(response.status_code, 201)
+
+    def test_manager_a_cannot_access_branch_b_candidature_detail(self):
+        """Un gestionnaire de l'annexe A obtient 404 sur la candidature de l'annexe B."""
+        _login(self.client, self.manager_a)
+        url = reverse("accounts:htmx_candidature_detail", args=[self.cand_b.id])
+        response = self.client.get(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 404)
 
 
 @override_settings(

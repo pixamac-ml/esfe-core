@@ -53,10 +53,11 @@ urlpatterns = [
     path("sitemap.xml", sitemap, {"sitemaps": build_sitemaps()}, name="sitemap_xml"),
     # Core (home + pages publiques)
     path("", include("core.urls")),
+    path("ui/", include("ui.urls")),
     path("academics/", include("academics.urls")),
     path("memoires/", include(("memoires.urls", "memoires"), namespace="memoires")),
     path("community/", include("community.urls")),
-    path("communication/", include(("communication.urls", "communication"), namespace="communication")),
+    path("notifications/", include(("notification_center.urls", "notification_center"), namespace="notification_center")),
     path("marketing/", include(("marketing.urls", "marketing"), namespace="marketing")),
     path("ckeditor5/", include("django_ckeditor_5.urls")),
 ]

@@ -23,8 +23,9 @@
 <p style="font-size:13px;color:var(--ink-2);line-height:1.55">{{ case.description }}</p>
 {% endif %}
 
-{% if case.status != "resolu" %}
+{% if case.status != "resolu" and not is_escalated %}
 <div class="sec-title">Faire avancer</div>
+{% if can_advance %}
 <form hx-post="{% url 'accounts_portal:supervisor_case_advance' kind case.id %}" hx-target="#supervisor-drawer-content">
   {% csrf_token %}
   <button type="submit" class="btn primary" style="width:100%;justify-content:center;margin-bottom:10px">
@@ -39,8 +40,18 @@
         hx-target="#supervisor-drawer-content">
   {% if kind == 'teacher' %}Convoquer l'enseignant{% else %}Convoquer (étudiant / parents){% endif %}
 </button>
+<form hx-post="{% url 'accounts_portal:supervisor_case_escalate' kind case.id %}" hx-target="#supervisor-drawer-content">
+  {% csrf_token %}
+  <button type="submit" class="btn" style="width:100%;justify-content:center;margin-bottom:10px;color:var(--bad)"
+          hx-confirm="Transmettre ce cas à la Direction des études ?">
+    Transmettre à la Direction des études
+  </button>
+</form>
+{% endif %}
 {% else %}
-<p style="color:var(--ok);font-weight:700;font-size:13px;margin-top:10px">✓ Dossier résolu et classé.</p>
+<p style="color:var(--ok);font-weight:700;font-size:13px;margin-top:10px">
+  {% if is_escalated %}✓ Dossier transmis à la Direction des études.{% else %}✓ Dossier résolu et classé.{% endif %}
+</p>
 {% endif %}
 
 <div class="sec-title">Notes internes ({{ case.notes.count }})</div>

@@ -4,9 +4,8 @@ from django.urls import reverse
 
 from academics.models import AcademicDiplomaAward, ECGrade
 from academics.services.workflow import is_session_complete_for_class
-from communication.models import CommunicationNotification
-from communication.services.email_service import EmailService
-from communication.services.notification_service import NotificationService
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 
 
 @receiver(pre_save, sender=AcademicDiplomaAward)
@@ -37,7 +36,7 @@ def diploma_award_notify(sender, instance, created, **kwargs):
     diploma_url = reverse("academics:diploma_award_detail", args=[instance.id])
     diploma_name = instance.diploma.name if instance.diploma else str(instance.programme)
 
-    EmailService.send_transactional(
+    NotificationBus.send_email(
         subject=f"Votre diplome {diploma_name} est disponible",
         recipient=user,
         event_type="diploma_ready",
@@ -54,7 +53,7 @@ def diploma_award_notify(sender, instance, created, **kwargs):
         priority="high",
     )
 
-    NotificationService.notify_user(
+    NotificationBus.notify(
         recipient=user,
         actor=instance.delivered_by or instance.prepared_by,
         event_type="diploma_ready",
@@ -91,13 +90,13 @@ def _notify_directors_session_complete(branch, semester, session_type):
         f"{semester.academic_class.display_name} (Semestre {semester.number})."
     )
     for director in directors:
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=director,
             event_type="grades_session_complete",
             title=f"Saisie terminee - {semester.academic_class.display_name}",
             body=body,
             source_app="academics",
-            priority=CommunicationNotification.PRIORITY_NORMAL,
+            priority=NotificationMessage.PRIORITY_NORMAL,
             legacy_source="ec_grade_session_complete",
             legacy_object_id=f"{semester.id}:{session_type}",
         )

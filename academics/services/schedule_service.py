@@ -817,10 +817,13 @@ def get_student_week_schedule(student, week_start):
     return schedule
 
 
-def get_teacher_week_schedule(user, week_start):
+def get_teacher_week_schedule(user, week_start, *, branch=None):
     teacher_user = getattr(user, "user", user)
+    teacher_events = AcademicScheduleEvent.objects.filter(teacher=teacher_user)
+    if branch is not None:
+        teacher_events = teacher_events.filter(branch=branch)
     queryset, normalized = _week_queryset(
-        AcademicScheduleEvent.objects.filter(teacher=teacher_user),
+        teacher_events,
         week_start,
     )
     events = list(queryset)
@@ -1055,14 +1058,17 @@ def get_teacher_today_schedule(user):
     }
 
 
-def get_teacher_next_events(user, limit=5):
+def get_teacher_next_events(user, limit=5, *, branch=None):
     teacher_user = getattr(user, "user", user)
     now = timezone.now()
     queryset = AcademicScheduleEvent.objects.filter(
         teacher=teacher_user,
         is_active=True,
         start_datetime__gte=now,
-    ).exclude(
+    )
+    if branch is not None:
+        queryset = queryset.filter(branch=branch)
+    queryset = queryset.exclude(
         status=AcademicScheduleEvent.STATUS_CANCELLED,
     ).select_related("academic_class", "teacher", "branch", "ec", "ec__ue", "academic_year").order_by("start_datetime", "id")[:limit]
     return [_serialize_event(event) for event in queryset]

@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from accounts.dashboards.helpers import get_user_branch, is_global_viewer
 from academics.models import AcademicClass, AcademicEnrollment
-from communication.selectors import get_user_notifications, get_user_unread_count
+from notification_center.selectors import get_user_notifications, get_user_unread_count
 from students.models import Student
 
 from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog

@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from communication.services import EmailService
+from notifier.services import NotificationBus
 
 
 def send_student_credentials_email(*, student, raw_password=None):
@@ -50,7 +50,7 @@ def send_student_credentials_email(*, student, raw_password=None):
         },
     }
 
-    EmailService.send_transactional(
+    NotificationBus.send_email(
         subject=subject,
         recipient=user,
         recipient_email=user.email,
@@ -110,7 +110,7 @@ def send_payment_confirmation_email(*, payment):
         "branch_name": getattr(candidature.branch, "name", ""),
     }
 
-    EmailService.send_transactional(
+    NotificationBus.send_email(
         subject=subject,
         recipient=getattr(student, "user", None),
         recipient_email=candidature.email,

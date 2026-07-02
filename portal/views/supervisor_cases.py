@@ -11,7 +11,12 @@ from accounts.access import get_user_position
 from accounts.dashboards.helpers import get_user_branch
 from portal.services.supervisor_dashboard_service import get_supervisor_class_picker_bundle
 from students.models import Student, StudentCase, StudentCaseNote, TeacherCase, TeacherCaseNote
-from students.services.case_service import advance_student_case, advance_teacher_case, list_open_cases
+from students.services.case_service import (
+    advance_student_case,
+    advance_teacher_case,
+    escalate_case_to_director,
+    list_open_cases,
+)
 
 
 def _deny(request):
@@ -29,11 +34,19 @@ def _require_supervisor(func):
 
 
 def _case_model(kind):
-    return StudentCase if kind == "student" else TeacherCase
+    if kind == "student":
+        return StudentCase
+    if kind == "teacher":
+        return TeacherCase
+    return None
 
 
 def _case_note_model(kind):
-    return StudentCaseNote if kind == "student" else TeacherCaseNote
+    if kind == "student":
+        return StudentCaseNote
+    if kind == "teacher":
+        return TeacherCaseNote
+    return None
 
 
 _FLOW_LABELS = {
@@ -130,6 +143,8 @@ def supervisor_case_detail(request, kind: str, case_id: int):
     """Drawer de détail d'un cas (kind = 'student' ou 'teacher')."""
     branch = get_user_branch(request.user)
     model = _case_model(kind)
+    if model is None:
+        return HttpResponseBadRequest("Type de cas invalide.")
     related = (
         ["student__inscription__candidature", "opened_by"]
         if kind == "student"
@@ -140,7 +155,18 @@ def supervisor_case_detail(request, kind: str, case_id: int):
         pk=case_id,
         branch=branch,
     )
-    context = {"case": case, "kind": kind, "flow_steps": _flow_steps(case)}
+    is_escalated = (
+        case.status == StudentCase.STATUS_ESCALADE
+        if kind == "student"
+        else case.notes.filter(content="Cas transmis à la Direction des études.").exists()
+    )
+    context = {
+        "case": case,
+        "kind": kind,
+        "flow_steps": _flow_steps(case),
+        "can_advance": case.status in StudentCase.SIMPLE_FLOW_STATUSES and case.status != StudentCase.STATUS_RESOLU,
+        "is_escalated": is_escalated,
+    }
     response = render(request, "portal/staff/supervisor/partials/case_detail.html", context)
     response["HX-Trigger"] = "supervisor-drawer-open"
     return response
@@ -198,6 +224,8 @@ def supervisor_case_advance(request, kind: str, case_id: int):
     """Avance un cas (étudiant ou enseignant) à l'étape suivante du flux simplifié."""
     branch = get_user_branch(request.user)
     model = _case_model(kind)
+    if model is None:
+        return HttpResponseBadRequest("Type de cas invalide.")
     case = get_object_or_404(model, pk=case_id, branch=branch)
 
     if kind == "student":
@@ -205,6 +233,21 @@ def supervisor_case_advance(request, kind: str, case_id: int):
     else:
         advance_teacher_case(case=case, user=request.user)
 
+    return supervisor_case_detail(request, kind=kind, case_id=case_id)
+
+
+@_require_supervisor
+@require_POST
+def supervisor_case_escalate(request, kind: str, case_id: int):
+    """Transmet un cas de la même annexe à la Direction des études."""
+    branch = get_user_branch(request.user)
+    if not branch:
+        return HttpResponseBadRequest("Aucune annexe rattachée.")
+    model = _case_model(kind)
+    if model is None:
+        return HttpResponseBadRequest("Type de cas invalide.")
+    case = get_object_or_404(model, pk=case_id, branch=branch)
+    escalate_case_to_director(case=case, user=request.user)
     return supervisor_case_detail(request, kind=kind, case_id=case_id)
 
 
@@ -217,6 +260,8 @@ def supervisor_case_add_note(request, kind: str, case_id: int):
     branch = get_user_branch(request.user)
     model = _case_model(kind)
     note_model = _case_note_model(kind)
+    if model is None or note_model is None:
+        return HttpResponseBadRequest("Type de cas invalide.")
     case = get_object_or_404(model, pk=case_id, branch=branch)
 
     content = request.POST.get("content", "").strip()

@@ -6,9 +6,9 @@ from django.views.decorators.http import require_POST
 
 from accounts.forms import ProfileForm, UserPreferenceForm
 from accounts.models import PayrollEntry, Profile, UserPreference
-from communication.models import CommunicationNotification
-from communication.selectors import get_user_notifications, get_user_unread_count
-from communication.services import NotificationService
+from notifier.models import NotificationMessage
+from notification_center.selectors import get_user_notifications, get_user_unread_count
+from notifier.services import NotificationBus
 from .forms import AnnouncementForm, CampaignForm, MarketingMediaForm, MarketingSettingsForm, ProspectLeadForm
 from .models import Announcement, Campaign, MarketingMedia, MarketingSettings, ProspectLead
 from .permissions import marketing_required
@@ -65,7 +65,7 @@ def _build_account_context(request, *, selected_notification=None, profile_form=
 
     notifications_queryset = get_user_notifications(
         request.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
     )
     notifications_page = _paginate(request, notifications_queryset, per_page=10, page_param="notifications_page")
 
@@ -114,12 +114,12 @@ def account_notifications_panel(request):
     notification_id = request.GET.get("notification_id")
     if notification_id:
         selected_notification = get_object_or_404(
-            CommunicationNotification.objects.select_related("actor", "event"),
+            NotificationMessage.objects.select_related("actor", "event"),
             pk=notification_id,
             recipient=request.user,
-            channel=CommunicationNotification.CHANNEL_IN_APP,
+            channel=NotificationMessage.CHANNEL_IN_APP,
         )
-        NotificationService.mark_as_read(selected_notification)
+        NotificationBus.mark_as_read(selected_notification)
     context = _build_account_context(request, selected_notification=selected_notification)
     return render(request, "marketing/partials/account_notifications.html", context)
 

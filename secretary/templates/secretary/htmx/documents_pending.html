@@ -1,0 +1,42 @@
+{% load component_tags %}
+<div id="documents-pending-list"
+     hx-get="{% url 'secretary:htmx_documents_pending' %}"
+     hx-trigger="secretary:documents-updated from:body"
+     hx-swap="outerHTML">
+{% component "dashboard_card" padding="none" %}
+  {% fill "default" %}
+    {% if pending_documents_rows %}
+      <div class="divide-y divide-[color:var(--line)]">
+        {% for item in pending_documents_rows %}
+          <div class="flex items-center justify-between px-4 py-3 text-sm">
+            <div class="min-w-0">
+              <div class="font-bold text-[color:var(--text)]">{{ item.title }}</div>
+              <div class="text-xs text-[color:var(--muted-2)]">{{ item.submitted_by_name }} - {{ item.received_at|date:"d/m H:i" }}</div>
+            </div>
+            {% if item.status == "pending" %}
+              <form method="post" hx-post="{% url 'secretary:document_receipt_start' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
+                {% component "button" label="Prendre en charge" variant="primary" size="sm" type="submit" icon_left="hand-holding" %}{% endcomponent %}
+              </form>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="p-4">
+        {% component "empty_state" title="Aucune pièce en attente" icon="archive" compact=True %}
+          {% fill "default" %}
+            <button type="button" class="mt-2 inline-flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-bold text-[color:var(--school-primary)] transition hover:bg-[color:var(--school-primary-soft)]" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+              <i data-lucide="plus" style="width:12px;height:12px;"></i>Nouveau dépôt
+            </button>
+          {% endfill %}
+        {% endcomponent %}
+      </div>
+    {% endif %}
+    {% if documents_page and documents_page.has_other_pages %}
+      <div class="border-t border-[color:var(--line)] px-4 py-3">
+        {% component "pagination" total=documents_page.paginator.count page=documents_page.number per_page=10 hx_target="#documents-pending-list" %}{% endcomponent %}
+      </div>
+    {% endif %}
+  {% endfill %}
+{% endcomponent %}
+</div>

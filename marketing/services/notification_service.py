@@ -1,6 +1,6 @@
-from communication.models import CommunicationNotification
-from communication.services.audience import resolve_platform_users
-from communication.services.notification_service import NotificationService
+from notifier.models import NotificationMessage
+from notifier.services.audience import resolve_platform_users
+from notifier.services import NotificationBus
 
 from marketing.models import Announcement, DispatchLog
 from .campaign_service import create_dispatch_log
@@ -20,13 +20,13 @@ def resolve_announcement_recipients(announcement):
 
 def publish_announcement(announcement, *, actor=None):
     recipients = resolve_announcement_recipients(announcement)
-    channels = [CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET]
+    channels = [NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET]
     if "email" in (announcement.channels or []):
-        channels.append(CommunicationNotification.CHANNEL_EMAIL_MARKETING)
+        channels.append(NotificationMessage.CHANNEL_EMAIL_MARKETING)
 
     created_count = 0
     for recipient in recipients.iterator():
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=recipient,
             actor=actor,
             event_type="marketing.announcement",

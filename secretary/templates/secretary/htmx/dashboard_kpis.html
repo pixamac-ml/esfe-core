@@ -1,0 +1,11 @@
+{% load component_tags %}
+<div id="sg-dashboard-kpis"
+     class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+     hx-get="{% url 'secretary:htmx_dashboard_kpis' %}"
+     hx-trigger="secretary:kpis-updated from:body"
+     hx-swap="outerHTML">
+  {% component "metric_card" label="Registre" value=pending_registry_count|default:0 icon="book-open" hint="Entrees en attente de routage" %}{% endcomponent %}
+  {% component "metric_card" label="Visiteurs" value=active_visits|default:0 icon="user-clock" hint="Passages aujourd'hui" %}{% endcomponent %}
+  {% component "metric_card" label="Rendez-vous" value=appointments_today|default:0 icon="calendar-days" hint="Agenda du jour" %}{% endcomponent %}
+  {% component "metric_card" label="Pieces / depots" value=pending_documents_count|default:0 icon="archive" hint="Documents ou colis en attente" %}{% endcomponent %}
+</div>

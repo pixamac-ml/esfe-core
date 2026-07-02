@@ -567,8 +567,8 @@ class RegistryDetailViewTests(SecretaryTestMixin, TestCase):
     def test_history_timeline_renders_events(self):
         self.client.force_login(self.secretary)
         response = self.client.get(self.url, HTTP_HX_REQUEST="true")
-        self.assertContains(response, "fa-circle-plus")
-        self.assertContains(response, "fa-right-left")
+        self.assertContains(response, "circle-plus")
+        self.assertContains(response, "arrow-right-left")
 
     def test_regular_user_cannot_access(self):
         self.client.force_login(self.regular_user)

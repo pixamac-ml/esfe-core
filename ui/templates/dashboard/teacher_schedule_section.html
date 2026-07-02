@@ -1,0 +1,48 @@
+{% load humanize component_tags %}
+        <!-- =========== SCHEDULE =========== -->
+        <div id="teacher-panel-schedule" class="sg-section-panel {% if active_section == 'schedule' %}is-active{% endif %}" data-sg-panel="schedule" {% if active_section != 'schedule' %}hidden{% endif %}>
+          {% component "section_header" title="Mon emploi du temps" subtitle="Vision hebdomadaire de vos cours, classes et salles." icon="calendar-days" %}
+            {% fill "action" %}<span class="sg-scope-chip">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</span>{% endfill %}
+          {% endcomponent %}
+
+          <div class="mb-4">{% component "kpi_row" cards=section_kpi_cards columns=4 %}{% endcomponent %}</div>
+
+          {% component "dashboard_card" %}
+            {% fill "default" %}
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-[color:var(--text)]">Planning hebdomadaire</span>
+                <span class="sg-scope-chip">{{ teacher_kpis.scheduled_days }} jour(s)</span>
+              </div>
+              <div class="sg-table-wrap">
+                <table class="sg-table">
+                  <thead><tr><th>Jour</th><th>Horaire</th><th>Cours</th><th>Classe</th><th>Salle</th><th style="text-align:right;">Action</th></tr></thead>
+                  <tbody>
+                    {% if teaching_days %}
+                      {% for day in teaching_days %}
+                        {% for event in day.events %}
+                        <tr>
+                          <td><div style="font-weight:900;">{{ day.label }}</div><div style="font-size:.65rem;color:var(--muted-2);">{{ day.date|date:"d/m" }}</div></td>
+                          <td>{{ event.time_range }}</td>
+                          <td style="font-weight:900;">{{ event.title }}</td>
+                          <td>{{ event.class_name }}</td>
+                          <td>{{ event.location|default:"-" }}</td>
+                          <td style="text-align:right;">
+                            <button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-[color:var(--school-primary)] px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:opacity-90"
+                                    hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"
+                                    >
+                              <i data-lucide="pen" style="width:12px;height:12px;"></i>Cahier
+                            </button>
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      {% endfor %}
+                    {% else %}
+                    <tr><td colspan="6"><div class="sg-empty"><div class="sg-empty-icon"><i data-lucide="calendar-days"></i></div><div class="sg-empty-text">Aucun cours planifie sur cette semaine.</div></div></td></tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            {% endfill %}
+          {% endcomponent %}
+        </div>
+

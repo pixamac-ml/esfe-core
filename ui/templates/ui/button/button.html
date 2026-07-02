@@ -1,4 +1,18 @@
 {% if href %}<a href="{{ href }}"{% else %}<button type="{{ type }}"{% endif %}
+  x-data="{ htmxLoading: false }"
+  x-on:htmx:before-request.window="if ($event.detail.elt === $el || ($el.form && $event.detail.elt.form === $el.form)) htmxLoading = true"
+  x-on:htmx:after-request.window="htmxLoading = false"
+  x-on:htmx:send-error.window="htmxLoading = false"
+  {% if not href %}:disabled="htmxLoading || {{ disabled|yesno:'true,false' }}"{% endif %}
+  {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
+  {% if hx_post %}hx-post="{{ hx_post }}"{% endif %}
+  {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+  {% if hx_swap %}hx-swap="{{ hx_swap }}"{% endif %}
+  {% if hx_indicator %}hx-indicator="{{ hx_indicator }}"{% endif %}
+  {% if hx_confirm %}hx-confirm="{{ hx_confirm }}"{% endif %}
+  {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+  {% if title %}title="{{ title }}"{% endif %}
+  {% if x_on_click %}@click="{{ x_on_click }}"{% endif %}
   class="inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary-soft)] focus:ring-offset-2
     {% if full_width %} w-full {% endif %}
     {% if size == 'sm' %} px-3 py-1.5 text-xs
@@ -12,15 +26,25 @@
       border border-[color:var(--border)] text-[color:var(--text)] bg-[color:var(--card)] hover:bg-[color:var(--card-soft)]
     {% elif variant == 'ghost' %}
       text-[color:var(--text)] hover:bg-[color:var(--card-soft)]
+    {% elif variant == 'success' %}
+      bg-[color:var(--success)] text-white hover:opacity-90
     {% elif variant == 'danger' %}
       bg-[color:var(--danger)] text-white hover:opacity-90
     {% else %}
       bg-[color:var(--card-soft)] text-[color:var(--text)] border border-[color:var(--line)] hover:bg-[color:var(--surface-2)]
     {% endif %}
-    {% if disabled %} opacity-50 pointer-events-none {% endif %}"
+    {% if disabled %} opacity-50 pointer-events-none {% endif %}
+    {{ class_str }}
+  "
+  :class="htmxLoading ? 'opacity-60 pointer-events-none' : ''"
   aria-disabled="{{ disabled|lower }}"
 >
-  {% if icon_left %}<i data-lucide="{{ icon_left }}" style="width:16px;height:16px;"></i>{% endif %}
-  {{ label }}
-  {% if icon_right %}<i data-lucide="{{ icon_right }}" style="width:16px;height:16px;"></i>{% endif %}
+  <svg x-show="htmxLoading || {{ loading|yesno:'true,false' }}" class="animate-spin -ml-0.5 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+  </svg>
+  <i x-show="!(htmxLoading || {{ loading|yesno:'true,false' }}) && '{{ icon_left }}'" data-lucide="{{ icon_left }}" style="width:16px;height:16px;"></i>
+  <span x-show="!(htmxLoading || {{ loading|yesno:'true,false' }})">{{ label }}</span>
+  <span x-show="htmxLoading || {{ loading|yesno:'true,false' }}" class="sr-only">Chargement...</span>
+  <i x-show="!(htmxLoading || {{ loading|yesno:'true,false' }}) && '{{ icon_right }}'" data-lucide="{{ icon_right }}" style="width:16px;height:16px;"></i>
 {% if href %}</a>{% else %}</button>{% endif %}

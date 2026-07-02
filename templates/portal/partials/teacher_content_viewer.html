@@ -1,9 +1,9 @@
 {% if content %}
 <div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#0f172a,#1e293b);">
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,var(--text),#1e293b);">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
       <div style="flex:1;min-width:0;">
-        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-eye"></i> {{ content.get_content_type_display }}</div>
+        <div class="sg-drawer-hero-sub"><i data-lucide="eye"></i> {{ content.get_content_type_display }}</div>
         <div class="sg-drawer-hero-title" style="font-size:1.3rem;">{{ content.title }}</div>
         <div class="sg-drawer-hero-meta">
           {% if content.chapter %}{{ content.chapter.ec.title }} &middot; {{ content.chapter.title }}{% endif %}
@@ -12,11 +12,11 @@
       <div style="display:flex;gap:8px;flex-shrink:0;">
         {% if content.file and content.file.url %}
         <a href="{{ content.file.url }}" target="_blank" class="sg-btn" style="min-height:36px;font-size:.7rem;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);color:#fff;">
-          <i class="fa-solid fa-download"></i> Telecharger
+          <i data-lucide="download"></i> Telecharger
         </a>
         {% endif %}
-        <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
-          <i class="fa-solid fa-xmark"></i> Fermer
+        <button type="button" class="sg-drawer-hero-badge" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
+          <i data-lucide="x"></i> Fermer
         </button>
       </div>
     </div>
@@ -28,43 +28,60 @@
       <iframe src="{{ content.file.url }}#view=FitH" title="{{ content.title }}" style="width:100%;height:calc(100vh - 220px);border:none;display:block;"></iframe>
     </div>
 
-    {% elif content.content_type == 'video' and content.video_url %}
+    {% elif content.content_type == 'video' %}
+    {% with embed_url=content.video_embed_url %}
+    {% if embed_url %}
     <div class="sg-drawer-section" style="padding:0;overflow:hidden;">
       <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;background:#000;">
-        {% if 'youtube' in content.video_url or 'youtu.be' in content.video_url %}
-        <iframe src="{{ content.video_url }}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>
-        {% elif 'vimeo' in content.video_url %}
-        <iframe src="{{ content.video_url }}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>
+        {% if 'youtube' in embed_url or 'youtu.be' in embed_url or 'youtube.com/embed' in embed_url %}
+        <iframe src="{{ embed_url }}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>
+        {% elif 'vimeo' in embed_url %}
+        <iframe src="{{ embed_url }}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>
         {% else %}
         <video controls style="position:absolute;top:0;left:0;width:100%;height:100%;">
-          <source src="{{ content.video_url }}">
+          <source src="{{ embed_url }}">
         </video>
         {% endif %}
       </div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;padding:4px 0;">
-      <span class="sg-badge-sm sg-badge-blue"><i class="fa-solid fa-video"></i> Video</span>
-      <a href="{{ content.video_url }}" target="_blank" class="sg-btn sg-btn-outline" style="min-height:32px;font-size:.68rem;">
-        <i class="fa-solid fa-external-link"></i> Ouvrir dans un nouvel onglet
-      </a>
+    {% elif content.file and content.file.url %}
+    <div class="sg-drawer-section" style="padding:0;overflow:hidden;">
+      <video controls style="width:100%;display:block;max-height:calc(100vh - 220px);background:#000;">
+        <source src="{{ content.file.url }}">
+      </video>
     </div>
+    {% endif %}
+    <div class="flex gap-2 items-center pt-2">
+      <span class="sg-badge-sm sg-badge-blue"><i data-lucide="video"></i> Video</span>
+      {% if embed_url %}
+      <a href="{{ content.video_url }}" target="_blank" class="sg-btn sg-btn-outline" style="min-height:32px;font-size:.68rem;">
+        <i data-lucide="external-link"></i> Ouvrir
+      </a>
+      {% endif %}
+      {% if content.file and content.file.url %}
+      <a href="{{ content.file.url }}" target="_blank" class="sg-btn sg-btn-outline" style="min-height:32px;font-size:.68rem;">
+        <i data-lucide="download"></i> Telecharger
+      </a>
+      {% endif %}
+    </div>
+    {% endwith %}
 
     {% elif content.content_type == 'text' and rendered_text %}
     <div class="sg-drawer-section">
-      <div class="sg-drawer-section-title"><i class="fa-solid fa-align-left"></i> Contenu du cours</div>
-      <div style="font-size:.92rem;line-height:1.7;color:#1e293b;max-width:800px;">
+      <div class="sg-drawer-section-title"><i data-lucide="align-left"></i> Contenu du cours</div>
+      <div style="font-size:.92rem;line-height:1.7;color:var(--text);max-width:800px;">
         {{ rendered_text|linebreaks }}
       </div>
     </div>
 
     {% elif content.content_type == 'image' and content.file and content.file.url %}
-    <div class="sg-drawer-section" style="padding:0;overflow:hidden;text-align:center;background:#f1f5f9;">
+    <div class="sg-drawer-section" style="padding:0;overflow:hidden;text-align:center;background:var(--card-soft);">
       <img src="{{ content.file.url }}" alt="{{ content.title }}" style="max-width:100%;max-height:calc(100vh - 240px);object-fit:contain;display:block;margin:0 auto;">
     </div>
 
     {% elif content.content_type == 'audio' and content.file and content.file.url %}
     <div class="sg-drawer-section" style="text-align:center;padding:32px;">
-      <div style="font-size:3rem;margin-bottom:12px;color:#2563eb;"><i class="fa-solid fa-headphones"></i></div>
+      <div style="font-size:3rem;margin-bottom:12px;color:var(--school-primary);"><i data-lucide="headphones"></i></div>
       <div style="font-size:1.1rem;font-weight:900;margin-bottom:16px;">{{ content.title }}</div>
       <audio controls style="width:100%;max-width:500px;">
         <source src="{{ content.file.url }}">
@@ -73,18 +90,18 @@
 
     {% elif content.file and content.file.url %}
     <div class="sg-drawer-section" style="text-align:center;padding:48px 32px;">
-      <div style="font-size:3rem;margin-bottom:12px;color:#94a3b8;"><i class="fa-solid fa-file"></i></div>
+      <div style="font-size:3rem;margin-bottom:12px;color:var(--muted-2);"><i data-lucide="file"></i></div>
       <div style="font-size:1.1rem;font-weight:900;margin-bottom:4px;">{{ content.title }}</div>
-      <div style="font-size:.78rem;color:#64748b;margin-bottom:20px;">{{ content.get_content_type_display }} &middot; {{ content.file.size|filesizeformat }}</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:20px;">{{ content.get_content_type_display }} &middot; {{ content.file.size|filesizeformat }}</div>
       <a href="{{ content.file.url }}" target="_blank" class="sg-btn sg-btn-primary" style="min-height:40px;font-size:.82rem;">
-        <i class="fa-solid fa-download"></i> Telecharger le fichier
+        <i data-lucide="download"></i> Telecharger le fichier
       </a>
     </div>
 
     {% else %}
     <div class="sg-drawer-empty" style="min-height:40vh;">
       <div>
-        <div class="sg-drawer-empty-icon"><i class="fa-solid fa-eye-slash"></i></div>
+        <div class="sg-drawer-empty-icon"><i data-lucide="eye-off"></i></div>
         <div class="sg-drawer-empty-text">Aucun apercu disponible pour ce type de contenu.</div>
       </div>
     </div>
@@ -93,21 +110,21 @@
 </div>
 {% else %}
 <div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#991b1b,#7f1d1d);">
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,var(--danger),#7f1d1d);">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
       <div>
-        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-triangle-exclamation"></i> Erreur</div>
+        <div class="sg-drawer-hero-sub"><i data-lucide="triangle-alert"></i> Erreur</div>
         <div class="sg-drawer-hero-title">Contenu introuvable</div>
       </div>
-      <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
-        <i class="fa-solid fa-xmark"></i> Fermer
+      <button type="button" class="sg-drawer-hero-badge" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
+        <i data-lucide="x"></i> Fermer
       </button>
     </div>
   </div>
   <div class="sg-drawer-body">
     <div class="sg-drawer-empty" style="min-height:40vh;">
       <div>
-        <div class="sg-drawer-empty-icon"><i class="fa-solid fa-file-circle-exclamation"></i></div>
+        <div class="sg-drawer-empty-icon"><i data-lucide="file-warning"></i></div>
         <div class="sg-drawer-empty-text">{{ error|default:"Ce contenu n'est pas accessible." }}</div>
       </div>
     </div>

@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseBadRequest
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
@@ -431,10 +431,38 @@ def supervisor_workflow_roll_action(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_quick_course_create(request):
+    branch = _resolve_academic_branch(request)
+    if request.method == "GET":
+        class_id_raw = (request.GET.get("class_id") or "").strip()
+        if branch is None or not class_id_raw.isdigit():
+            return render(
+                request,
+                "portal/staff/supervisor/partials/planner_course_form_drawer.html",
+                {"academic_class": None},
+            )
+        week_start = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
+        try:
+            context = build_class_detail_context(
+                request,
+                branch=branch,
+                class_id=int(class_id_raw),
+                week_start=week_start,
+            )
+        except AcademicClass.DoesNotExist:
+            context = {"academic_class": None}
+        if context.get("academic_class"):
+            context.update(build_courses_section_context(
+                request=request,
+                branch=branch,
+                academic_class=context["academic_class"],
+            ))
+            _inject_planner_route_context(context, role_prefix="supervisor", workspace_target_id="#supervisor-workspace")
+        response = render(request, "portal/staff/supervisor/partials/planner_course_form_drawer.html", context)
+        response["HX-Trigger"] = "supervisor-drawer-open"
+        return response
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
     if branch is None:
         return _render_supervisor_workflow_workspace(
             request,
@@ -578,6 +606,74 @@ def supervisor_student_drawer(request):
 @_position_required({"academic_supervisor"})
 def supervisor_portal(request):
     return redirect("accounts_portal:portal_dashboard")
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_student_attendance_print(request, student_id: int):
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return HttpResponseBadRequest("Aucune annexe rattachée.")
+    class_id_raw = (request.GET.get("class_id") or "").strip()
+    if not class_id_raw.isdigit():
+        return HttpResponseBadRequest("Classe requise.")
+    academic_class = get_object_or_404(AcademicClass, pk=int(class_id_raw), branch=branch, is_active=True)
+    student = get_object_or_404(
+        Student.objects.select_related("user", "inscription__candidature"),
+        pk=student_id,
+        inscription__candidature__branch=branch,
+        user__academic_enrollments__academic_class=academic_class,
+        user__academic_enrollments__branch=branch,
+        user__academic_enrollments__is_active=True,
+    )
+    month_raw = (request.GET.get("month") or "").strip()
+    try:
+        month = datetime.strptime(month_raw, "%Y-%m").date().replace(day=1) if month_raw else timezone.localdate().replace(day=1)
+    except ValueError:
+        month = timezone.localdate().replace(day=1)
+    report = build_attendance_monthly_report_context(branch=branch, academic_class=academic_class, month=month)
+    row = next((item for item in report["attendance_report_rows"] if item["student"].pk == student.pk), None)
+    return render(request, "portal/staff/supervisor/reports/individual_print.html", {
+        "report_kind": "student",
+        "branch": branch,
+        "academic_class": academic_class,
+        "student": student,
+        "report_row": row,
+        "period_start": report["attendance_report_month"],
+        "period_end": report["attendance_report_month_end"],
+        "generated_at": timezone.now(),
+    })
+
+
+@_position_required({"academic_supervisor"})
+def supervisor_teacher_regularity_print(request, teacher_id: int):
+    branch = _resolve_academic_branch(request)
+    if branch is None:
+        return HttpResponseBadRequest("Aucune annexe rattachée.")
+    User = get_user_model()
+    teacher = get_object_or_404(
+        User.objects.select_related("profile"),
+        pk=teacher_id,
+        profile__branch=branch,
+        profile__position="teacher",
+    )
+    week_raw = (request.GET.get("week_start") or "").strip()
+    week_start = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
+    try:
+        if week_raw:
+            week_start = datetime.strptime(week_raw, "%Y-%m-%d").date()
+    except ValueError:
+        pass
+    report = build_teachers_weekly_report_context(branch=branch, week_start=week_start)
+    row = next((item for item in report["report_teachers"] if item["id"] == teacher.pk), None)
+    return render(request, "portal/staff/supervisor/reports/individual_print.html", {
+        "report_kind": "teacher",
+        "branch": branch,
+        "teacher": teacher,
+        "report_row": row,
+        "period_start": report["report_week_start"],
+        "period_end": report["report_week_end"],
+        "generated_at": timezone.now(),
+    })
 
 
 @_position_required({"academic_supervisor"})
@@ -995,7 +1091,7 @@ def supervisor_planner_view_workspace(request):
 
 
 @_position_required({"academic_supervisor"})
-def supervisor_weekly_slots_workspace(request, class_id: int):
+def supervisor_weekly_slots_workspace(request, class_id: int, drawer_form=False):
     branch = _resolve_academic_branch(request)
     if branch is None:
         return render(
@@ -1012,10 +1108,10 @@ def supervisor_weekly_slots_workspace(request, class_id: int):
         except ValueError:
             week_start = timezone.localdate()
 
-    edit_raw = (request.GET.get("edit") or "").strip()
+    edit_raw = (request.GET.get("edit") or request.GET.get("slot_id") or "").strip()
     editing_slot_id = int(edit_raw) if edit_raw.isdigit() else None
 
-    drawer_form = (request.GET.get("drawer_form") or "").strip() == "1"
+    drawer_form = bool(drawer_form) or (request.GET.get("drawer_form") or "").strip() == "1"
 
     def _maybe_open_drawer(response):
         if drawer_form:

@@ -1,0 +1,60 @@
+{% load component_tags %}
+{% if total_pages > 1 %}
+  <nav class="mt-4 flex items-center justify-between text-sm" aria-label="Pagination">
+    <span class="text-xs font-semibold text-[color:var(--muted)]">
+      {{ start }}–{{ end }} sur {{ total }}
+      <span id="{{ id }}-spinner" class="htmx-indicator ml-1">
+        <i data-lucide="loader" style="width:12px;height:12px;" class="animate-spin"></i>
+      </span>
+    </span>
+    <div class="flex items-center gap-1">
+      {% if page > 1 %}
+        <a href="?page={{ page|add:-1 }}"
+           hx-get="?page={{ page|add:-1 }}"
+           hx-target="{{ hx_target }}"
+           hx-push-url="{{ hx_push_url }}"
+           hx-indicator="#{{ id }}-spinner"
+           class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-bold text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--card-soft)] transition"
+        >
+          <i data-lucide="chevron-left" style="width:14px;height:14px;"></i>
+          Précédent
+        </a>
+      {% endif %}
+      {% for p in pages %}
+        {% if p == page %}
+          <span class="inline-flex items-center justify-center rounded-lg bg-[color:var(--school-primary)] px-3 py-1.5 text-xs font-bold text-white min-w-[32px]">
+            {{ p }}
+          </span>
+        {% else %}
+          <a href="?page={{ p }}"
+             hx-get="?page={{ p }}"
+             hx-target="{{ hx_target }}"
+             hx-push-url="{{ hx_push_url }}"
+             hx-indicator="#{{ id }}-spinner"
+             class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-bold text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--card-soft)] transition min-w-[32px]"
+          >
+            {{ p }}
+          </a>
+        {% endif %}
+      {% endfor %}
+      {% if page < total_pages %}
+        <a href="?page={{ page|add:1 }}"
+           hx-get="?page={{ page|add:1 }}"
+           hx-target="{{ hx_target }}"
+           hx-push-url="{{ hx_push_url }}"
+           hx-indicator="#{{ id }}-spinner"
+           class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-bold text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--card-soft)] transition"
+        >
+          Suivant
+          <i data-lucide="chevron-right" style="width:14px;height:14px;"></i>
+        </a>
+      {% endif %}
+    </div>
+  </nav>
+{% else %}
+  {% if total > 0 %}
+    <div class="mt-4 text-center text-xs font-semibold text-[color:var(--muted-2)]">
+      {{ total }} résultat{% if total > 1 %}s{% endif %}
+    </div>
+  {% endif %}
+{% endif %}

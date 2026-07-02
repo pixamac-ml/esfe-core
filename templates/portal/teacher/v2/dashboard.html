@@ -1,0 +1,147 @@
+{% extends "base_app.html" %}
+{% load static humanize component_tags %}
+{% block title %}{% firstof title "Espace Enseignant — ESFE" %}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'portal/css/teacher_dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+{% with nav_items=teacher_nav_items|default:"" %}
+
+<!-- Modal -->
+{% component "modal" title="" %}
+  {% fill "trigger" %}{% endfill %}
+  {% fill "content" %}<div id="sg-modal-content">{{ modal_placeholder|default:"" }}</div>{% endfill %}
+{% endcomponent %}
+
+<!-- Shell -->
+<div x-data="teacherShell()" class="flex h-screen min-h-0 overflow-hidden">
+
+  <!-- Sidebar -->
+  {% component "teacher_sidebar" active_section=active_section user_display_name=user_display_name branch_name=status_summary.branch_name pending_lesson_logs_count=pending_lesson_logs_count notifications_count=notifications_count nav_items=nav_items %}{% endcomponent %}
+
+  <!-- Main -->
+  <div class="flex flex-1 flex-col min-w-0 min-h-0">
+
+    <!-- Topbar -->
+    {% component "teacher_topbar" user_display_name=user_display_name branch_name=status_summary.branch_name notifications_count=notifications_count %}{% endcomponent %}
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto overflow-x-hidden">
+      <div class="p-4 md:p-6">
+
+        {% component "teacher_workspace" nav_items=nav_items active_section=active_section branch_missing=branch_missing teacher_user=request.user kpi_cards=kpi_cards section_kpi_cards=section_kpi_cards today_events=today_events upcoming_events=upcoming_events recent_lesson_logs=recent_lesson_logs recent_supports=recent_supports teacher_insights=teacher_insights class_focus_rows=class_focus_rows teacher_kpis=teacher_kpis week_start=week_start week_end=week_end teacher_support_stats=teacher_support_stats teaching_days=teaching_days pending_lesson_logs_count=pending_lesson_logs_count week_lesson_logs_count=week_lesson_logs_count pending_lesson_log_rows=pending_lesson_log_rows teacher_hours=teacher_hours teacher_payments=teacher_payments teacher_hour_rows=teacher_hour_rows teacher_notifications=teacher_notifications %}{% endcomponent %}
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% component "drawer" id="teacher-drawer" content_id="sg-drawer-content" kicker="Espace enseignant" placeholder="Sélectionnez un élément pour afficher les détails." open_event="teacher-drawer-open" close_event="teacher-drawer-close" %}{% endcomponent %}
+
+{% endwith %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function teacherShell() {
+  return {
+    init() {
+      window.teacherOpenDrawer = () => window.dispatchEvent(new CustomEvent('teacher-drawer-open'));
+      window.teacherCloseDrawer = () => window.dispatchEvent(new CustomEvent('teacher-drawer-close'));
+    }
+  };
+}
+
+function sgTickClock() {
+  var now = new Date();
+  var dateText = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  var timeText = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  document.querySelectorAll('[data-sg-current-date]').forEach(function (n) { n.textContent = dateText; });
+  document.querySelectorAll('[data-sg-current-time]').forEach(function (n) { n.textContent = timeText; });
+}
+
+function sgRefreshDashboard() {
+  var active = document.querySelector('.sg-section-panel.is-active');
+  if (active && window.htmx) {
+    var name = active.getAttribute('data-sg-panel') || 'overview';
+    htmx.ajax('GET', '?section=' + name + '&refresh=1', {
+      target: '#teacher-workspace',
+      swap: 'outerHTML'
+    });
+  }
+  if (window.esfeToast) window.esfeToast('Données actualisées.', 'info');
+}
+
+// Search dropdown
+document.addEventListener('click', function (e) {
+  var wrap = document.querySelector('.sg-search-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('search-results-panel')?.classList.add('hidden');
+  }
+});
+
+document.addEventListener('input', function (e) {
+  if (e.target.matches('.sg-search-wrap input[type="search"]') && !e.target.value.trim()) {
+    var panel = document.getElementById('search-results-panel');
+    if (panel) {
+      panel.innerHTML = '';
+      panel.classList.add('hidden');
+    }
+  }
+});
+
+sgTickClock();
+setInterval(sgTickClock, 30000);
+
+// Auto-open drawer when HTMX loads content into it
+document.body.addEventListener('htmx:afterSwap', function (event) {
+  var target = event.detail?.target;
+  if (!target) return;
+  if (target.id === 'sg-drawer-content' && target.innerHTML.trim()) {
+    if (window.teacherOpenDrawer) window.teacherOpenDrawer();
+  }
+  if (target.id === 'sg-modal-content' && target.innerHTML.trim()) {
+    window.dispatchEvent(new CustomEvent('teacher-modal-open'));
+  }
+  if (target.id === 'search-results-panel') {
+    target.classList.toggle('hidden', !target.innerHTML.trim());
+  }
+});
+
+// Safety net: open drawer before any HTMX request targeting sg-drawer-content
+document.body.addEventListener('htmx:beforeRequest', function (event) {
+  var targetId = event.detail?.elt?.getAttribute?.('hx-target');
+  if (targetId === '#sg-drawer-content' && window.teacherOpenDrawer) {
+    window.teacherOpenDrawer();
+  }
+  if (targetId === '#teacher-workspace') {
+    document.getElementById('teacher-workspace')?.setAttribute('aria-busy', 'true');
+  }
+});
+
+document.body.addEventListener('htmx:responseError', function (event) {
+  var target = event.detail?.target;
+  target?.setAttribute?.('aria-busy', 'false');
+  if (window.esfeToast) window.esfeToast('Impossible de charger cette zone. Réessayez.', 'error');
+});
+
+// Response triggers
+document.body.addEventListener('htmx:afterRequest', function (event) {
+  var raw = event.detail?.xhr?.getResponseHeader?.('HX-Trigger') || '';
+  if (!raw) return;
+  try {
+    var triggers = JSON.parse(raw);
+    if (triggers['teacher-drawer-close'] && window.teacherCloseDrawer) window.teacherCloseDrawer();
+    if (triggers['teacher-toast']) {
+      var t = triggers['teacher-toast'];
+      window.esfeToast(t.message || 'Action effectuee', t.type || 'success');
+    }
+    if (triggers['teacher-dashboard-refresh']) sgRefreshDashboard();
+  } catch (e) {}
+});
+</script>
+{% endblock %}
+

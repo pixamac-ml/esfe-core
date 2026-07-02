@@ -1,0 +1,38 @@
+J'ai analysé tout le dashboard secrétaire. Voici l'état des lieux :
+
+CE QUI EXISTE (521 lignes de dashboard + 1067 lignes de base template)
+- 10 sections : Overview, Registry, Visits, Classes, Students,
+  Appointments, Deposits, Salary, Notifications, Settings, Reports
+- 20+ partials HTMX
+- Base template auto-conçue avec CSS inline (sg-*) + Font Awesome
+- Un seul composant UI utilisé : metric_card
+
+LE PLAN DE REBUILD
+1. Créer secretary/dashboards/ (comme accounts/dashboards/)
+   - dashboard_views.py → vue principale
+   - htmx_secretary.py → endpoints HTMX (détachés de views.py)
+   - helpers.py, permissions.py, querysets.py
+
+2. Réécrire base.html → utiliser le layout partagé (Lucide au lieu de
+   FontAwesome, Tailwind via tokens CSS, Alpine + HTMX officiels)
+
+3. Réécrire dashboard.html avec uniquement {% component %} :
+   - {% component "page_header" %} pour chaque section
+   - {% component "toolbar" %} pour les listes
+   - {% component "widget_card" %} pour les KPIs
+   - {% component "data_table" %} pour les tableaux
+   - {% component "pagination" %} pour la pagination
+   - {% component "empty_state" %} pour les états vides
+   - {% component "filter_bar" %} pour les recherches
+   - {% component "loading_overlay" %} pour le feedback instantané
+
+4. Réécrire les partials HTMX avec les composants UI
+
+5. Supprimer le CSS sg-* inline (1067→~200 lignes)
+
+---
+
+Je propose de commencer par la section la plus simple (Reports ~40 lignes)
+pour valider le pattern, puis la section la plus complexe (Overview ~80 lignes).
+
+Tu valides le plan ? Je commence par quelle section ?

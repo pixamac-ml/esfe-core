@@ -15,7 +15,7 @@ from django.db.models import Prefetch
 from django.views.decorators.http import require_POST
 
 from academics.models import AcademicEnrollment, EC, ECChapter, ECContent, StudentContentProgress
-from communication.models import CommunicationNotification
+from notifier.models import NotificationMessage
 from portal.permissions import role_required
 
 from .services import (
@@ -318,20 +318,20 @@ def messages_partial(request):
 @require_POST
 def mark_message_read(request, message_id):
     notification = get_object_or_404(
-        CommunicationNotification,
+        NotificationMessage,
         pk=message_id,
         recipient=request.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
     )
     if notification.read_at is None:
         now = timezone.now()
         notification.read_at = now
-        notification.status = CommunicationNotification.STATUS_READ
+        notification.status = NotificationMessage.STATUS_READ
         notification.save(update_fields=["read_at", "status", "updated_at"])
 
-    unread_count = CommunicationNotification.objects.filter(
+    unread_count = NotificationMessage.objects.filter(
         recipient=request.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
         read_at__isnull=True,
     ).count()
     return JsonResponse({"ok": True, "unread_count": unread_count, "message_id": notification.id})
@@ -342,13 +342,13 @@ def mark_message_read(request, message_id):
 @require_POST
 def mark_all_messages_read(request):
     now = timezone.now()
-    CommunicationNotification.objects.filter(
+    NotificationMessage.objects.filter(
         recipient=request.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
         read_at__isnull=True,
     ).update(
         read_at=now,
-        status=CommunicationNotification.STATUS_READ,
+        status=NotificationMessage.STATUS_READ,
         updated_at=now,
     )
     return JsonResponse({"ok": True, "unread_count": 0})
@@ -359,19 +359,19 @@ def mark_all_messages_read(request):
 @require_POST
 def mark_message_unread(request, message_id):
     notification = get_object_or_404(
-        CommunicationNotification,
+        NotificationMessage,
         pk=message_id,
         recipient=request.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
     )
     if notification.read_at is not None:
         notification.read_at = None
-        notification.status = CommunicationNotification.STATUS_DELIVERED
+        notification.status = NotificationMessage.STATUS_DELIVERED
         notification.save(update_fields=["read_at", "status", "updated_at"])
 
-    unread_count = CommunicationNotification.objects.filter(
+    unread_count = NotificationMessage.objects.filter(
         recipient=request.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
         read_at__isnull=True,
     ).count()
     return JsonResponse({"ok": True, "unread_count": unread_count, "message_id": notification.id})

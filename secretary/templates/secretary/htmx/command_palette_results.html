@@ -1,0 +1,54 @@
+{% load component_tags %}
+{% if students %}
+  <div class="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[color:var(--muted-2)]">Etudiants</div>
+  {% for student in students %}
+    <button
+      type="button"
+      class="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-[color:var(--accent-bg)]"
+      hx-get="{% url 'secretary:student_snapshot' student.id %}"
+      hx-target="#sg-drawer-content"
+      hx-swap="innerHTML"
+      onclick="sgCloseCommandPalette()"
+    >
+      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[color:var(--accent-bg)] text-[color:var(--muted-2)]">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-graduate"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+      </span>
+      <span class="min-w-0">
+        <span class="block text-xs font-bold text-[color:var(--text)]">{{ student.full_name }}</span>
+        <span class="block text-[11px] font-medium text-[color:var(--muted-2)]">{{ student.matricule }} - {{ student.programme_title }}</span>
+      </span>
+    </button>
+  {% endfor %}
+{% endif %}
+
+{% if actions %}
+  <div class="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[color:var(--muted-2)]">Actions</div>
+  {% for action in actions %}
+    {% if action.drawer %}
+      <button
+        type="button"
+        class="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-[color:var(--accent-bg)]"
+        hx-get="{{ action.url }}"
+        hx-target="#sg-drawer-content"
+        hx-swap="innerHTML"
+        onclick="sgCloseCommandPalette()"
+      >
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[color:var(--accent-bg)] text-[color:var(--muted-2)]">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="{{ action.icon|cut:'fa-solid fa-' }}"></svg>
+        </span>
+        <span class="text-xs font-bold text-[color:var(--text)]">{{ action.label }}</span>
+      </button>
+    {% else %}
+      <a class="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-[color:var(--accent-bg)]" href="{{ action.url }}" onclick="sgCloseCommandPalette()">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[color:var(--accent-bg)] text-[color:var(--muted-2)]">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="{{ action.icon|cut:'fa-solid fa-' }}"></svg>
+        </span>
+        <span class="text-xs font-bold text-[color:var(--text)]">{{ action.label }}</span>
+      </a>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{% if query and not students and not actions %}
+  {% component "empty_state" title="Aucun résultat" message="Aucun resultat pour «{{ query }}»." icon="search" compact=True %}{% endcomponent %}
+{% endif %}

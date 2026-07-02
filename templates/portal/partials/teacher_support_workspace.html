@@ -1,3 +1,4 @@
+{% load component_tags %}
 {% if toast %}
 <div class="sg-toast-inline sg-toast-{{ toast.level }}">{{ toast.message }}</div>
 {% endif %}
@@ -7,10 +8,10 @@
 {% with support_target=teacher_support_target|default:"#sg-drawer-content" %}
 
 <div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#1e3a5f,#1e293b);">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-      <div style="flex:1;">
-        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-folder-open"></i> Supports de cours &mdash; Gestion</div>
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,var(--info, #2563eb),var(--text, #0f172a));">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0 flex-1">
+        <div class="sg-drawer-hero-sub"><i data-lucide="folder-open"></i> Supports de cours &mdash; Gestion</div>
         <div class="sg-drawer-hero-title">
           {% if selected_ec %}{{ selected_ec.title }}
           {% elif selected_class %}{{ selected_class.display_name }}
@@ -20,24 +21,24 @@
           {% if selected_ec %}Classe: {{ selected_class.display_name }} &middot; {{ selected_ec_summary.chapter_count }} chapitre(s), {{ selected_ec_summary.content_count }} support(s){% endif %}
         </div>
       </div>
-      <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
-        <i class="fa-solid fa-xmark"></i> Fermer
+      <button type="button" class="sg-drawer-hero-badge" style="cursor:pointer;" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()">
+        <i data-lucide="x"></i> Fermer
       </button>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">
-      <div class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
-        <i class="fa-solid fa-layer-group"></i> {{ teacher_support_ecs|length }} matiere(s)
-      </div>
-      <div class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
-        <i class="fa-solid fa-table-cells"></i> {{ teacher_support_classes|length }} classe(s)
-      </div>
+    <div class="flex flex-wrap gap-2 mt-4">
+      <span class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
+        <i data-lucide="layers"></i> {{ teacher_support_ecs|length }} matiere(s)
+      </span>
+      <span class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
+        <i data-lucide="layout-grid"></i> {{ teacher_support_classes|length }} classe(s)
+      </span>
       {% if selected_ec_summary %}
-      <div class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
-        <i class="fa-solid fa-file"></i> {{ selected_ec_summary.content_count }} support(s)
-      </div>
+      <span class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);">
+        <i data-lucide="file"></i> {{ selected_ec_summary.content_count }} support(s)
+      </span>
       {% endif %}
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;">
+    <div class="flex flex-wrap gap-1.5 mt-3.5">
       {% for row in teacher_support_classes %}
       <button type="button"
               hx-get="{{ teacher_support_workspace_url }}?class_id={{ row.class_id }}&support_target={{ support_target|urlencode }}"
@@ -53,44 +54,41 @@
     {% if selected_class %}
     <div class="sg-drawer-grid">
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-book-open"></i> Matieres</div>
+        <div class="sg-drawer-section-title"><i data-lucide="book-open"></i> Matieres</div>
         {% if teacher_support_ecs %}
-        <div style="display:grid;gap:6px;">
+        <div class="space-y-1.5">
           {% for ec in teacher_support_ecs %}
           <button type="button"
                   hx-get="{{ teacher_support_workspace_url }}?class_id={{ selected_class.id }}&ec_id={{ ec.id }}&support_target={{ support_target|urlencode }}"
                   hx-target="{{ support_target }}" hx-swap="innerHTML"
-                  class="sg-action-card{% if selected_ec and selected_ec.id == ec.id %}" style="border-color:#2563eb;background:#eff6ff;{% endif %}">
-            <div>
-              <div class="sg-action-label" style="font-size:.82rem;">{{ ec.title }}</div>
+                  class="sg-action-card"{% if selected_ec and selected_ec.id == ec.id %} style="border-color:var(--school-primary);background:var(--school-primary-soft);"{% endif %}>
+            <div class="min-w-0">
+              <div class="sg-action-label">{{ ec.title }}</div>
               <div class="sg-action-sub">{{ ec.ue_code|default:"-" }} &middot; {{ ec.chapter_count }} chapitre(s)</div>
             </div>
-            <span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">{{ ec.content_count }}</span>
+            <span class="sg-action-count sg-badge-blue">{{ ec.content_count }}</span>
           </button>
           {% endfor %}
         </div>
         {% else %}
-        <div class="sg-drawer-empty" style="padding:32px 0;">
-          <div class="sg-drawer-empty-icon"><i class="fa-solid fa-book"></i></div>
-          <div class="sg-drawer-empty-text">Aucune matiere rattachee a cette classe.</div>
-        </div>
+        {% component "empty_state" title="Aucune matiere" message="Aucune matiere rattachee a cette classe." icon="book" compact=True %}{% endcomponent %}
         {% endif %}
       </div>
 
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-upload"></i> Depot de support</div>
+        <div class="sg-drawer-section-title"><i data-lucide="upload"></i> Depot de support</div>
         {% if selected_ec %}
-        <div class="sg-action-card" style="border-color:#bfdbfe;background:#eff6ff;margin-bottom:12px;cursor:default;">
-          <div>
-            <div class="sg-action-label" style="font-size:.82rem;">{{ selected_ec.title }}</div>
+        <div class="sg-action-card" style="border-color:var(--school-primary-soft);background:var(--school-primary-soft);margin-bottom:12px;cursor:default;">
+          <div class="min-w-0">
+            <div class="sg-action-label">{{ selected_ec.title }}</div>
             <div class="sg-action-sub">Deposer un fichier, une video ou du texte</div>
           </div>
           <button type="button" class="sg-btn sg-btn-primary" onclick="sgToggleUploadForm()" id="sg-upload-btn">
-            <i class="fa-solid fa-plus"></i> Nouveau
+            <i data-lucide="plus"></i> Nouveau
           </button>
         </div>
 
-        <div id="sg-upload-form" style="{% if not editing_content %}display:none;{% endif %}">
+        <div id="sg-upload-form" class="{% if not editing_content %}hidden{% endif %}">
           <form method="post" enctype="multipart/form-data"
                 hx-post="{{ teacher_support_workspace_url }}"
                 hx-target="{{ support_target }}" hx-swap="innerHTML"
@@ -111,7 +109,7 @@
             <div class="sg-form-grid">
               <div class="field">
                 <label>Chapitre</label>
-                <select name="chapter_id" class="sg-form-select" style="height:40px;">
+                <select name="chapter_id" class="sg-form-select">
                   {% for chapter in teacher_support_chapters %}
                   <option value="{{ chapter.id }}" {% if editing_content and editing_content.chapter_id == chapter.id %}selected{% elif selected_chapter and selected_chapter.id == chapter.id %}selected{% endif %}>{{ chapter.title }}</option>
                   {% endfor %}
@@ -119,99 +117,102 @@
                 </select>
               </div>
               <div class="field">
-                <label>Nouveau chapitre <span style="font-weight:600;color:#94a3b8;">(optionnel)</span></label>
-                <input type="text" name="new_chapter_title" class="sg-form-input" style="height:40px;" placeholder="Ex: Chapitre 2">
+                <label>Nouveau chapitre <span class="font-semibold text-[color:var(--muted-2)]">(optionnel)</span></label>
+                <input type="text" name="new_chapter_title" class="sg-form-input" placeholder="Ex: Chapitre 2">
               </div>
             </div>
 
-            <div class="field" style="margin-top:12px;">
-              <label>Titre du support <span style="color:#ef4444;">*</span></label>
-              <input type="text" name="content_title" required class="sg-form-input" style="height:40px;" placeholder="Ex: Cours 3 - Les derivees" value="{{ editing_content.title|default:"" }}">
+            <div class="field mt-3">
+              <label>Titre du support <span class="text-[color:var(--danger)]">*</span></label>
+              <input type="text" name="content_title" required class="sg-form-input" placeholder="Ex: Cours 3 - Les derivees" value="{{ editing_content.title|default:"" }}">
             </div>
 
-            <div class="sg-form-grid" style="margin-top:12px;">
+            <div class="sg-form-grid mt-3">
               <div class="field">
-                <label>Type <span style="color:#ef4444;">*</span></label>
-                <select name="content_type" class="sg-form-select" style="height:40px;" onchange="sgToggleContentType(this.value, true)">
+                <label>Type <span class="text-[color:var(--danger)]">*</span></label>
+                <select name="content_type" class="sg-form-select" onchange="sgToggleContentType(this.value, true)">
                   {% for value, label in content_type_choices %}
                   <option value="{{ value }}"{% if editing_content and editing_content.content_type == value %} selected{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </select>
               </div>
-              <div class="field" id="sg-file-field"{% if editing_content and editing_content.content_type != 'pdf' and editing_content.content_type != 'doc' and editing_content.content_type != 'excel' and editing_content.content_type != 'ppt' and editing_content.content_type != 'image' and editing_content.content_type != 'audio' %} style="display:none;"{% endif %}>
-                <label>Fichier{% if not editing_content %} <span style="color:#ef4444;">*</span>{% endif %}</label>
-                <input type="file" name="file" class="sg-form-input" style="padding-top:7px;">
-                {% if editing_content and editing_content.file_url %}
-                <div style="font-size:.7rem;color:#64748b;margin-top:4px;">Fichier actuel: {{ editing_content.file_name }}. Laissez vide pour garder le fichier existant.</div>
-                {% endif %}
+              <div id="sg-file-field">
+                <div class="field">
+                  <label>Fichier</label>
+                  <input type="file" name="file" class="sg-form-input">
+                  {% if editing_content and editing_content.file_url %}
+                  <div class="text-xs text-[color:var(--muted)] mt-1">Fichier actuel: {{ editing_content.file_name }}. Laissez vide pour garder le fichier existant.</div>
+                  {% endif %}
+                  <div class="text-xs text-[color:var(--muted-2)] mt-1">Requis sauf si une URL YouTube est fournie.</div>
+                </div>
               </div>
-              <div class="field" id="sg-video-field"{% if not editing_content or editing_content.content_type != 'video' %} style="display:none;"{% endif %}>
-                <label>URL <span style="color:#ef4444;">*</span></label>
-                <input type="url" name="video_url" class="sg-form-input" style="height:40px;" placeholder="https://youtube.com/..." value="{{ editing_content.video_url|default:"" }}">
+              <div id="sg-video-field" class="{% if not editing_content or editing_content.content_type != 'video' %}hidden{% endif %}">
+                <div class="field">
+                  <label>URL YouTube</label>
+                  <input type="url" name="video_url" class="sg-form-input" placeholder="https://youtube.com/... ou https://youtu.be/..." value="{{ editing_content.video_url|default:"" }}">
+                  <div class="text-xs text-[color:var(--muted-2)] mt-1">Optionnel si un fichier video est fourni.</div>
+                </div>
               </div>
             </div>
 
-            <div class="field" id="sg-text-field"{% if not editing_content or editing_content.content_type != 'text' %} style="display:none;margin-top:12px;"{% else %} style="margin-top:12px;"{% endif %}>
-              <label>Texte du cours <span style="color:#ef4444;">*</span></label>
+            <div class="field mt-3{% if not editing_content or editing_content.content_type != 'text' %} hidden{% endif %}" id="sg-text-field">
+              <label>Texte du cours <span class="text-[color:var(--danger)]">*</span></label>
               <textarea name="text_content" rows="5" class="sg-form-input" placeholder="Redigez le contenu...">{{ editing_content.text_content|default:"" }}</textarea>
             </div>
 
-            <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
-              <button type="button" class="sg-btn sg-btn-outline" style="min-height:38px;font-size:.75rem;" onclick="sgToggleUploadForm()">Annuler</button>
-              <button type="submit" class="sg-btn sg-btn-primary" style="min-height:38px;font-size:.75rem;" id="sg-submit-support">
-                <i class="fa-solid fa-{% if editing_content %}pen{% else %}upload{% endif %}"></i> {% if editing_content %}Modifier le support{% else %}Deposer le support{% endif %}
+            <div class="flex gap-2 mt-3.5 justify-end">
+              <button type="button" class="sg-btn sg-btn-outline" onclick="sgToggleUploadForm()">Annuler</button>
+              <button type="submit" class="sg-btn sg-btn-primary" id="sg-submit-support">
+                <i data-lucide="{% if editing_content %}pen{% else %}upload{% endif %}"></i> {% if editing_content %}Modifier le support{% else %}Deposer le support{% endif %}
               </button>
             </div>
           </form>
         </div>
         {% else %}
-        <div class="sg-drawer-empty" style="padding:32px 0;">
-          <div class="sg-drawer-empty-icon"><i class="fa-solid fa-hand-pointer"></i></div>
-          <div class="sg-drawer-empty-text">Selectionnez une matiere pour deposer un support.</div>
-        </div>
+        {% component "empty_state" title="Selectionnez une matiere" message="Selectionnez une matiere pour deposer un support." icon="pointer" compact=True %}{% endcomponent %}
         {% endif %}
       </div>
     </div>
 
     {% if selected_ec %}
     <div class="sg-drawer-section">
-      <div class="sg-drawer-section-title"><i class="fa-solid fa-table-list"></i> Supports deposes &mdash; {{ selected_ec_summary.content_count }} document(s)</div>
-      <div style="overflow-x:auto;">
+      <div class="sg-drawer-section-title"><i data-lucide="list"></i> Supports deposes &mdash; {{ selected_ec_summary.content_count }} document(s)</div>
+      <div class="overflow-x-auto">
         <table class="sg-drawer-table">
           <thead>
             <tr>
               <th>Support</th>
               <th>Chapitre</th>
               <th>Type</th>
-              <th style="text-align:right;">Actions</th>
+              <th class="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for chapter in teacher_support_chapters %}
               {% for content in chapter.contents %}
               <tr>
-                <td style="font-weight:900;">{{ content.title }}</td>
-                <td style="color:#64748b;">{{ chapter.title }}</td>
+                <td class="font-black text-[color:var(--text)]">{{ content.title }}</td>
+                <td class="text-[color:var(--muted)]">{{ chapter.title }}</td>
                 <td><span class="sg-badge-sm sg-badge-gray">{{ content.content_type_label }}</span></td>
-                <td style="text-align:right;white-space:nowrap;">
-                  <div style="display:flex;gap:4px;justify-content:flex-end;">
+                <td class="text-right whitespace-nowrap">
+                  <div class="flex gap-1 justify-end">
                   {% if content.file_url or content.video_url or content.has_text_content %}
-                  <button type="button" class="sg-btn" style="min-height:30px;font-size:.65rem;background:#1e293b;border-color:#1e293b;color:#fff;" hx-get="{% url 'accounts_portal:teacher_content_viewer' content.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-                    <i class="fa-solid fa-eye"></i>
+                  <button type="button" class="sg-btn" hx-get="{% url 'accounts_portal:teacher_content_viewer' content.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+                    <i data-lucide="eye"></i>
                   </button>
                   {% endif %}
-                  <button type="button" class="sg-btn" style="min-height:30px;font-size:.65rem;background:#2563eb;border-color:#2563eb;color:#fff;" hx-post="{{ teacher_support_workspace_url }}" hx-target="{{ support_target }}" hx-swap="innerHTML" hx-include="closest .sg-drawer-page" hx-vals='{"action":"fetch_content","content_id":"{{ content.id }}","support_target":"{{ support_target }}"}' hx-trigger="click">
-                    <i class="fa-solid fa-pen"></i>
+                  <button type="button" class="sg-btn sg-btn-primary" hx-post="{{ teacher_support_workspace_url }}" hx-target="{{ support_target }}" hx-swap="innerHTML" hx-include="closest .sg-drawer-page" hx-vals='{"action":"fetch_content","content_id":"{{ content.id }}","support_target":"{{ support_target }}"}' hx-trigger="click">
+                    <i data-lucide="pen"></i>
                   </button>
-                  <button type="button" class="sg-btn" style="min-height:30px;font-size:.65rem;background:#dc2626;border-color:#dc2626;color:#fff;" onclick="sgConfirmDelete({{ content.id }}, '{{ content.title|escapejs }}')">
-                    <i class="fa-solid fa-trash-can"></i>
+                  <button type="button" class="sg-btn sg-btn-danger" onclick="sgConfirmDelete({{ content.id }}, '{{ content.title|escapejs }}')">
+                    <i data-lucide="trash-2"></i>
                   </button>
                   </div>
                 </td>
               </tr>
               {% endfor %}
             {% empty %}
-            <tr><td colspan="4"><div class="sg-drawer-empty" style="padding:32px 0;"><div class="sg-drawer-empty-text">Aucun support pour cette matiere.</div></div></td></tr>
+            <tr><td colspan="4">{% component "empty_state" title="Aucun support" message="Aucun support pour cette matiere." icon="file" compact=True %}{% endcomponent %}</td></tr>
             {% for content in chapter.contents %}<!-- end row -->{% endfor %}
             {% endfor %}
           </tbody>
@@ -221,10 +222,7 @@
     {% endif %}
     {% else %}
     <div class="sg-drawer-section">
-      <div class="sg-drawer-empty" style="padding:48px 0;">
-        <div class="sg-drawer-empty-icon"><i class="fa-solid fa-school"></i></div>
-        <div class="sg-drawer-empty-text">Selectionnez une classe pour commencer.</div>
-      </div>
+      {% component "empty_state" title="Selectionnez une classe" message="Selectionnez une classe pour commencer." icon="school" compact=True %}{% endcomponent %}
     </div>
     {% endif %}
   </div>
@@ -235,9 +233,9 @@ function sgToggleUploadForm() {
   var form = document.getElementById('sg-upload-form');
   var btn = document.getElementById('sg-upload-btn');
   if (!form) return;
-  var isOpen = form.style.display !== 'none';
-  form.style.display = isOpen ? 'none' : 'block';
-  if (btn) btn.style.display = isOpen ? 'inline-flex' : 'none';
+  var isOpen = !form.classList.contains('hidden');
+  form.classList.toggle('hidden');
+  if (btn) btn.classList.toggle('hidden');
   if (isOpen) {
     var editInput = form.querySelector('input[name="action"]');
     if (editInput) editInput.value = 'create_content';
@@ -248,19 +246,20 @@ function sgToggleUploadForm() {
     sgToggleContentType('pdf');
     form.querySelector('input[name="video_url"]').value = '';
     form.querySelector('textarea[name="text_content"]').value = '';
-    form.querySelector('button[type="submit"]').innerHTML = '<i class="fa-solid fa-upload"></i> Deposer le support';
+    form.querySelector('button[type="submit"]').innerHTML = '<i data-lucide="upload"></i> Deposer le support';
+    lucide.createIcons();
   }
 }
 function sgToggleContentType(val) {
-  var isFile = ['pdf', 'doc', 'excel', 'ppt', 'image', 'audio'].includes(val);
+  var isFile = ['pdf', 'doc', 'excel', 'ppt', 'image', 'audio', 'video'].includes(val);
   var isVideo = val === 'video';
   var isText = val === 'text';
   var fileField = document.getElementById('sg-file-field');
   var videoField = document.getElementById('sg-video-field');
   var textField = document.getElementById('sg-text-field');
-  if (fileField) fileField.style.display = isFile ? '' : 'none';
-  if (videoField) videoField.style.display = isVideo ? '' : 'none';
-  if (textField) textField.style.display = isText ? '' : 'none';
+  if (fileField) fileField.classList.toggle('hidden', !isFile);
+  if (videoField) videoField.classList.toggle('hidden', !isVideo);
+  if (textField) textField.classList.toggle('hidden', !isText);
 }
 function sgConfirmDelete(contentId, contentTitle) {
   if (!confirm('Supprimer le support "' + contentTitle + '" ? Cette action est irreversible.')) return;

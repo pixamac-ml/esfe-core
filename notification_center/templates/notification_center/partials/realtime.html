@@ -1,0 +1,50 @@
+{% if request.user.is_authenticated %}
+<script>
+(function () {
+  const state = window.esfeNotifications = window.esfeNotifications || {socket: null, reconnectTimer: null};
+
+  state.updateUnreadCount = state.updateUnreadCount || function (count) {
+    const value = Math.max(Number(count) || 0, 0);
+    document.querySelectorAll('.js-notification-unread-count').forEach(function (badge) {
+      badge.textContent = value ? (value > 99 ? '99+' : String(value)) : '';
+      badge.classList.toggle('is-empty', value === 0);
+      badge.classList.toggle('hidden', value === 0);
+      badge.classList.toggle('flex', value > 0);
+    });
+    document.querySelectorAll('.js-notification-unread-text').forEach(function (node) { node.textContent = String(value); });
+  };
+
+  state.connect = state.connect || function () {
+    if (state.socket && (state.socket.readyState === WebSocket.OPEN || state.socket.readyState === WebSocket.CONNECTING)) return;
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    state.socket = new WebSocket(protocol + '://' + window.location.host + '/ws/notifications/');
+    state.socket.onmessage = function (event) {
+      const data = JSON.parse(event.data || '{}');
+      if (typeof data.unread_count === 'number') state.updateUnreadCount(data.unread_count);
+      document.querySelectorAll('.notification-widget-btn').forEach(function (button) {
+        button.classList.add('has-new');
+        window.setTimeout(function () { button.classList.remove('has-new'); }, 1600);
+      });
+      if (window.esfeToast) window.esfeToast({message: data.body || data.title || 'Nouvelle notification', type: 'info'});
+      document.body.dispatchEvent(new CustomEvent('notifier.notification', {detail: data}));
+    };
+    state.socket.onclose = function () {
+      state.socket = null;
+      window.clearTimeout(state.reconnectTimer);
+      state.reconnectTimer = window.setTimeout(state.connect, 5000);
+    };
+    state.socket.onerror = function () { state.socket.close(); };
+  };
+
+  state.connect();
+  if (!state.readListenerBound) {
+    document.body.addEventListener('notification.read', function () {
+      const badge = document.querySelector('.js-notification-unread-count');
+      const current = Number.parseInt((badge && badge.textContent) || '0', 10) || 0;
+      state.updateUnreadCount(current - 1);
+    });
+    state.readListenerBound = true;
+  }
+})();
+</script>
+{% endif %}

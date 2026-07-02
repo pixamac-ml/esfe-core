@@ -28,19 +28,19 @@ main {
   <script defer src="{% static 'vendor/alpinejs/alpine-intersect.min.js' %}"></script>
   <script defer src="{% static 'vendor/alpinejs/alpine.min.js' %}"></script>
   <script defer src="{% static 'vendor/htmx/htmx.min.js' %}"></script>
+  <script defer src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
 
   <!-- ESFE OPTIMISTIC ENGINE — instant feedback for ALL HTMX actions -->
   <style>
-    .esfe-overlay{position:absolute;inset:0;z-index:50;background:rgba(255,255,255,0.7);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;border-radius:inherit;opacity:0;transition:opacity .12s ease;pointer-events:none}
+    .esfe-overlay{position:absolute;inset:0;z-index:50;background:color-mix(in srgb, var(--card) 80%, transparent);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;border-radius:inherit;opacity:0;transition:opacity .12s ease;pointer-events:none}
     .esfe-overlay.is-active{opacity:1;pointer-events:auto}
-    .esfe-spinner{width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:#0891b2;border-radius:50%;animation:esfe-spin .6s linear infinite}
+    .esfe-spinner{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--school-primary);border-radius:50%;animation:esfe-spin .6s linear infinite}
     @keyframes esfe-spin{to{transform:rotate(360deg)}}
   </style>
   <script>
   (function(){
     'use strict';
     var reqs={};
-    function q(s){return document.querySelector(s)}
     function qa(s,p){return(p||document).querySelectorAll(s)}
     function overlay(el,a){
       if(!el)return;
@@ -62,7 +62,6 @@ main {
       if(!el)return;
       qa('button,input[type=submit],input[type=reset],.sg-btn,.dg-btn,.btn',el).forEach(function(b){b.disabled=false;b.classList.remove('opacity-60','cursor-not-allowed')});
     }
-    function toast(msg,t,d){t=t||'info';d=d||3000;window.dispatchEvent(new CustomEvent('esfe:toast',{detail:{message:msg,type:t,duration:d}}))}
     function path(evt){return(evt.detail.pathInfo&&evt.detail.pathInfo.requestPath)||evt.detail.path||''}
     function refresh(p){
       document.body.dispatchEvent(new CustomEvent('esfe:data-changed',{bubbles:true}));
@@ -86,8 +85,6 @@ main {
       var id=el.id||Math.random().toString(36).slice(2);reqs[id]=true;
       var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
       overlay(c,true);disable(c);
-      var v=(evt.detail.requestConfig&&evt.detail.requestConfig.verb)||'';
-      if(['post','put','delete','patch'].indexOf(v)!==-1)toast('Action en cours...','info',2000);
     });
 
     document.addEventListener('htmx:afterRequest',function(evt){
@@ -95,8 +92,6 @@ main {
       if(!evt.detail.successful)return;
       var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
       overlay(c,false);enable(c);
-      var v=(evt.detail.requestConfig&&evt.detail.requestConfig.verb)||'';
-      if(['post','put','delete','patch'].indexOf(v)!==-1)toast('Effectué ✓','success',2000);
       refresh(path(evt));
     });
 
@@ -104,14 +99,14 @@ main {
       var el=evt.detail.elt;if(!el)return;delete reqs[el.id||''];
       var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
       overlay(c,false);enable(c);
-      toast('Erreur '+(evt.detail.xhr?evt.detail.xhr.status:'réseau'),'error',5000);
+      window.esfeToast('Erreur '+(evt.detail.xhr?evt.detail.xhr.status:'réseau'),'error',5000);
     });
 
     document.addEventListener('htmx:sendError',function(evt){
       var el=evt.detail.elt;if(!el)return;
       var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
       overlay(c,false);enable(c);
-      toast('Erreur réseau - vérifiez votre connexion','error',5000);
+      window.esfeToast('Erreur réseau - vérifiez votre connexion','error',5000);
     });
   })();
   </script>
@@ -185,55 +180,6 @@ main {
 
   {% block extra_scripts %}{% endblock %}
 
-  <!-- WebSocket Notifications -->
-  <script>
-    (function() {
-      try {
-        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        const socket = new WebSocket(
-          protocol + "://" + window.location.host + "/ws/communication/notifications/"
-        );
-
-        socket.onmessage = function(e) {
-          const data = JSON.parse(e.data);
-          if (typeof data.unread_count === "number") {
-            const badge = document.getElementById("unread-notification-count");
-            if (badge) {
-              if (data.unread_count > 0) {
-                badge.classList.remove("hidden");
-                badge.classList.add("flex");
-                badge.textContent = data.unread_count > 9 ? "9+" : String(data.unread_count);
-              } else {
-                badge.classList.remove("flex");
-                badge.classList.add("hidden");
-                badge.textContent = "";
-              }
-            }
-          }
-
-          if (typeof data.unread_count !== "number") {
-            const badge = document.getElementById("unread-notification-count");
-            if (badge) {
-              const current = Number.parseInt(badge.textContent || "0", 10) || 0;
-              const next = current + 1;
-              badge.classList.remove("hidden");
-              badge.classList.add("flex");
-              badge.textContent = next > 9 ? "9+" : String(next);
-            }
-          }
-
-          document.body.dispatchEvent(
-            new CustomEvent("communication:notification", { detail: data })
-          );
-        };
-
-        socket.onerror = function(e) {
-          console.warn("WebSocket connection failed (notifications)");
-        };
-      } catch (err) {
-        console.warn("WebSocket not available");
-      }
-    })();
-  </script>
+  {% include "notification_center/partials/realtime.html" %}
 </body>
 </html>

@@ -1,0 +1,28 @@
+{% load component_tags %}
+<div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+  {% if title %}
+    <div class="mb-3 flex items-center justify-between">
+      <strong class="text-sm font-black text-[color:var(--text)]">{{ title }}</strong>
+      {% slot "action" %}{% endslot %}
+    </div>
+  {% endif %}
+  <div style="position:relative;height:{{ height }}px;">
+    <canvas
+      id="{{ chart_id }}"
+      data-chart-config="{{ chart_config_json }}"
+      x-data="{
+        chart: null,
+        init() {
+          const ctx = this.$el.getContext('2d');
+          const config = JSON.parse(this.$el.dataset.chartConfig || '{}');
+          this.chart = new Chart(ctx, config);
+        },
+        destroy() {
+          if (this.chart) { this.chart.destroy(); this.chart = null; }
+        }
+      }"
+      x-init="init()"
+      x-on:htmx:before-swap.window="destroy()"
+    ></canvas>
+  </div>
+</div>

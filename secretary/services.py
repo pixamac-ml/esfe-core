@@ -6,8 +6,8 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from accounts.dashboards.helpers import get_user_branch
-from communication.models import CommunicationNotification
-from communication.services.notification_service import NotificationService
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 from academics.services.schedule_service import get_student_week_schedule
 from students.models import StudentAttendance
 from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
@@ -43,14 +43,14 @@ def _clean_instance(instance):
 
 
 def _notify_recipient(*, recipient, actor, event_type, title, body, metadata, legacy_source, legacy_object_id):
-    NotificationService.notify_user(
+    NotificationBus.notify(
         recipient=recipient,
         actor=actor,
         event_type=event_type,
         title=title,
         body=body,
         source_app="secretary",
-        channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+        channels=(NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET),
         metadata=metadata,
         legacy_source=legacy_source,
         legacy_object_id=legacy_object_id,

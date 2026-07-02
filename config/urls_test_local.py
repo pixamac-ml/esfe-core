@@ -22,7 +22,7 @@ urlpatterns = [
     path("memoires/", include(("memoires.urls", "memoires"), namespace="memoires")),
     path("actualites/", include("news.urls", namespace="news")),
     path("superadmin/", include("superadmin.urls")),
-    path("communication/", include(("communication.urls", "communication"), namespace="communication")),
+    path("notifications/", include(("notification_center.urls", "notification_center"), namespace="notification_center")),
     path("sitemap.xml", sitemap, {"sitemaps": build_sitemaps()}, name="sitemap_xml"),
     path("community/", include("community.urls")),
     path("ckeditor5/", include("django_ckeditor_5.urls")),

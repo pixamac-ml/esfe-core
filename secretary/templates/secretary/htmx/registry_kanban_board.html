@@ -1,0 +1,48 @@
+{% load component_tags secretary_badges %}
+<div id="sg-kanban-board" class="grid auto-cols-fr grid-flow-col gap-4 overflow-x-auto pb-2">
+  {% for column in columns %}
+    <div class="flex min-w-[260px] flex-col rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)]">
+      <div class="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
+        <span class="text-xs font-extrabold text-[color:var(--text)]">{{ column.label }}</span>
+        <span class="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[color:var(--accent-bg)] px-1.5 text-[10px] font-bold text-[color:var(--muted-2)]">{{ column.count }}</span>
+      </div>
+      <div class="flex flex-col gap-2 p-3">
+        {% for entry in column.entries %}
+          <div class="rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] p-3 shadow-sm transition-shadow hover:shadow-md {% if entry.priority|is_urgent_priority %}border-l-4 border-l-red-500{% endif %}">
+            <div class="mb-1.5 flex items-center justify-between gap-2">
+              <span class="cursor-pointer text-xs font-extrabold text-[color:var(--text)] hover:text-[color:var(--primary)]"
+                    hx-get="{% url 'secretary:registry_detail' entry.pk %}"
+                    hx-target="#sg-drawer-content"
+                    hx-swap="innerHTML">{{ entry.registry_number|default:entry.pk }}</span>
+              <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ entry.priority|priority_pill_class }}">{% if entry.priority|is_urgent_priority %}<span class="h-1.5 w-1.5 rounded-full bg-current"></span>{% endif %}{{ entry.get_priority_display }}</span>
+            </div>
+            <div class="text-[10px] font-semibold text-[color:var(--muted-2)] leading-relaxed">
+              {{ entry.get_entry_type_display }}<br>
+              {% if entry.visitor_name %}{{ entry.visitor_name }} - {% endif %}{{ entry.target_service|default:"Accueil" }}
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1.5 border-t border-[color:var(--border)] pt-2">
+              <button type="button" class="inline-flex items-center gap-1 rounded-md bg-[color:var(--accent-bg)] px-2 py-1 text-[10px] font-bold text-[color:var(--text)] transition-colors hover:bg-[color:var(--border)]"
+                      hx-get="{% url 'secretary:registry_detail' entry.pk %}"
+                      hx-target="#sg-drawer-content"
+                      hx-swap="innerHTML">
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                Detail
+              </button>
+              {% for move_status, move_label in entry.kanban_moves %}
+                <button type="button" class="inline-flex items-center gap-1 rounded-md bg-[color:var(--accent-bg)] px-2 py-1 text-[10px] font-bold text-[color:var(--primary)] transition-colors hover:bg-[color:var(--border)]"
+                        hx-post="{% url 'secretary:registry_kanban_move' entry.pk move_status %}{{ querystring }}"
+                        hx-target="#sg-kanban-board"
+                        hx-swap="outerHTML">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                  {{ move_label }}
+                </button>
+              {% endfor %}
+            </div>
+          </div>
+        {% empty %}
+          {% component "empty_state" title="Aucune entrée" icon="book-open" compact=True %}{% endcomponent %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>

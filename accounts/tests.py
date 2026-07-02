@@ -40,7 +40,7 @@ from accounts.services.sensitive_actions import (
 	request_sensitive_action,
 )
 from unittest.mock import patch
-from communication.models import CommunicationNotification
+from notifier.models import NotificationMessage
 from portal.permissions import get_user_role as get_portal_user_role
 from portal.permissions import get_post_login_portal_url
 from portal.models import AccountSupportState, ArchiveBatch, DirectorTeacherAssignment, SupportAuditLog, TeacherDashboardPreference
@@ -420,7 +420,7 @@ class ManagerDashboardRegressionTests(TestCase):
 		entry = PayrollEntry.objects.get(branch=self.branch, employee=employee, period_month="2026-05-01")
 		self.assertEqual(entry.status, PayrollEntry.STATUS_READY)
 		self.assertTrue(
-			CommunicationNotification.objects.filter(
+			NotificationMessage.objects.filter(
 				recipient=employee,
 				event_type="salary_available",
 				legacy_source="payroll_entry",
@@ -732,10 +732,102 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_teacher"))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Dashboard enseignant")
-		self.assertContains(response, "ENS-001")
-		self.assertContains(response, "Mes classes et effectifs")
-		self.assertContains(response, "Chargement des parametres")
+		self.assertContains(response, "Espace Enseignant")
+		self.assertContains(response, self.branch.name)
+		self.assertContains(response, 'id="teacher-workspace"')
+		self.assertContains(response, 'id="teacher-panel-overview"')
+
+	def test_teacher_overview_htmx_renders_only_the_active_workspace_section(self):
+		teacher = self._create_user("portal_teacher_overview_htmx", role="teacher", position="teacher")
+		self.client.force_login(teacher)
+
+		response = self.client.get(
+			reverse("accounts_portal:portal_teacher"),
+			{"section": "overview"},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="teacher-workspace"')
+		self.assertContains(response, 'id="teacher-panel-overview"')
+		self.assertNotContains(response, 'id="teacher-panel-salary"')
+		self.assertNotContains(response, "<!DOCTYPE html>")
+		self.assertTemplateUsed(response, "portal/teacher/v2/workspace.html")
+
+	def test_teacher_each_section_has_a_targeted_htmx_workspace(self):
+		teacher = self._create_user("portal_teacher_all_sections", role="teacher", position="teacher")
+		self.client.force_login(teacher)
+		sections = ("overview", "classes", "supports", "schedule", "logs", "salary", "notifications", "settings")
+
+		for section in sections:
+			with self.subTest(section=section):
+				response = self.client.get(
+					reverse("accounts_portal:portal_teacher"),
+					{"section": section},
+					HTTP_HX_REQUEST="true",
+				)
+
+				self.assertEqual(response.status_code, 200)
+				self.assertContains(response, 'id="teacher-workspace"', count=1)
+				self.assertContains(response, f'id="teacher-panel-{section}"', count=1)
+				self.assertNotContains(response, "<!DOCTYPE html>")
+				self.assertTemplateUsed(response, "portal/teacher/v2/workspace.html")
+				for other_section in sections:
+					if other_section != section:
+						self.assertNotContains(response, f'id="teacher-panel-{other_section}"')
+
+	def test_teacher_dashboard_without_branch_fails_closed(self):
+		teacher = self._create_user("portal_teacher_without_branch", role="teacher", position="teacher")
+		teacher.profile.branch = None
+		teacher.profile.save(update_fields=["branch", "updated_at"])
+		academic_year, academic_class, ec = self._create_academic_class_bundle("NB1")
+		self._create_course_event(academic_class, academic_year, ec, teacher, hour=9)
+		self.client.force_login(teacher)
+
+		response = self.client.get(reverse("accounts_portal:portal_teacher"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, "Aucune annexe rattachée")
+		self.assertNotContains(response, academic_class.display_name)
+		self.assertNotContains(response, ec.title)
+
+	def test_teacher_cannot_see_or_open_another_branch_class(self):
+		teacher = self._create_user("portal_teacher_branch_isolation", role="teacher", position="teacher")
+		other_branch = Branch.objects.create(
+			name="Annexe Portal B",
+			code="APB",
+			slug="annexe-portal-b",
+		)
+		academic_year = AcademicYear.objects.create(
+			name="25-26-ISO",
+			start_date="2025-10-01",
+			end_date="2026-07-31",
+			is_active=True,
+		)
+		other_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=other_branch,
+			academic_year=academic_year,
+			level="ISO",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		semester = Semester.objects.create(academic_class=other_class, number=1)
+		ue = UE.objects.create(semester=semester, code="UE-ISO", title="UE Isolation")
+		other_ec = EC.objects.create(ue=ue, title="EC Annexe Interdite", credit_required=3, coefficient=2)
+		self._create_course_event(other_class, academic_year, other_ec, teacher, hour=10)
+		self.client.force_login(teacher)
+
+		dashboard_response = self.client.get(reverse("accounts_portal:portal_teacher"))
+		detail_response = self.client.get(
+			reverse("accounts_portal:teacher_class_detail", args=[other_class.id])
+		)
+
+		self.assertEqual(dashboard_response.status_code, 200)
+		self.assertNotContains(dashboard_response, other_class.display_name)
+		self.assertNotContains(dashboard_response, other_ec.title)
+		self.assertEqual(detail_response.status_code, 200)
+		self.assertIn("appartient pas a votre annexe", detail_response.content.decode())
 
 	def test_teacher_class_detail_renders_for_assigned_teacher(self):
 		teacher = self._create_user("portal_teacher_class_detail", role="teacher", position="teacher")
@@ -914,10 +1006,13 @@ class PortalPhaseOneTests(TestCase):
 		teacher = self._create_user("portal_teacher_settings", role="teacher", position="teacher")
 		self.client.force_login(teacher)
 
-		dashboard_response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+		dashboard_response = self.client.get(
+			reverse("accounts_portal:portal_teacher"),
+			{"section": "settings"},
+		)
 		self.assertEqual(dashboard_response.status_code, 200)
-		self.assertContains(dashboard_response, "Profil central, preferences, securite")
-		self.assertContains(dashboard_response, "Ouvrir Parametres")
+		self.assertContains(dashboard_response, 'id="teacher-panel-settings"')
+		self.assertContains(dashboard_response, "Profil enseignant")
 
 		response = self.client.get(reverse("accounts_portal:teacher_settings_workspace"))
 		self.assertEqual(response.status_code, 200)
@@ -2585,7 +2680,7 @@ class SensitiveActionServiceTests(TestCase):
 
 		self.assertEqual(otp_request.status, SensitiveActionRequest.STATUS_PENDING)
 		self.assertTrue(
-			CommunicationNotification.objects.filter(
+			NotificationMessage.objects.filter(
 				recipient=self.dg,
 				event_type="sensitive_action_otp",
 				legacy_object_id=str(otp_request.pk),
@@ -2773,7 +2868,7 @@ class SalaryCorrectionOtpWorkflowTests(TestCase):
 		self.assertEqual(otp_request.target_id, self.entry.pk)
 		self.assertEqual(otp_request.requested_state["base_salary"], 90000)
 		self.assertTrue(
-			CommunicationNotification.objects.filter(recipient=self.dg, event_type="sensitive_action_otp").exists()
+			NotificationMessage.objects.filter(recipient=self.dg, event_type="sensitive_action_otp").exists()
 		)
 
 	def test_confirming_correction_with_correct_code_applies_change_and_logs_audit(self):

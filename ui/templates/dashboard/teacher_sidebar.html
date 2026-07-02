@@ -1,0 +1,93 @@
+{% load component_tags %}
+<aside
+  id="teacher-sidebar"
+  x-data="{ collapsed: localStorage.getItem('teacher-sidebar-collapsed') === 'true', mobileOpen: false }"
+  x-on:sidebar-toggle.window="if (window.innerWidth < 860) { mobileOpen = !mobileOpen } else { collapsed = !collapsed; localStorage.setItem('teacher-sidebar-collapsed', collapsed) }"
+  x-on:resize.window="if (window.innerWidth >= 860) mobileOpen = false"
+  :class="[(collapsed ? 'w-[72px]' : 'w-[260px]'), (mobileOpen ? 'is-mobile-open' : '')]"
+  class="flex h-screen shrink-0 flex-col overflow-hidden border-r border-[color:var(--line)] bg-white transition-[width] duration-200"
+>
+  <!-- Logo -->
+  <div :class="collapsed ? 'justify-center px-0' : 'px-4'"
+       class="flex h-[68px] items-center gap-3 border-b border-[color:var(--line)] shrink-0">
+    <button type="button"
+            class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary)] text-white"
+            @click="collapsed = !collapsed; localStorage.setItem('teacher-sidebar-collapsed', collapsed)"
+            title="Basculer la barre laterale">
+      <i data-lucide="panel-left-close" style="width:17px;height:17px;"></i>
+    </button>
+    <div x-show="!collapsed" x-cloak>
+      <div class="text-sm font-black text-[color:var(--text)]">ESFE</div>
+      <div class="text-[11px] font-bold text-[color:var(--muted-2)]">Espace enseignant</div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+    <div x-show="!collapsed" x-cloak class="px-2 pb-2 text-[10px] font-bold uppercase tracking-widest text-[color:var(--muted-2)]">Accueil</div>
+
+    {% for item in nav_items %}
+    <div class="{% if item.divider %}{% endif %}">
+      {% if item.divider %}
+      <div x-show="!collapsed" x-cloak class="px-2 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest text-[color:var(--muted-2)]">{{ item.divider }}</div>
+      {% endif %}
+      <a href="{{ item.url }}"
+         {% if item.hx_get %}
+         hx-get="{{ item.hx_get }}"
+         hx-target="{{ item.hx_target }}"
+         hx-select="{{ item.hx_select|default:item.hx_target }}"
+         hx-swap="{{ item.hx_swap|default:'outerHTML' }}"
+         hx-push-url="true"
+         hx-trigger="click"
+         {% endif %}
+         x-data="{ selected: {{ item.active|yesno:'true,false' }} }"
+         @teacher-nav-change.window="selected = $event.detail === '{{ item.id }}'"
+         :class="[
+           collapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2.5 w-full',
+           selected ? 'bg-[color:var(--school-primary)] text-white shadow-[0_4px_12px_rgba(37,99,235,0.2)]' : 'text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] hover:text-[color:var(--text)]'
+         ]"
+         class="group flex items-center gap-3 rounded-xl text-sm font-bold transition"
+         @click="$dispatch('teacher-nav-change', '{{ item.id }}'); if (window.innerWidth < 860) mobileOpen = false"
+         {% if item.active %}aria-current="page"{% endif %}
+      >
+        <span class="grid shrink-0 place-items-center" style="width:20px;height:20px;">
+          <i data-lucide="{{ item.icon }}" style="width:18px;height:18px;"></i>
+        </span>
+        <span x-show="!collapsed" x-cloak class="truncate">{{ item.label }}</span>
+        {% if item.badge %}
+        <span x-show="!collapsed" x-cloak
+              class="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[color:var(--danger)] px-1.5 text-[10px] font-black text-white">
+          {{ item.badge }}
+        </span>
+        {% endif %}
+      </a>
+    </div>
+    {% endfor %}
+  </nav>
+
+  <!-- Logout -->
+  <div class="border-t border-[color:var(--line)] px-3 py-3">
+    <form method="post" action="{% url 'accounts:logout' %}">
+      {% csrf_token %}
+      <button type="submit"
+              :class="collapsed ? 'justify-center px-0 w-10 h-10 mx-auto' : 'px-3 py-2.5 w-full'"
+              class="flex items-center gap-3 rounded-xl text-sm font-bold text-[color:var(--danger)] transition hover:bg-[color:var(--danger-soft)]">
+        <span class="grid shrink-0 place-items-center" style="width:20px;height:20px;">
+          <i data-lucide="log-out" style="width:18px;height:18px;"></i>
+        </span>
+        <span x-show="!collapsed" x-cloak>Deconnexion</span>
+      </button>
+    </form>
+  </div>
+
+  <template x-teleport="body">
+    <div
+      x-show="mobileOpen"
+      x-transition.opacity.duration.200ms
+      x-cloak
+      class="fixed inset-0 z-40 bg-black/40"
+      @click="mobileOpen = false"
+      aria-hidden="true"
+    ></div>
+  </template>
+</aside>

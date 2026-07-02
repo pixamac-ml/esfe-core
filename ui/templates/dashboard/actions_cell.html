@@ -1,0 +1,20 @@
+{% load component_tags %}
+<div class="flex items-center gap-1">
+  {% for action in actions %}
+    {% if action.divider %}
+      <span class="h-4 w-px bg-[color:var(--line)]"></span>
+    {% elif action.component %}
+      {% component "dynamic" is=action.component %}{% endcomponent %}
+    {% else %}
+      <a
+        href="{{ action.url|default:'#' }}"
+        class="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-[color:var(--card-soft)] hover:text-[color:var(--text)]"
+        {% if action.hx_get %}hx-get="{{ action.hx_get }}" hx-target="{{ action.hx_target }}"{% endif %}
+        {% if action.title %}title="{{ action.title }}"{% endif %}
+        aria-label="{{ action.label|default:action.title }}"
+      >
+        {% if action.icon %}<i data-lucide="{{ action.icon }}" style="width:16px;height:16px;"></i>{% endif %}
+      </a>
+    {% endif %}
+  {% endfor %}
+</div>

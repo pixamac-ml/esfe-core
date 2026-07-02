@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from branches.models import Branch
-from communication.models import CommunicationNotification
+from notifier.models import NotificationMessage
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
 from admissions.models import Candidature
@@ -121,7 +121,7 @@ class ShopWorkflowTests(TestCase):
         )
         self.assertEqual(self.product.current_stock, 2)
         self.assertTrue(
-            CommunicationNotification.objects.filter(
+            NotificationMessage.objects.filter(
                 recipient=self.student_user,
                 event_type="shop_purchase_validated",
             ).exists()

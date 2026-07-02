@@ -1,0 +1,24 @@
+{% load component_tags %}
+<div hx-get="{% url 'secretary:htmx_task_results' %}?q={{ query|urlencode }}&page={{ page_obj.number }}" hx-trigger="load" hx-swap="outerHTML">
+<div class="divide-y divide-[color:var(--border)]">
+  {% for task in tasks %}
+    <div class="flex items-start gap-3 px-4 py-3 hover:bg-[color:var(--accent-bg)] transition-colors">
+      <div class="min-w-0 flex-1">
+        <div class="font-semibold text-[color:var(--text)]">{{ task.title }}</div>
+        <div class="mt-0.5 text-xs font-medium text-[color:var(--muted-2)]">{{ task.get_priority_display }} | {{ task.get_status_display }} | {{ task.assigned_to|default:"Non assignee" }}</div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="px-4 py-6">
+    {% if query %}
+      {% component "empty_state" title="Aucune tâche trouvée" icon="search" compact=True %}{% endcomponent %}
+    {% else %}
+      {% component "empty_state" title="Aucune tâche" message="Les taches en cours apparaitront ici." icon="list-checks" compact=True %}{% endcomponent %}
+    {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% if page_obj and page_obj.has_other_pages %}
+  {% component "pagination" total=page_obj.paginator.count page=page_obj.number per_page=page_obj.paginator.per_page hx_target="closest div" %}{% endcomponent %}
+{% endif %}
+</div>

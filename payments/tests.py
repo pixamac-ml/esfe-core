@@ -8,7 +8,7 @@ from accounts.models import BranchCashMovement
 from accounts.models import Profile
 from admissions.models import Candidature
 from branches.models import Branch
-from communication.models import CommunicationNotification
+from notifier.models import NotificationMessage
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
 from payments.models import CashPaymentSession, FinancialLog, Payment, PaymentAgent
@@ -227,9 +227,9 @@ class StudentPaymentViewTests(TestCase):
         self.assertEqual(movement.receipt_number, payment.receipt_number)
         self.assertEqual(
             set(
-                CommunicationNotification.objects.filter(
+                NotificationMessage.objects.filter(
                     recipient=student.user,
-                    channel=CommunicationNotification.CHANNEL_IN_APP,
+                    channel=NotificationMessage.CHANNEL_IN_APP,
                 ).values_list("event_type", flat=True)
             ),
             {
@@ -237,16 +237,16 @@ class StudentPaymentViewTests(TestCase):
             },
         )
         self.assertEqual(
-            CommunicationNotification.objects.filter(
+            NotificationMessage.objects.filter(
                 event_type="first_payment_validated_staff",
-                channel=CommunicationNotification.CHANNEL_IN_APP,
+                channel=NotificationMessage.CHANNEL_IN_APP,
             ).count(),
             2,
         )
         self.assertFalse(
-            CommunicationNotification.objects.filter(
+            NotificationMessage.objects.filter(
                 recipient=student.user,
-                channel=CommunicationNotification.CHANNEL_WEBSOCKET,
+                channel=NotificationMessage.CHANNEL_WEBSOCKET,
             ).exists()
         )
         send_credentials.assert_called_once()

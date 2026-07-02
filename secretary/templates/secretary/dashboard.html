@@ -1,521 +1,615 @@
 {% extends "secretary/base.html" %}
 {% load humanize %}
+{% load component_tags %}
 {% load secretary_badges %}
-{% block title %}Dashboard Secretariat ESFE{% endblock %}
 
-{% block content %}
-{% include "secretary/partials/dashboard_scope.html" %}
+{% block title %}Secrétariat — ESFE{% endblock %}
 
-<!-- =========== SECTION: OVERVIEW =========== -->
-<div class="sg-section-panel {% if active_section == 'overview' %}is-active{% endif %}" data-sg-panel="overview" {% if active_section != 'overview' %}hidden{% endif %}>
-  {% include "secretary/partials/dashboard_kpis.html" %}
+{% block content_inner %}
 
-  <div class="sg-row-2" style="margin-bottom:16px;">
-    {% include "secretary/partials/dashboard_overview_registry.html" %}
+{# ─── Helper: status → tone ─── #}
+{% with status_success="success" status_warning="warning" status_danger="danger" status_info="info" status_neutral="neutral" %}
 
-    <div class="sg-panel">
-      <div class="sg-panel-title">Actions rapides</div>
-      <div class="sg-action-grid">
-        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-          <div><div class="sg-action-label" style="color:#2563eb;"><i class="fa-solid fa-book-medical"></i> Registre</div><div class="sg-action-sub">Accueil parent, visiteur, paiement</div></div><span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">+</span>
-        </button>
-        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-          <div><div class="sg-action-label" style="color:#7c3aed;"><i class="fa-solid fa-user-plus"></i> Visite</div><div class="sg-action-sub">Arrivee et sortie</div></div><span class="sg-action-count" style="background:#f5f3ff;color:#7c3aed;">+</span>
-        </button>
-        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-          <div><div class="sg-action-label" style="color:#16a34a;"><i class="fa-regular fa-calendar-plus"></i> RDV</div><div class="sg-action-sub">Agenda direction/service</div></div><span class="sg-action-count" style="background:#dcfce7;color:#16a34a;">+</span>
-        </button>
-        <button type="button" class="sg-action-card" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-          <div><div class="sg-action-label" style="color:#d97706;"><i class="fa-solid fa-box"></i> Depot</div><div class="sg-action-sub">Document, colis, livraison</div></div><span class="sg-action-count" style="background:#fef3c7;color:#d97706;">+</span>
-        </button>
-      </div>
-      <div class="sg-divider"></div>
-      <div class="sg-panel-title">Routage intelligent</div>
-      <div class="sg-section-header-sub" style="margin-bottom:12px;">Chaque entree registre est automatiquement orientee vers le service competent.</div>
-      {% for entry_type, rule in registry_routing_summary.items %}
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>{{ rule.label }}</span><span style="display:flex;align-items:center;gap:6px;"><span class="sg-priority-pill {{ rule.priority|priority_pill_class }}">{% if rule.priority|is_urgent_priority %}<span class="sg-priority-dot"></span>{% endif %}{{ rule.priority_label }}</span>{{ rule.target_service }}</span></div></div>
-      {% endfor %}
-    </div>
+{# ═══════════════════════════════════════════════════════ #}
+{#  OVERVIEW                                              #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="overview" {% if active_section != 'overview' %}hidden{% endif %}>
+  {% component "page_header" title="Vue d'ensemble" subtitle="" %}
+    {% fill "actions" %}
+      {% url 'secretary:secretary_dashboard' as dash_url %}
+      {% component "button" label="Registre" href=dash_url|add:"?section=registry" icon_left="book-open" variant="outline" size="sm" %}{% endcomponent %}
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-4">
+    {% component "widget_card" label="Registre" value=pending_registry_count|default:"0" icon="book-open" tone="primary" size="lg" hint="Entrées en attente" %}{% endcomponent %}
+    {% component "widget_card" label="Visiteurs" value=active_visits|default:"0" icon="user-clock" tone="info" size="lg" hint="Passages aujourd'hui" %}{% endcomponent %}
+    {% component "widget_card" label="Rendez-vous" value=appointments_today|default:"0" icon="calendar-days" tone="success" size="lg" hint="Agenda du jour" %}{% endcomponent %}
+    {% component "widget_card" label="Dépôts" value=pending_documents_count|default:"0" icon="archive" tone="warning" size="lg" hint="En attente" %}{% endcomponent %}
   </div>
 
-  <div class="sg-row-3">
-    {% include "secretary/partials/dashboard_overview_appointments.html" %}
-    {% include "secretary/partials/dashboard_overview_visits.html" %}
-    {% include "secretary/partials/dashboard_overview_tasks.html" %}
-  </div>
-</div>
-
-<!-- =========== SECTION: REGISTRY =========== -->
-<div class="sg-section-panel {% if active_section == 'registry' %}is-active{% endif %}" data-sg-panel="registry" {% if active_section != 'registry' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-solid fa-book-open" style="color:#2563eb;margin-right:8px;"></i>Registre administratif intelligent</div>
-      <div class="sg-section-hero-sub">Chaque interaction humaine devient un evenement route, historise et imprimable.</div>
-    </div>
-    <div class="sg-section-actions">
-      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:registry_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
-      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-        <i class="fa-solid fa-plus"></i>Nouvelle entree
-      </button>
-    </div>
-  </div>
-  <div class="sg-row-4" style="margin-bottom:16px;">
-    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ pending_registry_count }}</div><div class="sg-stat-lbl">En attente</div></div>
-    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ pending_tasks }}</div><div class="sg-stat-lbl">Actions liees</div></div>
-    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ visits_today }}</div><div class="sg-stat-lbl">Passages jour</div></div>
-    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ pending_documents_count }}</div><div class="sg-stat-lbl">Pieces</div></div>
-  </div>
-  <div class="sg-row-2" style="margin-bottom:16px;">
-    <div class="sg-panel">
-      <div class="sg-section-header"><div class="sg-panel-title" style="margin:0;">Entrees recentes</div></div>
-      <div class="sg-table-wrap">
-        <table class="sg-table">
-          <thead><tr><th>N</th><th>Type</th><th>Visiteur</th><th>Etudiant</th><th>Service</th><th>Statut</th><th></th></tr></thead>
-          <tbody>
-            {% for item in recent_registry %}
-            <tr>
-              <td class="sg-mono">{{ item.registry_number|default:item.pk }}</td>
-              <td style="font-weight:900;">{{ item.get_entry_type_display }}</td>
-              <td>{{ item.visitor_name|default:"-" }}</td>
-              <td>{% if item.related_student %}{{ item.related_student.full_name }}{% else %}-{% endif %}</td>
-              <td>{{ item.target_service|default:"Accueil" }}</td>
-              <td><span class="sg-badge-sm {{ item.status|status_badge_class }}">{{ item.get_status_display }}</span></td>
-              <td>
-                <button type="button" class="sg-btn sg-btn-outline" style="height:30px;font-size:.68rem;padding:0 .6rem;" hx-get="{% url 'secretary:registry_detail' item.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" title="Voir le detail et l'historique">
-                  <i class="fa-solid fa-clock-rotate-left"></i>
-                </button>
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7">
-              <div class="sg-empty">
-                <div class="sg-empty-icon"><i class="fa-solid fa-book-open"></i></div>
-                <div class="sg-empty-text">Aucune entree recente.</div>
-                <button type="button" class="sg-btn sg-btn-outline sg-empty-action" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-                  <i class="fa-solid fa-plus"></i>Nouvelle entree
-                </button>
-              </div>
-            </td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% if registry_page.has_other_pages %}
-        <div class="sg-pagination">
-          <div class="sg-pagination-info">Page {{ registry_page.number }} / {{ registry_page.paginator.num_pages }} - {{ registry_page.paginator.count }} entree(s)</div>
-          <div class="sg-pagination-actions">
-            {% if registry_page.has_previous %}
-              <a class="sg-page-link" href="?section=registry&registry_page={{ registry_page.previous_page_number }}"><i class="fa-solid fa-chevron-left"></i>Precedent</a>
-            {% else %}
-              <span class="sg-page-link is-disabled"><i class="fa-solid fa-chevron-left"></i>Precedent</span>
-            {% endif %}
-            <span class="sg-page-link is-current">{{ registry_page.number }}</span>
-            {% if registry_page.has_next %}
-              <a class="sg-page-link" href="?section=registry&registry_page={{ registry_page.next_page_number }}">Suivant<i class="fa-solid fa-chevron-right"></i></a>
-            {% else %}
-              <span class="sg-page-link is-disabled">Suivant<i class="fa-solid fa-chevron-right"></i></span>
-            {% endif %}
-          </div>
+  <div class="grid gap-4 lg:grid-cols-2">
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-[color:var(--muted)]">Entrées récentes (registre)</h3>
         </div>
-      {% endif %}
-    </div>
-    <div class="sg-panel">
-      <div class="sg-panel-title">Repartition par type</div>
-      {% for item in registry_type_distribution %}
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>{{ item.label }}</span><span>{{ item.pct }}% ({{ item.count }})</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:{{ item.pct }}%;background:{% cycle '#2563eb' '#16a34a' '#7c3aed' '#f59e0b' '#ef4444' '#14b8a6' '#f97316' '#6366f1' %};"></div></div></div>
-      {% empty %}
-      <div class="sg-empty">
-        <div class="sg-empty-icon"><i class="fa-solid fa-chart-pie"></i></div>
-        <div class="sg-empty-text">Aucune entree enregistree.</div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</div>
+        {% include "secretary/htmx/overview_registry.html" %}
+      {% endfill %}
+    {% endcomponent %}
 
-<!-- =========== SECTION: VISITS =========== -->
-<div class="sg-section-panel {% if active_section == 'visits' %}is-active{% endif %}" data-sg-panel="visits" {% if active_section != 'visits' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-solid fa-user-clock" style="color:#7c3aed;margin-right:8px;"></i>Gestion des visiteurs</div>
-      <div class="sg-section-hero-sub">Enregistrement arrivee et sortie, historique des passages.</div>
-    </div>
-    <div class="sg-section-actions">
-      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:visitor_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
-      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-        <i class="fa-solid fa-plus"></i>Nouveau passage
-      </button>
-    </div>
-  </div>
-  <div class="sg-row-4" style="margin-bottom:16px;">
-    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ active_visits }}</div><div class="sg-stat-lbl">Visites ouvertes</div></div>
-    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ visits_today }}</div><div class="sg-stat-lbl">Aujourd'hui</div></div>
-    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ pending_tasks }}</div><div class="sg-stat-lbl">En attente action</div></div>
-    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ pending_registry_count }}</div><div class="sg-stat-lbl">Registre en attente</div></div>
-  </div>
-  <div class="sg-row-2">
-    {% include "secretary/partials/dashboard_visits_open.html" %}
-    <div class="sg-panel">
-      <div class="sg-panel-title">Passages du jour</div>
-      <div class="message-list">
-        {% for item in today_visits_rows %}
-        <div class="sg-action-card">
-          <div><div class="sg-action-label">{{ item.full_name }}</div><div class="sg-action-sub">{{ item.arrived_at|date:"H:i" }} - {{ item.reason|default:"Accueil" }}</div></div>
-          <span class="sg-badge-sm {{ item.status|status_badge_class }}">{{ item.get_status_display }}</span>
-        </div>
-        {% empty %}
-        <div class="sg-empty">
-          <div class="sg-empty-icon"><i class="fa-solid fa-user-clock"></i></div>
-          <div class="sg-empty-text">Aucun passage aujourd'hui.</div>
-          <button type="button" class="sg-btn sg-btn-outline sg-empty-action" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-            <i class="fa-solid fa-plus"></i>Nouveau passage
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Actions rapides</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5 text-xs font-bold text-[color:var(--school-primary)] transition hover:bg-[color:var(--school-primary-soft)]"
+                  hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+            <i data-lucide="book-plus" style="width:15px;height:15px;"></i>
+            Registre
+          </button>
+          <button type="button" class="flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5 text-xs font-bold text-[color:var(--info)] transition hover:bg-[color:var(--info-soft)]"
+                  hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+            <i data-lucide="user-plus" style="width:15px;height:15px;"></i>
+            Visite
+          </button>
+          <button type="button" class="flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5 text-xs font-bold text-[color:var(--success)] transition hover:bg-[color:var(--success-soft)]"
+                  hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+            <i data-lucide="calendar-plus" style="width:15px;height:15px;"></i>
+            RDV
+          </button>
+          <button type="button" class="flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5 text-xs font-bold text-[color:var(--warning)] transition hover:bg-[color:var(--warning-soft)]"
+                  hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+            <i data-lucide="package" style="width:15px;height:15px;"></i>
+            Dépôt
           </button>
         </div>
-        {% endfor %}
-      </div>
-      {% if today_visits_page.has_other_pages %}
-        <div class="sg-pagination">
-          <div class="sg-pagination-info">Page {{ today_visits_page.number }} / {{ today_visits_page.paginator.num_pages }} - {{ today_visits_page.paginator.count }} passage(s)</div>
-          <div class="sg-pagination-actions">
-            {% if today_visits_page.has_previous %}
-              <a class="sg-page-link" href="?section=visits&today_visits_page={{ today_visits_page.previous_page_number }}"><i class="fa-solid fa-chevron-left"></i>Precedent</a>
-            {% else %}
-              <span class="sg-page-link is-disabled"><i class="fa-solid fa-chevron-left"></i>Precedent</span>
-            {% endif %}
-            <span class="sg-page-link is-current">{{ today_visits_page.number }}</span>
-            {% if today_visits_page.has_next %}
-              <a class="sg-page-link" href="?section=visits&today_visits_page={{ today_visits_page.next_page_number }}">Suivant<i class="fa-solid fa-chevron-right"></i></a>
-            {% else %}
-              <span class="sg-page-link is-disabled">Suivant<i class="fa-solid fa-chevron-right"></i></span>
-            {% endif %}
-          </div>
-        </div>
-      {% endif %}
-    </div>
-  </div>
-</div>
-
-<!-- =========== SECTION: CLASSES =========== -->
-<div class="sg-section-panel {% if active_section == 'classes' %}is-active{% endif %}" data-sg-panel="classes" {% if active_section != 'classes' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-solid fa-school" style="color:#7c3aed;margin-right:8px;"></i>Classes etudiants</div>
-      <div class="sg-section-hero-sub">Reperer une classe, ouvrir son effectif, puis acceder au dossier etudiant.</div>
-    </div>
-    <span class="sg-scope-chip">{{ classes_count|default:0 }} classes actives</span>
-  </div>
-  <div class="sg-row-2">
-    <div class="sg-panel">
-      <div class="sg-section-header">
-        <div>
-          <div class="sg-panel-title" style="margin-bottom:4px;">Classes de l'annexe</div>
-          <div class="sg-section-header-sub">Recherche par classe, niveau, formation ou annee academique.</div>
-        </div>
-      </div>
-      <div class="sg-search" style="width:100%;margin-bottom:14px;">
-        <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
-        <input type="search" name="q" placeholder="Ex: L1, Licence, Sante, 2026..." hx-get="{% url 'secretary:htmx_class_results' %}" hx-trigger="input changed delay:300ms" hx-target="#class-results-panel">
-      </div>
-      <div id="class-results-panel" class="message-list">
-        {% include "secretary/partials/class_results.html" with classes=classes_rows page_obj=classes_page query="" %}
-      </div>
-    </div>
-    <div class="sg-panel" id="class-students-panel">
-      <div class="sg-panel-title">Effectif de la classe</div>
-      <div class="sg-empty">
-        <div class="sg-empty-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
-        <div class="sg-empty-text">Selectionnez une classe pour afficher ses etudiants.</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- =========== SECTION: STUDENTS =========== -->
-<div class="sg-section-panel {% if active_section == 'students' %}is-active{% endif %}" data-sg-panel="students" {% if active_section != 'students' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-solid fa-graduation-cap" style="color:#14b8a6;margin-right:8px;"></i>Recherche et fiche etudiant</div>
-      <div class="sg-section-hero-sub">La fiche s'ouvre en drawer lateral large, pas en petite modal.</div>
-    </div>
-    <span class="sg-scope-chip">{{ students_count }} etudiants actifs</span>
-  </div>
-  <div class="sg-panel">
-    <div class="sg-search" style="width:100%;margin-bottom:14px;">
-      <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
-      <input type="search" name="q" placeholder="Nom, prenom, matricule, telephone ou email" hx-get="{% url 'secretary:htmx_student_results' %}" hx-trigger="input changed delay:300ms" hx-target="#student-results-panel" value="{{ student_query }}">
-    </div>
-    <div id="student-results-panel">
-      {% include "secretary/partials/student_results.html" with students=student_results page_obj=student_results_page query=student_query %}
-    </div>
-  </div>
-</div>
-
-<!-- =========== SECTION: APPOINTMENTS =========== -->
-<div class="sg-section-panel {% if active_section == 'appointments' %}is-active{% endif %}" data-sg-panel="appointments" {% if active_section != 'appointments' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-regular fa-calendar-days" style="color:#16a34a;margin-right:8px;"></i>Agenda et demandes de rendez-vous</div>
-      <div class="sg-section-hero-sub">DG, direction des etudes, gestionnaire, enseignants et administration.</div>
-    </div>
-    <div class="sg-section-actions">
-      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:appointment_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
-      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-        <i class="fa-solid fa-plus"></i>Nouveau RDV
-      </button>
-    </div>
-  </div>
-  <div class="sg-row-2" style="margin-bottom:16px;">
-    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ appointments_today }}</div><div class="sg-stat-lbl">Rdv aujourd'hui</div></div>
-    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ visits_today }}</div><div class="sg-stat-lbl">Visites jour</div></div>
-  </div>
-  {% include "secretary/partials/dashboard_appointments_today.html" %}
-</div>
-
-<!-- =========== SECTION: DEPOSITS =========== -->
-<div class="sg-section-panel {% if active_section == 'deposits' %}is-active{% endif %}" data-sg-panel="deposits" {% if active_section != 'deposits' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-solid fa-box-archive" style="color:#d97706;margin-right:8px;"></i>Depots, pieces et livraisons</div>
-      <div class="sg-section-hero-sub">Colis parent, document administratif, livraison ecole, retrait diplome.</div>
-    </div>
-    <div class="sg-section-actions">
-      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:document_receipt_list' %}"><i class="fa-solid fa-table"></i>Liste complete</a>
-      <button type="button" class="sg-btn sg-btn-primary" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-        <i class="fa-solid fa-plus"></i>Nouveau depot
-      </button>
-    </div>
-  </div>
-  <div class="sg-row-4" style="margin-bottom:16px;">
-    <div class="sg-stat-box" style="background:#fef3c7;"><div class="sg-stat-val" style="color:#d97706;">{{ pending_documents_count }}</div><div class="sg-stat-lbl">En attente</div></div>
-    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val" style="color:#2563eb;">{{ visits_today }}</div><div class="sg-stat-lbl">Passages jour</div></div>
-    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val" style="color:#16a34a;">{{ pending_registry_count }}</div><div class="sg-stat-lbl">Registre</div></div>
-    <div class="sg-stat-box" style="background:#f5f3ff;"><div class="sg-stat-val" style="color:#7c3aed;">{{ pending_tasks }}</div><div class="sg-stat-lbl">Taches</div></div>
-  </div>
-  <div class="sg-row-2">
-    {% include "secretary/partials/dashboard_documents_pending.html" %}
-    <div class="sg-panel">
-      <div class="sg-panel-title">Processus de remise</div>
-      <div class="sg-section-header-sub" style="margin-bottom:12px;">Les depots suivent un circuit de traitement en 3 etapes.</div>
-      {% for step in document_process_funnel %}
-      <div class="sg-bar-item"><div class="sg-bar-label"><span>{{ step.label }}</span><span>{{ step.sub }}</span></div><div class="sg-bar-track"><div class="sg-bar-fill" style="width:{{ step.pct }}%;background:{{ step.color }};"></div></div></div>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-
-<!-- =========== SECTION: SALARY =========== -->
-<div class="sg-section-panel {% if active_section == 'salary' %}is-active{% endif %}" data-sg-panel="salary" {% if active_section != 'salary' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-solid fa-money-bill-wave" style="color:#16a34a;margin-right:8px;"></i>Salaire et fiche de paie</div>
-      <div class="sg-section-hero-sub">Consultation personnelle. Les modifications et paiements restent gerees par le gestionnaire habilite.</div>
-    </div>
-    <span class="sg-scope-chip sg-mono">Base: {{ secretary_profile.salary_base|default:0|intcomma }} FCFA</span>
-  </div>
-  <div class="sg-row-3" style="margin-bottom:16px;">
-    <div class="sg-stat-box" style="background:#f0fdf4;"><div class="sg-stat-val sg-mono" style="color:#16a34a;">{{ secretary_profile.salary_base|default:0|intcomma }}</div><div class="sg-stat-lbl">Base FCFA</div></div>
-    <div class="sg-stat-box" style="background:#eff6ff;"><div class="sg-stat-val sg-mono" style="color:#2563eb;">{% if latest_salary_entry %}{{ latest_salary_entry.net_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Net dernier mois</div></div>
-    <div class="sg-stat-box" style="background:#fffbeb;"><div class="sg-stat-val sg-mono" style="color:#d97706;">{% if latest_salary_entry %}{{ latest_salary_entry.remaining_salary|intcomma }}{% else %}0{% endif %}</div><div class="sg-stat-lbl">Reste a retirer</div></div>
-  </div>
-  <div class="sg-row-2">
-    <div class="sg-panel">
-      <div class="sg-panel-title">Historique paie</div>
-      <div class="sg-table-wrap">
-        <table class="sg-table">
-          <thead><tr><th>Periode</th><th>Base</th><th>Primes</th><th>Retenues</th><th>Net</th><th>Retire</th><th>Statut</th><th>PDF</th></tr></thead>
-          <tbody>
-            {% for entry in salary_entries %}
-              <tr>
-                <td style="font-weight:900;">{{ entry.period_month|date:"F Y" }}</td>
-                <td class="sg-mono">{{ entry.base_salary|intcomma }}</td>
-                <td class="sg-mono">{{ entry.allowances|intcomma }}</td>
-                <td class="sg-mono">{{ entry.deductions|add:entry.advances|intcomma }}</td>
-                <td class="sg-mono" style="font-weight:900;">{{ entry.net_salary|intcomma }}</td>
-                <td class="sg-mono">{{ entry.paid_amount|intcomma }}</td>
-                <td><span class="sg-badge-sm {% if entry.status == 'paid' %}sg-badge-green{% elif entry.status == 'ready' %}sg-badge-blue{% elif entry.status == 'partial' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ entry.get_status_display }}</span></td>
-                <td><a href="{% url 'accounts:payslip_download' entry.id %}" target="_blank" class="sg-page-link" title="Telecharger la fiche de paie"><i class="fa-solid fa-file-arrow-down"></i></a></td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="8"><div class="sg-empty"><div class="sg-empty-icon"><i class="fa-regular fa-file-lines"></i></div><div class="sg-empty-text">Aucune fiche de paie disponible pour le moment.</div></div></td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% if salary_entries_page.has_other_pages %}
-        <div class="sg-pagination">
-          <div class="sg-pagination-info">Page {{ salary_entries_page.number }} / {{ salary_entries_page.paginator.num_pages }}</div>
-          <div class="sg-pagination-actions">
-            {% if salary_entries_page.has_previous %}<a class="sg-page-link" href="?section=salary&salary_page={{ salary_entries_page.previous_page_number }}"><i class="fa-solid fa-chevron-left"></i>Precedent</a>{% endif %}
-            <span class="sg-page-link is-current">{{ salary_entries_page.number }}</span>
-            {% if salary_entries_page.has_next %}<a class="sg-page-link" href="?section=salary&salary_page={{ salary_entries_page.next_page_number }}">Suivant<i class="fa-solid fa-chevron-right"></i></a>{% endif %}
-          </div>
-        </div>
-      {% endif %}
-    </div>
-    <div class="sg-panel">
-      <div class="sg-panel-title">Regles d'acces</div>
-      <div class="message-list">
-        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Lecture uniquement</div><div class="sg-action-sub">La secretaire consulte ses fiches sans modifier les montants.</div></div><span class="sg-badge-sm sg-badge-blue">RH</span></div>
-        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Correction salaire</div><div class="sg-action-sub">A demander au gestionnaire ou a la direction habilitee.</div></div><span class="sg-badge-sm sg-badge-gray">Controle</span></div>
-        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Probleme d'acces</div><div class="sg-action-sub">Traitement par l'informaticien pour garder la maintenabilite.</div></div><span class="sg-badge-sm sg-badge-amber">Support</span></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- =========== SECTION: NOTIFICATIONS =========== -->
-<div class="sg-section-panel {% if active_section == 'notifications' %}is-active{% endif %}" data-sg-panel="notifications" {% if active_section != 'notifications' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-regular fa-bell" style="color:#2563eb;margin-right:8px;"></i>Centre de notifications</div>
-      <div class="sg-section-hero-sub">Les alertes restent dans le dashboard. Ouvrir une notification la marque lue definitivement.</div>
-    </div>
-    <span class="sg-scope-chip">{{ messages_count|default:0 }} non lue(s)</span>
-  </div>
-  <div class="sg-row-2">
-    <div class="sg-panel">
-      <div class="sg-panel-title">Notifications recentes</div>
-      <div class="message-list">
-        {% for notification in notifications_rows %}
-          <a class="sg-action-card {% if not notification.read_at %}is-unread{% endif %}" href="?section=notifications&notification_id={{ notification.id }}">
-            <div style="min-width:0;">
-              <div class="sg-action-label">{{ notification.title }}</div>
-              <div class="sg-action-sub">{{ notification.body|default:"Notification centralisee"|truncatechars:90 }}</div>
-              <div class="sg-notification-meta">{{ notification.created_at|date:"d/m/Y H:i" }}</div>
+        <div class="mt-3">
+          <h4 class="mb-2 text-xs font-bold text-[color:var(--muted)]">Routage intelligent</h4>
+          {% for entry_type, rule in registry_routing_summary.items %}
+            <div class="flex items-center justify-between py-1.5 text-xs">
+              <span class="font-semibold text-[color:var(--text)]">{{ rule.label }}</span>
+              <span class="text-[color:var(--muted)]">{{ rule.target_service }}</span>
             </div>
-            {% if not notification.read_at %}<span class="sg-action-count" style="background:#dbeafe;color:#2563eb;">new</span>{% else %}<span class="sg-badge-sm sg-badge-gray">Lue</span>{% endif %}
-          </a>
-        {% empty %}
-          <div class="sg-empty">
-            <div class="sg-empty-icon"><i class="fa-regular fa-bell-slash"></i></div>
-            <div class="sg-empty-text">Aucune notification pour le moment.</div>
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+
+  <div class="grid gap-4 lg:grid-cols-3">
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Rendez-vous aujourd'hui</h3>
+        {% include "secretary/htmx/overview_appointments.html" %}
+      {% endfill %}
+    {% endcomponent %}
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Visites ouvertes</h3>
+        {% include "secretary/htmx/overview_visits.html" %}
+      {% endfill %}
+    {% endcomponent %}
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Tâches urgentes</h3>
+        {% include "secretary/htmx/overview_tasks.html" %}
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════ #}
+{#  REGISTRY                                              #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="registry" {% if active_section != 'registry' %}hidden{% endif %}>
+  {% component "page_header" title="Registre" subtitle="" %}
+    {% fill "actions" %}
+      {% url 'secretary:registry_list' as registry_list_url %}
+      {% component "button" label="Liste complète" href=registry_list_url icon_left="table" variant="outline" size="sm" %}{% endcomponent %}
+      <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-[color:var(--school-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90" hx-get="{% url 'secretary:registry_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"><i data-lucide="plus" style="width:14px;height:14px;"></i>Nouvelle entrée</button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-4">
+    {% component "widget_card" label="En attente" value=pending_registry_count|default:"0" icon="clock" tone="warning" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Actions liées" value=pending_tasks|default:"0" icon="list-checks" tone="primary" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Passages jour" value=visits_today|default:"0" icon="users" tone="success" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Pièces" value=pending_documents_count|default:"0" icon="archive" tone="info" size="md" %}{% endcomponent %}
+  </div>
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    {% component "dashboard_card" padding="none" %}
+      {% fill "default" %}
+        <div class="flex items-center justify-between px-4 pt-4">
+          <h3 class="text-sm font-bold text-[color:var(--muted)]">Entrées récentes</h3>
+        </div>
+        {% if recent_registry %}
+          <div class="divide-y divide-[color:var(--line)]">
+            {% for item in recent_registry %}
+              <div class="flex items-center justify-between px-4 py-3 text-sm">
+                <div class="flex items-center gap-4 min-w-0">
+                  <span class="font-mono text-xs text-[color:var(--muted-2)]">{{ item.registry_number|default:item.pk }}</span>
+                  <span class="font-bold text-[color:var(--text)]">{{ item.get_entry_type_display }}</span>
+                  <span class="text-[color:var(--muted)] truncate">{% if item.visitor_name %}{{ item.visitor_name }}{% elif item.related_student %}{{ item.related_student.full_name }}{% else %}-{% endif %}</span>
+                  <span class="text-[color:var(--muted-2)] text-xs">{{ item.target_service|default:"Accueil" }}</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="rounded-full border border-[color:var(--line)] bg-[color:var(--card-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--muted)]">{{ item.get_status_display }}</span>
+                  <button type="button" class="flex h-7 w-7 items-center justify-center rounded-lg border border-[color:var(--line)] text-[color:var(--muted)] transition hover:bg-[color:var(--card-soft)]" hx-get="{% url 'secretary:registry_detail' item.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" title="Détail">
+                    <i data-lucide="clock" style="width:12px;height:12px;"></i>
+                  </button>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          {% if registry_page.has_other_pages %}
+            <div class="border-t border-[color:var(--line)] px-4 py-3">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[color:var(--muted-2)]">Page {{ registry_page.number }}/{{ registry_page.paginator.num_pages }}</span>
+                <div class="flex items-center gap-1">
+                  {% if registry_page.has_previous %}<a href="?section=registry&registry_page={{ registry_page.previous_page_number }}" class="rounded-lg border border-[color:var(--line)] px-2 py-1 font-semibold text-[color:var(--muted)] hover:text-[color:var(--text)]"><i data-lucide="chevron-left" style="width:12px;height:12px;"></i></a>{% endif %}
+                  {% if registry_page.has_next %}<a href="?section=registry&registry_page={{ registry_page.next_page_number }}" class="rounded-lg border border-[color:var(--line)] px-2 py-1 font-semibold text-[color:var(--muted)] hover:text-[color:var(--text)]"><i data-lucide="chevron-right" style="width:12px;height:12px;"></i></a>{% endif %}
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="p-4">
+            {% component "empty_state" title="Aucune entrée" message="Commencez par créer une entrée registre." icon="book-open" %}{% endcomponent %}
+          </div>
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Répartition par type</h3>
+        {% if registry_type_distribution %}
+          {% for item in registry_type_distribution %}
+            <div class="mb-2">
+              <div class="flex items-center justify-between mb-1 text-xs">
+                <span class="font-semibold text-[color:var(--text)]">{{ item.label }}</span>
+                <span class="text-[color:var(--muted-2)]">{{ item.pct }}% ({{ item.count }})</span>
+              </div>
+              <div class="h-1.5 rounded-full bg-[color:var(--line)] overflow-hidden">
+                <div class="h-full rounded-full bg-[color:var(--school-primary)] transition-all" style="width:{{ item.pct }}%"></div>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          {% component "empty_state" title="Aucune donnée" message="Aucune entrée enregistrée." icon="chart-pie" compact=True %}{% endcomponent %}
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════ #}
+{#  VISITS                                                #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="visits" {% if active_section != 'visits' %}hidden{% endif %}>
+  {% component "page_header" title="Visiteurs" subtitle="" %}
+    {% fill "actions" %}
+      {% url 'secretary:visitor_list' as visitor_list_url %}
+      {% component "button" label="Liste complète" href=visitor_list_url icon_left="table" variant="outline" size="sm" %}{% endcomponent %}
+      <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-[color:var(--school-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"><i data-lucide="plus" style="width:14px;height:14px;"></i>Nouveau passage</button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-4">
+    {% component "widget_card" label="Visites ouvertes" value=active_visits|default:"0" icon="user-clock" tone="info" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Aujourd'hui" value=visits_today|default:"0" icon="calendar-check" tone="primary" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="En attente" value=pending_tasks|default:"0" icon="list-checks" tone="warning" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Registre" value=pending_registry_count|default:"0" icon="book-open" tone="neutral" size="md" %}{% endcomponent %}
+  </div>
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    {% component "dashboard_card" padding="none" %}
+      {% fill "default" %}
+        <div class="flex items-center justify-between px-4 pt-4">
+          <h3 class="text-sm font-bold text-[color:var(--muted)]">Visites en cours</h3>
+        </div>
+        {% include "secretary/htmx/visits_open.html" %}
+      {% endfill %}
+    {% endcomponent %}
+
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Passages du jour</h3>
+        {% if today_visits_rows %}
+          <div class="space-y-2">
+            {% for item in today_visits_rows %}
+              <div class="flex items-center justify-between rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2">
+                <div>
+                  <div class="text-sm font-bold text-[color:var(--text)]">{{ item.full_name }}</div>
+                  <div class="text-xs text-[color:var(--muted-2)]">{{ item.arrived_at|date:"H:i" }} — {{ item.reason|default:"Accueil" }}</div>
+                </div>
+                {% component "status_badge" label=item.get_status_display tone=status_info %}{% endcomponent %}
+              </div>
+            {% endfor %}
+          </div>
+          {% if today_visits_page.has_other_pages %}
+            {% component "pagination" total=today_visits_page.paginator.count page=today_visits_page.number per_page=10 hx_target="#visits-section" %}{% endcomponent %}
+          {% endif %}
+        {% else %}
+          {% component "empty_state" title="Aucun passage" message="Aucun visiteur aujourd'hui." icon="user-clock" compact=True %}{% endcomponent %}
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════ #}
+{#  CLASSES                                               #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="classes" {% if active_section != 'classes' %}hidden{% endif %}>
+  {% component "page_header" title="Classes" subtitle="" %}
+    {% fill "actions" %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--school-primary-soft)] px-3 py-1 text-xs font-bold text-[color:var(--school-primary)]">
+        {{ classes_count }} classe{{ classes_count|pluralize }}
+      </span>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Classes de l'annexe</h3>
+        <p class="mb-3 text-xs text-[color:var(--muted-2)]">Recherche par classe, niveau, formation ou année académique.</p>
+        {% component "search_bar" name="q" placeholder="Ex: L1, Licence, Santé, 2026..." hx_get="{% url 'secretary:htmx_class_results' %}" hx_target="#class-results-panel" %}{% endcomponent %}
+        {% include "secretary/htmx/class_results.html" with classes=classes_rows page_obj=classes_page query="" %}
+      {% endfill %}
+    {% endcomponent %}
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Effectif de la classe</h3>
+        {% component "empty_state" title="Sélectionnez une classe" message="Cliquez sur une classe pour afficher ses étudiants." icon="chalkboard" compact=True %}{% endcomponent %}
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════ #}
+{#  STUDENTS                                              #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="students" {% if active_section != 'students' %}hidden{% endif %}>
+  {% component "page_header" title="Étudiants" subtitle="" %}
+    {% fill "actions" %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--info-soft)] px-3 py-1 text-xs font-bold text-[color:var(--info)]">
+        {{ students_count }} étudiant{{ students_count|pluralize }} actif{{ students_count|pluralize }}
+      </span>
+    {% endfill %}
+  {% endcomponent %}
+
+  {% component "dashboard_card" %}
+    {% fill "default" %}
+      <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Recherche</h3>
+      {% component "search_bar" name="q" placeholder="Nom, prénom, matricule, téléphone ou email" hx_get="{% url 'secretary:htmx_student_results' %}" hx_target="#student-results-panel" %}{% endcomponent %}
+      {% include "secretary/htmx/student_results.html" with students=student_results page_obj=student_results_page query=student_query %}
+    {% endfill %}
+  {% endcomponent %}
+</div>
+
+{# ═══════════════════════════════════════════════════════ #}
+{#  APPOINTMENTS                                          #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="appointments" {% if active_section != 'appointments' %}hidden{% endif %}>
+  {% component "page_header" title="Rendez-vous" subtitle="" %}
+    {% fill "actions" %}
+      {% url 'secretary:appointment_list' as appointment_list_url %}
+      {% component "button" label="Liste complète" href=appointment_list_url icon_left="table" variant="outline" size="sm" %}{% endcomponent %}
+      <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-[color:var(--school-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"><i data-lucide="plus" style="width:14px;height:14px;"></i>Nouveau RDV</button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    {% component "widget_card" label="RDV aujourd'hui" value=appointments_today|default:"0" icon="calendar-days" tone="success" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Visites jour" value=visits_today|default:"0" icon="user-clock" tone="primary" size="md" %}{% endcomponent %}
+  </div>
+
+  {% include "secretary/htmx/appointments_today.html" %}
+</div>
+
+{# ═══════════════════════════════════════════════════════ #}
+{#  DEPOSITS                                              #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="deposits" {% if active_section != 'deposits' %}hidden{% endif %}>
+  {% component "page_header" title="Dépôts" subtitle="" %}
+    {% fill "actions" %}
+      {% url 'secretary:document_receipt_list' as doc_list_url %}
+      {% component "button" label="Liste complète" href=doc_list_url icon_left="table" variant="outline" size="sm" %}{% endcomponent %}
+      <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-[color:var(--school-primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90" hx-get="{% url 'secretary:document_receipt_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"><i data-lucide="plus" style="width:14px;height:14px;"></i>Nouveau dépôt</button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-4">
+    {% component "widget_card" label="En attente" value=pending_documents_count|default:"0" icon="clock" tone="warning" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Passages jour" value=visits_today|default:"0" icon="users" tone="primary" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Registre" value=pending_registry_count|default:"0" icon="book-open" tone="info" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Tâches" value=pending_tasks|default:"0" icon="list-checks" tone="neutral" size="md" %}{% endcomponent %}
+  </div>
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    {% component "dashboard_card" padding="none" %}
+      {% fill "default" %}
+        <div class="flex items-center justify-between px-4 pt-4">
+          <h3 class="text-sm font-bold text-[color:var(--muted)]">Dépôts en attente</h3>
+        </div>
+        {% include "secretary/htmx/documents_pending.html" %}
+      {% endfill %}
+    {% endcomponent %}
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Processus de remise</h3>
+        {% if document_process_funnel %}
+          {% for step in document_process_funnel %}
+            <div class="mb-3">
+              <div class="flex items-center justify-between mb-1 text-xs">
+                <span class="font-semibold text-[color:var(--text)]">{{ step.label }}</span>
+                <span class="text-[color:var(--muted-2)]">{{ step.sub }}</span>
+              </div>
+              <div class="h-2 rounded-full bg-[color:var(--line)] overflow-hidden">
+                <div class="h-full rounded-full transition-all" style="width:{{ step.pct }}%;background:{{ step.color }}"></div>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          {% component "empty_state" title="Aucun dépôt" message="Aucun processus en cours." icon="package" compact=True %}{% endcomponent %}
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════ #}
+{#  SALARY                                                #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="salary" {% if active_section != 'salary' %}hidden{% endif %}>
+  {% component "page_header" title="Salaire" subtitle="" %}
+    {% fill "actions" %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--success-soft)] px-3 py-1 text-xs font-bold font-mono text-[color:var(--success)]">
+        Base: {{ secretary_profile.salary_base|default:0|intcomma }} FCFA
+      </span>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-3">
+    {% component "widget_card" label="Base" value=secretary_profile.salary_base|default:"0"|intcomma icon="wallet" tone="success" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Net dernier mois" value=latest_salary_entry.net_salary|default:"0"|intcomma icon="check-circle" tone="primary" size="md" %}{% endcomponent %}
+    {% component "widget_card" label="Reste à retirer" value=latest_salary_entry.remaining_salary|default:"0"|intcomma icon="clock" tone="warning" size="md" %}{% endcomponent %}
+  </div>
+
+  {% component "dashboard_card" padding="none" %}
+    {% fill "default" %}
+      <div class="px-4 pt-4">
+        <h3 class="text-sm font-bold text-[color:var(--muted)]">Historique paie</h3>
+      </div>
+      {% if salary_entries %}
+        {% for entry in salary_entries %}
+          <div class="flex items-center justify-between border-b border-[color:var(--line)] px-4 py-3 last:border-0">
+            <div>
+              <div class="text-sm font-bold text-[color:var(--text)]">{{ entry.period_month|date:"F Y" }}</div>
+              <div class="text-xs text-[color:var(--muted-2)]">
+                Base: {{ entry.base_salary|intcomma }} · Primes: {{ entry.allowances|intcomma }} · Retenues: {{ entry.deductions|add:entry.advances|intcomma }}
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-sm font-black text-[color:var(--text)] font-mono">{{ entry.net_salary|intcomma }} FCFA</div>
+              {% component "status_badge" label=entry.get_status_display tone=status_success %}{% endcomponent %}
+            </div>
           </div>
         {% endfor %}
-      </div>
-      {% if notifications_page.has_other_pages %}
-        <div class="sg-pagination">
-          <div class="sg-pagination-info">Page {{ notifications_page.number }} / {{ notifications_page.paginator.num_pages }}</div>
-          <div class="sg-pagination-actions">
-            {% if notifications_page.has_previous %}<a class="sg-page-link" href="?section=notifications&notifications_page={{ notifications_page.previous_page_number }}"><i class="fa-solid fa-chevron-left"></i>Precedent</a>{% endif %}
-            <span class="sg-page-link is-current">{{ notifications_page.number }}</span>
-            {% if notifications_page.has_next %}<a class="sg-page-link" href="?section=notifications&notifications_page={{ notifications_page.next_page_number }}">Suivant<i class="fa-solid fa-chevron-right"></i></a>{% endif %}
+        {% if salary_entries_page.has_other_pages %}
+          <div class="px-4 pb-4">
+            {% component "pagination" total=salary_entries_page.paginator.count page=salary_entries_page.number per_page=8 hx_target="#salary-section" %}{% endcomponent %}
           </div>
-        </div>
-      {% endif %}
-    </div>
-    <div class="sg-panel">
-      <div class="sg-panel-title">Detail</div>
-      {% if selected_notification %}
-        <div class="sg-action-card" style="cursor:default;align-items:flex-start;">
-          <div>
-            <div class="sg-action-label" style="font-size:.95rem;color:#0f172a;">{{ selected_notification.title }}</div>
-            <div class="sg-action-sub" style="font-size:.78rem;margin-top:8px;color:#475569;">{{ selected_notification.body|default:"Aucun detail complementaire." }}</div>
-            <div class="sg-divider"></div>
-            <div class="sg-profile-line"><i class="fa-regular fa-clock" style="color:#94a3b8;width:18px;"></i><div><div class="sg-stat-lbl">Recu le</div><div style="font-weight:800;">{{ selected_notification.created_at|date:"d/m/Y H:i" }}</div></div></div>
-            <div class="sg-profile-line"><i class="fa-solid fa-check" style="color:#16a34a;width:18px;"></i><div><div class="sg-stat-lbl">Lecture</div><div style="font-weight:800;">Marquee lue le {{ selected_notification.read_at|date:"d/m/Y H:i" }}</div></div></div>
-          </div>
-        </div>
+        {% endif %}
       {% else %}
-        <div class="sg-empty"><div class="sg-empty-icon"><i class="fa-regular fa-message"></i></div><div class="sg-empty-text">Selectionnez une notification pour ouvrir son detail.</div></div>
+        <div class="p-4">
+          {% component "empty_state" title="Aucune fiche de paie" message="Aucune fiche disponible pour le moment." icon="file-text" compact=True %}{% endcomponent %}
+        </div>
       {% endif %}
-    </div>
-  </div>
+    {% endfill %}
+  {% endcomponent %}
 </div>
 
-<!-- =========== SECTION: SETTINGS =========== -->
-<div class="sg-section-panel {% if active_section == 'settings' %}is-active{% endif %}" data-sg-panel="settings" {% if active_section != 'settings' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-solid fa-user-gear" style="color:#64748b;margin-right:8px;"></i>Parametres du compte</div>
-      <div class="sg-section-hero-sub">Profil et preferences modifiables sans quitter le dashboard. Les acces sensibles passent par l'informaticien.</div>
-    </div>
-    <span class="sg-scope-chip">{{ request.user.username }}</span>
-  </div>
-  <div class="sg-row-2">
-    <div class="sg-panel">
-      <div class="sg-panel-title">Profil visible</div>
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding:12px;border:1px solid #f1f5f9;border-radius:12px;background:#fbfcff;">
-        <div class="sg-avatar-img" style="width:64px;height:64px;font-size:1.2rem;">
-          {% if secretary_profile.avatar %}
-            <img src="{{ secretary_profile.avatar.url }}" alt="Photo de profil">
-          {% else %}
-            {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+{# ═══════════════════════════════════════════════════════ #}
+{#  NOTIFICATIONS                                         #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="notifications" {% if active_section != 'notifications' %}hidden{% endif %}>
+  {% component "page_header" title="Notifications" subtitle="" %}
+    {% fill "actions" %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--school-primary-soft)] px-3 py-1 text-xs font-bold text-[color:var(--school-primary)]">
+        {{ messages_count }} non lue{{ messages_count|pluralize }}
+      </span>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Notifications récentes</h3>
+        {% if notifications_rows %}
+          <div class="space-y-1">
+            {% for notification in notifications_rows %}
+              <a href="?section=notifications&notification_id={{ notification.id }}" class="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition hover:bg-[color:var(--card-soft)] {% if not notification.read_at %}bg-[color:var(--school-primary-soft)]/30{% endif %}">
+                <div class="min-w-0">
+                  <div class="font-bold text-[color:var(--text)] truncate">{{ notification.title }}</div>
+                  <div class="text-xs text-[color:var(--muted-2)] truncate">{{ notification.body|default:"Notification centralisée"|truncatechars:90 }}</div>
+                  <div class="text-[10px] text-[color:var(--muted-2)] mt-0.5">{{ notification.created_at|date:"d/m/Y H:i" }}</div>
+                </div>
+                {% if not notification.read_at %}
+                  <span class="shrink-0 rounded-full bg-[color:var(--school-primary-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--school-primary)]">Nouveau</span>
+                {% else %}
+                  {% component "status_badge" label="Lue" tone=status_neutral %}{% endcomponent %}
+                {% endif %}
+              </a>
+            {% endfor %}
+          </div>
+          {% if notifications_page.has_other_pages %}
+            {% component "pagination" total=notifications_page.paginator.count page=notifications_page.number per_page=10 hx_target="#notifications-section" %}{% endcomponent %}
           {% endif %}
-        </div>
-        <div style="min-width:0;">
-          <div style="font-size:.95rem;font-weight:950;color:#0f172a;">{{ request.user.get_full_name|default:request.user.username }}</div>
-          <div class="sg-section-header-sub">{{ secretary_profile.phone|default:"Telephone non renseigne" }} - {{ secretary_profile.location|default:"Localisation non renseignee" }}</div>
-        </div>
-      </div>
-      <form method="post" action="{% url 'secretary:profile_update' %}" enctype="multipart/form-data" style="display:grid;gap:16px;">
-        {% csrf_token %}
-        {% include "secretary/partials/form_fields.html" with form=profile_form %}
-        <div class="sg-form-footer"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer le profil</button></div>
-      </form>
-    </div>
-    <div class="sg-panel">
-      <div class="sg-panel-title">Preferences et securite</div>
-      <form method="post" action="{% url 'secretary:preferences_update' %}" style="display:grid;gap:16px;">
-        {% csrf_token %}
-        {% include "secretary/partials/form_fields.html" with form=preference_form %}
-        <div class="sg-form-footer"><button type="submit" class="sg-btn sg-btn-primary"><i class="fa-solid fa-check"></i>Enregistrer les preferences</button></div>
-      </form>
-      <div class="sg-divider"></div>
-      <div class="message-list">
-        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Mot de passe</div><div class="sg-action-sub">Changement gere par l'informaticien pour assistance et tracabilite.</div></div><span class="sg-badge-sm sg-badge-amber">Support</span></div>
-        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Email institutionnel</div><div class="sg-action-sub">{{ request.user.email|default:"Non renseigne" }}</div></div><span class="sg-badge-sm sg-badge-gray">Compte</span></div>
-        <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label">Fonction</div><div class="sg-action-sub">{{ secretary_profile.get_position_display|default:"Secretaire" }} - {{ secretary_profile.branch.name|default:"Annexe non definie" }}</div></div><span class="sg-badge-sm sg-badge-blue">RH</span></div>
-      </div>
-    </div>
+        {% else %}
+          {% component "empty_state" title="Aucune notification" message="Aucune notification pour le moment." icon="bell-off" compact=True %}{% endcomponent %}
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-3 text-sm font-bold text-[color:var(--muted)]">Détail</h3>
+        {% if selected_notification %}
+          <div class="space-y-3">
+            <div>
+              <div class="text-sm font-bold text-[color:var(--text)]">{{ selected_notification.title }}</div>
+              <div class="mt-1 text-sm text-[color:var(--text)]/70">{{ selected_notification.body|default:"Aucun détail complémentaire." }}</div>
+            </div>
+            <div class="border-t border-[color:var(--line)] pt-3 space-y-2">
+              <div class="flex items-center gap-2 text-xs">
+                <i data-lucide="clock" style="width:13px;height:13px;" class="text-[color:var(--muted-2)]"></i>
+                <span class="text-[color:var(--muted)]">Reçu le</span>
+                <span class="font-bold text-[color:var(--text)]">{{ selected_notification.created_at|date:"d/m/Y H:i" }}</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <i data-lucide="check" style="width:13px;height:13px;" class="text-[color:var(--success)]"></i>
+                <span class="text-[color:var(--muted)]">Lecture</span>
+                <span class="font-bold text-[color:var(--text)]">Marquée le {{ selected_notification.read_at|date:"d/m/Y H:i" }}</span>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          {% component "empty_state" title="Sélectionnez une notification" message="Cliquez sur une notification pour voir son détail." icon="message-square" compact=True %}{% endcomponent %}
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
   </div>
 </div>
 
-<!-- =========== SECTION: REPORTS =========== -->
-<div class="sg-section-panel {% if active_section == 'reports' %}is-active{% endif %}" data-sg-panel="reports" {% if active_section != 'reports' %}hidden{% endif %}>
-  <div class="sg-section-hero">
-    <div>
-      <div class="sg-section-hero-title"><i class="fa-solid fa-file-export" style="color:#64748b;margin-right:8px;"></i>Rapports, impression et mode degrade</div>
-      <div class="sg-section-hero-sub">Rapport journalier, export Excel/PDF, impression directe et reprise manuelle en cas de panne.</div>
-    </div>
-    <div class="sg-section-actions">
-      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:daily_registry_report' %}?format=xlsx"><i class="fa-solid fa-file-excel"></i>Excel</a>
-      <a class="sg-btn sg-btn-outline" href="{% url 'secretary:daily_registry_report' %}?format=pdf"><i class="fa-solid fa-file-pdf"></i>PDF</a>
-      <a class="sg-btn sg-btn-primary" href="{% url 'secretary:daily_registry_report' %}"><i class="fa-solid fa-print"></i>Imprimer</a>
-    </div>
-  </div>
-  <div class="sg-row-3">
-    <div class="sg-panel">
-      <div class="sg-panel-title">Rapport journalier</div>
-      <p class="sg-section-header-sub">Colonnes : numero, heure, type, visiteur, etudiant, service, motif, action, statut et heure sortie.</p>
-      <div class="sg-divider"></div>
-      <div style="background:#f8fafc;border-radius:8px;padding:12px;text-align:center;">
-        <i class="fa-solid fa-file-lines" style="font-size:2rem;color:#94a3b8;margin-bottom:8px;display:block;"></i>
-        <p style="font-size:.78rem;font-weight:700;color:#475569;">Generer le rapport du jour</p>
-        <a class="sg-btn sg-btn-primary" href="{% url 'secretary:daily_registry_report' %}" style="margin-top:8px;"><i class="fa-solid fa-eye"></i>Voir le rapport</a>
-      </div>
-    </div>
-    <div class="sg-panel">
-      <div class="sg-panel-title">Archivage</div>
-      <p class="sg-section-header-sub">Les entrees, historiques, pieces jointes et scans restent traces dans le registre.</p>
-      <div class="sg-divider"></div>
-      <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label"><i class="fa-solid fa-book-open" style="color:#2563eb;width:18px;"></i>Entrees registre</div><div class="sg-action-sub">En attente de routage</div></div><span class="sg-badge-sm sg-badge-blue">{{ pending_registry_count|default:0 }}</span></div>
-      <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label"><i class="fa-solid fa-user-clock" style="color:#7c3aed;width:18px;"></i>Visites</div><div class="sg-action-sub">Passages aujourd'hui</div></div><span class="sg-badge-sm sg-badge-blue">{{ visits_today|default:0 }}</span></div>
-      <div class="sg-action-card" style="cursor:default;"><div><div class="sg-action-label"><i class="fa-solid fa-box-archive" style="color:#d97706;width:18px;"></i>Depots / pieces</div><div class="sg-action-sub">En attente de remise</div></div><span class="sg-badge-sm sg-badge-amber">{{ pending_documents_count|default:0 }}</span></div>
-    </div>
-    <div class="sg-panel">
-      <div class="sg-panel-title">Mode degrade</div>
-      <p class="sg-section-header-sub">En panne reseau ou courant, impression du canevas journalier puis saisie differee au retour serveur.</p>
-      <div class="sg-divider"></div>
-      <div class="sg-action-grid">
-        <button type="button" class="sg-action-card" onclick="window.print()">
-          <div><div class="sg-action-label" style="color:#2563eb;"><i class="fa-solid fa-print"></i>Imprimer canevas</div><div class="sg-action-sub">Feuille papier</div></div>
-        </button>
-        <button type="button" class="sg-action-card" onclick="sgRefreshDashboard()">
-          <div><div class="sg-action-label" style="color:#64748b;"><i class="fa-solid fa-cloud-arrow-up"></i>Reimporter</div><div class="sg-action-sub">Apres panne</div></div>
-        </button>
-      </div>
-    </div>
+{# ═══════════════════════════════════════════════════════ #}
+{#  SETTINGS                                              #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="settings" {% if active_section != 'settings' %}hidden{% endif %}>
+  {% component "page_header" title="Paramètres" subtitle="" %}
+    {% fill "actions" %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--card-soft)] px-3 py-1 text-xs font-bold text-[color:var(--muted)]">
+        {{ request.user.username }}
+      </span>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-4 text-sm font-bold text-[color:var(--muted)]">Profil</h3>
+        <div class="mb-4 flex items-center gap-3 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+          <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[color:var(--school-primary-soft)] text-lg font-black text-[color:var(--school-primary)]">
+            {% if secretary_profile.avatar %}
+              <img src="{{ secretary_profile.avatar.url }}" alt="" class="h-full w-full rounded-full object-cover">
+            {% else %}
+              {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+            {% endif %}
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm font-black text-[color:var(--text)]">{{ request.user.get_full_name|default:request.user.username }}</div>
+            <div class="text-xs text-[color:var(--muted-2)]">{{ secretary_profile.phone|default:"Téléphone non renseigné" }} — {{ secretary_profile.location|default:"Localisation non renseignée" }}</div>
+          </div>
+        </div>
+        <form method="post" action="{% url 'secretary:profile_update' %}" enctype="multipart/form-data" class="space-y-4">
+          {% csrf_token %}
+          {% include "secretary/htmx/form_fields.html" with form=profile_form %}
+          {% component "button" label="Enregistrer le profil" icon_left="check" variant="primary" type="submit" %}{% endcomponent %}
+        </form>
+      {% endfill %}
+    {% endcomponent %}
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-4 text-sm font-bold text-[color:var(--muted)]">Préférences</h3>
+        <form method="post" action="{% url 'secretary:preferences_update' %}" class="space-y-4">
+          {% csrf_token %}
+          {% include "secretary/htmx/form_fields.html" with form=preference_form %}
+          {% component "button" label="Enregistrer les préférences" icon_left="check" variant="primary" type="submit" %}{% endcomponent %}
+        </form>
+        <div class="mt-4 border-t border-[color:var(--line)] pt-4 space-y-2">
+          <div class="flex items-center justify-between rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2">
+            <div><div class="text-xs font-bold text-[color:var(--text)]">Mot de passe</div><div class="text-[10px] text-[color:var(--muted-2)]">Changement géré par l'informaticien</div></div>
+            {% component "status_badge" label="Support" tone=status_warning %}{% endcomponent %}
+          </div>
+          <div class="flex items-center justify-between rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2">
+            <div><div class="text-xs font-bold text-[color:var(--text)]">Email</div><div class="text-[10px] text-[color:var(--muted-2)]">{{ request.user.email|default:"Non renseigné" }}</div></div>
+            {% component "status_badge" label="Compte" tone=status_neutral %}{% endcomponent %}
+          </div>
+          <div class="flex items-center justify-between rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2">
+            <div><div class="text-xs font-bold text-[color:var(--text)]">Fonction</div><div class="text-[10px] text-[color:var(--muted-2)]">{{ secretary_profile.get_position_display|default:"Secrétaire" }} — {{ secretary_profile.branch.name|default:"Annexe" }}</div></div>
+            {% component "status_badge" label="RH" tone=status_info %}{% endcomponent %}
+          </div>
+        </div>
+      {% endfill %}
+    {% endcomponent %}
   </div>
 </div>
 
+{# ═══════════════════════════════════════════════════════ #}
+{#  REPORTS                                               #}
+{# ═══════════════════════════════════════════════════════ #}
+<div class="space-y-4" data-sg-panel="reports" {% if active_section != 'reports' %}hidden{% endif %}>
+  {% component "page_header" title="Rapports" subtitle="" %}
+    {% fill "actions" %}
+      {% url 'secretary:daily_registry_report' as report_url %}
+      {% component "button" label="Excel" href=report_url|add:"?format=xlsx" icon_left="file-spreadsheet" variant="outline" size="sm" %}{% endcomponent %}
+      {% component "button" label="PDF" href=report_url|add:"?format=pdf" icon_left="file-text" variant="outline" size="sm" %}{% endcomponent %}
+      {% component "button" label="Imprimer" href=report_url icon_left="printer" variant="primary" size="sm" %}{% endcomponent %}
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 lg:grid-cols-3">
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-2 text-sm font-bold text-[color:var(--muted)]">Rapport journalier</h3>
+
+        <div class="flex flex-col items-center gap-2 rounded-xl bg-[color:var(--card-soft)] p-4 text-center">
+          <i data-lucide="file-text" style="width:28px;height:28px;" class="text-[color:var(--muted-2)]"></i>
+          <p class="text-xs font-bold text-[color:var(--muted)]">Générer le rapport du jour</p>
+          {% component "button" label="Voir le rapport" href=report_url icon_left="eye" variant="primary" size="sm" %}{% endcomponent %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-2 text-sm font-bold text-[color:var(--muted)]">Archivage</h3>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2">
+            <div class="flex items-center gap-2 text-xs"><i data-lucide="book-open" style="width:12px;height:12px;" class="text-[color:var(--school-primary)]"></i><span class="font-bold text-[color:var(--text)]">Entrées registre</span></div>
+            <span class="rounded-full bg-[color:var(--school-primary-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--school-primary)]">{{ pending_registry_count }}</span>
+          </div>
+          <div class="flex items-center justify-between rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2">
+            <div class="flex items-center gap-2 text-xs"><i data-lucide="user-clock" style="width:12px;height:12px;" class="text-[color:var(--info)]"></i><span class="font-bold text-[color:var(--text)]">Visites</span></div>
+            <span class="rounded-full bg-[color:var(--info-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--info)]">{{ visits_today }}</span>
+          </div>
+          <div class="flex items-center justify-between rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2">
+            <div class="flex items-center gap-2 text-xs"><i data-lucide="package" style="width:12px;height:12px;" class="text-[color:var(--warning)]"></i><span class="font-bold text-[color:var(--text)]">Dépôts</span></div>
+            <span class="rounded-full bg-[color:var(--warning-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--warning)]">{{ pending_documents_count }}</span>
+          </div>
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <h3 class="mb-2 text-sm font-bold text-[color:var(--muted)]">Mode dégradé</h3>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" onclick="window.print()" class="flex items-center justify-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3 text-xs font-bold text-[color:var(--school-primary)] transition hover:bg-[color:var(--card-soft)]/50">
+            <i data-lucide="printer" style="width:14px;height:14px;"></i>
+            Imprimer
+          </button>
+          <button type="button" onclick="location.reload()" class="flex items-center justify-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-3 text-xs font-bold text-[color:var(--muted)] transition hover:bg-[color:var(--card-soft)]/50">
+            <i data-lucide="refresh-cw" style="width:14px;height:14px;"></i>
+            Recharger
+          </button>
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+</div>
+
+{% endwith %}
 {% endblock %}

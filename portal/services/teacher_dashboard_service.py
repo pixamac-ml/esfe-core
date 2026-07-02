@@ -12,6 +12,7 @@ from academics.models import AcademicClass, AcademicScheduleEvent, EC, ECChapter
 from academics.services.lesson_log_service import get_teacher_lesson_logs
 from academics.services.schedule_service import get_teacher_next_events, get_teacher_week_schedule
 from accounts.models import BranchCashMovement, TeacherHonorariumEntry, UserPreference
+from notification_center.selectors import get_user_in_app_messages, get_user_unread_count
 from portal.models import AccountSupportState
 from students.models import Student, TeacherAttendance
 from portal.models import TeacherDashboardPreference
@@ -25,6 +26,8 @@ WEEKDAY_LABELS = [
     "Samedi",
     "Dimanche",
 ]
+
+TEACHER_EXCLUDED_NOTIFICATION_SOURCES = ("admissions", "inscriptions")
 
 
 def _teacher_dashboard_preference_defaults():
@@ -121,6 +124,9 @@ def _serialize_class_focus(academic_class, *, event_count, slot_count, subjects,
 def _get_teacher_director_assignments(*, teacher, branch, academic_class=None):
     from portal.models import DirectorTeacherAssignment
 
+    if branch is None:
+        return []
+
     assignments_qs = DirectorTeacherAssignment.objects.select_related(
         "academic_class",
         "academic_class__programme",
@@ -132,14 +138,16 @@ def _get_teacher_director_assignments(*, teacher, branch, academic_class=None):
         teacher=teacher,
         is_active=True,
     )
-    if branch is not None:
-        assignments_qs = assignments_qs.filter(branch=branch)
+    assignments_qs = assignments_qs.filter(branch=branch)
     if academic_class is not None:
         assignments_qs = assignments_qs.filter(academic_class=academic_class)
     return list(assignments_qs)
 
 
 def _resolve_teacher_class(*, teacher, branch, class_id):
+    if branch is None:
+        raise ValidationError("Aucune annexe rattachee pour le compte enseignant.")
+
     academic_class = (
         AcademicClass.objects.select_related(
             "programme",
@@ -152,7 +160,7 @@ def _resolve_teacher_class(*, teacher, branch, class_id):
     )
     if academic_class is None:
         raise ValidationError("Classe introuvable.")
-    if branch is not None and academic_class.branch_id != branch.id:
+    if academic_class.branch_id != branch.id:
         raise ValidationError("Cette classe n'appartient pas a votre annexe.")
 
     has_assignment = AcademicScheduleEvent.objects.filter(
@@ -192,9 +200,13 @@ def _chapter_prefetch():
 
 
 def _get_teacher_class_queryset(*, teacher, branch):
+    if branch is None:
+        return AcademicClass.objects.none()
+
     event_class_ids = list(
         AcademicScheduleEvent.objects.filter(
             teacher=teacher,
+            branch=branch,
             is_active=True,
         )
         .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
@@ -203,6 +215,7 @@ def _get_teacher_class_queryset(*, teacher, branch):
     slot_class_ids = list(
         WeeklyScheduleSlot.objects.filter(
             teacher=teacher,
+            branch=branch,
             is_active=True,
         ).values_list("academic_class_id", flat=True)
     )
@@ -222,15 +235,18 @@ def _get_teacher_class_queryset(*, teacher, branch):
         pk__in=class_ids,
         is_active=True,
     )
-    if branch is not None:
-        queryset = queryset.filter(branch=branch)
+    queryset = queryset.filter(branch=branch)
     return queryset.order_by("programme__title", "level", "id")
 
 
 def _get_teacher_ecs_for_class(*, teacher, branch, academic_class):
+    if branch is None or academic_class.branch_id != branch.id:
+        return []
+
     event_ec_ids = list(
         AcademicScheduleEvent.objects.filter(
             teacher=teacher,
+            branch=branch,
             academic_class=academic_class,
             is_active=True,
         )
@@ -240,6 +256,7 @@ def _get_teacher_ecs_for_class(*, teacher, branch, academic_class):
     slot_ec_ids = list(
         WeeklyScheduleSlot.objects.filter(
             teacher=teacher,
+            branch=branch,
             academic_class=academic_class,
             is_active=True,
         ).values_list("ec_id", flat=True)
@@ -268,8 +285,7 @@ def _get_teacher_ecs_for_class(*, teacher, branch, academic_class):
         )
         .order_by("ue__code", "title", "id")
     )
-    if branch is not None:
-        queryset = queryset.filter(ue__semester__academic_class__branch=branch)
+    queryset = queryset.filter(ue__semester__academic_class__branch=branch)
     return list(queryset)
 
 
@@ -434,6 +450,7 @@ def update_teacher_content(*, teacher, branch, content_id, title, content_type, 
         ECContent.CONTENT_TYPE_IMAGE,
         ECContent.CONTENT_TYPE_AUDIO,
     }
+    video_type = ECContent.CONTENT_TYPE_VIDEO
 
     if content_type in file_based_types:
         if file:
@@ -441,14 +458,16 @@ def update_teacher_content(*, teacher, branch, content_id, title, content_type, 
             _validate_content_file_extension(content_type=content_type, uploaded_file=file)
         elif not content.file:
             raise ValidationError("Un fichier est requis pour ce type de contenu.")
+        content.video_url = None
+    elif content_type == video_type:
+        if file:
+            content.file = file
+            _validate_content_file_extension(content_type=content_type, uploaded_file=file)
+        content.video_url = video_url
+        if not content.file and not content.video_url:
+            raise ValidationError("Ajoutez un fichier video ou une URL YouTube.")
     else:
         content.file = None
-
-    if content_type == ECContent.CONTENT_TYPE_VIDEO:
-        if not video_url:
-            raise ValidationError("Une URL video est requise pour ce type de contenu.")
-        content.video_url = video_url
-    else:
         content.video_url = None
 
     if content_type == ECContent.CONTENT_TYPE_TEXT:
@@ -601,12 +620,26 @@ def build_teacher_support_workspace_context(request, *, branch, class_id=None, e
     }
 
 
-def build_teacher_dashboard_context(request, *, branch, base_context_builder):
+def build_teacher_dashboard_context(
+    request,
+    *,
+    branch,
+    base_context_builder,
+    include_honoraria=True,
+    section="overview",
+):
+    if branch is None:
+        raise ValidationError("Aucune annexe rattachee pour le compte enseignant.")
+
     teacher = request.user
     today = timezone.localdate()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=7)
     now = timezone.now()
+    needs_class_data = section in {"overview", "classes", "supports", "schedule"}
+    needs_schedule = section in {"overview", "schedule"}
+    needs_logs = section in {"overview", "logs"}
+    needs_supports = section in {"overview", "supports"}
 
     teacher_events_qs = (
         AcademicScheduleEvent.objects.select_related(
@@ -625,34 +658,19 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
         )
         .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
     )
-    if branch is not None:
-        teacher_events_qs = teacher_events_qs.filter(branch=branch)
+    teacher_events_qs = teacher_events_qs.filter(branch=branch)
 
     today_events = list(
-        teacher_events_qs
-        .filter(start_datetime__date=today)
-        .order_by("start_datetime", "id")
-    )
+        teacher_events_qs.filter(start_datetime__date=today).order_by("start_datetime", "id")
+    ) if needs_schedule or section == "overview" else []
     week_events = list(
         teacher_events_qs
         .filter(start_datetime__date__gte=week_start, start_datetime__date__lt=week_end)
         .order_by("start_datetime", "id")
     )
-    upcoming_events = get_teacher_next_events(teacher, limit=12)
-    if branch is not None:
-        upcoming_events = [event for event in upcoming_events if event.get("branch_name") == branch.name]
-    upcoming_events = upcoming_events[:8]
+    upcoming_events = get_teacher_next_events(teacher, limit=8, branch=branch) if section == "overview" else []
 
-    week_schedule = get_teacher_week_schedule(teacher, week_start)
-    if branch is not None:
-        week_schedule_events = [
-            event for event in week_schedule.get("events", [])
-            if event.get("branch_name") == branch.name
-        ]
-        week_schedule = {
-            **week_schedule,
-            "events": week_schedule_events,
-        }
+    week_schedule = get_teacher_week_schedule(teacher, week_start, branch=branch) if needs_schedule else {"events": [], "days": []}
 
     weekly_slots_qs = (
         WeeklyScheduleSlot.objects.select_related(
@@ -665,10 +683,9 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
         .filter(teacher=teacher, is_active=True)
         .order_by("academic_class__level", "academic_class__programme__title", "weekday", "start_time")
     )
-    if branch is not None:
-        weekly_slots_qs = weekly_slots_qs.filter(branch=branch)
-    weekly_slots = list(weekly_slots_qs)
-    director_assignments = _get_teacher_director_assignments(teacher=teacher, branch=branch)
+    weekly_slots_qs = weekly_slots_qs.filter(branch=branch)
+    weekly_slots = list(weekly_slots_qs) if needs_class_data else []
+    director_assignments = _get_teacher_director_assignments(teacher=teacher, branch=branch) if needs_class_data else []
 
     class_map = {}
     next_event_by_class = {}
@@ -757,65 +774,70 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
         if ec_id
     }
 
-    lesson_logs = get_teacher_lesson_logs(teacher, branch=branch, limit=6)
+    lesson_logs = get_teacher_lesson_logs(teacher, branch=branch, limit=6) if needs_logs else []
     lesson_logs_this_week = [
         log for log in lesson_logs
         if week_start <= log.date < week_end
     ]
 
-    logged_event_qs = LessonLog.objects.filter(
-        teacher=teacher,
-        schedule_event__isnull=False,
-        schedule_event__start_datetime__date__gte=week_start,
-        schedule_event__start_datetime__date__lt=week_end,
-    )
-    if branch is not None:
-        logged_event_qs = logged_event_qs.filter(branch=branch)
-    logged_event_ids = set(logged_event_qs.values_list("schedule_event_id", flat=True))
+    completed_or_past_week_events = [event for event in week_events if event.start_datetime <= now] if needs_logs else []
+    pending_lesson_logs = []
+    monthly_done_logs_count = 0
+    if needs_logs:
+        logged_event_ids = set(
+            LessonLog.objects.filter(
+                teacher=teacher,
+                branch=branch,
+                schedule_event__isnull=False,
+                schedule_event__start_datetime__date__gte=week_start,
+                schedule_event__start_datetime__date__lt=week_end,
+            ).values_list("schedule_event_id", flat=True)
+        )
+        pending_lesson_logs = [
+            event for event in completed_or_past_week_events if event.id not in logged_event_ids
+        ]
+        monthly_done_logs_count = LessonLog.objects.filter(
+            teacher=teacher,
+            branch=branch,
+            date__year=today.year,
+            date__month=today.month,
+            status=LessonLog.STATUS_DONE,
+        ).count()
 
-    completed_or_past_week_events = [event for event in week_events if event.start_datetime <= now]
-    pending_lesson_logs = [
-        event for event in completed_or_past_week_events
-        if event.id not in logged_event_ids
-    ]
-
-    monthly_done_logs = LessonLog.objects.filter(
-        teacher=teacher,
-        date__year=today.year,
-        date__month=today.month,
-        status=LessonLog.STATUS_DONE,
-    )
-    if branch is not None:
-        monthly_done_logs = monthly_done_logs.filter(branch=branch)
-
-    support_chapters_count = ECChapter.objects.filter(ec_id__in=teacher_ec_ids).count() if teacher_ec_ids else 0
+    support_chapters_count = ECChapter.objects.filter(ec_id__in=teacher_ec_ids).count() if needs_supports and teacher_ec_ids else 0
     support_contents_qs = ECContent.objects.filter(chapter__ec_id__in=teacher_ec_ids, is_active=True)
-    support_contents_count = support_contents_qs.count() if teacher_ec_ids else 0
+    support_contents_count = support_contents_qs.count() if needs_supports and teacher_ec_ids else 0
     support_file_count = (
         support_contents_qs.exclude(file="").filter(file__isnull=False).count()
-        if teacher_ec_ids
+        if needs_supports and teacher_ec_ids
         else 0
     )
     support_video_count = (
         support_contents_qs.exclude(video_url="").filter(video_url__isnull=False).count()
-        if teacher_ec_ids
+        if needs_supports and teacher_ec_ids
         else 0
     )
-    support_text_count = support_contents_qs.filter(content_type=ECContent.CONTENT_TYPE_TEXT).count() if teacher_ec_ids else 0
+    support_text_count = support_contents_qs.filter(content_type=ECContent.CONTENT_TYPE_TEXT).count() if needs_supports and teacher_ec_ids else 0
 
-    teacher_attendance_month_qs = TeacherAttendance.objects.filter(
-        teacher=teacher,
-        date__year=today.year,
-        date__month=today.month,
-    )
-    if branch is not None:
-        teacher_attendance_month_qs = teacher_attendance_month_qs.filter(branch=branch)
     teacher_attendance_summary = {
-        "present": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_PRESENT).count(),
-        "late": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_LATE).count(),
-        "absent": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_ABSENT).count(),
-        "total": teacher_attendance_month_qs.count(),
+        "present": 0,
+        "late": 0,
+        "absent": 0,
+        "total": 0,
     }
+    if section == "overview":
+        teacher_attendance_month_qs = TeacherAttendance.objects.filter(
+            teacher=teacher,
+            branch=branch,
+            date__year=today.year,
+            date__month=today.month,
+        )
+        teacher_attendance_summary = {
+            "present": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_PRESENT).count(),
+            "late": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_LATE).count(),
+            "absent": teacher_attendance_month_qs.filter(status=TeacherAttendance.STATUS_ABSENT).count(),
+            "total": teacher_attendance_month_qs.count(),
+        }
 
     preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
     status_summary = {
@@ -897,7 +919,7 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
     teacher_hours = {"month_hours": 0, "total_hours": 0}
     teacher_payments = {"pending_count": 0, "paid_count": 0, "recent_payments": []}
     teacher_hour_rows = []
-    if branch:
+    if include_honoraria:
         current_month_start = today.replace(day=1)
         year_start = today.replace(month=1, day=1)
 
@@ -990,7 +1012,7 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
             "week_courses": len(week_events),
             "active_classes": len(class_focus_rows),
             "visible_students": total_students_visible,
-            "month_done_logs": monthly_done_logs.count(),
+            "month_done_logs": monthly_done_logs_count,
             "subjects_count": len(subject_titles),
             "scheduled_days": scheduled_days_count,
             "weekly_rooms": len(weekly_rooms),
@@ -1011,8 +1033,170 @@ def build_teacher_dashboard_context(request, *, branch, base_context_builder):
         "teacher_hours": teacher_hours,
         "teacher_payments": teacher_payments,
         "teacher_hour_rows": teacher_hour_rows,
+        "notifications_count": 0,
+        "teacher_notifications": {"unread_count": 0, "items": []},
     }
     return context
+
+
+def build_teacher_overview_context(request, *, branch, base_context_builder):
+    """Build the overview payload without loading section-specific honoraria data."""
+    return build_teacher_dashboard_context(
+        request,
+        branch=branch,
+        base_context_builder=base_context_builder,
+        include_honoraria=False,
+        section="overview",
+    )
+
+
+def _build_teacher_standard_section_context(request, *, branch, base_context_builder, section):
+    return build_teacher_dashboard_context(
+        request,
+        branch=branch,
+        base_context_builder=base_context_builder,
+        include_honoraria=False,
+        section=section,
+    )
+
+
+def build_teacher_classes_context(request, *, branch, base_context_builder):
+    return _build_teacher_standard_section_context(request, branch=branch, base_context_builder=base_context_builder, section="classes")
+
+
+def build_teacher_supports_context(request, *, branch, base_context_builder):
+    return _build_teacher_standard_section_context(request, branch=branch, base_context_builder=base_context_builder, section="supports")
+
+
+def build_teacher_schedule_context(request, *, branch, base_context_builder):
+    return _build_teacher_standard_section_context(request, branch=branch, base_context_builder=base_context_builder, section="schedule")
+
+
+def build_teacher_logs_context(request, *, branch, base_context_builder):
+    return _build_teacher_standard_section_context(request, branch=branch, base_context_builder=base_context_builder, section="logs")
+
+
+def build_teacher_salary_context(request, *, branch, base_context_builder):
+    if branch is None:
+        raise ValidationError("Aucune annexe rattachée pour le compte enseignant.")
+
+    teacher = request.user
+    profile = getattr(teacher, "profile", None)
+    today = timezone.localdate()
+    current_month_start = today.replace(day=1)
+    year_start = today.replace(month=1, day=1)
+    entries = list(
+        TeacherHonorariumEntry.objects.filter(branch=branch, teacher=teacher)
+        .order_by("-period_month")
+    )
+    teacher_hours = {"month_hours": 0, "total_hours": 0}
+    teacher_payments = {"pending_count": 0, "paid_count": 0, "recent_payments": []}
+    teacher_hour_rows = []
+    status_map = {
+        TeacherHonorariumEntry.STATUS_DRAFT: ("pending", "À vérifier"),
+        TeacherHonorariumEntry.STATUS_READY: ("pending", "Disponible"),
+        TeacherHonorariumEntry.STATUS_PARTIAL: ("partial", "Retrait partiel"),
+        TeacherHonorariumEntry.STATUS_PAID: ("paid", "Payé"),
+    }
+    for entry in entries:
+        if entry.period_month == current_month_start:
+            teacher_hours["month_hours"] = float(entry.validated_hours)
+        if entry.period_month >= year_start:
+            teacher_hours["total_hours"] += float(entry.validated_hours)
+        status_slug, status_label = status_map.get(entry.status, ("draft", "Brouillon"))
+        teacher_hour_rows.append({
+            "month_label": entry.period_month.strftime("%B %Y"),
+            "hours": float(entry.validated_hours),
+            "tarif": entry.hourly_rate,
+            "gross_amount": entry.gross_amount,
+            "status": status_slug,
+            "status_display": status_label,
+            "entry_id": entry.pk,
+        })
+        if entry.status in (TeacherHonorariumEntry.STATUS_READY, TeacherHonorariumEntry.STATUS_DRAFT):
+            teacher_payments["pending_count"] += 1
+        elif entry.status in (TeacherHonorariumEntry.STATUS_PAID, TeacherHonorariumEntry.STATUS_PARTIAL):
+            teacher_payments["paid_count"] += 1
+
+    entry_ids = [entry.pk for entry in entries]
+    if entry_ids:
+        ref_pattern = "|".join(f"^HON-{pk}-" for pk in entry_ids)
+        recent_cash = BranchCashMovement.objects.filter(
+            branch=branch,
+            source=BranchCashMovement.SOURCE_HONORARIUM,
+            source_reference__regex=ref_pattern,
+            movement_date__gte=year_start,
+        ).order_by("-movement_date", "-created_at")[:10]
+        teacher_payments["recent_payments"] = [
+            {"label": movement.label, "date": movement.movement_date, "montant": movement.amount}
+            for movement in recent_cash
+        ]
+
+    preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
+    return {
+        **base_context_builder(request, page_title="Dashboard enseignant", module_cards=[]),
+        "dashboard_kind": "Enseignant",
+        "branch": branch,
+        "status_summary": {
+            "employment_status": getattr(profile, "get_employment_status_display", lambda: "Inconnu")(),
+            "employee_code": getattr(profile, "employee_code", "") or "Non renseigné",
+            "branch_name": branch.name,
+            "hire_date": getattr(profile, "hire_date", None),
+        },
+        "teacher_dashboard_preference": serialize_teacher_dashboard_preference(preference),
+        "teacher_hours": teacher_hours,
+        "teacher_payments": teacher_payments,
+        "teacher_hour_rows": teacher_hour_rows,
+        "pending_lesson_logs_count": 0,
+        "notifications_count": 0,
+    }
+
+
+def build_teacher_notifications_context(request, *, branch, base_context_builder):
+    teacher = request.user
+    profile = getattr(teacher, "profile", None)
+    preference = get_teacher_dashboard_preference(teacher=teacher, branch=branch)
+    messages = list(
+        get_user_in_app_messages(
+            teacher,
+            limit=30,
+            exclude_sources=TEACHER_EXCLUDED_NOTIFICATION_SOURCES,
+        )
+    )
+    notification_items = [
+        {
+            "id": message.pk,
+            "title": message.title,
+            "message": message.body,
+            "created_at": message.created_at,
+            "is_read": message.read_at is not None,
+            "priority": message.priority,
+            "url": (message.metadata or {}).get("url", ""),
+        }
+        for message in messages
+    ]
+    unread_count = get_user_unread_count(
+        teacher,
+        exclude_sources=TEACHER_EXCLUDED_NOTIFICATION_SOURCES,
+    )
+    return {
+        **base_context_builder(request, page_title="Dashboard enseignant", module_cards=[]),
+        "dashboard_kind": "Enseignant",
+        "branch": branch,
+        "status_summary": {
+            "employment_status": getattr(profile, "get_employment_status_display", lambda: "Inconnu")(),
+            "employee_code": getattr(profile, "employee_code", "") or "Non renseigne",
+            "branch_name": getattr(branch, "name", "Non rattache"),
+            "hire_date": getattr(profile, "hire_date", None),
+        },
+        "teacher_dashboard_preference": serialize_teacher_dashboard_preference(preference),
+        "notifications_count": unread_count,
+        "teacher_notifications": {
+            "unread_count": unread_count,
+            "items": notification_items,
+        },
+        "pending_lesson_logs_count": 0,
+    }
 
 
 def build_teacher_settings_context(request, *, branch, base_context_builder):
@@ -1028,12 +1212,12 @@ def build_teacher_settings_context(request, *, branch, base_context_builder):
         "hire_date": getattr(profile, "hire_date", None),
     }
     class_ids = set(
-        AcademicScheduleEvent.objects.filter(teacher=teacher, is_active=True)
+        AcademicScheduleEvent.objects.filter(teacher=teacher, branch=branch, is_active=True)
         .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
         .values_list("academic_class_id", flat=True)
     )
     class_ids.update(
-        WeeklyScheduleSlot.objects.filter(teacher=teacher, is_active=True).values_list("academic_class_id", flat=True)
+        WeeklyScheduleSlot.objects.filter(teacher=teacher, branch=branch, is_active=True).values_list("academic_class_id", flat=True)
     )
     class_ids.update(
         assignment.academic_class_id
@@ -1084,6 +1268,9 @@ def build_teacher_settings_context(request, *, branch, base_context_builder):
 
 
 def build_teacher_class_detail_context(request, *, branch, class_id, week_start=None):
+    if branch is None:
+        raise ValidationError("Aucune annexe rattachee pour le compte enseignant.")
+
     teacher = request.user
     anchor_date = week_start or timezone.localdate()
     normalized_week_start = anchor_date - timedelta(days=anchor_date.weekday())
@@ -1116,8 +1303,7 @@ def build_teacher_class_detail_context(request, *, branch, class_id, week_start=
         .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
         .order_by("start_datetime", "id")
     )
-    if branch is not None:
-        events_qs = events_qs.filter(branch=branch)
+    events_qs = events_qs.filter(branch=branch)
     week_events = list(events_qs)
 
     weekly_slots_qs = WeeklyScheduleSlot.objects.select_related("ec", "teacher").filter(
@@ -1125,8 +1311,7 @@ def build_teacher_class_detail_context(request, *, branch, class_id, week_start=
         teacher=teacher,
         is_active=True,
     )
-    if branch is not None:
-        weekly_slots_qs = weekly_slots_qs.filter(branch=branch)
+    weekly_slots_qs = weekly_slots_qs.filter(branch=branch)
     weekly_slots = list(weekly_slots_qs.order_by("weekday", "start_time", "id"))
 
     students = list(
@@ -1148,8 +1333,7 @@ def build_teacher_class_detail_context(request, *, branch, class_id, week_start=
         teacher=teacher,
         academic_class=academic_class,
     )
-    if branch is not None:
-        logs_qs = logs_qs.filter(branch=branch)
+    logs_qs = logs_qs.filter(branch=branch)
     recent_logs = list(logs_qs.order_by("-date", "-start_time", "-id")[:6])
 
     next_event = (
@@ -1164,7 +1348,7 @@ def build_teacher_class_detail_context(request, *, branch, class_id, week_start=
         .order_by("start_datetime", "id")
         .first()
     )
-    if branch is not None and next_event is not None and next_event.branch_id != branch.id:
+    if next_event is not None and next_event.branch_id != branch.id:
         next_event = None
 
     subject_rows = []
@@ -1223,6 +1407,9 @@ def build_teacher_class_detail_context(request, *, branch, class_id, week_start=
 
 
 def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
+    if branch is None:
+        raise ValidationError("Aucune annexe rattachee pour le compte enseignant.")
+
     teacher = request.user
     event_qs = AcademicScheduleEvent.objects.select_related(
         "academic_class",
@@ -1237,8 +1424,7 @@ def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
         event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
         is_active=True,
     )
-    if branch is not None:
-        event_qs = event_qs.filter(branch=branch)
+    event_qs = event_qs.filter(branch=branch)
     schedule_event = event_qs.first()
     if schedule_event is None:
         raise ValidationError("Cours introuvable pour cet enseignant.")
@@ -1248,8 +1434,7 @@ def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
         schedule_event=schedule_event,
         date=timezone.localdate(schedule_event.start_datetime),
     )
-    if branch is not None:
-        log_qs = log_qs.filter(branch=branch)
+    log_qs = log_qs.filter(branch=branch)
     lesson_log = log_qs.first()
 
     teacher_marked_present = TeacherAttendance.objects.filter(

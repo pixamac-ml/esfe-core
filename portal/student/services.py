@@ -6,8 +6,8 @@ from django.utils import timezone
 
 from academics.models import AcademicScheduleEvent, EC, ECContent, ECGrade, StudentContentProgress, WeeklyScheduleSlot
 from academics.services.schedule_service import get_student_week_schedule
-from communication.selectors import get_user_notifications
-from communication.models import CommunicationNotification
+from notification_center.selectors import get_user_notifications
+from notifier.models import NotificationMessage
 from news.models import Event
 from payments.models import Payment
 from .profile_service import get_profile_completion, get_profile_data
@@ -641,7 +641,7 @@ def get_student_messages(student):
         get_user_notifications(
             student.user,
             limit=24,
-            channel=CommunicationNotification.CHANNEL_IN_APP,
+            channel=NotificationMessage.CHANNEL_IN_APP,
         )
     )
     return [_serialize_student_notification(item) for item in communication_items]
@@ -679,9 +679,9 @@ def _notification_visuals(category, priority):
         "Systeme": ("bell-ring", "neutral"),
     }
     icon, tone = by_category.get(category, ("bell-ring", "neutral"))
-    if priority == CommunicationNotification.PRIORITY_CRITICAL:
+    if priority == NotificationMessage.PRIORITY_CRITICAL:
         return icon, "danger"
-    if priority == CommunicationNotification.PRIORITY_HIGH:
+    if priority == NotificationMessage.PRIORITY_HIGH:
         return icon, "warning"
     return icon, tone
 
@@ -709,9 +709,9 @@ def _serialize_student_notification(item):
 
 
 def get_student_message_summary(student):
-    qs = CommunicationNotification.objects.filter(
+    qs = NotificationMessage.objects.filter(
         recipient=student.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
     )
     items = list(qs.order_by("-created_at")[:100])
     categories = {}
@@ -751,9 +751,9 @@ def get_student_notification_events(student):
 
 
 def get_student_unread_messages_count(student):
-    return CommunicationNotification.objects.filter(
+    return NotificationMessage.objects.filter(
         recipient=student.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
         read_at__isnull=True,
     ).count()
 

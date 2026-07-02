@@ -1,4 +1,17 @@
-<span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold {{ classes }}">
+<span
+  x-data="{ hidden: false }"
+  x-show="!hidden"
+  class="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold {{ classes }}">
   {% if icon %}<i data-lucide="{{ icon }}" style="width:12px;height:12px;"></i>{% endif %}
   {{ label }}
+  {% if dismissible %}
+    <button
+      type="button"
+      @click="hidden = true; $dispatch('{{ dismiss_event }}')"
+      class="-mr-0.5 ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full opacity-60 transition hover:opacity-100"
+      aria-label="Supprimer"
+    >
+      <i data-lucide="x" style="width:10px;height:10px;"></i>
+    </button>
+  {% endif %}
 </span>

@@ -24,9 +24,9 @@ from reportlab.lib.styles import getSampleStyleSheet
 from accounts.dashboards.helpers import get_user_branch
 from accounts.forms import ProfileForm, UserPreferenceForm
 from accounts.models import PayrollEntry, Profile, UserPreference
-from communication.models import CommunicationNotification
-from communication.selectors import get_user_notifications, get_user_unread_count
-from communication.services import NotificationService
+from notifier.models import NotificationMessage
+from notification_center.selectors import get_user_notifications, get_user_unread_count
+from notifier.services import NotificationBus
 from .forms import (
     AppointmentForm,
     DocumentReceiptForm,
@@ -227,16 +227,40 @@ def secretary_dashboard(request):
     context["student_query"] = request.GET.get("student_q", "").strip()
     if context["student_query"]:
         context["active_section"] = "students"
+
+    branch_name = branch.name if branch else ""
+    user_display_name = request.user.get_full_name() or request.user.username
+    context["branch_name"] = branch_name
+    context["user_display_name"] = user_display_name
+    active_sec = context["active_section"]
+    sidebar_items = [
+        {"divider": "Général"},
+        {"label": "Vue d'ensemble", "icon": "layout-dashboard", "url": "?section=overview", "active": active_sec == "overview"},
+        {"label": "Registre", "icon": "book-open", "url": "?section=registry", "active": active_sec == "registry", "badge": context.get("pending_registry_count", 0), "badge_tone": "primary"},
+        {"label": "Visiteurs", "icon": "user-clock", "url": "?section=visits", "active": active_sec == "visits"},
+        {"label": "Dépôts", "icon": "archive", "url": "?section=deposits", "active": active_sec == "deposits", "badge": context.get("pending_documents_count", 0), "badge_tone": "warning"},
+        {"divider": "Suivi"},
+        {"label": "Rendez-vous", "icon": "calendar-days", "url": "?section=appointments", "active": active_sec == "appointments", "badge": context.get("appointments_today", 0), "badge_tone": "info"},
+        {"label": "Classes", "icon": "school", "url": "?section=classes", "active": active_sec == "classes"},
+        {"label": "Étudiants", "icon": "graduation-cap", "url": "?section=students", "active": active_sec == "students"},
+        {"divider": "Gestion"},
+        {"label": "Rapports", "icon": "file-export", "url": "?section=reports", "active": active_sec == "reports"},
+        {"label": "Salaire", "icon": "wallet", "url": "?section=salary", "active": active_sec == "salary"},
+        {"label": "Notifications", "icon": "bell", "url": "?section=notifications", "active": active_sec == "notifications", "badge": context.get("messages_count", 0), "badge_tone": "danger"},
+        {"divider": "Compte"},
+        {"label": "Paramètres", "icon": "settings", "url": "?section=settings", "active": active_sec == "settings"},
+    ]
+    context["nav_items"] = sidebar_items
     selected_notification = None
     notification_id = request.GET.get("notification_id")
     if notification_id:
         selected_notification = get_object_or_404(
-            CommunicationNotification.objects.select_related("actor", "event"),
+            NotificationMessage.objects.select_related("actor", "event"),
             pk=notification_id,
             recipient=request.user,
-            channel=CommunicationNotification.CHANNEL_IN_APP,
+            channel=NotificationMessage.CHANNEL_IN_APP,
         )
-        NotificationService.mark_as_read(selected_notification)
+        NotificationBus.mark_as_read(selected_notification)
         context["active_section"] = "notifications"
     if context["student_query"]:
         students_queryset = search_students(context["student_query"], user=request.user)
@@ -389,7 +413,7 @@ def secretary_dashboard(request):
 
     notifications_queryset = get_user_notifications(
         request.user,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
     )
     context["notifications_page"] = _paginate(request, notifications_queryset, per_page=10, page_param="notifications_page")
     context["notifications_rows"] = context["notifications_page"].object_list
@@ -516,7 +540,7 @@ def registry_kanban_move(request, pk, new_status):
     filters = _kanban_filters(request)
     response = render(
         request,
-        "secretary/partials/registry_kanban_board.html",
+        "secretary/htmx/registry_kanban_board.html",
         {
             "columns": _kanban_columns(request, filters),
             "querystring": _kanban_querystring(filters),
@@ -663,7 +687,7 @@ def registry_detail(request, pk):
         })
     return render(
         request,
-        "secretary/partials/registry_detail_drawer.html",
+        "secretary/htmx/registry_detail_drawer.html",
         {"entry": entry, "history_events": history_events},
     )
 
@@ -1111,7 +1135,7 @@ def student_snapshot_view(request, student_id):
         from academics.services.schedule_service import get_student_week_schedule
         student_schedule = get_student_week_schedule(student, timezone.localdate())
     if _is_htmx(request):
-        return render(request, "secretary/partials/student_drawer.html", {
+        return render(request, "secretary/htmx/student_drawer.html", {
             "snapshot": snapshot,
             "student_schedule": student_schedule,
         })
@@ -1150,7 +1174,7 @@ def htmx_command_palette(request):
         })
     return render(
         request,
-        "secretary/partials/command_palette_results.html",
+        "secretary/htmx/command_palette_results.html",
         {"query": query, "students": students, "actions": actions},
     )
 
@@ -1163,7 +1187,7 @@ def htmx_student_results(request):
     page_obj = _paginate(request, students_queryset, per_page=10)
     return render(
         request,
-        "secretary/partials/student_results.html",
+        "secretary/htmx/student_results.html",
         {"students": page_obj.object_list, "page_obj": page_obj, "query": query},
     )
 
@@ -1176,7 +1200,7 @@ def htmx_class_results(request):
     page_obj = _paginate(request, classes_queryset, per_page=12)
     return render(
         request,
-        "secretary/partials/class_results.html",
+        "secretary/htmx/class_results.html",
         {"classes": page_obj.object_list, "page_obj": page_obj, "query": query},
     )
 
@@ -1188,7 +1212,7 @@ def htmx_class_students(request, class_id):
     page_obj = _paginate(request, students, per_page=15)
     return render(
         request,
-        "secretary/partials/class_students.html",
+        "secretary/htmx/class_students.html",
         {"academic_class": academic_class, "students": page_obj.object_list, "page_obj": page_obj},
     )
 
@@ -1200,7 +1224,7 @@ def htmx_registry_results(request):
     page_obj = _paginate(request, get_registry_queryset(filters, user=request.user), per_page=12)
     return render(
         request,
-        "secretary/partials/registry_results.html",
+        "secretary/htmx/registry_results.html",
         {"entries": page_obj.object_list, "page_obj": page_obj, "query": filters.get("q", "")},
     )
 
@@ -1212,7 +1236,7 @@ def htmx_appointment_results(request):
     page_obj = _paginate(request, get_appointments_queryset(filters, user=request.user), per_page=12)
     return render(
         request,
-        "secretary/partials/appointment_results.html",
+        "secretary/htmx/appointment_results.html",
         {"appointments": page_obj.object_list, "page_obj": page_obj, "query": filters.get("q", "")},
     )
 
@@ -1224,7 +1248,7 @@ def htmx_document_results(request):
     page_obj = _paginate(request, get_documents_queryset(filters, user=request.user), per_page=12)
     return render(
         request,
-        "secretary/partials/document_results.html",
+        "secretary/htmx/document_results.html",
         {"receipts": page_obj.object_list, "page_obj": page_obj, "query": filters.get("q", "")},
     )
 
@@ -1236,7 +1260,7 @@ def htmx_task_results(request):
     page_obj = _paginate(request, get_tasks_queryset(filters, user=request.user), per_page=12)
     return render(
         request,
-        "secretary/partials/task_results.html",
+        "secretary/htmx/task_results.html",
         {"tasks": page_obj.object_list, "page_obj": page_obj, "query": filters.get("q", "")},
     )
 
@@ -1247,11 +1271,11 @@ def htmx_messages_panel(request):
     messages_list = get_user_notifications(
         request.user,
         limit=8,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
     )
     return render(
         request,
-        "secretary/partials/messages_panel.html",
+        "secretary/htmx/messages_panel.html",
         {
             "recent_messages": messages_list,
             "unread_count": get_user_unread_count(request.user),
@@ -1262,13 +1286,13 @@ def htmx_messages_panel(request):
 @login_required
 def htmx_dashboard_scope(request):
     context = _dashboard_base_context(request)
-    return render(request, "secretary/partials/dashboard_scope.html", context)
+    return render(request, "secretary/htmx/dashboard_scope.html", context)
 
 
 @login_required
 def htmx_dashboard_kpis(request):
     context = _dashboard_base_context(request)
-    return render(request, "secretary/partials/dashboard_kpis.html", context)
+    return render(request, "secretary/htmx/dashboard_kpis.html", context)
 
 
 @login_required
@@ -1276,7 +1300,7 @@ def htmx_sidebar_counters(request):
     context = _dashboard_base_context(request)
     context["messages_count"] = get_user_unread_count(request.user)
     context["active_section"] = _dashboard_section(request)
-    return render(request, "secretary/partials/sidebar_counters.html", context)
+    return render(request, "secretary/htmx/sidebar_counters.html", context)
 
 
 @login_required
@@ -1294,25 +1318,25 @@ def htmx_overview_registry(request):
         page_param="overview_registry_page",
     )
     context["pending_registry_rows"] = context["dashboard_pending_registry_page"].object_list
-    return render(request, "secretary/partials/dashboard_overview_registry.html", context)
+    return render(request, "secretary/htmx/overview_registry.html", context)
 
 
 @login_required
 def htmx_overview_appointments(request):
     context = _dashboard_base_context(request)
-    return render(request, "secretary/partials/dashboard_overview_appointments.html", context)
+    return render(request, "secretary/htmx/overview_appointments.html", context)
 
 
 @login_required
 def htmx_overview_visits(request):
     context = _dashboard_base_context(request)
-    return render(request, "secretary/partials/dashboard_overview_visits.html", context)
+    return render(request, "secretary/htmx/overview_visits.html", context)
 
 
 @login_required
 def htmx_overview_tasks(request):
     context = _dashboard_base_context(request)
-    return render(request, "secretary/partials/dashboard_overview_tasks.html", context)
+    return render(request, "secretary/htmx/overview_tasks.html", context)
 
 
 @login_required
@@ -1326,7 +1350,7 @@ def htmx_visits_open(request):
         page_param="open_visits_page",
     )
     context["open_visits_rows"] = context["open_visits_page"].object_list
-    return render(request, "secretary/partials/dashboard_visits_open.html", context)
+    return render(request, "secretary/htmx/visits_open.html", context)
 
 
 @login_required
@@ -1340,7 +1364,7 @@ def htmx_appointments_today(request):
         page_param="appointments_page",
     )
     context["today_appointments_rows"] = context["appointments_page"].object_list
-    return render(request, "secretary/partials/dashboard_appointments_today.html", context)
+    return render(request, "secretary/htmx/appointments_today.html", context)
 
 
 @login_required
@@ -1358,7 +1382,7 @@ def htmx_documents_pending(request):
         page_param="documents_page",
     )
     context["pending_documents_rows"] = context["documents_page"].object_list
-    return render(request, "secretary/partials/dashboard_documents_pending.html", context)
+    return render(request, "secretary/htmx/documents_pending.html", context)
 
 
 @login_required

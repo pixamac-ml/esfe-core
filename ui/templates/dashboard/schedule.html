@@ -1,0 +1,41 @@
+{% load component_tags %}
+<div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)]">
+  <div class="flex items-center justify-between border-b border-[color:var(--line)] px-4 py-3">
+    <div class="flex items-center gap-2">
+      <i data-lucide="calendar" style="width:16px;height:16px;" class="text-[color:var(--school-primary)]"></i>
+      <span class="text-sm font-bold text-[color:var(--text)]">Emploi du temps</span>
+      {% if week_label %}<span class="text-xs font-semibold text-[color:var(--muted)]">{{ week_label }}</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <div class="relative grid min-w-[700px]" style="grid-template-columns: 60px repeat({{ num_days }}, 1fr);">
+      {# Header row #}
+      <div class="sticky top-0 border-b border-[color:var(--line)] bg-[color:var(--card)] p-2"></div>
+      {% for day in days %}
+        <div class="sticky top-0 border-b border-[color:var(--line)] bg-[color:var(--card)] p-2 text-center text-[11px] font-bold text-[color:var(--text)]">{{ day }}</div>
+      {% endfor %}
+
+      {# Time rows #}
+      {% for time in time_slots %}
+        <div class="border-b border-[color:var(--line)]/50 px-1 py-3 text-right text-[10px] font-semibold text-[color:var(--muted-2)]">{{ time }}</div>
+        {% for day in days %}
+          <div class="min-h-[40px] border-b border-[color:var(--line)]/30 border-l border-[color:var(--line)]/20"></div>
+        {% endfor %}
+      {% endfor %}
+
+      {# Course slots overlaid #}
+      {% for slot in processed_slots %}
+        <div
+          class="mx-0.5 rounded-lg border px-2 py-1.5 text-[11px] leading-tight transition hover:shadow-md overflow-hidden"
+          style="{{ slot.style }}"
+          title="{{ slot.label }} · {{ slot.teacher }}{% if slot.room %} · {{ slot.room }}{% endif %}"
+        >
+          <span class="font-extrabold" style="color: {{ slot.color_var }};">{{ slot.label }}</span>
+          {% if slot.teacher %}<span class="mt-0.5 block text-[10px] font-semibold text-[color:var(--muted)]">{{ slot.teacher }}</span>{% endif %}
+          {% if slot.room %}<span class="block text-[10px] font-medium text-[color:var(--muted-2)]">Salle {{ slot.room }}</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

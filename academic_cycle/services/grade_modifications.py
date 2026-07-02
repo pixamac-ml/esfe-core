@@ -16,9 +16,8 @@ from django.utils import timezone
 from academic_cycle.models import GradeModificationRequest
 from academic_cycle.services.audit_service import log_action
 from accounts.models import Profile
-from communication.models import CommunicationNotification
-from communication.services.email_service import EmailService
-from communication.services.notification_service import NotificationService
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 
 
 class GradeModificationError(Exception):
@@ -97,17 +96,17 @@ def request_grade_modification(*, branch, ec_grade, session_type, requested_scor
     )
 
     for approver in approvers:
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=approver,
             actor=requested_by,
             event_type="grade_modification_otp",
             title="Validation requise - Correction de note",
             body=body,
             source_app="academic_cycle",
-            priority=CommunicationNotification.PRIORITY_HIGH,
+            priority=NotificationMessage.PRIORITY_HIGH,
             channels=(
-                CommunicationNotification.CHANNEL_IN_APP,
-                CommunicationNotification.CHANNEL_WEBSOCKET,
+                NotificationMessage.CHANNEL_IN_APP,
+                NotificationMessage.CHANNEL_WEBSOCKET,
             ),
             metadata={
                 "grade_modification_request_id": request_obj.pk,
@@ -117,7 +116,7 @@ def request_grade_modification(*, branch, ec_grade, session_type, requested_scor
             legacy_object_id=str(request_obj.pk),
         )
         if approver.email:
-            EmailService.send_transactional(
+            NotificationBus.send_email(
                 subject=f"[ESFE] Validation requise - Correction de note - {branch}",
                 recipient=approver,
                 recipient_email=approver.email,

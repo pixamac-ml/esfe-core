@@ -1,4 +1,4 @@
-from communication.services import EmailService
+from notifier.services import NotificationBus
 
 
 # ======================================================
@@ -9,7 +9,7 @@ def send_institutional_email(subject, template, context, recipient):
     """
     Envoi d'un email institutionnel HTML + texte.
     """
-    return EmailService.send_transactional(
+    return NotificationBus.send_email(
         subject=subject,
         recipient_email=recipient,
         source_app="admissions",

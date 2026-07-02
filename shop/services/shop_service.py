@@ -13,8 +13,8 @@ from core.pdf_documents import generate_pdf as generate_esfe_pdf
 from accounts.models import BranchCashMovement
 from payments.models import PaymentAgent
 from accounts.services.accounting_documents import create_cash_movement
-from communication.models import CommunicationNotification
-from communication.services import EmailService, NotificationService
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 from accounts.dashboards.helpers import is_manager
 from shop.models import (
     ShopOrder,
@@ -480,14 +480,14 @@ def notify_shop_order_received(*, order, actor=None):
         f"Montant: {order.total_amount} FCFA."
     )
     for manager in _get_branch_manager_recipients(order.branch):
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=manager,
             actor=actor,
             event_type="shop_order_received",
             title=title,
             body=body,
             source_app="shop",
-            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            channels=(NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET),
             metadata={"order_id": order.pk, "branch_id": order.branch_id},
             legacy_source="shop_order",
             legacy_object_id=str(order.pk),
@@ -501,14 +501,14 @@ def notify_shop_payment_validated(*, order, payment, actor=None):
         "Votre recu est disponible."
     )
     if order.student_id:
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=order.student,
             actor=actor,
             event_type="shop_purchase_validated",
             title=title,
             body=body,
             source_app="shop",
-            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            channels=(NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET),
             metadata={
                 "order_id": order.pk,
                 "payment_id": payment.pk,
@@ -525,20 +525,20 @@ def notify_shop_payment_validated(*, order, payment, actor=None):
     for manager in _get_branch_manager_recipients(order.branch):
         if actor and manager.pk == actor.pk and is_manager(manager):
             continue
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=manager,
             actor=actor,
             event_type="shop_payment_validated_manager",
             title="Paiement boutique valide",
             body=manager_body,
             source_app="shop",
-            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            channels=(NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET),
             metadata={"order_id": order.pk, "payment_id": payment.pk, "branch_id": order.branch_id},
             legacy_source="shop_order",
             legacy_object_id=str(order.pk),
         )
     if order.buyer_email:
-        EmailService.send_transactional(
+        NotificationBus.send_email(
             subject=title,
             recipient=order.student if order.student_id else None,
             recipient_email=order.buyer_email,
@@ -564,20 +564,20 @@ def notify_shop_order_ready(*, order, actor=None):
     title = "Commande boutique prete"
     body = f"Votre commande {order.reference} est prete. Vous pouvez passer pour le retrait."
     if order.student_id:
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=order.student,
             actor=actor,
             event_type="shop_order_ready",
             title=title,
             body=body,
             source_app="shop",
-            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            channels=(NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET),
             metadata={"order_id": order.pk, "branch_id": order.branch_id},
             legacy_source="shop_order",
             legacy_object_id=str(order.pk),
         )
     if order.buyer_email:
-        EmailService.send_transactional(
+        NotificationBus.send_email(
             subject=title,
             recipient=order.student if order.student_id else None,
             recipient_email=order.buyer_email,
@@ -594,14 +594,14 @@ def notify_shop_order_delivered(*, order, actor=None):
     title = "Commande boutique remise"
     body = f"La commande {order.reference} a ete remise avec succes."
     if order.student_id:
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=order.student,
             actor=actor,
             event_type="shop_order_delivered",
             title=title,
             body=body,
             source_app="shop",
-            channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+            channels=(NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET),
             metadata={"order_id": order.pk, "branch_id": order.branch_id},
             legacy_source="shop_order",
             legacy_object_id=str(order.pk),

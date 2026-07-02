@@ -1,0 +1,167 @@
+ANALYSE DE L'APPLICATION UI — ESFE CORE
+========================================
+
+MISE À JOUR APRÈS STABILISATION
+-------------------------------
+
+Les blocages techniques décrits dans ce rapport ont été corrigés :
+
+- les 160 composants enregistrés ont maintenant un template compilable ;
+- la galerie rend correctement une réponse HTTP 200 ;
+- les sérialisations JavaScript principales utilisent désormais du JSON sûr ;
+- Tailwind scanne aussi les classes déclarées dans les composants Python ;
+- l'enregistrement des composants appartient maintenant à l'app ui ;
+- quatre tests automatiques couvrent la compilation, la galerie et des composants critiques ;
+- python manage.py test ui passe ;
+- python manage.py check passe ;
+- le CSS de production a été recompilé.
+
+Les travaux restant à planifier sont surtout structurels : séparer progressivement les composants métier, renforcer les tests d'interaction et migrer les dashboards famille par famille.
+
+VERDICT
+-------
+
+L'app ui possède une bonne base structurelle, mais elle est actuellement au stade alpha/intégration, pas encore une bibliothèque fiable à généraliser sur tous les dashboards.
+
+
+ÉTAT MESURÉ
+-----------
+
+- 158 composants ESFE déclarés.
+- 156 templates dans ui/templates.
+- 516 appels explicites répartis sur 118 composants.
+- 40 composants sans usage explicite détecté.
+- python manage.py check passe.
+- python manage.py test ui trouve 0 test.
+- La galerie /ui/galerie/ ne peut pas être rendue.
+
+
+PROBLÈMES BLOQUANTS
+-------------------
+
+1. La galerie plante dès le composant badge
+
+Le template ui/templates/atoms/badge.html utilise une expression de type Python dans une balise dynamique, syntaxe invalide pour Django.
+
+
+2. Dix composants ont un template inutilisable
+
+Six erreurs de syntaxe :
+
+- badge
+- stepper
+- progress_ring : filtre div inexistant
+- filter_bar : utilisation de slot sans chargement des tags
+- actions_cell : nom de composant dynamique non accepté
+- data_table : même problème
+
+Quatre chemins de templates inexistants :
+
+- article_meta
+- reaction_bar
+- blog_article_detail
+- share_card
+
+
+3. Un composant est silencieusement cassé
+
+Dans ui/components/formation_learning_outcomes/formation_learning_outcomes.py, get_context_data() est défini en dehors de la classe.
+
+
+4. Enregistrement des composants confus
+
+Les composants sont chargés simultanément par :
+
+- UiConfig.ready()
+- CoreConfig.ready()
+- l'autodécouverte de django-components
+
+L'app ui devrait être seule responsable de son catalogue. Core ne devrait pas connaître et importer chaque composant UI.
+
+
+5. Sérialisation JavaScript dangereuse ou invalide
+
+Plusieurs structures Python sont injectées directement dans Alpine ou JavaScript :
+
+- ui/templates/forms/combobox.html
+- ui/templates/dashboard/chart_card.html
+- ui/templates/dashboard/toast.html
+
+Il faut produire du JSON réel avec json_script ou une sérialisation centralisée, sans utiliser |safe sur des données arbitraires.
+
+
+6. Tailwind ne scanne pas les classes Python
+
+La configuration Tailwind ne scanne que les templates HTML. Pourtant, plusieurs classes CSS sont construites dans les fichiers Python, par exemple dans widget_card.py.
+
+Ces classes peuvent disparaître du CSS compilé en production.
+
+
+7. La frontière de l'app est trop large
+
+L'app ui mélange actuellement :
+
+- les primitives universelles ;
+- les composants métier notes, informaticien, admissions et inscriptions ;
+- les accès directs à la base dans navbar, footer et certains composants blog.
+
+Cela contredit le principe défini dans le catalogue : construire d'abord les briques universelles. Un composant visuel générique devrait recevoir ses données, et non interroger directement les modèles métier.
+
+
+8. Version non reproductible
+
+Le projet fixe django_components==0.148.0 dans requirements.txt, mais l'environnement analysé utilise la version 0.150.0.
+
+Les validations doivent être exécutées avec la version réellement verrouillée par le projet.
+
+
+CE QUI EST DÉJÀ SOLIDE
+----------------------
+
+- Le découpage atoms/forms/dashboard/layout est compréhensible.
+- Les tokens CSS sont centralisés dans esfe_theme.css.
+- Lucide, Alpine, HTMX et Chart.js sont disponibles localement.
+- La galerie constitue le bon outil de validation.
+- Les composants principaux sont déjà beaucoup utilisés : empty_state, dashboard_card, status_badge, button et widget_card.
+- Le catalogue fonctionnel définit correctement les priorités P1, P2 et P3.
+
+
+PLAN RECOMMANDÉ
+---------------
+
+1. Stabilisation immédiate
+
+Réparer les dix templates, formation_learning_outcomes, la sérialisation JSON et rendre toute la galerie sans erreur.
+
+
+2. Architecture
+
+Supprimer l'enregistrement depuis CoreConfig, définir une convention unique de chemins et séparer les composants universels des compositions métier.
+
+
+3. Tests obligatoires
+
+Ajouter :
+
+- un test compilant chaque template enregistré ;
+- un test HTTP de la galerie ;
+- des tests de rendu des variantes P1 ;
+- des tests des interactions HTMX et Alpine critiques.
+
+
+4. Solidifier uniquement les P1
+
+Vérifier systématiquement les états normal, focus, disabled, loading, error et empty, ainsi que l'accessibilité.
+
+Éviter de poursuivre les composants P2 et P3 avant cette stabilisation.
+
+
+5. Migrer progressivement les dashboards
+
+Migrer une famille à la fois, avec test, vérification dans la galerie, build CSS et commit isolé.
+
+
+CONCLUSION
+----------
+
+La vision et le catalogue sont bons, et la quantité de composants est déjà importante. La priorité doit maintenant passer de « créer des composants » à « rendre les composants P1 réellement exécutables, testés et canoniques ».

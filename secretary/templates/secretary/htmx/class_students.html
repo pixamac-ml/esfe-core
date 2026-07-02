@@ -1,0 +1,50 @@
+{% load component_tags %}
+{% if not academic_class %}
+  {% component "empty_state" title="Classe introuvable" message="Classe introuvable ou hors de votre annexe." icon="school" compact=True %}{% endcomponent %}
+{% else %}
+  <div class="flex items-center justify-between gap-4 px-4 py-3">
+    <div>
+      <div class="text-sm font-extrabold text-[color:var(--text)]">{{ academic_class }}</div>
+      <div class="text-xs font-semibold text-[color:var(--muted-2)]">{{ academic_class.programme.title }} - {{ academic_class.academic_year.name }} - {% if page_obj %}{{ page_obj.paginator.count }}{% else %}{{ students|length }}{% endif %} etudiant(s)</div>
+    </div>
+    {% component "status_badge" label=academic_class.level tone="primary" %}{% endcomponent %}
+  </div>
+  <table class="w-full">
+    <thead>
+      <tr class="border-b border-[color:var(--border)] text-left text-xs font-bold text-[color:var(--muted-2)]">
+        <th class="px-4 py-2.5">Matricule</th>
+        <th class="px-4 py-2.5">Etudiant</th>
+        <th class="px-4 py-2.5">Email</th>
+        <th class="px-4 py-2.5">Action</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-[color:var(--border)]">
+      {% for student in students %}
+        <tr class="hover:bg-[color:var(--accent-bg)] transition-colors">
+          <td class="px-4 py-2.5 font-mono text-xs font-bold text-[color:var(--text)]">{{ student.matricule }}</td>
+          <td class="px-4 py-2.5 text-sm font-extrabold text-[color:var(--text)]">{{ student.full_name }}</td>
+          <td class="px-4 py-2.5 text-xs font-medium text-[color:var(--muted-2)]">{{ student.email }}</td>
+          <td class="px-4 py-2.5">
+            <div class="flex items-center gap-2">
+              <button class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--text)] transition-colors hover:bg-[color:var(--accent-bg)]" type="button" hx-get="{% url 'secretary:student_snapshot' student.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-open"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+                Dossier
+              </button>
+              <button class="inline-flex items-center gap-1.5 rounded-lg bg-[color:var(--primary)] px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:opacity-90" type="button" hx-get="{% url 'secretary:registry_create' %}?student={{ student.id }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-plus"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M9 10h6"/><path d="M12 7v6"/></svg>
+                Registre
+              </button>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="px-4 py-6">{% component "empty_state" title="Aucun étudiant" message="Aucun etudiant actif dans cette classe." icon="users-round" compact=True %}{% endcomponent %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if page_obj and page_obj.has_other_pages %}
+    {% component "pagination" total=page_obj.paginator.count page=page_obj.number per_page=page_obj.paginator.per_page hx_target="#class-students-panel" %}{% endcomponent %}
+  {% elif page_obj and page_obj.paginator.count > 0 %}
+    <div class="mt-4 text-center text-xs font-semibold text-[color:var(--muted-2)]">{{ page_obj.paginator.count }} résultat{% if page_obj.paginator.count > 1 %}s{% endif %}</div>
+  {% endif %}
+{% endif %}

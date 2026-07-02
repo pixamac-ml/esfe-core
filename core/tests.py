@@ -80,7 +80,7 @@ class SeoPlatformTests(TestCase):
 
 
 class ContactFormTests(TestCase):
-	@patch("core.views.EmailService.send_transactional")
+	@patch("core.views.NotificationBus.send_email")
 	def test_contact_post_creates_message_without_serialization_error(self, mock_send):
 		response = self.client.post(
 			reverse("core:contact"),

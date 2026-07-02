@@ -1,0 +1,251 @@
+================================================================================
+ BILAN DU PROJET — CE QUI A ÉTÉ FAIT PENDANT L'ABSENCE
+ Branche : refonte/dashboards-ui
+ Date    : 2026-07-02
+================================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ PARTIE 1 — TRAVAIL COMMITÉ (dans git)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5 commits sur la branche refonte/dashboards-ui (27 juin 2026) :
+
+
+PHASE 0 — Fondations UI
+────────────────────────
+- Tokens sémantiques CSS créés dans static/core/css/esfe_theme.css :
+    --school-primary, --school-secondary, --text, --muted,
+    --success, --danger, --warning, --info,
+    --surface-0/1/2, --border, --line, --card-soft
+- Support dark-mode (.dark-preview)
+- CDN Tailwind supprimé de 3 templates et remplacé par main.css + esfe_theme.css
+- Fix Lucide/HTMX dans base_app.html
+
+
+PHASE 1 — Bibliothèque de composants (ui/components/)
+──────────────────────────────────────────────────────
+Nouveaux composants créés :
+  Atomes    : icon, label, avatar, pill
+  Molécules : form_field, search_bar, tabs
+  Organismes: kpi_row, data_table, toast
+
+Composants existants mis à jour :
+  button, status_badge, metric_card, dashboard_card, section_header
+  → tous utilisent les tokens CSS + icônes Lucide (plus de couleurs en dur)
+
+
+PHASE 2.1 — Dashboard Étudiant
+───────────────────────────────
+- KPIs convertis en metric_card + kpi_row
+- Sections HTMX centralisées en boucle sections[]
+- Contexte sections[] ajouté à la vue dashboard()
+
+
+PHASE 2.2 — Dashboard Enseignant
+─────────────────────────────────
+- Nav-tabs convertis vers tokens CSS
+- KPIs (sg-stat-box) → composant kpi_row
+- Contexte kpi_cards ajouté à teacher_portal()
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ PARTIE 2 — TRAVAIL NON-COMMITÉ (énorme — 228 fichiers modifiés)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+────────────────────────────────────────────────────────────────────────────
+ CHANTIER A — Migration communication/ → notifier/ + notification_center/
+────────────────────────────────────────────────────────────────────────────
+
+C'est le plus gros changement. L'ancienne app communication/ mélangeait
+deux choses très différentes dans le même dossier :
+  1. Le MOTEUR D'ENVOI (EventBus, dispatchers, providers email, WebSocket)
+  2. L'INTERFACE UTILISATEUR (centre de notifications, vues, templates)
+
+Cela causait une confusion permanente. La décision a été de séparer les
+deux en deux apps Django distinctes :
+
+  notifier/              → LE MOTEUR D'ENVOI (infrastructure pure)
+  ─────────────────────────────────────────────────────────────────
+  - NotificationBus : API unique (notify, send_email, mark_as_read)
+    remplace les 3 anciennes APIs : NotificationService, EmailService,
+    CommunicationEventBus
+  - Modèles renommés : NotificationEvent, NotificationMessage, DeliveryAttempt
+    (ex CommunicationEvent, CommunicationNotification, CommunicationDelivery)
+  - Dispatcher, channels, policy engine, audience resolver
+  - Providers email (Brevo)
+  - WebSocket consumer (ws/notifications/)
+  - Migrations créées et validées
+  - Tests unitaires (2 tests)
+
+  notification_center/   → L'INTERFACE UTILISATEUR (lecture seule)
+  ─────────────────────────────────────────────────────────────────
+  - Vues : centre de notifications, widget cloche, dropdown, marquer lu/non-lu
+  - URLs sous /notifications/
+  - Selecteurs : get_user_messages, get_user_unread_count, get_stats...
+  - Context processor global (remplace communication.context_processors)
+  - Templates : index, list, item, detail, dropdown, widget (avec WebSocket JS)
+  - Tests : test_views.py, test_selectors.py
+
+Migration des call sites (85 appels dans 15+ apps) :
+  - admissions, inscriptions, payments, shop, community
+  - secretary, portal, marketing, academics, accounts
+  - core, students, superadmin
+  Tous migrés de NotificationService.notify_user() → NotificationBus.notify()
+
+Config nettoyée :
+  - config/urls.py : URLs communication/ retirées, notification_center/ ajoutée
+  - config/asgi.py : WebSocket communication/ retiré, notifier/ ajouté
+  - config/settings.py : context_processor mis à jour
+  - ui/navbar : importe maintenant depuis notification_center (plus communication)
+
+Statut de communication/ :
+  - Toujours dans INSTALLED_APPS (nécessaire pour les migrations DB)
+  - Plus aucun import externe
+  - Plus aucune URL accessible
+  - Prochaine étape : migration des données DB, puis suppression définitive
+
+
+────────────────────────────────────────────────────────────────────────────
+ CHANTIER B — Dashboard Enseignant V2
+────────────────────────────────────────────────────────────────────────────
+
+Objectif : faire du dashboard enseignant la référence technique pour les
+autres dashboards. Travail réalisé :
+
+Sécurité par annexe (PRIORITÉ 0) :
+  - Annexe rendue OBLIGATOIRE : enseignant sans annexe → zéro donnée
+  - Querysets de cours, classes, créneaux, matières filtrés par branche
+  - Détail d'une classe d'une autre annexe refusé (403)
+  - Support vérifié contre l'annexe ET les affectations réelles
+  - Services de planning filtrés directement par branche
+  - Tests anti-fuite : compte sans annexe + classe d'une autre annexe
+
+Architecture HTMX (unique workspace) :
+  - Suppression des 8 sections simultanées rendues au chargement
+  - Un seul #teacher-workspace remplacé par HTMX selon la section active
+  - Navigation via hx-get + hx-push-url (URL navigable, bouton Précédent)
+  - Plus de rechargement global de page pour changer de section
+  - Composant ui tabs remplace la navigation HTML répétée
+  - Actualisation corrigée : cible uniquement #teacher-workspace
+
+Corrections UI :
+  - Recherche HTMX rendue visible après réponse (était invisible)
+  - Fermeture recherche au clic extérieur
+  - Sidebar mobile : panneau superposé avec overlay + réouverture
+  - Navigation active mise à jour instantanément avec Alpine
+  - Drawer spécifique remplacé par le composant ui drawer
+
+Nettoyage code :
+  - SG_SECTIONS et sgSwitchSection() supprimés (code mort)
+  - Anciens templates sg_* supprimés (sg_base.html, sg_dashboard.html,
+    sg_partials/notifications.html, overview_*.html, salary.html, etc.)
+  - Nouvelle structure : templates/portal/teacher/v2/
+
+
+────────────────────────────────────────────────────────────────────────────
+ CHANTIER C — Dashboard Secrétaire
+────────────────────────────────────────────────────────────────────────────
+
+Refonte majeure :
+  - secretary/templates/secretary/base.html : refonte complète de la structure
+  - secretary/templates/secretary/dashboard.html : refonte complète
+  - Anciens partials supprimés (20+ fichiers dans secretary/partials/)
+  - Nouvelle structure : secretary/templates/secretary/htmx/
+  - secretary/dashboards/ : nouvelle organisation des vues
+  - secretary/views.py et secretary/services.py mis à jour
+
+
+────────────────────────────────────────────────────────────────────────────
+ CHANTIER D — Bibliothèque UI massivement étendue (~40 nouveaux composants)
+────────────────────────────────────────────────────────────────────────────
+
+Atomes :
+  badge, spinner, skeleton, tooltip, avatar_group, divider
+
+Composants dashboard :
+  stat_card, mini_stat, chart_card, confirm_dialog, filter_bar,
+  glass_card, loading_overlay, pagination, progress_ring, schedule,
+  timeline, toolbar, widget_card, activity_wave, alert, animated_counter,
+  skeleton_card, page_header, actions_cell, amount_cell, avatar_name_cell,
+  status_cell
+
+Composants forms :
+  input, select, textarea, checkbox, radio_group, date_picker,
+  switch, stepper, combobox, amount_input, form_actions, form_section
+
+Composants layout :
+  breadcrumb, panel
+
+Composants enseignant-spécifiques :
+  teacher_sidebar, teacher_topbar, teacher_overview_section,
+  teacher_classes_section, teacher_logs_section, teacher_salary_section,
+  teacher_notifications_section, teacher_schedule_section,
+  teacher_settings_section, teacher_supports_section, teacher_workspace
+
+Composants secrétaire-spécifiques :
+  secretary_sidebar, secretary_topbar
+
+
+────────────────────────────────────────────────────────────────────────────
+ CHANTIER E — Nettoyage général
+────────────────────────────────────────────────────────────────────────────
+
+Supprimés :
+  - 9 fichiers HTML maquettes à la racine du projet :
+      maquettes_dg.html, dash_maquette.html, dash_section_2.html,
+      dash_section_3.html, dashboard_informaticien.html,
+      dashboard_surveillant.html, dashboard_surveillant_creation_emploi_du_temps.html,
+      section_alertes_risques_dg.html, section_workflow_annexes_dg.html
+  - Templates sg_* de l'enseignant (voir Chantier B)
+  - Anciens partials secrétaire (voir Chantier C)
+
+Ajoutés :
+  - mockups/CATALOGUE_BIBLIOTHEQUE_UI_ESFE.md
+  - mockups/secretaire.txt
+  - core/migrations/0010_migrate_and_delete_legacy_notification.py
+    (suppression du modèle legacy core.Notification)
+
+Documents d'analyse créés à la racine :
+  - analyse_communication_vs_notification.txt (ce qui a guidé le chantier A)
+  - analyse_app_ui.txt
+  - resume_refonte.md (plan général de la refonte)
+  - plan_finalisation_dashboard_enseignant.txt (plan détaillé du chantier B)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ÉTAT DU PROJET — VERDICT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  python manage.py check --settings=config.settings_test_local → 0 issues ✅
+
+Le projet est dans un état stable et cohérent. Toutes les migrations
+s'appliquent, tous les imports sont résolus, le serveur peut démarrer.
+
+La quantité de travail non-commité est très importante (228 fichiers,
+~3500 lignes ajoutées, ~12000 lignes supprimées). Il serait prudent
+de commiter tout cela en plusieurs commits organisés par chantier
+avant de continuer.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ PROCHAINES ÉTAPES (selon les plans existants)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. [URGENT] Commiter le travail en cours (ne pas risquer de perdre 228 fichiers)
+
+  2. [MOYEN TERME] Migration des données DB communication_* → notifier_*
+     puis suppression définitive du dossier communication/
+
+  3. [MOYEN TERME] Continuer la refonte des dashboards :
+     - Phase 2.3 Dashboard Gestionnaire (~1500 lignes, 481 fa-*)
+     - Phase 2.4 Dashboard Directeur
+     - Phase 2.5 Dashboard DG
+     - Phase 2.6 Dashboard Informaticien
+
+  4. [LONG TERME] Unifier les ~23 layouts/bases différents
+  5. [LONG TERME] Convertir les 481 fa-* restants → Lucide
+  6. [LONG TERME] Vérification qualité : contraste, responsive, accessibilité
+
+================================================================================

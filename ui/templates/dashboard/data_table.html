@@ -1,16 +1,29 @@
-<div id="{{ id }}">
+{% load component_tags %}
+<div
+  id="{{ id }}"
+  x-data="{ loading: {{ loading|lower }} }"
+  @htmx:before-request="if ($event.detail.target.id === '{{ id }}' || $event.detail.target.closest('#{{ id }}')) loading = true"
+  @htmx:after-request="if ($event.detail.target.id === '{{ id }}' || $event.detail.target.closest('#{{ id }}')) loading = false"
+  @htmx:timeout="loading = false"
+  @htmx:error="loading = false"
+>
   {% if rows %}
-    <div class="overflow-x-auto rounded-xl border border-[color:var(--line)]">
+    <div class="relative overflow-x-auto rounded-xl border border-[color:var(--line)]">
       <table class="w-full text-sm">
         <thead>
           <tr class="bg-[color:var(--surface-2)]">
+            {% if selectable %}
+              <th class="w-10 px-4 py-3">
+                <input type="checkbox" x-data x-on:change="document.querySelectorAll('#{{ id }} tbody input[type=checkbox]').forEach(c => c.checked = $el.checked)" class="rounded border-[color:var(--line)] text-[color:var(--school-primary)] focus:ring-[color:var(--school-primary-soft)]">
+              </th>
+            {% endif %}
             {% for header in headers %}
               <th class="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)] {% if header.sortable %}cursor-pointer hover:text-[color:var(--text)]{% endif %}">
                 {% if header.sortable %}
-                  <a href="{{ header.sort_url }}" class="flex items-center gap-1">
+                  <a href="{{ header.sort_url }}" class="flex items-center gap-1" hx-get="{{ header.sort_url }}" hx-target="{{ hx_target }}" hx-trigger="click" hx-push-url="true">
                     {{ header.label }}
                     {% if header.sorted %}
-                      <i data-lucide="arrow-up" style="width:14px;height:14px;"></i>
+                      <i data-lucide="{% if header.sort_dir == 'desc' %}arrow-down{% else %}arrow-up{% endif %}" style="width:14px;height:14px;"></i>
                     {% endif %}
                   </a>
                 {% else %}
@@ -23,12 +36,39 @@
         <tbody class="divide-y divide-[color:var(--line)] bg-[color:var(--card)]">
           {% for row in rows %}
             <tr class="transition hover:bg-[color:var(--card-soft)]">
+              {% if selectable %}
+                <td class="px-4 py-3">
+                  <input type="checkbox" name="selected" value="{{ row.id|default:forloop.counter }}" class="rounded border-[color:var(--line)] text-[color:var(--school-primary)] focus:ring-[color:var(--school-primary-soft)]">
+                </td>
+              {% endif %}
               {% for cell in row.cells %}
-                <td class="px-4 py-3 text-[color:var(--text)] {% if cell.class %}{{ cell.class }}{% endif %}">
+                <td class="px-4 py-3 text-[color:var(--text)] {% if cell.class %}{{ cell.class }}{% endif %}"
+                    {% if cell.editable %}
+                      x-data="{ editing: false, value: '{{ cell.value|default:''|escapejs }}', saving: false, save() { if ('{{ cell_edit_url }}') { saving = true; let params = new URLSearchParams({value: this.value}); {% if cell.field %}params.append('field', '{{ cell.field }}');{% endif %} {% if row.id %}params.append('pk', '{{ row.id }}');{% endif %} fetch('{{ cell_edit_url }}', { method: 'POST', headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''}, body: params }).then(r => { saving = false; editing = false; if (!r.ok) throw Error(); }).catch(() => { saving = false; }) } else { editing = false; } } }"
+                      x-on:dblclick="editing = true"
+                    {% endif %}>
                   {% if cell.component %}
-                    {% component cell.component %}{% endcomponent %}
+                    {% component "dynamic" is=cell.component %}{% endcomponent %}
                   {% elif cell.html %}
                     {{ cell.html|safe }}
+                  {% elif cell.editable %}
+                    <span x-show="!editing" class="cursor-pointer hover:bg-[color:var(--card-soft)] px-1 -mx-1 rounded" x-on:dblclick="editing = true">
+                      <span x-text="value || '—'"></span>
+                      <i data-lucide="pencil" style="width:12px;height:12px;" class="inline-block ml-1 text-[color:var(--muted-2)]"></i>
+                    </span>
+                    <div x-show="editing" class="relative">
+                      <input x-model="value"
+                             x-on:blur="save()"
+                             x-on:keydown.escape="editing = false"
+                             x-on:keydown.enter="save()"
+                             x-ref="input"
+                             x-init="$nextTick(() => $refs.input.focus())"
+                             class="w-full rounded border border-[color:var(--school-primary)] bg-[color:var(--card)] px-2 py-1 text-sm text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--school-primary-soft)]"
+                             value="{{ cell.value|default:'' }}">
+                      <div x-show="saving" class="absolute right-1 top-1/2 -translate-y-1/2">
+                        {% component "spinner" size="sm" %}{% endcomponent %}
+                      </div>
+                    </div>
                   {% else %}
                     {{ cell.value|default:"—" }}
                   {% endif %}
@@ -38,7 +78,17 @@
           {% endfor %}
         </tbody>
       </table>
+      <div x-show="loading"
+           x-transition.opacity.duration.200ms
+           class="absolute inset-0 flex items-center justify-center rounded-xl bg-[color:var(--card)]/60"
+      >
+        <div class="flex flex-col items-center gap-2">
+          {% component "spinner" size="lg" %}{% endcomponent %}
+          <span class="text-xs font-semibold text-[color:var(--muted)]">Chargement...</span>
+        </div>
+      </div>
     </div>
+    {% slot "pagination" %}{% endslot %}
   {% else %}
     {% component "empty_state" title=empty_title message=empty_message icon=empty_icon %}{% endcomponent %}
   {% endif %}

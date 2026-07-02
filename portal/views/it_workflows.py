@@ -70,7 +70,7 @@ from portal.selectors.informaticien import grade_entries_for_class, support_tick
 from portal.models import SupportAuditLog, SupportTicket
 from students.models import Student
 from portal.views.admin_grades import _build_notes_grid_context
-from communication.models.notifications import CommunicationNotification
+from notifier.models import NotificationMessage
 
 
 def _require_it_support(request):
@@ -1571,7 +1571,7 @@ def it_notifications_workspace(request):
 
     # Return just the unread count badge (used by the bell icon)
     if request.GET.get("count_only"):
-        unread = CommunicationNotification.objects.filter(
+        unread = NotificationMessage.objects.filter(
             recipient=user, read_at__isnull=True,
         ).count()
         badge = (
@@ -1583,7 +1583,7 @@ def it_notifications_workspace(request):
 
     # Dropdown partial for the bell icon (7 latest notifications)
     if request.GET.get("partial") == "dropdown":
-        from communication.selectors import get_user_notifications, get_user_unread_count
+        from notification_center.selectors import get_user_notifications, get_user_unread_count
         notifs = get_user_notifications(user, limit=7)
         unread = get_user_unread_count(user)
         return render(request, "portal/informaticien/partials/notifications_dropdown_it.html", {
@@ -1599,7 +1599,7 @@ def it_notifications_workspace(request):
     page = request.GET.get("page", 1)
     notification_id = request.GET.get("notification_id")
 
-    qs = CommunicationNotification.objects.filter(
+    qs = NotificationMessage.objects.filter(
         Q(recipient=user) | Q(legacy_source__icontains="system"),
     )
 
@@ -1612,7 +1612,7 @@ def it_notifications_workspace(request):
     elif status_filter == "read":
         qs = qs.filter(read_at__isnull=False)
     elif status_filter == "failed":
-        qs = qs.filter(status=CommunicationNotification.STATUS_FAILED)
+        qs = qs.filter(status=NotificationMessage.STATUS_FAILED)
     if priority:
         qs = qs.filter(priority=priority)
     if source:
@@ -1630,19 +1630,19 @@ def it_notifications_workspace(request):
     selected_notification = None
     if notification_id:
         try:
-            selected_notification = CommunicationNotification.objects.filter(
+            selected_notification = NotificationMessage.objects.filter(
                 id=notification_id,
             ).select_related("event").prefetch_related("deliveries").first()
         except ValueError:
             pass
 
-    all_user_notifs = CommunicationNotification.objects.filter(recipient=user)
+    all_user_notifs = NotificationMessage.objects.filter(recipient=user)
     stats = {
         "total": all_user_notifs.count(),
         "unread": all_user_notifs.filter(read_at__isnull=True).count(),
-        "critical": all_user_notifs.filter(priority=CommunicationNotification.PRIORITY_CRITICAL).count(),
-        "email": all_user_notifs.filter(channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL).count(),
-        "failed": all_user_notifs.filter(status=CommunicationNotification.STATUS_FAILED).count(),
+        "critical": all_user_notifs.filter(priority=NotificationMessage.PRIORITY_CRITICAL).count(),
+        "email": all_user_notifs.filter(channel=NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL).count(),
+        "failed": all_user_notifs.filter(status=NotificationMessage.STATUS_FAILED).count(),
         "by_source": list(
             all_user_notifs.values("event__source_app").annotate(total=Count("id")).order_by("-total")[:5]
         ),
@@ -1662,10 +1662,10 @@ def it_notifications_workspace(request):
         "page_obj": page_obj,
         "stats": stats,
         "unread_count": unread_count,
-        "channels": CommunicationNotification.CHANNEL_CHOICES,
-        "priorities": CommunicationNotification.PRIORITY_CHOICES,
+        "channels": NotificationMessage.CHANNEL_CHOICES,
+        "priorities": NotificationMessage.PRIORITY_CHOICES,
         "sources": list(
-            CommunicationNotification.objects.filter(recipient=user)
+            NotificationMessage.objects.filter(recipient=user)
             .values_list("event__source_app", flat=True)
             .distinct()[:10]
         ),
@@ -1690,24 +1690,24 @@ def it_notifications_action(request):
     toast = None
 
     if action == "mark_read" and notification_id:
-        updated = CommunicationNotification.objects.filter(
+        updated = NotificationMessage.objects.filter(
             id=notification_id, recipient=user, read_at__isnull=True,
-        ).update(read_at=timezone.now(), status=CommunicationNotification.STATUS_READ)
+        ).update(read_at=timezone.now(), status=NotificationMessage.STATUS_READ)
         if updated:
             toast = {"level": "success", "message": "Notification marquee comme lue."}
         else:
             toast = {"level": "error", "message": "Notification deja lue ou introuvable."}
 
     elif action == "mark_unread" and notification_id:
-        CommunicationNotification.objects.filter(
+        NotificationMessage.objects.filter(
             id=notification_id, recipient=user,
-        ).update(read_at=None, status=CommunicationNotification.STATUS_DELIVERED)
+        ).update(read_at=None, status=NotificationMessage.STATUS_DELIVERED)
         toast = {"level": "success", "message": "Notification marquee comme non lue."}
 
     elif action == "mark_all_read":
-        count = CommunicationNotification.objects.filter(
+        count = NotificationMessage.objects.filter(
             recipient=user, read_at__isnull=True,
-        ).update(read_at=timezone.now(), status=CommunicationNotification.STATUS_READ)
+        ).update(read_at=timezone.now(), status=NotificationMessage.STATUS_READ)
         toast = {"level": "success", "message": f"{count} notification(s) marquee(s) comme lue(s)."}
 
     else:

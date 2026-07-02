@@ -5,12 +5,12 @@ Signaux pour les notifications automatiques lors des changements de statut
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from django.contrib.auth import get_user_model
 
 from admissions.models import Candidature
-from communication.models import CommunicationNotification
-from communication.services import NotificationService
-from communication.services.channel_policy import resolve_channel_policy
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
+from notifier.services.policy import resolve_channel_policy
+from notifier.services.audience import resolve_candidate_user_by_email, restrict_candidate_channels
 from core.models import StatusHistory
 
 # ==========================================================
@@ -49,10 +49,6 @@ NOTIFICATION_MESSAGES = {
 }
 
 
-def _get_candidate_user(email):
-    return get_user_model().objects.filter(email__iexact=email).first()
-
-
 def _queue_candidature_email(*, candidature_id, notification_id, notification_type):
     """Migration progressive: l'envoi transactionnel est pilote par communication/."""
     return None
@@ -86,17 +82,17 @@ def create_status_notification(candidature, notification_type):
         extra_context["admin_comment"] = candidature.admin_comment
         extra_context["comment"] = candidature.admin_comment
 
-    recipient_user = _get_candidate_user(candidature.email)
-    default_channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+    recipient_user = resolve_candidate_user_by_email(candidature.email)
+    default_channels = [NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL]
     if recipient_user:
         default_channels = [
-            CommunicationNotification.CHANNEL_IN_APP,
-            CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+            NotificationMessage.CHANNEL_IN_APP,
+            NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
         ]
     policy = resolve_channel_policy(
         notification_type,
         default_channels=default_channels,
-        default_priority=CommunicationNotification.PRIORITY_NORMAL,
+        default_priority=NotificationMessage.PRIORITY_NORMAL,
         metadata={
             "recipient_email": candidature.email,
             "recipient_name": recipient_name,
@@ -127,7 +123,8 @@ def create_status_notification(candidature, notification_type):
             },
         },
     )
-    event, created_notifications = NotificationService.notify_user(
+    policy["channels"] = restrict_candidate_channels(recipient_user, policy["channels"])
+    event, created_notifications = NotificationBus.notify(
         recipient=recipient_user,
         actor=None,
         event_type=notification_type,
@@ -255,17 +252,17 @@ def check_documents_after_status_change(sender, instance, created, **kwargs):
                 # CORRIGE: utiliser last_name et first_name au lieu de full_name
                 recipient_name = f"{instance.last_name} {instance.first_name}"
 
-                recipient_user = _get_candidate_user(instance.email)
-                default_channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+                recipient_user = resolve_candidate_user_by_email(instance.email)
+                default_channels = [NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL]
                 if recipient_user:
                     default_channels = [
-                        CommunicationNotification.CHANNEL_IN_APP,
-                        CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+                        NotificationMessage.CHANNEL_IN_APP,
+                        NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
                     ]
                 policy = resolve_channel_policy(
                     "document_missing",
                     default_channels=default_channels,
-                    default_priority=CommunicationNotification.PRIORITY_HIGH,
+                    default_priority=NotificationMessage.PRIORITY_HIGH,
                     metadata={
                         "recipient_email": instance.email,
                         "recipient_name": recipient_name,
@@ -301,7 +298,8 @@ def check_documents_after_status_change(sender, instance, created, **kwargs):
                         },
                     },
                 )
-                NotificationService.notify_user(
+                policy["channels"] = restrict_candidate_channels(recipient_user, policy["channels"])
+                NotificationBus.notify(
                     recipient=recipient_user,
                     actor=None,
                     event_type="document_missing",

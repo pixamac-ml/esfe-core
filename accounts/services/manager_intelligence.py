@@ -15,8 +15,8 @@ from accounts.models import (
     TeacherHonorariumEntry,
 )
 from accounts.services.accounting_documents import create_cash_movement
-from communication.models import CommunicationNotification
-from communication.services import NotificationService
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 from inscriptions.models import Inscription
 from payments.models import Payment
 
@@ -185,7 +185,7 @@ def prepare_missing_teacher_honorarium_entries(branch, period_month, user):
 
 
 def notify_teacher_honorarium_available(entry, actor):
-    existing_notification = CommunicationNotification.objects.filter(
+    existing_notification = NotificationMessage.objects.filter(
         recipient=entry.teacher,
         event_type="teacher_honorarium_available",
         legacy_source="teacher_honorarium_entry",
@@ -193,7 +193,7 @@ def notify_teacher_honorarium_available(entry, actor):
     ).exists()
     if existing_notification:
         return False
-    NotificationService.notify_user(
+    NotificationBus.notify(
         recipient=entry.teacher,
         actor=actor,
         event_type="teacher_honorarium_available",
@@ -203,7 +203,7 @@ def notify_teacher_honorarium_available(entry, actor):
             "Il peut etre consulte et retire selon la caisse disponible."
         ),
         source_app="accounts",
-        channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+        channels=(NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET),
         metadata={
             "honorarium_entry_id": entry.pk,
             "branch_id": entry.branch_id,
@@ -312,7 +312,7 @@ def build_monthly_closure_snapshot(
 
 
 def notify_salary_available(payroll_entry, actor):
-    existing_notification = CommunicationNotification.objects.filter(
+    existing_notification = NotificationMessage.objects.filter(
         recipient=payroll_entry.employee,
         event_type="salary_available",
         legacy_source="payroll_entry",
@@ -320,7 +320,7 @@ def notify_salary_available(payroll_entry, actor):
     ).exists()
     if existing_notification:
         return False
-    NotificationService.notify_user(
+    NotificationBus.notify(
         recipient=payroll_entry.employee,
         actor=actor,
         event_type="salary_available",
@@ -330,7 +330,7 @@ def notify_salary_available(payroll_entry, actor):
             "Vous pouvez passer pour le retrait selon la disponibilite caisse."
         ),
         source_app="accounts",
-        channels=(CommunicationNotification.CHANNEL_IN_APP, CommunicationNotification.CHANNEL_WEBSOCKET),
+        channels=(NotificationMessage.CHANNEL_IN_APP, NotificationMessage.CHANNEL_WEBSOCKET),
         metadata={
             "payroll_entry_id": payroll_entry.pk,
             "branch_id": payroll_entry.branch_id,

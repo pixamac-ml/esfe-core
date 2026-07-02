@@ -3,7 +3,7 @@ Context processors pour l'application community
 """
 
 # DEPRECATED: le compteur officiel de notifications passe par communication/.
-from communication.selectors import get_user_unread_count
+from notification_center.selectors import get_user_unread_count
 
 
 def notifications_processor(request):

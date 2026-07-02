@@ -1,11 +1,50 @@
-<div x-data="{ open: false }" class="relative inline-block">
-  <button @click="open = !open"
-          class="px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200">
-    {{ label }}
-  </button>
+{% load component_tags %}
+<div x-data="{ open: false }" @keydown.escape="open = false" class="relative inline-block">
+  <div @click="open = !open" class="cursor-pointer">
+    {% slot "trigger" %}
+      <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-sm font-bold text-[color:var(--text)] transition hover:bg-[color:var(--card-soft)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary-soft)]">
+        <span>Menu</span>
+        <i data-lucide="chevron-down" style="width:14px;height:14px;" class="transition" x-bind:class="open ? 'rotate-180' : ''"></i>
+      </button>
+    {% endslot %}
+  </div>
 
-  <div x-show="open" @click.outside="open = false"
-       class="absolute right-0 mt-2 w-48 bg-white border rounded-md shadow">
-    {% block content %}{% endblock %}
+  <div
+    x-show="open"
+    @click.outside="open = false"
+    x-transition:enter="transition ease-out duration-150"
+    x-transition:enter-start="opacity-0 scale-95"
+    x-transition:enter-end="opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-100"
+    x-transition:leave-start="opacity-100 scale-100"
+    x-transition:leave-end="opacity-0 scale-95"
+    x-cloak
+    class="absolute z-50 mt-1 min-w-[180px] {{ position_class }}"
+  >
+    <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] py-1 shadow-lg">
+      {% if items %}
+        {% for item in items %}
+          {% if item.divider %}
+            <div class="my-1 border-t border-[color:var(--line)]"></div>
+          {% else %}
+            <a
+              href="{{ item.url|default:'#' }}"
+              class="flex items-center gap-2.5 px-3 py-2 text-sm font-semibold transition
+                {% if item.danger %}text-[color:var(--danger)] hover:bg-[color:var(--danger-soft)]
+                {% else %}text-[color:var(--text)] hover:bg-[color:var(--card-soft)]{% endif %}"
+              {% if item.hx_get %}hx-get="{{ item.hx_get }}" hx-target="{{ item.hx_target }}"{% endif %}
+              @click="open = false"
+            >
+              {% if item.icon %}<i data-lucide="{{ item.icon }}" style="width:16px;height:16px;"></i>{% endif %}
+              {{ item.label }}
+            </a>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        {% slot "items" %}
+          <div class="px-3 py-2 text-sm text-[color:var(--muted)]">Aucun élément</div>
+        {% endslot %}
+      {% endif %}
+    </div>
   </div>
 </div>

@@ -1,0 +1,230 @@
+{% load component_tags %}
+<div>
+  <header class="flex items-start justify-between gap-4 px-6 py-5">
+    <div class="flex items-center gap-3.5 min-w-0">
+      <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-lg font-black text-white">
+        {{ snapshot.full_name|slice:":1"|upper }}
+      </div>
+      <div class="min-w-0">
+        <div class="text-base font-extrabold text-[color:var(--text)] truncate">{{ snapshot.full_name }}</div>
+        <div class="mt-1 flex flex-wrap gap-2 text-[11px] font-bold text-[color:var(--muted-2)]">
+          <span class="font-mono">{{ snapshot.matricule|default:"Matricule non defini" }}</span>
+          <span>{{ snapshot.academic_class|default:"Classe non definie" }}</span>
+          <span>{{ snapshot.academic_year|default:"Annee non definie" }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2.5 shrink-0">
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--accent-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--text)]">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        {{ snapshot.presence_state.label|default:"Statut non disponible" }}
+      </span>
+      <button type="button" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] px-3 py-1.5 text-xs font-bold text-[color:var(--text)] transition-colors hover:bg-[color:var(--accent-bg)]">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        Fermer
+      </button>
+    </div>
+  </header>
+
+  <div class="px-6 pb-6">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
+      <aside class="space-y-4">
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="mb-3 text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider">Fiche etudiant</div>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-at shrink-0 text-[color:var(--muted-2)]"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Email</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ snapshot.email|default:"-" }}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-graduation-cap shrink-0 text-[color:var(--muted-2)]"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Formation</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ snapshot.programme|default:"-" }}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-school shrink-0 text-[color:var(--muted-2)]"><path d="M14 22v-4a2 2 0 1 0-4 0v4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M18 5v17"/><path d="m4 6 8-4 8 4"/><path d="M6 5v17"/><circle cx="12" cy="9" r="1"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Classe</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ snapshot.academic_class|default:"-" }}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building shrink-0 text-[color:var(--muted-2)]"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Annexe</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ snapshot.branch|default:"-" }}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="mb-3 text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider">Activite administrative</div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="rounded-lg bg-blue-50 p-3 text-center">
+              <div class="text-lg font-black text-blue-600">{{ snapshot.registry_entries_count|default:0 }}</div>
+              <div class="text-[10px] font-bold text-[color:var(--muted-2)]">Registre</div>
+            </div>
+            <div class="rounded-lg bg-green-50 p-3 text-center">
+              <div class="text-lg font-black text-green-600">{{ snapshot.appointments_count|default:0 }}</div>
+              <div class="text-[10px] font-bold text-[color:var(--muted-2)]">RDV</div>
+            </div>
+            <div class="rounded-lg bg-purple-50 p-3 text-center">
+              <div class="text-lg font-black text-purple-600">{{ snapshot.open_visits_count|default:0 }}</div>
+              <div class="text-[10px] font-bold text-[color:var(--muted-2)]">Visites</div>
+            </div>
+            <div class="rounded-lg bg-amber-50 p-3 text-center">
+              <div class="text-lg font-black text-amber-600">{{ snapshot.documents_count|default:0 }}</div>
+              <div class="text-[10px] font-bold text-[color:var(--muted-2)]">Pieces</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="mb-3 text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider">Actions secretaire</div>
+          <div class="space-y-2">
+            <button type="button" class="flex w-full items-center justify-between rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] p-3 text-left transition-colors hover:bg-[color:var(--accent-bg)]" hx-get="{% url 'secretary:registry_create' %}?student={{ snapshot.student_id }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+              <div>
+                <div class="text-xs font-bold text-blue-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-plus inline-block mr-1"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="M9 10h6"/><path d="M12 7v6"/></svg>
+                  Nouvelle entree
+                </div>
+                <div class="text-[10px] font-semibold text-[color:var(--muted-2)]">Routage administratif</div>
+              </div>
+              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">+</span>
+            </button>
+            <button type="button" class="flex w-full items-center justify-between rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] p-3 text-left transition-colors hover:bg-[color:var(--accent-bg)]" hx-get="{% url 'secretary:appointment_create' %}?student={{ snapshot.student_id }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+              <div>
+                <div class="text-xs font-bold text-green-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-plus inline-block mr-1"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M10 16h4"/><path d="M12 14v4"/></svg>
+                  Rendez-vous
+                </div>
+                <div class="text-[10px] font-semibold text-[color:var(--muted-2)]">Planifier un passage</div>
+              </div>
+              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-600">+</span>
+            </button>
+            <button type="button" class="flex w-full items-center justify-between rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] p-3 text-left transition-colors hover:bg-[color:var(--accent-bg)]" hx-get="{% url 'secretary:visitor_create' %}?student={{ snapshot.student_id }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+              <div>
+                <div class="text-xs font-bold text-purple-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-plus inline-block mr-1"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
+                  Visite
+                </div>
+                <div class="text-[10px] font-semibold text-[color:var(--muted-2)]">Accueil au secretariat</div>
+              </div>
+              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-600">+</span>
+            </button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="space-y-4">
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="flex items-center justify-between gap-4 mb-3">
+            <div>
+              <div class="text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider" style="margin-bottom:4px;">Situation maintenant</div>
+              <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">Verification rapide pour savoir si l'etudiant est suppose etre en classe.</div>
+            </div>
+            {% if snapshot.current_event %}
+              {% component "status_badge" label=snapshot.current_event.time_range tone="info" %}{% endcomponent %}
+            {% else %}
+              {% component "status_badge" label="Hors cours" tone="neutral" %}{% endcomponent %}
+            {% endif %}
+          </div>
+          {% if snapshot.current_event %}
+            <div class="flex items-center justify-between rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] p-3">
+              <div>
+                <div class="text-xs font-bold text-blue-600">{{ snapshot.current_event.title }}</div>
+                <div class="text-[10px] font-semibold text-[color:var(--muted-2)]">{{ snapshot.current_event.teacher_name }} - {{ snapshot.current_event.location|default:"Salle non precisee" }} - {{ snapshot.current_event.attendance_label }}</div>
+              </div>
+              <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold bg-[color:var(--accent-bg)] text-[color:var(--text)]">{{ snapshot.presence_state.label }}</span>
+            </div>
+          {% else %}
+            {% component "empty_state" title="Aucun cours en cours" message="Aucun cours en cours pour cette classe a l'heure actuelle." icon="calendar" compact=True %}{% endcomponent %}
+          {% endif %}
+        </section>
+
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="flex items-center justify-between gap-4 mb-3">
+            <div>
+              <div class="text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider" style="margin-bottom:4px;">Cours du jour</div>
+              <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">{{ snapshot.schedule.today_events_count|default:0 }} cours aujourd'hui</div>
+            </div>
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--accent-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--text)]">Semaine du {{ snapshot.schedule.week_start|date:"d/m" }} au {{ snapshot.schedule.week_end|date:"d/m/Y" }}</span>
+          </div>
+          <div class="space-y-1">
+            {% for event in snapshot.today_events %}
+              <div class="flex items-center justify-between rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] p-3">
+                <div>
+                  <div class="text-xs font-bold text-[color:var(--text)]">{{ event.title }}</div>
+                  <div class="text-[10px] font-semibold text-[color:var(--muted-2)]">{{ event.teacher_name }} - {{ event.location|default:"Salle non precisee" }} - {{ event.attendance_label }}</div>
+                </div>
+                {% if event.attendance_status == 'present' %}
+                  {% component "status_badge" label=event.time_range tone="success" %}{% endcomponent %}
+                {% elif event.attendance_status == 'late' %}
+                  {% component "status_badge" label=event.time_range tone="warning" %}{% endcomponent %}
+                {% elif event.attendance_status == 'absent' %}
+                  {% component "status_badge" label=event.time_range tone="danger" %}{% endcomponent %}
+                {% else %}
+                  {% component "status_badge" label=event.time_range tone="info" %}{% endcomponent %}
+                {% endif %}
+              </div>
+            {% empty %}
+              {% component "empty_state" title="Aucun cours" message="Aucun cours prevu aujourd'hui." icon="calendar" compact=True %}{% endcomponent %}
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="flex items-center justify-between gap-4 mb-3">
+            <div>
+              <div class="text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider" style="margin-bottom:4px;">Emploi du temps officiel</div>
+              <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">La meme base horaire que celle exploitee par le surveillant et la direction.</div>
+            </div>
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--accent-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--text)]">{{ snapshot.schedule.events|length }} cours / semaine</span>
+          </div>
+          {% if snapshot.schedule.slots %}
+          <div class="overflow-x-auto">
+            <div class="grid gap-px bg-[color:var(--border)]" style="grid-template-columns:110px repeat({{ snapshot.schedule.days|length|default:6 }}, minmax(160px, 1fr));">
+              <div class="bg-[color:var(--card-bg)] px-3 py-2 text-[11px] font-extrabold text-[color:var(--muted-2)]">Heure</div>
+              {% for day in snapshot.schedule.days %}
+                <div class="bg-[color:var(--card-bg)] px-3 py-2 text-center text-[11px] font-extrabold {% if day.is_today %}text-blue-700 bg-blue-50{% else %}text-[color:var(--muted-2)]{% endif %}">
+                  {{ day.label }}<br><span class="text-[10px] font-semibold">{{ day.date|date:"d/m" }}</span>
+                </div>
+              {% endfor %}
+              {% for slot in snapshot.schedule.slots %}
+                <div class="bg-[color:var(--card-bg)] px-3 py-2 text-[11px] font-bold text-[color:var(--muted-2)]">{{ slot.time_range|default:slot.label }}</div>
+                {% for cell in slot.cells %}
+                  <div class="bg-[color:var(--card-bg)] px-2 py-1.5">
+                    {% for event in cell.events %}
+                      <div class="mb-1 rounded-md bg-[color:var(--accent-bg)] p-1.5">
+                        <div class="text-[11px] font-extrabold text-[color:var(--text)]">{{ event.title }}</div>
+                        <div class="text-[10px] font-bold text-[color:var(--muted-2)]">{{ event.teacher_name }}</div>
+                        <div class="mt-0.5 flex flex-wrap gap-1.5 text-[9px] font-extrabold text-blue-600">
+                          <span>{{ event.time_range }}</span>
+                          <span>{{ event.location|default:"Salle non precisee" }}</span>
+                        </div>
+                      </div>
+                    {% empty %}
+                      <div class="flex h-full items-center justify-center text-[10px] font-extrabold text-[color:var(--muted-2)]">Libre</div>
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          {% if snapshot.schedule.week_notice %}
+            <div class="mt-3 rounded-xl border border-dashed border-[color:var(--border)] bg-[color:var(--accent-bg)] p-3 text-xs font-semibold text-[color:var(--muted)]">
+              {{ snapshot.schedule.week_notice }}
+            </div>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,139 @@
+{% load component_tags %}
+<div
+  x-data="{
+    open: false,
+    value: '{{ value }}',
+    year: 0,
+    month: 0,
+    init() {
+      const d = this.value ? new Date(this.value + 'T12:00:00') : new Date();
+      this.year = d.getFullYear();
+      this.month = d.getMonth();
+    },
+    get daysInMonth() {
+      return new Date(this.year, this.month + 1, 0).getDate();
+    },
+    get firstDayOfMonth() {
+      return new Date(this.year, this.month, 1).getDay();
+    },
+    get calendarDays() {
+      const days = [];
+      const total = this.daysInMonth;
+      const start = this.firstDayOfMonth;
+      for (let i = 0; i < start; i++) days.push(null);
+      for (let d = 1; d <= total; d++) days.push(d);
+      return days;
+    },
+    isToday(day) {
+      const t = new Date();
+      return day === t.getDate() && this.month === t.getMonth() && this.year === t.getFullYear();
+    },
+    isSelected(day) {
+      if (!this.value) return false;
+      const s = new Date(this.value + 'T12:00:00');
+      return day === s.getDate() && this.month === s.getMonth() && this.year === s.getFullYear();
+    },
+    select(day) {
+      const m = String(this.month + 1).padStart(2, '0');
+      const d = String(day).padStart(2, '0');
+      this.value = `${this.year}-${m}-${d}`;
+      this.open = false;
+    },
+    prevMonth() { if (--this.month < 0) { this.month = 11; this.year--; } },
+    nextMonth() { if (++this.month > 11) { this.month = 0; this.year++; } },
+    monthName(m) { return ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][m]; },
+    prevYear() { this.year--; },
+    nextYear() { this.year++; },
+    today() {
+      const t = new Date();
+      this.year = t.getFullYear();
+      this.month = t.getMonth();
+      this.select(t.getDate());
+    },
+    clear() { this.value = ''; this.open = false; }
+  }"
+  x-init="init()"
+  class="relative {{ class_str }}"
+>
+  <div class="relative">
+    <input
+      type="text"
+      readonly
+      x-model="value"
+      @focus="open = true"
+      placeholder="JJ-MM-AAAA"
+      {% if required %}required{% endif %}
+      {% if disabled %}disabled{% endif %}
+      class="block w-full rounded-lg border bg-[color:var(--card)] px-3 py-2.5 pl-10 text-sm text-[color:var(--text)] transition outline-none cursor-pointer
+             border-[color:var(--line)] focus:border-[color:var(--school-primary)] focus:ring-2 focus:ring-[color:var(--school-primary-soft)]
+             {% if errors %}border-[color:var(--danger)]! focus:border-[color:var(--danger)]! focus:ring-[color:var(--danger-soft)]!{% endif %}
+             {% if disabled %}opacity-50 pointer-events-none{% endif %}"
+    >
+    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[color:var(--muted-2)]">
+      <i data-lucide="calendar" style="width:16px;height:16px;"></i>
+    </span>
+  </div>
+  <input type="hidden" name="{{ name }}" x-model="value">
+
+  <div
+    x-show="open"
+    @click.outside="open = false"
+    x-cloak
+    x-transition:enter="transition ease-out duration-150"
+    x-transition:enter-start="opacity-0 scale-95"
+    x-transition:enter-end="opacity-100 scale-100"
+    class="absolute z-50 mt-1 w-72 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3 shadow-lg"
+  >
+    <div class="flex items-center justify-between mb-3">
+      <button @click="prevYear" class="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition" type="button">
+        <i data-lucide="chevrons-left" style="width:14px;height:14px;"></i>
+      </button>
+      <button @click="prevMonth" class="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition" type="button">
+        <i data-lucide="chevron-left" style="width:14px;height:14px;"></i>
+      </button>
+      <span class="text-sm font-bold text-[color:var(--text)]">
+        <span x-text="monthName(month)"></span> <span x-text="year"></span>
+      </span>
+      <button @click="nextMonth" class="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition" type="button">
+        <i data-lucide="chevron-right" style="width:14px;height:14px;"></i>
+      </button>
+      <button @click="nextYear" class="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition" type="button">
+        <i data-lucide="chevrons-right" style="width:14px;height:14px;"></i>
+      </button>
+    </div>
+
+    <div class="grid grid-cols-7 gap-0.5 text-center text-xs font-bold mb-1">
+      <span class="py-1 text-[color:var(--muted-2)]">Di</span>
+      <span class="py-1 text-[color:var(--muted-2)]">Lu</span>
+      <span class="py-1 text-[color:var(--muted-2)]">Ma</span>
+      <span class="py-1 text-[color:var(--muted-2)]">Me</span>
+      <span class="py-1 text-[color:var(--muted-2)]">Je</span>
+      <span class="py-1 text-[color:var(--muted-2)]">Ve</span>
+      <span class="py-1 text-[color:var(--muted-2)]">Sa</span>
+    </div>
+
+    <div class="grid grid-cols-7 gap-0.5">
+      <template x-for="(day, idx) in calendarDays" :key="idx">
+        <div>
+          <template x-if="day">
+            <button
+              @click="select(day)"
+              type="button"
+              :class="isSelected(day) ? 'bg-[color:var(--school-primary)] text-white' : isToday(day) ? 'border border-[color:var(--school-primary)] text-[color:var(--school-primary)]' : 'text-[color:var(--text)] hover:bg-[color:var(--card-soft)]'"
+              class="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold transition"
+              x-text="day"
+            ></button>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <div class="mt-2 flex items-center justify-between border-t border-[color:var(--line)] pt-2">
+      <button @click="today" type="button" class="text-xs font-bold text-[color:var(--school-primary)] hover:underline">Aujourd'hui</button>
+      <button @click="clear" type="button" class="text-xs font-bold text-[color:var(--muted)] hover:underline">Effacer</button>
+    </div>
+  </div>
+</div>
+{% for error in errors %}
+  <p class="text-xs font-semibold text-[color:var(--danger)] mt-1">{{ error }}</p>
+{% endfor %}

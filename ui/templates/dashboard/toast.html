@@ -1,11 +1,15 @@
 <div
-  x-data="esfeToastCenter()"
+  x-data="esfeToastCenter({ maxToasts: {{ max_toasts }}, dedupeMs: {{ dedupe_ms }} })"
   x-init="init()"
-  class="pointer-events-none fixed inset-x-0 top-4 z-[90] px-3 sm:top-6 sm:px-6"
+  class="pointer-events-none fixed z-[90] px-3 sm:px-6
+    {% if position == 'top-left' %}left-0 top-4 sm:top-6
+    {% elif position == 'bottom-right' %}right-0 bottom-4 sm:bottom-6
+    {% elif position == 'bottom-left' %}left-0 bottom-4 sm:bottom-6
+    {% else %}inset-x-0 top-4 sm:top-6{% endif %}"
   aria-live="polite"
   aria-atomic="true"
 >
-  <div class="mx-auto flex w-full max-w-2xl flex-col items-center gap-3 sm:items-end">
+  <div class="mx-auto flex w-full max-w-2xl flex-col items-center gap-3 {% if position != 'top-center' %}sm:items-end{% endif %}">
     <template x-for="toast in toasts" :key="toast.id">
       <div
         x-show="toast.visible"
@@ -21,7 +25,7 @@
       >
         <div class="flex items-start gap-3 px-4 py-4 sm:px-5">
           <div class="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-white/15">
-            <i :class="iconFor(toast.type)" data-lucide="info" style="width:18px;height:18px;" class="text-white"></i>
+            <i :data-lucide="iconFor(toast.type)" style="width:18px;height:18px;" class="text-white"></i>
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-xs font-semibold uppercase tracking-[0.22em] text-white/70" x-text="labelFor(toast.type)"></p>
@@ -37,6 +41,9 @@
       </div>
     </template>
   </div>
+  {% if bootstrap_messages %}
+    {{ bootstrap_messages|json_script:"esfe-toast-bootstrap" }}
+  {% endif %}
 </div>
 
 <style>
@@ -44,15 +51,20 @@
     from { transform: scaleX(1); }
     to { transform: scaleX(0); }
 }
+.esfe-toast--success { border-color: color-mix(in srgb, var(--success) 40%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--success) 90%, black), var(--success)); }
+.esfe-toast--error   { border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--danger) 90%, black), var(--danger)); }
+.esfe-toast--warning { border-color: color-mix(in srgb, var(--warning) 50%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--warning) 90%, black), var(--warning)); }
+.esfe-toast--info    { border-color: color-mix(in srgb, var(--school-primary) 40%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--school-primary) 90%, black), var(--school-primary)); }
+.esfe-toast--neutral { border-color: color-mix(in srgb, var(--muted) 40%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--muted) 80%, black), var(--muted)); }
 </style>
 
 <script>
-function esfeToastCenter() {
+function esfeToastCenter(opts = {}) {
     return {
         toasts: [],
         nextId: 0,
-        maxToasts: 3,
-        dedupeWindowMs: 2500,
+        maxToasts: opts.maxToasts || 3,
+        dedupeWindowMs: opts.dedupeMs || 2500,
         recentKeys: {},
         init() {
             this.bindGlobalListeners();
@@ -148,12 +160,13 @@ function esfeToastCenter() {
             window.setTimeout(() => { this.toasts = this.toasts.filter((item) => item.id !== id); }, 220);
         },
         toneClasses(type) {
-            return {
-                success: 'border-emerald-300/40 bg-[linear-gradient(135deg,#0f766e_0%,#14b8a6_100%)]',
-                error: 'border-rose-300/40 bg-[linear-gradient(135deg,#b91c1c_0%,#ef4444_100%)]',
-                warning: 'border-amber-200/50 bg-[linear-gradient(135deg,#b45309_0%,#f59e0b_100%)]',
-                info: 'border-sky-300/40 bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_100%)]'
-            }[type] || 'border-slate-300/40 bg-[linear-gradient(135deg,#334155_0%,#475569_100%)]';
+            const map = {
+                success: 'esfe-toast--success',
+                error: 'esfe-toast--error',
+                warning: 'esfe-toast--warning',
+                info: 'esfe-toast--info'
+            };
+            return map[type] || 'esfe-toast--neutral';
         },
         labelFor(type) { return { success: 'Succes', error: 'Erreur', warning: 'Attention', info: 'Information' }[type] || 'Notification'; },
         iconFor(type) { return { success: 'check-circle', error: 'alert-circle', warning: 'alert-triangle', info: 'info' }[type] || 'bell'; }

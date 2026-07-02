@@ -61,14 +61,23 @@ from accounts.dashboards.helpers import get_user_branch, paginate_queryset
 from branches.models import Branch
 from inscriptions.models import Inscription
 from payments.models import Payment
+from notification_center.selectors import get_user_unread_count
 from portal.permissions import get_post_login_portal_url
 from portal.services import (
     build_it_dashboard_context,
     build_teacher_class_detail_context,
     build_teacher_dashboard_context,
+    build_teacher_overview_context,
+    build_teacher_classes_context,
+    build_teacher_logs_context,
+    build_teacher_notifications_context,
+    build_teacher_salary_context,
+    build_teacher_schedule_context,
+    build_teacher_supports_context,
     build_teacher_lesson_log_context,
 )
 from portal.services.teacher_dashboard_service import (
+    TEACHER_EXCLUDED_NOTIFICATION_SOURCES,
     _validate_content_file_extension,
     build_teacher_support_workspace_context,
     build_teacher_settings_context,
@@ -1846,6 +1855,55 @@ def staff_portal(request):
     return render(request, "portal/staff.html", context)
 
 
+TEACHER_PORTAL_SECTIONS = (
+    "overview",
+    "classes",
+    "supports",
+    "schedule",
+    "logs",
+    "salary",
+    "notifications",
+    "settings",
+)
+
+TEACHER_SECTION_CONTEXT_BUILDERS = {
+    "overview": build_teacher_overview_context,
+    "classes": build_teacher_classes_context,
+    "supports": build_teacher_supports_context,
+    "schedule": build_teacher_schedule_context,
+    "logs": build_teacher_logs_context,
+    "salary": build_teacher_salary_context,
+    "notifications": build_teacher_notifications_context,
+    "settings": build_teacher_settings_context,
+}
+
+
+def _teacher_nav_items(active_section):
+    definitions = (
+        ("overview", "Accueil", "layout-dashboard"),
+        ("classes", "Mes classes", "graduation-cap"),
+        ("supports", "Supports", "folder-open"),
+        ("schedule", "Planning", "calendar-days"),
+        ("logs", "Cahier texte", "book-open"),
+        ("salary", "Honoraires", "wallet"),
+        ("notifications", "Notifications", "bell"),
+        ("settings", "Paramètres", "settings"),
+    )
+    return [
+        {
+            "id": section,
+            "label": label,
+            "icon": icon,
+            "url": f"?section={section}",
+            "hx_get": f"?section={section}",
+            "hx_target": "#teacher-workspace",
+            "hx_swap": "outerHTML",
+            "active": active_section == section,
+        }
+        for section, label, icon in definitions
+    ]
+
+
 @login_required
 def teacher_portal(request):
     if not can_access(request.user, "view_portal", "teacher"):
@@ -1853,6 +1911,7 @@ def teacher_portal(request):
 
     branch = _resolve_academic_branch(request)
     section = request.GET.get("section", "overview")
+    active_section = section if section in TEACHER_PORTAL_SECTIONS else "overview"
 
     if section == "search":
         q = (request.GET.get("q") or "").strip()
@@ -1889,19 +1948,82 @@ def teacher_portal(request):
             })
         return render(request, "portal/partials/teacher_search_results.html", {"q": q})
 
-    context = build_teacher_dashboard_context(
+    if branch is None:
+        context = {
+            **_build_portal_context(
+                request,
+                page_title="Dashboard enseignant",
+                module_cards=[],
+            ),
+            "dashboard_kind": "Enseignant",
+            "branch": None,
+            "branch_missing": True,
+            "active_section": active_section,
+            "teacher_nav_items": _teacher_nav_items(active_section),
+            "status_summary": {"branch_name": "Annexe non définie"},
+            "pending_lesson_logs_count": 0,
+            "notifications_count": 0,
+            "kpi_cards": [],
+        }
+        return render(request, "portal/teacher/v2/dashboard.html", context)
+
+    context_builder = TEACHER_SECTION_CONTEXT_BUILDERS[active_section]
+    context = context_builder(
         request,
         branch=branch,
         base_context_builder=_build_portal_context,
     )
-    context["active_section"] = section if section in ("overview", "classes", "supports", "schedule", "logs", "salary", "notifications", "settings") else "overview"
+    context["active_section"] = active_section
+    context["teacher_nav_items"] = _teacher_nav_items(active_section)
+    context.setdefault("pending_lesson_logs_count", 0)
+    context["notifications_count"] = get_user_unread_count(
+        request.user,
+        exclude_sources=TEACHER_EXCLUDED_NOTIFICATION_SOURCES,
+    )
+    context.setdefault("teacher_notifications", {"unread_count": 0, "items": []})
     context["kpi_cards"] = [
         {"label": "Mes classes", "value": len(context.get("class_focus_rows") or []), "icon": "graduation-cap"},
         {"label": "Cours aujourd'hui", "value": context.get("teacher_kpis", {}).get("today_courses", 0), "icon": "calendar-check-2"},
         {"label": "Cahiers en attente", "value": context.get("pending_lesson_logs_count", 0), "icon": "book-open"},
         {"label": "Cahiers du mois", "value": context.get("teacher_kpis", {}).get("month_done_logs", 0), "icon": "clipboard-check"},
     ]
-    return render(request, "portal/teacher/sg_dashboard.html", context)
+    teacher_kpis = context.get("teacher_kpis", {})
+    support_stats = context.get("teacher_support_stats", {})
+    section_kpis = {
+        "classes": [
+            {"label": "Classes", "value": len(context.get("class_focus_rows") or []), "icon": "graduation-cap", "tone": "primary"},
+            {"label": "Matières", "value": teacher_kpis.get("subjects_count", 0), "icon": "book-open", "tone": "info"},
+            {"label": "Étudiants", "value": teacher_kpis.get("visible_students", 0), "icon": "users", "tone": "success"},
+        ],
+        "supports": [
+            {"label": "Classes", "value": len(context.get("class_focus_rows") or []), "icon": "graduation-cap", "tone": "primary"},
+            {"label": "Chapitres", "value": support_stats.get("chapters", 0), "icon": "book-open", "tone": "info"},
+            {"label": "Supports", "value": support_stats.get("contents", 0), "icon": "folder-open", "tone": "success"},
+            {"label": "Fichiers", "value": support_stats.get("files", 0), "icon": "file", "tone": "neutral"},
+        ],
+        "schedule": [
+            {"label": "Aujourd'hui", "value": teacher_kpis.get("today_courses", 0), "icon": "calendar-check", "tone": "primary"},
+            {"label": "Cette semaine", "value": teacher_kpis.get("week_courses", 0), "icon": "calendar-days", "tone": "success"},
+            {"label": "Classes", "value": len(context.get("class_focus_rows") or []), "icon": "graduation-cap", "tone": "info"},
+            {"label": "Salles", "value": teacher_kpis.get("weekly_rooms", 0), "icon": "door-open", "tone": "warning"},
+        ],
+        "logs": [
+            {"label": "Récents", "value": len(context.get("recent_lesson_logs") or []), "icon": "book-open", "tone": "success"},
+            {"label": "Cette semaine", "value": context.get("week_lesson_logs_count", 0), "icon": "calendar-days", "tone": "primary"},
+            {"label": "En attente", "value": context.get("pending_lesson_logs_count", 0), "icon": "alert-triangle", "tone": "warning"},
+            {"label": "Ce mois", "value": teacher_kpis.get("month_done_logs", 0), "icon": "clipboard-check", "tone": "info"},
+        ],
+        "salary": [
+            {"label": "Heures ce mois", "value": context.get("teacher_hours", {}).get("month_hours", 0), "icon": "clock", "tone": "primary"},
+            {"label": "Total année", "value": context.get("teacher_hours", {}).get("total_hours", 0), "icon": "calendar", "tone": "success"},
+            {"label": "En attente", "value": context.get("teacher_payments", {}).get("pending_count", 0), "icon": "hourglass", "tone": "warning"},
+            {"label": "Payés", "value": context.get("teacher_payments", {}).get("paid_count", 0), "icon": "circle-check", "tone": "success"},
+        ],
+    }
+    context["section_kpi_cards"] = section_kpis.get(active_section, [])
+    if request.headers.get("HX-Request") == "true":
+        return render(request, "portal/teacher/v2/workspace.html", context)
+    return render(request, "portal/teacher/v2/dashboard.html", context)
 
 
 @_position_required({"teacher"})
@@ -2094,12 +2216,10 @@ def teacher_support_workspace(request):
                     if not text_content:
                         raise ValidationError("Le texte du support est obligatoire pour ce type de contenu.")
                 elif content_type == ECContent.CONTENT_TYPE_VIDEO:
-                    if uploaded_file is not None:
-                        raise ValidationError("Le type Video attend une URL video, pas un fichier.")
                     if text_content:
                         raise ValidationError("Le type Video n'accepte pas de texte direct.")
-                    if not video_url:
-                        raise ValidationError("Ajoutez l'URL video du support.")
+                    if not uploaded_file and not video_url:
+                        raise ValidationError("Ajoutez un fichier video ou une URL YouTube.")
                 else:
                     if video_url:
                         raise ValidationError("L'URL video est reservee au type Video.")
@@ -2239,7 +2359,18 @@ def teacher_settings_workspace(request):
 @_position_required({"teacher"})
 def teacher_content_viewer(request, content_id: int):
     branch = _resolve_academic_branch(request)
+    if branch is None:
+        return render(
+            request,
+            "portal/partials/teacher_content_viewer.html",
+            {"content": None, "error": "Aucune annexe rattachée à ce compte enseignant."},
+        )
     try:
+        get_teacher_content_for_edit(
+            teacher=request.user,
+            branch=branch,
+            content_id=content_id,
+        )
         content = ECContent.objects.select_related("chapter__ec").get(
             pk=content_id,
             is_active=True,
@@ -2247,10 +2378,7 @@ def teacher_content_viewer(request, content_id: int):
         if content.chapter is None:
             raise ValidationError("Ce contenu n'est pas rattache a un chapitre.")
         ec = content.chapter.ec
-        branch_match = (
-            ec.ue.semester.academic_class.branch_id == branch.id
-            if branch else True
-        )
+        branch_match = ec.ue.semester.academic_class.branch_id == branch.id
         if not branch_match:
             raise ValidationError("Contenu non accessible pour cette annexe.")
 

@@ -603,11 +603,33 @@ class ECContent(models.Model):
     def ec(self):
         return self.chapter.ec
 
+    @property
+    def video_embed_url(self):
+        url = (self.video_url or "").strip()
+        if not url:
+            return None
+        yt_patterns = [
+            "youtube.com/watch?v=",
+            "youtu.be/",
+            "youtube.com/embed/",
+            "m.youtube.com/watch?v=",
+        ]
+        for pattern in yt_patterns:
+            if pattern in url:
+                if "youtube.com/embed/" in url:
+                    return url
+                if "youtu.be/" in url:
+                    video_id = url.split("youtu.be/")[-1].split("?")[0].split("&")[0]
+                else:
+                    video_id = url.split("v=")[-1].split("&")[0]
+                return f"https://www.youtube.com/embed/{video_id}"
+        return url
+
     def clean(self):
         errors = {}
         text_value = (self.text_content or "").strip()
 
-        file_based_types = {
+        file_required_types = {
             self.CONTENT_TYPE_PDF,
             self.CONTENT_TYPE_DOC,
             self.CONTENT_TYPE_EXCEL,
@@ -615,22 +637,24 @@ class ECContent(models.Model):
             self.CONTENT_TYPE_IMAGE,
             self.CONTENT_TYPE_AUDIO,
         }
-        if self.content_type in file_based_types and not self.file:
+        file_allowed_types = file_required_types | {self.CONTENT_TYPE_VIDEO}
+
+        if self.content_type in file_required_types and not self.file:
             errors["file"] = "Un fichier est requis pour ce type de contenu."
 
-        if self.content_type == self.CONTENT_TYPE_VIDEO and not self.video_url:
-            errors["video_url"] = "Une URL vidéo est requise pour ce type de contenu."
+        if self.content_type == self.CONTENT_TYPE_VIDEO and not self.file and not self.video_url:
+            errors["video_url"] = "Ajoutez un fichier video ou une URL YouTube."
 
         if self.content_type == self.CONTENT_TYPE_TEXT and not text_value:
             errors["text_content"] = "Un texte est requis pour ce type de contenu."
 
         if self.content_type != self.CONTENT_TYPE_VIDEO and self.video_url:
-            errors["video_url"] = "L'URL vidéo ne doit être utilisée que pour un contenu vidéo."
+            errors["video_url"] = "L'URL video ne doit etre utilisee que pour un contenu video."
 
         if self.content_type != self.CONTENT_TYPE_TEXT and text_value:
             errors["text_content"] = "Le texte direct n'est disponible que pour le type Texte."
 
-        if self.content_type not in file_based_types and self.file:
+        if self.content_type not in file_allowed_types and self.file:
             errors["file"] = "Le fichier n'est disponible que pour les contenus bases sur fichier."
 
         if self.duration is not None and self.duration <= 0:

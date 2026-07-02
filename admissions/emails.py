@@ -3,8 +3,8 @@
 
 import logging
 
-from communication.models import CommunicationNotification
-from communication.services.dispatcher import NotificationDispatcher
+from notifier.models import NotificationMessage
+from notifier.services import Dispatcher
 
 
 logger = logging.getLogger(__name__)
@@ -16,23 +16,23 @@ def send_notification_email(notification_id):
     """
 
     try:
-        notification = CommunicationNotification.objects.get(
+        notification = NotificationMessage.objects.get(
             pk=notification_id,
-            channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+            channel=NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
         )
-    except CommunicationNotification.DoesNotExist:
+    except NotificationMessage.DoesNotExist:
         return False
 
     if notification.status in {
-        CommunicationNotification.STATUS_SENT,
-        CommunicationNotification.STATUS_DELIVERED,
-        CommunicationNotification.STATUS_READ,
-        CommunicationNotification.STATUS_SKIPPED,
+        NotificationMessage.STATUS_SENT,
+        NotificationMessage.STATUS_DELIVERED,
+        NotificationMessage.STATUS_READ,
+        NotificationMessage.STATUS_SKIPPED,
     }:
         return False
 
     try:
-        NotificationDispatcher.dispatch(notification)
+        Dispatcher.dispatch(notification)
         return True
     except Exception:
         logger.exception("Echec replay notification centralisee id=%s", notification_id)
@@ -44,12 +44,12 @@ def send_pending_notifications():
     Rejoue toutes les notifications email centralisees en attente.
     """
 
-    pending = CommunicationNotification.objects.filter(
-        channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+    pending = NotificationMessage.objects.filter(
+        channel=NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
         status__in=[
-            CommunicationNotification.STATUS_PENDING,
-            CommunicationNotification.STATUS_QUEUED,
-            CommunicationNotification.STATUS_FAILED,
+            NotificationMessage.STATUS_PENDING,
+            NotificationMessage.STATUS_QUEUED,
+            NotificationMessage.STATUS_FAILED,
         ],
     ).order_by("created_at")
     sent_count = 0

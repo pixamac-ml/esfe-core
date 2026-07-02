@@ -1,0 +1,82 @@
+<nav class="flex {% if variant == 'vertical' %}flex-col gap-4{% else %}items-center{% endif %}" aria-label="Progression">
+  {% for step in steps %}
+    {% if variant == 'vertical' %}
+      <div class="flex items-start gap-3">
+        <div class="flex flex-col items-center">
+          {% if step.url or step.hx_get %}<a{% else %}<span{% endif %}
+            {% if step.url %}href="{{ step.url }}"{% endif %}
+            {% if step.hx_get %}hx-get="{{ step.hx_get }}" hx-target="{{ step.hx_target|default:'#main-content' }}"{% endif %}
+            class="flex {{ size_map.circle }} items-center justify-center rounded-full font-black shrink-0 transition
+              {% if step.clickable or step.url or step.hx_get %}cursor-pointer hover:scale-110{% endif %}
+              {% if forloop.counter0 < active_step %}
+                bg-[color:var(--success)] text-white
+              {% elif forloop.counter0 == active_step %}
+                bg-[color:var(--school-primary)] text-white ring-2 ring-[color:var(--school-primary-soft)] ring-offset-2
+              {% else %}
+                bg-[color:var(--card-soft)] text-[color:var(--muted-2)] border border-[color:var(--line)]
+              {% endif %}">
+            {% if forloop.counter0 < active_step %}
+              <i data-lucide="check" style="width:{{ size_map.icon }};height:{{ size_map.icon }};"></i>
+            {% elif step.icon %}
+              <i data-lucide="{{ step.icon }}" style="width:{{ size_map.icon }};height:{{ size_map.icon }};"></i>
+            {% else %}
+              {{ forloop.counter }}
+            {% endif %}
+          {% if step.url or step.hx_get %}</a>{% else %}</span>{% endif %}
+          {% if not forloop.last %}
+            <div class="mt-1 w-px flex-1 min-h-[24px]
+              {% if forloop.counter0 < active_step %}bg-[color:var(--success)]
+              {% else %}bg-[color:var(--line)]{% endif %}">
+            </div>
+          {% endif %}
+        </div>
+        <div class="pb-4 min-w-0">
+          <p class="font-bold {{ size_map.label }} whitespace-nowrap
+            {% if forloop.counter0 <= active_step %}text-[color:var(--text)]
+            {% else %}text-[color:var(--muted-2)]{% endif %}">
+            {{ step.label }}
+          </p>
+          {% if step.description %}
+            <p class="text-[10px] text-[color:var(--muted-2)] mt-0.5">{{ step.description }}</p>
+          {% endif %}
+        </div>
+      </div>
+    {% else %}
+      <div class="flex items-center">
+        <div class="flex items-center gap-2.5">
+          {% if step.url or step.hx_get %}<a{% else %}<span{% endif %}
+            {% if step.url %}href="{{ step.url }}"{% endif %}
+            {% if step.hx_get %}hx-get="{{ step.hx_get }}" hx-target="{{ step.hx_target|default:'#main-content' }}"{% endif %}
+            class="flex {{ size_map.circle }} items-center justify-center rounded-full font-black transition
+              {% if step.clickable or step.url or step.hx_get %}cursor-pointer hover:scale-110{% endif %}
+              {% if forloop.counter0 < active_step %}
+                bg-[color:var(--success)] text-white
+              {% elif forloop.counter0 == active_step %}
+                bg-[color:var(--school-primary)] text-white ring-2 ring-[color:var(--school-primary-soft)] ring-offset-2
+              {% else %}
+                bg-[color:var(--card-soft)] text-[color:var(--muted-2)] border border-[color:var(--line)]
+              {% endif %}">
+            {% if forloop.counter0 < active_step %}
+              <i data-lucide="check" style="width:{{ size_map.icon }};height:{{ size_map.icon }};"></i>
+            {% elif step.icon %}
+              <i data-lucide="{{ step.icon }}" style="width:{{ size_map.icon }};height:{{ size_map.icon }};"></i>
+            {% else %}
+              {{ forloop.counter }}
+            {% endif %}
+          {% if step.url or step.hx_get %}</a>{% else %}</span>{% endif %}
+          <span class="font-bold whitespace-nowrap {{ size_map.label }}
+            {% if forloop.counter0 <= active_step %}text-[color:var(--text)]
+            {% else %}text-[color:var(--muted-2)]{% endif %}">
+            {{ step.label }}
+          </span>
+        </div>
+        {% if not forloop.last %}
+          <div class="mx-3 h-px {{ size_map.connector }}
+            {% if forloop.counter0 < active_step %}bg-[color:var(--success)]
+            {% else %}bg-[color:var(--line)]{% endif %}">
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% endfor %}
+</nav>

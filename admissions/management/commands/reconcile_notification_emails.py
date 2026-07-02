@@ -5,7 +5,7 @@ from django.db.models import Count
 from django.utils import timezone
 
 from admissions.emails import send_notification_email
-from communication.models import CommunicationNotification
+from notifier.models import NotificationMessage
 
 
 class Command(BaseCommand):
@@ -49,12 +49,12 @@ class Command(BaseCommand):
         limit = options.get("limit")
         confirmed = options.get("yes", False)
 
-        qs = CommunicationNotification.objects.filter(
-            channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+        qs = NotificationMessage.objects.filter(
+            channel=NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
             status__in=[
-                CommunicationNotification.STATUS_PENDING,
-                CommunicationNotification.STATUS_QUEUED,
-                CommunicationNotification.STATUS_FAILED,
+                NotificationMessage.STATUS_PENDING,
+                NotificationMessage.STATUS_QUEUED,
+                NotificationMessage.STATUS_FAILED,
             ],
         ).order_by("created_at")
 
@@ -79,7 +79,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE(f"Notifications ciblees: {total}"))
 
         grouped = (
-            CommunicationNotification.objects.filter(pk__in=[n.pk for n in notifications])
+            NotificationMessage.objects.filter(pk__in=[n.pk for n in notifications])
             .values("event_type")
             .annotate(total=Count("id"))
             .order_by("-total")
@@ -108,8 +108,8 @@ class Command(BaseCommand):
 
         if action == "mark-sent":
             ids = [n.pk for n in notifications]
-            updated = CommunicationNotification.objects.filter(pk__in=ids).update(
-                status=CommunicationNotification.STATUS_SENT,
+            updated = NotificationMessage.objects.filter(pk__in=ids).update(
+                status=NotificationMessage.STATUS_SENT,
                 sent_at=timezone.now(),
             )
             self.stdout.write(self.style.SUCCESS(f"Marquees status=sent: {updated}"))

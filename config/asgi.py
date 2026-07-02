@@ -58,9 +58,7 @@ http_asgi_app = ClientDisconnectSafeASGIApp(django_asgi_app)
 if os.getenv("ENABLE_WEBSOCKETS", "True").strip().lower() in {"1", "true", "yes", "on"}:
 	from channels.auth import AuthMiddlewareStack
 	from channels.routing import ProtocolTypeRouter, URLRouter
-	from communication.realtime.routing import websocket_urlpatterns as communication_websocket_urlpatterns
-
-	websocket_urlpatterns = [*communication_websocket_urlpatterns]
+	from notifier.realtime.routing import websocket_urlpatterns
 
 	application = ProtocolTypeRouter(
 		{

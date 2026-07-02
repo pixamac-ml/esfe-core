@@ -1,0 +1,16 @@
+<div class="comm-list">
+  {% for notification in notifications %}
+    {% include "notification_center/partials/item.html" %}
+  {% empty %}
+    <div class="comm-empty">Aucune notification ne correspond aux filtres.</div>
+  {% endfor %}
+</div>
+{% if page_obj and page_obj.has_other_pages %}
+  <div class="comm-panel-head">
+    <div class="comm-panel-title">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</div>
+    <div style="display:flex;gap:8px">
+      {% if page_obj.has_previous %}<a class="comm-btn" hx-get="?page={{ page_obj.previous_page_number }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q }}" hx-target="#comm-list" hx-push-url="true">Precedent</a>{% endif %}
+      {% if page_obj.has_next %}<a class="comm-btn" hx-get="?page={{ page_obj.next_page_number }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q }}" hx-target="#comm-list" hx-push-url="true">Suivant</a>{% endif %}
+    </div>
+  </div>
+{% endif %}

@@ -705,56 +705,7 @@ main {
     });
   </script>
 
-  <!-- WebSocket Notifications -->
-  <script>
-    (function() {
-      try {
-        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        const socket = new WebSocket(
-          protocol + "://" + window.location.host + "/ws/communication/notifications/"
-        );
-
-        socket.onmessage = function(e) {
-          const data = JSON.parse(e.data);
-          if (typeof data.unread_count === "number") {
-            const badge = document.getElementById("unread-notification-count");
-            if (badge) {
-              if (data.unread_count > 0) {
-                badge.classList.remove("hidden");
-                badge.classList.add("flex");
-                badge.textContent = data.unread_count > 9 ? "9+" : String(data.unread_count);
-              } else {
-                badge.classList.remove("flex");
-                badge.classList.add("hidden");
-                badge.textContent = "";
-              }
-            }
-          }
-
-          if (typeof data.unread_count !== "number") {
-            const badge = document.getElementById("unread-notification-count");
-            if (badge) {
-              const current = Number.parseInt(badge.textContent || "0", 10) || 0;
-              const next = current + 1;
-              badge.classList.remove("hidden");
-              badge.classList.add("flex");
-              badge.textContent = next > 9 ? "9+" : String(next);
-            }
-          }
-
-          document.body.dispatchEvent(
-            new CustomEvent("communication:notification", { detail: data })
-          );
-        };
-
-        socket.onerror = function(e) {
-          console.warn("WebSocket connection failed (notifications)");
-        };
-      } catch (err) {
-        console.warn("WebSocket not available");
-      }
-    })();
-  </script>
+  {% include "notification_center/partials/realtime.html" %}
     <!-- AOS JS -->
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
       <script>

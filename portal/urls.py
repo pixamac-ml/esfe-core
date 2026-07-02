@@ -12,6 +12,7 @@ from portal.views import (
     save_grade,
     save_grade_confirm_otp,
 )
+from portal.views.it_dashboard_v2 import it_portal_v2
 from portal.views.admin_grades import excel_grade_view
 from portal.views.it_grades_import import it_grades_import_view
 from portal.views.it_surveillance import (
@@ -68,6 +69,7 @@ from portal.views.supervisor_cases import (
     supervisor_case_detail,
     supervisor_case_create,
     supervisor_case_advance,
+    supervisor_case_escalate,
     supervisor_case_add_note,
     supervisor_student_cases,
 )
@@ -92,6 +94,8 @@ from portal.views.supervisor import (
     supervisor_student_drawer,
     supervisor_student_options,
     supervisor_teacher_drawer,
+    supervisor_student_attendance_print,
+    supervisor_teacher_regularity_print,
     supervisor_toggle_teacher_presence,
     supervisor_week_materialize,
     supervisor_weekly_slot_save,
@@ -247,6 +251,16 @@ urlpatterns = [
     path("dg/diplomas/action/", dg_diploma_action, name="dg_diploma_action"),
     path("dg/export/", dg_export, name="dg_export"),
     path("supervisor/", supervisor_portal, name="portal_supervisor"),
+    path(
+        "supervisor/reports/students/<int:student_id>/attendance/",
+        supervisor_student_attendance_print,
+        name="supervisor_student_attendance_print",
+    ),
+    path(
+        "supervisor/reports/teachers/<int:teacher_id>/regularity/",
+        supervisor_teacher_regularity_print,
+        name="supervisor_teacher_regularity_print",
+    ),
     path("supervisor/search/", supervisor_quick_search, name="supervisor_quick_search"),
     path(
         "supervisor/classes/<int:class_id>/",
@@ -294,6 +308,12 @@ urlpatterns = [
         name="supervisor_weekly_slots_workspace",
     ),
     path(
+        "supervisor/classes/<int:class_id>/weekly-slots/form/",
+        supervisor_weekly_slots_workspace,
+        {"drawer_form": "1"},
+        name="supervisor_weekly_slot_form",
+    ),
+    path(
         "supervisor/student-options/",
         supervisor_student_options,
         name="supervisor_student_options",
@@ -324,6 +344,7 @@ urlpatterns = [
         name="supervisor_student_drawer",
     ),
     path("it/", it_portal, name="portal_it"),
+    path("it/v2/", it_portal_v2, name="portal_it_v2"),
     path("it/panels/diagnostics/", it_diagnostics_panel, name="it_diagnostics_panel"),
     path("it/panels/accounts/", it_accounts_panel, name="it_accounts_panel"),
     path("it/panels/support/", it_support_panel, name="it_support_panel"),
@@ -418,6 +439,11 @@ urlpatterns = [
         "supervisor/cases/<str:kind>/<int:case_id>/advance/",
         supervisor_case_advance,
         name="supervisor_case_advance",
+    ),
+    path(
+        "supervisor/cases/<str:kind>/<int:case_id>/escalate/",
+        supervisor_case_escalate,
+        name="supervisor_case_escalate",
     ),
     path(
         "supervisor/cases/<str:kind>/<int:case_id>/notes/",

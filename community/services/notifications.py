@@ -9,9 +9,9 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 
-from communication.models import CommunicationNotification
-from communication.services import NotificationService
-from communication.services.channel_policy import resolve_channel_policy
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
+from notifier.services.policy import resolve_channel_policy
 
 
 def create_notification(
@@ -63,8 +63,8 @@ def create_notification(
             return None
 
     default_channels = [
-        CommunicationNotification.CHANNEL_IN_APP,
-        CommunicationNotification.CHANNEL_WEBSOCKET,
+        NotificationMessage.CHANNEL_IN_APP,
+        NotificationMessage.CHANNEL_WEBSOCKET,
     ]
     if send_email and user.email:
         metadata = {
@@ -81,16 +81,16 @@ def create_notification(
                 ),
             },
         }
-        default_channels.append(CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL)
+        default_channels.append(NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL)
 
     policy = resolve_channel_policy(
         event_type,
         default_channels=default_channels,
-        default_priority=CommunicationNotification.PRIORITY_NORMAL,
+        default_priority=NotificationMessage.PRIORITY_NORMAL,
         metadata=metadata,
     )
 
-    _event, created_notifications = NotificationService.notify_user(
+    _event, created_notifications = NotificationBus.notify(
         recipient=user,
         actor=actor,
         event_type=event_type,
@@ -230,10 +230,10 @@ def _build_email_content(*, recipient, notification_type, actor, vote_count=1, t
 
 
 def _find_existing_notification(*, recipient, event_type, topic=None, answer=None, unread_only=False):
-    queryset = CommunicationNotification.objects.filter(
+    queryset = NotificationMessage.objects.filter(
         recipient=recipient,
         event_type=event_type,
-        channel=CommunicationNotification.CHANNEL_IN_APP,
+        channel=NotificationMessage.CHANNEL_IN_APP,
         metadata__topic_id=getattr(topic, "id", None),
         metadata__answer_id=getattr(answer, "id", None),
     ).order_by("-created_at")

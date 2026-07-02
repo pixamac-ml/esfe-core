@@ -1,0 +1,22 @@
+{% load component_tags %}
+<div class="flex flex-wrap items-center gap-2 {{ class_str }}">
+  {% for filter in filters %}
+    <select
+      name="{{ filter.name }}"
+      hx-get="{{ filter.hx_get|default:'?' }}"
+      hx-trigger="change"
+      hx-target="{{ filter.hx_target|default:hx_target }}"
+      hx-indicator="#{{ id }}-spinner"
+      class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text)] outline-none transition focus:border-[color:var(--school-primary)] focus:ring-2 focus:ring-[color:var(--school-primary-soft)]"
+    >
+      <option value="">{{ filter.placeholder|default:'Tous' }}</option>
+      {% for opt in filter.options %}
+        <option value="{{ opt.value }}" {% if filter.selected == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+      {% endfor %}
+    </select>
+  {% endfor %}
+  <span id="{{ id }}-spinner" class="htmx-indicator">
+    <i data-lucide="loader" style="width:14px;height:14px;" class="animate-spin text-[color:var(--muted)]"></i>
+  </span>
+  {% slot "default" %}{% endslot %}
+</div>

@@ -1,3 +1,4 @@
+{% load component_tags %}
 {% if toast %}
 <div class="sg-toast-inline sg-toast-{{ toast.level }}">{{ toast.message }}</div>
 {% endif %}
@@ -8,149 +9,134 @@
 
 {% if academic_class %}
 <div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#0f172a,#1e293b);">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-      <div>
-        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-users"></i> Classe suivie</div>
+  <div class="sg-drawer-hero">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <div class="sg-drawer-hero-sub"><i data-lucide="users"></i> Classe suivie</div>
         <div class="sg-drawer-hero-title">{{ academic_class.display_name }}</div>
         <div class="sg-drawer-hero-meta">{{ academic_class.programme.title }} &middot; {{ students|length }} etudiant(s)</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="flex gap-2 flex-wrap shrink-0">
         {% if teacher_support_workspace_url %}
-        <button type="button" class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.12);cursor:pointer;" hx-get="{{ teacher_support_workspace_url }}?class_id={{ academic_class.id }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-          <i class="fa-solid fa-folder-open"></i> Supports
+        <button type="button" class="sg-drawer-hero-badge" style="cursor:pointer;" hx-get="{{ teacher_support_workspace_url }}?class_id={{ academic_class.id }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+          <i data-lucide="folder-open"></i> Supports
         </button>
         {% endif %}
-        <button type="button" class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.12);cursor:pointer;" hx-get="{% url 'accounts_portal:teacher_class_detail' academic_class.id %}?week_start={{ prev_week_start|date:'Y-m-d' }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-          <i class="fa-solid fa-chevron-left"></i>
+        <button type="button" class="sg-drawer-hero-badge" style="cursor:pointer;" hx-get="{% url 'accounts_portal:teacher_class_detail' academic_class.id %}?week_start={{ prev_week_start|date:'Y-m-d' }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+          <i data-lucide="chevron-left"></i>
         </button>
-        <button type="button" class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.12);cursor:pointer;" hx-get="{% url 'accounts_portal:teacher_class_detail' academic_class.id %}?week_start={{ next_week_start|date:'Y-m-d' }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-          <i class="fa-solid fa-chevron-right"></i>
+        <button type="button" class="sg-drawer-hero-badge" style="cursor:pointer;" hx-get="{% url 'accounts_portal:teacher_class_detail' academic_class.id %}?week_start={{ next_week_start|date:'Y-m-d' }}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+          <i data-lucide="chevron-right"></i>
         </button>
-        <button type="button" class="sg-drawer-hero-badge" style="background:rgba(255,255,255,.12);cursor:pointer;" onclick="window.sgCloseDrawer && window.sgCloseDrawer()">
-          <i class="fa-solid fa-xmark"></i> Fermer
+        <button type="button" class="sg-drawer-hero-badge" style="cursor:pointer;" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()">
+          <i data-lucide="x"></i> Fermer
         </button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:16px;">
-      <div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;">
-        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.5);">Semaine</div>
-        <div style="margin-top:4px;font-size:.82rem;font-weight:700;color:#fff;">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</div>
+    <div class="grid gap-2.5 mt-4" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+      <div class="rounded-xl p-3" style="background:rgba(255,255,255,.08);">
+        <div class="text-[.65rem] font-bold uppercase tracking-widest" style="color:rgba(255,255,255,.5);">Semaine</div>
+        <div class="mt-1 text-[.82rem] font-bold text-white">{{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }}</div>
       </div>
-      <div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;">
-        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.5);">Prochaine seance</div>
-        <div style="margin-top:4px;font-size:.82rem;font-weight:700;color:#fff;">{% if teacher_class_next_event %}{{ teacher_class_next_event.start_datetime|date:"D d/m H:i" }}{% else %}Non planifiee{% endif %}</div>
+      <div class="rounded-xl p-3" style="background:rgba(255,255,255,.08);">
+        <div class="text-[.65rem] font-bold uppercase tracking-widest" style="color:rgba(255,255,255,.5);">Prochaine seance</div>
+        <div class="mt-1 text-[.82rem] font-bold text-white">{% if teacher_class_next_event %}{{ teacher_class_next_event.start_datetime|date:"D d/m H:i" }}{% else %}Non planifiee{% endif %}</div>
       </div>
-      <div style="background:rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;">
-        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.5);">Trame officielle</div>
-        <div style="margin-top:4px;font-size:.82rem;font-weight:700;color:#fff;">{{ teacher_class_weekly_slot_rows|length }} creneau(x)</div>
+      <div class="rounded-xl p-3" style="background:rgba(255,255,255,.08);">
+        <div class="text-[.65rem] font-bold uppercase tracking-widest" style="color:rgba(255,255,255,.5);">Trame officielle</div>
+        <div class="mt-1 text-[.82rem] font-bold text-white">{{ teacher_class_weekly_slot_rows|length }} creneau(x)</div>
       </div>
     </div>
   </div>
 
   <div class="sg-drawer-body">
     <div class="sg-drawer-section">
-      <div class="sg-drawer-section-title"><i class="fa-solid fa-book-open"></i> Matieres assurees</div>
-      <div style="display:grid;gap:6px;">
+      <div class="sg-drawer-section-title"><i data-lucide="book-open"></i> Matieres assurees</div>
+      <div class="space-y-1.5">
         {% for row in teacher_class_subject_rows %}
         <div class="sg-action-card" style="cursor:default;">
-          <div>
+          <div class="min-w-0">
             <div class="sg-action-label">{{ row.title }}</div>
             <div class="sg-action-sub">{{ row.ue_code }} &middot; {{ row.room }}</div>
           </div>
-          <span class="sg-action-count" style="background:#ccfbf1;color:#0f766e;">{{ row.event_count }} seance(s)</span>
+          <span class="sg-action-count sg-badge-green">{{ row.event_count }} seance(s)</span>
         </div>
         {% empty %}
-        <div class="sg-drawer-empty" style="padding:32px 0;">
-          <div class="sg-drawer-empty-icon"><i class="fa-solid fa-book"></i></div>
-          <div class="sg-drawer-empty-text">Aucune matiere active pour cette classe.</div>
-        </div>
+        {% component "empty_state" title="Aucune matiere" message="Aucune matiere active pour cette classe." icon="book" compact=True %}{% endcomponent %}
         {% endfor %}
       </div>
     </div>
 
-    <div style="display:grid;gap:16px;">
+    <div class="grid gap-4">
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-calendar-days"></i> Seances datees de la semaine</div>
-        <div style="display:grid;gap:6px;">
+        <div class="sg-drawer-section-title"><i data-lucide="calendar-days"></i> Seances datees de la semaine</div>
+        <div class="space-y-1.5">
           {% for event in teacher_class_week_events %}
-          <div class="sg-action-card" style="cursor:default;border-color:#e2e8f0;">
-            <div>
+          <div class="sg-action-card" style="cursor:default;">
+            <div class="min-w-0">
               <div class="sg-action-label">{{ event.ec.title }}</div>
               <div class="sg-action-sub">{{ event.start_datetime|date:"D d/m H:i" }} - {{ event.end_datetime|date:"H:i" }} &middot; {{ event.location|default:"Salle non precisee" }}</div>
             </div>
-            <button type="button" class="sg-btn" style="min-height:32px;font-size:.68rem;background:#0f172a;border-color:#0f172a;color:#fff;" hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-              <i class="fa-solid fa-book"></i> Cahier
+            <button type="button" class="sg-btn" hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+              <i data-lucide="book"></i> Cahier
             </button>
           </div>
           {% empty %}
-          <div class="sg-drawer-empty" style="padding:32px 0;">
-            <div class="sg-drawer-empty-icon"><i class="fa-solid fa-calendar-xmark"></i></div>
-            <div class="sg-drawer-empty-text">Aucune seance datee sur cette semaine.</div>
-          </div>
+          {% component "empty_state" title="Aucune seance" message="Aucune seance datee sur cette semaine." icon="calendar-x" compact=True %}{% endcomponent %}
           {% endfor %}
         </div>
       </div>
 
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-clock"></i> Trame hebdomadaire officielle</div>
-        <div style="display:grid;gap:6px;">
+        <div class="sg-drawer-section-title"><i data-lucide="clock"></i> Trame hebdomadaire officielle</div>
+        <div class="space-y-1.5">
           {% for slot in teacher_class_weekly_slot_rows %}
-          <div class="sg-action-card" style="cursor:default;border-color:#e2e8f0;">
-            <div>
+          <div class="sg-action-card" style="cursor:default;">
+            <div class="min-w-0">
               <div class="sg-action-label">{{ slot.ec_title }}</div>
               <div class="sg-action-sub">{{ slot.weekday_label }} &middot; {{ slot.time_range }} &middot; {{ slot.room }} &middot; {{ slot.ue_code }}</div>
             </div>
-            <span class="sg-action-count" style="background:#e2e8f0;color:#475569;">Recurrent</span>
+            <span class="sg-action-count sg-badge-gray">Recurrent</span>
           </div>
           {% empty %}
-          <div class="sg-drawer-empty" style="padding:32px 0;">
-            <div class="sg-drawer-empty-icon"><i class="fa-solid fa-clock"></i></div>
-            <div class="sg-drawer-empty-text">Aucun creneau hebdomadaire defini pour cette classe.</div>
-          </div>
+          {% component "empty_state" title="Aucun creneau" message="Aucun creneau hebdomadaire defini pour cette classe." icon="clock" compact=True %}{% endcomponent %}
           {% endfor %}
         </div>
       </div>
     </div>
 
     <div class="sg-drawer-section">
-      <div class="sg-drawer-section-title"><i class="fa-solid fa-user-graduate"></i> Etudiants de la classe ({{ students|length }})</div>
-      <div style="display:grid;gap:4px;">
+      <div class="sg-drawer-section-title"><i data-lucide="graduation-cap"></i> Etudiants de la classe ({{ students|length }})</div>
+      <div class="space-y-1">
         {% for student in students %}
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:12px;background:#f8fafc;">
-          <div style="min-width:0;">
-            <div style="font-size:.82rem;font-weight:900;color:#0f172a;">{{ student.full_name }}</div>
-            <div style="font-size:.72rem;color:#94a3b8;">{{ student.matricule|default:"-" }}</div>
+        <div class="flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 bg-[color:var(--card)] border border-[color:var(--line)]">
+          <div class="min-w-0">
+            <div class="text-sm font-black text-[color:var(--text)]">{{ student.full_name }}</div>
+            <div class="text-xs font-semibold text-[color:var(--muted-2)]">{{ student.matricule|default:"-" }}</div>
           </div>
-          <span class="sg-badge-sm sg-badge-gray" style="background:#dcfce7;color:#166534;">Actif</span>
+          <span class="sg-badge-sm sg-badge-green">Actif</span>
         </div>
         {% empty %}
-        <div class="sg-drawer-empty" style="padding:32px 0;">
-          <div class="sg-drawer-empty-icon"><i class="fa-solid fa-users-slash"></i></div>
-          <div class="sg-drawer-empty-text">Aucun etudiant visible sur cette classe.</div>
-        </div>
+        {% component "empty_state" title="Aucun etudiant" message="Aucun etudiant visible sur cette classe." icon="users-round" compact=True %}{% endcomponent %}
         {% endfor %}
       </div>
     </div>
 
     <div class="sg-drawer-section">
-      <div class="sg-drawer-section-title"><i class="fa-solid fa-book-bookmark"></i> Derniers cahiers saisis</div>
-      <div style="display:grid;gap:6px;">
+      <div class="sg-drawer-section-title"><i data-lucide="bookmark"></i> Derniers cahiers saisis</div>
+      <div class="space-y-1.5">
         {% for log in teacher_class_recent_logs %}
-        <div class="sg-action-card" style="cursor:default;border-color:#e2e8f0;">
-          <div>
+        <div class="sg-action-card" style="cursor:default;">
+          <div class="min-w-0">
             <div class="sg-action-label">{{ log.ec.title }}</div>
             <div class="sg-action-sub">{{ log.date|date:"d/m/Y" }} {{ log.start_time|time:"H:i" }} - {{ log.end_time|time:"H:i" }}</div>
           </div>
-          <span class="sg-action-count" style="{% if log.status == 'done' %}background:#dcfce7;color:#166534;{% elif log.status == 'absent_teacher' %}background:#fee2e2;color:#991b1b;{% else %}background:#f1f5f9;color:#475569;{% endif %}">
+          <span class="sg-action-count {% if log.status == 'done' %}sg-badge-green{% elif log.status == 'absent_teacher' %}sg-badge-red{% else %}sg-badge-gray{% endif %}">
             {{ log.get_status_display }}
           </span>
         </div>
         {% empty %}
-        <div class="sg-drawer-empty" style="padding:32px 0;">
-          <div class="sg-drawer-empty-icon"><i class="fa-solid fa-book"></i></div>
-          <div class="sg-drawer-empty-text">Aucun cahier recent pour cette classe.</div>
-        </div>
+        {% component "empty_state" title="Aucun cahier" message="Aucun cahier recent pour cette classe." icon="book" compact=True %}{% endcomponent %}
         {% endfor %}
       </div>
     </div>
@@ -158,21 +144,21 @@
 </div>
 {% else %}
 <div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#991b1b,#7f1d1d);">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,var(--danger, #ef4444),#7f1d1d);">
+    <div class="flex items-start justify-between gap-4">
       <div>
-        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-triangle-exclamation"></i> Erreur</div>
+        <div class="sg-drawer-hero-sub"><i data-lucide="triangle-alert"></i> Erreur</div>
         <div class="sg-drawer-hero-title">Classe introuvable</div>
       </div>
-      <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
-        <i class="fa-solid fa-xmark"></i> Fermer
+      <button type="button" class="sg-drawer-hero-badge" style="cursor:pointer;" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()">
+        <i data-lucide="x"></i> Fermer
       </button>
     </div>
   </div>
   <div class="sg-drawer-body">
     <div class="sg-drawer-empty" style="min-height:40vh;">
       <div>
-        <div class="sg-drawer-empty-icon"><i class="fa-solid fa-file-circle-exclamation"></i></div>
+        <div class="sg-drawer-empty-icon"><i data-lucide="file-warning"></i></div>
         <div class="sg-drawer-empty-text">Cette classe n'est pas accessible.</div>
       </div>
     </div>

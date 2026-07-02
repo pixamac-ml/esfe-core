@@ -1,30 +1,52 @@
 {% load component_tags %}
 <div
-  class="scrim"
   x-data="{ open: false }"
-  :class="open ? 'open' : ''"
-  @{{ open_event }}.window="open = true"
-  @{{ close_event }}.window="open = false"
+  :class="open ? 'block' : 'hidden'"
+  @{{ open_event }}.window="open = true; document.body.classList.add('sg-overlay-open')"
+  @{{ close_event }}.window="open = false; document.body.classList.remove('sg-overlay-open')"
   @click="$dispatch('{{ close_event }}')"
+  class="fixed inset-0 z-40 bg-black/40 transition-opacity"
+  x-cloak
+  :aria-hidden="!open"
 ></div>
 <aside
   id="{{ id }}"
-  class="drawer"
   x-data="{ open: false }"
-  :class="open ? 'open' : ''"
+  :class="open ? 'translate-x-0' : 'translate-x-full'"
   @{{ open_event }}.window="open = true"
   @{{ close_event }}.window="open = false"
   @keydown.escape.window="$dispatch('{{ close_event }}')"
+  x-cloak
   :aria-hidden="!open"
+  role="dialog"
+  aria-modal="true"
+  aria-label="{{ kicker }}{% if title %} — {{ title }}{% endif %}"
+  tabindex="-1"
+  class="fixed right-0 top-0 z-50 flex flex-col h-full w-full max-w-lg border-l border-[color:var(--line)] bg-[color:var(--card)] shadow-2xl transition-transform duration-300"
 >
-  <div class="drawer-h">
-    <div>
-      <div class="crumb" style="color:var(--ink-3);font-size:11px;letter-spacing:.05em;font-weight:700;text-transform:uppercase">{{ kicker }}</div>
-      <h3 style="font-size:17px;font-weight:800;margin-top:3px">{{ title }}</h3>
+  <div class="flex items-center justify-between border-b border-[color:var(--line)] px-5 py-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
+        <i data-lucide="folder" style="width:16px;height:16px;"></i>
+      </span>
+      <div class="min-w-0">
+        <span class="block text-[11px] font-bold uppercase tracking-[.05em] text-[color:var(--muted-2)]">{{ kicker }}</span>
+        {% if title %}<h3 class="mt-0.5 truncate text-[17px] font-extrabold text-[color:var(--text)]">{{ title }}</h3>{% endif %}
+      </div>
     </div>
-    <button class="x" type="button" @click="$dispatch('{{ close_event }}')" aria-label="Fermer">×</button>
+    <button type="button" @click="$dispatch('{{ close_event }}')" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-[color:var(--card-soft)] hover:text-[color:var(--text)]" aria-label="Fermer">
+      <i data-lucide="x" style="width:18px;height:18px;"></i>
+    </button>
   </div>
-  <div class="drawer-b" id="{{ content_id }}">
-    <p>{{ placeholder }}</p>
+  <div class="relative flex-1 overflow-hidden">
+    <div class="overflow-y-auto p-5 h-full" id="{{ content_id }}">
+      <p class="text-sm text-[color:var(--muted)]">{{ placeholder }}</p>
+    </div>
+    <div class="sg-drawer-loading-overlay" aria-hidden="true">
+      <div class="flex flex-col items-center gap-3">
+        <div class="esfe-spinner"></div>
+        <span class="text-xs font-bold">Chargement...</span>
+      </div>
+    </div>
   </div>
 </aside>

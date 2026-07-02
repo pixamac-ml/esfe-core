@@ -1,0 +1,481 @@
+PLAN DE FINALISATION DU DASHBOARD ENSEIGNANT
+============================================
+
+OBJECTIF
+--------
+
+Le dashboard enseignant sera réellement terminé lorsqu'il sera :
+
+- strictement filtré par annexe ;
+- entièrement fonctionnel sur ordinateur et mobile ;
+- composé principalement avec la bibliothèque ui ;
+- découpé en sections maintenables ;
+- fluide avec HTMX et Alpine ;
+- accessible ;
+- couvert par des tests métier, de sécurité et de rendu ;
+- débarrassé du code CSS et JavaScript devenu inutile.
+
+
+PRIORITÉ 0 — SÉCURITÉ PAR ANNEXE
+--------------------------------
+
+C'est le travail le plus urgent.
+
+1. Fonctionner en mode fermé
+
+Si l'enseignant n'a aucune annexe valide :
+
+- ne retourner aucun cours ;
+- ne retourner aucune classe ;
+- ne retourner aucun étudiant ;
+- ne retourner aucun support ;
+- ne retourner aucun cahier de texte ;
+- ne retourner aucun honoraire ;
+- afficher un état vide expliquant que le compte doit être rattaché à une annexe.
+
+Il faut supprimer la logique qui signifie actuellement : « si branch existe, filtrer ; sinon afficher sans filtre ».
+
+La règle correcte est : « branch obligatoire ; sinon aucune donnée ».
+
+
+2. Vérifier tous les endpoints enseignant
+
+Le filtrage doit être présent dans :
+
+- le dashboard principal ;
+- la recherche ;
+- le détail d'une classe ;
+- le dépôt et la consultation des supports ;
+- le cahier de texte ;
+- le planning ;
+- les honoraires ;
+- les notifications métier ;
+- tous les endpoints HTMX des drawers et modales.
+
+
+3. Ajouter des tests anti-fuite
+
+Créer au minimum deux annexes et vérifier qu'un enseignant de l'annexe A ne peut jamais :
+
+- voir une classe de l'annexe B ;
+- rechercher un étudiant de l'annexe B ;
+- ouvrir un drawer avec un identifiant appartenant à l'annexe B ;
+- modifier un cahier ou un support de l'annexe B ;
+- voir les honoraires de l'annexe B.
+
+
+PRIORITÉ 1 — RÉPARER LES INTERACTIONS ACTUELLES
+-----------------------------------------------
+
+1. Recherche
+
+- Afficher #search-results-panel après une réponse HTMX contenant des résultats.
+- Le masquer lorsqu'on clique à l'extérieur.
+- Le masquer quand la recherche est vide.
+- Ajouter un état de chargement et un état « aucun résultat ».
+- Vérifier la navigation clavier.
+
+
+2. Actualisation
+
+- Donner un identifiant stable à chaque panneau de section.
+- Corriger sgRefreshDashboard() afin qu'il cible réellement la section active.
+- Corriger l'appel au toast : le deuxième argument de esfeToast doit être un type comme info ou success, pas un deuxième message.
+- Supprimer l'actualisation globale si une actualisation HTMX ciblée suffit.
+
+
+3. Drawer
+
+- Remplacer le drawer spécifique par le composant ui drawer, ou enrichir ce composant pour couvrir exactement le besoin enseignant.
+- Conserver l'ouverture automatique après un swap HTMX.
+- Fermer avec Échap, clic sur l'overlay et bouton Fermer.
+- Restaurer correctement le focus après fermeture.
+- Bloquer le scroll de la page pendant l'ouverture.
+- Afficher une erreur visible si le chargement HTMX échoue.
+
+
+4. Modale
+
+- Vérifier l'ouverture via teacher-modal-open.
+- Ajouter un vrai titre selon l'action chargée.
+- Fermer la modale après une sauvegarde réussie.
+- Gérer le focus initial et le retour du focus.
+
+
+5. Sidebar mobile
+
+- Sur mobile, transformer la sidebar en panneau superposé.
+- Ajouter un overlay.
+- La fermer après sélection d'une entrée.
+- Permettre au bouton de la topbar de la rouvrir.
+- Ne pas utiliser la même logique pour « réduire sur ordinateur » et « ouvrir sur mobile ».
+
+
+PRIORITÉ 2 — DÉCOUPER LE TEMPLATE
+---------------------------------
+
+Le fichier dashboard.html fait actuellement plus de 800 lignes. Il doit devenir une coquille de dashboard, pas contenir toutes les pages.
+
+Structure recommandée :
+
+templates/portal/teacher/v2/
+    dashboard.html
+    sections/
+        overview.html
+        classes.html
+        supports.html
+        schedule.html
+        logs.html
+        salary.html
+        notifications.html
+        settings.html
+    partials/
+        event_row.html
+        class_row.html
+        lesson_log_row.html
+        support_row.html
+        honorarium_row.html
+        quick_actions.html
+
+dashboard.html doit uniquement contenir :
+
+- la sidebar ;
+- la topbar ;
+- la navigation ;
+- la zone principale ;
+- le conteneur du drawer ;
+- le conteneur de la modale ;
+- l'initialisation minimale du shell.
+
+
+PRIORITÉ 3 — CHARGER LES SECTIONS AVEC HTMX
+-------------------------------------------
+
+Aujourd'hui, toutes les sections sont rendues côté serveur puis cachées. Cela alourdit inutilement la page et le service Python.
+
+Approche recommandée :
+
+1. Rendre uniquement la section active au premier chargement.
+2. Charger une nouvelle section avec hx-get.
+3. Remplacer uniquement #teacher-workspace.
+4. Mettre à jour l'URL avec hx-push-url.
+5. Conserver le bouton précédent du navigateur.
+6. Ajouter un skeleton pendant le chargement.
+7. Réinitialiser Lucide après chaque swap.
+
+Chaque section doit avoir son endpoint ou un dispatcher clairement structuré.
+
+
+PRIORITÉ 4 — TERMINER L'UTILISATION DE LA BIBLIOTHÈQUE UI
+---------------------------------------------------------
+
+Remplacements recommandés :
+
+- onglets HTML répétés -> tabs ;
+- sg-stat-box -> mini_stat, stat_card ou kpi_row ;
+- sg-badge-* -> badge ou status_badge ;
+- boutons d'action répétés -> button ;
+- états vides spécifiques -> empty_state ;
+- drawer spécifique -> drawer ;
+- champs de formulaire -> form_field, input, select, textarea et form_actions ;
+- pagination manuelle -> pagination ;
+- bandeaux de retour -> alert ;
+- indicateurs de chargement -> spinner, skeleton ou loading_overlay.
+
+Les tableaux métier peuvent rester spécifiques lorsqu'ils sont complexes. Il ne faut utiliser data_table que lorsque son contrat représente correctement les données et les actions nécessaires.
+
+
+Avant de remplacer tous les boutons, le composant button doit accepter proprement :
+
+- hx-get ou hx-post ;
+- hx-target ;
+- hx-swap ;
+- hx-indicator ;
+- aria-label ;
+- title ;
+- confirmation éventuelle ;
+- état de chargement.
+
+Il ne faut pas injecter arbitrairement des attributs non contrôlés dans le HTML.
+
+
+PRIORITÉ 5 — RÉDUIRE LE CSS SPÉCIFIQUE SG
+-----------------------------------------
+
+Le template contient encore beaucoup de classes sg-* et du CSS intégré.
+
+Ordre recommandé :
+
+1. Remplacer les styles déjà couverts par un composant ui.
+2. Garder uniquement les styles réellement métier.
+3. Déplacer ces styles dans un fichier statique dédié au dashboard enseignant.
+4. Supprimer les classes devenues inutilisées.
+5. N'utiliser que les tokens CSS institutionnels.
+
+Il faut notamment supprimer progressivement :
+
+- sg-stat-* ;
+- sg-badge-* ;
+- sg-empty-* ;
+- sg-btn-* ;
+- les variantes de cartes déjà couvertes par ui.
+
+
+PRIORITÉ 6 — NETTOYER LE JAVASCRIPT
+-----------------------------------
+
+- Supprimer SG_SECTIONS si la constante reste inutilisée.
+- Supprimer sgSwitchSection() si HTMX devient responsable de la navigation.
+- Centraliser le shell Alpine dans une seule fonction.
+- Ne pas multiplier les listeners globaux HTMX.
+- Éviter les fonctions globales window.* sauf pour une API volontairement documentée.
+- Déplacer le JavaScript stable dans un fichier statique.
+- Protéger chaque accès à htmx, Alpine et esfeToast si la librairie n'est pas chargée.
+- Gérer explicitement les erreurs réseau.
+
+
+PRIORITÉ 7 — COHÉRENCE DES DONNÉES
+----------------------------------
+
+Le service build_teacher_dashboard_context() est déjà une bonne base, mais il devient volumineux.
+
+Le découper en sélecteurs ou builders cohérents :
+
+- build_teacher_overview_context() ;
+- build_teacher_classes_context() ;
+- build_teacher_supports_context() ;
+- build_teacher_schedule_context() ;
+- build_teacher_logs_context() ;
+- build_teacher_honoraria_context() ;
+- build_teacher_notifications_context() ;
+- build_teacher_settings_context().
+
+Chaque fonction doit :
+
+- recevoir teacher et branch explicitement ;
+- refuser de travailler sans branch lorsque les données sont liées à une annexe ;
+- retourner des structures prêtes à afficher ;
+- éviter les requêtes dans les composants ui ;
+- utiliser select_related et prefetch_related lorsque nécessaire ;
+- éviter les requêtes répétées par ligne dans les templates.
+
+
+PRIORITÉ 8 — ACCESSIBILITÉ ET QUALITÉ VISUELLE
+---------------------------------------------
+
+- Ajouter aria-label à tous les boutons composés uniquement d'une icône.
+- Ajouter aria-current="page" à la navigation active.
+- Vérifier tous les labels de formulaire.
+- Garantir un focus visible sur tous les éléments interactifs.
+- Vérifier la navigation complète au clavier.
+- Respecter prefers-reduced-motion.
+- Vérifier les contrastes en mode clair et sombre.
+- Ne pas utiliser uniquement la couleur pour transmettre un statut.
+- Corriger les textes français sans accents : Paramètres, Étudiants, Matières, Déposer, Sélectionner, etc.
+- Ajouter des textes alternatifs utiles aux images de profil.
+
+
+PRIORITÉ 9 — TESTS À AJOUTER
+----------------------------
+
+Tests de sécurité :
+
+- isolation stricte entre deux annexes ;
+- refus d'un identifiant appartenant à une autre annexe ;
+- refus d'accès pour un utilisateur non enseignant ;
+- comportement sans annexe.
+
+Tests fonctionnels :
+
+- chaque section retourne HTTP 200 ;
+- chaque endpoint HTMX retourne le bon partial ;
+- création et modification d'un cahier ;
+- dépôt d'un support ;
+- recherche ;
+- préférences enseignant ;
+- lecture des honoraires sans possibilité de les modifier ;
+- fermeture du drawer après succès via HX-Trigger.
+
+Tests UI :
+
+- compilation de chaque partial ;
+- présence des composants principaux ;
+- état vide pour chaque section ;
+- rendu mobile à vérifier manuellement ;
+- absence de nouvelles classes ou couleurs codées en dur.
+
+
+PRIORITÉ 10 — PERFORMANCE
+-------------------------
+
+- Mesurer le nombre de requêtes SQL du dashboard initial.
+- Ne charger que les données de la section demandée.
+- Paginer les notifications, supports, cahiers et honoraires.
+- Limiter les listes de l'overview.
+- Éviter les calculs de totaux dans les templates.
+- Utiliser annotations et agrégations côté queryset.
+- Vérifier que les requêtes restent filtrées par annexe avant toute agrégation.
+
+
+ORDRE D'EXÉCUTION CONSEILLÉ
+--------------------------
+
+Lot 1 — Sécurité et bugs
+
+- verrouiller l'annexe ;
+- réparer recherche, refresh, drawer et mobile ;
+- ajouter les tests anti-fuite.
+
+Lot 2 — Découpage
+
+- extraire les huit sections ;
+- séparer les context builders ;
+- conserver le comportement actuel.
+
+Lot 3 — Navigation HTMX
+
+- charger uniquement la section active ;
+- gérer URL, historique, skeleton et erreurs.
+
+Lot 4 — Migration UI complète
+
+- remplacer badges, statistiques, boutons, champs et drawer ;
+- supprimer le CSS sg-* devenu inutile.
+
+Lot 5 — Finition
+
+- accessibilité ;
+- français et textes ;
+- responsive ;
+- performance ;
+- tests complets.
+
+
+CRITÈRES DE VALIDATION FINALE
+-----------------------------
+
+Le dashboard peut être déclaré terminé seulement si :
+
+- aucun scénario ne permet une fuite entre annexes ;
+- un enseignant sans annexe ne voit aucune donnée métier ;
+- les huit sections fonctionnent en HTMX ;
+- la recherche, le drawer et la modale fonctionnent au clavier et sur mobile ;
+- le template principal est court et ne contient plus toute la logique des sections ;
+- les composants ui remplacent les duplications visuelles principales ;
+- aucun code JavaScript mort ne reste ;
+- les erreurs réseau produisent un retour visible ;
+- les tests du dashboard enseignant passent ;
+- python manage.py check passe ;
+- python manage.py test --settings=config.settings_test_local accounts passe ;
+- npm run build:css passe ;
+- une vérification visuelle a été faite sur mobile, tablette, ordinateur, mode clair et mode sombre.
+
+
+AVIS FINAL
+----------
+
+Le dashboard enseignant est un très bon candidat pour devenir la référence technique des autres dashboards ESFE.
+
+La priorité n'est plus d'ajouter des fonctions. Il faut maintenant verrouiller la sécurité par annexe, découper la page, charger les sections avec HTMX et terminer la migration vers ui. Une fois ces points réalisés, le même shell et la même méthode pourront être appliqués aux dashboards étudiant, secrétaire et staff avec beaucoup moins de duplication.
+
+
+RÉPONSE À TA REMARQUE SUR LES PARTIALS — DÉCISION D'EXÉCUTION
+------------------------------------------------------------
+
+Je comprends précisément ton problème : tu ne veux pas revenir à une architecture où un dashboard charge une grande quantité de partials mal organisés, répète du HTML, alourdit le rendu initial et donne l'impression que plusieurs petites pages sont collées ensemble.
+
+Je ne vais donc pas réintroduire cette ancienne organisation.
+
+La proposition est ajustée ainsi :
+
+- dashboard.html reste une coquille unique et légère ;
+- #teacher-workspace est l'unique zone principale remplacée par HTMX ;
+- une section n'est rendue que lorsqu'elle est demandée ;
+- le serveur rend un composant de section, pas une collection de fichiers inclus au chargement initial ;
+- les composants de section assemblent les composants universels de ui ;
+- aucun rechargement global de page pour naviguer entre les sections ;
+- hx-push-url conserve une URL navigable et le bouton Précédent ;
+- skeleton et retour visuel démarrent immédiatement ;
+- les drawers et modales restent des zones HTMX indépendantes ;
+- les données d'une section ne sont calculées que lorsque cette section est ouverte.
+
+Il existera toujours des templates internes aux composants, car django-components en a besoin pour produire le HTML. Mais ils ne fonctionneront pas comme les anciens partials : ils ne seront ni tous inclus, ni tous calculés, ni tous rendus au chargement du dashboard.
+
+Architecture retenue :
+
+    dashboard.html
+        -> composant de shell
+        -> composant de navigation
+        -> #teacher-workspace
+             -> un seul composant de section actif
+        -> composant drawer
+        -> composant modal
+
+Navigation :
+
+    clic sur « Mes classes »
+        -> requête HTMX ciblée
+        -> calcul du contexte classes uniquement
+        -> rendu du composant teacher_classes_section
+        -> remplacement de #teacher-workspace
+        -> aucune actualisation globale
+
+Je vais aussi éviter une autre erreur : placer toutes les règles métier dans ui. La bibliothèque ui reste responsable des briques universelles. Les composants de composition propres à l'enseignant pourront utiliser ces briques sans transformer ui en application métier.
+
+La bibliothèque sera donc davantage mise en valeur :
+
+- ui fournit les cartes, tableaux, boutons, badges, formulaires, états, overlays et navigation ;
+- le dashboard enseignant fournit uniquement les données et la composition métier ;
+- les autres dashboards pourront réutiliser le même shell et les mêmes composants universels.
+
+Règle ferme pendant l'exécution : si un découpage rend le dashboard plus lourd, provoque plusieurs chargements inutiles ou nécessite un rechargement global, il sera refusé. Le critère principal reste une interface instantanée, ciblée et stable.
+
+
+PREMIER LOT MIS EN EXÉCUTION
+----------------------------
+
+1. Verrouillage strict par annexe.
+2. Correction de la recherche HTMX invisible.
+3. Correction de l'actualisation ciblée.
+4. Stabilisation du drawer et de la sidebar mobile.
+5. Mise en place du workspace unique sans rechargement global.
+6. Tests anti-fuite entre annexes avant de poursuivre la conversion visuelle.
+
+Après ce lot, la migration des sections se fera une par une. À aucun moment toutes les sections ne seront réintroduites sous forme de partials chargés simultanément.
+
+
+JOURNAL D'EXÉCUTION — PREMIER LOT RÉALISÉ
+-----------------------------------------
+
+La mise en exécution a commencé sans recréer les anciens partials.
+
+Travail réalisé :
+
+- annexe rendue obligatoire dans le service du dashboard enseignant ;
+- querysets de cours, classes, créneaux, matières et affectations filtrés avant exécution ;
+- enseignant sans annexe placé en mode fermé avec zéro donnée métier ;
+- détail d'une classe d'une autre annexe refusé ;
+- consultation d'un support vérifiée contre l'annexe et les affectations réelles de l'enseignant ;
+- services de planning étendus pour filtrer directement par branche ;
+- deux tests anti-fuite ajoutés : compte sans annexe et classe d'une autre annexe ;
+- test d'isolation inter-annexes validé ;
+- recherche HTMX rendue visible après réception des résultats ;
+- fermeture correcte de la recherche au clic extérieur ;
+- sidebar mobile transformée en panneau superposé avec overlay et réouverture possible ;
+- navigation active de la sidebar mise à jour instantanément avec Alpine ;
+- navigation horizontale remplacée par le composant ui tabs ;
+- navigation configurée avec hx-get, hx-select, hx-target, hx-swap et hx-push-url ;
+- création de l'unique zone #teacher-workspace ;
+- remplacement ciblé de cette zone sans rechargement global ;
+- une seule section active rendue dans le DOM au lieu des huit sections simultanées ;
+- actualisation corrigée pour remplacer uniquement #teacher-workspace ;
+- drawer spécifique supprimé du dashboard et remplacé par le composant ui drawer ;
+- code JavaScript mort SG_SECTIONS et sgSwitchSection supprimé ;
+- compilation des templates validée ;
+- python manage.py check validé ;
+- les quatre tests de l'app ui passent ;
+- le build Tailwind passe.
+
+Important : le mécanisme actuel utilise hx-select comme transition sûre. Le serveur répond encore avec la vue du dashboard, mais HTMX n'insère que #teacher-workspace. Cela permet de supprimer immédiatement les rechargements globaux sans réintroduire les partials ni casser les sections existantes.
+
+Étape suivante d'exécution : séparer progressivement le calcul des données par section et rendre directement un composant de section. Cette évolution réduira aussi le travail serveur et la taille de la réponse réseau. Elle se fera section par section, en conservant à chaque étape le fallback par URL et les tests de sécurité.

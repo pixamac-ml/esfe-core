@@ -58,11 +58,24 @@ def build_home_section_context(*, branch, selected_class=None):
             }
         )
 
+    kpi_cards = [
+        {
+            "label": "Présence aujourd'hui",
+            "value": f"{presence_rate}%" if presence_rate is not None else "—",
+            "icon": "user-check",
+            "tone": "success",
+            "hint": selected_class.display_name if selected_class else "Toute l'annexe",
+        },
+        {"label": "Appels en attente", "value": len(pending_appel_rows), "icon": "clipboard-clock", "tone": "warning", "hint": "Aujourd'hui"},
+        {"label": "Enseignants absents", "value": anomalies["absent_teacher_event_count"], "icon": "user-x", "tone": "danger", "hint": "Aujourd'hui"},
+        {"label": "Cas ouverts", "value": count_open_cases(branch=branch), "icon": "shield-alert", "tone": "info", "hint": "Étudiants et enseignants"},
+    ]
     return {
         "home_presence_rate": presence_rate,
         "home_pending_appel_count": len(pending_appel_rows),
         "home_absent_teachers_count": anomalies["absent_teacher_event_count"],
-        "home_open_cases_count": count_open_cases(branch=branch),
+        "home_open_cases_count": kpi_cards[3]["value"],
+        "supervisor_kpi_cards": kpi_cards,
         "home_today_sessions": today_rows[:8],
         "home_alerts": alerts[:5],
     }

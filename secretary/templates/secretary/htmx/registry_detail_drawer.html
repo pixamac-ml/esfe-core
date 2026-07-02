@@ -1,0 +1,166 @@
+{% load component_tags secretary_badges %}
+{% load secretary_timeline %}
+<div>
+  <header class="flex items-start justify-between gap-4 px-6 py-5">
+    <div class="flex items-center gap-3.5 min-w-0">
+      <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <div class="min-w-0">
+        <div class="text-base font-extrabold text-[color:var(--text)] truncate">{{ entry.title }}</div>
+        <div class="mt-1 flex flex-wrap gap-2 text-[11px] font-bold text-[color:var(--muted-2)]">
+          <span class="font-mono">{{ entry.registry_number|default:"-" }}</span>
+          <span>{{ entry.get_entry_type_display }}</span>
+          <span>{{ entry.created_at|date:"d/m/Y H:i" }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2.5 shrink-0">
+      <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold {{ entry.priority|priority_pill_class }}">{% if entry.priority|is_urgent_priority %}<span class="h-1.5 w-1.5 rounded-full bg-current"></span>{% endif %}{{ entry.get_priority_display }}</span>
+      {% component "status_badge" label=entry.get_status_display tone=entry.status|status_tone %}{% endcomponent %}
+      <button type="button" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] px-3 py-1.5 text-xs font-bold text-[color:var(--text)] transition-colors hover:bg-[color:var(--accent-bg)]">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        Fermer
+      </button>
+    </div>
+  </header>
+
+  <div class="px-6 pb-6">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
+      <aside class="space-y-4">
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="mb-3 text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider">Informations</div>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user shrink-0 text-[color:var(--muted-2)]"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Visiteur</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ entry.visitor_name|default:"-" }}</div>
+              </div>
+            </div>
+            {% if entry.visitor_phone %}
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-phone shrink-0 text-[color:var(--muted-2)]"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Telephone</div>
+                <div class="text-xs font-extrabold font-mono text-[color:var(--text)]">{{ entry.visitor_phone }}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if entry.related_student %}
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-graduation-cap shrink-0 text-[color:var(--muted-2)]"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Etudiant concerne</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ entry.related_student.full_name }}{% if entry.student_class_label %} - {{ entry.student_class_label }}{% endif %}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if entry.related_staff %}
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-id-card shrink-0 text-[color:var(--muted-2)]"><path d="M16 10h2"/><path d="M16 14h2"/><path d="M6.17 15a3 3 0 0 1 5.66 0"/><circle cx="8" cy="9" r="2"/><rect x="2" y="3" width="20" height="18" rx="2"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Personnel concerne</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ entry.related_staff.get_full_name|default:entry.related_staff.username }}</div>
+              </div>
+            </div>
+            {% endif %}
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building2 shrink-0 text-[color:var(--muted-2)]"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Service destinataire</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ entry.target_service|default:"Accueil" }}</div>
+              </div>
+            </div>
+            {% if entry.motive %}
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-square shrink-0 text-[color:var(--muted-2)]"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Motif</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ entry.motive }}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if entry.description %}
+            <div class="flex items-start gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-align-left shrink-0 text-[color:var(--muted-2)] mt-0.5"><path d="M15 12H3"/><path d="M17 6H3"/><path d="M21 18H3"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Description</div>
+                <div class="text-xs font-extrabold text-[color:var(--text)]">{{ entry.description }}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if entry.exited_at %}
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-door-open shrink-0 text-[color:var(--muted-2)]"><path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Heure de sortie</div>
+                <div class="text-xs font-extrabold font-mono text-[color:var(--text)]">{{ entry.exited_at|date:"d/m/Y H:i" }}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if entry.closed_at %}
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-archive shrink-0 text-[color:var(--muted-2)]"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+              <div>
+                <div class="text-[10px] font-extrabold text-[color:var(--muted-2)]">Cloture</div>
+                <div class="text-xs font-extrabold font-mono text-[color:var(--text)]">{{ entry.closed_at|date:"d/m/Y H:i" }}</div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </section>
+
+        {% if entry.linked_actions %}
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="mb-3 text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider">Actions prevues</div>
+          <div class="flex flex-wrap gap-1.5">
+            {% for action in entry.linked_actions %}
+              {% component "status_badge" label=action tone="primary" %}{% endcomponent %}
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="mb-3 text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider">Actions</div>
+          <button type="button" class="flex w-full items-center justify-center gap-2 rounded-lg bg-[color:var(--primary)] px-4 py-2 text-xs font-bold text-white transition-colors hover:opacity-90" hx-get="{% url 'secretary:registry_update' entry.pk %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+            Modifier l'entree
+          </button>
+        </section>
+      </aside>
+
+      <main>
+        <section class="rounded-xl border border-[color:var(--border)] bg-[color:var(--card-bg)] p-4">
+          <div class="mb-4 text-xs font-extrabold text-[color:var(--muted-2)] uppercase tracking-wider">Historique de l'entree</div>
+          <div class="space-y-0">
+            {% for event in history_events %}
+              <div class="flex gap-3 pb-4">
+                <div class="flex flex-col items-center">
+                  <div class="flex h-7 w-7 items-center justify-center rounded-full bg-[color:var(--accent-bg)] text-[color:var(--muted-2)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide {{ event.action|history_action_icon }}"></svg>
+                  </div>
+                  {% if not forloop.last %}<div class="mt-1 w-px flex-1 bg-[color:var(--border)]"></div>{% endif %}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-extrabold text-[color:var(--text)]">{{ event.action|history_action_label }}</div>
+                  <div class="mt-0.5 text-[11px] font-semibold text-[color:var(--muted-2)]">{% if event.at %}{{ event.at|date:"d/m/Y H:i" }}{% else %}Date inconnue{% endif %} - {{ event.by|history_actor_label }}</div>
+                  {% if event.action == "changement_statut" %}
+                  <div class="mt-1 flex items-center gap-1.5">
+                    {% component "status_badge" label=event.details.from|registry_status_label tone=event.details.from|status_tone %}{% endcomponent %}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right text-[color:var(--muted-2)]"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    {% component "status_badge" label=event.details.to|registry_status_label tone=event.details.to|status_tone %}{% endcomponent %}
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% empty %}
+              {% component "empty_state" title="Aucun événement" message="Aucun evenement enregistre." icon="history" compact=True %}{% endcomponent %}
+            {% endfor %}
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</div>

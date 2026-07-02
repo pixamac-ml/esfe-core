@@ -71,8 +71,8 @@ def create_convocation(
 
 
 def _send_convocation_email(convocation: Convocation) -> None:
-    from communication.models import CommunicationNotification
-    from communication.services.notification_service import NotificationService
+    from notifier.models import NotificationMessage
+    from notifier.services import NotificationBus
 
     recipient = (
         convocation.student.user
@@ -89,7 +89,7 @@ def _send_convocation_email(convocation: Convocation) -> None:
     ).strip()
 
     try:
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=recipient,
             actor=convocation.created_by,
             event_type="supervisor_convocation",
@@ -97,9 +97,9 @@ def _send_convocation_email(convocation: Convocation) -> None:
             body=body,
             source_app="portal",
             channels=(
-                CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
-                CommunicationNotification.CHANNEL_IN_APP,
-                CommunicationNotification.CHANNEL_WEBSOCKET,
+                NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
+                NotificationMessage.CHANNEL_IN_APP,
+                NotificationMessage.CHANNEL_WEBSOCKET,
             ),
             metadata={"convocation_id": convocation.id, "motif": convocation.motif},
         )

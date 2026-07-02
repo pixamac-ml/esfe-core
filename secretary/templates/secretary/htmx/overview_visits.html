@@ -1,0 +1,35 @@
+{% load component_tags %}
+<div id="overview-visits"
+     hx-get="{% url 'secretary:htmx_overview_visits' %}"
+     hx-trigger="secretary:visits-updated from:body"
+     hx-swap="outerHTML">
+{% component "dashboard_card" %}
+  {% fill "default" %}
+    {% if open_visits_rows %}
+      <div class="divide-y divide-[color:var(--line)]">
+        {% for item in open_visits_rows %}
+          <div class="flex items-center justify-between py-2.5 text-sm">
+            <div class="min-w-0">
+              <div class="font-bold text-[color:var(--text)]">{{ item.full_name }}</div>
+              <div class="text-xs text-[color:var(--muted-2)]">{{ item.arrived_at|date:"H:i" }} - {{ item.reason|default:"Accueil" }}{% if item.related_student %} — {{ item.related_student.full_name }}{% endif %}</div>
+            </div>
+            {% if item.status != "completed" %}
+              <form method="post" hx-post="{% url 'secretary:visitor_complete' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
+                {% component "button" label="Sortie" variant="outline" size="sm" type="submit" icon_left="arrow-right-from-bracket" %}{% endcomponent %}
+              </form>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% component "empty_state" title="Aucune visite ouverte" icon="user-clock" compact=True %}
+        {% fill "default" %}
+          <button type="button" class="mt-2 inline-flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-bold text-[color:var(--school-primary)] transition hover:bg-[color:var(--school-primary-soft)]" hx-get="{% url 'secretary:visitor_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+            <i data-lucide="plus" style="width:12px;height:12px;"></i>Nouveau passage
+          </button>
+        {% endfill %}
+      {% endcomponent %}
+    {% endif %}
+  {% endfill %}
+{% endcomponent %}
+</div>

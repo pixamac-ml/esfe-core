@@ -1,0 +1,35 @@
+{% load component_tags %}
+<div id="overview-tasks"
+     hx-get="{% url 'secretary:htmx_overview_tasks' %}"
+     hx-trigger="secretary:tasks-updated from:body"
+     hx-swap="outerHTML">
+{% component "dashboard_card" %}
+  {% fill "default" %}
+    {% if pending_tasks_rows %}
+      <div class="divide-y divide-[color:var(--line)]">
+        {% for item in pending_tasks_rows %}
+          <div class="flex items-center justify-between py-2.5 text-sm">
+            <div class="min-w-0">
+              <div class="font-bold text-[color:var(--text)]">{{ item.title }}</div>
+              <div class="flex items-center gap-2 text-xs text-[color:var(--muted-2)]">
+                <span>{{ item.due_date|date:"d/m"|default:"Sans date" }}</span>
+              </div>
+            </div>
+            {% if item.status == "pending" %}
+              <form method="post" hx-post="{% url 'secretary:task_start' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
+                {% component "button" label="Démarrer" variant="primary" size="sm" type="submit" icon_left="play" %}{% endcomponent %}
+              </form>
+            {% elif item.status == "in_progress" %}
+              <form method="post" hx-post="{% url 'secretary:task_complete' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
+                {% component "button" label="Terminer" variant="success" size="sm" type="submit" icon_left="check" %}{% endcomponent %}
+              </form>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% component "empty_state" title="Aucune tâche urgente" icon="list-checks" compact=True %}{% endcomponent %}
+    {% endif %}
+  {% endfill %}
+{% endcomponent %}
+</div>

@@ -4,18 +4,18 @@
 
 {% if schedule_event %}
 <div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#15575b,#0e3a3d);">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-      <div>
-        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-book"></i> Cahier de texte</div>
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,var(--info, #2563eb),#0e3a3d);">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <div class="sg-drawer-hero-sub"><i data-lucide="book"></i> Cahier de texte</div>
         <div class="sg-drawer-hero-title">{{ schedule_event.ec.title }}</div>
         <div class="sg-drawer-hero-meta">
           {{ schedule_event.academic_class.display_name }} &middot; {{ schedule_event.start_datetime|date:"D d/m/Y" }} &middot; {{ schedule_event.start_datetime|date:"H:i" }} - {{ schedule_event.end_datetime|date:"H:i" }}
         </div>
         <div class="sg-drawer-hero-meta">{{ schedule_event.location|default:"Salle non precisee" }}</div>
       </div>
-      <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
-        <i class="fa-solid fa-xmark"></i> Fermer
+      <button type="button" class="sg-drawer-hero-badge" style="cursor:pointer;" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()">
+        <i data-lucide="x"></i> Fermer
       </button>
     </div>
   </div>
@@ -25,9 +25,9 @@
       {% csrf_token %}
 
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-flag"></i> Statut de la seance</div>
+        <div class="sg-drawer-section-title"><i data-lucide="flag"></i> Statut de la seance</div>
         <div class="field">
-          <select name="status" class="sg-form-select" style="height:44px;">
+          <select name="status" class="sg-form-select">
             {% for value, label in lesson_log_status_choices %}
             <option value="{{ value }}"{% if lesson_log and lesson_log.status == value %} selected{% elif not lesson_log and value == 'done' %} selected{% endif %}>{{ label }}</option>
             {% endfor %}
@@ -36,48 +36,48 @@
       </div>
 
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-pen"></i> Contenu du cours</div>
+        <div class="sg-drawer-section-title"><i data-lucide="pen"></i> Contenu du cours</div>
         <div class="field">
           <textarea name="content" rows="5" class="sg-form-input" placeholder="Resume du cours, points traites, progression...">{{ lesson_log.content|default:"" }}</textarea>
         </div>
       </div>
 
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-briefcase"></i> Travaux / devoirs</div>
+        <div class="sg-drawer-section-title"><i data-lucide="briefcase"></i> Travaux / devoirs</div>
         <div class="field">
           <textarea name="homework" rows="3" class="sg-form-input" placeholder="Travaux donnes a la classe...">{{ lesson_log.homework|default:"" }}</textarea>
         </div>
       </div>
 
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-note-sticky"></i> Observations</div>
+        <div class="sg-drawer-section-title"><i data-lucide="sticky-note"></i> Observations</div>
         <div class="field">
           <textarea name="observations" rows="3" class="sg-form-input" placeholder="Retard, ajustement, incident, remarque utile...">{{ lesson_log.observations|default:"" }}</textarea>
         </div>
       </div>
 
       <div class="sg-drawer-section">
-        <div class="sg-drawer-section-title"><i class="fa-solid fa-check-circle"></i> Ma presence</div>
+        <div class="sg-drawer-section-title"><i data-lucide="check-circle"></i> Ma presence</div>
         <div class="field">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:.82rem;">
-            <input type="checkbox" name="mark_present" value="1"{% if teacher_marked_present %} checked{% endif %} style="width:18px;height:18px;accent-color:#16a34a;">
+          <label class="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+            <input type="checkbox" name="mark_present" value="1"{% if teacher_marked_present %} checked{% endif %} class="w-[18px] h-[18px] rounded" style="accent-color:var(--success);">
             Je certifie etre present(e) pour cette seance
           </label>
         </div>
       </div>
 
       {% if lesson_log %}
-      <div style="padding:8px 4px 16px;font-size:.72rem;font-weight:600;color:#94a3b8;">
-        <i class="fa-regular fa-clock"></i> Derniere mise a jour : {{ lesson_log.updated_at|date:"d/m/Y H:i" }}
+      <div class="flex items-center gap-1.5 text-xs font-semibold text-[color:var(--muted-2)] px-1 pb-4">
+        <i data-lucide="clock" style="width:12px;height:12px;"></i> Derniere mise a jour : {{ lesson_log.updated_at|date:"d/m/Y H:i" }}
       </div>
       {% endif %}
 
-      <div style="display:flex;gap:10px;padding:4px 0 8px;">
+      <div class="flex gap-2.5 pt-1 pb-2">
         <button type="submit" class="sg-btn sg-btn-primary" style="min-height:40px;font-size:.78rem;">
-          <i class="fa-solid fa-floppy-disk"></i> {% if lesson_log %}Mettre a jour{% else %}Enregistrer{% endif %}
+          <i data-lucide="floppy-disk"></i> {% if lesson_log %}Mettre a jour{% else %}Enregistrer{% endif %}
         </button>
         <button type="button" class="sg-btn sg-btn-outline" style="min-height:40px;font-size:.78rem;" hx-get="{% url 'accounts_portal:teacher_class_detail' schedule_event.academic_class_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
-          <i class="fa-solid fa-arrow-left"></i> Apercu classe
+          <i data-lucide="arrow-left"></i> Apercu classe
         </button>
       </div>
     </form>
@@ -85,21 +85,21 @@
 </div>
 {% else %}
 <div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,#991b1b,#7f1d1d);">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,var(--danger, #ef4444),#7f1d1d);">
+    <div class="flex items-start justify-between gap-4">
       <div>
-        <div class="sg-drawer-hero-sub"><i class="fa-solid fa-triangle-exclamation"></i> Erreur</div>
+        <div class="sg-drawer-hero-sub"><i data-lucide="triangle-alert"></i> Erreur</div>
         <div class="sg-drawer-hero-title">Cours introuvable</div>
       </div>
-      <button type="button" class="sg-drawer-hero-badge" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
-        <i class="fa-solid fa-xmark"></i> Fermer
+      <button type="button" class="sg-drawer-hero-badge" style="cursor:pointer;" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()">
+        <i data-lucide="x"></i> Fermer
       </button>
     </div>
   </div>
   <div class="sg-drawer-body">
     <div class="sg-drawer-empty" style="min-height:40vh;">
       <div>
-        <div class="sg-drawer-empty-icon"><i class="fa-solid fa-file-circle-exclamation"></i></div>
+        <div class="sg-drawer-empty-icon"><i data-lucide="file-warning"></i></div>
         <div class="sg-drawer-empty-text">Ce cours n'est pas accessible.</div>
       </div>
     </div>

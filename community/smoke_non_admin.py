@@ -4,7 +4,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from communication.models import CommunicationNotification
+from notifier.models import NotificationMessage
 from community.models import Category, Topic, Answer
 from community.services.notifications import create_notification
 
@@ -85,11 +85,11 @@ with override_settings(ALLOWED_HOSTS=["testserver", "127.0.0.1", "localhost"]):
     print("ACCEPTED_ANSWER_MATCH", created_topic.accepted_answer_id == created_answer.id)
 
     # 5) Notifications checks
-    communication_notif_for_auteur = CommunicationNotification.objects.filter(
+    communication_notif_for_auteur = NotificationMessage.objects.filter(
         recipient=auteur,
         event_type="community_new_answer",
     ).count()
-    communication_notif_for_member = CommunicationNotification.objects.filter(
+    communication_notif_for_member = NotificationMessage.objects.filter(
         recipient=membre,
         event_type="community_accepted_answer",
     ).count()
@@ -97,17 +97,17 @@ with override_settings(ALLOWED_HOSTS=["testserver", "127.0.0.1", "localhost"]):
     print("COMM_NOTIF_ACCEPTED_FOR_MEMBER", communication_notif_for_member)
     print(
         "COMM_UNREAD_AUTEUR",
-        CommunicationNotification.objects.filter(
+        NotificationMessage.objects.filter(
             recipient=auteur,
-            channel=CommunicationNotification.CHANNEL_IN_APP,
+            channel=NotificationMessage.CHANNEL_IN_APP,
             read_at__isnull=True,
         ).count(),
     )
     print(
         "COMM_UNREAD_MEMBER",
-        CommunicationNotification.objects.filter(
+        NotificationMessage.objects.filter(
             recipient=membre,
-            channel=CommunicationNotification.CHANNEL_IN_APP,
+            channel=NotificationMessage.CHANNEL_IN_APP,
             read_at__isnull=True,
         ).count(),
     )

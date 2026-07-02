@@ -1,0 +1,32 @@
+{% load humanize %}
+<div class="max-h-80 overflow-y-auto">
+  {% for notification in notifications %}
+    <a href="{% url 'notification_center:notifications' %}?notification_id={{ notification.id }}"
+       class="block border-b border-slate-100 px-5 py-4 transition hover:bg-slate-50 {% if not notification.read_at %}bg-blue-50/50{% endif %}">
+      <div class="flex items-start gap-3">
+        <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+          <i class="fa-solid fa-bell"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-semibold text-slate-900">{{ notification.title }}</p>
+          <p class="mt-1 line-clamp-2 text-xs text-slate-600">{{ notification.body }}</p>
+          <p class="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ notification.created_at|timesince }}</p>
+        </div>
+        {% if not notification.read_at %}
+          <span class="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500"></span>
+        {% endif %}
+      </div>
+    </a>
+  {% empty %}
+    <div class="p-5 text-sm text-slate-500">Aucune notification.</div>
+  {% endfor %}
+</div>
+{% if unread_count > 0 %}
+  <div class="border-t border-slate-100 bg-slate-50 px-5 py-3">
+    <button
+      hx-post="{% url 'notification_center:mark_all_notifications_read' %}"
+      class="w-full text-center text-sm font-semibold text-primary-600 hover:text-primary-700">
+      Tout marquer comme lu
+    </button>
+  </div>
+{% endif %}

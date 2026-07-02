@@ -27,14 +27,15 @@ Use `--settings=config.settings_test_local` for isolated testing — swaps to SQ
 
 ## Architecture
 
-- **ASGI primary** (`config.asgi`) — daphne/channels. HTTP wrapped in `ClientDisconnectSafeASGIApp` (swallows `CancelledError`). WebSocket via `communication.realtime.routing`. Disable with `ENABLE_WEBSOCKETS=False`.
+- **ASGI primary** (`config.asgi`) — daphne/channels. HTTP wrapped in `ClientDisconnectSafeASGIApp` (swallows `CancelledError`). WebSocket via `notifier.realtime.routing`. Disable with `ENABLE_WEBSOCKETS=False`.
 - **WSGI fallback** (`config.wsgi`) — gunicorn + whitenoise for HTTP
 - **~20 Django apps** — monolithic layout. Key groups:
   - `core` / `ui` — home, about, SEO, sitemap, django-components registration (`core/apps.py:CoreConfig.ready()`)
   - `accounts` / `portal` / `secretary` / `students` — user dashboards
   - `admissions` / `inscriptions` / `payments` / `academic_cycle` / `academics` — core school workflows
   - `shop`, `blog`, `news`, `community`, `formations`, `branches`, `superadmin`, `marketing`
-  - `communication` — email (Brevo SMTP via `.env`), realtime/WebSocket, notifications
+  - `notifier` — moteur de notifications (in-app, email Brevo, WebSocket, audit des livraisons)
+  - `notification_center` — interface utilisateur de consultation des notifications
 - **Access system**: `accounts/access.py` — `can_access()`, `get_user_scope()`. Full mapping at `accounts/ACCESS_MAPPING.md`
 - **Settings** (`config.settings`) loads `.env` at project root. Postgres in dev/prod, SQLite in `settings_test_local`. DB config via `DATABASE_URL` env var or individual `DB_*` vars.
 - **Channels layers**: Redis if `REDIS_URL` + `channels_redis` available, else InMemory.

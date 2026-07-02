@@ -1,19 +1,51 @@
-<span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-extrabold
-  {% if tone == 'success' %}
-    border-[color:var(--success)]/30 bg-[color:var(--success-soft)] text-[color:var(--success)]
-  {% elif tone == 'warning' %}
-    border-[color:var(--warning)]/30 bg-[color:var(--warning-soft)] text-[color:var(--warning)]
-  {% elif tone == 'danger' %}
-    border-[color:var(--danger)]/30 bg-[color:var(--danger-soft)] text-[color:var(--danger)]
-  {% elif tone == 'primary' %}
-    border-[color:var(--school-primary)]/30 bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]
-  {% elif tone == 'info' %}
-    border-[color:var(--info)]/30 bg-[color:var(--info-soft)] text-[color:var(--info)]
-  {% else %}
-    border-[color:var(--line)] bg-[color:var(--card-soft)] text-[color:var(--muted)]
-  {% endif %}
-">
-  {% if icon %}<i data-lucide="{{ icon }}" style="width:13px;height:13px;"></i>{% endif %}
-  {{ label }}
-</span>
+{% if dot %}
+  <span
+    class="inline-block rounded-full w-2.5 h-2.5
+      {% if pulse %}animate-pulse{% endif %}
+      {% if clickable %}cursor-pointer transition hover:scale-125{% endif %}
+      {{ class_str }}
+      {% if tone == 'success' %}bg-[color:var(--success)]
+      {% elif tone == 'warning' %}bg-[color:var(--warning)]
+      {% elif tone == 'danger' %}bg-[color:var(--danger)]
+      {% elif tone == 'primary' %}bg-[color:var(--school-primary)]
+      {% elif tone == 'info' %}bg-[color:var(--info)]
+      {% else %}bg-[color:var(--muted)]{% endif %}"
+    {% if clickable %}role="button" tabindex="0"{% endif %}
+    aria-label="{{ label }}"
+  ></span>
+{% else %}
+  {% if clickable %}<button type="button"{% else %}<span{% endif %}
+    {% if dismissible %}x-data="{ hidden: false }" x-show="!hidden"{% endif %}
+    class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-extrabold transition
+      {% if clickable %}cursor-pointer hover:opacity-80 focus:outline-2 focus:outline-offset-2{% endif %}
+      {% if pulse %}animate-pulse{% endif %}
+      {{ class_str }}
+      {% if tone == 'success' %}
+        border-[color:var(--success)]/30 bg-[color:var(--success-soft)] text-[color:var(--success)]
+      {% elif tone == 'warning' %}
+        border-[color:var(--warning)]/30 bg-[color:var(--warning-soft)] text-[color:var(--warning)]
+      {% elif tone == 'danger' %}
+        border-[color:var(--danger)]/30 bg-[color:var(--danger-soft)] text-[color:var(--danger)]
+      {% elif tone == 'primary' %}
+        border-[color:var(--school-primary)]/30 bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]
+      {% elif tone == 'info' %}
+        border-[color:var(--info)]/30 bg-[color:var(--info-soft)] text-[color:var(--info)]
+      {% else %}
+        border-[color:var(--line)] bg-[color:var(--card-soft)] text-[color:var(--muted)]
+      {% endif %}
+    ">
+    {% if icon %}<i data-lucide="{{ icon }}" style="width:13px;height:13px;"></i>{% endif %}
+    {{ label }}
+    {% if dismissible %}
+      <button
+        type="button"
+        @click="hidden = true; $dispatch('badge-dismiss')"
+        class="-mr-0.5 ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full opacity-60 transition hover:opacity-100"
+        aria-label="Supprimer"
+      >
+        <i data-lucide="x" style="width:10px;height:10px;"></i>
+      </button>
+    {% endif %}
+  {% if clickable %}</button>{% else %}</span>{% endif %}
+{% endif %}
 

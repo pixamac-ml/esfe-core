@@ -1,0 +1,37 @@
+{% load component_tags %}
+<div id="overview-appointments"
+     hx-get="{% url 'secretary:htmx_overview_appointments' %}"
+     hx-trigger="secretary:appointments-updated from:body"
+     hx-swap="outerHTML">
+{% component "dashboard_card" %}
+  {% fill "default" %}
+    {% if today_appointments_rows %}
+      <div class="divide-y divide-[color:var(--line)]">
+        {% for item in today_appointments_rows %}
+          <div class="flex items-center justify-between py-2.5 text-sm">
+            <div class="min-w-0">
+              <div class="font-bold text-[color:var(--text)]">{{ item.scheduled_at|date:"H:i" }} - {{ item.person_name }}</div>
+              <div class="text-xs text-[color:var(--muted-2)]">{{ item.title }}</div>
+            </div>
+            {% if item.status != "completed" and item.status != "cancelled" %}
+              <form method="post" hx-post="{% url 'secretary:appointment_complete' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
+                {% component "button" label="Cloturer" variant="success" size="sm" type="submit" icon_left="check" %}{% endcomponent %}
+              </form>
+            {% else %}
+              {% component "status_badge" label=item.get_status_display tone="success" %}{% endcomponent %}
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% component "empty_state" title="Aucun rendez-vous" message="Aucun rendez-vous aujourd'hui." icon="calendar-days" compact=True %}
+        {% fill "default" %}
+          <button type="button" class="mt-2 inline-flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2 text-xs font-bold text-[color:var(--school-primary)] transition hover:bg-[color:var(--school-primary-soft)]" hx-get="{% url 'secretary:appointment_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+            <i data-lucide="plus" style="width:12px;height:12px;"></i>Nouveau rendez-vous
+          </button>
+        {% endfill %}
+      {% endcomponent %}
+    {% endif %}
+  {% endfill %}
+{% endcomponent %}
+</div>

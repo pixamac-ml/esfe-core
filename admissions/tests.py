@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from admissions.models import Candidature
 from branches.models import Branch
-from communication.models import CommunicationNotification
+from notifier.models import NotificationMessage
 from formations.models import Cycle, Diploma, Filiere, Programme, ProgrammeRequiredDocument, RequiredDocument
 
 
@@ -127,9 +127,9 @@ class AdmissionTunnelValidationTests(TestCase):
 		candidature.status = "accepted"
 		candidature.save(update_fields=["status"])
 
-		notification = CommunicationNotification.objects.filter(
+		notification = NotificationMessage.objects.filter(
 			event_type="candidature_accepted",
-			channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+			channel=NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
 		).latest("created_at")
 
 		self.assertEqual(notification.metadata["template_key"], "candidature_accepted")

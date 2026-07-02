@@ -36,8 +36,8 @@ from blog.forms import ArticleForm
 from superadmin.forms import ProgrammeForm
 from news.models import News, Event, EventType, MediaItem, ResultSession, Category as NewsCategory
 from news.services import create_event_media_batch
-from communication.models import CommunicationNotification
-from communication.services import EmailService
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 from core.models import (
     Institution,
     InstitutionPresentation,
@@ -184,7 +184,7 @@ def _send_inscription_relance(inscription, *, source='superadmin'):
             "Merci de verifier votre espace candidat pour finaliser le processus."
         )
 
-    EmailService.send_transactional(
+    NotificationBus.send_email(
         subject="Relance dossier d'inscription",
         recipient_email=candidature.email,
         source_app="superadmin",
@@ -540,12 +540,12 @@ def dashboard_widgets_fragment(request):
 
     context['recent_cash_sessions_count'] = recent_cash_sessions_qs.count()
     context['recent_cash_sessions'] = recent_cash_sessions_qs[:5]
-    pending_notifications_qs = CommunicationNotification.objects.filter(
-        channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+    pending_notifications_qs = NotificationMessage.objects.filter(
+        channel=NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
         status__in=[
-            CommunicationNotification.STATUS_PENDING,
-            CommunicationNotification.STATUS_QUEUED,
-            CommunicationNotification.STATUS_FAILED,
+            NotificationMessage.STATUS_PENDING,
+            NotificationMessage.STATUS_QUEUED,
+            NotificationMessage.STATUS_FAILED,
         ],
     )
     context['pending_notifications_count'] = pending_notifications_qs.count()
@@ -618,12 +618,12 @@ def dashboard_notifications_action(request):
     action = request.POST.get('action')
     notification_type = request.POST.get('notification_type', '').strip()
 
-    qs = CommunicationNotification.objects.filter(
-        channel=CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+    qs = NotificationMessage.objects.filter(
+        channel=NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
         status__in=[
-            CommunicationNotification.STATUS_PENDING,
-            CommunicationNotification.STATUS_QUEUED,
-            CommunicationNotification.STATUS_FAILED,
+            NotificationMessage.STATUS_PENDING,
+            NotificationMessage.STATUS_QUEUED,
+            NotificationMessage.STATUS_FAILED,
         ],
     )
     if notification_type:
@@ -634,19 +634,19 @@ def dashboard_notifications_action(request):
     if action == 'mark_old_done':
         cutoff = timezone.now() - timedelta(days=7)
         updated = qs.filter(created_at__lt=cutoff).update(
-            status=CommunicationNotification.STATUS_SKIPPED,
+            status=NotificationMessage.STATUS_SKIPPED,
             sent_at=timezone.now(),
         )
         messages.success(request, f"{updated} notification(s) ancienne(s) marquee(s) comme traitee(s).")
     elif action == 'mark_type_done' and notification_type:
         updated = qs.update(
-            status=CommunicationNotification.STATUS_SKIPPED,
+            status=NotificationMessage.STATUS_SKIPPED,
             sent_at=timezone.now(),
         )
         messages.success(request, f"{updated} notification(s) du type '{notification_type}' marquee(s) comme traitee(s).")
     elif action == 'mark_all_done':
         updated = qs.update(
-            status=CommunicationNotification.STATUS_SKIPPED,
+            status=NotificationMessage.STATUS_SKIPPED,
             sent_at=timezone.now(),
         )
         messages.success(request, f"{updated} notification(s) marquee(s) comme traitee(s).")

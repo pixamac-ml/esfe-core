@@ -10,11 +10,11 @@ Fonctions :
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.db import transaction
-from django.contrib.auth import get_user_model
 
-from communication.models import CommunicationNotification
-from communication.services import NotificationService
-from communication.services.channel_policy import resolve_channel_policy
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
+from notifier.services.policy import resolve_channel_policy
+from notifier.services.audience import resolve_candidate_user_by_email, restrict_candidate_channels
 from .models import Inscription, StatusHistory
 from students.services import create_student_after_first_payment
 
@@ -85,10 +85,6 @@ STATUS_TITLES = {
 }
 
 
-def _get_inscription_user(email):
-    return get_user_model().objects.filter(email__iexact=email).first()
-
-
 # ==========================================================
 # CREATION NOTIFICATION
 # ==========================================================
@@ -118,17 +114,17 @@ def create_inscription_notification(inscription, previous_status, new_status):
         f"Votre statut d'inscription est maintenant : {new_status}"
     )
 
-    recipient_user = _get_inscription_user(recipient_email)
-    default_channels = [CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL]
+    recipient_user = resolve_candidate_user_by_email(recipient_email)
+    default_channels = [NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL]
     if recipient_user:
         default_channels = [
-            CommunicationNotification.CHANNEL_IN_APP,
-            CommunicationNotification.CHANNEL_EMAIL_TRANSACTIONAL,
+            NotificationMessage.CHANNEL_IN_APP,
+            NotificationMessage.CHANNEL_EMAIL_TRANSACTIONAL,
         ]
     policy = resolve_channel_policy(
         notification_type,
         default_channels=default_channels,
-        default_priority=CommunicationNotification.PRIORITY_NORMAL,
+        default_priority=NotificationMessage.PRIORITY_NORMAL,
         metadata={
             "recipient_email": recipient_email,
             "recipient_name": recipient_name,
@@ -150,7 +146,8 @@ def create_inscription_notification(inscription, previous_status, new_status):
             },
         },
     )
-    event, _created_notifications = NotificationService.notify_user(
+    policy["channels"] = restrict_candidate_channels(recipient_user, policy["channels"])
+    event, _created_notifications = NotificationBus.notify(
         recipient=recipient_user,
         actor=None,
         event_type=notification_type,

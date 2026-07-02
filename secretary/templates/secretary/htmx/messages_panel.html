@@ -1,0 +1,26 @@
+{% load component_tags %}
+<div>
+  <div class="flex items-center justify-between gap-2.5 border-b border-[color:var(--border)] px-3.5 py-3">
+    <div>
+      <div class="text-sm font-extrabold text-[color:var(--text)]">Notifications</div>
+      <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">{{ unread_count|default:0 }} non lue(s)</div>
+    </div>
+    <a class="text-xs font-bold text-[color:var(--primary)] hover:underline" href="{% url 'secretary:secretary_dashboard' %}?section=notifications">Tout voir</a>
+  </div>
+  <div class="divide-y divide-[color:var(--border)]">
+    {% for message in recent_messages %}
+      <a class="flex items-start gap-2.5 px-3.5 py-2.5 transition-colors hover:bg-[color:var(--accent-bg)] {% if not message.read_at %}bg-[color:var(--accent-bg)]{% endif %}" href="{% url 'secretary:secretary_dashboard' %}?section=notifications&notification_id={{ message.id }}">
+        <span class="mt-1.5 block h-2 w-2 shrink-0 rounded-full {% if message.read_at %}bg-[color:var(--muted-2)]{% else %}bg-[color:var(--primary)]{% endif %}"></span>
+        <span class="min-w-0">
+          <span class="block text-xs font-bold text-[color:var(--text)]">{{ message.title }}</span>
+          <span class="mt-0.5 block text-xs font-medium text-[color:var(--muted-2)]">{{ message.body|default:"Notification centralisee"|truncatechars:120 }}</span>
+          <span class="mt-0.5 block text-[11px] font-semibold text-[color:var(--muted-2)]">{{ message.created_at|date:"d/m/Y H:i" }}</span>
+        </span>
+      </a>
+    {% empty %}
+      <div class="px-3.5 py-6">
+        {% component "empty_state" title="Aucune notification" message="Aucune notification recente." icon="bell" compact=True %}{% endcomponent %}
+      </div>
+    {% endfor %}
+  </div>
+</div>

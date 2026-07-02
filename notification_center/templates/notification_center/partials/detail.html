@@ -1,0 +1,27 @@
+{% load humanize %}
+<div class="comm-detail-card">
+  <style>
+    .comm-detail-card{padding:16px}.comm-detail-title{font-size:18px;font-weight:950;color:#0f172a}.comm-detail-body{margin-top:10px;border:1px solid #eef2f7;background:#f8fafc;border-radius:12px;padding:13px;font-size:13px;font-weight:700;color:#475569;line-height:1.55;white-space:pre-wrap}.comm-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.comm-detail-box{border:1px solid #eef2f7;border-radius:10px;padding:10px}.comm-detail-label{font-size:10px;font-weight:950;text-transform:uppercase;color:#64748b}.comm-detail-value{font-size:13px;font-weight:900;color:#0f172a;margin-top:4px}.comm-delivery{margin-top:12px;border-top:1px solid #eef2f7;padding-top:12px}@media(max-width:720px){.comm-detail-grid{grid-template-columns:1fr}}
+  </style>
+  <div class="comm-detail-title">{{ notification.title }}</div>
+  <div class="comm-detail-body">{{ notification.body|default:"Aucun detail complementaire." }}</div>
+  <div class="comm-detail-grid">
+    <div class="comm-detail-box"><div class="comm-detail-label">Priorite</div><div class="comm-detail-value">{{ notification.get_priority_display }}</div></div>
+    <div class="comm-detail-box"><div class="comm-detail-label">Canal</div><div class="comm-detail-value">{{ notification.get_channel_display }}</div></div>
+    <div class="comm-detail-box"><div class="comm-detail-label">Statut</div><div class="comm-detail-value">{{ notification.get_status_display }}</div></div>
+    <div class="comm-detail-box"><div class="comm-detail-label">Source</div><div class="comm-detail-value">{% if notification.event %}{{ notification.event.source_app }}{% else %}{{ notification.legacy_source|default:"systeme" }}{% endif %}</div></div>
+    <div class="comm-detail-box"><div class="comm-detail-label">Recu</div><div class="comm-detail-value">{{ notification.created_at|date:"d/m/Y H:i" }}</div></div>
+    <div class="comm-detail-box"><div class="comm-detail-label">Lu</div><div class="comm-detail-value">{{ notification.read_at|date:"d/m/Y H:i"|default:"Non lu" }}</div></div>
+  </div>
+  <div class="comm-delivery">
+    <div class="comm-panel-title">Livraisons</div>
+    {% for delivery in notification.delivery_attempts.all %}
+      <div class="comm-detail-box" style="margin-top:8px">
+        <div class="comm-detail-value">{{ delivery.channel }} - {{ delivery.provider|default:"internal" }} - {{ delivery.get_status_display }}</div>
+        {% if delivery.error_message %}<div class="comm-row-body">{{ delivery.error_message }}</div>{% endif %}
+      </div>
+    {% empty %}
+      <div class="comm-detail-box" style="margin-top:8px"><div class="comm-detail-value">Aucune livraison rattachee.</div></div>
+    {% endfor %}
+  </div>
+</div>

@@ -13,9 +13,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import FinancialAuditLog, Profile, SensitiveActionRequest
-from communication.models import CommunicationNotification
-from communication.services.email_service import EmailService
-from communication.services.notification_service import NotificationService
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 
 
 class SensitiveActionError(Exception):
@@ -92,17 +91,17 @@ def request_sensitive_action(
     )
 
     for approver in approvers:
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=approver,
             actor=requested_by,
             event_type="sensitive_action_otp",
             title=f"Validation requise - {action_label}",
             body=body,
             source_app="accounts",
-            priority=CommunicationNotification.PRIORITY_HIGH,
+            priority=NotificationMessage.PRIORITY_HIGH,
             channels=(
-                CommunicationNotification.CHANNEL_IN_APP,
-                CommunicationNotification.CHANNEL_WEBSOCKET,
+                NotificationMessage.CHANNEL_IN_APP,
+                NotificationMessage.CHANNEL_WEBSOCKET,
             ),
             metadata={
                 "sensitive_action_request_id": request_obj.pk,
@@ -113,7 +112,7 @@ def request_sensitive_action(
             legacy_object_id=str(request_obj.pk),
         )
         if approver.email:
-            EmailService.send_transactional(
+            NotificationBus.send_email(
                 subject=f"[ESFE] Validation requise - {action_label} - {branch}",
                 recipient=approver,
                 recipient_email=approver.email,

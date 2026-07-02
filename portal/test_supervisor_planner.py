@@ -28,6 +28,8 @@ from academics.models import (
 )
 from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
+from notifier.models import NotificationMessage
+from students.models import TeacherCase
 
 
 User = get_user_model()
@@ -131,9 +133,9 @@ class SupervisorPlannerViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         body = response.content.decode()
-        self.assertIn("Creer un creneau recurrent", body)
-        self.assertIn("Generer la semaine", body)
-        self.assertIn("Generer le mois", body)
+        self.assertIn("Nouveau créneau", body)
+        self.assertIn("Générer la semaine", body)
+        self.assertIn("Générer le mois", body)
 
     def test_weekly_slots_workspace_renders_inline_form_is_gone(self):
         url = reverse("accounts_portal:supervisor_weekly_slots_workspace", args=[self.cls.id])
@@ -249,3 +251,63 @@ class SupervisorMaterializeTests(TestCase):
             branch=self.branch,
         )
         self.assertGreaterEqual(created.count(), 1)
+
+
+class SupervisorDgRequirementsTests(TestCase):
+    def setUp(self):
+        self.branch = _create_branch(code="DGR", name="Annexe DG Requirements")
+        self.other_branch = _create_branch(code="DGO", name="Annexe DG Other")
+        self.supervisor = _create_supervisor(self.branch, "sup_dg_requirements")
+        self.teacher = _create_teacher(self.branch, "teacher_dg_requirements")
+        self.other_teacher = _create_teacher(self.other_branch, "teacher_other_branch")
+        self.director = USER_MANAGER.create_user(
+            username="director_dg_requirements",
+            email="director_dg_requirements@test.com",
+            password="pass1234",
+        )
+        self.director.profile.position = "director_of_studies"
+        self.director.profile.branch = self.branch
+        self.director.profile.save(update_fields=["position", "branch", "updated_at"])
+        self.client.force_login(self.supervisor)
+
+    def test_teacher_regularity_sheet_is_printable_and_branch_scoped(self):
+        response = self.client.get(
+            reverse("accounts_portal:supervisor_teacher_regularity_print", args=[self.teacher.id])
+        )
+        foreign_response = self.client.get(
+            reverse("accounts_portal:supervisor_teacher_regularity_print", args=[self.other_teacher.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fiche individuelle de régularité")
+        self.assertContains(response, self.teacher.username)
+        self.assertEqual(foreign_response.status_code, 404)
+
+    def test_teacher_case_can_be_transmitted_to_branch_director(self):
+        case = TeacherCase.objects.create(
+            teacher=self.teacher,
+            branch=self.branch,
+            case_type=TeacherCase.TYPE_INCIDENT,
+            title="Incident à transmettre",
+            opened_by=self.supervisor,
+        )
+
+        response = self.client.post(
+            reverse("accounts_portal:supervisor_case_escalate", args=["teacher", case.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(case.notes.filter(content="Cas transmis à la Direction des études.").exists())
+        self.assertTrue(
+            NotificationMessage.objects.filter(
+                recipient=self.director,
+                event_type="disciplinary_case_escalated",
+                channel=NotificationMessage.CHANNEL_IN_APP,
+            ).exists()
+        )
+
+    def test_invalid_case_kind_is_rejected(self):
+        response = self.client.get(
+            reverse("accounts_portal:supervisor_case_detail", args=["invalid", 1])
+        )
+        self.assertEqual(response.status_code, 400)

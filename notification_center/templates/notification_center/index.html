@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Centre de notifications | ESFE{% endblock %}
+{% block content %}
+<section class="comm-center">
+  <style>
+    .comm-center{max-width:1280px;margin:0 auto;padding:28px 22px 56px}.comm-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}.comm-kicker{font-size:11px;font-weight:950;text-transform:uppercase;letter-spacing:.18em;color:#2563eb}.comm-title{font-size:30px;font-weight:950;color:#0f172a;margin-top:6px}.comm-sub{font-size:14px;font-weight:700;color:#64748b;margin-top:4px}.comm-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}.comm-stat{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}.comm-stat-label{font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:.08em;color:#64748b}.comm-stat-value{font-size:26px;font-weight:950;color:#0f172a;margin-top:6px}.comm-shell{display:grid;grid-template-columns:minmax(0,1fr)360px;gap:16px}.comm-panel{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden}.comm-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #eef2f7}.comm-panel-title{font-size:13px;font-weight:950;text-transform:uppercase;letter-spacing:.08em;color:#475569}.comm-filters{display:grid;grid-template-columns:1.4fr repeat(4,minmax(120px,1fr)) auto;gap:10px;margin-bottom:16px}.comm-input,.comm-select{width:100%;border:1px solid #dbe3ef;border-radius:10px;background:#fff;padding:10px 11px;font-size:13px;color:#0f172a}.comm-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;border:1px solid #dbe3ef;border-radius:10px;background:#fff;color:#475569;padding:0 13px;font-size:12px;font-weight:900;text-decoration:none;cursor:pointer}.comm-btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}.comm-list{display:grid}.comm-empty{padding:26px;color:#64748b;font-size:13px;font-weight:700}.comm-detail-host{min-height:360px}.comm-source-list{display:grid;gap:9px;padding:14px}.comm-source{display:flex;align-items:center;justify-content:space-between;gap:8px}.comm-badge{font-size:11px;font-weight:950;color:#64748b}
+  </style>
+  <div class="comm-head">
+    <div>
+      <div class="comm-kicker">Notifications ESFE</div>
+      <h1 class="comm-title">Centre de notifications</h1>
+      <p class="comm-sub">Suivi central des notifications internes, temps reel et canaux externes rattaches a votre compte.</p>
+    </div>
+    <form method="post" action="{% url 'notification_center:mark_all_notifications_read' %}">
+      {% csrf_token %}
+      <button class="comm-btn primary" type="submit">Tout marquer lu</button>
+    </form>
+  </div>
+
+  <div class="comm-grid">
+    <div class="comm-stat"><div class="comm-stat-label">In-app</div><div class="comm-stat-value">{{ stats.total }}</div></div>
+    <div class="comm-stat"><div class="comm-stat-label">Non lues</div><div class="comm-stat-value">{{ stats.unread }}</div></div>
+    <div class="comm-stat"><div class="comm-stat-label">Critiques</div><div class="comm-stat-value">{{ stats.critical }}</div></div>
+    <div class="comm-stat"><div class="comm-stat-label">Emails</div><div class="comm-stat-value">{{ stats.email }}</div></div>
+    <div class="comm-stat"><div class="comm-stat-label">Echecs</div><div class="comm-stat-value">{{ stats.failed }}</div></div>
+  </div>
+
+  <form class="comm-filters" method="get" hx-get="{% url 'notification_center:notifications' %}" hx-target="#comm-list" hx-push-url="true">
+    <input class="comm-input" type="search" name="q" value="{{ filters.q }}" placeholder="Rechercher titre, contenu, source...">
+    <select class="comm-select" name="channel">
+      <option value="all" {% if filters.channel == "all" %}selected{% endif %}>Tous canaux</option>
+      {% for value,label in channels %}<option value="{{ value }}" {% if filters.channel == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select class="comm-select" name="status">
+      <option value="">Tous statuts</option>
+      <option value="unread" {% if filters.status == "unread" %}selected{% endif %}>Non lues</option>
+      <option value="read" {% if filters.status == "read" %}selected{% endif %}>Lues</option>
+      <option value="failed" {% if filters.status == "failed" %}selected{% endif %}>Echec</option>
+    </select>
+    <select class="comm-select" name="priority">
+      <option value="">Toutes priorites</option>
+      {% for value,label in priorities %}<option value="{{ value }}" {% if filters.priority == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <select class="comm-select" name="source">
+      <option value="">Toutes sources</option>
+      {% for source in sources %}<option value="{{ source }}" {% if filters.source == source %}selected{% endif %}>{{ source }}</option>{% endfor %}
+    </select>
+    <button class="comm-btn primary" type="submit">Filtrer</button>
+  </form>
+
+  <div class="comm-shell">
+    <section class="comm-panel">
+      <div class="comm-panel-head">
+        <div class="comm-panel-title">Flux</div>
+        <span class="comm-badge">{{ page_obj.paginator.count }} resultat(s)</span>
+      </div>
+      <div id="comm-list">
+        {% include "notification_center/partials/list.html" %}
+      </div>
+    </section>
+    <aside class="comm-panel">
+      <div class="comm-panel-head"><div class="comm-panel-title">Lecture</div><span class="comm-badge">Detail</span></div>
+      <div id="comm-detail" class="comm-detail-host">
+        {% if selected_notification %}
+          {% include "notification_center/partials/detail.html" with notification=selected_notification %}
+        {% else %}
+          <div class="comm-empty">Selectionnez une notification pour ouvrir sa fiche detaillee.</div>
+        {% endif %}
+      </div>
+      <div class="comm-panel-head"><div class="comm-panel-title">Sources recentes</div></div>
+      <div class="comm-source-list">
+        {% for row in stats.by_source %}
+          <div class="comm-source"><strong>{{ row.event__source_app|default:"systeme" }}</strong><span class="comm-badge">{{ row.total }}</span></div>
+        {% empty %}
+          <div class="comm-empty">Aucune source pour le moment.</div>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

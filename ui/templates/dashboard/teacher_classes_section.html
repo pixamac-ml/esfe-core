@@ -1,0 +1,56 @@
+{% load humanize component_tags %}
+        <!-- =========== CLASSES =========== -->
+        <div id="teacher-panel-classes" class="sg-section-panel {% if active_section == 'classes' %}is-active{% endif %}" data-sg-panel="classes" {% if active_section != 'classes' %}hidden{% endif %}>
+          {% component "section_header" title="Mes classes et effectifs" subtitle="Consultation des classes, des etudiants et des matieres que vous assurez." icon="school" %}
+            {% fill "action" %}<span class="sg-scope-chip">{{ class_focus_rows|length }} classe(s) active(s)</span>{% endfill %}
+          {% endcomponent %}
+
+          <div class="mb-4">{% component "kpi_row" cards=section_kpi_cards columns=3 %}{% endcomponent %}</div>
+
+          {% component "dashboard_card" %}
+            {% fill "default" %}
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <span class="text-xs font-bold text-[color:var(--text)]">Classes rattachees</span>
+                  <p class="text-[11px] font-semibold text-[color:var(--muted-2)]">Cliquez sur une ligne pour voir le detail.</p>
+                </div>
+              </div>
+              <div class="sg-table-wrap">
+                <table class="sg-table">
+                  <thead><tr>
+                    <th>Classe</th><th>Programme</th><th>Effectif</th><th>Matieres</th><th>Seances</th><th>Prochaine</th><th style="text-align:right;">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    {% for row in class_focus_rows %}
+                    <tr>
+                      <td style="font-weight:900;">{{ row.class_name }}</td>
+                      <td>{{ row.programme_title }}</td>
+                      <td>{{ row.student_count }} etudiant(s)</td>
+                      <td>{{ row.subjects|join:", "|default:"A confirmer" }}</td>
+                      <td>{{ row.event_count }} / {{ row.slot_count }} creneau(x)</td>
+                      <td>{% if row.next_event %}{{ row.next_event.start_datetime|date:"d/m H:i" }}{% else %}Non planifiee{% endif %}</td>
+                      <td style="text-align:right; white-space:nowrap;">
+                        <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1.5 text-[11px] font-bold text-[color:var(--muted)] transition hover:border-[color:var(--school-primary-soft)] hover:text-[color:var(--school-primary)]"
+                                hx-get="{% url 'accounts_portal:teacher_class_detail' row.class_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"
+                                >
+                          <i data-lucide="eye" style="width:12px;height:12px;"></i>Apercu
+                        </button>
+                        {% if row.next_event %}
+                        <button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-[color:var(--school-primary)] px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:opacity-90"
+                                hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' row.next_event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"
+                                >
+                          <i data-lucide="pen" style="width:12px;height:12px;"></i>Cahier
+                        </button>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7"><div class="sg-empty"><div class="sg-empty-icon"><i data-lucide="school"></i></div><div class="sg-empty-text">Aucune classe rattachee a votre compte.</div></div></td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endfill %}
+          {% endcomponent %}
+        </div>
+

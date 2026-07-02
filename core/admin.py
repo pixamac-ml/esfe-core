@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.db import connection
 from django.db.utils import OperationalError, ProgrammingError
 from django.shortcuts import redirect
-from communication.services import EmailService
+from notifier.services import NotificationBus
 
 from .models import (
     Institution,
@@ -28,7 +28,6 @@ from .models import (
     LegalSidebarBlock,
     LegalPageHistory,
     ContactMessage,
-    Notification,
     StatusHistory,
 )
 
@@ -788,7 +787,7 @@ class ContactMessageAdmin(admin.ModelAdmin):
                 "contact_email": settings.DEFAULT_FROM_EMAIL,
                 "reply_date": timezone.now(),
             }
-            EmailService.send_transactional(
+            NotificationBus.send_email(
                 subject=f"[ESFE] Reponse a votre demande - {obj.get_subject_display()}",
                 recipient_email=obj.email,
                 source_app="core_admin",
@@ -809,72 +808,6 @@ class ContactMessageAdmin(admin.ModelAdmin):
         if obj and obj.status == "closed":
             return False
         return super().has_change_permission(request, obj)
-
-
-# ==========================================================
-# NOTIFICATIONS (LECTURE SEULE)
-# ==========================================================
-
-@admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
-
-    list_display = (
-        "notification_type_display",
-        "recipient_name",
-        "recipient_email",
-        "title",
-        "email_status_badge",
-        "sent_at",
-        "created_at",
-    )
-
-    list_filter = (
-        "notification_type",
-        "email_sent",
-        "created_at",
-    )
-
-    search_fields = (
-        "recipient_name",
-        "recipient_email",
-        "title",
-        "message",
-    )
-
-    readonly_fields = (
-        "recipient_email",
-        "recipient_name",
-        "notification_type",
-        "title",
-        "message",
-        "related_candidature",
-        "related_inscription",
-        "related_payment",
-        "email_sent",
-        "sent_at",
-        "created_at",
-    )
-
-    ordering = ("-created_at",)
-
-    def notification_type_display(self, obj):
-        return obj.get_notification_type_display()
-    notification_type_display.short_description = "Type"
-
-    def email_status_badge(self, obj):
-        if obj.email_sent:
-            return format_html(
-                '<span style="color:white;background:#16a34a;padding:4px 8px;border-radius:4px;font-weight:600;">{}</span>',
-                '✓ Envoye',
-            )
-        return format_html(
-            '<span style="color:white;background:#f59e0b;padding:4px 8px;border-radius:4px;font-weight:600;">{}</span>',
-            'En attente',
-        )
-    email_status_badge.short_description = "Email"
-
-    def has_add_permission(self, request):
-        return False
 
 
 # ==========================================================

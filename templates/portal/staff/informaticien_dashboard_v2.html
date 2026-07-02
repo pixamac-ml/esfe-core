@@ -1,0 +1,290 @@
+{% extends "base_app.html" %}
+{% load humanize component_tags %}
+
+{% block title %}Espace Informaticien — ESFE{% endblock %}
+
+{% block extra_head %}
+<style>
+html, body { width: 100%; height: 100%; }
+body { font-family: "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; }
+
+/* Section panels */
+.sg-section-panel { display: none; }
+.sg-section-panel.is-active { display: block; animation: sgFadeIn .2s ease; }
+@keyframes sgFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Stat grid */
+.sg-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.sg-stat-box { text-align: center; padding: 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); transition: all .2s; }
+.sg-stat-box:hover { border-color: var(--school-primary-soft); background: var(--card-soft); transform: translateY(-2px); }
+.sg-stat-val { font-size: 1.8rem; font-weight: 900; color: var(--text); line-height: 1.1; }
+.sg-stat-lbl { font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 4px; }
+.sg-stat-icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; margin: 0 auto 12px; }
+
+/* Action card */
+.sg-action-card { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: .75rem; background: var(--card); padding: 12px 16px; cursor: pointer; transition: all .15s; }
+.sg-action-card:hover { border-color: var(--school-primary-soft); background: var(--card-soft); transform: translateY(-1px); }
+.sg-action-label { font-size: .82rem; font-weight: 800; color: var(--text); }
+.sg-action-sub { font-size: .68rem; color: var(--muted-2); font-weight: 600; margin-top: 2px; }
+.sg-action-count { font-size: .72rem; font-weight: 950; padding: .25rem .6rem; border-radius: 999px; flex-shrink: 0; }
+
+/* Quick action button */
+.sg-quick-action { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); cursor: pointer; transition: all .2s; }
+.sg-quick-action:hover { border-color: var(--school-primary-soft); background: var(--card-soft); transform: translateY(-2px); }
+.sg-quick-action-icon { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; }
+.sg-quick-action-label { font-size: .78rem; font-weight: 800; color: var(--text); text-align: center; }
+
+/* Activity item */
+.sg-activity-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--line); transition: background .15s; }
+.sg-activity-item:last-child { border-bottom: none; }
+.sg-activity-item:hover { background: var(--card-soft); }
+.sg-activity-icon { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
+.sg-activity-content { flex: 1; min-width: 0; }
+.sg-activity-title { font-size: .82rem; font-weight: 700; color: var(--text); }
+.sg-activity-time { font-size: .68rem; color: var(--muted-2); margin-top: 2px; }
+
+/* Empty state */
+.sg-empty { text-align: center; padding: 40px 20px; color: var(--muted-2); }
+.sg-empty-icon { font-size: 2rem; margin-bottom: 12px; opacity: .35; display: flex; justify-content: center; }
+.sg-empty-text { font-size: .82rem; font-weight: 700; }
+
+/* Status indicator */
+.sg-status-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: .72rem; font-weight: 800; }
+.sg-status-dot { width: 8px; height: 8px; border-radius: 50%; animation: statusPulse 2s ease-in-out infinite; }
+@keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+.sg-status-online { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-soft); }
+.sg-status-online .sg-status-dot { background: var(--success); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen min-h-0 overflow-hidden">
+  
+  <!-- Sidebar -->
+  <aside class="w-64 flex-shrink-0 border-r border-[color:var(--line)] bg-[color:var(--card)] flex flex-col">
+    <div class="p-4 border-b border-[color:var(--line)]">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[color:var(--school-primary)] to-[color:var(--school-primary-soft)] flex items-center justify-center text-white">
+          <i data-lucide="cpu" style="width:20px;height:20px;"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-bold text-[color:var(--text)]">Informaticien</div>
+          <div class="text-xs font-semibold text-[color:var(--muted)]">{{ branch.name|default:"Support global" }}</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto p-3">
+      <div class="text-xs font-bold text-[color:var(--muted-2)] uppercase tracking-wider mb-2 px-2">Navigation</div>
+      
+      <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition mb-1"
+              :class="{ 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]': activeSection === 'overview' }"
+              @click="activeSection = 'overview'">
+        <i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i>
+        <span>Vue globale</span>
+      </button>
+      
+      <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition mb-1"
+              :class="{ 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]': activeSection === 'grades' }"
+              @click="activeSection = 'grades'">
+        <i data-lucide="file-spreadsheet" style="width:18px;height:18px;"></i>
+        <span>Notes</span>
+        {% if grade_metrics.pending_semesters > 0 %}
+        <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-[color:var(--danger-soft)] text-[color:var(--danger)]">{{ grade_metrics.pending_semesters }}</span>
+        {% endif %}
+      </button>
+      
+      <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition mb-1"
+              :class="{ 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]': activeSection === 'reenrollment' }"
+              @click="activeSection = 'reenrollment'">
+        <i data-lucide="repeat-2" style="width:18px;height:18px;"></i>
+        <span>Passages</span>
+      </button>
+      
+      <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition mb-1"
+              :class="{ 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]': activeSection === 'diagnostics' }"
+              @click="activeSection = 'diagnostics'">
+        <i data-lucide="stethoscope" style="width:18px;height:18px;"></i>
+        <span>Diagnostic</span>
+        {% if diagnostic_metrics.inscriptions_without_assignment > 0 %}
+        <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-[color:var(--danger-soft)] text-[color:var(--danger)]">{{ diagnostic_metrics.inscriptions_without_assignment }}</span>
+        {% endif %}
+      </button>
+      
+      <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition mb-1"
+              :class="{ 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]': activeSection === 'accounts' }"
+              @click="activeSection = 'accounts'">
+        <i data-lucide="shield-check" style="width:18px;height:18px;"></i>
+        <span>Comptes</span>
+        {% if access_metrics.inactive_accounts > 0 %}
+        <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-[color:var(--danger-soft)] text-[color:var(--danger)]">{{ access_metrics.inactive_accounts }}</span>
+        {% endif %}
+      </button>
+      
+      <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition mb-1"
+              :class="{ 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]': activeSection === 'health' }"
+              @click="activeSection = 'health'">
+        <i data-lucide="activity" style="width:18px;height:18px;"></i>
+        <span>Santé système</span>
+      </button>
+    </nav>
+
+    <div class="p-3 border-t border-[color:var(--line)]">
+      <div class="flex items-center gap-3 px-2 py-2">
+        <div class="w-9 h-9 rounded-lg bg-[color:var(--surface-2)] text-[color:var(--text)] font-bold text-sm flex items-center justify-center">
+          {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-bold text-[color:var(--text)] truncate">{{ user.get_full_name }}</div>
+          <div class="text-xs font-semibold text-[color:var(--muted)]">Informaticien</div>
+        </div>
+      </div>
+      <form method="post" action="{% url 'logout' %}" class="mt-2">
+        {% csrf_token %}
+        <button type="submit" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--danger-soft)] text-[color:var(--danger)] font-bold text-sm border border-[color:var(--danger-soft)] hover:bg-[color:var(--danger-soft)] transition">
+          <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+          <span>Déconnexion</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+    <!-- Topbar -->
+    <div class="min-h-[72px] border-b border-[color:var(--line)] bg-[color:var(--card)] px-6 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <h1 class="text-lg font-bold text-[color:var(--text)]">Support Technique</h1>
+        <span class="text-xs font-semibold text-[color:var(--muted)]">{{ branch.name|default:"Support global" }}</span>
+      </div>
+      <div class="flex items-center gap-3 flex-shrink-0">
+        <div class="sg-status-indicator sg-status-online">
+          <span class="sg-status-dot"></span>
+          <span>Système opérationnel</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scrollable content -->
+    <div class="flex-1 overflow-y-auto overflow-x-hidden">
+      <div class="p-6">
+        
+        <!-- Overview Section -->
+        <div class="sg-section-panel is-active" data-sg-panel="overview">
+          {% component "page_header" title="Vue d'ensemble" subtitle="Aperçu du système et indicateurs clés" %}
+            {% fill "actions" %}
+              <button type="button" class="flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] text-sm font-semibold text-[color:var(--text)] hover:bg-[color:var(--card-soft)] transition"
+                      hx-get="{% url 'portal_it_v2' %}?section=diagnostics" hx-target="main" hx-swap="innerHTML">
+                <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
+                Actualiser
+              </button>
+            {% endfill %}
+          {% endcomponent %}
+
+          <!-- Stats Grid -->
+          <div class="sg-stat-grid mb-6">
+            <div class="sg-stat-box">
+              <div class="sg-stat-icon bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
+                <i data-lucide="users" style="width:20px;height:20px;"></i>
+              </div>
+              <div class="sg-stat-val">{{ total_users|default:"0" }}</div>
+              <div class="sg-stat-lbl">Utilisateurs</div>
+            </div>
+            
+            <div class="sg-stat-box">
+              <div class="sg-stat-icon bg-[color:var(--info-soft)] text-[color:var(--info)]">
+                <i data-lucide="graduation-cap" style="width:20px;height:20px;"></i>
+              </div>
+              <div class="sg-stat-val">{{ total_students|default:"0" }}</div>
+              <div class="sg-stat-lbl">Étudiants</div>
+            </div>
+            
+            <div class="sg-stat-box">
+              <div class="sg-stat-icon bg-[color:var(--warning-soft)] text-[color:var(--warning)]">
+                <i data-lucide="alert-triangle" style="width:20px;height:20px;"></i>
+              </div>
+              <div class="sg-stat-val">{{ alerts|length|default:"0" }}</div>
+              <div class="sg-stat-lbl">Alertes</div>
+            </div>
+            
+            <div class="sg-stat-box">
+              <div class="sg-stat-icon bg-[color:var(--success-soft)] text-[color:var(--success)]">
+                <i data-lucide="activity" style="width:20px;height:20px;"></i>
+              </div>
+              <div class="sg-stat-val">{{ quality.score|default:0 }}%</div>
+              <div class="sg-stat-lbl">Santé</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <button type="button" class="sg-quick-action" hx-get="{% url 'portal_it_v2' %}?section=diagnostics" hx-target="main" hx-swap="innerHTML">
+              <div class="sg-quick-action-icon bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
+                <i data-lucide="search-code" style="width:20px;height:20px;"></i>
+              </div>
+              <span class="sg-quick-action-label">Diagnostic</span>
+            </button>
+            
+            <button type="button" class="sg-quick-action" hx-get="{% url 'portal_it_v2' %}?section=grades" hx-target="main" hx-swap="innerHTML">
+              <div class="sg-quick-action-icon bg-[color:var(--info-soft)] text-[color:var(--info)]">
+                <i data-lucide="file-spreadsheet" style="width:20px;height:20px;"></i>
+              </div>
+              <span class="sg-quick-action-label">Notes</span>
+            </button>
+            
+            <button type="button" class="sg-quick-action" hx-get="{% url 'portal_it_v2' %}?section=accounts" hx-target="main" hx-swap="innerHTML">
+              <div class="sg-quick-action-icon bg-[color:var(--success-soft)] text-[color:var(--success)]">
+                <i data-lucide="user-round-cog" style="width:20px;height:20px;"></i>
+              </div>
+              <span class="sg-quick-action-label">Comptes</span>
+            </button>
+            
+            <button type="button" class="sg-quick-action" hx-get="{% url 'portal_it_v2' %}?section=health" hx-target="main" hx-swap="innerHTML">
+              <div class="sg-quick-action-icon bg-[color:var(--warning-soft)] text-[color:var(--warning)]">
+                <i data-lucide="siren" style="width:20px;height:20px;"></i>
+              </div>
+              <span class="sg-quick-action-label">Santé</span>
+            </button>
+          </div>
+
+          <!-- Recent Activity -->
+          {% component "dashboard_card" %}
+            {% fill "default" %}
+              <h3 class="text-sm font-bold text-[color:var(--muted)] mb-3">Activité récente</h3>
+              {% for log in recent_support_logs|slice:":5" %}
+              <div class="sg-activity-item">
+                <div class="sg-activity-icon bg-[color:var(--success-soft)] text-[color:var(--success)]">
+                  <i data-lucide="zap" style="width:18px;height:18px;"></i>
+                </div>
+                <div class="sg-activity-content">
+                  <div class="sg-activity-title">{{ log.get_action_type_display }}</div>
+                  <div class="sg-activity-time">{{ log.created_at|date:"d/m/Y H:i" }}</div>
+                </div>
+              </div>
+              {% empty %}
+              <div class="sg-empty">
+                <div class="sg-empty-icon">
+                  <i data-lucide="inbox" style="width:32px;height:32px;"></i>
+                </div>
+                <div class="sg-empty-text">Aucune activité récente</div>
+              </div>
+              {% endfor %}
+            {% endfill %}
+          {% endcomponent %}
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize Alpine.js data
+  document.querySelector('main').setAttribute('x-data', '{ activeSection: "overview" }');
+});
+</script>
+{% endblock %}
+{% endblock %}

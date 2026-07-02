@@ -16,13 +16,13 @@ _HISTORY_ACTION_LABELS = {
 }
 
 _HISTORY_ACTION_ICONS = {
-    "creation": "fa-circle-plus",
-    "prise_en_charge": "fa-hand",
-    "mise_a_jour": "fa-pen",
-    "changement_statut": "fa-right-left",
-    "traite": "fa-check",
-    "archive": "fa-box-archive",
-    "backfill": "fa-clock-rotate-left",
+    "creation": "circle-plus",
+    "prise_en_charge": "hand",
+    "mise_a_jour": "pen",
+    "changement_statut": "arrow-right-left",
+    "traite": "check",
+    "archive": "archive",
+    "backfill": "history",
 }
 
 _STATUS_LABELS = dict(RegistryEntry.STATUS_CHOICES)

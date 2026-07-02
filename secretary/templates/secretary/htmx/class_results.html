@@ -1,0 +1,25 @@
+{% load component_tags %}
+{% for academic_class in classes %}
+  <button type="button" class="flex w-full items-center justify-between rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5 text-sm transition hover:border-[color:var(--school-primary)]/30 hover:bg-[color:var(--school-primary-soft)]/20 text-left" hx-get="{% url 'secretary:htmx_class_students' academic_class.id %}" hx-target="#class-students-panel" hx-swap="innerHTML">
+    <div class="min-w-0">
+      <div class="font-bold text-[color:var(--text)]">{{ academic_class }}</div>
+      <div class="text-xs text-[color:var(--muted-2)]">{{ academic_class.programme.title }} - {{ academic_class.academic_year.name }} - {{ academic_class.branch.name }}</div>
+    </div>
+    <span class="inline-flex items-center gap-1 rounded-full bg-[color:var(--school-primary-soft)] px-3 py-1 text-xs font-bold text-[color:var(--school-primary)]">{{ academic_class.active_student_count|default:0 }}</span>
+  </button>
+{% empty %}
+  <div class="p-3">
+    {% if query %}
+      {% component "empty_state" title="Aucune classe trouvée" icon="search" compact=True %}{% endcomponent %}
+    {% else %}
+      {% component "empty_state" title="Aucune classe active" message="Aucune classe active dans cette annexe." icon="school" compact=True %}{% endcomponent %}
+    {% endif %}
+  </div>
+{% endfor %}
+{% if page_obj and page_obj.has_other_pages %}
+  <div class="mt-3">
+    {% component "pagination" total=page_obj.paginator.count page=page_obj.number per_page=page_obj.paginator.per_page hx_target="#class-results-panel" %}{% endcomponent %}
+  </div>
+{% elif page_obj and page_obj.paginator.count > 0 %}
+  <div class="mt-4 text-center text-xs font-semibold text-[color:var(--muted-2)]">{{ page_obj.paginator.count }} résultat{% if page_obj.paginator.count > 1 %}s{% endif %}</div>
+{% endif %}

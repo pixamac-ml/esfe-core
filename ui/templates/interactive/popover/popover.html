@@ -1,0 +1,40 @@
+{% load component_tags %}
+<div x-data="{ open: false }" @keydown.escape="open = false" class="relative inline-flex">
+  <div
+    @click="open = !open"
+    @keydown.enter="open = !open"
+    role="button"
+    tabindex="0"
+    :aria-expanded="open"
+    class="cursor-pointer {{ trigger_class }}"
+  >
+    {% slot "trigger" %}
+      <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-sm font-bold text-[color:var(--text)] transition hover:bg-[color:var(--card-soft)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary-soft)]">
+        <span>{% if title %}{{ title }}{% else %}Ouvrir{% endif %}</span>
+        <i data-lucide="chevron-down" style="width:14px;height:14px;" class="transition" x-bind:class="open ? 'rotate-180' : ''"></i>
+      </button>
+    {% endslot %}
+  </div>
+
+  <div
+    x-show="open"
+    @click.outside="open = false"
+    x-transition:enter="transition ease-out duration-150"
+    x-transition:enter-start="opacity-0 scale-95"
+    x-transition:enter-end="opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-100"
+    x-transition:leave-start="opacity-100 scale-100"
+    x-transition:leave-end="opacity-0 scale-95"
+    x-cloak
+    class="absolute z-50 {{ position_class }} {{ width_class }}"
+  >
+    <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4 shadow-lg">
+      {% if title %}
+        <strong class="mb-2 block text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]">{{ title }}</strong>
+      {% endif %}
+      {% slot "content" %}
+        <div class="text-sm text-[color:var(--text)]">Contenu du popover.</div>
+      {% endslot %}
+    </div>
+  </div>
+</div>

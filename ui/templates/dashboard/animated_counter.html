@@ -1,0 +1,149 @@
+{# Animated Counter Widget - Compteur animé avec effet visuel #}
+<div class="ac-wrapper" x-data="animatedCounter({{ value }}, {{ duration }})" x-init="startAnimation()">
+  <div class="ac-card">
+    <div class="ac-icon-bg bg-gradient-to-br {{ color }}">
+      <i data-lucide="{{ icon }}" style="width:24px;height:24px;"></i>
+    </div>
+    <div class="ac-content">
+      <div class="ac-value">
+        <span x-text="prefix"></span>
+        <span x-text="animatedValue"></span>
+        <span x-text="suffix"></span>
+      </div>
+      <div class="ac-label">{{ label }}</div>
+    </div>
+    <div class="ac-pulse-ring" :class="{ 'ac-pulse-active': isAnimating }"></div>
+  </div>
+</div>
+
+<style>
+  .ac-wrapper {
+    position: relative;
+  }
+
+  .ac-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -1px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+
+  .ac-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 
+      0 20px 25px -5px rgba(0, 0, 0, 0.1),
+      0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+
+  .ac-icon-bg {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    color: white;
+    font-weight: 700;
+    box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.2);
+    position: relative;
+    z-index: 2;
+  }
+
+  .ac-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ac-value {
+    font-size: 2.25rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .ac-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #64748b;
+    margin-top: 0.25rem;
+  }
+
+  .ac-pulse-ring {
+    position: absolute;
+    inset: -2px;
+    border-radius: 22px;
+    border: 2px solid transparent;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(147, 51, 234, 0.5)) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .ac-pulse-active {
+    opacity: 1;
+    animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-ring {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 0.2;
+    }
+  }
+</style>
+
+<script>
+function animatedCounter(targetValue, duration) {
+  return {
+    animatedValue: 0,
+    isAnimating: false,
+    
+    startAnimation() {
+      this.isAnimating = true;
+      const startValue = 0;
+      const startTime = performance.now();
+      
+      const animate = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for smooth animation
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+        this.animatedValue = Math.floor(startValue + (targetValue - startValue) * easeOutQuart);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          this.isAnimating = false;
+          this.animatedValue = targetValue;
+        }
+      };
+      
+      requestAnimationFrame(animate);
+    }
+  };
+}
+</script>

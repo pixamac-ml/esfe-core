@@ -68,7 +68,8 @@ INSTALLED_APPS = [
     # UI / Core
     "ui.apps.UiConfig",
     "core.apps.CoreConfig",
-    "communication.apps.CommunicationConfig",
+    "notifier.apps.NotifierConfig",
+    "notification_center.apps.NotificationCenterConfig",
     "marketing.apps.MarketingConfig",
 
     # ✅ CKEditor 5 (UNIQUEMENT celui-ci)
@@ -209,7 +210,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.seo_defaults",
-                "communication.context_processors.notification_widget",
+                "notification_center.context_processors.notification_widget",
             ],
         },
     },
@@ -361,6 +362,8 @@ EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "20"))
 EMAIL_LOCAL_HOSTNAME = os.getenv("EMAIL_LOCAL_HOSTNAME", "localhost")
 COMMUNICATION_EMAIL_PROVIDER = os.getenv("COMMUNICATION_EMAIL_PROVIDER", "brevo")
 COMMUNICATION_EMAIL_PROVIDER_MODE = os.getenv("COMMUNICATION_EMAIL_PROVIDER_MODE", "smtp")
+NOTIFIER_EMAIL_PROVIDER = os.getenv("NOTIFIER_EMAIL_PROVIDER", "brevo")
+NOTIFIER_EMAIL_PROVIDER_MODE = os.getenv("NOTIFIER_EMAIL_PROVIDER_MODE", "smtp")
 
 # ==================================================
 # AUTH REDIRECTS

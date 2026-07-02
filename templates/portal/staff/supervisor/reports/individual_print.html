@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if report_kind == 'student' %}Fiche de présence{% else %}Fiche de régularité{% endif %}</title>
+  <style>
+    @page { size: A4; margin: 18mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #0f172a; font-family: Arial, sans-serif; font-size: 12px; }
+    header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 3px solid #1d4ed8; padding-bottom: 14px; }
+    h1 { margin: 18px 0 4px; font-size: 22px; }
+    h2 { margin: 0; font-size: 16px; }
+    .muted { color: #64748b; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
+    .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+    th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: center; }
+    th { background: #eff6ff; font-size: 10px; text-transform: uppercase; }
+    .signature { display: flex; justify-content: flex-end; margin-top: 48px; text-align: center; }
+    .no-print { margin-bottom: 16px; }
+    button { border: 0; border-radius: 8px; background: #1d4ed8; color: white; padding: 10px 16px; font-weight: 700; cursor: pointer; }
+    @media print { .no-print { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="no-print"><button type="button" onclick="window.print()">Imprimer la fiche</button></div>
+  <header>
+    <div><h2>ESFE</h2><div class="muted">École Supérieure de Formation en Santé</div></div>
+    <div style="text-align:right"><strong>{{ branch.name }}</strong><br><span class="muted">Généré le {{ generated_at|date:"d/m/Y H:i" }}</span></div>
+  </header>
+
+  {% if report_kind == 'student' %}
+    <h1>Fiche individuelle de présence</h1>
+    <div class="muted">Période du {{ period_start|date:"d/m/Y" }} au {{ period_end|date:"d/m/Y" }}</div>
+    <div class="meta">
+      <div class="box"><strong>Étudiant</strong><br>{{ student.full_name }}<br><span class="muted">{{ student.matricule }}</span></div>
+      <div class="box"><strong>Classe</strong><br>{{ academic_class.display_name }}</div>
+    </div>
+    <table>
+      <thead><tr><th>Présences</th><th>Absences</th><th>Justifiées</th><th>Retards</th><th>Séances</th><th>Taux</th></tr></thead>
+      <tbody><tr>
+        <td>{{ report_row.present|default:0 }}</td><td>{{ report_row.absent|default:0 }}</td>
+        <td>{{ report_row.justified|default:0 }}</td><td>{{ report_row.late|default:0 }}</td>
+        <td>{{ report_row.total|default:0 }}</td><td>{% if report_row.rate is not None %}{{ report_row.rate }} %{% else %}—{% endif %}</td>
+      </tr></tbody>
+    </table>
+  {% else %}
+    <h1>Fiche individuelle de régularité</h1>
+    <div class="muted">Semaine du {{ period_start|date:"d/m/Y" }} au {{ period_end|date:"d/m/Y" }}</div>
+    <div class="meta">
+      <div class="box"><strong>Enseignant</strong><br>{{ teacher.get_full_name|default:teacher.username }}</div>
+      <div class="box"><strong>Matières</strong><br>{% if report_row %}{{ report_row.subjects|join:", "|default:"—" }}{% else %}—{% endif %}</div>
+    </div>
+    <table>
+      <thead><tr><th>Programmés</th><th>Tenus</th><th>Absences</th><th>Retards</th><th>Annulés</th><th>Régularité</th></tr></thead>
+      <tbody><tr>
+        <td>{{ report_row.planned|default:0 }}</td><td>{{ report_row.held|default:0 }}</td>
+        <td>{{ report_row.absent|default:0 }}</td><td>{{ report_row.late|default:0 }}</td>
+        <td>{{ report_row.cancelled|default:0 }}</td><td>{% if report_row.regularity_rate is not None %}{{ report_row.regularity_rate }} %{% else %}—{% endif %}</td>
+      </tr></tbody>
+    </table>
+  {% endif %}
+  <div class="signature"><div>Le Surveillant Général<br><br><br>Signature</div></div>
+</body>
+</html>

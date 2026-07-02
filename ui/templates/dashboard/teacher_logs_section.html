@@ -1,0 +1,71 @@
+{% load humanize component_tags %}
+        <!-- =========== LOGS =========== -->
+        <div id="teacher-panel-logs" class="sg-section-panel {% if active_section == 'logs' %}is-active{% endif %}" data-sg-panel="logs" {% if active_section != 'logs' %}hidden{% endif %}>
+          {% component "section_header" title="Cahier de texte" subtitle="Suivi et completion de votre cahier de texte." icon="book-open" %}
+            {% fill "action" %}<span class="sg-scope-chip">{{ pending_lesson_logs_count }} en attente</span>{% endfill %}
+          {% endcomponent %}
+
+          <div class="mb-4">{% component "kpi_row" cards=section_kpi_cards columns=4 %}{% endcomponent %}</div>
+
+          {% if pending_lesson_log_rows %}
+          <div class="mb-4">
+            {% component "dashboard_card" %}
+              {% fill "default" %}
+                <div class="flex items-center gap-2 mb-3" style="color:var(--danger);">
+                  <i data-lucide="alert-triangle" style="width:15px;height:15px;"></i>
+                  <span class="text-[11px] font-bold uppercase tracking-wide">Cours a completer</span>
+                  <span class="ml-auto sg-badge-sm sg-badge-red">{{ pending_lesson_logs_count }} urgent</span>
+                </div>
+                <div class="space-y-2">
+                  {% for event in pending_lesson_log_rows %}
+                  <div class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] p-3">
+                    <div class="min-w-0">
+                      <div class="text-xs font-bold text-[color:var(--text)]">{{ event.ec.title }}</div>
+                      <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">{{ event.academic_class.display_name }} &middot; {{ event.start_datetime|date:"d/m/Y H:i" }}</div>
+                    </div>
+                    <button type="button" class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[color:var(--danger)] px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:opacity-90"
+                            hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"
+                            >
+                      <i data-lucide="pen" style="width:12px;height:12px;"></i>Saisir
+                    </button>
+                  </div>
+                  {% endfor %}
+                </div>
+              {% endfill %}
+            {% endcomponent %}
+          </div>
+          {% endif %}
+
+          {% component "dashboard_card" %}
+            {% fill "default" %}
+              <span class="block text-xs font-bold text-[color:var(--text)] mb-3">Derniers cahiers saisis</span>
+              <div class="sg-table-wrap">
+                <table class="sg-table">
+                  <thead><tr><th>Cours</th><th>Classe</th><th>Date</th><th>Statut</th><th style="text-align:right;">Actions</th></tr></thead>
+                  <tbody>
+                    {% for log in recent_lesson_logs %}
+                    <tr>
+                      <td style="font-weight:900;">{{ log.ec.title }}</td>
+                      <td>{{ log.academic_class.display_name }}</td>
+                      <td>{{ log.date|date:"d/m/Y" }} &middot; {{ log.start_time|time:"H:i" }}</td>
+                      <td><span class="sg-badge-sm {% if log.status == 'done' %}sg-badge-green{% elif log.status == 'absent_teacher' %}sg-badge-red{% else %}sg-badge-gray{% endif %}">{{ log.get_status_display }}</span></td>
+                      <td style="text-align:right;">
+                        {% if log.schedule_event_id %}
+                        <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1.5 text-[11px] font-bold text-[color:var(--muted)] transition hover:border-[color:var(--school-primary-soft)]"
+                                hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' log.schedule_event_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"
+                                >
+                          <i data-lucide="eye" style="width:12px;height:12px;"></i>
+                        </button>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5"><div class="sg-empty"><div class="sg-empty-icon"><i data-lucide="book-open"></i></div><div class="sg-empty-text">Aucun cahier recent.</div></div></td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endfill %}
+          {% endcomponent %}
+        </div>
+

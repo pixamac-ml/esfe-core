@@ -13,7 +13,7 @@ from django.utils.text import slugify
 
 from academics.models import AcademicClass, EC
 from accounts.dashboards.helpers import get_user_branch
-from communication.services import EmailService
+from notifier.services import NotificationBus
 from portal.models import DirectorTeacherAssignment
 from portal.services.it_support_service import create_temp_password, log_support_action
 
@@ -232,7 +232,7 @@ def create_teacher_with_account(data, user) -> TeacherCreationResult:
 
     email_sent = False
     try:
-        EmailService.send_transactional(
+        NotificationBus.send_email(
             subject="Acces enseignant ESFE",
             recipient=teacher,
             recipient_email=email,

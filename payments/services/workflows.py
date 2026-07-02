@@ -4,9 +4,9 @@ from django.db.models import Q
 from django.urls import reverse
 
 from accounts.models import BranchCashMovement
-from communication.models import CommunicationNotification
-from communication.services import EmailService, NotificationService
-from communication.services.channel_policy import resolve_channel_policy
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
+from notifier.services.policy import resolve_channel_policy
 
 
 User = get_user_model()
@@ -64,11 +64,11 @@ def _notify_user(*, recipient, event_type, title, body, metadata):
         return None
     policy = resolve_channel_policy(
         event_type,
-        default_channels=(CommunicationNotification.CHANNEL_IN_APP,),
-        default_priority=CommunicationNotification.PRIORITY_NORMAL,
+        default_channels=(NotificationMessage.CHANNEL_IN_APP,),
+        default_priority=NotificationMessage.PRIORITY_NORMAL,
         metadata=metadata,
     )
-    return NotificationService.notify_user(
+    return NotificationBus.notify(
         recipient=recipient,
         actor=None,
         event_type=event_type,
@@ -142,7 +142,7 @@ def _send_receipt_available_email(*, payment, student_user):
                 "mimetype": "application/pdf",
             }
         )
-    return EmailService.send_transactional(
+    return NotificationBus.send_email(
         subject="ESFE - Votre recu officiel est disponible",
         recipient=student_user,
         recipient_email=candidature.email,

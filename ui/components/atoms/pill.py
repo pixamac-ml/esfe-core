@@ -14,10 +14,12 @@ class Pill(component.Component):
         "info": "bg-[color:var(--info-soft)] text-[color:var(--info)] border-[color:var(--info)]/20",
     }
 
-    def get_context_data(self, label="", variant="default", icon="", **kwargs):
+    def get_context_data(self, label="", variant="default", icon="", dismissible=False, dismiss_event="", **kwargs):
         return {
             "label": label,
             "icon": icon,
+            "dismissible": dismissible,
+            "dismiss_event": dismiss_event or f"pill-dismiss-{label.lower().replace(' ', '-')}",
             "classes": self.VARIANTS.get(variant, self.VARIANTS["default"]),
             **kwargs,
         }

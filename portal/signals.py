@@ -4,8 +4,8 @@ CAHIER_DES_CHARGES_DIRECTEUR_ETUDES.md, 2.4). Suit le meme pattern que
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from communication.models import CommunicationNotification
-from communication.services.notification_service import NotificationService
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 from portal.models import TeacherDocument, TransferRequest
 
 
@@ -27,13 +27,13 @@ def _notify_directors(branch, *, event_type, title, body, legacy_source, legacy_
         return
     User = get_user_model()
     for director in User.objects.filter(pk__in=director_ids, is_active=True):
-        NotificationService.notify_user(
+        NotificationBus.notify(
             recipient=director,
             event_type=event_type,
             title=title,
             body=body,
             source_app="portal",
-            priority=CommunicationNotification.PRIORITY_NORMAL,
+            priority=NotificationMessage.PRIORITY_NORMAL,
             legacy_source=legacy_source,
             legacy_object_id=legacy_object_id,
         )

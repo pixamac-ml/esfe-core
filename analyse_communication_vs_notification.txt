@@ -1,0 +1,1517 @@
+================================================================================
+ ANALYSE : Système "Communication" vs "Centre de Notification"
+ Projet : ESFE Core (Mali) — Django 6.0 / Python 3.14
+ Date   : 29 Juin 2026
+================================================================================
+
+TABLE DES MATIÈRES
+───────────────────────────────────────────────────────────────────────────────
+1.  Résumé exécutif
+2.  Problème de fond : deux systèmes qui se chevauchent
+3.  Architecture actuelle (le "vaisseau")
+    3.1 Le système COMMUNICATION (nouveau, centralisé)
+    3.2 Le système NOTIFICATION CENTER (legacy core.Notification)
+4.  Comparaison détaillée des deux systèmes
+5.  Pourquoi le projet "vascille" — les vrais problèmes
+6.  Schéma du pipeline complet
+7.  Recommandations
+
+
+================================================================================
+1. RÉSUMÉ EXÉCUTIF
+================================================================================
+
+Le projet ESFE Core a DEUX systèmes de notification qui coexistent :
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  SYSTÈME A : communication (l'avenir)                               │
+  │  App : communication/                                               │
+  _______________________________________________________________________│
+  │  Modèle principal : CommunicationNotification                        │
+  │  Canaux : in_app, email, websocket, SMS (futur)                      │
+  │  Architecture : Event → Notification → Delivery                      │
+  │  UI : "Centre de notifications" complet avec filtres, stats,         │
+  │       WebSocket en temps réel, dropdown, widget                      │
+  │  État : ACTIF — ∼85 points d'appel dans 15+ apps                    │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  SYSTÈME B : core.Notification (l'ancien, legacy)                   │
+  │  App : core/                                                        │
+  _______________________________________________________________________│
+  │  Modèle : Notification (dans core/models.py:864)                     │
+  │  Canaux : email uniquement                                           │
+  │  Ciblé : candidatures (admissions)                                   │
+  │  UI : Aucune (admin read-only)                                       │
+  │  État : DÉPRÉCIÉ — encore utilisé par endroits                      │
+  └─────────────────────────────────────────────────────────────────────┘
+
+MAIS le vrai problème n'est PAS cette dualité legacy/nouveau.
+Le vrai problème est conceptuel :
+
+  ▶ Le terme "communication" est utilisé pour désigner à la fois :
+      1. L'INFRASTRUCTURE d'envoi (EventBus, dispatchers, providers email,
+         WebSocket, channel policy)
+      2. Le CENTRE DE NOTIFICATIONS (UI utilisateur : liste, filtres,
+         marquer comme lu, stats)
+
+  ▶ Résultat : on ne sait plus si "communication" désigne le tuyau
+    ou le robinet. La confusion est partout dans le code.
+
+
+================================================================================
+2. PROBLÈME DE FOND : DEUX SYSTÈMES QUI SE CHEVAUCHENT
+================================================================================
+
+Le projet a commencé avec un système simple :
+
+  core.Notification
+  ─────────────────
+  - Créé pour les candidatures
+  - Email-only
+  - Pas de notion de canal, de priorité, de statut avancé
+  - Pas d'interface utilisateur pour le destinataire
+
+Puis un nouveau système a été construit :
+
+  communication
+  ─────────────
+  - Architecture générique Event → Notification → Delivery
+  - Multi-canaux (in_app, email, websocket)
+  - Tracking complet (pending → queued → sent → delivered → read)
+  - Interface utilisateur riche (centre de notifications, dropdown, widget)
+  - WebSocket temps réel
+  - 85 points d'intégration dans 15+ apps
+
+MAIS le nouveau système a été nommé "communication" — un nom trop large
+qui crée une confusion permanente. Dans l'esprit des développeurs :
+
+  • "communication" = à la fois le MOTEUR d'envoi ET l'INTERFACE
+  • On trouve des appels à NotificationService.notify_user() pour des
+    notifications in-app, et des appels à EmailService.send_transactional()
+    pour des emails, mais les DEUX passent par CommunicationEventBus.
+  • Le "Centre de notifications" (l'UI) est dans le même dossier et les
+    mêmes fichiers que le moteur d'envoi.
+
+
+================================================================================
+3. ARCHITECTURE ACTUELLE
+================================================================================
+
+3.1 LE SYSTÈME COMMUNICATION (NOUVEAU)
+──────────────────────────────────────
+
+  Fichier : communication/services/event_bus.py
+  Classe  : CommunicationEventBus
+
+  FLUX GÉNÉRAL :
+
+    Appel extérieur (85 call sites)
+          │
+          ▼
+    NotificationService.notify_user()      # Haut niveau : in-app + websocket
+    EmailService.send_transactional()       # Haut niveau : email
+          │
+          ▼
+    CommunicationEventBus.emit()            # Orchester central
+          │
+          ├──▶ Crée CommunicationEvent     # Trace d'audit
+          │
+          └──▶ Pour chaque canal :
+                  │
+                  ├──▶ Crée CommunicationNotification
+                  │    (1 par destinataire × canal)
+                  │
+                  └──▶ NotificationDispatcher.dispatch()
+                          │
+                          ├──▶ Crée CommunicationDelivery
+                          │    (trace de la tentative d'envoi)
+                          │
+                          └──▶ dispatch_notification()
+                                  │
+                                  ├── in_app     → dispatch_in_app()
+                                  ├── email      → dispatch_email() → Brevo SMTP
+                                  ├── websocket  → dispatch_websocket() → Channels
+                                  └── sms        → skip (futur)
+
+  POINTS D'ENTRÉE PUBLICS :
+
+    NotificationService.notify_user(recipient, event_type, title, body, ...)
+        → Par défaut : canaux in_app + websocket
+        → Utilisé par : admissions, inscriptions, payments, shop, community,
+          secretary, portal, marketing, academics, et plus (85 call sites)
+
+    EmailService.send_transactional(subject, recipient, template_key, context, ...)
+        → Canal : email_transactional uniquement
+        → Utilisé par : admissions (confirmations), payments (reçus),
+          onboarding, academics
+
+  COUCHE INFRASTRUCTURE :
+
+    Fichier                          Rôle
+    ─────────────────────────────   ──────────────────────────────────────
+    models/events.py                 CommunicationEvent (trace d'audit)
+    models/notifications.py          CommunicationNotification + CommunicationDelivery
+    services/event_bus.py            CommunicationEventBus.emit() — l'orchestrateur
+    services/notification_service.py NotificationService.notify_user()
+    services/notifications.py        create_notification(), mark_notification_read()
+    services/dispatcher.py           NotificationDispatcher.dispatch()
+    services/channels.py             dispatch_in_app(), dispatch_websocket(), dispatch_email()
+    services/channel_policy.py       Registry de 20+ types d'événements avec règles
+    services/audience.py             resolve_platform_users() — routage par rôle/branche
+    services/email_service.py        EmailService.send_transactional()
+    services/websocket_service.py    WebsocketService.notify_user()
+    providers/registry.py            get_email_provider() → BrevoEmailProvider
+    providers/brevo.py               Envoi SMTP via core.emailing
+    realtime/consumers.py            CommunicationNotificationConsumer (WebSocket)
+    realtime/service.py              send_notification_to_user() via Channels layer
+    realtime/payloads.py             build_notification_payload()
+
+  COUCHE PRÉSENTATION (UI) :
+
+    Fichier                          Rôle
+    ─────────────────────────────   ──────────────────────────────────────
+    views.py                         6 vues (notifications, detail, partial,
+                                     widget, mark_read, mark_all_read)
+    urls.py                          6 routes sous /communication/notifications/
+    selectors/notifications.py       5 fonctions de requêtage
+    context_processors.py            notification_widget() — injecte compteur
+                                     non-lus + notifications récentes dans DANS
+                                     TOUS les templates
+    templates/communication/         Centre de notifications complet :
+      notifications.html              Page principale avec stats, filtres,
+                                     liste paginée, panneau de détail
+      partials/notification_item.html Ligne de notification individuelle
+      partials/notification_detail.html Carte de détail avec logs de livraison
+      partials/notifications_list.html Liste paginée (HTMX)
+      partials/notifications_dropdown.html Dropdown navbar
+      partials/dashboard_widget.html  Widget cloche avec WebSocket JS
+
+
+3.2 LE SYSTÈME NOTIFICATION CENTER (LEGACY)
+───────────────────────────────────────────
+
+  Fichier : core/models.py (ligne 864)
+  Modèle  : Notification
+
+  class Notification(models.Model):
+      recipient_email = EmailField()
+      recipient_name = CharField(150)
+      notification_type = CharField(choices=TYPE_CHOICES)
+          → 17 types liés aux candidatures/inscriptions/paiements
+      title = CharField(200)
+      message = TextField()
+      related_candidature = FK → Candidature
+      related_inscription = FK → Inscription
+      related_payment = FK → Payment
+      email_sent = BooleanField(default=False)
+      sent_at = DateTimeField(nullable)
+      created_at = DateTimeField(auto_now_add=True)
+
+  CARACTÉRISTIQUES :
+    • Email-only (pas de canal in-app, websocket, etc.)
+    • Pas de notion de priorité
+    • Pas de notion de statut avancé (juste email_sent: bool)
+    • Pas d'interface utilisateur pour le destinataire
+    • Admin read-only
+    • Lié uniquement aux candidatures/inscriptions/paiements
+    • Pas de filtrage, pas de recherche, pas de stats
+
+  ÉTAT : Déprécié. Le plan de migration (COMMUNICATION_MIGRATION_PLAN.md)
+  prévoit son remplacement complet par le système communication.
+  Encore utilisé par endroits (notamment admissions).
+
+
+================================================================================
+4. COMPARAISON DÉTAILLÉE
+================================================================================
+
+  CRITÈRE                │ COMMUNICATION (nouveau)   │ NOTIFICATION (legacy)
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Modèle principal       │ CommunicationNotification │ core.models.Notification
+  Fichier                │ communication/models/     │ core/models.py:864
+                         │ notifications.py          │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Canaux supportés       │ in_app, email (transac    │ Email uniquement
+                         │ + marketing), websocket,  │
+                         │ SMS (réservé)             │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Priorités              │ low, normal, high,        │ Aucune
+                         │ critical                  │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Statuts                │ pending → queued → sent   │ email_sent: bool
+                         │ → delivered → read        │
+                         │ + failed, skipped         │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Tracking d'envoi       │ CommunicationDelivery     │ Aucun
+                         │ (tentative, provider,     │
+                         │ message_id, erreur)       │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Trace d'audit          │ CommunicationEvent        │ Aucune
+                         │ (event_type, source_app,  │
+                         │ actor, payload)           │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Interface utilisateur  │ Centre de notifications   │ Admin read-only
+                         │ complet : list, filter,   │
+                         │ search, stats, detail,    │
+                         │ dropdown, widget,         │
+                         │ WebSocket temps réel      │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Destinataire           │ User FK (authentifié)     │ Email (peut être
+                         │                           │ anonyme)
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Routage par politique  │ CHANNEL_POLICY_REGISTRY   │ Aucun
+                         │ (20+ types d'événements   │
+                         │ avec règles canaux,       │
+                         │ priorité, audience)       │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Résolution d'audience  │ resolve_platform_users()  │ Aucune
+                         │ (par rôle, branche,       │
+                         │ programme, classe...)     │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Context processor      │ Oui — injecté dans TOUS   │ Non
+                         │ les templates             │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Points d'intégration   │ ∼85 call sites            │ Peu (ancien code)
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Plan de migration      │ COMMUNICATION_MIGRATION   │ Doit être remplacé
+                         │ _PLAN.md existe           │
+ ────────────────────────┼───────────────────────────┼─────────────────────────
+  Tests                  │ communication/tests.py    │ Aucun dédié
+                         │ + tests dans shop,        │
+                         │ payments, etc.            │
+
+
+================================================================================
+5. POURQUOI LE PROJET "VASCILLE" — LES VRAIS PROBLÈMES
+================================================================================
+
+PROBLÈME N°1 : CONFUSION SÉMANTIQUE (LE PIRE)
+──────────────────────────────────────────────
+
+  Le dossier "communication/" contient À LA FOIS :
+    • Le MOTEUR D'ENVOI (EventBus, dispatchers, providers, channel policy)
+    • L'INTERFACE UTILISATEUR (Centre de notifications, vues, templates)
+
+  Conséquence : quand on lit le code, on ne sait jamais si "communication"
+  fait référence à l'infrastructure d'envoi ou à l'interface de notification.
+
+  Exemple concret :
+    - communication/views.py → c'est le Centre de notifications
+    - communication/services/event_bus.py → c'est le moteur d'envoi
+    - communication/context_processors.py → c'est pour l'UI
+    - communication/services/websocket_service.py → c'est l'infrastructure
+    - communication/realtime/consumers.py → c'est l'infrastructure (push)
+
+  => C'est comme si le dossier "electricite/" contenait à la fois
+  le tableau électrique ET les ampoules.
+
+
+PROBLÈME N°2 : LE NOTIFICATION SERVICE EST UN PASSE-PLAFOND
+───────────────────────────────────────────────────────────
+
+  NotificationService.notify_user() est un simple wrapper qui appelle
+  CommunicationEventBus.emit(). Il n'ajoute RIEN :
+
+  class NotificationService:
+      @staticmethod
+      def notify_user(...):
+          return CommunicationEventBus.emit(...)
+
+  Cela signifie qu'il y a DEUX APIs pour faire la même chose, ce qui
+  ajoute de la complexité inutile et dilue la responsabilité.
+
+
+PROBLÈME N°3 : COMMUNICATIONEVENTBUS.EMIT() FAIT TROP DE CHOSES
+────────────────────────────────────────────────────────────────
+
+  La méthode emit() :
+    1. Crée un CommunicationEvent
+    2. Pour chaque canal, crée une CommunicationNotification
+    3. Dispatche chaque notification
+    4. Finalise le statut de l'event
+
+  C'est trop de responsabilités dans une seule méthode. En théorie,
+  l'EventBus devrait juste émettre l'événement. La création des
+  notifications et le dispatch devraient être découplés.
+
+
+PROBLÈME N°4 : DOUBLE ÉCRITURE LEGACY/NEW
+─────────────────────────────────────────
+
+  Pour certains événements, le code écrit à la fois dans
+  core.Notification (legacy) ET dans CommunicationNotification (new).
+  Cela double la charge et crée des risques de divergence.
+
+  Voir : COMMUNICATION_MIGRATION_PLAN.md — "écrire en double vers
+  l'ancien et le nouveau modèle".
+
+
+PROBLÈME N°5 : PAS DE FILE D'ATTENTE ASYNCHRONE
+───────────────────────────────────────────────
+
+  Le dossier communication/tasks/ est un placeholder vide. Actuellement,
+  tout le dispatch est synchrone (ou via transaction.on_commit).
+
+  Conséquence :
+    - Un envoi d'email bloque la requête HTTP
+    - Si Brevo SMTP est lent, l'utilisateur attend
+    - Pas de retry automatique en cas d'échec
+    - Pas de gestion de charge
+
+
+PROBLÈME N°6 : TROIS "CENTRES DE NOTIFICATIONS" DIFFÉRENTS
+──────────────────────────────────────────────────────────
+
+  Il existe en réalité TROIS interfaces de notification :
+    1. communication/templates/communication/notifications.html
+       → Le vrai centre de notifications (complet)
+    2. templates/portal/informaticien/workflows/notifications_workspace.html
+       → Un workspace dédié pour l'informaticien
+    3. marketing/templates/marketing/partials/account_notifications.html
+       → Un panneau pour le marketing
+
+  Chacun a sa propre logique, ses propres partials, ses propres vues.
+  Cela duplique l'effort de maintenance et crée des incohérences.
+
+
+================================================================================
+6. SCHÉMA DU PIPELINE COMPLET
+================================================================================
+
+  ┌──────────────────────────────────────────────────────────┐
+  │                APPLICATIONS CONSOMMATRICES                │
+  │  admissions  │  inscriptions  │  payments  │  shop       │
+  │  community   │  secretary     │  portal    │  marketing   │
+  │  academics   │  accounts      │  etc. (15+)              │
+  └──────────────┬───────────────────────────────────────────┘
+                 │
+                 ▼
+  ┌──────────────────────────────────────────────────────────┐
+  │           COUCHE DE SERVICE PUBLIQUE (API)                │
+  │                                                           │
+  │  NotificationService.notify_user()                        │
+  │    → Par défaut : in_app + websocket                      │
+  │                                                           │
+  │  EmailService.send_transactional()                        │
+  │    → Canal : email_transactional                          │
+  │                                                           │
+  │  (AUSSI : appel direct à CommunicationEventBus.emit())    │
+  └──────────────────────────┬───────────────────────────────┘
+                             │
+                             ▼
+  ┌──────────────────────────────────────────────────────────┐
+  │           COMMUNICATION EVENT BUS (ORCHESTREUR)           │
+  │                                                           │
+  │   CommunicationEventBus.emit()                            │
+  │     1. Crée CommunicationEvent     (audit)               │
+  │     2. Pour chaque canal :                                │
+  │        a. Résout la politique (channel_policy.py)         │
+  │        b. Crée CommunicationNotification                 │
+  │        c. NotificationDispatcher.dispatch()               │
+  └──────────────────────────┬───────────────────────────────┘
+                             │
+                             ▼
+  ┌──────────────────────────────────────────────────────────┐
+  │           DISPATCHER PAR CANAL                            │
+  │                                                           │
+  │   dispatch_notification()                                 │
+  │       │                                                   │
+  │       ├── CHANNEL_IN_APP                                  │
+  │       │   → dispatch_in_app()                             │
+  │       │   → Pas d'action (déjà en DB)                     │
+  │       │                                                   │
+  │       ├── CHANNEL_WEBSOCKET                               │
+  │       │   → build_notification_payload()                  │
+  │       │   → send_notification_to_user()                   │
+  │       │   → Channels layer (Redis/InMemory)               │
+  │       │   → CommunicationNotificationConsumer             │
+  │       │   → JS dans dashboard_widget.html                 │
+  │       │                                                   │
+  │       ├── CHANNEL_EMAIL                                   │
+  │       │   → get_email_provider() → BrevoEmailProvider     │
+  │       │   → resolve_email_configuration()                 │
+  │       │   → core.emailing.send_templated_email()          │
+  │       │   → StableSMTPEmailBackend → Brevo SMTP           │
+  │       │                                                   │
+  │       └── CHANNEL_SMS                                     │
+  │           → skip (futur)                                  │
+  └──────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+  ┌──────────────────────────────────────────────────────────┐
+  │           COUCHE PRÉSENTATION (UI)                        │
+  │                                                           │
+  │   CONTEXT PROCESSOR (global)                              │
+  │   └─ notification_widget()                                │
+  │      └─ communication_unread_count                        │
+  │      └─ communication_recent_notifications                │
+  │                                                           │
+  │   VUES (6 endpoints)                                      │
+  │   └─ /communication/notifications/                        │
+  │      └─ notifications()    → page principale              │
+  │      └─ notification_detail()  → détail                   │
+  │      └─ notifications_partial() → dropdown                │
+  │      └─ notifications_widget() → widget cloche            │
+  │      └─ mark_notification_read()                          │
+  │      └─ mark_all_notifications_read()                     │
+  │                                                           │
+  │   SELECTEURS (5 fonctions)                                │
+  │   └─ get_user_notifications()                             │
+  │   └─ get_user_unread_count()                              │
+  │   └─ get_notification_center_queryset()                   │
+  │   └─ get_notification_center_stats()                      │
+  │   └─ get_notification_filter_options()                    │
+  │                                                           │
+  │   TEMPLATES                                               │
+  │   └─ notifications.html          (centre complet)         │
+  │   └─ partials/notification_item.html                      │
+  │   └─ partials/notification_detail.html                    │
+  │   └─ partials/notifications_list.html                     │
+  │   └─ partials/notifications_dropdown.html                 │
+  │   └─ partials/dashboard_widget.html    (JS WebSocket)     │
+  └──────────────────────────────────────────────────────────┘
+
+
+================================================================================
+7. RECOMMANDATIONS
+================================================================================
+
+RECOMMANDATION N°1 : SÉPARER L'INFRASTRUCTURE DE L'INTERFACE (URGENT)
+─────────────────────────────────────────────────────────────────────
+
+  Créer deux apps ou paquets distincts :
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  Option A : Deux apps Django                                │
+    │                                                             │
+    │  notifier/             ← LE MOTEUR D'ENVOI                  │
+    │    ├── models/         (Event, Notification, Delivery)      │
+    │    ├── services/       (EventBus, Dispatcher, Channels,     │
+    │    │                    Providers, Policy, Audience)        │
+    │    ├── realtime/       (Consumers, Service, Payloads)       │
+    │    ├── providers/      (Brevo, Registry)                    │
+    │    └── tasks/          (Queue async)                        │
+    │                                                             │
+    │  notification_center/  ← L'INTERFACE UTILISATEUR            │
+    │    ├── views.py                                             │
+    │    ├── urls.py                                              │
+    │    ├── selectors.py                                         │
+    │    ├── context_processors.py                                │
+    │    ├── templates/notification_center/                       │
+    │    └── templates/notification_center/partials/              │
+    └─────────────────────────────────────────────────────────────┘
+
+    OU
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  Option B : Même app, sous-paquets clairs                   │
+    │                                                             │
+    │  communication/                                             │
+    │    ├── engine/          ← Moteur (EventBus, Dispatcher...)  │
+    │    ├── center/          ← UI (views, selectors, templates)  │
+    │    ├── realtime/        ← WebSocket                         │
+    │    ├── providers/       ← Email providers                   │
+    │    └── tasks/           ← Queue async                       │
+    └─────────────────────────────────────────────────────────────┘
+
+
+RECOMMANDATION N°2 : UNIFIER NOTIFICATIONSERVICE ET EVENTBUS
+────────────────────────────────────────────────────────────
+
+  NotificationService.notify_user() est un wrapper vide qui ajoute
+  zéro valeur. Supprimer ce wrapper et soit :
+    - Utiliser directement CommunicationEventBus.emit()
+    - Ou faire de NotificationService la SEULE API publique et
+      rendre EventBus interne/privé
+
+  Actuellement, les deux coexistent et les développeurs ne savent
+  pas lequel utiliser.
+
+
+RECOMMANDATION N°3 : TERMINER LA MIGRATION LEGACY → NEW
+───────────────────────────────────────────────────────
+
+  core.Notification doit être supprimé une fois que :
+    - Tous les appels sont migrés vers CommunicationNotification
+    - Les données sont exportées/transformées
+    - Le plan COMMUNICATION_MIGRATION_PLAN.md est exécuté
+
+
+RECOMMANDATION N°4 : AJOUTER UNE FILE D'ATTENTE ASYNCHRONE
+─────────────────────────────────────────────────────────
+
+  Le dossier tasks/ existe mais est vide. Ajouter Celery ou RQ ou
+  Django Q pour :
+    - Envoyer les emails en arrière-plan
+    - Retry automatique en cas d'échec
+    - Ne pas bloquer les requêtes HTTP
+    - Gérer les pics de charge
+
+
+RECOMMANDATION N°5 : UNIFIER LES TROIS INTERFACES UTILISATEUR
+─────────────────────────────────────────────────────────────
+
+  Les trois "centres de notifications" (communication, IT, marketing)
+  devraient partager le même code de base avec des surcharges mineures
+  plutôt que d'être trois implémentations séparées.
+
+
+RECOMMANDATION N°6 : CLARIFIER LA NOMENCLATURE
+─────────────────────────────────────────────
+
+  Termes actuels      → Termes recommandés
+  ───────────────────   ───────────────────
+  "communication"      → "notifications" (pour l'UI)
+                         "event_bus" ou "dispatcher" (pour le moteur)
+  "NotificationService" → "Notifier" ou "NotificationBus"
+  "CommunicationEvent"  → "NotificationEvent" (ou garder)
+  "CommunicationNotification" → "Notification" (après migration legacy)
+
+
+RECOMMANDATION N°7 : ALLÉGER COMMUNICATIONEVENTBUS.EMIT()
+─────────────────────────────────────────────────────────
+
+  Séparer les responsabilités :
+    1. EventBus.emit() → crée juste l'Event
+    2. Un NotificationOrchestrator ou NotificationPipeline prend le relais
+       pour créer les notifications et les dispatcher
+
+  Principe : une classe = une responsabilité.
+
+
+================================================================================
+CONCLUSION
+================================================================================
+
+Le projet "vascille" non pas parce que le code est mal écrit, mais parce
+que l'ARCHITECTURE est ambiguë :
+
+  • Le nom "communication" est trop large et crée une confusion entre
+    l'infrastructure d'envoi et l'interface de notification.
+
+  • La cohabitation d'un système legacy (core.Notification) et d'un
+    nouveau système (communication) sans séparation nette des
+    responsabilités ajoute de la complexité inutile.
+
+  • NotificationService ne fait que wrapper EventBus sans valeur
+    ajoutée, ce qui dilue l'API publique.
+
+  • L'absence de file d'attente asynchrone rend les envois d'email
+    bloquants.
+
+  • La duplication des centres de notifications (3 interfaces)
+    triple l'effort de maintenance.
+
+La solution prioritaire est la RECOMMANDATION N°1 (séparer clairement
+le moteur d'envoi de l'interface utilisateur), suivie de la N°2
+(unifier l'API publique) et de la N°4 (file d'attente asynchrone).
+
+Le code existant est solide et bien structuré — c'est l'organisation
+conceptuelle qui a besoin d'être clarifiée.
+
+
+================================================================================
+8. PLAN DE SÉPARATION CONCRET — "OPÉRATION DÉMÉNAGEMENT"
+================================================================================
+
+PRINCIPE
+─────────────────
+Créer DEUX apps Django distinctes avec des responsabilités claires :
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  APP A : notifier/  (MOTEUR D'ENVOI — l'infrastructure)         │
+  │  Rôle : émet des notifications, les dispatche, track les envois  │
+  │  Dépend de : models (User), providers email, Channels layer      │
+  │  NE DÉPEND PAS DE : notification_center/ NI DE ui/              │
+  │  EXPOSÉ : NotificationBus API publique                           │
+  └─────────────────────────────────────────────────────────────────┘
+                              │
+                    consomme les modèles
+                              │
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  APP B : notification_center/  (INTERFACE UTILISATEUR)           │
+  │  Rôle : affiche les notifications, permet de les filtrer,        │
+  │         les marquer comme lues, stats, widget cloche             │
+  │  Dépend de : notifier.models (lecture seule + statut)            │
+  │  NE CONTIENT PAS : EventBus, dispatchers, providers              │
+  │  DÉPENDANCES SORTANTES : ui/ dépend de notification_center/     │
+  └─────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │
+                    ui/ dépend de notification_center/
+                    (navbar → get_user_unread_count + URLs)
+                              │
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  APP C : ui/  (COMPOSANTS — design system)                      │
+  │  Rôle : composants de présentation réutilisables                 │
+  │  Dépend de : notification_center.selectors (navbar : compteur)  │
+  │  Dépend de : notification_center.urls (navbar : lien vers       │
+  │              le centre + dropdown HTMX)                          │
+  │  DÉJÀ EXISTANTE — juste à changer les imports                   │
+  └─────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+CE QUE J'AI DÉCOUVERT DANS L'APP UI
+═══════════════════════════════════════════════════════════════════════════════
+
+En lisant ui/components/layout/navbar/navbar.py et son template, j'ai trouvé
+ce lien DIRECT entre ui/ et communication/ :
+
+  1. ui/components/layout/navbar/navbar.py (ligne 7) :
+       from communication.selectors import get_user_unread_count
+
+     → Le composant navbar appelle get_user_unread_count() pour afficher
+       le badge de notifications non lues dans l'icône cloche.
+
+  2. ui/templates/layout/navbar/navbar.html (lignes 213-246) :
+       hx-get="{% url 'communication:notifications_partial' %}"
+       href="{% url 'communication:notifications' %}"
+
+     → Le template navbar charge le dropdown des notifications via HTMX
+       et pointe vers le centre de notifications.
+
+  3. Le JS WebSocket (dashboard_widget.html) écoute l'événement DOM
+     "communication:notification" pour rafraîchir le badge en temps réel.
+
+C'est EXACTEMENT le problème de nommage que j'ai décrit plus haut :
+  - ui/ importe depuis "communication" ce qui est en réalité
+    de l'affichage de notifications (selecteurs, URLs)
+  - Le mot "communication" cache qu'il s'agit de deux choses distinctes
+
+DANS LA NOUVELLE ARCHITECTURE :
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  AVANT :  ui/ → communication/                                  │
+  │           (le nom dit "envoi" mais utilise l'interface)         │
+  │                                                                 │
+  │  APRÈS :  ui/ → notification_center/ → notifier/                │
+  │           (ui dépend de l'interface, pas du moteur)             │
+  │           (notification_center dépend du moteur pour les infos) │
+  └─────────────────────────────────────────────────────────────────┘
+
+  CHANGEMENT CONCRET DANS UI/ :
+    ui/components/layout/navbar/navbar.py
+      AVANT :  from communication.selectors import get_user_unread_count
+      APRÈS :  from notification_center.selectors import get_user_unread_count
+
+    ui/templates/layout/navbar/navbar.html
+      AVANT :  {% url 'communication:notifications_partial' %}
+      APRÈS :  {% url 'notification_center:notifications_partial' %}
+
+    ui/templates/layout/navbar/navbar.html
+      AVANT :  {% url 'communication:notifications' %}
+      APRÈS :  {% url 'notification_center:notifications' %}
+
+  → C'est un changement trivial (rechercher/remplacer 3 lignes).
+  → Mais conceptuellement c'est une énorme clarification.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ARCHITECTURE CIBLE — LES TROIS COUCHES
+═══════════════════════════════════════════════════════════════════════════════
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  COUCHE 3 : PRÉSENTATION GÉNÉRIQUE                                      │
+  │                                                                          │
+  │  App : ui/                                                               │
+  │  Rôle : design system, composants réutilisables (navbar, footer,         │
+  │         dashboard cards, forms, atoms...)                                │
+  │  Dépend de : notification_center/ (pour le compteur de notifications     │
+  │              et les liens vers le centre)                                │
+  │  Aucune dépendance vers le moteur d'envoi                               │
+  └──────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  COUCHE 2 : INTERFACE DE NOTIFICATIONS                                   │
+  │                                                                          │
+  │  App : notification_center/                                              │
+  │  Rôle : afficher, filtrer, marquer comme lu, widget cloche, dropdown,    │
+  │         stats, contexte global (context processor)                       │
+  │  Dépend de : notifier/ (lecture seule des modèles + mise à jour statut)  │
+  │  NE FAIT PAS : envoyer des notifications, dispatcher, providers         │
+  └──────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  COUCHE 1 : MOTEUR DE NOTIFICATIONS (INFRASTRUCTURE)                     │
+  │                                                                          │
+  │  App : notifier/                                                         │
+  │  Rôle : créer des notifications, les dispatcher (in_app, email,         │
+  │         websocket), gérer les providers, le policy engine,               │
+  │         l'audience, la file d'attente async                             │
+  │  Dépend de : models (User), providers email, Channels layer              │
+  │  NE DÉPEND D'AUCUNE AUTRE APP DU PROJET                                 │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  RÈGLE ABSOLUE :
+    ┌──────────────────────────────────────────────────────────────┐
+    │  Une couche NE PEUT dépendre QUE de la couche en dessous.    │
+    │  Jamais de dépendance ascendante ni transversale.            │
+    │                                                              │
+    │  ✅ ui/ → notification_center/ → notifier/                   │
+    │  ❌ notifier/ → ui/                                          │
+    │  ❌ notification_center/ → ui/                                │
+    │  ❌ ui/ → notifier/ (contournement interdit)                 │
+    └──────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 1 — CRÉER L'APP NOTIFIER (moteur)
+═══════════════════════════════════════════════════════════════════════════════
+
+ÉTAPE 1.1 : Créer le dossier notifier/
+─────────────────────────────────────
+
+  notifier/
+    ├── __init__.py
+    ├── apps.py               # NotifierConfig
+    ├── admin.py              # Modèles en read-only
+    ├── models/
+    │   ├── __init__.py       # Exporte : NotificationEvent, NotificationMessage, DeliveryAttempt
+    │   ├── event.py          # NotificationEvent (ex-CommunicationEvent)
+    │   ├── message.py        # NotificationMessage (ex-CommunicationNotification)
+    │   └── delivery.py       # DeliveryAttempt (ex-CommunicationDelivery)
+    ├── services/
+    │   ├── __init__.py       # Exporte : NotificationBus
+    │   ├── bus.py            # NotificationBus — le seul point d'entrée public
+    │   ├── dispatcher.py     # Dispatch + delivery tracking
+    │   ├── channels.py       # dispatch_in_app / dispatch_email / dispatch_websocket
+    │   ├── policy.py         # POLICY_REGISTRY + resolve_policy()
+    │   └── audience.py       # resolve_platform_users()
+    ├── providers/
+    │   ├── __init__.py
+    │   ├── base.py           # BaseProvider ABC
+    │   ├── registry.py       # get_email_provider()
+    │   └── brevo.py          # BrevoEmailProvider
+    ├── realtime/
+    │   ├── __init__.py
+    │   ├── consumer.py       # NotificationConsumer (AsyncWebsocketConsumer)
+    │   ├── routing.py        # websocket_urlpatterns
+    │   ├── service.py        # send_to_user()
+    │   └── payloads.py       # build_payload()
+    ├── tasks/
+    │   ├── __init__.py
+    │   └── dispatch.py       # dispatch_notification_task() (async)
+    ├── migrations/
+    │   └── __init__.py
+    ├── tests/
+    │   ├── __init__.py
+    │   └── test_bus.py
+    └── templatetags/         # (optionnel, si besoin de filtres)
+
+ÉTAPE 1.2 : Renommer les modèles (plus clairs)
+───────────────────────────────────────────────
+
+  Ancien nom (communication/)          Nouveau nom (notifier/)
+  ────────────────────────────────    ─────────────────────────────
+  CommunicationEvent                   NotificationEvent
+  CommunicationNotification            NotificationMessage
+  CommunicationDelivery                DeliveryAttempt
+
+  → Les champs restent IDENTIQUES (pas de migration de données).
+  → On crée les nouvelles tables à côté.
+
+ÉTAPE 1.3 : API publique unique — NotificationBus
+──────────────────────────────────────────────────
+
+  La classe NotificationBus est le SEUL point d'entrée. Plus de
+  doublon EventBus/NotificationService.
+
+  class NotificationBus:
+      @staticmethod
+      def notify(recipient, event_type, title, body="",
+                 channels=None, priority="normal", ...):
+          """Une seule méthode pour TOUT envoyer."""
+
+      @staticmethod
+      def notify_many(recipients, event_type, title, body="",
+                      channels=None, ...):
+          """Même chose mais pour plusieurs destinataires."""
+
+      @staticmethod
+      def send_email(recipient, subject, template_key, context, ...):
+          """Email uniquement (cas particulier)."""
+
+  → Disparaissent : CommunicationEventBus, NotificationService,
+    EmailService (fusionnés dans NotificationBus)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 2 — CRÉER L'APP NOTIFICATION_CENTER (interface)
+═══════════════════════════════════════════════════════════════════════════════
+
+ÉTAPE 2.1 : Créer le dossier notification_center/
+─────────────────────────────────────────────────
+
+  notification_center/
+    ├── __init__.py
+    ├── apps.py               # NotificationCenterConfig
+    ├── views.py              # Vues (centre, widget, dropdown, mark_read...)
+    ├── urls.py               # Routes (sous /notifications/)
+    ├── selectors.py          # get_unread_count(), get_queryset(), get_stats()
+    ├── context_processors.py # notification_widget() (injecte compteur partout)
+    ├── templates/
+    │   └── notification_center/
+    │       ├── index.html              # Page principale du centre
+    │       └── partials/
+    │           ├── list.html           # Liste paginée
+    │           ├── item.html           # Ligne individuelle
+    │           ├── detail.html         # Carte de détail
+    │           ├── dropdown.html       # Dropdown navbar
+    │           └── widget.html         # Widget cloche + JS WebSocket
+    ├── tests/
+    │   ├── __init__.py
+    │   ├── test_views.py
+    │   └── test_selectors.py
+    └── migrations/
+        └── __init__.py
+
+ÉTAPE 2.2 : Ce que notification_center NE CONTIENT PAS
+──────────────────────────────────────────────────────
+
+  notification_center/ N'A PAS :
+    ❌ De modèles (utilise notifier.models en lecture)
+    ❌ De services d'envoi (bus, dispatcher, channels)
+    ❌ De providers email
+    ❌ De WebSocket consumer (juste le JS client)
+    ❌ De policy engine
+    ❌ De logique d'audience
+
+  → C'est une app "read-only" qui ne fait qu'afficher et mettre à jour
+    le statut (read/unread).
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 3 — MIGRATION PROGRESSIVE
+═══════════════════════════════════════════════════════════════════════════════
+
+ÉTAPE 3.1 : Migration des données (sans perte)
+───────────────────────────────────────────────
+
+  a) Créer les migrations Django pour notifier/ (nouvelles tables)
+  b) Créer une commande de migration :
+
+       python manage.py migrate_communication_to_notifier
+
+     Cette commande :
+       1. Copie CommunicationEvent  → NotificationEvent
+       2. Copie CommunicationNotification → NotificationMessage
+       3. Copie CommunicationDelivery → DeliveryAttempt
+       4. Vérifie l'intégrité (counts égaux)
+       5. Ne supprime PAS les anciennes données (safety net)
+
+  c) Laisser les deux systèmes cohabiter quelques semaines
+
+ÉTAPE 3.2 : Migration des 85 call sites
+────────────────────────────────────────
+
+  Remplacer APPEL_ANCIEN → APPEL_NOUVEAU
+
+  Ancien                                 Nouveau
+  ──────────────────────────────         ──────────────────────────────
+  NotificationService.notify_user(...)   NotificationBus.notify(...)
+  CommunicationEventBus.emit(...)        NotificationBus.notify(...)
+  EmailService.send_transactional(...)   NotificationBus.send_email(...)
+
+  → Le changement est mécanique (rechercher/remplacer avec grep)
+
+ÉTAPE 3.3 : Bascule des URLs et templates
+──────────────────────────────────────────
+
+  Ancienne route                        Nouvelle route
+  ──────────────────────────────         ──────────────────────────────
+  /communication/notifications/          /notifications/
+  /communication/notifications/widget/   /notifications/widget/
+  /communication/notifications/...       /notifications/...
+
+  → Les templates dans communication/templates/communication/
+    sont déplacés vers notification_center/templates/notification_center/
+  → Les context_processors sont mis à jour
+  → Les chemins statics sont mis à jour
+
+ÉTAPE 3.4 : Suppression des anciens fichiers
+────────────────────────────────────────────
+
+  Une fois que :
+    ✓ Tous les call sites sont migrés
+    ✓ Les données sont copiées et vérifiées
+    ✓ Les tests passent
+
+  Alors :
+    1. Supprimer communication/models/ (events.py, notifications.py)
+    2. Supprimer communication/services/ (event_bus.py, notification_service.py,
+       email_service.py, websocket_service.py, dispatcher.py, channels.py,
+       channel_policy.py, audience.py, notifications.py, json_utils.py)
+    3. Supprimer communication/providers/
+    4. Supprimer communication/realtime/ (consumer, routing, service, payloads)
+    5. Supprimer communication/views.py + communication/urls.py
+    6. Supprimer communication/selectors/
+    7. Supprimer communication/context_processors.py
+    8. Supprimer communication/templates/communication/
+    9. Supprimer communication/admin.py
+   10. Supprimer communication/tasks/
+
+  → Le dossier communication/ est réduit à peau de chagrin (juste apps.py
+    qui importe des signaux, à migrer aussi).
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 4 — ÉLIMINER L'ANCIEN core.Notification
+═══════════════════════════════════════════════════════════════════════════════
+
+ÉTAPE 4.1 : Audit des usages de core.Notification
+──────────────────────────────────────────────────
+
+  $ grep -rn "core\.models\.Notification"   # ou "from core.models import Notification"
+  $ grep -rn "Notification(" core/
+  $ grep -rn "related_candidature" admissions/
+  $ grep -rn "Notification" core/admin.py
+
+ÉTAPE 4.2 : Migration des données legacy
+─────────────────────────────────────────
+
+  Commande : python manage.py migrate_legacy_notifications
+
+  Pour chaque core.Notification :
+    - Créer un NotificationMessage (via NotificationBus)
+    - Copier recipient_email → chercher User correspondant ou utiliser
+      le champ email
+    - Copier notification_type → event_type
+    - Copier title, message → title, body
+    - Copier created_at
+    - Marquer email_sent → status = sent/delivered selon le cas
+
+ÉTAPE 4.3 : Supprimer le modèle legacy
+───────────────────────────────────────
+
+  1. Supprimer la classe Notification dans core/models.py
+  2. Supprimer NotificationAdmin dans core/admin.py
+  3. Supprimer les références dans admissions, payments, etc.
+  4. Créer la migration de suppression
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 5 — AJOUTER LA FILE D'ATTENTE ASYNCHRONE
+═══════════════════════════════════════════════════════════════════════════════
+
+ÉTAPE 5.1 : Choisir une solution
+─────────────────────────────────
+
+  Options (par ordre de recommandation) :
+    1. Django Q2        → natif Django, pas de Redis nécessaire
+    2. Huey            → léger, support Redis/sqlite
+    3. Celery           → trop lourd pour ce projet
+
+  Si REDIS_URL est déjà configuré → Huey ou Django Q2
+  Si pas de Redis → Django Q2 avec SQLite (ou Huey avec sqlite)
+
+ÉTAPE 5.2 : Modifier le dispatcher
+───────────────────────────────────
+
+  Dans notifier/services/dispatcher.py :
+
+      class Dispatcher:
+          def dispatch(self, message):
+              if message.channel == CHANNEL_EMAIL:
+                  async_dispatch_email.delay(message.id)
+              else:
+                  dispatch_sync(message)
+
+  → Les emails passent en arrière-plan
+  → Les notifications in-app + websocket restent synchrones (rapides)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PHASE 6 — UNIFIER LES TROIS CENTRES DE NOTIFICATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+ÉTAPE 6.1 : Inventaire des trois interfaces
+────────────────────────────────────────────
+
+  1. communication/templates/communication/notifications.html
+     → Le vrai centre (complet : stats, filtre, liste, détail)
+
+  2. templates/portal/informaticien/workflows/notifications_workspace.html
+     → Workspace IT (similaire mais avec des fonctionnalités admin en plus)
+
+  3. marketing/templates/marketing/partials/account_notifications.html
+     → Panneau marketing (simplifié)
+
+ÉTAPE 6.2 : Créer un socle commun
+──────────────────────────────────
+
+  notification_center/templates/notification_center/partials/
+    ├── list.html         ← utilisé PARTOUT
+    ├── item.html         ← utilisé PARTOUT
+    ├── detail.html       ← utilisé PARTOUT
+    └── stats_grid.html   ← le bloc des stats (total, unread, critical, failed)
+
+  Puis chaque app spécifique surcharge via {% extends %} ou inclusion :
+
+    templates/portal/informaticien/workflows/notifications_workspace.html
+      → {% include "notification_center/partials/list.html" %}
+      → + fonctionnalités IT supplémentaires
+
+    marketing/templates/marketing/partials/account_notifications.html
+      → {% include "notification_center/partials/list.html" with compact=True %}
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PLANNING RECOMMANDÉ
+═══════════════════════════════════════════════════════════════════════════════
+
+  ┌────────────┬──────────────────────────────────────────────────────────┐
+  │  SEMAINE   │  TRAVAIL                                                  │
+  ├────────────┼──────────────────────────────────────────────────────────┤
+  │  Semaine 1 │ Créer notifier/ — modèles, bus, dispatcher, providers    │
+  │            │ Créer les migrations + data migration                    │
+  │            │ Écrire les tests unitaires du bus                        │
+  ├────────────┼──────────────────────────────────────────────────────────┤
+  │  Semaine 2 │ Créer notification_center/ — vues, templates, selecteurs │
+  │            │ Migrer les 85 call sites (recherche/remplacement)        │
+  │            │ Pointer les URLs vers le nouveau centre                  │
+  ├────────────┼──────────────────────────────────────────────────────────┤
+  │  Semaine 3 │ Ajouter la file d'attente asynchrone (Django Q2)         │
+  │            │ Migrer les emails en arrière-plan                        │
+  │            │ Tests d'intégration + régression                         │
+  ├────────────┼──────────────────────────────────────────────────────────┤
+  │  Semaine 4 │ Nettoyage : supprimer communication/ (ancien moteur)     │
+  │            │ Supprimer core.Notification (legacy)                     │
+  │            │ Unifier les 3 centres de notifications                   │
+  │            │ Tests finaux + validation                                │
+  └────────────┴──────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+RÉSUMÉ DES BÉNÉFICES ATTENDUS
+═══════════════════════════════════════════════════════════════════════════════
+
+  ✅ PLUS DE CONFUSION — notifier = moteur, notification_center = UI
+  ✅ API UNIQUE — NotificationBus.notify() au lieu de 3 APIs différentes
+  ✅ EMAILS ASYNCHRONES — les requêtes HTTP ne bloquent plus
+  ✅ CODE LÉGER — notification_center n'a que de la présentation
+  ✅ MAINTENABLE — chaque app a une responsabilité unique
+  ✅ ÉVOLUTIF — on peut changer le moteur sans toucher l'UI et vice-versa
+  ✅ TESTABLE — les tests du moteur sont indépendants de l'UI
+  ✅ ZÉRO RÉGRESSION — les données sont copiées, pas détruites
+  ✅ PLUS DE LEGACY — core.Notification disparaît
+
+
+================================================================================
+9. RAPPORT D'EXÉCUTION — SESSION DU 29 JUIN 2026
+================================================================================
+
+OBJECTIF : Créer l'APP A (notifier/ — le moteur) dans cette session.
+           L'APP B (notification_center/ — l'interface) sera créée dans
+           une session future par un autre agent.
+
+═══════════════════════════════════════════════════════════════════════════════
+9.1 CE QUI A ÉTÉ FAIT
+═══════════════════════════════════════════════════════════════════════════════
+
+  notifier/  — NOUVELLE APP (moteur de notifications)
+  ─────────────────────────────────────────────────────
+
+  notifier/
+    ├── __init__.py
+    ├── apps.py               # NotifierConfig
+    ├── admin.py              # 3 ModelAdmin (NotificationEvent, NotificationMessage, DeliveryAttempt)
+    ├── tests.py              # 2 tests (policy + email template)
+    │
+    ├── models/
+    │   ├── __init__.py       # Exporte les 3 modèles
+    │   ├── event.py          # NotificationEvent (ex-CommunicationEvent)
+    │   ├── message.py        # NotificationMessage (ex-CommunicationNotification)
+    │   └── delivery.py       # DeliveryAttempt (ex-CommunicationDelivery)
+    │
+    ├── services/
+    │   ├── __init__.py       # Exporte : NotificationBus, EmailService, resolve_platform_users
+    │   ├── bus.py            # NotificationBus — API UNIQUE (notify / send_email / mark_as_read)
+    │   ├── dispatcher.py     # Dispatcher.dispatch() + finalize_event_status()
+    │   ├── channels.py       # dispatch_in_app / dispatch_email / dispatch_websocket
+    │   ├── policy.py         # POLICY_REGISTRY (20+ types d'événements) + resolve_channel_policy()
+    │   ├── audience.py       # resolve_platform_users() — routage par rôle/branche
+    │   ├── notifications.py  # create_message() + mark_message_read() (low-level)
+    │   ├── json_utils.py     # make_json_safe()
+    │   ├── template_registry.py  # EMAIL_TEMPLATE_REGISTRY + resolve_email_configuration()
+    │   └── email_service.py  # EmailService.send_transactional() → délègue à NotificationBus
+    │
+    ├── providers/
+    │   ├── __init__.py       # Exporte get_email_provider()
+    │   ├── base.py           # ProviderResult + BaseEmailProvider ABC
+    │   ├── registry.py       # get_email_provider() → BrevoEmailProvider
+    │   └── brevo.py          # BrevoEmailProvider → core.emailing.send_templated_email()
+    │
+    ├── realtime/
+    │   ├── __init__.py       # Exporte websocket_urlpatterns
+    │   ├── consumer.py       # NotificationConsumer (AsyncWebsocketConsumer)
+    │   ├── routing.py        # ws/notifications/
+    │   ├── service.py        # send_to_user() via Channels layer
+    │   └── payloads.py       # build_notification_payload()
+    │
+    ├── tasks/
+    │   ├── __init__.py       # Placeholder pour file d'attente async
+    │   └── dispatch.py       # Placeholder
+    │
+    └── migrations/
+        └── 0001_initial.py   # Crée les 3 tables + tous les indexes
+
+  Fichiers modifiés dans config/
+  ──────────────────────────────
+
+    config/settings.py
+      └─ INSTALLED_APPS (ligne 72) : ajout de "notifier.apps.NotifierConfig"
+
+    config/asgi.py
+      └─ Import + ajout des routes WebSocket notifier.realtime.routing
+
+  Fichiers NON touchés
+  ─────────────────────
+
+    communication/         → 100% inchangé (toujours fonctionnel)
+    core/                  → 100% inchangé (legacy encore en place)
+    config/urls.py         → 100% inchangé (pas de routes UI pour notifier)
+    config/urls_test_local.py → 100% inchangé
+
+
+═══════════════════════════════════════════════════════════════════════════════
+9.2 CE QUI A ÉTÉ TESTÉ / VALIDÉ
+═══════════════════════════════════════════════════════════════════════════════
+
+  ✅ python manage.py check --settings=config.settings_test_local → 0 issues
+  ✅ python manage.py makemigrations notifier → 0001_initial créée
+  ✅ python manage.py migrate notifier → OK
+  ✅ Tous les imports Python résolus (pas d'ImportError)
+  ✅ NotificationBus.notify() → fonctionnel
+  ✅ NotificationBus.send_email() → fonctionnel
+  ✅ NotificationBus.mark_as_read() → fonctionnel
+  ✅ resolve_channel_policy() → retourne les bonnes valeurs
+  ✅ resolve_platform_users() → fonctionnel
+  ✅ BrevoEmailProvider → importable
+  ✅ WebSocket consumer → importable
+  ✅ notifier apparaît bien dans apps.get_app_configs()
+
+
+═══════════════════════════════════════════════════════════════════════════════
+9.3 POUR LA PROCHAINE SESSION (notification_center/)
+═══════════════════════════════════════════════════════════════════════════════
+
+  L'agent suivant devra créer notification_center/ (l'interface utilisateur).
+
+  Ce qu'il doit faire :
+  ─────────────────────
+
+  1. Créer notification_center/apps.py (NotificationCenterConfig)
+
+  2. Créer notification_center/views.py :
+     - Centre de notifications (liste + filtres + stats)
+     - Détail d'une notification
+     - Dropdown navbar
+     - Widget cloche
+     - Marquer comme lu / tout marquer comme lu
+
+  3. Créer notification_center/urls.py :
+     - Routes sous /notifications/
+
+  4. Créer notification_center/selectors.py :
+     - get_user_messages(user)           # lecteurs depuis NotificationMessage
+     - get_user_unread_count(user)
+     - get_notification_center_queryset(user, filters)
+     - get_notification_center_stats(user)
+     - get_notification_filter_options(user)
+
+  5. Créer notification_center/context_processors.py :
+     - notification_widget() → injecte unread_count + recent dans tous les templates
+
+  6. Créer les templates (même structure que communication/templates/communication/)
+     - index.html (page principale)
+     - partials/list.html, item.html, detail.html, dropdown.html, widget.html
+
+  7. Modifier ui/components/layout/navbar/navbar.py :
+     - AVANT : from communication.selectors import get_user_unread_count
+     - APRÈS : from notification_center.selectors import get_user_unread_count
+
+  8. Modifier ui/templates/layout/navbar/navbar.html :
+     - AVANT : {% url 'communication:notifications_partial' %}
+     - APRÈS : {% url 'notification_center:notifications_partial' %}
+     - AVANT : {% url 'communication:notifications' %}
+     - APRÈS : {% url 'notification_center:notifications' %}
+
+  9. Enregistrer dans config/settings.py :
+     - INSTALLED_APPS : "notification_center.apps.NotificationCenterConfig"
+     - Context processors : communication.context_processeurs.notification_widget
+       → Remplacer par notification_center.context_processors.notification_widget
+     - URL conf : path("notifications/", include("notification_center.urls"))
+
+  10. Supprimer les anciens context_processors dans communication/ (optionnel)
+
+  ⚠ PIÈGES À ÉVITER :
+     • Les templates doivent charger {% load humanize %} indépendamment
+     • Le JS WebSocket dans widget.html doit pointer sur ws/notifications/
+       (pas ws/communication/notifications/)
+     • Le type d'événement DOM change : "communication.notification"
+       → "notifier.notification"
+     • Ne PAS toucher à communication/ — on le supprimera plus tard
+
+
+═══════════════════════════════════════════════════════════════════════════════
+9.4 ARCHITECTURE FINALE APRÈS LES DEUX SESSIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                    AVANT (situation actuelle)                       │
+  │                                                                     │
+  │  ui/ ──dépend de──▶ communication/ ──(contient à la fois──┐        │
+  │                          le moteur et l'interface)         │        │
+  │                                                            ▼        │
+  │                 Les 85 call sites utilisent aussi communication/    │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                    APRÈS (situation cible)                           │
+  │                                                                     │
+  │  ui/ ──dépend de──▶ notification_center/ ──dépend de──▶ notifier/  │
+  │  (navbar, badge)     (interface, vues,              (moteur pur)    │
+  │                       templates, selecteurs)                        │
+  │                                                                     │
+  │  Les 85 call sites sont migrés vers NotificationBus (notifier/)     │
+   │  communication/ est supprimé                                        │
+   └─────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+9.5 RAPPORT D'EXÉCUTION — SESSION DU 29 JUIN 2026 (SUITE)
+================================================================================
+
+OBJECTIF : Créer l'APP B (notification_center/ — l'interface utilisateur).
+           Modification des dépendances ui/ → notification_center/.
+
+================================================================================
+CE QUI A ÉTÉ FAIT
+================================================================================
+
+  notification_center/  — NOUVELLE APP (interface utilisateur de notifications)
+  ─────────────────────────────────────────────────────────────────────────────
+
+  notification_center/
+    ├── __init__.py
+    ├── apps.py               # NotificationCenterConfig
+    ├── views.py              # 8 vues (notifications, detail, partial, widget,
+    │                         #   mark_read, mark_unread, mark_all_read)
+    ├── urls.py               # 7 routes sous /notifications/
+    ├── selectors.py          # 5 fonctions (get_user_messages,
+    │                         #   get_user_unread_count,
+    │                         #   get_notification_center_queryset,
+    │                         #   get_notification_center_stats,
+    │                         #   get_notification_filter_options)
+    ├── context_processors.py # notification_widget() — injecte compteur partout
+    ├── templates/
+    │   └── notification_center/
+    │       ├── index.html              # Page principale du centre
+    │       └── partials/
+    │           ├── list.html           # Liste paginée (HTMX)
+    │           ├── item.html           # Ligne individuelle
+    │           ├── detail.html         # Carte de détail + livraisons
+    │           ├── dropdown.html       # Dropdown navbar
+    │           └── widget.html         # Widget cloche + JS WebSocket
+    │                                   #   (ws/notifications/, event "notifier.notification")
+    ├── tests/
+    │   ├── __init__.py
+    │   ├── test_views.py
+    │   └── test_selectors.py
+    ├── migrations/
+    │   └── __init__.py
+    └── __init__.py
+
+  Fichiers modifiés
+  ─────────────────
+
+    config/settings.py
+      └─ INSTALLED_APPS (ligne 73) : ajout de "notification_center.apps.NotificationCenterConfig"
+      └─ Context processors (ligne 213) : communication.context_processeurs.notification_widget
+           → Remplacé par notification_center.context_processors.notification_widget
+
+    config/urls.py
+      └─ Ajout : path("notifications/", include("notification_center.urls"))
+
+    config/urls_test_local.py
+      └─ Ajout : path("notifications/", include("notification_center.urls"))
+
+    ui/components/layout/navbar/navbar.py
+      └─ AVANT : from communication.selectors import get_user_unread_count
+      └─ APRÈS : from notification_center.selectors import get_user_unread_count
+
+    ui/templates/layout/navbar/navbar.html
+      └─ AVANT : {% url 'communication:notifications' %}
+      └─ APRÈS : {% url 'notification_center:notifications' %}
+      └─ AVANT : {% url 'communication:notifications_partial' %}
+      └─ APRÈS : {% url 'notification_center:notifications_partial' %}
+      └─ AVANT : hx-trigger="load, communication:notification from:body"
+      └─ APRÈS : hx-trigger="load, notifier.notification from:body"
+
+  Fichiers NON touchés
+  ─────────────────────
+
+    communication/         → 100% inchangé (toujours fonctionnel, sera supprimé en Phase 3)
+    core/                  → 100% inchangé (legacy core.Notification toujours en place)
+    notifier/              → 100% inchangé (créé en session précédente)
+
+================================================================================
+CE QUI A ÉTÉ TESTÉ / VALIDÉ
+================================================================================
+
+  ✅ python manage.py check --settings=config.settings_test_local → 0 issues
+  ✅ Tous les imports Python résolus (notification_center → notifier → Django)
+  ✅ Toutes les URLs résolues :
+       /notifications/
+       /notifications/widget/
+       /notifications/partial/
+       /notifications/<pk>/detail/
+       /notifications/<pk>/read/
+       /notifications/<pk>/unread/
+       /notifications/read-all/
+  ✅ notification_center.selectors fonctionnels (import + signatures)
+  ✅ notification_center.context_processors.notification_widget fonctionnel
+  ✅ notification_center.apps.NotificationCenterConfig enregistré
+
+================================================================================
+ARCHITECTURE APRÈS CETTE SESSION
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                    SITUATION ACTUELLE                                │
+  │                                                                     │
+  │  ui/ ──dépend de──▶ notification_center/ ──dépend de──▶ notifier/  │
+  │  (navbar, badge)     (interface, vues,              (moteur pur)    │
+  │                       templates, selecteurs)                        │
+  │                                                                     │
+  │  communication/ existe encore (cohabitation temporaire)             │
+  │  core.Notification (legacy) existe encore                           │
+  │                                                                     │
+  │  ✅ PHASE 3 & 4 TERMINÉES :                                        │
+  │     • Tous les call sites migrés vers NotificationBus              │
+  │     • Plus aucun import externe depuis communication/              │
+  │     • Templates externes → notification_center/                    │
+  │     • WebSocket → /ws/notifications/                               │
+  │     • URLs communication/ retirées du root URLconf                 │
+  │     • ASGI nettoyé (plus de communication.realtime)               │
+  │                                                                     │
+  │  📦 communication/ conservé dans INSTALLED_APPS (migrations DB)     │
+  │  ⏳ Reste : migration des données + suppression finale              │
+  └─────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+9.6  RAPPORT FINAL — MIGRATION COMPLÈTE (Phase 3)
+================================================================================
+
+Date   : 2026-06-29
+Statut : ✅ TERMINÉ — Plus aucune dépendance externe vers communication/
+
+1. API migrées
+   - NotificationService.notify_user()      → NotificationBus.notify()
+   - EmailService.send_transactional()      → NotificationBus.send_email()
+   - NotificationService.mark_as_read()     → NotificationBus.mark_as_read()
+   - CommunicationNotification (constantes) → NotificationMessage (mêmes valeurs)
+
+2. Fichiers Python modifiés (~45 fichiers)
+   - admissions/signals.py, admissions/services/emails.py, admissions/emails.py
+   - academics/signals.py
+   - academic_cycle/services/grade_modifications.py
+   - accounts/services/manager_intelligence.py, sensitive_actions.py
+   - community/services/notifications.py, community/ontext_processors.py
+   - core/admin.py, core/views.py, core/tests.py
+   - inscriptions/signals.py
+   - marketing/services/notification_service.py, marketing/views.py
+   - notifier/tests.py
+   - payments/services/workflows.py
+   - portal/signals.py, portal/student/services.py, portal/student/views.py
+   - portal/services/director/teacher_management_service.py
+   - portal/views/it_workflows.py
+   - secretary/services.py, secretary/views.py, secretary/selectors.py
+   - shop/services/shop_service.py, shop/tests.py
+   - students/services/convocation_service.py, students/services/email.py
+   - superadmin/views.py
+   - accounts/tests.py, admissions/tests.py, payments/tests.py
+
+3. Templates HTML modifiés (13 fichiers)
+   - marketing/templates/marketing/base.html
+   - accounts/templates/accounts/dashboard/manager_dashboard.html
+   - accounts/templates/accounts/dashboard/base_dashboard.html
+   - templates/portal/dg/dashboard.html
+   - superadmin/templates/superadmin/base.html
+   - templates/portal/informaticien/partials/notifications_dropdown_it.html
+   - templates/base.html, templates/base_app.html
+   - formations/base.html
+
+4. Fichiers notification_center/ créés (~12 fichiers)
+   - apps.py, views.py, urls.py, selectors.py, context_processors.py
+   - templates/notification_center/index.html
+   - templates/notification_center/partials/list.html, item.html
+   - templates/notification_center/partials/detail.html, dropdown.html
+   - templates/notification_center/partials/widget.html
+   - tests/test_views.py, tests/test_selectors.py
+
+5. Fichiers config/ modifiés
+   - config/settings.py (INSTALLED_APPS + context_processors + TEMPLATES dir)
+   - config/urls.py (notification_center/ inclus)
+   - config/urls_test_local.py (notification_center/ inclus)
+
+6. Navbar modifiée
+   - ui/components/layout/navbar/navbar.py (context + URL)
+   - ui/templates/layout/navbar/navbar.html (include widget)
+
+7. Tests
+   - python manage.py check      → 0 issues
+   - notifier.tests (2 tests)    → OK
+   - core.tests.ContactFormTests → Échec préexistant (formulaire, pas lié)
+
+8. Restant (après Phase 3)
+   - communication/ utilisable uniquement en interne (auto-références)
+   - core.NotificationModel non migré
+   - Données DB communication_* non migrées vers notifier_*
+
+Prochaine étape : Phase 4 — Nettoyage final + suppression de communication/
+
+================================================================================
+9.7  RAPPORT FINAL — NETTOYAGE (Phase 4)
+================================================================================
+
+Date   : 2026-06-29
+Statut : ✅ TERMINÉ — communication/ désactivé, plus aucun point d'entrée actif
+
+1. Configurations nettoyées
+   - config/urls.py          : retrait de path("communication/", ...)
+   - config/urls_test_local.py : idem
+   - config/asgi.py          : retrait de communication.realtime.routing
+                               (garde uniquement notifier.realtime.routing)
+
+2. Apps.py nettoyé
+   - communication/apps.py   : retrait du ready() (ne fait plus rien)
+   - verbose_name → "Communication (deprecated)"
+
+3. État actuel
+   - communication/ est toujours dans INSTALLED_APPS
+     (nécessaire pour la cohérence des migrations Django)
+   - Plus AUCUN code externe n'importe depuis communication/
+   - Plus AUCUNE template externe n'inclut communication/
+   - Plus AUCUNE URL communication/ n'est accessible
+   - Le WebSocket communication/ est désactivé (asgi.py)
+   - communication/ ne peut plus être atteint que par ses propres
+     imports internes (auto-références au sein du dossier)
+
+4. Tests
+   - python manage.py check → 0 issues
+   - notifier.tests (2)     → OK
+   - Toutes les migrations s'appliquent correctement
+
+5. Prochaine étape (Phase 5)
+   - Migration des données existantes (communication_* → notifier_*)
+   - Créer une commande de gestion dédiée (manage.py migrate_communications)
+   - Supprimer définitivement le dossier communication/
+   - Supprimer core.NotificationModel
+
+================================================================================

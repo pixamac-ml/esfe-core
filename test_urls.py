@@ -52,9 +52,9 @@ urls_to_test = [
     ('accounts_portal:it_grade_sheet_pdf', [1, 1]),
     ('accounts_portal:it_grade_sheet_print', [1, 1]),
     ('accounts_portal:it_grades_import', []),
-    ('communication:notifications_partial', []),
-    ('communication:notification_detail', [1]),
-    ('communication:mark_all_notifications_read', []),
+    ('notification_center:notifications_partial', []),
+    ('notification_center:notification_detail', [1]),
+    ('notification_center:mark_all_notifications_read', []),
 ]
 
 all_ok = True

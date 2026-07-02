@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from branches.models import Branch
 from students.models import StudentCase, StudentCaseNote, TeacherCase, TeacherCaseNote
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 
 _PRIORITY_ORDER = {
     StudentCase.PRIORITY_CRITIQUE: 0,
@@ -107,3 +110,55 @@ def create_teacher_case(
         priority=priority,
         opened_by=opened_by,
     )
+
+
+def escalate_case_to_director(*, case, user):
+    """Transmit a branch-scoped disciplinary case to the Direction des études."""
+    if case.branch_id is None:
+        raise ValidationError("Le cas doit être rattaché à une annexe.")
+
+    if isinstance(case, StudentCase):
+        case.status = StudentCase.STATUS_ESCALADE
+        case.save(update_fields=["status", "updated_at"])
+        note_model = StudentCaseNote
+        subject_name = case.student.full_name
+        case_kind = "Étudiant"
+    elif isinstance(case, TeacherCase):
+        note_model = TeacherCaseNote
+        subject_name = case.teacher.get_full_name() or case.teacher.username
+        case_kind = "Enseignant"
+    else:
+        raise ValidationError("Type de cas non pris en charge.")
+
+    note_model.objects.create(
+        case=case,
+        author=user,
+        content="Cas transmis à la Direction des études.",
+    )
+
+    directors = get_user_model().objects.filter(
+        is_active=True,
+        profile__branch_id=case.branch_id,
+        profile__position="director_of_studies",
+    )
+    for director in directors:
+        NotificationBus.notify(
+            recipient=director,
+            actor=user,
+            event_type="disciplinary_case_escalated",
+            title="Cas disciplinaire transmis",
+            body=f"{case_kind} : {subject_name} — {case.title}",
+            source_app="students",
+            channels=(
+                NotificationMessage.CHANNEL_IN_APP,
+                NotificationMessage.CHANNEL_WEBSOCKET,
+            ),
+            priority=NotificationMessage.PRIORITY_HIGH,
+            metadata={
+                "branch_id": case.branch_id,
+                "case_id": case.pk,
+                "case_kind": "student" if isinstance(case, StudentCase) else "teacher",
+                "url": "/portal/dashboard/?section=home",
+            },
+        )
+    return case

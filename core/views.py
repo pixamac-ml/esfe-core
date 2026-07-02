@@ -15,7 +15,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.utils import OperationalError, ProgrammingError
 from django.urls import NoReverseMatch, reverse
-from communication.services import EmailService
+from notifier.services import NotificationBus
 
 # PDF
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
@@ -368,8 +368,8 @@ def home(request):
     ).order_by("order")[:3]
 
     branches = Branch.objects.filter(is_active=True).select_related("manager").order_by("name")[:8]
-    annexes_names = json.dumps(
-        list(Branch.objects.filter(is_active=True).order_by("name").values_list("name", flat=True)[:8])
+    annexes_names = list(
+        Branch.objects.filter(is_active=True).order_by("name").values_list("name", flat=True)[:8]
     )
 
     why_blocks = [
@@ -549,7 +549,7 @@ def contact_view(request):
             message_context = contact_message.to_email_context()
 
             try:
-                EmailService.send_transactional(
+                NotificationBus.send_email(
                     subject=f"[CONTACT] {contact_message.get_subject_display()}",
                     recipient_email=settings.DEFAULT_FROM_EMAIL,
                     source_app="core",
@@ -564,7 +564,7 @@ def contact_view(request):
                 logger.exception("Echec notification interne contact id=%s", contact_message.pk)
 
             try:
-                EmailService.send_transactional(
+                NotificationBus.send_email(
                     subject="Votre demande a bien ete recue",
                     recipient_email=contact_message.email,
                     source_app="core",

@@ -254,25 +254,7 @@ input[type="file"]::file-selector-button {
   </div>
 
   {# ═══════ DRAWER ═══════ #}
-  <template x-teleport="body">
-    <div x-show="drawerOpen" x-transition.opacity.duration.180ms class="sg-drawer-overlay" @click="drawerOpen = false"></div>
-  </template>
-  <template x-teleport="body">
-    <div x-show="drawerOpen" x-transition.duration.220ms class="sg-drawer-panel" id="sg-drawer-content">
-      <div class="flex items-center justify-between border-b border-[color:var(--line)] px-6 py-4 shrink-0">
-        <div class="flex items-center gap-3">
-          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
-            <i data-lucide="layout-dashboard" style="width:16px;height:16px;"></i>
-          </span>
-          <span class="text-sm font-bold text-[color:var(--text)]">ESFE</span>
-        </div>
-        <button type="button" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--line)] text-[color:var(--muted)] hover:bg-[color:var(--card-soft)] transition" @click="drawerOpen = false">
-          <i data-lucide="x" style="width:16px;height:16px;"></i>
-        </button>
-      </div>
-      <div class="flex-1 overflow-y-auto bg-[color:var(--card-soft)]"></div>
-    </div>
-  </template>
+  {% component "drawer" id="secretary-drawer" content_id="sg-drawer-content" kicker="Secrétariat" title="ESFE" placeholder="Sélectionnez une action pour afficher son contenu." open_event="secretary-drawer-open" close_event="secretary-drawer-close" %}{% endcomponent %}
 
   {# ═══════ MODAL ═══════ #}
   <template x-teleport="body">
@@ -317,8 +299,8 @@ function secretaryShell() {
       document.addEventListener('keydown', e => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); this.commandOpen = !this.commandOpen; if (this.commandOpen) this.$nextTick(() => document.getElementById('command-input')?.focus()); }
       });
-      window.sgOpenDrawer = () => { this.drawerOpen = true; };
-      window.sgCloseDrawer = () => { this.drawerOpen = false; };
+      window.sgOpenDrawer = () => window.dispatchEvent(new CustomEvent('secretary-drawer-open'));
+      window.sgCloseDrawer = () => window.dispatchEvent(new CustomEvent('secretary-drawer-close'));
       window.sgSwitchSection = (section) => { this.switchSection(section); };
     }
   };

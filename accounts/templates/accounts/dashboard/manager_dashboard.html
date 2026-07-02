@@ -162,7 +162,42 @@
   #modal-container { position: fixed; inset: 0; z-index: 100; }
   #modal-container.hidden { display: none !important; }
 
+  /* Refonte visuelle 2026 : cockpit gestionnaire */
+  .dashboard-sidebar { box-shadow: 18px 0 50px -36px rgba(2, 8, 23, .75); }
+  .dashboard-logo { height: 88px; background: rgba(255,255,255,.025); }
+  .dashboard-logo-mark { width: 44px; height: 44px; border-radius: 14px; box-shadow: 0 12px 30px rgba(37,99,235,.32); }
+  .dashboard-link { min-height: 46px; border: 1px solid transparent; }
+  .dashboard-link.active { border-color: rgba(255,255,255,.12); box-shadow: 0 12px 28px rgba(37,99,235,.3); }
+  .dashboard-topbar { min-height: 82px; background: rgba(255,255,255,.88); backdrop-filter: blur(18px); }
+  .dashboard-scroll-area { background:
+    radial-gradient(circle at 92% 2%, rgba(37,99,235,.10), transparent 25rem),
+    radial-gradient(circle at 12% 38%, rgba(15,157,138,.06), transparent 24rem),
+    #f6f8fc; }
+  .dashboard-content-wrap { max-width: 1680px; margin-inline: auto; padding: 24px 28px 36px; }
+  .dashboard-panel { border-color: rgba(203,213,225,.72); box-shadow: 0 16px 45px -34px rgba(15,23,42,.38); }
+  .manager-command-hero { position: relative; overflow: hidden; border: 1px solid rgba(96,165,250,.22); border-radius: 24px; padding: 28px; color: #fff; background: linear-gradient(125deg,#071b36 0%,#0b3765 54%,#0f766e 130%); box-shadow: 0 26px 70px -42px rgba(2,16,37,.85); }
+  .manager-command-hero::after { content:""; position:absolute; width:300px; height:300px; right:-90px; top:-150px; border-radius:999px; background:rgba(96,165,250,.16); box-shadow:0 0 0 48px rgba(255,255,255,.025),0 0 0 96px rgba(255,255,255,.018); }
+  .manager-command-content { position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+  .manager-command-kicker { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid rgba(255,255,255,.16); border-radius:999px; background:rgba(255,255,255,.08); color:#bfdbfe; font-size:.68rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+  .manager-command-title { margin-top:16px; max-width:760px; font-size:clamp(1.65rem,2.5vw,2.5rem); line-height:1.08; font-weight:950; letter-spacing:-.04em; }
+  .manager-command-subtitle { margin-top:10px; max-width:700px; color:#cbd5e1; font-size:.88rem; line-height:1.6; font-weight:600; }
+  .manager-command-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+  .manager-command-action { display:inline-flex; align-items:center; gap:8px; min-height:42px; padding:0 14px; border-radius:12px; border:1px solid rgba(255,255,255,.18); color:#fff; background:rgba(255,255,255,.09); font-size:.75rem; font-weight:850; transition:.18s ease; }
+  .manager-command-action:hover { transform:translateY(-2px); background:rgba(255,255,255,.16); }
+  .manager-command-action.primary { border-color:#60a5fa; background:#2563eb; box-shadow:0 12px 26px rgba(37,99,235,.3); }
+  .manager-overview-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-top:16px; }
+  .manager-overview-kpis > * { min-width:0; }
+  .manager-overview-kpis .dashboard-kpi-card { min-height:100%; cursor:default; border-radius:12px; padding:16px; box-shadow:none; }
+  .manager-overview-kpis .dashboard-kpi-card:hover { transform:none; box-shadow:none; }
+  .manager-quick-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:16px 0 20px; }
+  .manager-quick-action { display:flex; align-items:center; gap:12px; min-height:72px; padding:14px 16px; border:1px solid rgba(203,213,225,.8); border-radius:16px; background:rgba(255,255,255,.88); color:#0f172a; box-shadow:0 12px 30px -28px rgba(15,23,42,.7); transition:.18s ease; }
+  .manager-quick-action:hover { transform:translateY(-2px); border-color:#93c5fd; box-shadow:0 18px 38px -28px rgba(37,99,235,.55); }
+  .manager-quick-icon { display:grid; width:40px; height:40px; flex:0 0 40px; place-items:center; border-radius:12px; background:#eff6ff; color:#2563eb; }
+  .manager-quick-label { display:block; font-size:.78rem; font-weight:900; }
+  .manager-quick-hint { display:block; margin-top:2px; color:#64748b; font-size:.64rem; font-weight:650; }
+
   @media (max-width: 1200px) {
+    .manager-overview-kpis, .manager-quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dashboard-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dashboard-row-2, .dashboard-row-3 { grid-template-columns: 1fr; }
     .dashboard-row-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -180,6 +215,9 @@
   }
 
   @media (max-width: 768px) {
+    .manager-command-content { align-items:flex-start; flex-direction:column; }
+    .manager-command-actions { justify-content:flex-start; }
+    .manager-overview-kpis, .manager-quick-actions { grid-template-columns: 1fr; }
     body { overflow: auto; }
     .dashboard-row-2, .dashboard-row-3, .dashboard-row-4, .dashboard-action-grid, .dashboard-pill-grid, .dashboard-kpi-grid, .dashboard-form-grid { grid-template-columns: 1fr; }
     .dashboard-content-wrap { padding: 12px; }
@@ -374,26 +412,34 @@
 
         {% if active_section == "overview" %}
         <section class="dashboard-section-block">
-          <div class="dashboard-panel">
-            <div class="dashboard-section-hero">
+          <div class="manager-command-hero">
+            <div class="manager-command-content">
               <div>
-                <div class="dashboard-section-hero-title">{% component "icon" name="briefcase-business" %}{% endcomponent %}Pilotage global de l'annexe</div>
-                <div class="dashboard-section-hero-sub">Suivre le dossier et l'encaissement, arbitrer entre recettes, charges et engagements.</div>
+                <span class="manager-command-kicker">{% component "icon" name="radio" size=14 %}{% endcomponent %} Centre de pilotage · {{ branch.name }}</span>
+                <h1 class="manager-command-title">Bonjour {{ user.first_name|default:"Gestionnaire" }}, votre annexe en un coup d'œil.</h1>
+                <p class="manager-command-subtitle">Suivez les admissions, les encaissements et les engagements financiers depuis un espace opérationnel unique.</p>
               </div>
-              <div class="dashboard-section-actions">
-                <a href="?section=candidatures" class="dashboard-btn dashboard-btn-outline">{% component "icon" name="file-circle-check" %}{% endcomponent %}Candidatures</a>
-                <a href="?section=caisse" class="dashboard-btn dashboard-btn-primary">{% component "icon" name="vault" %}{% endcomponent %}Caisse</a>
+              <div class="manager-command-actions">
+                <a href="?section=rapport" class="manager-command-action">{% component "icon" name="file-chart-column" size=16 %}{% endcomponent %} Rapport</a>
+                <a href="?section=caisse" class="manager-command-action primary">{% component "icon" name="vault" size=16 %}{% endcomponent %} Ouvrir la caisse</a>
               </div>
             </div>
+          </div>
 
-            <div class="dashboard-kpi-grid" id="live-kpi-grid">
-              {% component "metric_card" label="Étudiants" value=total_students|intcomma icon="users" hint="Inscrits actifs" %}{% endcomponent %}
-              {% include "accounts/dashboard/partials/widget_today_payments.html" %}
-              <div id="alerts-kpi-card">
-                {% component "metric_card" label="Alertes" value=manager_intelligence.alerts|length|default:0 icon="triangle-alert" hint="Éléments critiques à traiter" %}{% endcomponent %}
-              </div>
-              {% include "accounts/dashboard/partials/widget_cash_balance.html" %}
+          <div class="manager-overview-kpis" id="live-kpi-grid">
+            {% component "metric_card" label="Étudiants" value=total_students|intcomma icon="users" hint="Inscrits actifs" %}{% endcomponent %}
+            {% include "accounts/dashboard/partials/widget_today_payments.html" %}
+            <div id="alerts-kpi-card">
+              {% component "metric_card" label="Alertes" value=manager_intelligence.alerts|length|default:0 icon="triangle-alert" hint="Éléments critiques à traiter" %}{% endcomponent %}
             </div>
+            {% include "accounts/dashboard/partials/widget_cash_balance.html" %}
+          </div>
+
+          <div class="manager-quick-actions" aria-label="Actions rapides">
+            <a href="?section=candidatures" class="manager-quick-action"><span class="manager-quick-icon">{% component "icon" name="user-round-check" size=18 %}{% endcomponent %}</span><span><span class="manager-quick-label">Traiter les candidatures</span><span class="manager-quick-hint">Examiner les dossiers en attente</span></span></a>
+            <a href="?section=paiements" class="manager-quick-action"><span class="manager-quick-icon">{% component "icon" name="badge-dollar-sign" size=18 %}{% endcomponent %}</span><span><span class="manager-quick-label">Valider un paiement</span><span class="manager-quick-hint">Contrôler les justificatifs reçus</span></span></a>
+            <a href="?section=depenses" class="manager-quick-action"><span class="manager-quick-icon">{% component "icon" name="receipt-text" size=18 %}{% endcomponent %}</span><span><span class="manager-quick-label">Suivre les dépenses</span><span class="manager-quick-hint">Voir les charges de la période</span></span></a>
+            <a href="?section=cloture" class="manager-quick-action"><span class="manager-quick-icon">{% component "icon" name="calendar-check-2" size=18 %}{% endcomponent %}</span><span><span class="manager-quick-label">Préparer la clôture</span><span class="manager-quick-hint">Contrôler la situation mensuelle</span></span></a>
           </div>
         </section>
 

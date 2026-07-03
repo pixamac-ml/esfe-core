@@ -1420,8 +1420,8 @@
   </main>
 </div>
 
-<div id="modal-container" class="hidden">
-  <div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+<div id="modal-container" class="hidden" aria-hidden="true">
+  <div class="fixed inset-0 z-[110] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Détail">
     <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
     <div class="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
       <div id="modal-content"></div>
@@ -1442,6 +1442,7 @@
     const modal = document.getElementById('modal-container');
     if (!modal) return;
     modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
   };
 
@@ -1455,7 +1456,10 @@
     const modal = document.getElementById('modal-container');
     const content = document.getElementById('modal-content');
     if (content) content.innerHTML = '';
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
     document.body.style.overflow = '';
   };
 
@@ -1545,6 +1549,27 @@
   document.body.addEventListener('htmx:afterSwap', function(event) {
     if (event.target && event.target.id === 'modal-content' && event.target.innerHTML.trim()) {
       window.openDashboardModal();
+      if (window.lucide) window.lucide.createIcons({ nodes: [event.target] });
+    }
+  });
+
+  document.body.addEventListener('htmx:beforeRequest', function(event) {
+    const element = event.detail && event.detail.elt;
+    if (element && element.getAttribute('hx-target') === '#modal-content') {
+      window.openDashboardModal();
+      const content = document.getElementById('modal-content');
+      if (content && !content.innerHTML.trim()) {
+        content.innerHTML = '<div class="p-8 text-center text-sm font-semibold text-slate-500">Chargement du détail…</div>';
+      }
+    }
+  });
+
+  document.body.addEventListener('htmx:responseError', function(event) {
+    const element = event.detail && event.detail.elt;
+    if (element && element.getAttribute('hx-target') === '#modal-content') {
+      const content = document.getElementById('modal-content');
+      if (content) content.innerHTML = '<div class="p-8 text-center text-sm font-semibold text-rose-600">Impossible de charger cette fenêtre.</div>';
+      window.openDashboardModal();
     }
   });
 
@@ -1556,7 +1581,8 @@
     const icons = { success: 'circle-check', error: 'circle-x', warning: 'circle-alert', info: 'circle-info' };
     const toast = document.createElement('div');
     toast.style.cssText = 'background:' + (colors[type] || colors.info) + '; color:#fff; padding:12px 20px; border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,.18); display:flex; align-items:center; gap:12px; font-size:.85rem; font-weight:700; transform:translateX(120%); opacity:0; transition:all .35s cubic-bezier(.22,1,.36,1); pointer-events:auto; max-width:420px;';
-    toast.innerHTML = '{% component "icon" name="award" class_str="' + (icons[type] || icons.info) + '" %}{% endcomponent %}<span style="flex:1;">' + message + '</span><button onclick="this.parentElement.remove()" style="background:none; border:none; color:rgba(255,255,255,.7); cursor:pointer; padding:2px;">{% component "icon" name="x" %}{% endcomponent %}</button>';
+    toast.innerHTML = '<i data-lucide="' + (icons[type] || icons.info) + '" style="width:18px;height:18px" aria-hidden="true"></i><span style="flex:1;">' + message + '</span><button onclick="this.parentElement.remove()" style="background:none; border:none; color:rgba(255,255,255,.7); cursor:pointer; padding:2px;"><i data-lucide="x" style="width:16px;height:16px" aria-hidden="true"></i></button>';
+    if (window.lucide) window.lucide.createIcons({ nodes: [toast] });
     container.appendChild(toast);
     requestAnimationFrame(function() {
       toast.style.transform = 'translateX(0)';

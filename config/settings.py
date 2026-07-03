@@ -417,6 +417,8 @@ SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "strict-origin-when
 # Le dashboard integre certains contenus (PDF, previews) via iframe.
 # SAMEORIGIN garde la protection clickjacking tout en autorisant l'integration interne.
 X_FRAME_OPTIONS = os.getenv("X_FRAME_OPTIONS", "SAMEORIGIN")
+# SAMEORIGIN est intentionnel pour les aperçus internes de documents.
+SILENCED_SYSTEM_CHECKS = ["security.W019"]
 
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"

@@ -722,7 +722,7 @@ def _manager_context(request, active_section="overview"):
         "collection_rate": collection_rate,
         "candidature_conversion_rate": candidature_conversion_rate,
     }
-    demo_flow = [
+    operational_flow = [
         {
             "label": "Candidatures a traiter",
             "value": candidatures_pending,
@@ -852,7 +852,7 @@ def _manager_context(request, active_section="overview"):
         "cash_stats": cash_stats,
         "recent_financial_logs": recent_financial_logs,
         "period_summary": period_summary,
-        "demo_flow": demo_flow,
+        "operational_flow": operational_flow,
         "cash_type": cash_type,
         "cash_source": cash_source,
         "cash_search": cash_search,

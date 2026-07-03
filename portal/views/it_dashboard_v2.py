@@ -9,7 +9,7 @@ from portal.views.views import (
 
 @login_required
 def it_portal_v2(request):
-    """Vue prototype pour le dashboard informaticien refactorisé avec composants UI"""
+    """Affiche le dashboard opérationnel du support informatique."""
     context = _build_it_dashboard_context(request)
     context.update(
         build_it_grade_selection_context(

@@ -409,9 +409,9 @@ class StudentYearDecision(models.Model):
                 errors["target_class"] = "La classe cible ne correspond pas a l'annee cible."
             if self.source_enrollment_id:
                 if self.target_class.programme_id != self.source_enrollment.programme_id:
-                    errors["target_class"] = "La classe cible doit rester dans le meme programme en phase 1."
+                    errors["target_class"] = "La classe cible doit appartenir au même programme."
                 if self.target_class.branch_id != self.source_enrollment.branch_id:
-                    errors["target_class"] = "La classe cible doit rester dans la meme annexe en phase 1."
+                    errors["target_class"] = "La classe cible doit appartenir à la même annexe."
 
         if errors:
             raise ValidationError(errors)

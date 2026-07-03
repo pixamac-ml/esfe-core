@@ -53,7 +53,6 @@ urlpatterns = [
     path("sitemap.xml", sitemap, {"sitemaps": build_sitemaps()}, name="sitemap_xml"),
     # Core (home + pages publiques)
     path("", include("core.urls")),
-    path("ui/", include("ui.urls")),
     path("academics/", include("academics.urls")),
     path("memoires/", include(("memoires.urls", "memoires"), namespace="memoires")),
     path("community/", include("community.urls")),
@@ -64,6 +63,10 @@ urlpatterns = [
 
 if settings.DEBUG and "django_browser_reload" in settings.INSTALLED_APPS:
     urlpatterns.append(path("__reload__/", include("django_browser_reload.urls")))
+
+if settings.DEBUG:
+    # La galerie de composants contient uniquement des données de démonstration.
+    urlpatterns.append(path("ui/", include("ui.urls")))
 
 
 # ==========================================================
